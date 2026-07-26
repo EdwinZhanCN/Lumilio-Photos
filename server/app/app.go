@@ -9,11 +9,14 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"server/config"
@@ -41,7 +44,6 @@ import (
 	"server/internal/utils/imaging"
 	"server/internal/version"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -79,10 +81,47 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 	}
 	dbConfig := appConfig.DatabaseConfig
 
-	return run(ctx, appConfig, dbConfig, controls)
+	for {
+		if _, err := dbbackup.ApplyPendingRestore(context.WithoutCancel(ctx), dbConfig.Path, nil); err != nil {
+			return fmt.Errorf("apply pending SQLite restore: %w", err)
+		}
+
+		generationCtx, cancelGeneration := context.WithCancel(ctx)
+		var restartRequested atomic.Bool
+		requestRestart := func() {
+			restartRequested.Store(true)
+			cancelGeneration()
+		}
+		err := run(generationCtx, appConfig, dbConfig, controls, requestRestart)
+		cancelGeneration()
+		if err != nil {
+			if dbbackup.HasAppliedRestore(dbConfig.Path) {
+				rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+				rollbackErr := dbbackup.RollbackPendingRestore(rollbackCtx, dbConfig.Path, nil)
+				rollbackCancel()
+				if rollbackErr != nil {
+					return errors.Join(err, fmt.Errorf("rollback failed SQLite restore: %w", rollbackErr))
+				}
+				if ctx.Err() == nil {
+					continue
+				}
+			}
+			return err
+		}
+		if restartRequested.Load() && ctx.Err() == nil {
+			continue
+		}
+		return nil
+	}
 }
 
-func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.DatabaseConfig, controls OperatorControls) error {
+func run(
+	ctx context.Context,
+	appConfig config.AppConfig,
+	dbConfig config.DatabaseConfig,
+	controls OperatorControls,
+	requestRestart func(),
+) error {
 	agentRefUserBudget := controls.AgentRefUserHotBudgetBytes
 	if agentRefUserBudget <= 0 {
 		agentRefUserBudget = ref.DefaultUserHotBudget
@@ -125,9 +164,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 
 	appLogger.Info("starting Lumilio Photos API",
 		zap.String("operation", "server.start"),
-		zap.String("db_host", dbConfig.Host),
-		zap.String("db_port", dbConfig.Port),
-		zap.String("db_name", dbConfig.DBName),
+		zap.String("db_path", dbConfig.Path),
 		zap.String("config_path", appConfig.ManifestPath),
 		zap.Int("config_schema_version", appConfig.SchemaVersion),
 		zap.String("config_sha256", appConfig.ManifestSHA256),
@@ -149,30 +186,26 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		return fmt.Errorf("ensure storage layout: %w", err)
 	}
 
-	// Try to self-heal database password if the volume was recreated/reset
-	if err := db.SelfHealPassword(ctx, &dbConfig); err != nil {
-		appLogger.Warn("database password self-healing failed",
-			zap.String("operation", "database.self_heal"),
-			zap.Error(err),
-		)
+	database, err := db.Open(ctx, dbConfig)
+	if err != nil {
+		return fmt.Errorf("open SQLite database: %w", err)
 	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer closeCancel()
+		if err := database.Close(closeCtx); err != nil {
+			appLogger.Warn("SQLite close maintenance failed", zap.Error(err))
+		}
+	}()
 
-	// Run database migrations
-	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
+	if err := database.Migrate(ctx); err != nil {
 		appLogger.Error("failed to run migrations automatically",
 			zap.String("operation", "database.migrate"),
 			zap.Error(err),
 		)
 		return fmt.Errorf("run database migrations: %w", err)
 	}
-
-	// Connect to the database
-	database, err := db.New(dbConfig)
-	if err != nil {
-		return fmt.Errorf("connect to database: %w", err)
-	}
-	defer database.Close()
-	pgxPool := database.Pool
+	sqlDB := database.SQL
 	queries := database.Queries
 
 	settingsService := service.NewSettingsService(queries, settings.Default(appConfig.Environment), appConfig.Auth.SecretKeyFile)
@@ -182,7 +215,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 
 	// Single source of truth for first-run bootstrap progress. Reconcile at boot
 	// so the cached phase reflects the current gates.
-	bootstrapService := service.NewBootstrapService(queries, dbConfig.RotatedPasswordFile)
+	bootstrapService := service.NewBootstrapService(queries)
 	if phase, err := bootstrapService.Reconcile(ctx); err != nil {
 		appLogger.Warn("failed to reconcile bootstrap phase", zap.Error(err))
 	} else {
@@ -233,13 +266,13 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	}
 
 	workers := river.NewWorkers()
-	queueClient, err := queue.New(pgxPool, workers, logRuntime.RiverLogger())
+	queueClient, err := queue.New(sqlDB, workers, logRuntime.RiverLogger())
 	if err != nil {
 		return fmt.Errorf("initialize queue: %w", err)
 	}
-	faceService := service.NewFaceService(queries, repoManager, pgxPool)
+	faceService := service.NewFaceService(queries, repoManager, sqlDB)
 
-	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, pgxPool, queries, workers, appLogger, lumenLogger, settingsService, faceService)
+	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, queries, workers, appLogger, lumenLogger, settingsService, faceService)
 	if err != nil {
 		return fmt.Errorf("initialize ML services: %w", err)
 	}
@@ -252,16 +285,16 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		}
 	}()
 
-	assetService, err := service.NewAssetService(queries, pgxPool, lumenService, embeddingService, appLogger.Named("asset_service"))
+	assetService, err := service.NewAssetService(queries, sqlDB, lumenService, embeddingService, appLogger.Named("asset_service"))
 	if err != nil {
 		return fmt.Errorf("initialize asset service: %w", err)
 	}
-	locationService := service.NewLocationService(queries, pgxPool, appConfig.Geocoding)
+	locationService := service.NewLocationService(queries, sqlDB, appConfig.Geocoding)
 	speciesReferenceService := service.NewSpeciesReferenceService()
-	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
-	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
-	duplicateService := service.NewDuplicateService(queries, pgxPool, appLogger.Named("duplicate"), assetService)
-	authService, err := service.NewAuthService(queries, pgxPool, appConfig.Auth, appLogger.Named("auth"), securityLogger)
+	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, sqlDB, indexingLogger, repoAuditProvider)
+	stackService := service.NewStackService(queries, sqlDB, appLogger.Named("stack"), repoAuditProvider)
+	duplicateService := service.NewDuplicateService(queries, sqlDB, appLogger.Named("duplicate"), assetService)
+	authService, err := service.NewAuthService(queries, sqlDB, appConfig.Auth, appLogger.Named("auth"), securityLogger)
 	if err != nil {
 		return fmt.Errorf("initialize auth service: %w", err)
 	}
@@ -270,7 +303,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		return fmt.Errorf("initialize auth rate limiter: %w", err)
 	}
 	albumService := service.NewAlbumService(queries)
-	userService := service.NewUserService(queries, pgxPool)
+	userService := service.NewUserService(queries, sqlDB)
 
 	// Break-glass recovery is an explicit single-run host control, separate from
 	// immutable AppConfig.
@@ -291,7 +324,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	go refStore.RunJanitor(ctx, 10*time.Minute)
 	conversations := core.NewConversationStore(core.DefaultConversationTTL)
 	go conversations.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, pgxPool, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
+	agentService := core.NewAgentService(queries, sqlDB, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
 	agentPins := pins.NewService(queries, refStore, authorizedLibraries)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
@@ -305,7 +338,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
 	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
-	sourceMaterializer := sourcing.NewSourceMaterializer(queries, stagingManager, queueClient, assetService, processorLogger, repoAuditProvider)
+	sourceMaterializer := sourcing.NewSourceMaterializer(database, stagingManager, queueClient, processorLogger, repoAuditProvider)
 
 	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, appConfig.Transcode, appConfig.Tools, processorLogger, repoAuditProvider)
 	repositoryScanner := scanner.NewScanner(queries, queueClient, appConfig.RepositoryScan, scannerLogger)
@@ -334,69 +367,40 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// (enabled/interval/retention) is read from runtime settings on every tick,
 	// so the periodic job below can stay a fixed hourly heartbeat.
 	backupLogger := appLogger.Named("db_backup").Sugar()
+	catalogInfo, err := db.InspectCatalog(ctx, database.Path)
+	if err != nil {
+		return fmt.Errorf("inspect SQLite catalog for backup runtime: %w", err)
+	}
+	snapshotMetadata := dbbackup.SnapshotMetadata{
+		AppVersion:          version.Version,
+		ConfigSchemaVersion: appConfig.SchemaVersion,
+	}
+	snapshotCompatibility := dbbackup.Compatibility{
+		LibraryID:               catalogInfo.LibraryID,
+		ConfigSchemaVersion:     appConfig.SchemaVersion,
+		MaxApplicationMigration: catalogInfo.ApplicationMigration,
+		MaxRiverMigration:       catalogInfo.RiverMigration,
+	}
 	backupScheduler := &dbbackup.Scheduler{
-		Conn: dbbackup.Conn{
-			Host:         dbConfig.Host,
-			Port:         dbConfig.Port,
-			User:         dbConfig.User,
-			Password:     dbConfig.Password,
-			PasswordFile: dbConfig.RotatedPasswordFile,
-			DBName:       dbConfig.DBName,
-		},
-		Pool:        pgxPool,
-		ToolsBinDir: dbConfig.ToolsBinDir,
-		Dir:         appConfig.StorageConfig.BackupsDir(),
-		AppVersion:  version.Version,
-		Ready:       bootstrapService.IsReady,
-		Settings:    settingsService.GetBackupConfig,
-		Logf:        func(format string, args ...any) { backupLogger.Infof(format, args...) },
+		Source:   sqlDB,
+		Dir:      appConfig.StorageConfig.BackupsDir(),
+		Metadata: snapshotMetadata,
+		Ready:    bootstrapService.IsReady,
+		Settings: settingsService.GetBackupConfig,
+		Logf:     func(format string, args ...any) { backupLogger.Infof(format, args...) },
 	}
 	river.AddWorker[queue.DatabaseBackupArgs](workers, &queue.DatabaseBackupWorker{Run: backupScheduler.Run})
 
-	// Admin backup surface (list/trigger/download/delete/restore). Restore
-	// pauses all queues ("*"), applies the dump with a restore point +
-	// automatic rollback, re-runs migrations, and health-checks before
-	// resuming the queues.
+	// Admin backup surface (list/trigger/download/delete/restore). Restore only
+	// stages a validated snapshot here; the generation loop drains and closes
+	// this runtime before replacing the active database.
 	backupService := service.NewBackupService(service.BackupRuntime{
-		Conn:        backupScheduler.Conn,
-		Pool:        pgxPool,
-		ToolsBinDir: dbConfig.ToolsBinDir,
-		Dir:         appConfig.StorageConfig.BackupsDir(),
-		AppVersion:  version.Version,
-		Logf:        backupScheduler.Logf,
-		Hooks: dbbackup.RestoreHooks{
-			Quiesce: func(ctx context.Context) error {
-				return queueClient.QueuePause(ctx, "*", nil)
-			},
-			Resume: func(ctx context.Context) error {
-				return queueClient.QueueResume(ctx, "*", nil)
-			},
-			Reconnect: func(ctx context.Context) error {
-				pgxPool.Reset()
-				if err := pgxPool.Ping(ctx); err != nil {
-					return fmt.Errorf("database pool reconnect failed: %w", err)
-				}
-				return nil
-			},
-			Migrate: func(ctx context.Context) error {
-				migrationConfig := dbConfig
-				migrationConfig.Password = backupScheduler.Conn.ResolvedPassword()
-				return db.AutoMigrate(ctx, migrationConfig)
-			},
-			Verify: func(ctx context.Context) error {
-				if _, err := settingsService.GetSystemSettings(ctx); err != nil {
-					return fmt.Errorf("settings unreadable after restore: %w", err)
-				}
-				var users int
-				if err := pgxPool.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
-					return fmt.Errorf("users table unreadable after restore: %w", err)
-				}
-				if users == 0 {
-					return fmt.Errorf("no users present after restore")
-				}
-				return nil
-			},
-		},
+		ActivePath:     database.Path,
+		Dir:            appConfig.StorageConfig.BackupsDir(),
+		Metadata:       snapshotMetadata,
+		Compatibility:  snapshotCompatibility,
+		RequestRestart: requestRestart,
+		Logf:           backupScheduler.Logf,
 	}, queueClient)
 
 	// River's Start runs the client in a background goroutine until Stop is
@@ -406,6 +410,17 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	if err := queueClient.Start(context.Background()); err != nil {
 		return fmt.Errorf("start queue client: %w", err)
 	}
+	queueStopped := false
+	defer func() {
+		if queueStopped {
+			return
+		}
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer stopCancel()
+		if err := queueClient.Stop(stopCtx); err != nil {
+			appLogger.Warn("queue client cleanup failed", zap.Error(err))
+		}
+	}()
 	appLogger.Info("queues initialized successfully", zap.String("operation", "queue.init"))
 
 	// --- Periodic Jobs (River PeriodicJobs) ---
@@ -437,13 +452,13 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL)
-	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, pgxPool, bootstrapService, repoManager, appConfig.StorageConfig.Path))
+	setupController := handler.NewSetupHandler(service.NewSetupServiceWithPool(dbConfig, sqlDB, bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	locationController := handler.NewLocationHandler(locationService, queueClient)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService, securityLogger)
-	queueController := handler.NewQueueHandler(pgxPool)
+	queueController := handler.NewQueueHandler(sqlDB)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, authorizedLibraries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
@@ -510,6 +525,31 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 		Addr:    ":" + appConfig.ServerConfig.Port,
 		Handler: router,
 	}
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", srv.Addr, err)
+	}
+
+	if dbbackup.HasAppliedRestore(database.Path) {
+		if _, err := settingsService.GetSystemSettings(ctx); err != nil {
+			_ = listener.Close()
+			return fmt.Errorf("settings unreadable after SQLite restore: %w", err)
+		}
+		var users int
+		if err := sqlDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
+			_ = listener.Close()
+			return fmt.Errorf("users table unreadable after SQLite restore: %w", err)
+		}
+		if users == 0 {
+			_ = listener.Close()
+			return errors.New("no users present after SQLite restore")
+		}
+		if err := dbbackup.CompletePendingRestore(ctx, database.Path); err != nil {
+			_ = listener.Close()
+			return fmt.Errorf("complete SQLite restore: %w", err)
+		}
+		appLogger.Info("restored SQLite runtime generation is healthy", zap.String("operation", "database.restore"))
+	}
 
 	appLogger.Info("server starting",
 		zap.String("operation", "server.listen"),
@@ -522,7 +562,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	// graceful shutdown when it is cancelled.
 	serverErr := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
 	}()
@@ -555,6 +595,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 	if err := queueClient.Stop(shutdownCtx); err != nil {
 		appLogger.Warn("queue client shutdown error", zap.String("operation", "queue.shutdown"), zap.Error(err))
 	}
+	queueStopped = true
 	appLogger.Info("shutdown complete", zap.String("operation", "server.shutdown"))
 	return nil
 }
@@ -562,7 +603,7 @@ func run(ctx context.Context, appConfig config.AppConfig, dbConfig config.Databa
 func initMLServices(
 	ctx context.Context,
 	appConfig config.AppConfig,
-	pgxPool *pgxpool.Pool,
+	sqlDB *sql.DB,
 	queries *repo.Queries,
 	workers *river.Workers,
 	appLogger *zap.Logger,
@@ -586,9 +627,9 @@ func initMLServices(
 		zap.Bool("enabled", appConfig.Lumen.Enabled()),
 	)
 
-	embeddingService := service.NewEmbeddingService(queries, pgxPool)
+	embeddingService := service.NewEmbeddingService(queries, sqlDB)
 	speciesService := service.NewSpeciesService(queries)
-	ocrService := service.NewOCRService(queries, pgxPool)
+	ocrService := service.NewOCRService(queries, sqlDB)
 	imageLoader := queue.NewDBMLImageLoader(queries)
 
 	river.AddWorker[queue.ProcessSemanticArgs](workers, &queue.ProcessSemanticWorker{
@@ -624,7 +665,7 @@ func initMLServices(
 	appLogger.Info("face service and worker registered", zap.String("operation", "ml.init"))
 
 	aiTagService := service.NewAIGeneratedTagService(queries)
-	classifierService := service.NewClassifierService(pgxPool, lumenService, embeddingService, appLogger.Named("classifier"))
+	classifierService := service.NewClassifierService(sqlDB, lumenService, embeddingService, appLogger.Named("classifier"))
 	river.AddWorker[queue.ZeroshotClassifyArgs](workers, &queue.ZeroshotClassifyWorker{
 		EmbeddingService:  embeddingService,
 		ClassifierService: classifierService,

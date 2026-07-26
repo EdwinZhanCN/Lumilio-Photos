@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -10,31 +11,65 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
-func optionalUUIDToString(value pgtype.UUID) *string {
-	if !value.Valid {
+func optionalUUIDToString(value any) *string {
+	var id uuid.UUID
+	switch typed := value.(type) {
+	case uuid.NullUUID:
+		if !typed.Valid {
+			return nil
+		}
+		id = typed.UUID
+	case uuid.UUID:
+		id = typed
+	case string:
+		parsed, err := uuid.Parse(typed)
+		if err != nil {
+			return nil
+		}
+		id = parsed
+	case []byte:
+		parsed, err := uuid.ParseBytes(typed)
+		if err != nil {
+			return nil
+		}
+		id = parsed
+	default:
 		return nil
 	}
-
-	id := uuid.UUID(value.Bytes).String()
-	return &id
+	if id == uuid.Nil {
+		return nil
+	}
+	text := id.String()
+	return &text
 }
 
-func optionalPGTime(value pgtype.Timestamptz) *time.Time {
+func optionalDBTime(value dbtypes.Timestamp) *time.Time {
 	if !value.Valid {
 		return nil
 	}
 
 	return &value.Time
+}
+
+func int64Position(value int64) *int32 {
+	position := int32(value)
+	return &position
+}
+
+func optionalPosition(value *int32) int64 {
+	if value == nil {
+		return 0
+	}
+	return int64(*value)
 }
 
 func toAlbumResponseDTO(album dto.AlbumDTO, assetCount int64, displayCoverAssetID *string) dto.GetAlbumResponseDTO {
@@ -76,8 +111,8 @@ func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
 			GpsGeohash7:          row.GpsGeohash7,
 			ExifRaw:              row.ExifRaw,
 		}),
-		Position:  row.Position,
-		AddedTime: optionalPGTime(row.AddedTime),
+		Position:  int64Position(row.Position),
+		AddedTime: optionalDBTime(row.AddedTime),
 	}
 }
 
@@ -95,8 +130,8 @@ func toAssetAlbumDTO(row repo.GetAssetAlbumsRow) dto.AssetAlbumDTO {
 				AlbumType:    row.AlbumType,
 			}),
 		},
-		Position:  row.Position,
-		AddedTime: optionalPGTime(row.AddedTime),
+		Position:  int64Position(row.Position),
+		AddedTime: optionalDBTime(row.AddedTime),
 	}
 }
 
@@ -137,7 +172,7 @@ func toScopedAlbumListItemDTO(row repo.GetAlbumsByUserScopedRow) dto.GetAlbumRes
 type AlbumHandler struct {
 	albumService    *service.AlbumService
 	queries         *repo.Queries
-	queueClient     *river.Client[pgx.Tx]
+	queueClient     *river.Client[*sql.Tx]
 	settingsService service.SettingsService
 	runtimeChecker  service.LumenService
 }
@@ -146,7 +181,7 @@ type AlbumHandler struct {
 func NewAlbumHandler(
 	albumService *service.AlbumService,
 	queries *repo.Queries,
-	queueClient *river.Client[pgx.Tx],
+	queueClient *river.Client[*sql.Tx],
 	settingsService service.SettingsService,
 	runtimeChecker service.LumenService,
 ) *AlbumHandler {
@@ -194,7 +229,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 		AlbumType:   repo.AlbumTypeDefault,
 	}
 	if req.AlbumType != nil {
-		params.AlbumType = repo.AlbumType(*req.AlbumType)
+		params.AlbumType = *req.AlbumType
 	}
 
 	// Handle optional cover asset ID
@@ -204,7 +239,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 			api.GinBadRequest(c, err, "Invalid cover asset ID")
 			return
 		}
-		params.CoverAssetID = pgtype.UUID{Bytes: coverAssetUUID, Valid: true}
+		params.CoverAssetID = uuid.NullUUID{UUID: coverAssetUUID, Valid: true}
 	}
 
 	album, err := (*h.albumService).CreateNewAlbum(c.Request.Context(), params)
@@ -326,8 +361,8 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	albums, err := h.queries.GetAlbumsByUserScoped(c.Request.Context(), repo.GetAlbumsByUserScopedParams{
 		UserID:       int32(userID.(int)),
 		RepositoryID: repositoryID,
-		Limit:        int32(limit),
-		Offset:       int32(offset),
+		Limit:        limit,
+		Offset:       offset,
 	})
 	if err != nil {
 		log.Printf("Failed to retrieve albums for user %d: %v", userID.(int), err)
@@ -402,7 +437,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		updateParams.Description = req.Description
 	}
 	if req.AlbumType != nil {
-		updateParams.AlbumType = repo.AlbumType(*req.AlbumType)
+		updateParams.AlbumType = *req.AlbumType
 	}
 	if req.CoverAssetID != nil {
 		coverAssetUUID, err := uuid.Parse(*req.CoverAssetID)
@@ -410,7 +445,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 			api.GinBadRequest(c, err, "Invalid cover asset ID")
 			return
 		}
-		updateParams.CoverAssetID = pgtype.UUID{Bytes: coverAssetUUID, Valid: true}
+		updateParams.CoverAssetID = uuid.NullUUID{UUID: coverAssetUUID, Valid: true}
 	}
 
 	updatedAlbum, err := h.queries.UpdateAlbum(c.Request.Context(), updateParams)
@@ -567,8 +602,7 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 		return
 	}
 
-	assetPGUUID := pgtype.UUID{Bytes: assetID, Valid: true}
-	asset, err := h.queries.GetAssetByID(c.Request.Context(), assetPGUUID)
+	asset, err := h.queries.GetAssetByID(c.Request.Context(), assetID)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")
 		return
@@ -582,9 +616,9 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 	}
 
 	params := repo.AddAssetToAlbumParams{
-		AssetID:  assetPGUUID,
+		AssetID:  assetID,
 		AlbumID:  int32(albumID),
-		Position: req.Position,
+		Position: optionalPosition(req.Position),
 	}
 
 	err = h.queries.AddAssetToAlbum(c.Request.Context(), params)
@@ -711,7 +745,7 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 	}
 
 	params := repo.RemoveAssetFromAlbumParams{
-		AssetID: pgtype.UUID{Bytes: assetID, Valid: true},
+		AssetID: assetID,
 		AlbumID: int32(albumID),
 	}
 
@@ -766,8 +800,8 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 
 	params := repo.UpdateAssetPositionInAlbumParams{
 		AlbumID:  int32(albumID),
-		AssetID:  pgtype.UUID{Bytes: assetID, Valid: true},
-		Position: req.Position,
+		AssetID:  assetID,
+		Position: int64(*req.Position),
 	}
 
 	if _, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to modify this album", "You don't have permission to modify this album"); !ok {
@@ -804,7 +838,7 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		return
 	}
 
-	asset, err := h.queries.GetAssetByID(c.Request.Context(), pgtype.UUID{Bytes: assetID, Valid: true})
+	asset, err := h.queries.GetAssetByID(c.Request.Context(), assetID)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")
 		return
@@ -813,7 +847,7 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		return
 	}
 
-	albums, err := h.queries.GetAssetAlbums(c.Request.Context(), pgtype.UUID{Bytes: assetID, Valid: true})
+	albums, err := h.queries.GetAssetAlbums(c.Request.Context(), assetID)
 	if err != nil {
 		log.Printf("Failed to retrieve albums for asset %s: %v", assetID, err)
 		api.GinInternalError(c, err, "Failed to retrieve asset albums")

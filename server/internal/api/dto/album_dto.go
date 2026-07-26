@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"server/internal/db/repo"
-
-	"github.com/google/uuid"
 )
 
 // CreateAlbumRequestDTO represents the request structure for creating an album
@@ -48,7 +46,7 @@ func ToAlbumDTO(a repo.Album) AlbumDTO {
 	}
 	var coverID *string
 	if a.CoverAssetID.Valid {
-		s := uuid.UUID(a.CoverAssetID.Bytes).String()
+		s := a.CoverAssetID.UUID.String()
 		coverID = &s
 	}
 

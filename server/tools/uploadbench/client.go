@@ -221,7 +221,7 @@ type apiAsset struct {
 	Hash             *string `json:"hash"`
 	FileSize         int64   `json:"file_size"`
 	Type             string  `json:"type"`
-	// Status is JSONB; gin encodes []byte as base64, and Go's json decoder
+	// Status is stored as JSON; gin encodes []byte as base64, and Go's decoder
 	// transparently base64-decodes it back into the raw JSON bytes here.
 	Status []byte `json:"status"`
 }

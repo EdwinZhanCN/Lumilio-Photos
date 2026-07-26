@@ -8,32 +8,33 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const adminUpdateUser = `-- name: AdminUpdateUser :one
 UPDATE users
-SET username = $2,
-    display_name = $3,
-    avatar_asset_id = $4,
-    role = $5,
-    is_active = $6,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+SET username = ?2,
+    display_name = ?3,
+    avatar_asset_id = ?4,
+    role = ?5,
+    is_active = ?6,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
 type AdminUpdateUserParams struct {
-	UserID        int32       `db:"user_id" json:"user_id"`
-	Username      string      `db:"username" json:"username"`
-	DisplayName   string      `db:"display_name" json:"display_name"`
-	AvatarAssetID pgtype.UUID `db:"avatar_asset_id" json:"avatar_asset_id"`
-	Role          string      `db:"role" json:"role"`
-	IsActive      *bool       `db:"is_active" json:"is_active"`
+	UserID        int32         `db:"user_id" json:"user_id"`
+	Username      string        `db:"username" json:"username"`
+	DisplayName   string        `db:"display_name" json:"display_name"`
+	AvatarAssetID uuid.NullUUID `db:"avatar_asset_id" json:"avatar_asset_id"`
+	Role          string        `db:"role" json:"role"`
+	IsActive      bool          `db:"is_active" json:"is_active"`
 }
 
 func (q *Queries) AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, adminUpdateUser,
+	row := q.db.QueryRowContext(ctx, adminUpdateUser,
 		arg.UserID,
 		arg.Username,
 		arg.DisplayName,
@@ -62,12 +63,12 @@ func (q *Queries) AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams
 
 const completeRequiredPasswordChange = `-- name: CompleteRequiredPasswordChange :one
 UPDATE users
-SET password = $3,
+SET password = ?3,
     password_change_required = false,
     auth_version = auth_version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
-  AND auth_version = $2
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
+  AND auth_version = ?2
   AND password_change_required = true
 RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
@@ -79,7 +80,7 @@ type CompleteRequiredPasswordChangeParams struct {
 }
 
 func (q *Queries) CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error) {
-	row := q.db.QueryRow(ctx, completeRequiredPasswordChange, arg.UserID, arg.AuthVersion, arg.Password)
+	row := q.db.QueryRowContext(ctx, completeRequiredPasswordChange, arg.UserID, arg.AuthVersion, arg.Password)
 	var i User
 	err := row.Scan(
 		&i.UserID,
@@ -102,12 +103,12 @@ func (q *Queries) CompleteRequiredPasswordChange(ctx context.Context, arg Comple
 const countActiveUsersByRole = `-- name: CountActiveUsersByRole :one
 SELECT COUNT(*)
 FROM users
-WHERE role = $1
+WHERE role = ?1
   AND is_active = true
 `
 
 func (q *Queries) CountActiveUsersByRole(ctx context.Context, role string) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveUsersByRole, role)
+	row := q.db.QueryRowContext(ctx, countActiveUsersByRole, role)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -118,26 +119,26 @@ SELECT COUNT(*) FROM users
 `
 
 func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countUsers)
+	row := q.db.QueryRowContext(ctx, countUsers)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createRefreshToken = `-- name: CreateRefreshToken :one
-INSERT INTO refresh_tokens (user_id, token, expires_at)
-VALUES ($1, $2, $3)
+INSERT INTO refresh_tokens (user_id, token, expires_at, created_at)
+VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 RETURNING token_id, user_id, token, expires_at, created_at, is_revoked
 `
 
 type CreateRefreshTokenParams struct {
-	UserID    int32              `db:"user_id" json:"user_id"`
-	Token     string             `db:"token" json:"token"`
-	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UserID    int32             `db:"user_id" json:"user_id"`
+	Token     string            `db:"token" json:"token"`
+	ExpiresAt dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error) {
-	row := q.db.QueryRow(ctx, createRefreshToken, arg.UserID, arg.Token, arg.ExpiresAt)
+	row := q.db.QueryRowContext(ctx, createRefreshToken, arg.UserID, arg.Token, arg.ExpiresAt)
 	var i RefreshToken
 	err := row.Scan(
 		&i.TokenID,
@@ -151,8 +152,24 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, password, display_name, role, webauthn_user_handle)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO users (
+    username,
+    password,
+    display_name,
+    role,
+    webauthn_user_handle,
+    created_at,
+    updated_at
+)
+VALUES (
+    ?1,
+    ?2,
+    ?3,
+    ?4,
+    ?5,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
@@ -165,7 +182,7 @@ type CreateUserParams struct {
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser,
+	row := q.db.QueryRowContext(ctx, createUser,
 		arg.Username,
 		arg.Password,
 		arg.DisplayName,
@@ -192,11 +209,11 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const deleteUser = `-- name: DeleteUser :exec
-DELETE FROM users WHERE user_id = $1
+DELETE FROM users WHERE user_id = ?1
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, userID int32) error {
-	_, err := q.db.Exec(ctx, deleteUser, userID)
+	_, err := q.db.ExecContext(ctx, deleteUser, userID)
 	return err
 }
 
@@ -210,7 +227,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetOldestActiveAdmin(ctx context.Context) (User, error) {
-	row := q.db.QueryRow(ctx, getOldestActiveAdmin)
+	row := q.db.QueryRowContext(ctx, getOldestActiveAdmin)
 	var i User
 	err := row.Scan(
 		&i.UserID,
@@ -232,11 +249,11 @@ func (q *Queries) GetOldestActiveAdmin(ctx context.Context) (User, error) {
 
 const getRefreshTokenByToken = `-- name: GetRefreshTokenByToken :one
 SELECT token_id, user_id, token, expires_at, created_at, is_revoked FROM refresh_tokens
-WHERE token = $1 AND is_revoked = false
+WHERE token = ?1 AND is_revoked = false
 `
 
 func (q *Queries) GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error) {
-	row := q.db.QueryRow(ctx, getRefreshTokenByToken, token)
+	row := q.db.QueryRowContext(ctx, getRefreshTokenByToken, token)
 	var i RefreshToken
 	err := row.Scan(
 		&i.TokenID,
@@ -251,11 +268,11 @@ func (q *Queries) GetRefreshTokenByToken(ctx context.Context, token string) (Ref
 
 const getRefreshTokenRecordByToken = `-- name: GetRefreshTokenRecordByToken :one
 SELECT token_id, user_id, token, expires_at, created_at, is_revoked FROM refresh_tokens
-WHERE token = $1
+WHERE token = ?1
 `
 
 func (q *Queries) GetRefreshTokenRecordByToken(ctx context.Context, token string) (RefreshToken, error) {
-	row := q.db.QueryRow(ctx, getRefreshTokenRecordByToken, token)
+	row := q.db.QueryRowContext(ctx, getRefreshTokenRecordByToken, token)
 	var i RefreshToken
 	err := row.Scan(
 		&i.TokenID,
@@ -269,11 +286,11 @@ func (q *Queries) GetRefreshTokenRecordByToken(ctx context.Context, token string
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users WHERE user_id = $1
+SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users WHERE user_id = ?1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, userID int32) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByID, userID)
+	row := q.db.QueryRowContext(ctx, getUserByID, userID)
 	var i User
 	err := row.Scan(
 		&i.UserID,
@@ -294,11 +311,11 @@ func (q *Queries) GetUserByID(ctx context.Context, userID int32) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users WHERE username = $1
+SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users WHERE username = ?1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByUsername, username)
+	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
 	var i User
 	err := row.Scan(
 		&i.UserID,
@@ -321,16 +338,16 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 const listUsers = `-- name: ListUsers :many
 SELECT user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required FROM users
 ORDER BY created_at DESC
-LIMIT $1 OFFSET $2
+LIMIT ?1 OFFSET ?2
 `
 
 type ListUsersParams struct {
-	Limit  int32 `db:"limit" json:"limit"`
-	Offset int32 `db:"offset" json:"offset"`
+	Limit  int64 `db:"limit" json:"limit"`
+	Offset int64 `db:"offset" json:"offset"`
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, listUsers, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listUsers, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -357,6 +374,9 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -366,8 +386,8 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 const listUsersWithStats = `-- name: ListUsersWithStats :many
 SELECT
   u.user_id, u.username, u.password, u.created_at, u.updated_at, u.is_active, u.last_login, u.display_name, u.avatar_asset_id, u.role, u.webauthn_user_handle, u.auth_version, u.password_change_required,
-  COALESCE(asset_counts.asset_count, 0)::bigint AS asset_count,
-  COALESCE(album_counts.album_count, 0)::bigint AS album_count
+  COALESCE(asset_counts.asset_count, 0) AS asset_count,
+  COALESCE(album_counts.album_count, 0) AS album_count
 FROM users u
 LEFT JOIN (
   SELECT owner_id AS user_id, COUNT(*) AS asset_count
@@ -382,34 +402,34 @@ LEFT JOIN (
   GROUP BY user_id
 ) album_counts ON album_counts.user_id = u.user_id
 ORDER BY u.created_at DESC, u.user_id DESC
-LIMIT $1 OFFSET $2
+LIMIT ?1 OFFSET ?2
 `
 
 type ListUsersWithStatsParams struct {
-	Limit  int32 `db:"limit" json:"limit"`
-	Offset int32 `db:"offset" json:"offset"`
+	Limit  int64 `db:"limit" json:"limit"`
+	Offset int64 `db:"offset" json:"offset"`
 }
 
 type ListUsersWithStatsRow struct {
-	UserID                 int32              `db:"user_id" json:"user_id"`
-	Username               string             `db:"username" json:"username"`
-	Password               string             `db:"password" json:"password"`
-	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	IsActive               *bool              `db:"is_active" json:"is_active"`
-	LastLogin              pgtype.Timestamptz `db:"last_login" json:"last_login"`
-	DisplayName            string             `db:"display_name" json:"display_name"`
-	AvatarAssetID          pgtype.UUID        `db:"avatar_asset_id" json:"avatar_asset_id"`
-	Role                   string             `db:"role" json:"role"`
-	WebauthnUserHandle     []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
-	AuthVersion            int64              `db:"auth_version" json:"auth_version"`
-	PasswordChangeRequired bool               `db:"password_change_required" json:"password_change_required"`
-	AssetCount             int64              `db:"asset_count" json:"asset_count"`
-	AlbumCount             int64              `db:"album_count" json:"album_count"`
+	UserID                 int32             `db:"user_id" json:"user_id"`
+	Username               string            `db:"username" json:"username"`
+	Password               string            `db:"password" json:"password"`
+	CreatedAt              dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt              dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	IsActive               bool              `db:"is_active" json:"is_active"`
+	LastLogin              dbtypes.Timestamp `db:"last_login" json:"last_login"`
+	DisplayName            string            `db:"display_name" json:"display_name"`
+	AvatarAssetID          uuid.NullUUID     `db:"avatar_asset_id" json:"avatar_asset_id"`
+	Role                   string            `db:"role" json:"role"`
+	WebauthnUserHandle     []byte            `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	AuthVersion            int64             `db:"auth_version" json:"auth_version"`
+	PasswordChangeRequired bool              `db:"password_change_required" json:"password_change_required"`
+	AssetCount             int64             `db:"asset_count" json:"asset_count"`
+	AlbumCount             int64             `db:"album_count" json:"album_count"`
 }
 
 func (q *Queries) ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error) {
-	rows, err := q.db.Query(ctx, listUsersWithStats, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listUsersWithStats, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -438,6 +458,9 @@ func (q *Queries) ListUsersWithStats(ctx context.Context, arg ListUsersWithStats
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -446,11 +469,11 @@ func (q *Queries) ListUsersWithStats(ctx context.Context, arg ListUsersWithStats
 
 const resetUserAccessPassword = `-- name: ResetUserAccessPassword :one
 UPDATE users
-SET password = $2,
+SET password = ?2,
     password_change_required = true,
     auth_version = auth_version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
@@ -460,7 +483,7 @@ type ResetUserAccessPasswordParams struct {
 }
 
 func (q *Queries) ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error) {
-	row := q.db.QueryRow(ctx, resetUserAccessPassword, arg.UserID, arg.Password)
+	row := q.db.QueryRowContext(ctx, resetUserAccessPassword, arg.UserID, arg.Password)
 	var i User
 	err := row.Scan(
 		&i.UserID,
@@ -481,41 +504,43 @@ func (q *Queries) ResetUserAccessPassword(ctx context.Context, arg ResetUserAcce
 }
 
 const revokeRefreshToken = `-- name: RevokeRefreshToken :exec
-UPDATE refresh_tokens SET is_revoked = true WHERE token_id = $1
+UPDATE refresh_tokens SET is_revoked = true WHERE token_id = ?1
 `
 
-func (q *Queries) RevokeRefreshToken(ctx context.Context, tokenID int32) error {
-	_, err := q.db.Exec(ctx, revokeRefreshToken, tokenID)
+func (q *Queries) RevokeRefreshToken(ctx context.Context, tokenID int64) error {
+	_, err := q.db.ExecContext(ctx, revokeRefreshToken, tokenID)
 	return err
 }
 
 const revokeUserRefreshTokens = `-- name: RevokeUserRefreshTokens :exec
 UPDATE refresh_tokens
 SET is_revoked = true
-WHERE user_id = $1
+WHERE user_id = ?1
   AND is_revoked = false
 `
 
 func (q *Queries) RevokeUserRefreshTokens(ctx context.Context, userID int32) error {
-	_, err := q.db.Exec(ctx, revokeUserRefreshTokens, userID)
+	_, err := q.db.ExecContext(ctx, revokeUserRefreshTokens, userID)
 	return err
 }
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET username = $2, updated_at = CURRENT_TIMESTAMP, last_login = $3
-WHERE user_id = $1
+SET username = ?2,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    last_login = ?3
+WHERE user_id = ?1
 RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
 type UpdateUserParams struct {
-	UserID    int32              `db:"user_id" json:"user_id"`
-	Username  string             `db:"username" json:"username"`
-	LastLogin pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	UserID    int32             `db:"user_id" json:"user_id"`
+	Username  string            `db:"username" json:"username"`
+	LastLogin dbtypes.Timestamp `db:"last_login" json:"last_login"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUser, arg.UserID, arg.Username, arg.LastLogin)
+	row := q.db.QueryRowContext(ctx, updateUser, arg.UserID, arg.Username, arg.LastLogin)
 	var i User
 	err := row.Scan(
 		&i.UserID,
@@ -537,27 +562,28 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 
 const updateUserLastLogin = `-- name: UpdateUserLastLogin :exec
 UPDATE users
-SET last_login = $2, updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+SET last_login = ?2,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 `
 
 type UpdateUserLastLoginParams struct {
-	UserID    int32              `db:"user_id" json:"user_id"`
-	LastLogin pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	UserID    int32             `db:"user_id" json:"user_id"`
+	LastLogin dbtypes.Timestamp `db:"last_login" json:"last_login"`
 }
 
 func (q *Queries) UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error {
-	_, err := q.db.Exec(ctx, updateUserLastLogin, arg.UserID, arg.LastLogin)
+	_, err := q.db.ExecContext(ctx, updateUserLastLogin, arg.UserID, arg.LastLogin)
 	return err
 }
 
 const updateUserPassword = `-- name: UpdateUserPassword :exec
 UPDATE users
-SET password = $2,
+SET password = ?2,
     password_change_required = false,
     auth_version = auth_version + 1,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 `
 
 type UpdateUserPasswordParams struct {
@@ -566,27 +592,27 @@ type UpdateUserPasswordParams struct {
 }
 
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
-	_, err := q.db.Exec(ctx, updateUserPassword, arg.UserID, arg.Password)
+	_, err := q.db.ExecContext(ctx, updateUserPassword, arg.UserID, arg.Password)
 	return err
 }
 
 const updateUserProfile = `-- name: UpdateUserProfile :one
 UPDATE users
-SET display_name = $2,
-    avatar_asset_id = $3,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+SET display_name = ?2,
+    avatar_asset_id = ?3,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
 `
 
 type UpdateUserProfileParams struct {
-	UserID        int32       `db:"user_id" json:"user_id"`
-	DisplayName   string      `db:"display_name" json:"display_name"`
-	AvatarAssetID pgtype.UUID `db:"avatar_asset_id" json:"avatar_asset_id"`
+	UserID        int32         `db:"user_id" json:"user_id"`
+	DisplayName   string        `db:"display_name" json:"display_name"`
+	AvatarAssetID uuid.NullUUID `db:"avatar_asset_id" json:"avatar_asset_id"`
 }
 
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserProfile, arg.UserID, arg.DisplayName, arg.AvatarAssetID)
+	row := q.db.QueryRowContext(ctx, updateUserProfile, arg.UserID, arg.DisplayName, arg.AvatarAssetID)
 	var i User
 	err := row.Scan(
 		&i.UserID,

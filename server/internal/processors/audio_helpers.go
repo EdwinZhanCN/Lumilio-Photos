@@ -68,7 +68,7 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 		return fmt.Errorf("unexpected metadata type for audio: %T", result.Metadata)
 	}
 
-	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID.Bytes, audioInfo.Duration); err != nil {
+	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID, audioInfo.Duration); err != nil {
 		return fmt.Errorf("update duration: %w", err)
 	}
 
@@ -77,7 +77,7 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 		return fmt.Errorf("marshal metadata: %w", err)
 	}
 
-	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
+	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID, sm, result.Raw); err != nil {
 		return fmt.Errorf("save metadata: %w", err)
 	}
 

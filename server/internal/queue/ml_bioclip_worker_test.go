@@ -8,16 +8,16 @@ import (
 	"server/internal/utils/imagesource"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 )
 
 type bioClipWorkerSpeciesStub struct {
-	assetID     pgtype.UUID
+	assetID     uuid.UUID
 	predictions []dbtypes.SpeciesPredictionMeta
 }
 
-func (s *bioClipWorkerSpeciesStub) SaveSpeciesPredictions(_ context.Context, assetID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
+func (s *bioClipWorkerSpeciesStub) SaveSpeciesPredictions(_ context.Context, assetID uuid.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
 	s.assetID = assetID
 	s.predictions = append([]dbtypes.SpeciesPredictionMeta(nil), predictions...)
 	return nil
@@ -26,10 +26,7 @@ func (s *bioClipWorkerSpeciesStub) SaveSpeciesPredictions(_ context.Context, ass
 func TestProcessBioClipWorkerProcessesSpeciesPredictions(t *testing.T) {
 	t.Parallel()
 
-	assetID := pgtype.UUID{}
-	if err := assetID.Scan("22222222-2222-2222-2222-222222222222"); err != nil {
-		t.Fatalf("scan asset id: %v", err)
-	}
+	assetID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 
 	speciesSvc := &bioClipWorkerSpeciesStub{}
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
@@ -64,10 +61,7 @@ func TestProcessBioClipWorkerProcessesSpeciesPredictions(t *testing.T) {
 func TestProcessBioClipWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	t.Parallel()
 
-	assetID := pgtype.UUID{}
-	if err := assetID.Scan("33333333-3333-3333-3333-333333333333"); err != nil {
-		t.Fatalf("scan asset id: %v", err)
-	}
+	assetID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
 
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
 	speciesSvc := &bioClipWorkerSpeciesStub{}

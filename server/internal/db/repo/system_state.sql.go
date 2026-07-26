@@ -10,29 +10,39 @@ import (
 )
 
 const getSystemState = `-- name: GetSystemState :one
-SELECT id, bootstrap_phase, updated_at FROM system_state
+SELECT id, library_id, bootstrap_phase, updated_at FROM system_state
 WHERE id = 1
 `
 
 func (q *Queries) GetSystemState(ctx context.Context) (SystemState, error) {
-	row := q.db.QueryRow(ctx, getSystemState)
+	row := q.db.QueryRowContext(ctx, getSystemState)
 	var i SystemState
-	err := row.Scan(&i.ID, &i.BootstrapPhase, &i.UpdatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.LibraryID,
+		&i.BootstrapPhase,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
 const setBootstrapPhase = `-- name: SetBootstrapPhase :one
 UPDATE system_state
 SET
-    bootstrap_phase = $1,
-    updated_at = NOW()
+    bootstrap_phase = ?1,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE id = 1
-RETURNING id, bootstrap_phase, updated_at
+RETURNING id, library_id, bootstrap_phase, updated_at
 `
 
 func (q *Queries) SetBootstrapPhase(ctx context.Context, bootstrapPhase string) (SystemState, error) {
-	row := q.db.QueryRow(ctx, setBootstrapPhase, bootstrapPhase)
+	row := q.db.QueryRowContext(ctx, setBootstrapPhase, bootstrapPhase)
 	var i SystemState
-	err := row.Scan(&i.ID, &i.BootstrapPhase, &i.UpdatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.LibraryID,
+		&i.BootstrapPhase,
+		&i.UpdatedAt,
+	)
 	return i, err
 }

@@ -8,25 +8,26 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const countLocationClusters = `-- name: CountLocationClusters :one
 SELECT COUNT(*) AS count
 FROM location_clusters
-WHERE ($1::uuid IS NULL OR repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR owner_id = $2::integer)
-  AND ($3::text IS NULL OR geohash = $3::text)
+WHERE (?1 IS NULL OR repository_id = ?1)
+  AND (?2 IS NULL OR owner_id = ?2)
+  AND (?3 IS NULL OR geohash = ?3)
 `
 
 type CountLocationClustersParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	Geohash      *string     `db:"geohash" json:"geohash"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	Geohash      interface{} `db:"geohash" json:"geohash"`
 }
 
 func (q *Queries) CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countLocationClusters, arg.RepositoryID, arg.OwnerID, arg.Geohash)
+	row := q.db.QueryRowContext(ctx, countLocationClusters, arg.RepositoryID, arg.OwnerID, arg.Geohash)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -34,37 +35,43 @@ func (q *Queries) CountLocationClusters(ctx context.Context, arg CountLocationCl
 
 const deleteLocationClustersForScope = `-- name: DeleteLocationClustersForScope :exec
 DELETE FROM location_clusters
-WHERE ($1::uuid IS NULL OR repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR owner_id = $2::integer)
+WHERE (?1 IS NULL OR repository_id = ?1)
+  AND (?2 IS NULL OR owner_id = ?2)
 `
 
 type DeleteLocationClustersForScopeParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) DeleteLocationClustersForScope(ctx context.Context, arg DeleteLocationClustersForScopeParams) error {
-	_, err := q.db.Exec(ctx, deleteLocationClustersForScope, arg.RepositoryID, arg.OwnerID)
+	_, err := q.db.ExecContext(ctx, deleteLocationClustersForScope, arg.RepositoryID, arg.OwnerID)
 	return err
 }
 
 const getReverseGeocodeCache = `-- name: GetReverseGeocodeCache :one
 SELECT cache_key, provider, language, latitude, longitude, label, country, region, city, raw_response, queried_at, expires_at
 FROM reverse_geocode_cache
-WHERE cache_key = $1::text
-  AND provider = $2::text
-  AND language = $3::text
-  AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+WHERE cache_key = ?1
+  AND provider = ?2
+  AND language = ?3
+  AND (expires_at IS NULL OR expires_at > ?4)
 `
 
 type GetReverseGeocodeCacheParams struct {
-	CacheKey string `db:"cache_key" json:"cache_key"`
-	Provider string `db:"provider" json:"provider"`
-	Language string `db:"language" json:"language"`
+	CacheKey string            `db:"cache_key" json:"cache_key"`
+	Provider string            `db:"provider" json:"provider"`
+	Language string            `db:"language" json:"language"`
+	Now      dbtypes.Timestamp `db:"now" json:"now"`
 }
 
 func (q *Queries) GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error) {
-	row := q.db.QueryRow(ctx, getReverseGeocodeCache, arg.CacheKey, arg.Provider, arg.Language)
+	row := q.db.QueryRowContext(ctx, getReverseGeocodeCache,
+		arg.CacheKey,
+		arg.Provider,
+		arg.Language,
+		arg.Now,
+	)
 	var i ReverseGeocodeCache
 	err := row.Scan(
 		&i.CacheKey,
@@ -88,7 +95,7 @@ INSERT INTO location_cluster_assets (cluster_id, asset_id)
 SELECT lc.cluster_id, a.asset_id
 FROM assets a
 JOIN location_clusters lc
-  ON lc.owner_id IS NOT DISTINCT FROM a.owner_id
+  ON lc.owner_id IS a.owner_id
  AND lc.repository_id = a.repository_id
  AND lc.geohash = a.gps_geohash_7
 WHERE a.is_deleted = false
@@ -97,18 +104,18 @@ WHERE a.is_deleted = false
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL
   AND a.gps_geohash_7 IS NOT NULL
-  AND ($1::uuid IS NULL OR a.repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR a.owner_id = $2::integer)
+  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?2 IS NULL OR a.owner_id = ?2)
 ON CONFLICT (cluster_id, asset_id) DO NOTHING
 `
 
 type InsertLocationClusterAssetsForScopeParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error {
-	_, err := q.db.Exec(ctx, insertLocationClusterAssetsForScope, arg.RepositoryID, arg.OwnerID)
+	_, err := q.db.ExecContext(ctx, insertLocationClusterAssetsForScope, arg.RepositoryID, arg.OwnerID)
 	return err
 }
 
@@ -128,9 +135,9 @@ SELECT
   a.repository_id,
   a.gps_geohash_7 AS geohash,
   7 AS precision,
-  AVG(a.gps_latitude)::double precision AS centroid_latitude,
-  AVG(a.gps_longitude)::double precision AS centroid_longitude,
-  COUNT(*)::integer AS photo_count,
+  AVG(a.gps_latitude) AS centroid_latitude,
+  AVG(a.gps_longitude) AS centroid_longitude,
+  COUNT(*) AS photo_count,
   'pending' AS geocode_status
 FROM assets a
 WHERE a.is_deleted = false
@@ -139,8 +146,8 @@ WHERE a.is_deleted = false
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL
   AND a.gps_geohash_7 IS NOT NULL
-  AND ($1::uuid IS NULL OR a.repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR a.owner_id = $2::integer)
+  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?2 IS NULL OR a.owner_id = ?2)
 GROUP BY a.owner_id, a.repository_id, a.gps_geohash_7
 ON CONFLICT (owner_id, repository_id, geohash) DO UPDATE
 SET
@@ -150,18 +157,17 @@ SET
   geocode_status = CASE
     WHEN location_clusters.label IS NULL THEN 'pending'
     ELSE location_clusters.geocode_status
-  END,
-  updated_at = CURRENT_TIMESTAMP
-RETURNING cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, search_vector
+  END
+RETURNING cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
 `
 
 type InsertLocationClustersForScopeParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) InsertLocationClustersForScope(ctx context.Context, arg InsertLocationClustersForScopeParams) ([]LocationCluster, error) {
-	rows, err := q.db.Query(ctx, insertLocationClustersForScope, arg.RepositoryID, arg.OwnerID)
+	rows, err := q.db.QueryContext(ctx, insertLocationClustersForScope, arg.RepositoryID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,11 +193,13 @@ func (q *Queries) InsertLocationClustersForScope(ctx context.Context, arg Insert
 			&i.GeocodedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -200,25 +208,25 @@ func (q *Queries) InsertLocationClustersForScope(ctx context.Context, arg Insert
 }
 
 const listLocationClusters = `-- name: ListLocationClusters :many
-SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, search_vector
+SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
 FROM location_clusters
-WHERE ($1::uuid IS NULL OR repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR owner_id = $2::integer)
-  AND ($3::text IS NULL OR geohash = $3::text)
+WHERE (?1 IS NULL OR repository_id = ?1)
+  AND (?2 IS NULL OR owner_id = ?2)
+  AND (?3 IS NULL OR geohash = ?3)
 ORDER BY photo_count DESC, updated_at DESC, cluster_id DESC
-LIMIT $5 OFFSET $4
+LIMIT ?5 OFFSET ?4
 `
 
 type ListLocationClustersParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	Geohash      *string     `db:"geohash" json:"geohash"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	Geohash      interface{} `db:"geohash" json:"geohash"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error) {
-	rows, err := q.db.Query(ctx, listLocationClusters,
+	rows, err := q.db.QueryContext(ctx, listLocationClusters,
 		arg.RepositoryID,
 		arg.OwnerID,
 		arg.Geohash,
@@ -250,11 +258,13 @@ func (q *Queries) ListLocationClusters(ctx context.Context, arg ListLocationClus
 			&i.GeocodedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -263,23 +273,23 @@ func (q *Queries) ListLocationClusters(ctx context.Context, arg ListLocationClus
 }
 
 const listPendingLocationClusters = `-- name: ListPendingLocationClusters :many
-SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, search_vector
+SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
 FROM location_clusters
 WHERE geocode_status = 'pending'
-  AND ($1::uuid IS NULL OR repository_id = $1::uuid)
-  AND ($2::integer IS NULL OR owner_id = $2::integer)
+  AND (?1 IS NULL OR repository_id = ?1)
+  AND (?2 IS NULL OR owner_id = ?2)
 ORDER BY photo_count DESC, updated_at DESC
-LIMIT $3
+LIMIT ?3
 `
 
 type ListPendingLocationClustersParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListPendingLocationClusters(ctx context.Context, arg ListPendingLocationClustersParams) ([]LocationCluster, error) {
-	rows, err := q.db.Query(ctx, listPendingLocationClusters, arg.RepositoryID, arg.OwnerID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listPendingLocationClusters, arg.RepositoryID, arg.OwnerID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -305,11 +315,13 @@ func (q *Queries) ListPendingLocationClusters(ctx context.Context, arg ListPendi
 			&i.GeocodedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -320,55 +332,63 @@ func (q *Queries) ListPendingLocationClusters(ctx context.Context, arg ListPendi
 const markLocationClustersGeocodeDisabled = `-- name: MarkLocationClustersGeocodeDisabled :exec
 UPDATE location_clusters
 SET geocode_status = 'disabled',
-    provider = $1::text,
-    geocoded_at = CURRENT_TIMESTAMP
+    provider = ?1,
+    geocoded_at = ?2
 WHERE geocode_status = 'pending'
-  AND ($2::uuid IS NULL OR repository_id = $2::uuid)
-  AND ($3::integer IS NULL OR owner_id = $3::integer)
+  AND (?3 IS NULL OR repository_id = ?3)
+  AND (?4 IS NULL OR owner_id = ?4)
 `
 
 type MarkLocationClustersGeocodeDisabledParams struct {
-	Provider     string      `db:"provider" json:"provider"`
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
+	Provider     *string           `db:"provider" json:"provider"`
+	GeocodedAt   dbtypes.Timestamp `db:"geocoded_at" json:"geocoded_at"`
+	RepositoryID interface{}       `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{}       `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) MarkLocationClustersGeocodeDisabled(ctx context.Context, arg MarkLocationClustersGeocodeDisabledParams) error {
-	_, err := q.db.Exec(ctx, markLocationClustersGeocodeDisabled, arg.Provider, arg.RepositoryID, arg.OwnerID)
+	_, err := q.db.ExecContext(ctx, markLocationClustersGeocodeDisabled,
+		arg.Provider,
+		arg.GeocodedAt,
+		arg.RepositoryID,
+		arg.OwnerID,
+	)
 	return err
 }
 
 const updateLocationClusterGeocode = `-- name: UpdateLocationClusterGeocode :exec
 UPDATE location_clusters
 SET
-  label = $1,
-  country = $2,
-  region = $3,
-  city = $4,
-  provider = $5,
-  geocode_status = $6,
-  geocoded_at = CURRENT_TIMESTAMP
-WHERE cluster_id = $7
+  label = ?1,
+  country = ?2,
+  region = ?3,
+  city = ?4,
+  provider = ?5,
+  geocode_status = ?6,
+  geocoded_at = ?7
+WHERE cluster_id = ?8
 `
 
 type UpdateLocationClusterGeocodeParams struct {
-	Label         *string     `db:"label" json:"label"`
-	Country       *string     `db:"country" json:"country"`
-	Region        *string     `db:"region" json:"region"`
-	City          *string     `db:"city" json:"city"`
-	Provider      *string     `db:"provider" json:"provider"`
-	GeocodeStatus string      `db:"geocode_status" json:"geocode_status"`
-	ClusterID     pgtype.UUID `db:"cluster_id" json:"cluster_id"`
+	Label         *string           `db:"label" json:"label"`
+	Country       *string           `db:"country" json:"country"`
+	Region        *string           `db:"region" json:"region"`
+	City          *string           `db:"city" json:"city"`
+	Provider      *string           `db:"provider" json:"provider"`
+	GeocodeStatus string            `db:"geocode_status" json:"geocode_status"`
+	GeocodedAt    dbtypes.Timestamp `db:"geocoded_at" json:"geocoded_at"`
+	ClusterID     uuid.UUID         `db:"cluster_id" json:"cluster_id"`
 }
 
 func (q *Queries) UpdateLocationClusterGeocode(ctx context.Context, arg UpdateLocationClusterGeocodeParams) error {
-	_, err := q.db.Exec(ctx, updateLocationClusterGeocode,
+	_, err := q.db.ExecContext(ctx, updateLocationClusterGeocode,
 		arg.Label,
 		arg.Country,
 		arg.Region,
 		arg.City,
 		arg.Provider,
 		arg.GeocodeStatus,
+		arg.GeocodedAt,
 		arg.ClusterID,
 	)
 	return err
@@ -389,18 +409,18 @@ INSERT INTO reverse_geocode_cache (
   queried_at,
   expires_at
 ) VALUES (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  $6,
-  $7,
-  $8,
-  $9,
-  $10::jsonb,
-  CURRENT_TIMESTAMP,
-  $11::timestamptz
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  ?5,
+  ?6,
+  ?7,
+  ?8,
+  ?9,
+  ?10,
+  ?11,
+  ?12
 )
 ON CONFLICT (cache_key) DO UPDATE
 SET
@@ -413,27 +433,28 @@ SET
   region = EXCLUDED.region,
   city = EXCLUDED.city,
   raw_response = EXCLUDED.raw_response,
-  queried_at = CURRENT_TIMESTAMP,
+  queried_at = EXCLUDED.queried_at,
   expires_at = EXCLUDED.expires_at
 RETURNING cache_key, provider, language, latitude, longitude, label, country, region, city, raw_response, queried_at, expires_at
 `
 
 type UpsertReverseGeocodeCacheParams struct {
-	CacheKey    string             `db:"cache_key" json:"cache_key"`
-	Provider    string             `db:"provider" json:"provider"`
-	Language    string             `db:"language" json:"language"`
-	Latitude    float64            `db:"latitude" json:"latitude"`
-	Longitude   float64            `db:"longitude" json:"longitude"`
-	Label       *string            `db:"label" json:"label"`
-	Country     *string            `db:"country" json:"country"`
-	Region      *string            `db:"region" json:"region"`
-	City        *string            `db:"city" json:"city"`
-	RawResponse []byte             `db:"raw_response" json:"raw_response"`
-	ExpiresAt   pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CacheKey    string            `db:"cache_key" json:"cache_key"`
+	Provider    string            `db:"provider" json:"provider"`
+	Language    string            `db:"language" json:"language"`
+	Latitude    float64           `db:"latitude" json:"latitude"`
+	Longitude   float64           `db:"longitude" json:"longitude"`
+	Label       *string           `db:"label" json:"label"`
+	Country     *string           `db:"country" json:"country"`
+	Region      *string           `db:"region" json:"region"`
+	City        *string           `db:"city" json:"city"`
+	RawResponse dbtypes.JSON      `db:"raw_response" json:"raw_response"`
+	QueriedAt   dbtypes.Timestamp `db:"queried_at" json:"queried_at"`
+	ExpiresAt   dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) UpsertReverseGeocodeCache(ctx context.Context, arg UpsertReverseGeocodeCacheParams) (ReverseGeocodeCache, error) {
-	row := q.db.QueryRow(ctx, upsertReverseGeocodeCache,
+	row := q.db.QueryRowContext(ctx, upsertReverseGeocodeCache,
 		arg.CacheKey,
 		arg.Provider,
 		arg.Language,
@@ -444,6 +465,7 @@ func (q *Queries) UpsertReverseGeocodeCache(ctx context.Context, arg UpsertRever
 		arg.Region,
 		arg.City,
 		arg.RawResponse,
+		arg.QueriedAt,
 		arg.ExpiresAt,
 	)
 	var i ReverseGeocodeCache

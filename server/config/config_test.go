@@ -11,17 +11,10 @@ import (
 	"time"
 )
 
-const completeManifest = `schema_version = 1
+const completeManifest = `schema_version = 2
 environment = "development"
 [database]
-host = "localhost"
-port = "5433"
-user = "postgres"
-name = "lumiliophotos"
-ssl = "disable"
-bootstrap_password_file = ".secrets/bootstrap"
-rotated_password_file = "data/rotated"
-tools_bin_dir = ""
+path = "data/app-state/library.sqlite3"
 [server]
 port = "6680"
 cors_allowed_origins = []
@@ -90,12 +83,6 @@ func writeManifestFixture(t *testing.T, contents string) string {
 	t.Helper()
 	contents = strings.ReplaceAll(contents, `"/opt/ffprobe"`, strconv.Quote(filepath.ToSlash(absoluteToolFixturePath())))
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".secrets"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".secrets", "bootstrap"), []byte("bootstrap-secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	path := filepath.Join(dir, "server.toml")
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
@@ -121,10 +108,10 @@ func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
 		t.Fatalf("LoadAppConfig: %v", err)
 	}
 	base := filepath.Dir(path)
-	if !cfg.LoadedFromManifest() || cfg.SchemaVersion != 1 || cfg.ManifestPath != path || len(cfg.ManifestSHA256) != 64 {
+	if !cfg.LoadedFromManifest() || cfg.SchemaVersion != 2 || cfg.ManifestPath != path || len(cfg.ManifestSHA256) != 64 {
 		t.Fatalf("missing manifest provenance: %+v", cfg)
 	}
-	if cfg.ServerConfig.Port != "6680" || cfg.DatabaseConfig.Password != "bootstrap-secret" || !cfg.Lumen.DiscoveryEnabled {
+	if cfg.ServerConfig.Port != "6680" || cfg.DatabaseConfig.Path != filepath.Join(base, "data/app-state/library.sqlite3") || !cfg.Lumen.DiscoveryEnabled {
 		t.Fatalf("ambient environment changed config: %+v", cfg)
 	}
 	if cfg.StorageConfig.Path != filepath.Join(base, "data/storage") {
@@ -148,28 +135,11 @@ func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
 	}
 }
 
-func TestLoadAppConfigUsesRotatedSecretWhenPresent(t *testing.T) {
-	path := writeManifestFixture(t, completeManifest)
-	rotated := filepath.Join(filepath.Dir(path), "data", "rotated")
-	if err := os.MkdirAll(filepath.Dir(rotated), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(rotated, []byte("rotated-secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := LoadAppConfig(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.DatabaseConfig.Password != "rotated-secret" || cfg.DatabaseConfig.BootstrapPassword != "bootstrap-secret" {
-		t.Fatalf("unexpected secrets: %+v", cfg.DatabaseConfig)
-	}
-}
-
 func TestLoadAppConfigRejectsUnknownAndLegacyFields(t *testing.T) {
 	for name, contents := range map[string]string{
 		"unknown":           completeManifest + "\nunknown_field = true\n",
-		"legacy password":   strings.Replace(completeManifest, "host = \"localhost\"", "host = \"localhost\"\npassword = \"plaintext\"", 1),
+		"legacy host":       strings.Replace(completeManifest, "path = \"data/app-state/library.sqlite3\"", "path = \"data/app-state/library.sqlite3\"\nhost = \"localhost\"", 1),
+		"legacy password":   strings.Replace(completeManifest, "path = \"data/app-state/library.sqlite3\"", "path = \"data/app-state/library.sqlite3\"\npassword = \"plaintext\"", 1),
 		"legacy server log": strings.Replace(completeManifest, "port = \"6680\"", "port = \"6680\"\nlog_level = \"debug\"", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -182,7 +152,7 @@ func TestLoadAppConfigRejectsUnknownAndLegacyFields(t *testing.T) {
 }
 
 func TestLoadAppConfigAggregatesMissingFields(t *testing.T) {
-	path := writeManifestFixture(t, "schema_version = 1\n")
+	path := writeManifestFixture(t, "schema_version = 2\n")
 	_, err := LoadAppConfig(path)
 	if err == nil {
 		t.Fatal("expected incomplete manifest to fail")
@@ -227,17 +197,6 @@ func TestLoadAppConfigAggregatesInvalidValues(t *testing.T) {
 	}
 }
 
-func TestLoadAppConfigRequiresReadableNonEmptyBootstrapSecret(t *testing.T) {
-	path := writeManifestFixture(t, completeManifest)
-	if err := os.WriteFile(filepath.Join(filepath.Dir(path), ".secrets", "bootstrap"), nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	_, err := LoadAppConfig(path)
-	if err == nil || !strings.Contains(err.Error(), "secret file is empty") {
-		t.Fatalf("expected empty secret error, got %v", err)
-	}
-}
-
 func TestLoadAppConfigRequiresExplicitPath(t *testing.T) {
 	if _, err := LoadAppConfig(""); err == nil {
 		t.Fatal("expected empty path to fail")
@@ -245,6 +204,20 @@ func TestLoadAppConfigRequiresExplicitPath(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing.toml")
 	if _, err := LoadAppConfig(missing); err == nil || !strings.Contains(err.Error(), missing) {
 		t.Fatalf("expected path in error, got %v", err)
+	}
+}
+
+func TestLoadAppConfigRejectsV1AndInMemoryDatabase(t *testing.T) {
+	for name, contents := range map[string]string{
+		"schema v1": strings.Replace(completeManifest, "schema_version = 2", "schema_version = 1", 1),
+		"in memory": strings.Replace(completeManifest, `path = "data/app-state/library.sqlite3"`, `path = ":memory:"`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := LoadAppConfig(writeManifestFixture(t, contents))
+			if err == nil {
+				t.Fatal("expected manifest rejection")
+			}
+		})
 	}
 }
 
@@ -258,7 +231,7 @@ func TestLoadAppConfigRejectsPrivateStateInsideMediaRoot(t *testing.T) {
 		"backups":     {`backups_path = "data/app-state/backups"`, `backups_path = "data/storage/backups"`, "storage.backups_path"},
 		"logs":        {`dir = "logs"`, `dir = "data/storage/logs"`, "logging.dir"},
 		"app secret":  {`secret_key_file = "data/app-state/secrets/key"`, `secret_key_file = "data/storage/.secrets/key"`, "auth.secret_key_file"},
-		"db rotated":  {`rotated_password_file = "data/rotated"`, `rotated_password_file = "data/storage/.secrets/rotated"`, "database.rotated_password_file"},
+		"database":    {`path = "data/app-state/library.sqlite3"`, `path = "data/storage/library.sqlite3"`, "database.path"},
 	}
 
 	for name, test := range cases {

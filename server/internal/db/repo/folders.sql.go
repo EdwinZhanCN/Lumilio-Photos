@@ -8,7 +8,7 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const getFolderChildSummaries = `-- name: GetFolderChildSummaries :many
@@ -21,18 +21,18 @@ WITH scoped AS (
     a.upload_time,
     a.repository_id,
     CASE
-      WHEN $1::text = '' THEN a.storage_path
-      ELSE substring(a.storage_path FROM length($1::text) + 2)
+      WHEN ?1 = '' THEN a.storage_path
+      ELSE substr(a.storage_path, length(?1) + 2)
     END AS remainder
   FROM assets a
   WHERE a.is_deleted = false
-    AND ($2::integer IS NULL OR a.owner_id = $2)
-    AND ($3::uuid IS NULL OR a.repository_id = $3)
+    AND (?2 IS NULL OR a.owner_id = ?2)
+    AND (?3 IS NULL OR a.repository_id = ?3)
     AND a.storage_path NOT LIKE '.lumilio/%'
     AND a.storage_path NOT LIKE 'inbox/%'
     AND (
-      $1::text = ''
-      OR a.storage_path LIKE $1::text || '/%'
+      ?1 = ''
+      OR a.storage_path LIKE ?1 || '/%'
     )
 ),
 child_folders AS (
@@ -42,41 +42,50 @@ child_folders AS (
     taken_time,
     upload_time,
     repository_id,
-    split_part(remainder, '/', 1) AS child_name
+    substr(remainder, 1, instr(remainder, '/') - 1) AS child_name
   FROM scoped
   WHERE remainder LIKE '%/%'
+),
+ranked AS (
+  SELECT
+    child_folders.asset_id, child_folders.type, child_folders.taken_time, child_folders.upload_time, child_folders.repository_id, child_folders.child_name,
+    ROW_NUMBER() OVER (
+      PARTITION BY repository_id, child_name
+      ORDER BY COALESCE(taken_time, upload_time) DESC, asset_id DESC
+    ) AS cover_rank
+  FROM child_folders
 )
 SELECT
   repository_id,
   child_name,
-  COUNT(*)::bigint AS asset_count,
-  COUNT(*) FILTER (WHERE type = 'PHOTO')::bigint AS photo_count,
-  COUNT(*) FILTER (WHERE type = 'VIDEO')::bigint AS video_count,
-  COUNT(*) FILTER (WHERE type = 'AUDIO')::bigint AS audio_count,
-  MIN(COALESCE(taken_time, upload_time))::timestamptz AS date_start,
-  MAX(COALESCE(taken_time, upload_time))::timestamptz AS date_end,
-  (ARRAY_AGG(asset_id ORDER BY COALESCE(taken_time, upload_time) DESC))[1]::uuid AS cover_asset_id
-FROM child_folders
+  COUNT(*) AS asset_count,
+  COUNT(*) FILTER (WHERE type = 'PHOTO') AS photo_count,
+  COUNT(*) FILTER (WHERE type = 'VIDEO') AS video_count,
+  COUNT(*) FILTER (WHERE type = 'AUDIO') AS audio_count,
+  MIN(COALESCE(taken_time, upload_time)) AS date_start,
+  MAX(COALESCE(taken_time, upload_time)) AS date_end,
+  MAX(CASE WHEN cover_rank = 1 THEN asset_id END) AS cover_asset_id
+FROM ranked
 GROUP BY repository_id, child_name
 ORDER BY child_name ASC
 `
 
 type GetFolderChildSummariesParams struct {
-	ParentPath   string      `db:"parent_path" json:"parent_path"`
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	ParentPath   interface{} `db:"parent_path" json:"parent_path"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
 }
 
 type GetFolderChildSummariesRow struct {
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	ChildName    string             `db:"child_name" json:"child_name"`
-	AssetCount   int64              `db:"asset_count" json:"asset_count"`
-	PhotoCount   int64              `db:"photo_count" json:"photo_count"`
-	VideoCount   int64              `db:"video_count" json:"video_count"`
-	AudioCount   int64              `db:"audio_count" json:"audio_count"`
-	DateStart    pgtype.Timestamptz `db:"date_start" json:"date_start"`
-	DateEnd      pgtype.Timestamptz `db:"date_end" json:"date_end"`
-	CoverAssetID pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	RepositoryID uuid.UUID   `db:"repository_id" json:"repository_id"`
+	ChildName    string      `db:"child_name" json:"child_name"`
+	AssetCount   int64       `db:"asset_count" json:"asset_count"`
+	PhotoCount   int64       `db:"photo_count" json:"photo_count"`
+	VideoCount   int64       `db:"video_count" json:"video_count"`
+	AudioCount   int64       `db:"audio_count" json:"audio_count"`
+	DateStart    interface{} `db:"date_start" json:"date_start"`
+	DateEnd      interface{} `db:"date_end" json:"date_end"`
+	CoverAssetID interface{} `db:"cover_asset_id" json:"cover_asset_id"`
 }
 
 // Folder browsing has no dedicated table: "folders" are derived from the
@@ -88,7 +97,7 @@ type GetFolderChildSummariesRow struct {
 // uploads, and any asset that sits directly in parent_path (files, not
 // folders).
 func (q *Queries) GetFolderChildSummaries(ctx context.Context, arg GetFolderChildSummariesParams) ([]GetFolderChildSummariesRow, error) {
-	rows, err := q.db.Query(ctx, getFolderChildSummaries, arg.ParentPath, arg.OwnerID, arg.RepositoryID)
+	rows, err := q.db.QueryContext(ctx, getFolderChildSummaries, arg.ParentPath, arg.OwnerID, arg.RepositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +120,9 @@ func (q *Queries) GetFolderChildSummaries(ctx context.Context, arg GetFolderChil
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -118,46 +130,53 @@ func (q *Queries) GetFolderChildSummaries(ctx context.Context, arg GetFolderChil
 }
 
 const getFolderSummary = `-- name: GetFolderSummary :one
+WITH scoped AS (
+  SELECT
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    ROW_NUMBER() OVER (
+      ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+    ) AS cover_rank
+  FROM assets a
+  WHERE a.is_deleted = false
+    AND (?1 IS NULL OR a.owner_id = ?1)
+    AND a.repository_id = ?2
+    AND a.storage_path NOT LIKE '.lumilio/%'
+    AND a.storage_path NOT LIKE 'inbox/%'
+    AND (
+      ?3 = ''
+      OR a.storage_path LIKE ?3 || '/%'
+    )
+)
 SELECT
-  COUNT(*)::bigint AS asset_count,
-  COUNT(*) FILTER (WHERE a.type = 'PHOTO')::bigint AS photo_count,
-  COUNT(*) FILTER (WHERE a.type = 'VIDEO')::bigint AS video_count,
-  COUNT(*) FILTER (WHERE a.type = 'AUDIO')::bigint AS audio_count,
-  MIN(COALESCE(a.taken_time, a.upload_time))::timestamptz AS date_start,
-  MAX(COALESCE(a.taken_time, a.upload_time))::timestamptz AS date_end,
-  (ARRAY_AGG(a.asset_id ORDER BY COALESCE(a.taken_time, a.upload_time) DESC))[1]::uuid AS cover_asset_id
-FROM assets a
-WHERE a.is_deleted = false
-  AND ($1::integer IS NULL OR a.owner_id = $1)
-  AND a.repository_id = $2
-  AND a.storage_path NOT LIKE '.lumilio/%'
-  AND a.storage_path NOT LIKE 'inbox/%'
-  AND (
-    $3::text = ''
-    OR a.storage_path LIKE $3::text || '/%'
-  )
+  COUNT(*) AS asset_count,
+  COUNT(*) FILTER (WHERE type = 'PHOTO') AS photo_count,
+  COUNT(*) FILTER (WHERE type = 'VIDEO') AS video_count,
+  COUNT(*) FILTER (WHERE type = 'AUDIO') AS audio_count,
+  MIN(COALESCE(taken_time, upload_time)) AS date_start,
+  MAX(COALESCE(taken_time, upload_time)) AS date_end,
+  MAX(CASE WHEN cover_rank = 1 THEN asset_id END) AS cover_asset_id
+FROM scoped
 `
 
 type GetFolderSummaryParams struct {
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	FolderPath   string      `db:"folder_path" json:"folder_path"`
+	OwnerID      interface{}   `db:"owner_id" json:"owner_id"`
+	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	FolderPath   interface{}   `db:"folder_path" json:"folder_path"`
 }
 
 type GetFolderSummaryRow struct {
-	AssetCount   int64              `db:"asset_count" json:"asset_count"`
-	PhotoCount   int64              `db:"photo_count" json:"photo_count"`
-	VideoCount   int64              `db:"video_count" json:"video_count"`
-	AudioCount   int64              `db:"audio_count" json:"audio_count"`
-	DateStart    pgtype.Timestamptz `db:"date_start" json:"date_start"`
-	DateEnd      pgtype.Timestamptz `db:"date_end" json:"date_end"`
-	CoverAssetID pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	AssetCount   int64       `db:"asset_count" json:"asset_count"`
+	PhotoCount   int64       `db:"photo_count" json:"photo_count"`
+	VideoCount   int64       `db:"video_count" json:"video_count"`
+	AudioCount   int64       `db:"audio_count" json:"audio_count"`
+	DateStart    interface{} `db:"date_start" json:"date_start"`
+	DateEnd      interface{} `db:"date_end" json:"date_end"`
+	CoverAssetID interface{} `db:"cover_asset_id" json:"cover_asset_id"`
 }
 
-// Aggregate stats for one folder path (recursive descendants), used for the
-// folder detail header/hero.
+// Aggregate stats for one folder path (recursive descendants).
 func (q *Queries) GetFolderSummary(ctx context.Context, arg GetFolderSummaryParams) (GetFolderSummaryRow, error) {
-	row := q.db.QueryRow(ctx, getFolderSummary, arg.OwnerID, arg.RepositoryID, arg.FolderPath)
+	row := q.db.QueryRowContext(ctx, getFolderSummary, arg.OwnerID, arg.RepositoryID, arg.FolderPath)
 	var i GetFolderSummaryRow
 	err := row.Scan(
 		&i.AssetCount,

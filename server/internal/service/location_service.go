@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,11 +12,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"server/config"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 )
 
@@ -23,6 +22,7 @@ const (
 	geocoderProviderDisabled  = "disabled"
 	geocoderProviderNominatim = "nominatim"
 	defaultGeocodeLimit       = 500
+	reverseGeocodeCacheTTL    = 30 * 24 * time.Hour
 )
 
 type LocationService interface {
@@ -72,11 +72,11 @@ type ReverseGeocoder interface {
 
 type locationService struct {
 	queries  *repo.Queries
-	pool     *pgxpool.Pool
+	pool     *sql.DB
 	geocoder ReverseGeocoder
 }
 
-func NewLocationService(queries *repo.Queries, pool *pgxpool.Pool, cfg config.GeocodingConfig) LocationService {
+func NewLocationService(queries *repo.Queries, pool *sql.DB, cfg config.GeocodingConfig) LocationService {
 	return &locationService{
 		queries:  queries,
 		pool:     pool,
@@ -90,11 +90,11 @@ func (s *locationService) RebuildLocationClusters(ctx context.Context, repositor
 		return err
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin location cluster rebuild: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	qtx := s.queries.WithTx(tx)
 	scope := repo.DeleteLocationClustersForScopeParams{
@@ -116,7 +116,7 @@ func (s *locationService) RebuildLocationClusters(ctx context.Context, repositor
 	}); err != nil {
 		return fmt.Errorf("insert location cluster memberships: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit location cluster rebuild: %w", err)
 	}
 
@@ -142,8 +142,8 @@ func (s *locationService) ListLocationClusters(ctx context.Context, params ListL
 		RepositoryID: repositoryUUID,
 		OwnerID:      params.OwnerID,
 		Geohash:      normalizeOptionalText(params.Geohash),
-		Limit:        int32(params.Limit),
-		Offset:       int32(params.Offset),
+		Limit:        int64(params.Limit),
+		Offset:       int64(params.Offset),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("list location clusters: %w", err)
@@ -156,10 +156,12 @@ func (s *locationService) ListLocationClusters(ctx context.Context, params ListL
 	return clusters, total, nil
 }
 
-func (s *locationService) resolvePendingClusterLabels(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32) error {
+func (s *locationService) resolvePendingClusterLabels(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) error {
 	if s.geocoder == nil || s.geocoder.Provider() == geocoderProviderDisabled {
+		provider := geocoderProviderDisabled
 		return s.queries.MarkLocationClustersGeocodeDisabled(ctx, repo.MarkLocationClustersGeocodeDisabledParams{
-			Provider:     geocoderProviderDisabled,
+			Provider:     &provider,
+			GeocodedAt:   dbtypes.NewTimestamp(time.Now()),
 			RepositoryID: repositoryID,
 			OwnerID:      ownerID,
 		})
@@ -168,7 +170,7 @@ func (s *locationService) resolvePendingClusterLabels(ctx context.Context, repos
 	clusters, err := s.queries.ListPendingLocationClusters(ctx, repo.ListPendingLocationClustersParams{
 		RepositoryID: repositoryID,
 		OwnerID:      ownerID,
-		Limit:        defaultGeocodeLimit,
+		Limit:        int64(defaultGeocodeLimit),
 	})
 	if err != nil {
 		return fmt.Errorf("list pending location clusters: %w", err)
@@ -191,11 +193,12 @@ func (s *locationService) resolveClusterLabel(ctx context.Context, cluster repo.
 		CacheKey: cacheKey,
 		Provider: provider,
 		Language: language,
+		Now:      dbtypes.NewTimestamp(time.Now()),
 	})
 	if err == nil {
 		return s.updateClusterGeocode(ctx, cluster.ClusterID, provider, "cached", cached.Label, cached.Country, cached.Region, cached.City)
 	}
-	if err != pgx.ErrNoRows {
+	if err != sql.ErrNoRows {
 		return fmt.Errorf("get reverse geocode cache: %w", err)
 	}
 
@@ -214,7 +217,9 @@ func (s *locationService) resolveClusterLabel(ctx context.Context, cluster repo.
 		Country:     result.Country,
 		Region:      result.Region,
 		City:        result.City,
-		RawResponse: result.RawResponse,
+		RawResponse: dbtypes.JSON(result.RawResponse),
+		QueriedAt:   dbtypes.NewTimestamp(time.Now()),
+		ExpiresAt:   dbtypes.NewTimestamp(time.Now().Add(reverseGeocodeCacheTTL)),
 	})
 	if err != nil {
 		return fmt.Errorf("cache reverse geocode result: %w", err)
@@ -223,11 +228,12 @@ func (s *locationService) resolveClusterLabel(ctx context.Context, cluster repo.
 	return s.updateClusterGeocode(ctx, cluster.ClusterID, provider, "resolved", cache.Label, cache.Country, cache.Region, cache.City)
 }
 
-func (s *locationService) updateClusterGeocode(ctx context.Context, clusterID pgtype.UUID, provider, status string, label, country, region, city *string) error {
+func (s *locationService) updateClusterGeocode(ctx context.Context, clusterID uuid.UUID, provider, status string, label, country, region, city *string) error {
 	return s.queries.UpdateLocationClusterGeocode(ctx, repo.UpdateLocationClusterGeocodeParams{
 		ClusterID:     clusterID,
 		Provider:      &provider,
 		GeocodeStatus: status,
+		GeocodedAt:    dbtypes.NewTimestamp(time.Now()),
 		Label:         label,
 		Country:       country,
 		Region:        region,
@@ -235,15 +241,15 @@ func (s *locationService) updateClusterGeocode(ctx context.Context, clusterID pg
 	})
 }
 
-func parseOptionalUUID(raw *string) (pgtype.UUID, error) {
+func parseOptionalUUID(raw *string) (uuid.NullUUID, error) {
 	if raw == nil || strings.TrimSpace(*raw) == "" {
-		return pgtype.UUID{}, nil
+		return uuid.NullUUID{}, nil
 	}
 	parsed, err := uuid.Parse(strings.TrimSpace(*raw))
 	if err != nil {
-		return pgtype.UUID{}, fmt.Errorf("invalid repository ID: %w", err)
+		return uuid.NullUUID{}, fmt.Errorf("invalid repository ID: %w", err)
 	}
-	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
+	return uuid.NullUUID{UUID: parsed, Valid: true}, nil
 }
 
 func normalizeOptionalText(raw *string) *string {
@@ -258,28 +264,20 @@ func normalizeOptionalText(raw *string) *string {
 }
 
 func toLocationCluster(row repo.LocationCluster) LocationCluster {
-	clusterID := ""
-	if row.ClusterID.Valid {
-		clusterID = uuid.UUID(row.ClusterID.Bytes).String()
-	}
-	repositoryID := ""
-	if row.RepositoryID.Valid {
-		repositoryID = uuid.UUID(row.RepositoryID.Bytes).String()
-	}
 	var geocodedAt *time.Time
 	if row.GeocodedAt.Valid {
 		t := row.GeocodedAt.Time
 		geocodedAt = &t
 	}
 	return LocationCluster{
-		ClusterID:         clusterID,
+		ClusterID:         row.ClusterID.String(),
 		OwnerID:           row.OwnerID,
-		RepositoryID:      repositoryID,
+		RepositoryID:      row.RepositoryID.String(),
 		Geohash:           row.Geohash,
-		Precision:         row.Precision,
+		Precision:         int32(row.Precision),
 		CentroidLatitude:  row.CentroidLatitude,
 		CentroidLongitude: row.CentroidLongitude,
-		PhotoCount:        row.PhotoCount,
+		PhotoCount:        int32(row.PhotoCount),
 		Label:             row.Label,
 		Country:           row.Country,
 		Region:            row.Region,

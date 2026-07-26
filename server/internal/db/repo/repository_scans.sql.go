@@ -8,27 +8,28 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const cancelRepositoryScanRun = `-- name: CancelRepositoryScanRun :one
 UPDATE repository_scan_runs
 SET
     status = 'cancelled',
-    finished_at = $2,
-    error = $3
-WHERE scan_id = $1
+    finished_at = ?2,
+    error = ?3
+WHERE scan_id = ?1
 RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
 `
 
 type CancelRepositoryScanRunParams struct {
-	ScanID     pgtype.UUID        `db:"scan_id" json:"scan_id"`
-	FinishedAt pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
-	Error      *string            `db:"error" json:"error"`
+	ScanID     uuid.UUID         `db:"scan_id" json:"scan_id"`
+	FinishedAt dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	Error      *string           `db:"error" json:"error"`
 }
 
 func (q *Queries) CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error) {
-	row := q.db.QueryRow(ctx, cancelRepositoryScanRun, arg.ScanID, arg.FinishedAt, arg.Error)
+	row := q.db.QueryRowContext(ctx, cancelRepositoryScanRun, arg.ScanID, arg.FinishedAt, arg.Error)
 	var i RepositoryScanRun
 	err := row.Scan(
 		&i.ScanID,
@@ -51,27 +52,27 @@ const completeRepositoryScanRun = `-- name: CompleteRepositoryScanRun :one
 UPDATE repository_scan_runs
 SET
     status = 'completed',
-    finished_at = $2,
-    discovered_count = $3,
-    updated_count = $4,
-    deleted_count = $5,
-    skipped_count = $6,
+    finished_at = ?2,
+    discovered_count = ?3,
+    updated_count = ?4,
+    deleted_count = ?5,
+    skipped_count = ?6,
     error = NULL
-WHERE scan_id = $1
+WHERE scan_id = ?1
 RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
 `
 
 type CompleteRepositoryScanRunParams struct {
-	ScanID          pgtype.UUID        `db:"scan_id" json:"scan_id"`
-	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
-	DiscoveredCount int64              `db:"discovered_count" json:"discovered_count"`
-	UpdatedCount    int64              `db:"updated_count" json:"updated_count"`
-	DeletedCount    int64              `db:"deleted_count" json:"deleted_count"`
-	SkippedCount    int64              `db:"skipped_count" json:"skipped_count"`
+	ScanID          uuid.UUID         `db:"scan_id" json:"scan_id"`
+	FinishedAt      dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	DiscoveredCount int64             `db:"discovered_count" json:"discovered_count"`
+	UpdatedCount    int64             `db:"updated_count" json:"updated_count"`
+	DeletedCount    int64             `db:"deleted_count" json:"deleted_count"`
+	SkippedCount    int64             `db:"skipped_count" json:"skipped_count"`
 }
 
 func (q *Queries) CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error) {
-	row := q.db.QueryRow(ctx, completeRepositoryScanRun,
+	row := q.db.QueryRowContext(ctx, completeRepositoryScanRun,
 		arg.ScanID,
 		arg.FinishedAt,
 		arg.DiscoveredCount,
@@ -106,21 +107,21 @@ INSERT INTO repository_scan_runs (
     status,
     started_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
+    ?1, ?2, ?3, ?4, ?5, ?6
 ) RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
 `
 
 type CreateRepositoryScanRunParams struct {
-	ScanID       pgtype.UUID        `db:"scan_id" json:"scan_id"`
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	Mode         string             `db:"mode" json:"mode"`
-	RequestedBy  *string            `db:"requested_by" json:"requested_by"`
-	Status       string             `db:"status" json:"status"`
-	StartedAt    pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	ScanID       uuid.UUID         `db:"scan_id" json:"scan_id"`
+	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Mode         string            `db:"mode" json:"mode"`
+	RequestedBy  *string           `db:"requested_by" json:"requested_by"`
+	Status       string            `db:"status" json:"status"`
+	StartedAt    dbtypes.Timestamp `db:"started_at" json:"started_at"`
 }
 
 func (q *Queries) CreateRepositoryScanRun(ctx context.Context, arg CreateRepositoryScanRunParams) (RepositoryScanRun, error) {
-	row := q.db.QueryRow(ctx, createRepositoryScanRun,
+	row := q.db.QueryRowContext(ctx, createRepositoryScanRun,
 		arg.ScanID,
 		arg.RepositoryID,
 		arg.Mode,
@@ -150,28 +151,28 @@ const failRepositoryScanRun = `-- name: FailRepositoryScanRun :one
 UPDATE repository_scan_runs
 SET
     status = 'failed',
-    finished_at = $2,
-    discovered_count = $3,
-    updated_count = $4,
-    deleted_count = $5,
-    skipped_count = $6,
-    error = $7
-WHERE scan_id = $1
+    finished_at = ?2,
+    discovered_count = ?3,
+    updated_count = ?4,
+    deleted_count = ?5,
+    skipped_count = ?6,
+    error = ?7
+WHERE scan_id = ?1
 RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
 `
 
 type FailRepositoryScanRunParams struct {
-	ScanID          pgtype.UUID        `db:"scan_id" json:"scan_id"`
-	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
-	DiscoveredCount int64              `db:"discovered_count" json:"discovered_count"`
-	UpdatedCount    int64              `db:"updated_count" json:"updated_count"`
-	DeletedCount    int64              `db:"deleted_count" json:"deleted_count"`
-	SkippedCount    int64              `db:"skipped_count" json:"skipped_count"`
-	Error           *string            `db:"error" json:"error"`
+	ScanID          uuid.UUID         `db:"scan_id" json:"scan_id"`
+	FinishedAt      dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	DiscoveredCount int64             `db:"discovered_count" json:"discovered_count"`
+	UpdatedCount    int64             `db:"updated_count" json:"updated_count"`
+	DeletedCount    int64             `db:"deleted_count" json:"deleted_count"`
+	SkippedCount    int64             `db:"skipped_count" json:"skipped_count"`
+	Error           *string           `db:"error" json:"error"`
 }
 
 func (q *Queries) FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error) {
-	row := q.db.QueryRow(ctx, failRepositoryScanRun,
+	row := q.db.QueryRowContext(ctx, failRepositoryScanRun,
 		arg.ScanID,
 		arg.FinishedAt,
 		arg.DiscoveredCount,
@@ -200,13 +201,13 @@ func (q *Queries) FailRepositoryScanRun(ctx context.Context, arg FailRepositoryS
 
 const getLatestRepositoryScanRun = `-- name: GetLatestRepositoryScanRun :one
 SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error FROM repository_scan_runs
-WHERE repository_id = $1
+WHERE repository_id = ?1
 ORDER BY started_at DESC
 LIMIT 1
 `
 
-func (q *Queries) GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error) {
-	row := q.db.QueryRow(ctx, getLatestRepositoryScanRun, repositoryID)
+func (q *Queries) GetLatestRepositoryScanRun(ctx context.Context, repositoryID uuid.UUID) (RepositoryScanRun, error) {
+	row := q.db.QueryRowContext(ctx, getLatestRepositoryScanRun, repositoryID)
 	var i RepositoryScanRun
 	err := row.Scan(
 		&i.ScanID,
@@ -227,11 +228,11 @@ func (q *Queries) GetLatestRepositoryScanRun(ctx context.Context, repositoryID p
 
 const getRepositoryScanRun = `-- name: GetRepositoryScanRun :one
 SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error FROM repository_scan_runs
-WHERE scan_id = $1
+WHERE scan_id = ?1
 `
 
-func (q *Queries) GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) (RepositoryScanRun, error) {
-	row := q.db.QueryRow(ctx, getRepositoryScanRun, scanID)
+func (q *Queries) GetRepositoryScanRun(ctx context.Context, scanID uuid.UUID) (RepositoryScanRun, error) {
+	row := q.db.QueryRowContext(ctx, getRepositoryScanRun, scanID)
 	var i RepositoryScanRun
 	err := row.Scan(
 		&i.ScanID,
@@ -252,19 +253,19 @@ func (q *Queries) GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) 
 
 const listRepositoryScanRuns = `-- name: ListRepositoryScanRuns :many
 SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error FROM repository_scan_runs
-WHERE repository_id = $1
+WHERE repository_id = ?1
 ORDER BY started_at DESC
-LIMIT $2 OFFSET $3
+LIMIT ?2 OFFSET ?3
 `
 
 type ListRepositoryScanRunsParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Limit        int32       `db:"limit" json:"limit"`
-	Offset       int32       `db:"offset" json:"offset"`
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	Limit        int64     `db:"limit" json:"limit"`
+	Offset       int64     `db:"offset" json:"offset"`
 }
 
 func (q *Queries) ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error) {
-	rows, err := q.db.Query(ctx, listRepositoryScanRuns, arg.RepositoryID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listRepositoryScanRuns, arg.RepositoryID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +291,9 @@ func (q *Queries) ListRepositoryScanRuns(ctx context.Context, arg ListRepository
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -300,15 +304,15 @@ const reclaimInterruptedRepositoryScanRuns = `-- name: ReclaimInterruptedReposit
 UPDATE repository_scan_runs
 SET
     status = 'failed',
-    finished_at = NOW(),
+    finished_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     error = 'interrupted by server restart'
 WHERE status = 'running'
 `
 
 func (q *Queries) ReclaimInterruptedRepositoryScanRuns(ctx context.Context) (int64, error) {
-	result, err := q.db.Exec(ctx, reclaimInterruptedRepositoryScanRuns)
+	result, err := q.db.ExecContext(ctx, reclaimInterruptedRepositoryScanRuns)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected(), nil
+	return result.RowsAffected()
 }

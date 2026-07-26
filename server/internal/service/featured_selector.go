@@ -10,8 +10,6 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -219,7 +217,7 @@ func computeFeatureWeight(
 	}
 
 	likedNorm := 0.0
-	if asset.Liked != nil && *asset.Liked {
+	if asset.Liked {
 		likedNorm = 1.0
 	}
 
@@ -329,14 +327,7 @@ func decodePhotoMetadata(asset repo.Asset) (dbtypes.PhotoSpecificMetadata, bool)
 }
 
 func assetUUIDString(asset repo.Asset) string {
-	if !asset.AssetID.Valid {
-		return ""
-	}
-	id, err := uuid.FromBytes(asset.AssetID.Bytes[:])
-	if err != nil {
-		return ""
-	}
-	return id.String()
+	return asset.AssetID.String()
 }
 
 func clamp01(v float64) float64 {

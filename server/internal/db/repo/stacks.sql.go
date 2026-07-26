@@ -7,43 +7,133 @@ package repo
 
 import (
 	"context"
+	"strings"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const addStackMember = `-- name: AddStackMember :exec
-INSERT INTO asset_stack_members (media_item_id, stack_id, position)
-VALUES ($1, $2, $3)
+INSERT INTO asset_stack_members (media_item_id, stack_id, position, created_at)
+VALUES (
+  ?1,
+  ?2,
+  ?3,
+  ?4
+)
+ON CONFLICT (media_item_id) DO NOTHING
 `
 
 type AddStackMemberParams struct {
-	MediaItemID pgtype.UUID `db:"media_item_id" json:"media_item_id"`
-	StackID     pgtype.UUID `db:"stack_id" json:"stack_id"`
-	Position    *int32      `db:"position" json:"position"`
+	MediaItemID uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	StackID     uuid.UUID         `db:"stack_id" json:"stack_id"`
+	Position    int64             `db:"position" json:"position"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) AddStackMember(ctx context.Context, arg AddStackMemberParams) error {
-	_, err := q.db.Exec(ctx, addStackMember, arg.MediaItemID, arg.StackID, arg.Position)
+	_, err := q.db.ExecContext(ctx, addStackMember,
+		arg.MediaItemID,
+		arg.StackID,
+		arg.Position,
+		arg.CreatedAt,
+	)
 	return err
 }
 
-const deleteMediaItem = `-- name: DeleteMediaItem :exec
-DELETE FROM media_items WHERE media_item_id = $1
+const countStackedMediaItems = `-- name: CountStackedMediaItems :one
+SELECT COUNT(DISTINCT media_item_id)
+FROM asset_stack_members
+WHERE media_item_id IN (/*SLICE:media_item_ids*/?)
 `
 
-func (q *Queries) DeleteMediaItem(ctx context.Context, mediaItemID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteMediaItem, mediaItemID)
+func (q *Queries) CountStackedMediaItems(ctx context.Context, mediaItemIds []uuid.UUID) (int64, error) {
+	query := countStackedMediaItems
+	var queryParams []interface{}
+	if len(mediaItemIds) > 0 {
+		for _, v := range mediaItemIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:media_item_ids*/?", strings.Repeat(",?", len(mediaItemIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:media_item_ids*/?", "NULL", 1)
+	}
+	row := q.db.QueryRowContext(ctx, query, queryParams...)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createAssetStack = `-- name: CreateAssetStack :one
+INSERT INTO asset_stacks (
+  stack_id, owner_id, repository_id, stack_kind, cover_media_item_id,
+  group_key, created_at, updated_at
+) VALUES (
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  ?5,
+  ?6,
+  ?7,
+  ?8
+)
+RETURNING stack_id, owner_id, repository_id, stack_kind, cover_media_item_id, group_key, created_at, updated_at
+`
+
+type CreateAssetStackParams struct {
+	StackID          uuid.UUID         `db:"stack_id" json:"stack_id"`
+	OwnerID          *int32            `db:"owner_id" json:"owner_id"`
+	RepositoryID     uuid.NullUUID     `db:"repository_id" json:"repository_id"`
+	StackKind        string            `db:"stack_kind" json:"stack_kind"`
+	CoverMediaItemID uuid.NullUUID     `db:"cover_media_item_id" json:"cover_media_item_id"`
+	GroupKey         *string           `db:"group_key" json:"group_key"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateAssetStack(ctx context.Context, arg CreateAssetStackParams) (AssetStack, error) {
+	row := q.db.QueryRowContext(ctx, createAssetStack,
+		arg.StackID,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.StackKind,
+		arg.CoverMediaItemID,
+		arg.GroupKey,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i AssetStack
+	err := row.Scan(
+		&i.StackID,
+		&i.OwnerID,
+		&i.RepositoryID,
+		&i.StackKind,
+		&i.CoverMediaItemID,
+		&i.GroupKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteMediaItem = `-- name: DeleteMediaItem :exec
+DELETE FROM media_items WHERE media_item_id = ?1
+`
+
+func (q *Queries) DeleteMediaItem(ctx context.Context, mediaItemID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteMediaItem, mediaItemID)
 	return err
 }
 
 const deleteStack = `-- name: DeleteStack :exec
 
-DELETE FROM asset_stacks WHERE stack_id = $1
+DELETE FROM asset_stacks WHERE stack_id = ?1
 `
 
 // Presentation stacks ------------------------------------------------------
-func (q *Queries) DeleteStack(ctx context.Context, stackID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteStack, stackID)
+func (q *Queries) DeleteStack(ctx context.Context, stackID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteStack, stackID)
 	return err
 }
 
@@ -54,42 +144,42 @@ SELECT a.asset_id,
        a.owner_id,
        a.original_filename,
        a.mime_type,
-       a.specific_metadata->>'is_raw' AS is_raw,
-       COALESCE(a.specific_metadata->>'camera_model', '')::text AS camera_model,
-       COALESCE(
-           NULLIF(a.exif_raw->>'BurstUUID', ''),
-           NULLIF(a.exif_raw->>'BurstID', ''),
-           NULLIF(a.exif_raw->>'BurstGroupID', ''),
+       CAST(json_extract(a.specific_metadata, '$.is_raw') AS INTEGER) AS is_raw,
+       CAST(COALESCE(json_extract(a.specific_metadata, '$.camera_model'), '') AS TEXT) AS camera_model,
+       CAST(COALESCE(
+           NULLIF(json_extract(a.exif_raw, '$.BurstUUID'), ''),
+           NULLIF(json_extract(a.exif_raw, '$.BurstID'), ''),
+           NULLIF(json_extract(a.exif_raw, '$.BurstGroupID'), ''),
            ''
-       )::text AS burst_id,
+       ) AS TEXT) AS burst_id,
        a.taken_time,
        a.upload_time,
-       regexp_replace(a.original_filename, '\.[^.]+$', '') AS base_name
+       CAST(lower(a.original_filename) AS TEXT) AS base_name
 FROM assets a
 JOIN media_item_assets mia ON mia.asset_id = a.asset_id
-WHERE a.repository_id = $1
+WHERE a.repository_id = ?1
   AND a.is_deleted = false
   AND a.type = 'PHOTO'
 ORDER BY base_name, a.original_filename
 `
 
 type FindCandidatesForStackingByNameRow struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	MediaItemID      pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	OriginalFilename string             `db:"original_filename" json:"original_filename"`
-	MimeType         string             `db:"mime_type" json:"mime_type"`
-	IsRaw            interface{}        `db:"is_raw" json:"is_raw"`
-	CameraModel      string             `db:"camera_model" json:"camera_model"`
-	BurstID          string             `db:"burst_id" json:"burst_id"`
-	TakenTime        pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
-	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	BaseName         string             `db:"base_name" json:"base_name"`
+	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
+	MediaItemID      uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	OwnerID          *int32            `db:"owner_id" json:"owner_id"`
+	OriginalFilename string            `db:"original_filename" json:"original_filename"`
+	MimeType         string            `db:"mime_type" json:"mime_type"`
+	IsRaw            int64             `db:"is_raw" json:"is_raw"`
+	CameraModel      string            `db:"camera_model" json:"camera_model"`
+	BurstID          string            `db:"burst_id" json:"burst_id"`
+	TakenTime        dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
+	UploadTime       dbtypes.Timestamp `db:"upload_time" json:"upload_time"`
+	BaseName         string            `db:"base_name" json:"base_name"`
 }
 
 // Structural and burst detection ------------------------------------------
-func (q *Queries) FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error) {
-	rows, err := q.db.Query(ctx, findCandidatesForStackingByName, repositoryID)
+func (q *Queries) FindCandidatesForStackingByName(ctx context.Context, repositoryID uuid.NullUUID) ([]FindCandidatesForStackingByNameRow, error) {
+	rows, err := q.db.QueryContext(ctx, findCandidatesForStackingByName, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +204,53 @@ func (q *Queries) FindCandidatesForStackingByName(ctx context.Context, repositor
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findLivePhotoPair = `-- name: FindLivePhotoPair :many
+SELECT asset_id, type
+FROM assets
+WHERE owner_id = ?1
+  AND is_deleted = false
+  AND type IN ('PHOTO', 'VIDEO')
+  AND json_extract(specific_metadata, '$.content_identifier')
+      = CAST(?2 AS TEXT)
+ORDER BY type, asset_id
+`
+
+type FindLivePhotoPairParams struct {
+	OwnerID           *int32 `db:"owner_id" json:"owner_id"`
+	ContentIdentifier string `db:"content_identifier" json:"content_identifier"`
+}
+
+type FindLivePhotoPairRow struct {
+	AssetID uuid.UUID `db:"asset_id" json:"asset_id"`
+	Type    string    `db:"type" json:"type"`
+}
+
+func (q *Queries) FindLivePhotoPair(ctx context.Context, arg FindLivePhotoPairParams) ([]FindLivePhotoPairRow, error) {
+	rows, err := q.db.QueryContext(ctx, findLivePhotoPair, arg.OwnerID, arg.ContentIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindLivePhotoPairRow
+	for rows.Next() {
+		var i FindLivePhotoPairRow
+		if err := rows.Scan(&i.AssetID, &i.Type); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -128,19 +265,19 @@ SELECT mi.media_item_id,
        primary_asset.original_filename,
        primary_asset.taken_time,
        primary_asset.upload_time,
-       COALESCE(primary_asset.specific_metadata->>'camera_model', '')::text AS camera_model,
-       COALESCE(
-           MAX(NULLIF(component.exif_raw->>'BurstUUID', '')),
-           MAX(NULLIF(component.exif_raw->>'BurstID', '')),
-           MAX(NULLIF(component.exif_raw->>'BurstGroupID', '')),
+       CAST(COALESCE(json_extract(primary_asset.specific_metadata, '$.camera_model'), '') AS TEXT) AS camera_model,
+       CAST(COALESCE(
+           MAX(NULLIF(json_extract(component.exif_raw, '$.BurstUUID'), '')),
+           MAX(NULLIF(json_extract(component.exif_raw, '$.BurstID'), '')),
+           MAX(NULLIF(json_extract(component.exif_raw, '$.BurstGroupID'), '')),
            ''
-       )::text AS burst_id
+       ) AS TEXT) AS burst_id
 FROM media_items mi
 JOIN assets primary_asset ON primary_asset.asset_id = mi.primary_asset_id
 JOIN media_item_assets mia ON mia.media_item_id = mi.media_item_id
 JOIN assets component ON component.asset_id = mia.asset_id
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
-WHERE mi.repository_id = $1
+WHERE mi.repository_id = ?1
   AND mi.media_kind = 'photo'
   AND primary_asset.is_deleted = false
   AND asm.media_item_id IS NULL
@@ -149,19 +286,19 @@ ORDER BY COALESCE(primary_asset.taken_time, primary_asset.upload_time), mi.media
 `
 
 type FindMediaItemsForBurstDetectionRow struct {
-	MediaItemID      pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	PrimaryAssetID   pgtype.UUID        `db:"primary_asset_id" json:"primary_asset_id"`
-	OriginalFilename string             `db:"original_filename" json:"original_filename"`
-	TakenTime        pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
-	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	CameraModel      string             `db:"camera_model" json:"camera_model"`
-	BurstID          string             `db:"burst_id" json:"burst_id"`
+	MediaItemID      uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	OwnerID          *int32            `db:"owner_id" json:"owner_id"`
+	RepositoryID     uuid.NullUUID     `db:"repository_id" json:"repository_id"`
+	PrimaryAssetID   uuid.NullUUID     `db:"primary_asset_id" json:"primary_asset_id"`
+	OriginalFilename string            `db:"original_filename" json:"original_filename"`
+	TakenTime        dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
+	UploadTime       dbtypes.Timestamp `db:"upload_time" json:"upload_time"`
+	CameraModel      string            `db:"camera_model" json:"camera_model"`
+	BurstID          string            `db:"burst_id" json:"burst_id"`
 }
 
-func (q *Queries) FindMediaItemsForBurstDetection(ctx context.Context, repositoryID pgtype.UUID) ([]FindMediaItemsForBurstDetectionRow, error) {
-	rows, err := q.db.Query(ctx, findMediaItemsForBurstDetection, repositoryID)
+func (q *Queries) FindMediaItemsForBurstDetection(ctx context.Context, repositoryID uuid.NullUUID) ([]FindMediaItemsForBurstDetectionRow, error) {
+	rows, err := q.db.QueryContext(ctx, findMediaItemsForBurstDetection, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -184,10 +321,35 @@ func (q *Queries) FindMediaItemsForBurstDetection(ctx context.Context, repositor
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
+}
+
+const getBurstStackByGroupKey = `-- name: GetBurstStackByGroupKey :one
+SELECT stack_id, owner_id, repository_id, stack_kind, cover_media_item_id, group_key, created_at, updated_at
+FROM asset_stacks
+WHERE stack_kind = 'burst' AND group_key = ?1
+`
+
+func (q *Queries) GetBurstStackByGroupKey(ctx context.Context, groupKey *string) (AssetStack, error) {
+	row := q.db.QueryRowContext(ctx, getBurstStackByGroupKey, groupKey)
+	var i AssetStack
+	err := row.Scan(
+		&i.StackID,
+		&i.OwnerID,
+		&i.RepositoryID,
+		&i.StackKind,
+		&i.CoverMediaItemID,
+		&i.GroupKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getMediaItemByAssetID = `-- name: GetMediaItemByAssetID :one
@@ -195,12 +357,12 @@ const getMediaItemByAssetID = `-- name: GetMediaItemByAssetID :one
 SELECT mi.media_item_id, mi.owner_id, mi.repository_id, mi.media_kind, mi.primary_asset_id, mi.group_key, mi.created_at, mi.updated_at
 FROM media_items mi
 JOIN media_item_assets mia ON mia.media_item_id = mi.media_item_id
-WHERE mia.asset_id = $1
+WHERE mia.asset_id = ?1
 `
 
 // Logical media items -------------------------------------------------------
-func (q *Queries) GetMediaItemByAssetID(ctx context.Context, assetID pgtype.UUID) (MediaItem, error) {
-	row := q.db.QueryRow(ctx, getMediaItemByAssetID, assetID)
+func (q *Queries) GetMediaItemByAssetID(ctx context.Context, assetID uuid.UUID) (MediaItem, error) {
+	row := q.db.QueryRowContext(ctx, getMediaItemByAssetID, assetID)
 	var i MediaItem
 	err := row.Scan(
 		&i.MediaItemID,
@@ -219,18 +381,18 @@ const getMediaItemComponents = `-- name: GetMediaItemComponents :many
 SELECT mia.asset_id, mia.media_item_id, mia.relation, mia.position, mia.created_at
 FROM media_item_assets mia
 JOIN assets a ON a.asset_id = mia.asset_id
-WHERE mia.media_item_id = $1
-  AND ($2::integer IS NULL OR a.owner_id = $2)
+WHERE mia.media_item_id = ?1
+  AND (?2 IS NULL OR a.owner_id = ?2)
 ORDER BY mia.position ASC, mia.created_at ASC
 `
 
 type GetMediaItemComponentsParams struct {
-	MediaItemID pgtype.UUID `db:"media_item_id" json:"media_item_id"`
-	OwnerID     *int32      `db:"owner_id" json:"owner_id"`
+	MediaItemID uuid.UUID   `db:"media_item_id" json:"media_item_id"`
+	OwnerID     interface{} `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetMediaItemComponents(ctx context.Context, arg GetMediaItemComponentsParams) ([]MediaItemAsset, error) {
-	rows, err := q.db.Query(ctx, getMediaItemComponents, arg.MediaItemID, arg.OwnerID)
+	rows, err := q.db.QueryContext(ctx, getMediaItemComponents, arg.MediaItemID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -249,6 +411,9 @@ func (q *Queries) GetMediaItemComponents(ctx context.Context, arg GetMediaItemCo
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -259,17 +424,27 @@ const getMediaItemsByAssetIDs = `-- name: GetMediaItemsByAssetIDs :many
 SELECT mia.asset_id, mia.media_item_id, mi.primary_asset_id
 FROM media_item_assets mia
 JOIN media_items mi ON mi.media_item_id = mia.media_item_id
-WHERE mia.asset_id = ANY($1::uuid[])
+WHERE mia.asset_id IN (/*SLICE:asset_ids*/?)
 `
 
 type GetMediaItemsByAssetIDsRow struct {
-	AssetID        pgtype.UUID `db:"asset_id" json:"asset_id"`
-	MediaItemID    pgtype.UUID `db:"media_item_id" json:"media_item_id"`
-	PrimaryAssetID pgtype.UUID `db:"primary_asset_id" json:"primary_asset_id"`
+	AssetID        uuid.UUID     `db:"asset_id" json:"asset_id"`
+	MediaItemID    uuid.UUID     `db:"media_item_id" json:"media_item_id"`
+	PrimaryAssetID uuid.NullUUID `db:"primary_asset_id" json:"primary_asset_id"`
 }
 
-func (q *Queries) GetMediaItemsByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetMediaItemsByAssetIDsRow, error) {
-	rows, err := q.db.Query(ctx, getMediaItemsByAssetIDs, dollar_1)
+func (q *Queries) GetMediaItemsByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetMediaItemsByAssetIDsRow, error) {
+	query := getMediaItemsByAssetIDs
+	var queryParams []interface{}
+	if len(assetIds) > 0 {
+		for _, v := range assetIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(assetIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -282,27 +457,43 @@ func (q *Queries) GetMediaItemsByAssetIDs(ctx context.Context, dollar_1 []pgtype
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
+const getNextStackPosition = `-- name: GetNextStackPosition :one
+SELECT CAST(COALESCE(MAX(position) + 1, 0) AS INTEGER)
+FROM asset_stack_members
+WHERE stack_id = ?1
+`
+
+func (q *Queries) GetNextStackPosition(ctx context.Context, stackID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getNextStackPosition, stackID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getStackByAssetID = `-- name: GetStackByAssetID :one
 SELECT asm.stack_id, asm.media_item_id, asm.position
 FROM media_item_assets mia
 JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
-WHERE mia.asset_id = $1
+WHERE mia.asset_id = ?1
 `
 
 type GetStackByAssetIDRow struct {
-	StackID     pgtype.UUID `db:"stack_id" json:"stack_id"`
-	MediaItemID pgtype.UUID `db:"media_item_id" json:"media_item_id"`
-	Position    *int32      `db:"position" json:"position"`
+	StackID     uuid.UUID `db:"stack_id" json:"stack_id"`
+	MediaItemID uuid.UUID `db:"media_item_id" json:"media_item_id"`
+	Position    int64     `db:"position" json:"position"`
 }
 
-func (q *Queries) GetStackByAssetID(ctx context.Context, assetID pgtype.UUID) (GetStackByAssetIDRow, error) {
-	row := q.db.QueryRow(ctx, getStackByAssetID, assetID)
+func (q *Queries) GetStackByAssetID(ctx context.Context, assetID uuid.UUID) (GetStackByAssetIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getStackByAssetID, assetID)
 	var i GetStackByAssetIDRow
 	err := row.Scan(&i.StackID, &i.MediaItemID, &i.Position)
 	return i, err
@@ -313,18 +504,18 @@ SELECT COUNT(*) AS count
 FROM asset_stack_members asm
 JOIN media_items mi ON mi.media_item_id = asm.media_item_id
 JOIN assets a ON a.asset_id = mi.primary_asset_id
-WHERE asm.stack_id = $1
+WHERE asm.stack_id = ?1
   AND a.is_deleted = false
-  AND ($2::integer IS NULL OR mi.owner_id = $2)
+  AND (?2 IS NULL OR mi.owner_id = ?2)
 `
 
 type GetStackMemberCountParams struct {
-	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
-	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+	StackID uuid.UUID   `db:"stack_id" json:"stack_id"`
+	OwnerID interface{} `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetStackMemberCount(ctx context.Context, arg GetStackMemberCountParams) (int64, error) {
-	row := q.db.QueryRow(ctx, getStackMemberCount, arg.StackID, arg.OwnerID)
+	row := q.db.QueryRowContext(ctx, getStackMemberCount, arg.StackID, arg.OwnerID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -334,17 +525,17 @@ const getStackMemberCountAny = `-- name: GetStackMemberCountAny :one
 SELECT COUNT(*) AS count
 FROM asset_stack_members asm
 JOIN media_items mi ON mi.media_item_id = asm.media_item_id
-WHERE asm.stack_id = $1
-  AND ($2::integer IS NULL OR mi.owner_id = $2)
+WHERE asm.stack_id = ?1
+  AND (?2 IS NULL OR mi.owner_id = ?2)
 `
 
 type GetStackMemberCountAnyParams struct {
-	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
-	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+	StackID uuid.UUID   `db:"stack_id" json:"stack_id"`
+	OwnerID interface{} `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetStackMemberCountAny(ctx context.Context, arg GetStackMemberCountAnyParams) (int64, error) {
-	row := q.db.QueryRow(ctx, getStackMemberCountAny, arg.StackID, arg.OwnerID)
+	row := q.db.QueryRowContext(ctx, getStackMemberCountAny, arg.StackID, arg.OwnerID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -355,26 +546,26 @@ SELECT asm.media_item_id, mi.primary_asset_id AS asset_id, asm.position, asm.cre
 FROM asset_stack_members asm
 JOIN media_items mi ON mi.media_item_id = asm.media_item_id
 JOIN assets a ON a.asset_id = mi.primary_asset_id
-WHERE asm.stack_id = $1
+WHERE asm.stack_id = ?1
   AND a.is_deleted = false
-  AND ($2::integer IS NULL OR mi.owner_id = $2)
+  AND (?2 IS NULL OR mi.owner_id = ?2)
 ORDER BY asm.position ASC, asm.created_at ASC
 `
 
 type GetStackMembersParams struct {
-	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
-	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+	StackID uuid.UUID   `db:"stack_id" json:"stack_id"`
+	OwnerID interface{} `db:"owner_id" json:"owner_id"`
 }
 
 type GetStackMembersRow struct {
-	MediaItemID pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
-	AssetID     pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Position    *int32             `db:"position" json:"position"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	MediaItemID uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	AssetID     uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+	Position    int64             `db:"position" json:"position"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) GetStackMembers(ctx context.Context, arg GetStackMembersParams) ([]GetStackMembersRow, error) {
-	rows, err := q.db.Query(ctx, getStackMembers, arg.StackID, arg.OwnerID)
+	rows, err := q.db.QueryContext(ctx, getStackMembers, arg.StackID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -392,6 +583,9 @@ func (q *Queries) GetStackMembers(ctx context.Context, arg GetStackMembersParams
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -402,25 +596,25 @@ const getStackMembersAny = `-- name: GetStackMembersAny :many
 SELECT asm.media_item_id, mi.primary_asset_id AS asset_id, asm.position, asm.created_at
 FROM asset_stack_members asm
 JOIN media_items mi ON mi.media_item_id = asm.media_item_id
-WHERE asm.stack_id = $1
-  AND ($2::integer IS NULL OR mi.owner_id = $2)
+WHERE asm.stack_id = ?1
+  AND (?2 IS NULL OR mi.owner_id = ?2)
 ORDER BY asm.position ASC, asm.created_at ASC
 `
 
 type GetStackMembersAnyParams struct {
-	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
-	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+	StackID uuid.UUID   `db:"stack_id" json:"stack_id"`
+	OwnerID interface{} `db:"owner_id" json:"owner_id"`
 }
 
 type GetStackMembersAnyRow struct {
-	MediaItemID pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
-	AssetID     pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Position    *int32             `db:"position" json:"position"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	MediaItemID uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	AssetID     uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+	Position    int64             `db:"position" json:"position"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) GetStackMembersAny(ctx context.Context, arg GetStackMembersAnyParams) ([]GetStackMembersAnyRow, error) {
-	rows, err := q.db.Query(ctx, getStackMembersAny, arg.StackID, arg.OwnerID)
+	rows, err := q.db.QueryContext(ctx, getStackMembersAny, arg.StackID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -438,6 +632,54 @@ func (q *Queries) GetStackMembersAny(ctx context.Context, arg GetStackMembersAny
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStackMembershipsByMediaItemIDs = `-- name: GetStackMembershipsByMediaItemIDs :many
+SELECT stack_id, CAST(MIN(position) AS INTEGER) AS position
+FROM asset_stack_members
+WHERE media_item_id IN (/*SLICE:media_item_ids*/?)
+GROUP BY stack_id
+`
+
+type GetStackMembershipsByMediaItemIDsRow struct {
+	StackID  uuid.UUID `db:"stack_id" json:"stack_id"`
+	Position int64     `db:"position" json:"position"`
+}
+
+func (q *Queries) GetStackMembershipsByMediaItemIDs(ctx context.Context, mediaItemIds []uuid.UUID) ([]GetStackMembershipsByMediaItemIDsRow, error) {
+	query := getStackMembershipsByMediaItemIDs
+	var queryParams []interface{}
+	if len(mediaItemIds) > 0 {
+		for _, v := range mediaItemIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:media_item_ids*/?", strings.Repeat(",?", len(mediaItemIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:media_item_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetStackMembershipsByMediaItemIDsRow
+	for rows.Next() {
+		var i GetStackMembershipsByMediaItemIDsRow
+		if err := rows.Scan(&i.StackID, &i.Position); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -448,18 +690,28 @@ const getStacksByAssetIDs = `-- name: GetStacksByAssetIDs :many
 SELECT mia.asset_id, asm.media_item_id, asm.stack_id, asm.position
 FROM media_item_assets mia
 JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
-WHERE mia.asset_id = ANY($1::uuid[])
+WHERE mia.asset_id IN (/*SLICE:asset_ids*/?)
 `
 
 type GetStacksByAssetIDsRow struct {
-	AssetID     pgtype.UUID `db:"asset_id" json:"asset_id"`
-	MediaItemID pgtype.UUID `db:"media_item_id" json:"media_item_id"`
-	StackID     pgtype.UUID `db:"stack_id" json:"stack_id"`
-	Position    *int32      `db:"position" json:"position"`
+	AssetID     uuid.UUID `db:"asset_id" json:"asset_id"`
+	MediaItemID uuid.UUID `db:"media_item_id" json:"media_item_id"`
+	StackID     uuid.UUID `db:"stack_id" json:"stack_id"`
+	Position    int64     `db:"position" json:"position"`
 }
 
-func (q *Queries) GetStacksByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetStacksByAssetIDsRow, error) {
-	rows, err := q.db.Query(ctx, getStacksByAssetIDs, dollar_1)
+func (q *Queries) GetStacksByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetStacksByAssetIDsRow, error) {
+	query := getStacksByAssetIDs
+	var queryParams []interface{}
+	if len(assetIds) > 0 {
+		for _, v := range assetIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(assetIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -477,29 +729,48 @@ func (q *Queries) GetStacksByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUI
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
+const moveAllMediaItemComponents = `-- name: MoveAllMediaItemComponents :exec
+UPDATE media_item_assets
+SET media_item_id = ?1
+WHERE media_item_id = ?2
+`
+
+type MoveAllMediaItemComponentsParams struct {
+	TargetMediaItemID uuid.UUID `db:"target_media_item_id" json:"target_media_item_id"`
+	SourceMediaItemID uuid.UUID `db:"source_media_item_id" json:"source_media_item_id"`
+}
+
+func (q *Queries) MoveAllMediaItemComponents(ctx context.Context, arg MoveAllMediaItemComponentsParams) error {
+	_, err := q.db.ExecContext(ctx, moveAllMediaItemComponents, arg.TargetMediaItemID, arg.SourceMediaItemID)
+	return err
+}
+
 const moveMediaItemComponent = `-- name: MoveMediaItemComponent :exec
 UPDATE media_item_assets
-SET media_item_id = $1,
-    relation = $2,
-    position = $3
-WHERE asset_id = $4
+SET media_item_id = ?1,
+    relation = ?2,
+    position = ?3
+WHERE asset_id = ?4
 `
 
 type MoveMediaItemComponentParams struct {
-	TargetMediaItemID pgtype.UUID   `db:"target_media_item_id" json:"target_media_item_id"`
-	Relation          StackRelation `db:"relation" json:"relation"`
-	Position          *int32        `db:"position" json:"position"`
-	AssetID           pgtype.UUID   `db:"asset_id" json:"asset_id"`
+	TargetMediaItemID uuid.UUID `db:"target_media_item_id" json:"target_media_item_id"`
+	Relation          string    `db:"relation" json:"relation"`
+	Position          int64     `db:"position" json:"position"`
+	AssetID           uuid.UUID `db:"asset_id" json:"asset_id"`
 }
 
 func (q *Queries) MoveMediaItemComponent(ctx context.Context, arg MoveMediaItemComponentParams) error {
-	_, err := q.db.Exec(ctx, moveMediaItemComponent,
+	_, err := q.db.ExecContext(ctx, moveMediaItemComponent,
 		arg.TargetMediaItemID,
 		arg.Relation,
 		arg.Position,
@@ -509,13 +780,95 @@ func (q *Queries) MoveMediaItemComponent(ctx context.Context, arg MoveMediaItemC
 }
 
 const removeStackMemberByAssetID = `-- name: RemoveStackMemberByAssetID :exec
-DELETE FROM asset_stack_members asm
-USING media_item_assets mia
-WHERE mia.asset_id = $1
-  AND asm.media_item_id = mia.media_item_id
+DELETE FROM asset_stack_members
+WHERE media_item_id IN (
+  SELECT media_item_id
+  FROM media_item_assets
+  WHERE asset_id = ?1
+)
 `
 
-func (q *Queries) RemoveStackMemberByAssetID(ctx context.Context, assetID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, removeStackMemberByAssetID, assetID)
+func (q *Queries) RemoveStackMemberByAssetID(ctx context.Context, assetID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, removeStackMemberByAssetID, assetID)
+	return err
+}
+
+const removeStackMembershipsByMediaItemIDs = `-- name: RemoveStackMembershipsByMediaItemIDs :exec
+DELETE FROM asset_stack_members
+WHERE media_item_id IN (/*SLICE:media_item_ids*/?)
+`
+
+func (q *Queries) RemoveStackMembershipsByMediaItemIDs(ctx context.Context, mediaItemIds []uuid.UUID) error {
+	query := removeStackMembershipsByMediaItemIDs
+	var queryParams []interface{}
+	if len(mediaItemIds) > 0 {
+		for _, v := range mediaItemIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:media_item_ids*/?", strings.Repeat(",?", len(mediaItemIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:media_item_ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
+}
+
+const updateMediaItemAfterStructuralMerge = `-- name: UpdateMediaItemAfterStructuralMerge :exec
+UPDATE media_items
+SET primary_asset_id = ?1,
+    media_kind = CASE
+      WHEN EXISTS (
+        SELECT 1
+        FROM media_item_assets
+        WHERE media_item_assets.media_item_id = ?2
+          AND relation = 'live_photo_video'
+      ) THEN 'live_photo'
+      ELSE 'photo'
+    END,
+    group_key = ?3,
+    updated_at = ?4
+WHERE media_items.media_item_id = ?2
+`
+
+type UpdateMediaItemAfterStructuralMergeParams struct {
+	PrimaryAssetID    uuid.NullUUID     `db:"primary_asset_id" json:"primary_asset_id"`
+	TargetMediaItemID uuid.UUID         `db:"target_media_item_id" json:"target_media_item_id"`
+	GroupKey          *string           `db:"group_key" json:"group_key"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateMediaItemAfterStructuralMerge(ctx context.Context, arg UpdateMediaItemAfterStructuralMergeParams) error {
+	_, err := q.db.ExecContext(ctx, updateMediaItemAfterStructuralMerge,
+		arg.PrimaryAssetID,
+		arg.TargetMediaItemID,
+		arg.GroupKey,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const updateMediaItemAsLivePhoto = `-- name: UpdateMediaItemAsLivePhoto :exec
+UPDATE media_items
+SET media_kind = 'live_photo',
+    primary_asset_id = ?1,
+    group_key = ?2,
+    updated_at = ?3
+WHERE media_item_id = ?4
+`
+
+type UpdateMediaItemAsLivePhotoParams struct {
+	PrimaryAssetID uuid.NullUUID     `db:"primary_asset_id" json:"primary_asset_id"`
+	GroupKey       *string           `db:"group_key" json:"group_key"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	MediaItemID    uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+}
+
+func (q *Queries) UpdateMediaItemAsLivePhoto(ctx context.Context, arg UpdateMediaItemAsLivePhotoParams) error {
+	_, err := q.db.ExecContext(ctx, updateMediaItemAsLivePhoto,
+		arg.PrimaryAssetID,
+		arg.GroupKey,
+		arg.UpdatedAt,
+		arg.MediaItemID,
+	)
 	return err
 }

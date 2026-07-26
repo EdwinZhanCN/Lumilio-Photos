@@ -75,7 +75,7 @@ func RegisterDedupe() {
 					continue
 				}
 				if h, ok := phash.FromVector(row.Vector.Slice()); ok {
-					hashOf[uuid.UUID(row.AssetID.Bytes)] = h
+					hashOf[row.AssetID] = h
 				}
 			}
 

@@ -9,7 +9,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/storage"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 type hostOwnerRepositoryManagerStub struct {
@@ -23,7 +23,7 @@ func (s *hostOwnerRepositoryManagerStub) HostOwnerID(context.Context) (*int32, e
 	return s.hostOwnerID, nil
 }
 
-func (s *hostOwnerRepositoryManagerStub) AddRepository(_ string, ownerID *int32, _ dbtypes.RepoRole, _ ...pgtype.UUID) (*repo.Repository, error) {
+func (s *hostOwnerRepositoryManagerStub) AddRepository(_ string, ownerID *int32, _ dbtypes.RepoRole, _ ...uuid.UUID) (*repo.Repository, error) {
 	s.attachedOwnerID = ownerID
 	return &repo.Repository{Name: "Archive", Status: dbtypes.RepoStatusActive}, nil
 }

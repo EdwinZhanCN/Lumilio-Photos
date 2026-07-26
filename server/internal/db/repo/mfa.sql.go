@@ -11,7 +11,7 @@ import (
 
 const createUserRecoveryCode = `-- name: CreateUserRecoveryCode :exec
 INSERT INTO user_mfa_recovery_codes (user_id, code_hash)
-VALUES ($1, $2)
+VALUES (?1, ?2)
 `
 
 type CreateUserRecoveryCodeParams struct {
@@ -20,54 +20,54 @@ type CreateUserRecoveryCodeParams struct {
 }
 
 func (q *Queries) CreateUserRecoveryCode(ctx context.Context, arg CreateUserRecoveryCodeParams) error {
-	_, err := q.db.Exec(ctx, createUserRecoveryCode, arg.UserID, arg.CodeHash)
+	_, err := q.db.ExecContext(ctx, createUserRecoveryCode, arg.UserID, arg.CodeHash)
 	return err
 }
 
 const deleteUserRecoveryCodes = `-- name: DeleteUserRecoveryCodes :exec
 DELETE FROM user_mfa_recovery_codes
-WHERE user_id = $1
+WHERE user_id = ?1
 `
 
 func (q *Queries) DeleteUserRecoveryCodes(ctx context.Context, userID int32) error {
-	_, err := q.db.Exec(ctx, deleteUserRecoveryCodes, userID)
+	_, err := q.db.ExecContext(ctx, deleteUserRecoveryCodes, userID)
 	return err
 }
 
 const deleteUserTOTPCredential = `-- name: DeleteUserTOTPCredential :exec
 DELETE FROM user_mfa_totp_credentials
-WHERE user_id = $1
+WHERE user_id = ?1
 `
 
 func (q *Queries) DeleteUserTOTPCredential(ctx context.Context, userID int32) error {
-	_, err := q.db.Exec(ctx, deleteUserTOTPCredential, userID)
+	_, err := q.db.ExecContext(ctx, deleteUserTOTPCredential, userID)
 	return err
 }
 
 const getUserMFAStatus = `-- name: GetUserMFAStatus :one
 SELECT
   (totp.user_id IS NOT NULL) AS totp_enabled,
-  COALESCE(passkeys.passkey_count, 0)::bigint AS passkey_count,
-  COALESCE(recovery.recovery_codes_remaining, 0)::bigint AS recovery_codes_remaining,
+  COALESCE(passkeys.passkey_count, 0) AS passkey_count,
+  COALESCE(recovery.recovery_codes_remaining, 0) AS recovery_codes_remaining,
   recovery.recovery_codes_generated_at
 FROM users u
 LEFT JOIN user_mfa_totp_credentials totp ON totp.user_id = u.user_id
 LEFT JOIN (
   SELECT
     user_webauthn_credentials.user_id,
-    COUNT(*)::bigint AS passkey_count
+    COUNT(*) AS passkey_count
   FROM user_webauthn_credentials
   GROUP BY user_webauthn_credentials.user_id
 ) passkeys ON passkeys.user_id = u.user_id
 LEFT JOIN (
   SELECT
     user_mfa_recovery_codes.user_id,
-    COUNT(*) FILTER (WHERE user_mfa_recovery_codes.used_at IS NULL)::bigint AS recovery_codes_remaining,
+    COUNT(*) FILTER (WHERE user_mfa_recovery_codes.used_at IS NULL) AS recovery_codes_remaining,
     MAX(user_mfa_recovery_codes.created_at) AS recovery_codes_generated_at
   FROM user_mfa_recovery_codes
   GROUP BY user_mfa_recovery_codes.user_id
 ) recovery ON recovery.user_id = u.user_id
-WHERE u.user_id = $1
+WHERE u.user_id = ?1
 `
 
 type GetUserMFAStatusRow struct {
@@ -78,7 +78,7 @@ type GetUserMFAStatusRow struct {
 }
 
 func (q *Queries) GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error) {
-	row := q.db.QueryRow(ctx, getUserMFAStatus, userID)
+	row := q.db.QueryRowContext(ctx, getUserMFAStatus, userID)
 	var i GetUserMFAStatusRow
 	err := row.Scan(
 		&i.TotpEnabled,
@@ -92,11 +92,11 @@ func (q *Queries) GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMF
 const getUserTOTPCredential = `-- name: GetUserTOTPCredential :one
 SELECT user_id, secret_ciphertext, created_at, updated_at, enabled_at, last_used_at
 FROM user_mfa_totp_credentials
-WHERE user_id = $1
+WHERE user_id = ?1
 `
 
 func (q *Queries) GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error) {
-	row := q.db.QueryRow(ctx, getUserTOTPCredential, userID)
+	row := q.db.QueryRowContext(ctx, getUserTOTPCredential, userID)
 	var i UserMfaTotpCredential
 	err := row.Scan(
 		&i.UserID,
@@ -111,13 +111,13 @@ func (q *Queries) GetUserTOTPCredential(ctx context.Context, userID int32) (User
 
 const updateUserTOTPLastUsed = `-- name: UpdateUserTOTPLastUsed :exec
 UPDATE user_mfa_totp_credentials
-SET last_used_at = CURRENT_TIMESTAMP,
-    updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
+SET last_used_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
 `
 
 func (q *Queries) UpdateUserTOTPLastUsed(ctx context.Context, userID int32) error {
-	_, err := q.db.Exec(ctx, updateUserTOTPLastUsed, userID)
+	_, err := q.db.ExecContext(ctx, updateUserTOTPLastUsed, userID)
 	return err
 }
 
@@ -128,11 +128,16 @@ INSERT INTO user_mfa_totp_credentials (
   enabled_at,
   updated_at
 )
-VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES (
+    ?1,
+    ?2,
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
 ON CONFLICT (user_id) DO UPDATE
 SET secret_ciphertext = EXCLUDED.secret_ciphertext,
-    enabled_at = CURRENT_TIMESTAMP,
-    updated_at = CURRENT_TIMESTAMP,
+    enabled_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     last_used_at = NULL
 RETURNING user_id, secret_ciphertext, created_at, updated_at, enabled_at, last_used_at
 `
@@ -143,7 +148,7 @@ type UpsertUserTOTPCredentialParams struct {
 }
 
 func (q *Queries) UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error) {
-	row := q.db.QueryRow(ctx, upsertUserTOTPCredential, arg.UserID, arg.SecretCiphertext)
+	row := q.db.QueryRowContext(ctx, upsertUserTOTPCredential, arg.UserID, arg.SecretCiphertext)
 	var i UserMfaTotpCredential
 	err := row.Scan(
 		&i.UserID,
@@ -158,9 +163,9 @@ func (q *Queries) UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTO
 
 const useRecoveryCode = `-- name: UseRecoveryCode :one
 UPDATE user_mfa_recovery_codes
-SET used_at = CURRENT_TIMESTAMP
-WHERE user_id = $1
-  AND code_hash = $2
+SET used_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
+  AND code_hash = ?2
   AND used_at IS NULL
 RETURNING recovery_code_id
 `
@@ -170,9 +175,9 @@ type UseRecoveryCodeParams struct {
 	CodeHash string `db:"code_hash" json:"code_hash"`
 }
 
-func (q *Queries) UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int32, error) {
-	row := q.db.QueryRow(ctx, useRecoveryCode, arg.UserID, arg.CodeHash)
-	var recovery_code_id int32
+func (q *Queries) UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, useRecoveryCode, arg.UserID, arg.CodeHash)
+	var recovery_code_id int64
 	err := row.Scan(&recovery_code_id)
 	return recovery_code_id, err
 }

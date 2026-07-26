@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -14,9 +15,7 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/settings"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
@@ -93,8 +92,8 @@ type assetIndexingService struct {
 	queries         *repo.Queries
 	settingsService SettingsService
 	runtimeChecker  LumenService
-	queueClient     *river.Client[pgx.Tx]
-	dbpool          *pgxpool.Pool
+	queueClient     *river.Client[*sql.Tx]
+	dbpool          *sql.DB
 	logger          *zap.Logger
 	auditProvider   logging.RepositoryAuditProvider
 }
@@ -108,8 +107,8 @@ func NewAssetIndexingService(
 	queries *repo.Queries,
 	settingsService SettingsService,
 	runtimeChecker LumenService,
-	queueClient *river.Client[pgx.Tx],
-	dbpool *pgxpool.Pool,
+	queueClient *river.Client[*sql.Tx],
+	dbpool *sql.DB,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 ) AssetIndexingService {
@@ -178,16 +177,16 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 	return result
 }
 
-func parseRepositoryUUID(repositoryID *string) (pgtype.UUID, error) {
+func parseRepositoryUUID(repositoryID *string) (uuid.NullUUID, error) {
 	if repositoryID == nil || strings.TrimSpace(*repositoryID) == "" {
-		return pgtype.UUID{}, nil
+		return uuid.NullUUID{}, nil
 	}
 
-	var pgUUID pgtype.UUID
-	if err := pgUUID.Scan(strings.TrimSpace(*repositoryID)); err != nil {
-		return pgtype.UUID{}, fmt.Errorf("invalid repository ID: %w", err)
+	parsed, err := uuid.Parse(strings.TrimSpace(*repositoryID))
+	if err != nil {
+		return uuid.NullUUID{}, fmt.Errorf("invalid repository ID: %w", err)
 	}
-	return pgUUID, nil
+	return uuid.NullUUID{UUID: parsed, Valid: true}, nil
 }
 
 func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryID *string) (AssetIndexingStats, error) {
@@ -450,7 +449,7 @@ func nextReindexPageOffset(missingOnly bool, candidateCount, limit, currentOffse
 
 func (s *assetIndexingService) collectReindexCandidates(
 	ctx context.Context,
-	repositoryUUID pgtype.UUID,
+	repositoryUUID uuid.NullUUID,
 	tasks []AssetIndexingTask,
 	input ReindexAssetsInput,
 ) ([]reindexCandidate, error) {
@@ -496,8 +495,8 @@ func (s *assetIndexingService) collectReindexCandidates(
 		if len(photoTasks) > 0 {
 			assets, err := s.queries.ListPhotoAssetsForIndexingBatch(ctx, repo.ListPhotoAssetsForIndexingBatchParams{
 				RepositoryID: repositoryUUID,
-				Limit:        int32(input.Limit),
-				Offset:       int32(input.Offset),
+				Limit:        int64(input.Limit),
+				Offset:       int64(input.Offset),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("list photo assets for indexing: %w", err)
@@ -512,8 +511,8 @@ func (s *assetIndexingService) collectReindexCandidates(
 		if len(videoTasks) > 0 {
 			assets, err := s.queries.ListVideoAssetsForIndexingBatch(ctx, repo.ListVideoAssetsForIndexingBatchParams{
 				RepositoryID: repositoryUUID,
-				Limit:        int32(input.Limit),
-				Offset:       int32(input.Offset),
+				Limit:        int64(input.Limit),
+				Offset:       int64(input.Offset),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("list video assets for indexing: %w", err)
@@ -549,7 +548,7 @@ func (s *assetIndexingService) collectReindexCandidates(
 
 func (s *assetIndexingService) listMissingAssetsForTask(
 	ctx context.Context,
-	repositoryUUID pgtype.UUID,
+	repositoryUUID uuid.NullUUID,
 	task AssetIndexingTask,
 	limit int,
 ) ([]repo.Asset, error) {
@@ -557,25 +556,25 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 	case AssetIndexingTaskSemanticImage:
 		return s.queries.ListPhotoAssetsMissingSemanticEmbedding(ctx, repo.ListPhotoAssetsMissingSemanticEmbeddingParams{
 			RepositoryID: repositoryUUID,
-			Limit:        int32(limit),
+			Limit:        int64(limit),
 			Offset:       0,
 		})
 	case AssetIndexingTaskOCR:
 		return s.queries.ListPhotoAssetsMissingOCRResults(ctx, repo.ListPhotoAssetsMissingOCRResultsParams{
 			RepositoryID: repositoryUUID,
-			Limit:        int32(limit),
+			Limit:        int64(limit),
 			Offset:       0,
 		})
 	case AssetIndexingTaskFaceRecognition:
 		return s.queries.ListPhotoAssetsMissingFaceResults(ctx, repo.ListPhotoAssetsMissingFaceResultsParams{
 			RepositoryID: repositoryUUID,
-			Limit:        int32(limit),
+			Limit:        int64(limit),
 			Offset:       0,
 		})
 	case AssetIndexingTaskVideoSemantic:
 		return s.queries.ListVideoAssetsMissingSemanticFrames(ctx, repo.ListVideoAssetsMissingSemanticFramesParams{
 			RepositoryID: repositoryUUID,
-			Limit:        int32(limit),
+			Limit:        int64(limit),
 			Offset:       0,
 		})
 	default:
@@ -595,11 +594,11 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		return 0, errors.New("asset storage path is missing")
 	}
 
-	repositoryID := candidate.asset.RepositoryID.String()
+	repositoryID := candidate.asset.RepositoryID.UUID.String()
 	repository, ok := repositoryCache[repositoryID]
 	if !ok {
 		var err error
-		repository, err = s.queries.GetRepository(ctx, candidate.asset.RepositoryID)
+		repository, err = s.queries.GetRepository(ctx, candidate.asset.RepositoryID.UUID)
 		if err != nil {
 			return 0, fmt.Errorf("get repository: %w", err)
 		}
@@ -654,7 +653,7 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 
 func (s *assetIndexingService) enqueueSemanticTask(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
 		AssetID:           assetID,
@@ -668,7 +667,7 @@ func (s *assetIndexingService) enqueueSemanticTask(
 
 func (s *assetIndexingService) enqueueOCRTask(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
 		AssetID:           assetID,
@@ -682,7 +681,7 @@ func (s *assetIndexingService) enqueueOCRTask(
 
 func (s *assetIndexingService) enqueueFaceTask(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
 		AssetID:           assetID,
@@ -696,7 +695,7 @@ func (s *assetIndexingService) enqueueFaceTask(
 
 func (s *assetIndexingService) enqueueVideoFramesTask(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessVideoFramesArgs{
 		AssetID:           assetID,
@@ -721,7 +720,7 @@ WHERE queue = $1
 `
 
 	var count int64
-	if err := s.dbpool.QueryRow(ctx, query, queueName).Scan(&count); err != nil {
+	if err := s.dbpool.QueryRowContext(ctx, query, queueName).Scan(&count); err != nil {
 		s.logger.Warn("indexing stats queue count failed",
 			zap.String("operation", "indexing.stats"),
 			zap.String("queue", queueName),
@@ -746,7 +745,10 @@ func (s *assetIndexingService) audit(repositoryID *string, repoPath string) logg
 	if err != nil {
 		return s.auditProvider.ForPath(repoPath)
 	}
-	repository, err := s.queries.GetRepository(context.Background(), repositoryUUID)
+	if !repositoryUUID.Valid {
+		return s.auditProvider.ForPath(repoPath)
+	}
+	repository, err := s.queries.GetRepository(context.Background(), repositoryUUID.UUID)
 	if err != nil {
 		return s.auditProvider.ForPath(repoPath)
 	}

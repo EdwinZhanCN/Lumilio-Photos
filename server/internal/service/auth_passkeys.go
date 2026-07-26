@@ -3,19 +3,19 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -124,7 +124,7 @@ func (s *AuthService) StartRegistration(ctx context.Context, req RegistrationSta
 	if err := s.withTx(ctx, func(q *repo.Queries) error {
 		if _, err := q.GetUserByUsername(ctx, username); err == nil {
 			return ErrUserAlreadyExists
-		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("check username availability: %w", err)
 		}
 
@@ -383,7 +383,7 @@ func (s *AuthService) DeletePasskey(ctx context.Context, userID int, passkeyID i
 
 	rowsAffected, err := s.queries.DeleteUserWebAuthnCredential(ctx, repo.DeleteUserWebAuthnCredentialParams{
 		UserID:                   int32(userID),
-		UserWebauthnCredentialID: int32(passkeyID),
+		UserWebauthnCredentialID: int64(passkeyID),
 	})
 	if err != nil {
 		return fmt.Errorf("delete passkey: %w", err)
@@ -398,7 +398,7 @@ func (s *AuthService) DeletePasskey(ctx context.Context, userID int, passkeyID i
 // userHasTOTP reports whether the user has an active TOTP credential.
 func (s *AuthService) userHasTOTP(ctx context.Context, userID int32) (bool, error) {
 	if _, err := s.queries.GetUserTOTPCredential(ctx, userID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, fmt.Errorf("get totp credential: %w", err)
@@ -409,12 +409,12 @@ func (s *AuthService) userHasTOTP(ctx context.Context, userID int32) (bool, erro
 func (s *AuthService) getUserForPasskey(ctx context.Context, username string) (repo.User, webAuthnUser, error) {
 	user, err := s.queries.GetUserByUsername(ctx, strings.ToLower(strings.TrimSpace(username)))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.User{}, webAuthnUser{}, ErrPasskeyNotConfigured
 		}
 		return repo.User{}, webAuthnUser{}, fmt.Errorf("get user by username: %w", err)
 	}
-	if user.IsActive == nil || !*user.IsActive {
+	if !user.IsActive {
 		return repo.User{}, webAuthnUser{}, ErrPasskeyNotConfigured
 	}
 
@@ -513,30 +513,16 @@ func credentialToUsageParams(userID int32, credential webauthn.Credential) repo.
 	}
 }
 
-func encodeCredentialTransports(transports []protocol.AuthenticatorTransport) []byte {
-	if len(transports) == 0 {
-		return []byte("[]")
-	}
-
+func encodeCredentialTransports(transports []protocol.AuthenticatorTransport) dbtypes.Strings {
 	values := make([]string, 0, len(transports))
 	for _, transport := range transports {
 		values = append(values, string(transport))
 	}
-
-	payload, err := json.Marshal(values)
-	if err != nil {
-		return []byte("[]")
-	}
-	return payload
+	return dbtypes.Strings(values)
 }
 
-func decodeCredentialTransports(payload []byte) []protocol.AuthenticatorTransport {
-	if len(payload) == 0 {
-		return nil
-	}
-
-	var values []string
-	if err := json.Unmarshal(payload, &values); err != nil {
+func decodeCredentialTransports(values dbtypes.Strings) []protocol.AuthenticatorTransport {
+	if len(values) == 0 {
 		return nil
 	}
 
@@ -577,16 +563,11 @@ func passkeySummaryFromListRow(row repo.ListUserWebAuthnCredentialSummariesRow, 
 	}, nil
 }
 
-func decodeTransportLabels(payload []byte) ([]string, error) {
-	if len(payload) == 0 {
+func decodeTransportLabels(values dbtypes.Strings) ([]string, error) {
+	if len(values) == 0 {
 		return nil, nil
 	}
-
-	var values []string
-	if err := json.Unmarshal(payload, &values); err != nil {
-		return nil, fmt.Errorf("decode passkey transports: %w", err)
-	}
-	return values, nil
+	return append([]string(nil), values...), nil
 }
 
 func (s *AuthService) issuePasskeyChallenge(claims passkeyChallengeClaims, ttl time.Duration) (string, error) {

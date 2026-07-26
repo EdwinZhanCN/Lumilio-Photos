@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 
 	"server/internal/db/repo"
@@ -28,18 +27,17 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 	if err != nil {
 		return err
 	}
-	repoID := pgtype.UUID{Bytes: repoUUID, Valid: true}
 	operation := normalizeDiscoverOperation(args.Operation)
 
 	if operation == jobs.DiscoverOperationDelete {
 		_, err = ap.queries.SoftDeleteAssetByRepositoryAndStoragePath(ctx, repo.SoftDeleteAssetByRepositoryAndStoragePathParams{
-			RepositoryID: repoID,
+			RepositoryID: uuid.NullUUID{UUID: repoUUID, Valid: true},
 			StoragePath:  &storagePath,
 		})
 		if err != nil {
 			return fmt.Errorf("soft delete discovered asset (%s): %w", storagePath, err)
 		}
-		repository, repoErr := ap.queries.GetRepository(ctx, repoID)
+		repository, repoErr := ap.queries.GetRepository(ctx, repoUUID)
 		if repoErr == nil {
 			ap.repoAudit(repository.Path).Operation("asset.discover.delete",
 				zap.String("repository_id", args.RepositoryID),

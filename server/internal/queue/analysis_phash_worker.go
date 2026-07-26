@@ -35,7 +35,7 @@ func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHa
 		return fmt.Errorf("asset %s has no repository", asset.AssetID.String())
 	}
 
-	repository, err := w.Queries.GetRepository(ctx, asset.RepositoryID)
+	repository, err := w.Queries.GetRepository(ctx, asset.RepositoryID.UUID)
 	if err != nil {
 		return fmt.Errorf("get repository: %w", err)
 	}
@@ -62,7 +62,6 @@ func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHa
 
 	vector := phash.ToVector(hash)
 
-	// Convert asset_id to pgtype.UUID (GetAssetByID returns it directly)
 	if err := w.EmbeddingService.SaveEmbedding(ctx, job.Args.AssetID,
 		service.EmbeddingTypePHash, phash.ModelDCTPHashV1, vector, true); err != nil {
 		return fmt.Errorf("save phash embedding: %w", err)

@@ -28,16 +28,23 @@ func TestTimestampRoundTrip(t *testing.T) {
 	if roundTrip.Location() != time.UTC {
 		t.Fatalf("roundTrip location = %s, want UTC", roundTrip.Location())
 	}
+	if !roundTrip.Valid {
+		t.Fatal("roundTrip Valid = false, want true")
+	}
 }
 
 func TestTimestampRejectsInvalidValues(t *testing.T) {
 	t.Parallel()
 
 	var value Timestamp
-	if err := value.Scan(nil); err == nil {
-		t.Fatal("Scan(nil) error = nil, want unsupported source error")
+	if err := value.Scan(nil); err != nil {
+		t.Fatalf("Scan(nil) error = %v", err)
 	}
-	if _, err := value.Value(); err == nil {
-		t.Fatal("zero Timestamp.Value() error = nil, want error")
+	stored, err := value.Value()
+	if err != nil {
+		t.Fatalf("null Timestamp.Value() error = %v", err)
+	}
+	if stored != nil {
+		t.Fatalf("null Timestamp.Value() = %v, want nil", stored)
 	}
 }

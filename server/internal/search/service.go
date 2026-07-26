@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"sort"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
@@ -26,13 +26,13 @@ type Service interface {
 }
 
 type AggregateService struct {
-	pool       *pgxpool.Pool
+	pool       *sql.DB
 	retrievers []Retriever
 	logger     *zap.Logger
 	rrfK       float64
 }
 
-func NewAggregateService(pool *pgxpool.Pool, retrievers []Retriever, logger *zap.Logger) *AggregateService {
+func NewAggregateService(pool *sql.DB, retrievers []Retriever, logger *zap.Logger) *AggregateService {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -211,7 +211,7 @@ FROM (
 `, strings.Join(subqueries, "\nUNION\n"))
 
 	var total int64
-	if err := s.pool.QueryRow(ctx, query, builder.args...).Scan(&total); err != nil {
+	if err := s.pool.QueryRowContext(ctx, query, builder.args...).Scan(&total); err != nil {
 		return 0, fmt.Errorf("count aggregate candidates: %w", err)
 	}
 	return int(total), nil

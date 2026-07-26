@@ -63,7 +63,10 @@ func RegisterLookupPeople() {
 
 			people := make([]LookupPerson, 0, len(rows))
 			for _, row := range rows {
-				name := ref.SanitizeUserText(row.Name, ref.MaxFacetValueLen)
+				name := ""
+				if row.Name != nil {
+					name = ref.SanitizeUserText(*row.Name, ref.MaxFacetValueLen)
+				}
 				if name == "" {
 					continue
 				}

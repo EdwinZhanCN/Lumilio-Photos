@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -18,9 +19,6 @@ import (
 	"server/internal/utils/raw"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
@@ -69,12 +67,12 @@ type StackService interface {
 
 type stackService struct {
 	queries       *repo.Queries
-	pool          *pgxpool.Pool
+	pool          *sql.DB
 	logger        *zap.Logger
 	auditProvider logging.RepositoryAuditProvider
 }
 
-func NewStackService(queries *repo.Queries, pool *pgxpool.Pool, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider) StackService {
+func NewStackService(queries *repo.Queries, pool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider) StackService {
 	return &stackService{queries: queries, pool: pool, logger: logger, auditProvider: auditProvider}
 }
 
@@ -117,7 +115,7 @@ func isIteration(filename string) bool {
 	return iterationPattern.MatchString(strings.TrimSuffix(filename, ext))
 }
 
-func effectiveTime(taken, upload pgtype.Timestamptz) time.Time {
+func effectiveTime(taken, upload dbtypes.Timestamp) time.Time {
 	if taken.Valid {
 		return taken.Time
 	}
@@ -191,7 +189,7 @@ func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []structu
 }
 
 func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.UUID) (int, error) {
-	repositoryUUID := pgtype.UUID{Bytes: repositoryID, Valid: true}
+	repositoryUUID := uuid.NullUUID{UUID: repositoryID, Valid: true}
 	candidates, err := s.queries.FindCandidatesForStackingByName(ctx, repositoryUUID)
 	if err != nil {
 		return 0, fmt.Errorf("find structural media candidates: %w", err)
@@ -234,11 +232,12 @@ func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey st
 	if len(members) < 2 {
 		return nil
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.queries.WithTx(tx)
 
 	// Prefer JPEG for browsing, then the first member in capture order.
 	primary := members[0]
@@ -250,84 +249,75 @@ func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey st
 	}
 	targetItemID := primary.MediaItemID
 	seenSourceItems := make(map[uuid.UUID]struct{})
-	allItemIDs := make([]pgtype.UUID, 0, len(members))
+	allItemIDs := make([]uuid.UUID, 0, len(members))
 	seenAllItems := make(map[uuid.UUID]bool)
 	for _, member := range members {
-		itemUUID := uuid.UUID(member.MediaItemID.Bytes)
+		itemUUID := member.MediaItemID
 		if !seenAllItems[itemUUID] {
 			seenAllItems[itemUUID] = true
 			allItemIDs = append(allItemIDs, member.MediaItemID)
 		}
-		if sourceID, ok := uuidFromPgUUID(member.MediaItemID); ok && sourceID != uuid.UUID(targetItemID.Bytes) {
-			seenSourceItems[sourceID] = struct{}{}
+		if member.MediaItemID != targetItemID {
+			seenSourceItems[member.MediaItemID] = struct{}{}
 		}
 	}
 	// Structural components may arrive after one frame has already joined a
 	// burst. Preserve a single shared presentation membership; never merge items
 	// that already belong to different stacks.
-	rows, err := tx.Query(ctx, `SELECT stack_id, MIN(position)::integer FROM asset_stack_members WHERE media_item_id = ANY($1::uuid[]) GROUP BY stack_id`, allItemIDs)
+	memberships, err := qtx.GetStackMembershipsByMediaItemIDs(ctx, allItemIDs)
 	if err != nil {
 		return err
 	}
-	type presentationMembership struct {
-		stackID  pgtype.UUID
-		position int32
-	}
-	var memberships []presentationMembership
-	for rows.Next() {
-		var membership presentationMembership
-		if err := rows.Scan(&membership.stackID, &membership.position); err != nil {
-			rows.Close()
-			return err
-		}
-		memberships = append(memberships, membership)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	rows.Close()
 	if len(memberships) > 1 {
-		return tx.Commit(ctx)
+		return tx.Commit()
 	}
 	if len(memberships) == 1 {
-		if _, err := tx.Exec(ctx, `DELETE FROM asset_stack_members WHERE media_item_id = ANY($1::uuid[])`, allItemIDs); err != nil {
+		if err := qtx.RemoveStackMembershipsByMediaItemIDs(ctx, allItemIDs); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO asset_stack_members (media_item_id, stack_id, position) VALUES ($1, $2, $3)`, targetItemID, memberships[0].stackID, memberships[0].position); err != nil {
+		if err := qtx.AddStackMember(ctx, repo.AddStackMemberParams{
+			MediaItemID: targetItemID,
+			StackID:     memberships[0].StackID,
+			Position:    memberships[0].Position,
+			CreatedAt:   dbtypes.NewTimestamp(time.Now()),
+		}); err != nil {
 			return err
 		}
 	}
 	// Move every component from source items, not just the PHOTO candidates.
 	// This preserves an already-associated Live Photo motion component.
 	for sourceID := range seenSourceItems {
-		if _, err := tx.Exec(ctx, `UPDATE media_item_assets SET media_item_id = $1 WHERE media_item_id = $2`, targetItemID, sourceID); err != nil {
+		if err := qtx.MoveAllMediaItemComponents(ctx, repo.MoveAllMediaItemComponentsParams{
+			TargetMediaItemID: targetItemID,
+			SourceMediaItemID: sourceID,
+		}); err != nil {
 			return err
 		}
 	}
 	for index, member := range members {
-		position := int32(index)
-		if _, err := tx.Exec(ctx, `UPDATE media_item_assets SET media_item_id = $1, relation = $2, position = $3 WHERE asset_id = $4`, targetItemID, classifyRelation(member.OriginalFilename), position, member.AssetID); err != nil {
+		if err := qtx.MoveMediaItemComponent(ctx, repo.MoveMediaItemComponentParams{
+			TargetMediaItemID: targetItemID,
+			Relation:          string(classifyRelation(member.OriginalFilename)),
+			Position:          int64(index),
+			AssetID:           member.AssetID,
+		}); err != nil {
 			return err
 		}
 	}
-	if _, err := tx.Exec(ctx, `UPDATE media_items
-		SET primary_asset_id = $2,
-		    media_kind = CASE
-		      WHEN EXISTS (SELECT 1 FROM media_item_assets WHERE media_item_id = $1 AND relation = 'live_photo_video') THEN 'live_photo'
-		      ELSE 'photo'
-		    END,
-		    group_key = $3,
-		    updated_at = NOW()
-		WHERE media_item_id = $1`, targetItemID, primary.AssetID, groupKey); err != nil {
+	if err := qtx.UpdateMediaItemAfterStructuralMerge(ctx, repo.UpdateMediaItemAfterStructuralMergeParams{
+		PrimaryAssetID:    uuid.NullUUID{UUID: primary.AssetID, Valid: true},
+		TargetMediaItemID: targetItemID,
+		GroupKey:          &groupKey,
+		UpdatedAt:         dbtypes.NewTimestamp(time.Now()),
+	}); err != nil {
 		return err
 	}
 	for sourceID := range seenSourceItems {
-		if _, err := tx.Exec(ctx, `DELETE FROM media_items WHERE media_item_id = $1`, sourceID); err != nil {
+		if err := qtx.DeleteMediaItem(ctx, sourceID); err != nil {
 			return err
 		}
 	}
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
 type burstCluster struct {
@@ -350,7 +340,7 @@ func burstClusters(candidates []repo.FindMediaItemsForBurstDetectionRow) []burst
 		sortBurstMembers(group)
 		result = append(result, burstCluster{GroupKey: "exif:" + key, Members: group})
 		for _, member := range group {
-			consumed[uuid.UUID(member.MediaItemID.Bytes)] = true
+			consumed[member.MediaItemID] = true
 		}
 	}
 
@@ -361,7 +351,7 @@ func burstClusters(candidates []repo.FindMediaItemsForBurstDetectionRow) []burst
 	}
 	fallback := make(map[fallbackKey][]repo.FindMediaItemsForBurstDetectionRow)
 	for _, candidate := range candidates {
-		if consumed[uuid.UUID(candidate.MediaItemID.Bytes)] || !candidate.TakenTime.Valid || strings.TrimSpace(candidate.CameraModel) == "" {
+		if consumed[candidate.MediaItemID] || !candidate.TakenTime.Valid || strings.TrimSpace(candidate.CameraModel) == "" {
 			continue
 		}
 		prefix, _, ok := filenameSequence(candidate.OriginalFilename)
@@ -426,27 +416,32 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 	if len(cluster.Members) == 0 {
 		return false, nil
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.queries.WithTx(tx)
 
-	var stackID pgtype.UUID
-	err = tx.QueryRow(ctx, `SELECT stack_id FROM asset_stacks WHERE stack_kind = 'burst' AND group_key = $1`, cluster.GroupKey).Scan(&stackID)
+	existing, err := qtx.GetBurstStackByGroupKey(ctx, &cluster.GroupKey)
 	if err == nil {
-		var nextPosition int32
-		if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(position) + 1, 0) FROM asset_stack_members WHERE stack_id = $1`, stackID).Scan(&nextPosition); err != nil {
+		nextPosition, err := qtx.GetNextStackPosition(ctx, existing.StackID)
+		if err != nil {
 			return false, err
 		}
 		for index, member := range cluster.Members {
-			if _, err := tx.Exec(ctx, `INSERT INTO asset_stack_members (media_item_id, stack_id, position) VALUES ($1, $2, $3) ON CONFLICT (media_item_id) DO NOTHING`, member.MediaItemID, stackID, nextPosition+int32(index)); err != nil {
+			if err := qtx.AddStackMember(ctx, repo.AddStackMemberParams{
+				MediaItemID: member.MediaItemID,
+				StackID:     existing.StackID,
+				Position:    nextPosition + int64(index),
+				CreatedAt:   dbtypes.NewTimestamp(time.Now()),
+			}); err != nil {
 				return false, err
 			}
 		}
-		return false, tx.Commit(ctx)
+		return false, tx.Commit()
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return false, err
 	}
 	minimum := 3
@@ -454,17 +449,33 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 		minimum = 2
 	}
 	if len(cluster.Members) < minimum {
-		return false, tx.Commit(ctx)
+		return false, tx.Commit()
 	}
-	if err := tx.QueryRow(ctx, `INSERT INTO asset_stacks (owner_id, repository_id, stack_kind, cover_media_item_id, group_key) VALUES ($1, $2, 'burst', $3, $4) RETURNING stack_id`, cluster.Members[0].OwnerID, cluster.Members[0].RepositoryID, cluster.Members[0].MediaItemID, cluster.GroupKey).Scan(&stackID); err != nil {
+	now := dbtypes.NewTimestamp(time.Now())
+	stackID := uuid.New()
+	if _, err := qtx.CreateAssetStack(ctx, repo.CreateAssetStackParams{
+		StackID:          stackID,
+		OwnerID:          cluster.Members[0].OwnerID,
+		RepositoryID:     cluster.Members[0].RepositoryID,
+		StackKind:        string(dbtypes.StackKindBurst),
+		CoverMediaItemID: uuid.NullUUID{UUID: cluster.Members[0].MediaItemID, Valid: true},
+		GroupKey:         &cluster.GroupKey,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}); err != nil {
 		return false, err
 	}
 	for index, member := range cluster.Members {
-		if _, err := tx.Exec(ctx, `INSERT INTO asset_stack_members (media_item_id, stack_id, position) VALUES ($1, $2, $3)`, member.MediaItemID, stackID, int32(index)); err != nil {
+		if err := qtx.AddStackMember(ctx, repo.AddStackMemberParams{
+			MediaItemID: member.MediaItemID,
+			StackID:     stackID,
+			Position:    int64(index),
+			CreatedAt:   now,
+		}); err != nil {
 			return false, err
 		}
 	}
-	return true, tx.Commit(ctx)
+	return true, tx.Commit()
 }
 
 func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UUID) (*StackInfo, error) {
@@ -474,11 +485,11 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 	items := make([]repo.MediaItem, 0, len(assetIDs))
 	seen := make(map[uuid.UUID]bool)
 	for _, assetID := range assetIDs {
-		item, err := s.queries.GetMediaItemByAssetID(ctx, pgtype.UUID{Bytes: assetID, Valid: true})
+		item, err := s.queries.GetMediaItemByAssetID(ctx, assetID)
 		if err != nil {
 			return nil, fmt.Errorf("resolve media item for %s: %w", assetID, err)
 		}
-		id := uuid.UUID(item.MediaItemID.Bytes)
+		id := item.MediaItemID
 		if !seen[id] {
 			seen[id] = true
 			items = append(items, item)
@@ -487,38 +498,49 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 	if len(items) < 2 {
 		return nil, errors.New("selected assets resolve to fewer than 2 media items")
 	}
-	pgAssetIDs := make([]pgtype.UUID, len(assetIDs))
-	for i, id := range assetIDs {
-		pgAssetIDs[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
-	if existing, err := s.queries.GetStacksByAssetIDs(ctx, pgAssetIDs); err != nil {
+	if existing, err := s.queries.GetStacksByAssetIDs(ctx, assetIDs); err != nil {
 		return nil, err
 	} else if len(existing) > 0 {
 		return nil, ErrAssetAlreadyStacked
 	}
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	var stackID pgtype.UUID
-	if err := tx.QueryRow(ctx, `INSERT INTO asset_stacks (owner_id, repository_id, stack_kind, cover_media_item_id) VALUES ($1, $2, 'manual', $3) RETURNING stack_id`, items[0].OwnerID, items[0].RepositoryID, items[0].MediaItemID).Scan(&stackID); err != nil {
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.queries.WithTx(tx)
+	stackID := uuid.New()
+	now := dbtypes.NewTimestamp(time.Now())
+	if _, err := qtx.CreateAssetStack(ctx, repo.CreateAssetStackParams{
+		StackID:          stackID,
+		OwnerID:          items[0].OwnerID,
+		RepositoryID:     items[0].RepositoryID,
+		StackKind:        string(dbtypes.StackKindManual),
+		CoverMediaItemID: uuid.NullUUID{UUID: items[0].MediaItemID, Valid: true},
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}); err != nil {
 		return nil, err
 	}
 	for index, item := range items {
-		if _, err := tx.Exec(ctx, `INSERT INTO asset_stack_members (media_item_id, stack_id, position) VALUES ($1, $2, $3)`, item.MediaItemID, stackID, int32(index)); err != nil {
+		if err := qtx.AddStackMember(ctx, repo.AddStackMemberParams{
+			MediaItemID: item.MediaItemID,
+			StackID:     stackID,
+			Position:    int64(index),
+			CreatedAt:   now,
+		}); err != nil {
 			return nil, err
 		}
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return s.buildStackInfo(ctx, stackID, false, nil)
 }
 
 func (s *stackService) GetStackByAssetAny(ctx context.Context, assetID uuid.UUID, ownerID *int32) (*StackInfo, error) {
-	row, err := s.queries.GetStackByAssetID(ctx, pgtype.UUID{Bytes: assetID, Valid: true})
+	row, err := s.queries.GetStackByAssetID(ctx, assetID)
 	if err != nil {
 		return nil, ErrStackNotFound
 	}
@@ -526,7 +548,7 @@ func (s *stackService) GetStackByAssetAny(ctx context.Context, assetID uuid.UUID
 }
 
 func (s *stackService) GetMediaItemByAsset(ctx context.Context, assetID uuid.UUID, ownerID *int32) (*MediaItemInfo, error) {
-	item, err := s.queries.GetMediaItemByAssetID(ctx, pgtype.UUID{Bytes: assetID, Valid: true})
+	item, err := s.queries.GetMediaItemByAssetID(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("get media item: %w", err)
 	}
@@ -538,35 +560,31 @@ func (s *stackService) GetMediaItemByAsset(ctx context.Context, assetID uuid.UUI
 		return nil, fmt.Errorf("get media item components: %w", err)
 	}
 	info := &MediaItemInfo{
-		MediaItemID:    uuid.UUID(item.MediaItemID.Bytes),
+		MediaItemID:    item.MediaItemID,
 		Kind:           item.MediaKind,
-		PrimaryAssetID: uuid.UUID(item.PrimaryAssetID.Bytes),
+		PrimaryAssetID: item.PrimaryAssetID.UUID,
 		Components:     make([]MediaItemComponentInfo, 0, len(components)),
 	}
 	for _, component := range components {
-		position := int32(0)
-		if component.Position != nil {
-			position = *component.Position
-		}
 		info.Components = append(info.Components, MediaItemComponentInfo{
-			AssetID:  uuid.UUID(component.AssetID.Bytes),
-			Relation: component.Relation,
-			Position: position,
+			AssetID:  component.AssetID,
+			Relation: repo.StackRelation(component.Relation),
+			Position: int32(component.Position),
 		})
 	}
 	return info, nil
 }
 
 func (s *stackService) RemoveFromStack(ctx context.Context, assetID uuid.UUID) error {
-	return s.queries.RemoveStackMemberByAssetID(ctx, pgtype.UUID{Bytes: assetID, Valid: true})
+	return s.queries.RemoveStackMemberByAssetID(ctx, assetID)
 }
 
 func (s *stackService) DeleteStack(ctx context.Context, stackID uuid.UUID) error {
-	return s.queries.DeleteStack(ctx, pgtype.UUID{Bytes: stackID, Valid: true})
+	return s.queries.DeleteStack(ctx, stackID)
 }
 
 func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUID) error {
-	asset, err := s.queries.GetAssetByID(ctx, pgtype.UUID{Bytes: assetID, Valid: true})
+	asset, err := s.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return fmt.Errorf("get asset for live photo matching: %w", err)
 	}
@@ -578,76 +596,103 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 		return nil
 	}
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, fmt.Sprintf("%d:%s", *asset.OwnerID, identifier)); err != nil {
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.queries.WithTx(tx)
+
+	rows, err := qtx.FindLivePhotoPair(ctx, repo.FindLivePhotoPairParams{
+		OwnerID:           asset.OwnerID,
+		ContentIdentifier: identifier,
+	})
+	if err != nil {
 		return err
 	}
-	const query = `SELECT
-		(ARRAY_AGG(a.asset_id) FILTER (WHERE a.type = 'PHOTO'))[1],
-		(ARRAY_AGG(a.asset_id) FILTER (WHERE a.type = 'VIDEO'))[1]
-	FROM assets a
-	WHERE a.owner_id = $1 AND a.is_deleted = false
-	  AND a.type IN ('PHOTO', 'VIDEO')
-	  AND a.specific_metadata->>'content_identifier' = $2
-	HAVING COUNT(*) FILTER (WHERE a.type = 'PHOTO') = 1
-	   AND COUNT(*) FILTER (WHERE a.type = 'VIDEO') = 1`
-	var photoID, videoID pgtype.UUID
-	if err := tx.QueryRow(ctx, query, *asset.OwnerID, identifier).Scan(&photoID, &videoID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return tx.Commit(ctx)
+	var photoID, videoID uuid.UUID
+	for _, row := range rows {
+		switch row.Type {
+		case string(dbtypes.AssetTypePhoto):
+			if photoID != uuid.Nil {
+				return tx.Commit()
+			}
+			photoID = row.AssetID
+		case string(dbtypes.AssetTypeVideo):
+			if videoID != uuid.Nil {
+				return tx.Commit()
+			}
+			videoID = row.AssetID
 		}
+	}
+	if photoID == uuid.Nil || videoID == uuid.Nil {
+		return tx.Commit()
+	}
+
+	photoItem, err := qtx.GetMediaItemByAssetID(ctx, photoID)
+	if err != nil {
 		return err
 	}
-	var photoItemID, videoItemID pgtype.UUID
-	if err := tx.QueryRow(ctx, `SELECT media_item_id FROM media_item_assets WHERE asset_id = $1`, photoID).Scan(&photoItemID); err != nil {
+	videoItem, err := qtx.GetMediaItemByAssetID(ctx, videoID)
+	if err != nil {
 		return err
 	}
-	if err := tx.QueryRow(ctx, `SELECT media_item_id FROM media_item_assets WHERE asset_id = $1`, videoID).Scan(&videoItemID); err != nil {
-		return err
-	}
+	photoItemID := photoItem.MediaItemID
+	videoItemID := videoItem.MediaItemID
 	if photoItemID == videoItemID {
-		return tx.Commit(ctx)
+		return tx.Commit()
 	}
 	// A structural merge may preserve an existing presentation membership on
 	// the still item, but never combines two independently stacked items.
-	var stackedItems int
-	if err := tx.QueryRow(ctx, `SELECT COUNT(DISTINCT media_item_id) FROM asset_stack_members WHERE media_item_id = ANY($1::uuid[])`, []pgtype.UUID{photoItemID, videoItemID}).Scan(&stackedItems); err != nil {
+	stackedItems, err := qtx.CountStackedMediaItems(ctx, []uuid.UUID{photoItemID, videoItemID})
+	if err != nil {
 		return err
 	}
 	if stackedItems > 1 {
-		return tx.Commit(ctx)
+		return tx.Commit()
 	}
-	if _, err := tx.Exec(ctx, `UPDATE media_item_assets SET media_item_id = $1, relation = 'live_photo_still', position = 0 WHERE asset_id = $2`, photoItemID, photoID); err != nil {
+	if err := qtx.MoveMediaItemComponent(ctx, repo.MoveMediaItemComponentParams{
+		TargetMediaItemID: photoItemID,
+		Relation:          string(repo.StackRelationLivePhotoStill),
+		Position:          0,
+		AssetID:           photoID,
+	}); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE media_item_assets SET media_item_id = $1, relation = 'live_photo_video', position = 1 WHERE asset_id = $2`, photoItemID, videoID); err != nil {
+	if err := qtx.MoveMediaItemComponent(ctx, repo.MoveMediaItemComponentParams{
+		TargetMediaItemID: photoItemID,
+		Relation:          string(repo.StackRelationLivePhotoVideo),
+		Position:          1,
+		AssetID:           videoID,
+	}); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE media_items SET media_kind = 'live_photo', primary_asset_id = $2, group_key = $3, updated_at = NOW() WHERE media_item_id = $1`, photoItemID, photoID, identifier); err != nil {
+	if err := qtx.UpdateMediaItemAsLivePhoto(ctx, repo.UpdateMediaItemAsLivePhotoParams{
+		PrimaryAssetID: uuid.NullUUID{UUID: photoID, Valid: true},
+		GroupKey:       &identifier,
+		UpdatedAt:      dbtypes.NewTimestamp(time.Now()),
+		MediaItemID:    photoItemID,
+	}); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM media_items WHERE media_item_id = $1`, videoItemID); err != nil {
+	if err := qtx.DeleteMediaItem(ctx, videoItemID); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
-func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID, includeDeleted bool, ownerID *int32) (*StackInfo, error) {
-	var kind dbtypes.StackKind
-	if err := s.pool.QueryRow(ctx, `SELECT stack_kind FROM asset_stacks WHERE stack_id = $1`, stackID).Scan(&kind); err != nil {
+func (s *stackService) buildStackInfo(ctx context.Context, stackID uuid.UUID, includeDeleted bool, ownerID *int32) (*StackInfo, error) {
+	kinds, err := s.queries.GetStackKindsByIDs(ctx, []uuid.UUID{stackID})
+	if err != nil || len(kinds) != 1 {
 		return nil, ErrStackNotFound
 	}
-	info := &StackInfo{StackID: uuid.UUID(stackID.Bytes), Kind: kind, Members: []StackMemberInfo{}}
-	appendMember := func(mediaItemID, assetID pgtype.UUID, position *int32) {
-		pos := int32(0)
-		if position != nil {
-			pos = *position
-		}
-		info.Members = append(info.Members, StackMemberInfo{MediaItemID: uuid.UUID(mediaItemID.Bytes), AssetID: uuid.UUID(assetID.Bytes), Position: pos})
+	info := &StackInfo{StackID: stackID, Kind: dbtypes.StackKind(kinds[0].StackKind), Members: []StackMemberInfo{}}
+	appendMember := func(mediaItemID uuid.UUID, assetID uuid.NullUUID, position int64) {
+		info.Members = append(info.Members, StackMemberInfo{
+			MediaItemID: mediaItemID,
+			AssetID:     assetID.UUID,
+			Position:    int32(position),
+		})
 	}
 	if includeDeleted {
 		members, err := s.queries.GetStackMembersAny(ctx, repo.GetStackMembersAnyParams{StackID: stackID, OwnerID: ownerID})

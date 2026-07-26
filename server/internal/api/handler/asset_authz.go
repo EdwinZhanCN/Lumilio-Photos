@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 
@@ -10,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 func applyAssetOwnershipScope(c *gin.Context, params service.QueryAssetsParams) service.QueryAssetsParams {
@@ -61,7 +61,7 @@ func ownerScopeID(c *gin.Context) *int32 {
 func (h *AssetHandler) loadAsset(c *gin.Context, assetID uuid.UUID) (*repo.Asset, bool) {
 	asset, err := h.assetService.GetAsset(c.Request.Context(), assetID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Asset not found")
 			return nil, false
 		}
@@ -75,7 +75,7 @@ func (h *AssetHandler) loadAsset(c *gin.Context, assetID uuid.UUID) (*repo.Asset
 func (h *AssetHandler) loadAssetAny(c *gin.Context, assetID uuid.UUID) (*repo.Asset, bool) {
 	asset, err := h.assetService.GetAssetAny(c.Request.Context(), assetID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			api.GinNotFound(c, err, "Asset not found")
 			return nil, false
 		}

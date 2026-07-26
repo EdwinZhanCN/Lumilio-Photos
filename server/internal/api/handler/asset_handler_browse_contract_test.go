@@ -98,8 +98,8 @@ func TestAssetHandlerQueryAssets_StackModeExpanded_AssetBrowseItemsConsistentTot
 				require.Equal(t, service.StackModeExpanded, params.StackMode)
 				return service.BrowseQueryResult{
 					Items: []service.BrowseItem{
-						{Type: "asset", ID: "asset:" + uuid.UUID(a.AssetID.Bytes).String(), Asset: a},
-						{Type: "asset", ID: "asset:" + uuid.UUID(b.AssetID.Bytes).String(), Asset: b},
+						{Type: "asset", ID: "asset:" + a.AssetID.String(), Asset: a},
+						{Type: "asset", ID: "asset:" + b.AssetID.String(), Asset: b},
 					},
 					TotalVisible: 2,
 					TotalAssets:  2,
@@ -257,8 +257,8 @@ func TestAssetHandlerSearchAssets_StackModeExpanded_AssetBrowseItemsConsistentTo
 				require.Equal(t, service.StackModeExpanded, params.StackMode)
 				return service.SearchBrowseResult{
 					Results: []service.BrowseItem{
-						{Type: "asset", ID: "asset:" + uuid.UUID(a.AssetID.Bytes).String(), Asset: a},
-						{Type: "asset", ID: "asset:" + uuid.UUID(b.AssetID.Bytes).String(), Asset: b},
+						{Type: "asset", ID: "asset:" + a.AssetID.String(), Asset: a},
+						{Type: "asset", ID: "asset:" + b.AssetID.String(), Asset: b},
 					},
 					ResultsTotalVisible: 2,
 					ResultsTotalAssets:  2,

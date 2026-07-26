@@ -5,19 +5,19 @@ import (
 	"testing"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	aggregatesearch "server/internal/search"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
 func testSearchAsset(t *testing.T, rawID string, filename string) repo.Asset {
 	t.Helper()
 
-	var assetID pgtype.UUID
-	require.NoError(t, assetID.Scan(rawID))
+	assetID, err := uuid.Parse(rawID)
+	require.NoError(t, err)
 
 	path := "/tmp/" + filename
 	return repo.Asset{
@@ -26,7 +26,7 @@ func testSearchAsset(t *testing.T, rawID string, filename string) repo.Asset {
 		OriginalFilename: filename,
 		StoragePath:      &path,
 		MimeType:         "image/jpeg",
-		UploadTime:       pgtype.Timestamptz{Time: time.Unix(1700000000, 0), Valid: true},
+		UploadTime:       dbtypes.NewTimestamp(time.Unix(1700000000, 0)),
 	}
 }
 
@@ -53,9 +53,9 @@ func TestAssetSetSourceFlowsIntoSearchFilters(t *testing.T) {
 	require.Equal(t, ids, filter.AssetIDs)
 
 	filenameParams := filenameMembershipParams(params)
-	require.Len(t, filenameParams.AssetIds, len(ids))
-	require.Equal(t, ids[0], uuid.UUID(filenameParams.AssetIds[0].Bytes))
-	require.Equal(t, ids[1], uuid.UUID(filenameParams.AssetIds[1].Bytes))
+	filenameIDs, ok := filenameParams.AssetIds.(dbtypes.UUIDs)
+	require.True(t, ok)
+	require.Equal(t, dbtypes.UUIDs(ids), filenameIDs)
 }
 
 // Best Results is the confidence-ordered Top-N subset of the fused set;

@@ -1,17 +1,10 @@
 # Complete container runtime manifest. No Lumilio server environment variable
 # overrides are applied. Secret values live only in the referenced files.
-schema_version = 1
+schema_version = 2
 environment = "production"
 
 [database]
-host = "db"
-port = "5432"
-user = "postgres"
-name = "lumiliophotos"
-ssl = "disable"
-bootstrap_password_file = "/run/secrets/db_bootstrap_password"
-rotated_password_file = "/data/app-state/secrets/db_password"
-tools_bin_dir = ""
+path = "/data/app-state/library.sqlite3"
 
 [server]
 port = "6680"

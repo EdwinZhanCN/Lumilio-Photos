@@ -1,36 +1,46 @@
 -- name: CreateOCRResult :one
 INSERT INTO ocr_results (asset_id, model_id, total_count, processing_time_ms)
-VALUES ($1, $2, $3, $4)
+VALUES (?1, ?2, ?3, ?4)
 RETURNING *;
 
 -- name: GetOCRResultByAsset :one
 SELECT * FROM ocr_results
-WHERE asset_id = $1;
+WHERE asset_id = ?1;
 
 -- name: DeleteOCRResultByAsset :exec
-DELETE FROM ocr_results WHERE asset_id = $1;
+DELETE FROM ocr_results WHERE asset_id = ?1;
 
 -- name: CreateOCRTextItem :one
 INSERT INTO ocr_text_items (asset_id, text_content, confidence, bounding_box, text_length, area_pixels)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 RETURNING *;
 
 -- name: GetOCRTextItemsByAsset :many
 SELECT * FROM ocr_text_items
-WHERE asset_id = $1
+WHERE asset_id = ?1
 ORDER BY confidence DESC, text_length DESC;
 
 -- name: GetOCRTextItemsByAssetWithLimit :many
 SELECT * FROM ocr_text_items
-WHERE asset_id = $1
+WHERE asset_id = ?1
 ORDER BY confidence DESC, text_length DESC
-LIMIT $2;
+LIMIT ?2;
 
 -- name: DeleteOCRTextItemsByAsset :exec
-DELETE FROM ocr_text_items WHERE asset_id = $1;
+DELETE FROM ocr_text_items WHERE asset_id = ?1;
 
 -- name: UpdateOCRFullText :exec
-UPDATE ocr_results SET full_text = $2 WHERE asset_id = $1;
+UPDATE ocr_results SET full_text = ?2 WHERE asset_id = ?1;
+
+-- name: SearchAssetsByOCRText :many
+SELECT a.*
+FROM ocr_search_fts
+JOIN ocr_results r ON r.rowid = ocr_search_fts.rowid
+JOIN assets a ON a.asset_id = r.asset_id
+WHERE ocr_search_fts.full_text MATCH sqlc.arg('query')
+  AND a.is_deleted = false
+ORDER BY ocr_search_fts.rank, a.asset_id DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetOCRStatsByModel :many
 SELECT
@@ -54,18 +64,18 @@ SELECT
     SUM(text_length) as total_text_length,
     AVG(text_length) as avg_text_length
 FROM ocr_text_items
-WHERE asset_id = $1;
+WHERE asset_id = ?1;
 
 -- name: GetHighConfidenceTextItems :many
 SELECT * FROM ocr_text_items
-WHERE confidence >= $1
+WHERE confidence >= ?1
 ORDER BY confidence DESC, text_length DESC
-LIMIT $2;
+LIMIT ?2;
 
 -- name: UpdateOCRResultStats :exec
 UPDATE ocr_results
 SET total_count = (
-    SELECT COUNT(*) FROM ocr_text_items ti WHERE ti.asset_id = $1
+    SELECT COUNT(*) FROM ocr_text_items ti WHERE ti.asset_id = ?1
 ),
-updated_at = CURRENT_TIMESTAMP
-WHERE asset_id = $1;
+updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE asset_id = ?1;

@@ -10,12 +10,12 @@ import (
 	"server/internal/agent/ref"
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // CreatePin pins a session ref onto the durable widget board.
@@ -184,7 +184,7 @@ func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 		}
 		byID := make(map[uuid.UUID]dto.AssetDTO, len(rows))
 		for _, row := range rows {
-			byID[uuid.UUID(row.AssetID.Bytes)] = dto.ToAssetDTO(row)
+			byID[row.AssetID] = dto.ToAssetDTO(row)
 		}
 		for _, id := range page {
 			if row, found := byID[id]; found {
@@ -470,7 +470,7 @@ func (h *AgentHandler) DeletePin(c *gin.Context) {
 
 func toAgentPinDTO(pin repo.AgentPin) dto.AgentPinDTO {
 	return dto.AgentPinDTO{
-		PinID:     uuid.UUID(pin.PinID.Bytes).String(),
+		PinID:     pin.PinID.String(),
 		Title:     pin.Title,
 		Widget:    pin.Widget,
 		Mode:      pin.Mode,
@@ -481,11 +481,11 @@ func toAgentPinDTO(pin repo.AgentPin) dto.AgentPinDTO {
 			X: int(pin.LayoutX), Y: int(pin.LayoutY), W: int(pin.LayoutW), H: int(pin.LayoutH),
 		},
 		CreatedAt:               pin.CreatedAt.Time,
-		LastSuccessfulRefreshAt: pgTimePointer(pin.LastSuccessfulRefreshAt),
+		LastSuccessfulRefreshAt: dbTimePointer(pin.LastSuccessfulRefreshAt),
 	}
 }
 
-func pgTimePointer(value pgtype.Timestamptz) *time.Time {
+func dbTimePointer(value dbtypes.Timestamp) *time.Time {
 	if !value.Valid {
 		return nil
 	}

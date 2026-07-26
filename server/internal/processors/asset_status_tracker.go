@@ -8,7 +8,7 @@ import (
 	"server/internal/db/dbtypes"
 	statusdb "server/internal/db/dbtypes/status"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const (
@@ -32,12 +32,12 @@ func trackedPipelineTasks(assetType dbtypes.AssetType) []string {
 
 func buildTrackedProcessingStatus(assetType dbtypes.AssetType, message string) ([]byte, error) {
 	status := statusdb.NewTrackedProcessingStatus(message, trackedPipelineTasks(assetType))
-	return status.ToJSONB()
+	return status.ToJSON()
 }
 
 func (ap *AssetProcessor) runTrackedAssetTask(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 	taskName string,
 	startMessage string,
 	successMessage string,
@@ -63,7 +63,7 @@ func (ap *AssetProcessor) runTrackedAssetTask(
 
 func (ap *AssetProcessor) tryMutateAssetStatus(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 	mutate func(*statusdb.AssetStatus),
 ) {
 	if err := ap.queries.MutateAssetStatus(ctx, assetID, func(current statusdb.AssetStatus) (statusdb.AssetStatus, error) {
@@ -76,7 +76,7 @@ func (ap *AssetProcessor) tryMutateAssetStatus(
 
 func (ap *AssetProcessor) markPipelineTasksFailed(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 	tasks []string,
 	err error,
 ) {

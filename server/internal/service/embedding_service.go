@@ -2,31 +2,30 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pgvector/pgvector-go"
+	"github.com/google/uuid"
 )
 
 const embeddingDistanceMetricL2 = "l2"
 
 // EmbeddingService interface defines the contract for embedding operations.
 type EmbeddingService interface {
-	SaveEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string, vector []float32, isPrimary bool) error
-	SaveVideoFrameEmbeddings(ctx context.Context, assetID pgtype.UUID, model string, frames []VideoFrameEmbedding) error
-	SaveAestheticScore(ctx context.Context, assetID pgtype.UUID, score float32, modelVersion string) error
-	GetEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) (repo.Embedding, error)
-	GetAssetEmbeddingInfo(ctx context.Context, assetID pgtype.UUID) (map[EmbeddingType]EmbeddingInfo, error)
-	DeleteEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) error
+	SaveEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string, vector []float32, isPrimary bool) error
+	SaveVideoFrameEmbeddings(ctx context.Context, assetID uuid.UUID, model string, frames []VideoFrameEmbedding) error
+	SaveAestheticScore(ctx context.Context, assetID uuid.UUID, score float32, modelVersion string) error
+	GetEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string) (repo.Embedding, error)
+	GetAssetEmbeddingInfo(ctx context.Context, assetID uuid.UUID) (map[EmbeddingType]EmbeddingInfo, error)
+	DeleteEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string) error
 	ResolveDefaultSearchSpace(ctx context.Context, embeddingType EmbeddingType, model string, dimensions int) (repo.EmbeddingSpace, error)
-	GetPrimaryEmbeddingVector(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error)
+	GetPrimaryEmbeddingVector(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error)
 }
 
 // VideoFrameEmbedding is one sampled video frame's semantic vector.
@@ -36,8 +35,7 @@ type VideoFrameEmbedding struct {
 }
 
 // PrimaryEmbedding is the decoded primary embedding for an asset/type, returned
-// as a plain []float32 so callers (e.g. the classification worker) need no
-// pgvector import.
+// as a plain []float32 so callers are independent of its database encoding.
 type PrimaryEmbedding struct {
 	Vector     []float32
 	Model      string
@@ -46,7 +44,7 @@ type PrimaryEmbedding struct {
 
 type embeddingService struct {
 	queries *repo.Queries
-	pool    *pgxpool.Pool
+	pool    *sql.DB
 }
 
 type EmbeddingType string
@@ -65,7 +63,7 @@ type EmbeddingInfo struct {
 	CreatedAt  string `json:"created_at"`
 }
 
-func NewEmbeddingService(queries *repo.Queries, pool *pgxpool.Pool) EmbeddingService {
+func NewEmbeddingService(queries *repo.Queries, pool *sql.DB) EmbeddingService {
 	return &embeddingService{
 		queries: queries,
 		pool:    pool,
@@ -73,7 +71,7 @@ func NewEmbeddingService(queries *repo.Queries, pool *pgxpool.Pool) EmbeddingSer
 }
 
 // SaveEmbedding saves any type of embedding with specified primary status.
-func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string, vector []float32, isPrimary bool) error {
+func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string, vector []float32, isPrimary bool) error {
 	if len(vector) == 0 {
 		return fmt.Errorf("embedding vector is empty")
 	}
@@ -86,11 +84,11 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		vector = canonicalizeSemanticVector(vector)
 	}
 
-	tx, err := e.pool.Begin(ctx)
+	tx, err := e.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin embedding transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	queries := e.queries.WithTx(tx)
 
@@ -99,7 +97,7 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		return err
 	}
 
-	pgVector := pgvector.NewVector(vector)
+	storedVector := dbtypes.NewVector(vector)
 
 	if embeddingType == EmbeddingTypeSemantic {
 		// Semantic vectors live in the dedicated fixed-dimension search_embeddings
@@ -120,13 +118,13 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 			AssetID:   assetID,
 			SpaceID:   space.ID,
 			FrameTsMs: nil,
-			Vector:    &pgVector,
+			Vector:    storedVector,
 			ModelID:   model,
 		}); err != nil {
 			return fmt.Errorf("insert search embedding: %w", err)
 		}
 
-		if err := tx.Commit(ctx); err != nil {
+		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit embedding transaction: %w", err)
 		}
 		return nil
@@ -137,16 +135,16 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 		AssetID:             assetID,
 		EmbeddingType:       string(embeddingType),
 		EmbeddingModel:      model,
-		EmbeddingDimensions: int32(len(vector)),
+		EmbeddingDimensions: int64(len(vector)),
 		SpaceID:             space.ID,
-		Vector:              &pgVector,
-		IsPrimary:           &isPrimary,
+		Vector:              storedVector,
+		IsPrimary:           isPrimary,
 	}
 	if err := queries.UpsertEmbedding(ctx, params); err != nil {
 		return fmt.Errorf("upsert embedding: %w", err)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit embedding transaction: %w", err)
 	}
 
@@ -155,7 +153,7 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID pgtype.UUI
 
 // SaveVideoFrameEmbeddings replaces all semantic rows for a video asset with
 // N frame rows (frame_ts_ms set). There is no NULL-primary row for videos.
-func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID pgtype.UUID, model string, frames []VideoFrameEmbedding) error {
+func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID uuid.UUID, model string, frames []VideoFrameEmbedding) error {
 	if len(frames) == 0 {
 		return fmt.Errorf("video frame embeddings are empty")
 	}
@@ -177,11 +175,11 @@ func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID
 		})
 	}
 
-	tx, err := e.pool.Begin(ctx)
+	tx, err := e.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin video frame embedding transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	queries := e.queries.WithTx(tx)
 
@@ -205,30 +203,29 @@ func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID
 		}
 		seenTS[frame.FrameTsMs] = struct{}{}
 
-		ts := frame.FrameTsMs
-		pgVector := pgvector.NewVector(frame.Vector)
+		ts := int64(frame.FrameTsMs)
 		if err := queries.InsertSearchEmbedding(ctx, repo.InsertSearchEmbeddingParams{
 			AssetID:   assetID,
 			SpaceID:   space.ID,
 			FrameTsMs: &ts,
-			Vector:    &pgVector,
+			Vector:    dbtypes.NewVector(frame.Vector),
 			ModelID:   model,
 		}); err != nil {
 			return fmt.Errorf("insert frame embedding at ts=%d: %w", frame.FrameTsMs, err)
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit video frame embedding transaction: %w", err)
 	}
 	return nil
 }
 
 // SaveAestheticScore upserts a per-asset aesthetic quality score.
-func (e *embeddingService) SaveAestheticScore(ctx context.Context, assetID pgtype.UUID, score float32, modelVersion string) error {
+func (e *embeddingService) SaveAestheticScore(ctx context.Context, assetID uuid.UUID, score float32, modelVersion string) error {
 	_, err := e.queries.UpsertAssetQualityScore(ctx, repo.UpsertAssetQualityScoreParams{
 		AssetID:      assetID,
-		Score:        score,
+		Score:        float64(score),
 		ModelVersion: modelVersion,
 	})
 	if err != nil {
@@ -242,11 +239,11 @@ func (e *embeddingService) ResolveDefaultSearchSpace(ctx context.Context, embedd
 		return repo.EmbeddingSpace{}, fmt.Errorf("invalid embedding dimensions: %d", dimensions)
 	}
 
-	tx, err := e.pool.Begin(ctx)
+	tx, err := e.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return repo.EmbeddingSpace{}, fmt.Errorf("begin embedding space transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	queries := e.queries.WithTx(tx)
 
@@ -272,7 +269,7 @@ func (e *embeddingService) ResolveDefaultSearchSpace(ctx context.Context, embedd
 		)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return repo.EmbeddingSpace{}, fmt.Errorf("commit embedding space transaction: %w", err)
 	}
 
@@ -280,7 +277,7 @@ func (e *embeddingService) ResolveDefaultSearchSpace(ctx context.Context, embedd
 }
 
 // GetEmbedding retrieves specific embedding by type and model.
-func (e *embeddingService) GetEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) (repo.Embedding, error) {
+func (e *embeddingService) GetEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string) (repo.Embedding, error) {
 	params := repo.GetEmbeddingParams{
 		AssetID:        assetID,
 		EmbeddingType:  string(embeddingType),
@@ -294,7 +291,7 @@ func (e *embeddingService) GetEmbedding(ctx context.Context, assetID pgtype.UUID
 }
 
 // GetPrimaryEmbedding retrieves primary embedding for a type.
-func (e *embeddingService) GetPrimaryEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (repo.Embedding, error) {
+func (e *embeddingService) GetPrimaryEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType) (repo.Embedding, error) {
 	params := repo.GetPrimaryEmbeddingParams{
 		AssetID:       assetID,
 		EmbeddingType: string(embeddingType),
@@ -309,7 +306,7 @@ func (e *embeddingService) GetPrimaryEmbedding(ctx context.Context, assetID pgty
 // GetPrimaryEmbeddingVector returns the asset's primary embedding for a type as
 // a decoded []float32 (plus model/dimensions). Reuses the existing
 // GetPrimaryEmbedding query; the worker never re-runs the ML model.
-func (e *embeddingService) GetPrimaryEmbeddingVector(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error) {
+func (e *embeddingService) GetPrimaryEmbeddingVector(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error) {
 	if embeddingType == EmbeddingTypeSemantic {
 		row, err := e.queries.GetPrimarySearchEmbedding(ctx, assetID)
 		if err != nil {
@@ -341,7 +338,7 @@ func (e *embeddingService) GetPrimaryEmbeddingVector(ctx context.Context, assetI
 }
 
 // GetEmbeddingByType retrieves best embedding for a type (primary first, then latest).
-func (e *embeddingService) GetEmbeddingByType(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType) (repo.Embedding, error) {
+func (e *embeddingService) GetEmbeddingByType(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType) (repo.Embedding, error) {
 	params := repo.GetEmbeddingByTypeParams{
 		AssetID:       assetID,
 		EmbeddingType: string(embeddingType),
@@ -354,7 +351,7 @@ func (e *embeddingService) GetEmbeddingByType(ctx context.Context, assetID pgtyp
 }
 
 // SetPrimaryEmbeddingForAsset sets specific model as primary for an asset and type.
-func (e *embeddingService) SetPrimaryEmbeddingForAsset(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) error {
+func (e *embeddingService) SetPrimaryEmbeddingForAsset(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string) error {
 	params := repo.SetPrimaryEmbeddingForAssetParams{
 		AssetID:        assetID,
 		EmbeddingType:  string(embeddingType),
@@ -364,12 +361,12 @@ func (e *embeddingService) SetPrimaryEmbeddingForAsset(ctx context.Context, asse
 }
 
 // GetAllEmbeddingsForAsset retrieves all embeddings for an asset.
-func (e *embeddingService) GetAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) ([]repo.GetAllEmbeddingsForAssetRow, error) {
+func (e *embeddingService) GetAllEmbeddingsForAsset(ctx context.Context, assetID uuid.UUID) ([]repo.GetAllEmbeddingsForAssetRow, error) {
 	return e.queries.GetAllEmbeddingsForAsset(ctx, assetID)
 }
 
 // GetAssetEmbeddingInfo returns embedding information for an asset.
-func (e *embeddingService) GetAssetEmbeddingInfo(ctx context.Context, assetID pgtype.UUID) (map[EmbeddingType]EmbeddingInfo, error) {
+func (e *embeddingService) GetAssetEmbeddingInfo(ctx context.Context, assetID uuid.UUID) (map[EmbeddingType]EmbeddingInfo, error) {
 	embeddings, err := e.GetAllEmbeddingsForAsset(ctx, assetID)
 	if err != nil {
 		return nil, err
@@ -382,11 +379,11 @@ func (e *embeddingService) GetAssetEmbeddingInfo(ctx context.Context, assetID pg
 			Model:      emb.EmbeddingModel,
 			Dimensions: int(emb.EmbeddingDimensions),
 			Type:       emb.EmbeddingType,
-			IsPrimary:  *emb.IsPrimary,
+			IsPrimary:  emb.IsPrimary,
 			CreatedAt:  emb.CreatedAt.Time.Format("2006-01-02T15:04:05Z"),
 		}
 
-		if existing, exists := result[EmbeddingType(emb.EmbeddingType)]; !exists || *emb.IsPrimary || emb.CreatedAt.Time.After(parseTime(existing.CreatedAt)) {
+		if existing, exists := result[EmbeddingType(emb.EmbeddingType)]; !exists || emb.IsPrimary || emb.CreatedAt.Time.After(parseTime(existing.CreatedAt)) {
 			result[EmbeddingType(emb.EmbeddingType)] = info
 		}
 	}
@@ -395,7 +392,7 @@ func (e *embeddingService) GetAssetEmbeddingInfo(ctx context.Context, assetID pg
 }
 
 // DeleteEmbedding removes specific embedding.
-func (e *embeddingService) DeleteEmbedding(ctx context.Context, assetID pgtype.UUID, embeddingType EmbeddingType, model string) error {
+func (e *embeddingService) DeleteEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string) error {
 	params := repo.DeleteEmbeddingParams{
 		AssetID:        assetID,
 		EmbeddingType:  string(embeddingType),
@@ -405,7 +402,7 @@ func (e *embeddingService) DeleteEmbedding(ctx context.Context, assetID pgtype.U
 }
 
 // DeleteAllEmbeddingsForAsset removes all embeddings for an asset.
-func (e *embeddingService) DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error {
+func (e *embeddingService) DeleteAllEmbeddingsForAsset(ctx context.Context, assetID uuid.UUID) error {
 	return e.queries.DeleteAllEmbeddingsForAsset(ctx, assetID)
 }
 
@@ -427,7 +424,7 @@ func (e *embeddingService) upsertEmbeddingSpace(ctx context.Context, queries *re
 	space, err := queries.UpsertEmbeddingSpace(ctx, repo.UpsertEmbeddingSpaceParams{
 		EmbeddingType:  string(embeddingType),
 		ModelID:        model,
-		Dimensions:     int32(dimensions),
+		Dimensions:     int64(dimensions),
 		DistanceMetric: embeddingDistanceMetricL2,
 	})
 	if err != nil {
@@ -444,13 +441,13 @@ func (e *embeddingService) ensureDefaultSpace(ctx context.Context, queries *repo
 	if err == nil {
 		return promoted, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return repo.EmbeddingSpace{}, fmt.Errorf("promote embedding space as default: %w", err)
 	}
 
 	defaultSpace, err := queries.GetDefaultEmbeddingSpaceByType(ctx, string(embeddingType))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return space, nil
 		}
 		return repo.EmbeddingSpace{}, fmt.Errorf("load default embedding space: %w", err)

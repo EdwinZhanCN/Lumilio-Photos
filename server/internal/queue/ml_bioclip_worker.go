@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 )
 
@@ -28,7 +28,7 @@ type ProcessBioClipWorker struct {
 }
 
 type speciesPredictionSaver interface {
-	SaveSpeciesPredictions(ctx context.Context, assetID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
+	SaveSpeciesPredictions(ctx context.Context, assetID uuid.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
 }
 
 func (w *ProcessBioClipWorker) Timeout(job *river.Job[ProcessBioClipArgs]) time.Duration {
@@ -45,11 +45,6 @@ func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessB
 	}
 	if !enabled {
 		return nil
-	}
-
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
 	if w.LumenService == nil {
@@ -72,7 +67,7 @@ func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessB
 		return fmt.Errorf("failed to classify image with BioCLIP: %w", err)
 	}
 
-	if err := w.SpeciesService.SaveSpeciesPredictions(ctx, pgUUID, labelsToSpeciesPredictions(labels)); err != nil {
+	if err := w.SpeciesService.SaveSpeciesPredictions(ctx, assetID, labelsToSpeciesPredictions(labels)); err != nil {
 		return fmt.Errorf("failed to save BioCLIP species predictions: %w", err)
 	}
 

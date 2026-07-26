@@ -5,45 +5,44 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"server/internal/db/repo" // 假设 sqlc 生成的代码在这个包
+
+	"server/internal/db/repo"
 )
 
-// PostgresStore 实现 compose.CheckPointStore
-type PostgresStore struct {
-	q *repo.Queries // sqlc 生成的 queries 对象
+// CheckpointStore persists agent checkpoints in the library catalog.
+type CheckpointStore struct {
+	q *repo.Queries
 }
 
-func NewPostgresStore(q *repo.Queries) *PostgresStore {
-	return &PostgresStore{q: q}
+func NewCheckpointStore(q *repo.Queries) *CheckpointStore {
+	return &CheckpointStore{q: q}
 }
 
-// Get 实现接口：读取快照
-func (s *PostgresStore) Get(ctx context.Context, key string) ([]byte, bool, error) {
+func (s *CheckpointStore) Get(ctx context.Context, key string) ([]byte, bool, error) {
 	data, err := s.q.GetCheckpoint(ctx, key)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, false, nil // 没找到不报错，返回 exist=false
+			return nil, false, nil
 		}
-		return nil, false, fmt.Errorf("db get checkpoint error: %w", err)
+		return nil, false, fmt.Errorf("get checkpoint: %w", err)
 	}
 	return data, true, nil
 }
 
-// Set 实现接口：保存快照
-func (s *PostgresStore) Set(ctx context.Context, key string, data []byte) error {
+func (s *CheckpointStore) Set(ctx context.Context, key string, data []byte) error {
 	err := s.q.UpsertCheckpoint(ctx, repo.UpsertCheckpointParams{
 		ID:   key,
 		Data: data,
 	})
 	if err != nil {
-		return fmt.Errorf("db save checkpoint error: %w", err)
+		return fmt.Errorf("save checkpoint: %w", err)
 	}
 	return nil
 }
 
-func (s *PostgresStore) Delete(ctx context.Context, key string) error {
+func (s *CheckpointStore) Delete(ctx context.Context, key string) error {
 	if err := s.q.DeleteCheckpoint(ctx, key); err != nil {
-		return fmt.Errorf("db delete checkpoint error: %w", err)
+		return fmt.Errorf("delete checkpoint: %w", err)
 	}
 	return nil
 }

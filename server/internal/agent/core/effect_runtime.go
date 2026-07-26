@@ -8,17 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type EffectRuntime struct {
-	pool     *pgxpool.Pool
+	pool     *sql.DB
 	queries  *repo.Queries
 	registry *ToolRegistry
 }
@@ -33,12 +32,12 @@ type EffectReceipt struct {
 	AlreadyCommitted bool   `json:"already_committed,omitempty"`
 }
 
-func NewEffectRuntime(pool *pgxpool.Pool, queries *repo.Queries, registry *ToolRegistry) *EffectRuntime {
+func NewEffectRuntime(pool *sql.DB, queries *repo.Queries, registry *ToolRegistry) *EffectRuntime {
 	return &EffectRuntime{pool: pool, queries: queries, registry: registry}
 }
 
-func effectUUID(id uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: id, Valid: true}
+func nullableEffectUUID(id uuid.UUID) uuid.NullUUID {
+	return uuid.NullUUID{UUID: id, Valid: true}
 }
 
 func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID string, runID uuid.UUID, toolName string, membership []uuid.UUID, payload, target any) (uuid.UUID, error) {
@@ -52,22 +51,17 @@ func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID stri
 	if len(membership) == 0 || len(membership) > policy.MaxCardinality {
 		return uuid.Nil, fmt.Errorf("effect membership cardinality %d is outside policy", len(membership))
 	}
-	pgIDs := make([]pgtype.UUID, len(membership))
-	for i, id := range membership {
-		pgIDs[i] = effectUUID(id)
-	}
+	assetIDs := append([]uuid.UUID(nil), membership...)
 	authorized, err := r.queries.GetAuthorizedAssetIDs(ctx, repo.GetAuthorizedAssetIDsParams{
-		AssetIds: pgIDs,
-		OwnerID:  userID,
+		AssetIds: assetIDs,
+		OwnerID:  &userID,
 	})
 	if err != nil {
 		return uuid.Nil, err
 	}
 	allowed := make(map[uuid.UUID]struct{}, len(authorized))
 	for _, id := range authorized {
-		if id.Valid {
-			allowed[uuid.UUID(id.Bytes)] = struct{}{}
-		}
+		allowed[id] = struct{}{}
 	}
 	if len(allowed) != len(membership) {
 		return uuid.Nil, sql.ErrNoRows
@@ -94,24 +88,27 @@ func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID stri
 		_, _ = hash.Write(id[:])
 	}
 	idempotencyKey := hex.EncodeToString(hash.Sum(nil))
+	now := dbtypes.NewTimestamp(time.Now())
 	row, err := r.queries.CreatePendingAgentEffect(ctx, repo.CreatePendingAgentEffectParams{
-		EffectID: effectUUID(effectID), UserID: userID, ThreadID: threadID,
-		InitiatingRunID: effectUUID(runID), ToolName: toolName,
-		EffectClass: policy.Class, PolicyVersion: int32(policy.PolicyVersion),
-		MembershipSnapshot: pgIDs, Payload: payloadJSON, Target: targetJSON,
+		EffectID: effectID, UserID: userID, ThreadID: threadID,
+		InitiatingRunID: runID, ToolName: toolName,
+		EffectClass: policy.Class, PolicyVersion: int64(policy.PolicyVersion),
+		MembershipSnapshot: dbtypes.UUIDs(assetIDs), Payload: dbtypes.JSON(payloadJSON), Target: dbtypes.JSON(targetJSON),
 		IdempotencyKey: idempotencyKey,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	})
 	if err != nil {
 		return uuid.Nil, err
 	}
-	return uuid.UUID(row.EffectID.Bytes), nil
+	return row.EffectID, nil
 }
 
 func (r *EffectRuntime) Reject(ctx context.Context, userID int32, threadID string, effectID uuid.UUID) error {
 	receipt, _ := json.Marshal(EffectReceipt{EffectID: effectID.String(), Status: "rejected"})
 	return r.queries.UpdatePendingAgentEffect(ctx, repo.UpdatePendingAgentEffectParams{
-		EffectID: effectUUID(effectID), UserID: userID, ThreadID: threadID,
-		Status: "rejected", Receipt: receipt,
+		EffectID: effectID, UserID: userID, ThreadID: threadID,
+		Status: "rejected", Receipt: dbtypes.JSON(receipt), UpdatedAt: dbtypes.NewTimestamp(time.Now()),
 	})
 }
 
@@ -119,17 +116,17 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 	if r == nil || r.pool == nil {
 		return EffectReceipt{}, errors.New("effect runtime unavailable")
 	}
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := r.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return EffectReceipt{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 	q := r.queries.WithTx(tx)
 	effect, err := q.GetPendingAgentEffectForUpdate(ctx, repo.GetPendingAgentEffectForUpdateParams{
-		EffectID: effectUUID(effectID), UserID: userID, ThreadID: threadID,
+		EffectID: effectID, UserID: userID, ThreadID: threadID,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return EffectReceipt{}, sql.ErrNoRows
 		}
 		return EffectReceipt{}, err
@@ -146,17 +143,17 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		return EffectReceipt{}, fmt.Errorf("effect is %s", effect.Status)
 	}
 	policy, ok := r.registry.EffectPolicy(effect.ToolName)
-	if !ok || int32(policy.PolicyVersion) != effect.PolicyVersion {
+	if !ok || int64(policy.PolicyVersion) != effect.PolicyVersion {
 		return EffectReceipt{}, errors.New("effect policy version is no longer executable")
 	}
 	if _, err := q.BindPendingAgentEffectExecutingRun(ctx, repo.BindPendingAgentEffectExecutingRunParams{
-		RunID: effectUUID(runID), EffectID: effectUUID(effectID),
+		RunID: nullableEffectUUID(runID), UpdatedAt: dbtypes.NewTimestamp(time.Now()), EffectID: effectID,
 		UserID: userID, ThreadID: threadID,
 	}); err != nil {
 		return EffectReceipt{}, sql.ErrNoRows
 	}
 	locked, err := q.LockAuthorizedAssetIDs(ctx, repo.LockAuthorizedAssetIDsParams{
-		AssetIds: effect.MembershipSnapshot, OwnerID: userID,
+		AssetIds: []uuid.UUID(effect.MembershipSnapshot), OwnerID: &userID,
 	})
 	if err != nil || len(locked) != len(effect.MembershipSnapshot) {
 		return EffectReceipt{}, sql.ErrNoRows
@@ -175,7 +172,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 			return EffectReceipt{}, err
 		}
 		if err := q.BulkUpdateAssetLiked(ctx, repo.BulkUpdateAssetLikedParams{
-			Liked: payload.Liked, AssetIds: effect.MembershipSnapshot,
+			Liked: payload.Liked, AssetIds: []uuid.UUID(effect.MembershipSnapshot),
 		}); err != nil {
 			return EffectReceipt{}, err
 		}
@@ -192,7 +189,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		if err := json.Unmarshal(effect.Payload, &payload); err != nil {
 			return EffectReceipt{}, err
 		}
-		if err := applyTagsTx(ctx, q, effect.MembershipSnapshot, payload.Mode, payload.Tags); err != nil {
+		if err := applyTagsTx(ctx, q, []uuid.UUID(effect.MembershipSnapshot), payload.Mode, payload.Tags); err != nil {
 			return EffectReceipt{}, err
 		}
 		receipt.Message = fmt.Sprintf("Applied tag change to %d assets", receipt.Count)
@@ -209,7 +206,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		if err != nil {
 			return EffectReceipt{}, err
 		}
-		if err := addAssetsToAlbumTx(ctx, q, album.AlbumID, effect.MembershipSnapshot); err != nil {
+		if err := addAssetsToAlbumTx(ctx, q, album.AlbumID, []uuid.UUID(effect.MembershipSnapshot)); err != nil {
 			return EffectReceipt{}, err
 		}
 		receipt.AlbumID = int(album.AlbumID)
@@ -225,7 +222,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		if err != nil || album.UserID != userID {
 			return EffectReceipt{}, sql.ErrNoRows
 		}
-		if err := addAssetsToAlbumTx(ctx, q, target.AlbumID, effect.MembershipSnapshot); err != nil {
+		if err := addAssetsToAlbumTx(ctx, q, target.AlbumID, []uuid.UUID(effect.MembershipSnapshot)); err != nil {
 			return EffectReceipt{}, err
 		}
 		receipt.AlbumID = int(target.AlbumID)
@@ -241,25 +238,24 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		return EffectReceipt{}, err
 	}
 	if err := q.UpdatePendingAgentEffect(ctx, repo.UpdatePendingAgentEffectParams{
-		EffectID: effectUUID(effectID), UserID: userID, ThreadID: threadID,
-		Status: "committed", Receipt: receiptJSON,
+		EffectID: effectID, UserID: userID, ThreadID: threadID,
+		Status: "committed", Receipt: dbtypes.JSON(receiptJSON), UpdatedAt: dbtypes.NewTimestamp(time.Now()),
 	}); err != nil {
 		return EffectReceipt{}, err
 	}
 	if err := ctx.Err(); err != nil {
 		return EffectReceipt{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return EffectReceipt{}, err
 	}
 	return receipt, nil
 }
 
-func addAssetsToAlbumTx(ctx context.Context, q *repo.Queries, albumID int32, ids []pgtype.UUID) error {
+func addAssetsToAlbumTx(ctx context.Context, q *repo.Queries, albumID int32, ids []uuid.UUID) error {
 	for i, id := range ids {
-		position := int32(i)
 		if err := q.AddAssetToAlbum(ctx, repo.AddAssetToAlbumParams{
-			AssetID: id, AlbumID: albumID, Position: &position,
+			AssetID: id, AlbumID: albumID, Position: int64(i),
 		}); err != nil {
 			return err
 		}
@@ -267,24 +263,20 @@ func addAssetsToAlbumTx(ctx context.Context, q *repo.Queries, albumID int32, ids
 	return nil
 }
 
-func applyTagsTx(ctx context.Context, q *repo.Queries, assets []pgtype.UUID, mode string, names []string) error {
+func applyTagsTx(ctx context.Context, q *repo.Queries, assets []uuid.UUID, mode string, names []string) error {
 	tagIDs := make([]int32, 0, len(names))
 	for _, name := range names {
 		tag, err := q.GetTagByName(ctx, name)
-		if errors.Is(err, pgx.ErrNoRows) && mode == "add" {
+		if errors.Is(err, sql.ErrNoRows) && mode == "add" {
 			tag, err = q.CreateTag(ctx, repo.CreateTagParams{TagName: name})
 		}
-		if errors.Is(err, pgx.ErrNoRows) && mode == "remove" {
+		if errors.Is(err, sql.ErrNoRows) && mode == "remove" {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 		tagIDs = append(tagIDs, tag.TagID)
-	}
-	confidence := pgtype.Numeric{}
-	if err := confidence.Scan("1.000"); err != nil {
-		return err
 	}
 	for _, assetID := range assets {
 		for _, tagID := range tagIDs {
@@ -293,7 +285,7 @@ func applyTagsTx(ctx context.Context, q *repo.Queries, assets []pgtype.UUID, mod
 					return err
 				}
 			} else if err := q.AddTagToAsset(ctx, repo.AddTagToAssetParams{
-				AssetID: assetID, TagID: tagID, Confidence: confidence, Source: "user",
+				AssetID: assetID, TagID: tagID, Confidence: 1, Source: "user",
 			}); err != nil {
 				return err
 			}

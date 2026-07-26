@@ -8,25 +8,25 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
 )
 
 const deleteExternalRepositoryRoot = `-- name: DeleteExternalRepositoryRoot :execrows
 DELETE FROM repository_roots
-WHERE repository_roots.root_id = $1
+WHERE repository_roots.root_id = ?1
   AND repository_roots.kind = 'external'
   AND NOT EXISTS (
       SELECT 1 FROM repositories WHERE repositories.root_id = repository_roots.root_id
   )
 `
 
-func (q *Queries) DeleteExternalRepositoryRoot(ctx context.Context, rootID pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteExternalRepositoryRoot, rootID)
+func (q *Queries) DeleteExternalRepositoryRoot(ctx context.Context, rootID uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteExternalRepositoryRoot, rootID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected(), nil
+	return result.RowsAffected()
 }
 
 const getDefaultRepositoryRoot = `-- name: GetDefaultRepositoryRoot :one
@@ -35,7 +35,7 @@ WHERE kind = 'default'
 `
 
 func (q *Queries) GetDefaultRepositoryRoot(ctx context.Context) (RepositoryRoot, error) {
-	row := q.db.QueryRow(ctx, getDefaultRepositoryRoot)
+	row := q.db.QueryRowContext(ctx, getDefaultRepositoryRoot)
 	var i RepositoryRoot
 	err := row.Scan(
 		&i.RootID,
@@ -51,11 +51,11 @@ func (q *Queries) GetDefaultRepositoryRoot(ctx context.Context) (RepositoryRoot,
 
 const getRepositoryRoot = `-- name: GetRepositoryRoot :one
 SELECT root_id, name, path, kind, status, created_at, updated_at FROM repository_roots
-WHERE root_id = $1
+WHERE root_id = ?1
 `
 
-func (q *Queries) GetRepositoryRoot(ctx context.Context, rootID pgtype.UUID) (RepositoryRoot, error) {
-	row := q.db.QueryRow(ctx, getRepositoryRoot, rootID)
+func (q *Queries) GetRepositoryRoot(ctx context.Context, rootID uuid.UUID) (RepositoryRoot, error) {
+	row := q.db.QueryRowContext(ctx, getRepositoryRoot, rootID)
 	var i RepositoryRoot
 	err := row.Scan(
 		&i.RootID,
@@ -71,11 +71,11 @@ func (q *Queries) GetRepositoryRoot(ctx context.Context, rootID pgtype.UUID) (Re
 
 const getRepositoryRootByPath = `-- name: GetRepositoryRootByPath :one
 SELECT root_id, name, path, kind, status, created_at, updated_at FROM repository_roots
-WHERE path = $1
+WHERE path = ?1
 `
 
 func (q *Queries) GetRepositoryRootByPath(ctx context.Context, path string) (RepositoryRoot, error) {
-	row := q.db.QueryRow(ctx, getRepositoryRootByPath, path)
+	row := q.db.QueryRowContext(ctx, getRepositoryRootByPath, path)
 	var i RepositoryRoot
 	err := row.Scan(
 		&i.RootID,
@@ -95,7 +95,7 @@ ORDER BY kind ASC, created_at ASC
 `
 
 func (q *Queries) ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, error) {
-	rows, err := q.db.Query(ctx, listRepositoryRoots)
+	rows, err := q.db.QueryContext(ctx, listRepositoryRoots)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +116,9 @@ func (q *Queries) ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, er
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -124,19 +127,19 @@ func (q *Queries) ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, er
 
 const setRepositoryRoot = `-- name: SetRepositoryRoot :one
 UPDATE repositories
-SET root_id = $2, updated_at = $3
-WHERE repo_id = $1
+SET root_id = ?2, updated_at = ?3
+WHERE repo_id = ?1
 RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type SetRepositoryRootParams struct {
-	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
-	RootID    pgtype.UUID        `db:"root_id" json:"root_id"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RepoID    uuid.UUID         `db:"repo_id" json:"repo_id"`
+	RootID    uuid.NullUUID     `db:"root_id" json:"root_id"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) SetRepositoryRoot(ctx context.Context, arg SetRepositoryRootParams) (Repository, error) {
-	row := q.db.QueryRow(ctx, setRepositoryRoot, arg.RepoID, arg.RootID, arg.UpdatedAt)
+	row := q.db.QueryRowContext(ctx, setRepositoryRoot, arg.RepoID, arg.RootID, arg.UpdatedAt)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,
@@ -157,22 +160,22 @@ func (q *Queries) SetRepositoryRoot(ctx context.Context, arg SetRepositoryRootPa
 const updateRepositoryRootFromDisk = `-- name: UpdateRepositoryRootFromDisk :one
 UPDATE repository_roots
 SET
-    name = $2,
-    status = $3,
-    updated_at = $4
-WHERE root_id = $1
+    name = ?2,
+    status = ?3,
+    updated_at = ?4
+WHERE root_id = ?1
 RETURNING root_id, name, path, kind, status, created_at, updated_at
 `
 
 type UpdateRepositoryRootFromDiskParams struct {
-	RootID    pgtype.UUID                  `db:"root_id" json:"root_id"`
+	RootID    uuid.UUID                    `db:"root_id" json:"root_id"`
 	Name      string                       `db:"name" json:"name"`
 	Status    dbtypes.RepositoryRootStatus `db:"status" json:"status"`
-	UpdatedAt pgtype.Timestamptz           `db:"updated_at" json:"updated_at"`
+	UpdatedAt dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpdateRepositoryRootFromDisk(ctx context.Context, arg UpdateRepositoryRootFromDiskParams) (RepositoryRoot, error) {
-	row := q.db.QueryRow(ctx, updateRepositoryRootFromDisk,
+	row := q.db.QueryRowContext(ctx, updateRepositoryRootFromDisk,
 		arg.RootID,
 		arg.Name,
 		arg.Status,
@@ -201,7 +204,7 @@ INSERT INTO repository_roots (
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7
 )
 ON CONFLICT (root_id) DO UPDATE SET
     name = EXCLUDED.name,
@@ -213,17 +216,17 @@ RETURNING root_id, name, path, kind, status, created_at, updated_at
 `
 
 type UpsertRepositoryRootParams struct {
-	RootID    pgtype.UUID                  `db:"root_id" json:"root_id"`
+	RootID    uuid.UUID                    `db:"root_id" json:"root_id"`
 	Name      string                       `db:"name" json:"name"`
 	Path      string                       `db:"path" json:"path"`
 	Kind      dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
 	Status    dbtypes.RepositoryRootStatus `db:"status" json:"status"`
-	CreatedAt pgtype.Timestamptz           `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz           `db:"updated_at" json:"updated_at"`
+	CreatedAt dbtypes.Timestamp            `db:"created_at" json:"created_at"`
+	UpdatedAt dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpsertRepositoryRoot(ctx context.Context, arg UpsertRepositoryRootParams) (RepositoryRoot, error) {
-	row := q.db.QueryRow(ctx, upsertRepositoryRoot,
+	row := q.db.QueryRowContext(ctx, upsertRepositoryRoot,
 		arg.RootID,
 		arg.Name,
 		arg.Path,

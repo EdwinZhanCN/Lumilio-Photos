@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"log"
 	"strings"
 
@@ -11,16 +12,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 )
 
 type LocationHandler struct {
 	locationService service.LocationService
-	queueClient     *river.Client[pgx.Tx]
+	queueClient     *river.Client[*sql.Tx]
 }
 
-func NewLocationHandler(locationService service.LocationService, queueClient *river.Client[pgx.Tx]) *LocationHandler {
+func NewLocationHandler(locationService service.LocationService, queueClient *river.Client[*sql.Tx]) *LocationHandler {
 	return &LocationHandler{
 		locationService: locationService,
 		queueClient:     queueClient,

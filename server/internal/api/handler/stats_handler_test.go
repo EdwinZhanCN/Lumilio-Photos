@@ -12,20 +12,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
 type stubStatsQuerier struct {
-	getFocalLengthDistributionFn func(ctx context.Context, repositoryID pgtype.UUID) ([]repo.GetFocalLengthDistributionRow, error)
+	getFocalLengthDistributionFn func(ctx context.Context, repositoryID interface{}) ([]repo.GetFocalLengthDistributionRow, error)
 	getCameraLensStatsFn         func(arg repo.GetCameraLensStatsParams) ([]repo.GetCameraLensStatsRow, error)
-	getTimeDistributionHourlyFn  func(repositoryID pgtype.UUID) ([]repo.GetTimeDistributionHourlyRow, error)
-	getTimeDistributionMonthlyFn func(repositoryID pgtype.UUID) ([]repo.GetTimeDistributionMonthlyRow, error)
+	getTimeDistributionHourlyFn  func(repositoryID interface{}) ([]repo.GetTimeDistributionHourlyRow, error)
+	getTimeDistributionMonthlyFn func(repositoryID interface{}) ([]repo.GetTimeDistributionMonthlyRow, error)
 	getDailyActivityHeatmapFn    func(arg repo.GetDailyActivityHeatmapParams) ([]repo.GetDailyActivityHeatmapRow, error)
-	getAvailableYearsFn          func(repositoryID pgtype.UUID) ([]int32, error)
+	getAvailableYearsFn          func(repositoryID interface{}) ([]int64, error)
 }
 
-func (s stubStatsQuerier) GetFocalLengthDistribution(_ context.Context, repositoryID pgtype.UUID) ([]repo.GetFocalLengthDistributionRow, error) {
+func (s stubStatsQuerier) GetFocalLengthDistribution(_ context.Context, repositoryID interface{}) ([]repo.GetFocalLengthDistributionRow, error) {
 	if s.getFocalLengthDistributionFn != nil {
 		return s.getFocalLengthDistributionFn(context.Background(), repositoryID)
 	}
@@ -39,14 +38,14 @@ func (s stubStatsQuerier) GetCameraLensStats(_ context.Context, arg repo.GetCame
 	return nil, nil
 }
 
-func (s stubStatsQuerier) GetTimeDistributionHourly(_ context.Context, repositoryID pgtype.UUID) ([]repo.GetTimeDistributionHourlyRow, error) {
+func (s stubStatsQuerier) GetTimeDistributionHourly(_ context.Context, repositoryID interface{}) ([]repo.GetTimeDistributionHourlyRow, error) {
 	if s.getTimeDistributionHourlyFn != nil {
 		return s.getTimeDistributionHourlyFn(repositoryID)
 	}
 	return nil, nil
 }
 
-func (s stubStatsQuerier) GetTimeDistributionMonthly(_ context.Context, repositoryID pgtype.UUID) ([]repo.GetTimeDistributionMonthlyRow, error) {
+func (s stubStatsQuerier) GetTimeDistributionMonthly(_ context.Context, repositoryID interface{}) ([]repo.GetTimeDistributionMonthlyRow, error) {
 	if s.getTimeDistributionMonthlyFn != nil {
 		return s.getTimeDistributionMonthlyFn(repositoryID)
 	}
@@ -60,7 +59,7 @@ func (s stubStatsQuerier) GetDailyActivityHeatmap(_ context.Context, arg repo.Ge
 	return nil, nil
 }
 
-func (s stubStatsQuerier) GetAvailableYears(_ context.Context, repositoryID pgtype.UUID) ([]int32, error) {
+func (s stubStatsQuerier) GetAvailableYears(_ context.Context, repositoryID interface{}) ([]int64, error) {
 	if s.getAvailableYearsFn != nil {
 		return s.getAvailableYearsFn(repositoryID)
 	}
@@ -74,12 +73,14 @@ func TestStatsHandlerGetFocalLengthDistribution_UsesRepositoryScope(t *testing.T
 	expectedRepositoryID := uuid.MustParse(rawRepositoryID)
 	handler := &StatsHandler{
 		queries: stubStatsQuerier{
-			getFocalLengthDistributionFn: func(_ context.Context, repositoryID pgtype.UUID) ([]repo.GetFocalLengthDistributionRow, error) {
-				require.True(t, repositoryID.Valid)
-				require.Equal(t, [16]byte(expectedRepositoryID), repositoryID.Bytes)
+			getFocalLengthDistributionFn: func(_ context.Context, repositoryID interface{}) ([]repo.GetFocalLengthDistributionRow, error) {
+				scopedRepositoryID, ok := repositoryID.(uuid.NullUUID)
+				require.True(t, ok)
+				require.True(t, scopedRepositoryID.Valid)
+				require.Equal(t, expectedRepositoryID, scopedRepositoryID.UUID)
 				return []repo.GetFocalLengthDistributionRow{
 					{
-						FocalLength: pgtype.Numeric{},
+						FocalLength: float64(50),
 						Count:       4,
 					},
 				}, nil
@@ -119,13 +120,15 @@ func TestStatsHandlerGetDailyActivityHeatmap_UsesYearRange(t *testing.T) {
 	handler := &StatsHandler{
 		queries: stubStatsQuerier{
 			getDailyActivityHeatmapFn: func(arg repo.GetDailyActivityHeatmapParams) ([]repo.GetDailyActivityHeatmapRow, error) {
-				require.Equal(t, 2024, arg.StartTime.Time.Year())
-				require.Equal(t, time.January, arg.StartTime.Time.Month())
-				require.Equal(t, 1, arg.StartTime.Time.Day())
+				startTime := arg.StartTime.Time.In(time.Local)
+				require.Equal(t, 2024, startTime.Year())
+				require.Equal(t, time.January, startTime.Month())
+				require.Equal(t, 1, startTime.Day())
 
-				require.Equal(t, 2024, arg.EndTime.Time.Year())
-				require.Equal(t, time.December, arg.EndTime.Time.Month())
-				require.Equal(t, 31, arg.EndTime.Time.Day())
+				endTime := arg.EndTime.Time.In(time.Local)
+				require.Equal(t, 2024, endTime.Year())
+				require.Equal(t, time.December, endTime.Month())
+				require.Equal(t, 31, endTime.Day())
 				return []repo.GetDailyActivityHeatmapRow{}, nil
 			},
 		},
@@ -159,9 +162,11 @@ func TestStatsHandlerGetAvailableYears_AllRepositories(t *testing.T) {
 
 	handler := &StatsHandler{
 		queries: stubStatsQuerier{
-			getAvailableYearsFn: func(repositoryID pgtype.UUID) ([]int32, error) {
-				require.False(t, repositoryID.Valid)
-				return []int32{2025, 2024}, nil
+			getAvailableYearsFn: func(repositoryID interface{}) ([]int64, error) {
+				scopedRepositoryID, ok := repositoryID.(uuid.NullUUID)
+				require.True(t, ok)
+				require.False(t, scopedRepositoryID.Valid)
+				return []int64{2025, 2024}, nil
 			},
 		},
 	}

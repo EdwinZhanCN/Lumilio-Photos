@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func burstCandidate(index int, filename string, capturedAt time.Time, burstID string) repo.FindMediaItemsForBurstDetectionRow {
@@ -16,13 +16,13 @@ func burstCandidate(index int, filename string, capturedAt time.Time, burstID st
 	assetID := uuid.MustParse(fmt.Sprintf("10000000-0000-0000-0000-%012d", index+1))
 	ownerID := int32(7)
 	return repo.FindMediaItemsForBurstDetectionRow{
-		MediaItemID:      pgtype.UUID{Bytes: itemID, Valid: true},
+		MediaItemID:      itemID,
 		OwnerID:          &ownerID,
-		RepositoryID:     pgtype.UUID{Bytes: uuid.MustParse("20000000-0000-0000-0000-000000000001"), Valid: true},
-		PrimaryAssetID:   pgtype.UUID{Bytes: assetID, Valid: true},
+		RepositoryID:     uuid.NullUUID{UUID: uuid.MustParse("20000000-0000-0000-0000-000000000001"), Valid: true},
+		PrimaryAssetID:   uuid.NullUUID{UUID: assetID, Valid: true},
 		OriginalFilename: filename,
-		TakenTime:        pgtype.Timestamptz{Time: capturedAt, Valid: true},
-		UploadTime:       pgtype.Timestamptz{Time: capturedAt.Add(time.Hour), Valid: true},
+		TakenTime:        dbtypes.NewTimestamp(capturedAt),
+		UploadTime:       dbtypes.NewTimestamp(capturedAt.Add(time.Hour)),
 		CameraModel:      "Example Camera",
 		BurstID:          burstID,
 	}
@@ -33,12 +33,12 @@ func structuralCandidate(index int, filename string, capturedAt time.Time) repo.
 	assetID := uuid.MustParse(fmt.Sprintf("40000000-0000-0000-0000-%012d", index+1))
 	ownerID := int32(7)
 	return repo.FindCandidatesForStackingByNameRow{
-		AssetID:          pgtype.UUID{Bytes: assetID, Valid: true},
-		MediaItemID:      pgtype.UUID{Bytes: itemID, Valid: true},
+		AssetID:          assetID,
+		MediaItemID:      itemID,
 		OwnerID:          &ownerID,
 		OriginalFilename: filename,
-		TakenTime:        pgtype.Timestamptz{Time: capturedAt, Valid: true},
-		UploadTime:       pgtype.Timestamptz{Time: capturedAt.Add(time.Hour), Valid: true},
+		TakenTime:        dbtypes.NewTimestamp(capturedAt),
+		UploadTime:       dbtypes.NewTimestamp(capturedAt.Add(time.Hour)),
 	}
 }
 

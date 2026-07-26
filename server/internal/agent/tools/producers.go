@@ -18,7 +18,7 @@ import (
 )
 
 // SearchSemanticInput finds assets by visual/semantic similarity to a text
-// query (CLIP embeddings + pgvector). Membership is decided by a per-query
+// query (CLIP embeddings + sqlite-vec). Membership is decided by a per-query
 // calibrated relevance cutoff — the ref is the full relevant set, not a
 // fixed TopK. Use rank/top to trim it.
 type SearchSemanticInput struct {
@@ -228,7 +228,7 @@ func RegisterSearchPeople() {
 			if truncated {
 				rows = rows[:ref.MaxSnapshotSize]
 			}
-			snapshot := fromPgUUIDs(rows)
+			snapshot := copyUUIDs(rows)
 
 			summary := fmt.Sprintf("search_people(%s) → %d assets", strings.Join(idStrs, ", "), len(snapshot))
 			if len(snapshot) == 0 {

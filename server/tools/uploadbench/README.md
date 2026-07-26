@@ -1,8 +1,9 @@
 # uploadbench — upload-to-photo-ready benchmark
 
 A host-side benchmark for the Lumilio Photos upload pipeline with ML/AI
-excluded. It drives a running server over HTTP only (no direct DB access), so it
-works against native dev, `docker-compose.yml`, or the release stack
+excluded. It drives a running server over HTTP and can optionally open its
+SQLite library read-only for exact River timing, so it works against native
+dev, `docker-compose.yml`, or the release stack
 (`docker-compose.release.yml`).
 
 A photo is **photo-ready** only when its `metadata_asset` *and* `thumbnail_asset`
@@ -25,7 +26,7 @@ completion. See the plan at
    (matched by original filename), recording first-observed completion time.
 6. Snapshots queue summaries + ML settings again as ML-exclusion evidence.
 7. Emits `manifest.json`, `events.jsonl`, `summary.json`, `report.md`, and (if a
-   sampler is attached) `resource_samples.csv` / `pg_samples.csv`.
+   sampler is attached) `resource_samples.csv`.
 
 ## Profiles
 
@@ -60,14 +61,13 @@ go run ./tools/uploadbench \
   -dataset "/Volumes/CodeBase/Photography/Sep 28 2025" \
   -user admin -pass 'YOUR_PASSWORD' \
   -concurrency 8 -profile core \
-  -sampler ./tools/uploadbench/sample.sh \
-  -pg-container "$(docker compose -f ../docker-compose.release.yml ps -q db | xargs docker inspect --format '{{.Name}}' | sed 's#^/##')"
+  -sampler ./tools/uploadbench/sample.sh
 ```
 
 Key flags: `-concurrency` (sweep 1/2/4/8/16/32 to find saturation),
 `-profile`, `-disable-ml` (default true), `-client-hash` (default true),
 `-timeout` (default 60m), `-limit` (cap files), `-run-id`, `-out`,
-`-instant-pass` (below), `-db` (below).
+`-instant-pass` (below), `-sqlite` (below).
 
 ### Instant upload via `-instant-pass` (optional)
 
@@ -81,24 +81,26 @@ bytes that never crossed the wire.
 means the fingerprint the client sent for a file does not match the one the server
 stored for the very same bytes — the two hash implementations have drifted apart.
 
-### Exact timing via `-db` (optional)
+### Exact timing via `-sqlite` (optional)
 
-Without `-db`, completion is detected by polling `/assets/list`, so per-asset
+Without `-sqlite`, completion is detected by polling `/assets/list`, so per-asset
 photo-ready latency is bounded by `-poll-interval` (default 1 s) — and the status
-JSONB `updated_at` is itself only second-precision. For **sub-second** per-asset
-and makespan numbers, point `-db` at PostgreSQL; the tool then reads
-`river_job.finalized_at` (microsecond-precision) for the two core jobs per asset.
+`updated_at` value is itself only second-precision. For **sub-second** per-asset
+and makespan numbers, point `-sqlite` at the live library catalog; the tool opens
+it read-only and reads `river_job.finalized_at` (millisecond-precision) for the
+two core jobs per asset.
 
-The release compose does **not** expose the DB port, so start the stack with the
-benchmark overlay and pass the (rotated) password:
+For native development, use the `database.path` value from the active manifest:
 
 ```bash
-docker compose -f docker-compose.release.yml -f docker-compose.release.dbport.yml up -d
-
-DBPW="$(cat "$LUMILIO_STORAGE/.secrets/db_password")"
 go run ./tools/uploadbench ... \
-  -db "postgres://postgres:${DBPW}@localhost:5432/lumiliophotos?sslmode=disable"
+  -sqlite "/absolute/path/to/library.sqlite3"
 ```
+
+When the server runs in a container, the catalog path must also be visible on
+the host. Pass the host-side path from the app-state volume. Do not copy the
+live database file; SQLite's WAL may contain committed pages that have not yet
+been checkpointed.
 
 `report.md`/`summary.json` record whether exact timing was used.
 
@@ -107,9 +109,9 @@ go run ./tools/uploadbench ... \
 The tool aborts preflight if any River job is pending. Reset between runs:
 
 ```bash
-# Wipe DB + storage volumes so each run starts from an empty repository/queue.
+# Wipe app-state + storage volumes so each run starts from an empty repository/queue.
 docker compose -f docker-compose.release.yml down -v
-rm -rf "$LUMILIO_STORAGE"/*    # or point LUMILIO_STORAGE at a fresh dir
+# Point LUMILIO_STORAGE at a fresh, empty directory for each run.
 docker compose -f docker-compose.release.yml up -d
 # Re-run first-time setup to recreate the admin user + primary repository.
 ```
@@ -172,8 +174,7 @@ docker compose -f docker-compose.release.yml ps
 Notes:
 - The server API is on `:6680`; the web UI is on `:6657`. The benchmark talks to
   the server directly (`-base http://localhost:6680`).
-- The `sample.sh` PG sampler reads stats via `docker exec` and needs no exposed
-  port. Exact per-job timing (`-db`) does need the port — use the committed
-  `docker-compose.release.dbport.yml` overlay (see "Exact timing via -db").
+- `sample.sh` records container resource usage with `docker stats`. Exact
+  per-job timing (`-sqlite`) reads the host-visible app-state catalog directly.
 - The release image installs `libraw23`, so NEF thumbnails resolve through the
   libraw embedded-preview path — RAW photos reach photo-ready in Docker.

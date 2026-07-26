@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/service"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 )
 
@@ -42,7 +42,7 @@ func (w *ZeroshotClassifyWorker) Work(ctx context.Context, job *river.Job[Zerosh
 	embedding, err := w.EmbeddingService.GetPrimaryEmbeddingVector(ctx, assetID, service.EmbeddingTypeSemantic)
 	if err != nil {
 		// The semantic embedding may not have landed yet; snooze and retry.
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return river.JobSnooze(30 * time.Second)
 		}
 		return fmt.Errorf("load primary semantic embedding: %w", err)

@@ -7,144 +7,138 @@ package repo
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
 )
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
     a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
-    COALESCE(thumbnails_rel.thumbnails, '[]'::json) as thumbnails,
-    COALESCE(tags_rel.tags, '[]'::json) as tags,
-    COALESCE(albums_rel.albums, '[]'::json) as albums,
-    COALESCE(species_rel.species_predictions, '[]'::json) as species_predictions,
-    ocr_rel.ocr_result,
-    face_rel.face_result
-FROM assets a
-LEFT JOIN LATERAL (
-    SELECT json_agg(
-        jsonb_build_object(
-            'thumbnail_id', t.thumbnail_id,
-            'size', t.size,
-            'storage_path', t.storage_path,
-            'mime_type', t.mime_type
-        )
-        ORDER BY
-            CASE t.size
+    COALESCE((
+        SELECT json_group_array(json_object(
+            'thumbnail_id', ordered.thumbnail_id,
+            'size', ordered.size,
+            'storage_path', ordered.storage_path,
+            'mime_type', ordered.mime_type
+        ))
+        FROM (
+            SELECT t.thumbnail_id, t.asset_id, t.size, t.storage_path, t.mime_type, t.created_at
+            FROM thumbnails t
+            WHERE t.asset_id = a.asset_id
+            ORDER BY CASE t.size
                 WHEN 'small' THEN 1
                 WHEN 'medium' THEN 2
                 WHEN 'large' THEN 3
-            END,
-            t.thumbnail_id ASC
-    ) AS thumbnails
-    FROM thumbnails t
-    WHERE t.asset_id = a.asset_id
-) thumbnails_rel ON true
-LEFT JOIN LATERAL (
-    SELECT json_agg(
-        jsonb_build_object(
-            'tag_id', tg.tag_id,
-            'tag_name', tg.tag_name,
-            'confidence', at.confidence,
-            'source', at.source
+            END, t.thumbnail_id
+        ) AS ordered
+    ), '[]') AS thumbnails,
+    COALESCE((
+        SELECT json_group_array(json_object(
+            'tag_id', ordered.tag_id,
+            'tag_name', ordered.tag_name,
+            'confidence', ordered.confidence,
+            'source', ordered.source
+        ))
+        FROM (
+            SELECT tg.tag_id, tg.tag_name, at.confidence, at.source
+            FROM asset_tags at
+            JOIN tags tg ON at.tag_id = tg.tag_id
+            WHERE at.asset_id = a.asset_id
+            ORDER BY tg.tag_name, tg.tag_id
+        ) AS ordered
+    ), '[]') AS tags,
+    COALESCE((
+        SELECT json_group_array(json_object(
+            'album_id', ordered.album_id,
+            'album_name', ordered.album_name,
+            'position', ordered.position,
+            'added_time', ordered.added_time
+        ))
+        FROM (
+            SELECT al.album_id, al.album_name, aa.position, aa.added_time
+            FROM album_assets aa
+            JOIN albums al ON aa.album_id = al.album_id
+            WHERE aa.asset_id = a.asset_id
+            ORDER BY aa.position IS NULL, aa.position, aa.added_time, al.album_id
+        ) AS ordered
+    ), '[]') AS albums,
+    COALESCE((
+        SELECT json_group_array(json_object('label', ordered.label, 'score', ordered.score))
+        FROM (
+            SELECT sp.label, sp.score
+            FROM species_predictions sp
+            WHERE sp.asset_id = a.asset_id
+            ORDER BY sp.score DESC, sp.label
+        ) AS ordered
+    ), '[]') AS species_predictions,
+    (
+        SELECT json_object(
+            'model_id', ocr.model_id,
+            'total_count', ocr.total_count,
+            'processing_time_ms', ocr.processing_time_ms,
+            'created_at', ocr.created_at,
+            'updated_at', ocr.updated_at,
+            'text_items', COALESCE((
+                SELECT json_group_array(json_object(
+                    'id', ordered.id,
+                    'text_content', ordered.text_content,
+                    'confidence', ordered.confidence,
+                    'bounding_box', json(ordered.bounding_box),
+                    'text_length', ordered.text_length,
+                    'area_pixels', ordered.area_pixels
+                ))
+                FROM (
+                    SELECT ocr_ti.id, ocr_ti.asset_id, ocr_ti.text_content, ocr_ti.confidence, ocr_ti.bounding_box, ocr_ti.text_length, ocr_ti.area_pixels, ocr_ti.created_at
+                    FROM ocr_text_items ocr_ti
+                    WHERE ocr_ti.asset_id = a.asset_id
+                    ORDER BY ocr_ti.confidence DESC, ocr_ti.text_length DESC, ocr_ti.id DESC
+                ) AS ordered
+            ), '[]')
         )
-        ORDER BY tg.tag_name ASC, tg.tag_id ASC
-    ) AS tags
-    FROM asset_tags at
-    JOIN tags tg ON at.tag_id = tg.tag_id
-    WHERE at.asset_id = a.asset_id
-) tags_rel ON true
-LEFT JOIN LATERAL (
-    SELECT json_agg(
-        jsonb_build_object(
-            'album_id', al.album_id,
-            'album_name', al.album_name,
-            'position', aa.position,
-            'added_time', aa.added_time
+        FROM ocr_results ocr
+        WHERE ocr.asset_id = a.asset_id
+    ) AS ocr_result,
+    (
+        SELECT json_object(
+            'model_id', fr.model_id,
+            'total_faces', fr.total_faces,
+            'processing_time_ms', fr.processing_time_ms,
+            'created_at', fr.created_at,
+            'updated_at', fr.updated_at,
+            'faces', COALESCE((
+                SELECT json_group_array(json_object(
+                    'id', ordered.id,
+                    'face_id', ordered.face_id,
+                    'bounding_box', json(ordered.bounding_box),
+                    'confidence', ordered.confidence,
+                    'age_group', ordered.age_group,
+                    'gender', ordered.gender,
+                    'ethnicity', ordered.ethnicity,
+                    'expression', ordered.expression,
+                    'is_primary', ordered.is_primary,
+                    'cluster_id', ordered.cluster_id,
+                    'cluster_name', ordered.cluster_name
+                ))
+                FROM (
+                    SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fcm.cluster_id, fc.cluster_name
+                    FROM face_items fi
+                    LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
+                    LEFT JOIN face_clusters fc ON fcm.cluster_id = fc.cluster_id
+                    WHERE fi.asset_id = a.asset_id
+                    ORDER BY fi.is_primary DESC, fi.confidence DESC, fi.id
+                ) AS ordered
+            ), '[]')
         )
-        ORDER BY aa.position ASC NULLS LAST, aa.added_time ASC, al.album_id ASC
-    ) AS albums
-    FROM album_assets aa
-    JOIN albums al ON aa.album_id = al.album_id
-    WHERE aa.asset_id = a.asset_id
-) albums_rel ON true
-LEFT JOIN LATERAL (
-    SELECT json_agg(
-        jsonb_build_object(
-            'label', sp.label,
-            'score', sp.score
-        )
-        ORDER BY sp.score DESC, sp.label ASC
-    ) AS species_predictions
-    FROM species_predictions sp
-    WHERE sp.asset_id = a.asset_id
-) species_rel ON true
-LEFT JOIN LATERAL (
-    SELECT jsonb_build_object(
-        'model_id', ocr.model_id,
-        'total_count', ocr.total_count,
-        'processing_time_ms', ocr.processing_time_ms,
-        'created_at', ocr.created_at,
-        'updated_at', ocr.updated_at,
-        'text_items', COALESCE((
-            SELECT jsonb_agg(
-                jsonb_build_object(
-                    'id', ocr_ti.id,
-                    'text_content', ocr_ti.text_content,
-                    'confidence', ocr_ti.confidence,
-                    'bounding_box', ocr_ti.bounding_box,
-                    'text_length', ocr_ti.text_length,
-                    'area_pixels', ocr_ti.area_pixels
-                )
-                ORDER BY ocr_ti.confidence DESC, ocr_ti.text_length DESC, ocr_ti.id DESC
-            )
-            FROM ocr_text_items ocr_ti
-            WHERE ocr_ti.asset_id = a.asset_id
-        ), '[]'::jsonb)
-    ) AS ocr_result
-    FROM ocr_results ocr
-    WHERE ocr.asset_id = a.asset_id
-) ocr_rel ON true
-LEFT JOIN LATERAL (
-    SELECT jsonb_build_object(
-        'model_id', fr.model_id,
-        'total_faces', fr.total_faces,
-        'processing_time_ms', fr.processing_time_ms,
-        'created_at', fr.created_at,
-        'updated_at', fr.updated_at,
-        'faces', COALESCE((
-            SELECT jsonb_agg(
-                jsonb_build_object(
-                    'id', fi.id,
-                    'face_id', fi.face_id,
-                    'bounding_box', fi.bounding_box,
-                    'confidence', fi.confidence,
-                    'age_group', fi.age_group,
-                    'gender', fi.gender,
-                    'ethnicity', fi.ethnicity,
-                    'expression', fi.expression,
-                    'is_primary', fi.is_primary,
-                    'cluster_id', fcm.cluster_id,
-                    'cluster_name', fc.cluster_name
-                )
-                ORDER BY fi.is_primary DESC, fi.confidence DESC, fi.id ASC
-            )
-            FROM face_items fi
-            LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
-            LEFT JOIN face_clusters fc ON fcm.cluster_id = fc.cluster_id
-            WHERE fi.asset_id = a.asset_id
-        ), '[]'::jsonb)
+        FROM face_results fr
+        WHERE fr.asset_id = a.asset_id
     ) AS face_result
-    FROM face_results fr
-    WHERE fr.asset_id = a.asset_id
-) face_rel ON true
-WHERE a.asset_id = $1
+FROM assets a
+WHERE a.asset_id = ?1
 `
 
 type GetAssetWithRelationsRow struct {
-	AssetID                 pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
 	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
 	Type                    string                   `db:"type" json:"type"`
 	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
@@ -154,35 +148,35 @@ type GetAssetWithRelationsRow struct {
 	ContentHash             string                   `db:"content_hash" json:"content_hash"`
 	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
 	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int32                   `db:"width" json:"width"`
-	Height                  *int32                   `db:"height" json:"height"`
+	Width                   *int64                   `db:"width" json:"width"`
+	Height                  *int64                   `db:"height" json:"height"`
 	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime               pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int32                   `db:"rating" json:"rating"`
-	Liked                   *bool                    `db:"liked" json:"liked"`
-	RepositoryID            pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status                  []byte                   `db:"status" json:"status"`
-	UpdatedAt               pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	Rating                  *int64                   `db:"rating" json:"rating"`
+	Liked                   bool                     `db:"liked" json:"liked"`
+	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
+	Status                  dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
 	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
 	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 json.RawMessage          `db:"exif_raw" json:"exif_raw"`
-	Thumbnails              []byte                   `db:"thumbnails" json:"thumbnails"`
-	Tags                    []byte                   `db:"tags" json:"tags"`
-	Albums                  []byte                   `db:"albums" json:"albums"`
-	SpeciesPredictions      []byte                   `db:"species_predictions" json:"species_predictions"`
-	OcrResult               []byte                   `db:"ocr_result" json:"ocr_result"`
-	FaceResult              []byte                   `db:"face_result" json:"face_result"`
+	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	Thumbnails              interface{}              `db:"thumbnails" json:"thumbnails"`
+	Tags                    interface{}              `db:"tags" json:"tags"`
+	Albums                  interface{}              `db:"albums" json:"albums"`
+	SpeciesPredictions      interface{}              `db:"species_predictions" json:"species_predictions"`
+	OcrResult               interface{}              `db:"ocr_result" json:"ocr_result"`
+	FaceResult              interface{}              `db:"face_result" json:"face_result"`
 }
 
-func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error) {
-	row := q.db.QueryRow(ctx, getAssetWithRelations, assetID)
+func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) (GetAssetWithRelationsRow, error) {
+	row := q.db.QueryRowContext(ctx, getAssetWithRelations, assetID)
 	var i GetAssetWithRelationsRow
 	err := row.Scan(
 		&i.AssetID,
@@ -228,26 +222,29 @@ const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
     a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
-        SELECT json_agg(
-            json_build_object(
-                'tag_id', tg.tag_id,
-                'tag_name', tg.tag_name,
-                'category', tg.category,
-                'confidence', at.confidence,
-                'source', at.source
+        SELECT json_group_array(
+            json_object(
+                'tag_id', ordered.tag_id,
+                'tag_name', ordered.tag_name,
+                'category', ordered.category,
+                'confidence', ordered.confidence,
+                'source', ordered.source
             )
-            ORDER BY tg.tag_name ASC, tg.tag_id ASC
         )
-        FROM asset_tags at
-        JOIN tags tg ON at.tag_id = tg.tag_id
-        WHERE at.asset_id = a.asset_id
-    ), '[]'::json) as tags
+        FROM (
+            SELECT tg.tag_id, tg.tag_name, tg.category, at.confidence, at.source
+            FROM asset_tags at
+            JOIN tags tg ON at.tag_id = tg.tag_id
+            WHERE at.asset_id = a.asset_id
+            ORDER BY tg.tag_name, tg.tag_id
+        ) AS ordered
+    ), '[]') as tags
 FROM assets a
-WHERE a.asset_id = $1
+WHERE a.asset_id = ?1
 `
 
 type GetAssetWithTagsRow struct {
-	AssetID                 pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
 	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
 	Type                    string                   `db:"type" json:"type"`
 	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
@@ -257,30 +254,30 @@ type GetAssetWithTagsRow struct {
 	ContentHash             string                   `db:"content_hash" json:"content_hash"`
 	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
 	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int32                   `db:"width" json:"width"`
-	Height                  *int32                   `db:"height" json:"height"`
+	Width                   *int64                   `db:"width" json:"width"`
+	Height                  *int64                   `db:"height" json:"height"`
 	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime               pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int32                   `db:"rating" json:"rating"`
-	Liked                   *bool                    `db:"liked" json:"liked"`
-	RepositoryID            pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status                  []byte                   `db:"status" json:"status"`
-	UpdatedAt               pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	Rating                  *int64                   `db:"rating" json:"rating"`
+	Liked                   bool                     `db:"liked" json:"liked"`
+	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
+	Status                  dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
 	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
 	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 json.RawMessage          `db:"exif_raw" json:"exif_raw"`
+	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
 	Tags                    interface{}              `db:"tags" json:"tags"`
 }
 
-func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error) {
-	row := q.db.QueryRow(ctx, getAssetWithTags, assetID)
+func (q *Queries) GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetAssetWithTagsRow, error) {
+	row := q.db.QueryRowContext(ctx, getAssetWithTags, assetID)
 	var i GetAssetWithTagsRow
 	err := row.Scan(
 		&i.AssetID,
@@ -321,29 +318,32 @@ const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
     a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
-        SELECT json_agg(
-            json_build_object(
-                'thumbnail_id', t.thumbnail_id,
-                'size', t.size,
-                'storage_path', t.storage_path,
-                'mime_type', t.mime_type,
-                'created_at', t.created_at
-            ) ORDER BY
-            CASE t.size
+        SELECT json_group_array(
+            json_object(
+                'thumbnail_id', ordered.thumbnail_id,
+                'size', ordered.size,
+                'storage_path', ordered.storage_path,
+                'mime_type', ordered.mime_type,
+                'created_at', ordered.created_at
+            )
+        )
+        FROM (
+            SELECT t.thumbnail_id, t.asset_id, t.size, t.storage_path, t.mime_type, t.created_at
+            FROM thumbnails t
+            WHERE t.asset_id = a.asset_id
+            ORDER BY CASE t.size
                 WHEN 'small' THEN 1
                 WHEN 'medium' THEN 2
                 WHEN 'large' THEN 3
-            END
-        )
-        FROM thumbnails t
-        WHERE t.asset_id = a.asset_id
-    ), '[]'::json) as thumbnails
+            END, t.thumbnail_id
+        ) AS ordered
+    ), '[]') as thumbnails
 FROM assets a
-WHERE a.asset_id = $1
+WHERE a.asset_id = ?1
 `
 
 type GetAssetWithThumbnailsRow struct {
-	AssetID                 pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
 	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
 	Type                    string                   `db:"type" json:"type"`
 	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
@@ -353,30 +353,30 @@ type GetAssetWithThumbnailsRow struct {
 	ContentHash             string                   `db:"content_hash" json:"content_hash"`
 	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
 	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int32                   `db:"width" json:"width"`
-	Height                  *int32                   `db:"height" json:"height"`
+	Width                   *int64                   `db:"width" json:"width"`
+	Height                  *int64                   `db:"height" json:"height"`
 	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime               pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int32                   `db:"rating" json:"rating"`
-	Liked                   *bool                    `db:"liked" json:"liked"`
-	RepositoryID            pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status                  []byte                   `db:"status" json:"status"`
-	UpdatedAt               pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	Rating                  *int64                   `db:"rating" json:"rating"`
+	Liked                   bool                     `db:"liked" json:"liked"`
+	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
+	Status                  dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
 	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
 	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 json.RawMessage          `db:"exif_raw" json:"exif_raw"`
+	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
 	Thumbnails              interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
-func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error) {
-	row := q.db.QueryRow(ctx, getAssetWithThumbnails, assetID)
+func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID uuid.UUID) (GetAssetWithThumbnailsRow, error) {
+	row := q.db.QueryRowContext(ctx, getAssetWithThumbnails, assetID)
 	var i GetAssetWithThumbnailsRow
 	err := row.Scan(
 		&i.AssetID,

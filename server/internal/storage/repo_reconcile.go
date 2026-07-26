@@ -12,7 +12,6 @@ import (
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -70,7 +69,7 @@ func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, cur
 	if _, err := rm.queries.UpdateRepositoryStatus(ctx, repo.UpdateRepositoryStatusParams{
 		RepoID:    current.RepoID,
 		Status:    status,
-		UpdatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		UpdatedAt: dbtypes.NewTimestamp(time.Now()),
 	}); err != nil {
 		return fmt.Errorf("update status: %w", err)
 	}
@@ -105,9 +104,6 @@ func (rm *DefaultRepositoryManager) inspectRepositoryOnDisk(current repo.Reposit
 	return dbtypes.RepoStatusActive, config
 }
 
-func repositoryIDString(id pgtype.UUID) string {
-	if !id.Valid {
-		return ""
-	}
-	return uuid.UUID(id.Bytes).String()
+func repositoryIDString(id uuid.UUID) string {
+	return id.String()
 }

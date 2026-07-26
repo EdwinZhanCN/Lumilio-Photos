@@ -7,8 +7,6 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-
-	"github.com/google/uuid"
 )
 
 // UploadAssetRequestDTO represents the request structure for asset upload
@@ -473,10 +471,7 @@ type AssetGroupDTO struct {
 
 // ToAssetDTO converts a repo.Asset to AssetDTO
 func ToAssetDTO(a repo.Asset) AssetDTO {
-	var id string
-	if a.AssetID.Valid {
-		id = uuid.UUID(a.AssetID.Bytes).String()
-	}
+	id := a.AssetID.String()
 	var storagePath string
 	if a.StoragePath != nil {
 		storagePath = *a.StoragePath
@@ -492,7 +487,7 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	}
 	var repositoryID *string
 	if a.RepositoryID.Valid {
-		repoUUID := uuid.UUID(a.RepositoryID.Bytes).String()
+		repoUUID := a.RepositoryID.UUID.String()
 		repositoryID = &repoUUID
 	}
 	var takenTime *time.Time
@@ -500,6 +495,28 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		t := a.TakenTime.Time
 		takenTime = &t
 	}
+	var width *int32
+	if a.Width != nil {
+		value := int32(*a.Width)
+		width = &value
+	}
+	var height *int32
+	if a.Height != nil {
+		value := int32(*a.Height)
+		height = &value
+	}
+	var captureOffsetMinutes *int16
+	if a.CaptureOffsetMinutes != nil {
+		value := int16(*a.CaptureOffsetMinutes)
+		captureOffsetMinutes = &value
+	}
+	var rating *int32
+	if a.Rating != nil {
+		value := int32(*a.Rating)
+		rating = &value
+	}
+	liked := a.Liked
+	isDeleted := a.IsDeleted
 	return AssetDTO{
 		AssetID:              id,
 		OwnerID:              a.OwnerID,
@@ -510,15 +527,15 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		MimeType:             a.MimeType,
 		FileSize:             a.FileSize,
 		Hash:                 stringPtr(a.ContentHash),
-		Width:                a.Width,
-		Height:               a.Height,
+		Width:                width,
+		Height:               height,
 		Duration:             a.Duration,
 		UploadTime:           uploadTime,
 		TakenTime:            takenTime,
-		CaptureOffsetMinutes: a.CaptureOffsetMinutes,
-		Rating:               a.Rating,
-		Liked:                a.Liked,
-		IsDeleted:            a.IsDeleted,
+		CaptureOffsetMinutes: captureOffsetMinutes,
+		Rating:               rating,
+		Liked:                &liked,
+		IsDeleted:            &isDeleted,
 		DeletedAt:            deletedAt,
 		Metadata:             a.SpecificMetadata,
 		Status:               a.Status,
@@ -620,7 +637,7 @@ type AssetAlbumRefDTO struct {
 }
 
 // AssetOCRTextItemDTO mirrors one OCR text item produced by GetAssetWithRelations.
-// BoundingBox is freeform jsonb geometry and is left untyped.
+// BoundingBox is freeform JSON geometry and is left untyped.
 type AssetOCRTextItemDTO struct {
 	ID          int64           `json:"id"`
 	TextContent string          `json:"text_content"`
@@ -642,7 +659,7 @@ type AssetOCRResultDTO struct {
 }
 
 // AssetFaceItemDTO mirrors one detected face produced by GetAssetWithRelations.
-// BoundingBox and Expression are freeform jsonb and are left untyped.
+// BoundingBox and Expression are freeform JSON and are left untyped.
 type AssetFaceItemDTO struct {
 	ID          int64           `json:"id"`
 	FaceID      *string         `json:"face_id,omitempty"`
@@ -695,10 +712,7 @@ type AssetDetailIncludes struct {
 // AssetDetailDTO, honoring the requested includes. Aggregate columns arrive as
 // raw JSON ([]byte); malformed or empty blobs degrade to nil rather than erroring.
 func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) AssetDetailDTO {
-	var id string
-	if r.AssetID.Valid {
-		id = uuid.UUID(r.AssetID.Bytes).String()
-	}
+	id := r.AssetID.String()
 	var storagePath string
 	if r.StoragePath != nil {
 		storagePath = *r.StoragePath
@@ -719,9 +733,31 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 	}
 	var repositoryID *string
 	if r.RepositoryID.Valid {
-		repoUUID := uuid.UUID(r.RepositoryID.Bytes).String()
+		repoUUID := r.RepositoryID.UUID.String()
 		repositoryID = &repoUUID
 	}
+	var width *int32
+	if r.Width != nil {
+		value := int32(*r.Width)
+		width = &value
+	}
+	var height *int32
+	if r.Height != nil {
+		value := int32(*r.Height)
+		height = &value
+	}
+	var captureOffsetMinutes *int16
+	if r.CaptureOffsetMinutes != nil {
+		value := int16(*r.CaptureOffsetMinutes)
+		captureOffsetMinutes = &value
+	}
+	var rating *int32
+	if r.Rating != nil {
+		value := int32(*r.Rating)
+		rating = &value
+	}
+	liked := r.Liked
+	isDeleted := r.IsDeleted
 
 	base := AssetDTO{
 		AssetID:              id,
@@ -733,61 +769,78 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		MimeType:             r.MimeType,
 		FileSize:             r.FileSize,
 		Hash:                 stringPtr(r.ContentHash),
-		Width:                r.Width,
-		Height:               r.Height,
+		Width:                width,
+		Height:               height,
 		Duration:             r.Duration,
 		UploadTime:           uploadTime,
 		TakenTime:            takenTime,
-		CaptureOffsetMinutes: r.CaptureOffsetMinutes,
-		Rating:               r.Rating,
-		Liked:                r.Liked,
-		IsDeleted:            r.IsDeleted,
+		CaptureOffsetMinutes: captureOffsetMinutes,
+		Rating:               rating,
+		Liked:                &liked,
+		IsDeleted:            &isDeleted,
 		DeletedAt:            deletedAt,
 		Metadata:             r.SpecificMetadata,
 		Status:               r.Status,
 	}
 
-	if inc.Species && len(r.SpeciesPredictions) > 0 {
+	if inc.Species {
 		var preds []dbtypes.SpeciesPredictionMeta
-		if err := json.Unmarshal(r.SpeciesPredictions, &preds); err == nil {
+		if unmarshalJSONColumn(r.SpeciesPredictions, &preds) {
 			base.SpeciesPredictions = preds
 		}
 	}
 
 	detail := AssetDetailDTO{AssetDTO: base}
 
-	if inc.Thumbnails && len(r.Thumbnails) > 0 {
+	if inc.Thumbnails {
 		var thumbs []AssetThumbnailDTO
-		if err := json.Unmarshal(r.Thumbnails, &thumbs); err == nil {
+		if unmarshalJSONColumn(r.Thumbnails, &thumbs) {
 			detail.Thumbnails = thumbs
 		}
 	}
-	if inc.Tags && len(r.Tags) > 0 {
+	if inc.Tags {
 		var tags []AssetTagDTO
-		if err := json.Unmarshal(r.Tags, &tags); err == nil {
+		if unmarshalJSONColumn(r.Tags, &tags) {
 			detail.Tags = tags
 		}
 	}
-	if inc.Albums && len(r.Albums) > 0 {
+	if inc.Albums {
 		var albums []AssetAlbumRefDTO
-		if err := json.Unmarshal(r.Albums, &albums); err == nil {
+		if unmarshalJSONColumn(r.Albums, &albums) {
 			detail.Albums = albums
 		}
 	}
-	if inc.OCR && len(r.OcrResult) > 0 {
+	if inc.OCR {
 		var ocr AssetOCRResultDTO
-		if err := json.Unmarshal(r.OcrResult, &ocr); err == nil {
+		if unmarshalJSONColumn(r.OcrResult, &ocr) {
 			detail.OcrResult = &ocr
 		}
 	}
-	if inc.Faces && len(r.FaceResult) > 0 {
+	if inc.Faces {
 		var face AssetFaceResultDTO
-		if err := json.Unmarshal(r.FaceResult, &face); err == nil {
+		if unmarshalJSONColumn(r.FaceResult, &face) {
 			detail.FaceResult = &face
 		}
 	}
 
 	return detail
+}
+
+func unmarshalJSONColumn(value any, target any) bool {
+	var raw []byte
+	switch typed := value.(type) {
+	case nil:
+		return false
+	case []byte:
+		raw = typed
+	case string:
+		raw = []byte(typed)
+	case dbtypes.JSON:
+		raw = []byte(typed)
+	default:
+		return false
+	}
+	return len(raw) > 0 && json.Unmarshal(raw, target) == nil
 }
 
 // AssetListResponseDTO represents the response structure for asset listing

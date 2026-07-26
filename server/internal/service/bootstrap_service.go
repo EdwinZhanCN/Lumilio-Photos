@@ -3,14 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"server/internal/db/repo"
 )
 
-// Bootstrap phases. The system progresses fresh → db_rotated → admin_created →
-// ready as first-run setup completes its gates.
+// Bootstrap phases. SQLite is already open and migrated when reconciliation
+// runs, so db_rotated now denotes "database ready, owner registration pending"
+// for wire compatibility with existing clients.
 const (
 	BootstrapPhaseFresh        = "fresh"
 	BootstrapPhaseDBRotated    = "db_rotated"
@@ -33,17 +32,11 @@ type BootstrapService interface {
 }
 
 type bootstrapService struct {
-	queries        *repo.Queries
-	dbPasswordFile string
+	queries *repo.Queries
 }
 
-// NewBootstrapService wires the bootstrap service. dbPasswordFile is the rotated
-// database password secret whose presence marks the db_rotated gate.
-func NewBootstrapService(queries *repo.Queries, dbPasswordFile string) BootstrapService {
-	return &bootstrapService{
-		queries:        queries,
-		dbPasswordFile: strings.TrimSpace(dbPasswordFile),
-	}
+func NewBootstrapService(queries *repo.Queries) BootstrapService {
+	return &bootstrapService{queries: queries}
 }
 
 func (s *bootstrapService) Phase(ctx context.Context) (string, error) {
@@ -82,10 +75,6 @@ func (s *bootstrapService) Reconcile(ctx context.Context) (string, error) {
 // compute derives the phase from the setup gates. It is the only place these
 // gates are evaluated.
 func (s *bootstrapService) compute(ctx context.Context) (string, error) {
-	if !s.dbCredentialRotated() {
-		return BootstrapPhaseFresh, nil
-	}
-
 	admins, err := s.queries.CountActiveUsersByRole(ctx, string(UserRoleAdmin))
 	if err != nil {
 		return "", fmt.Errorf("count admin users: %w", err)
@@ -103,15 +92,4 @@ func (s *bootstrapService) compute(ctx context.Context) (string, error) {
 	}
 
 	return BootstrapPhaseReady, nil
-}
-
-func (s *bootstrapService) dbCredentialRotated() bool {
-	if s.dbPasswordFile == "" {
-		return false
-	}
-	data, err := os.ReadFile(s.dbPasswordFile)
-	if err != nil {
-		return false
-	}
-	return strings.TrimSpace(string(data)) != ""
 }

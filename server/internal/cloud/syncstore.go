@@ -2,11 +2,10 @@ package cloud
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"server/internal/db/repo"
 )
@@ -30,25 +29,25 @@ type SyncStateStore interface {
 	MarkFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string, assetID uuid.UUID) error
 }
 
-// pgSyncStateStore is the PostgreSQL-backed implementation of SyncStateStore.
-type pgSyncStateStore struct {
+// sqliteSyncStateStore is the SQLite-backed implementation of SyncStateStore.
+type sqliteSyncStateStore struct {
 	queries      *repo.Queries
 	credentialID uuid.UUID
 }
 
-// NewPGSyncStateStore creates a SyncStateStore backed by PostgreSQL via sqlc-generated queries.
-func NewPGSyncStateStore(queries *repo.Queries, credentialID uuid.UUID) SyncStateStore {
-	return &pgSyncStateStore{queries: queries, credentialID: credentialID}
+// NewSQLiteSyncStateStore creates a SyncStateStore backed by SQLite via sqlc-generated queries.
+func NewSQLiteSyncStateStore(queries *repo.Queries, credentialID uuid.UUID) SyncStateStore {
+	return &sqliteSyncStateStore{queries: queries, credentialID: credentialID}
 }
 
-func (s *pgSyncStateStore) GetCursor(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind) (string, error) {
+func (s *sqliteSyncStateStore) GetCursor(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind) (string, error) {
 	val, err := s.queries.GetCloudSyncCursor(ctx, repo.GetCloudSyncCursorParams{
-		RepositoryID: toPGUUID(repositoryID),
-		CredentialID: toPGUUID(s.credentialID),
+		RepositoryID: repositoryID,
+		CredentialID: s.credentialID,
 		Provider:     string(provider),
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
 		return "", err
@@ -56,24 +55,24 @@ func (s *pgSyncStateStore) GetCursor(ctx context.Context, repositoryID uuid.UUID
 	return val, nil
 }
 
-func (s *pgSyncStateStore) SaveCursor(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, cursor string) error {
+func (s *sqliteSyncStateStore) SaveCursor(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, cursor string) error {
 	return s.queries.UpsertCloudSyncCursor(ctx, repo.UpsertCloudSyncCursorParams{
-		RepositoryID: toPGUUID(repositoryID),
-		CredentialID: toPGUUID(s.credentialID),
+		RepositoryID: repositoryID,
+		CredentialID: s.credentialID,
 		Provider:     string(provider),
 		CursorValue:  cursor,
 	})
 }
 
-func (s *pgSyncStateStore) IsFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string) (bool, error) {
+func (s *sqliteSyncStateStore) IsFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string) (bool, error) {
 	row, err := s.queries.GetCloudSyncFile(ctx, repo.GetCloudSyncFileParams{
-		RepositoryID: toPGUUID(repositoryID),
-		CredentialID: toPGUUID(s.credentialID),
+		RepositoryID: repositoryID,
+		CredentialID: s.credentialID,
 		Provider:     string(provider),
 		RemoteKey:    remoteKey,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
@@ -81,22 +80,15 @@ func (s *pgSyncStateStore) IsFileSynced(ctx context.Context, repositoryID uuid.U
 	return row.Etag == etag, nil
 }
 
-func (s *pgSyncStateStore) MarkFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string, assetID uuid.UUID) error {
-	var pgAssetID pgtype.UUID
-	if assetID != uuid.Nil {
-		pgAssetID = pgtype.UUID{Bytes: assetID, Valid: true}
-	}
+func (s *sqliteSyncStateStore) MarkFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string, assetID uuid.UUID) error {
+	nullableAssetID := uuid.NullUUID{UUID: assetID, Valid: assetID != uuid.Nil}
 	return s.queries.MarkCloudSyncFile(ctx, repo.MarkCloudSyncFileParams{
-		RepositoryID: toPGUUID(repositoryID),
-		CredentialID: toPGUUID(s.credentialID),
+		RepositoryID: repositoryID,
+		CredentialID: s.credentialID,
 		Provider:     string(provider),
 		RemoteKey:    remoteKey,
 		Etag:         etag,
 		LocalHash:    "", // filled lazily; materializer computes BLAKE3
-		AssetID:      pgAssetID,
+		AssetID:      nullableAssetID,
 	})
-}
-
-func toPGUUID(id uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: id, Valid: true}
 }

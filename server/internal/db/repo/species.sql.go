@@ -8,23 +8,23 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const createSpeciesPrediction = `-- name: CreateSpeciesPrediction :one
 INSERT INTO species_predictions (asset_id, label, score)
-VALUES ($1, $2, $3)
+VALUES (?1, ?2, ?3)
 RETURNING prediction_id, asset_id, label, score, created_at
 `
 
 type CreateSpeciesPredictionParams struct {
-	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
-	Label   string      `db:"label" json:"label"`
-	Score   float32     `db:"score" json:"score"`
+	AssetID uuid.UUID `db:"asset_id" json:"asset_id"`
+	Label   string    `db:"label" json:"label"`
+	Score   float64   `db:"score" json:"score"`
 }
 
 func (q *Queries) CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error) {
-	row := q.db.QueryRow(ctx, createSpeciesPrediction, arg.AssetID, arg.Label, arg.Score)
+	row := q.db.QueryRowContext(ctx, createSpeciesPrediction, arg.AssetID, arg.Label, arg.Score)
 	var i SpeciesPrediction
 	err := row.Scan(
 		&i.PredictionID,
@@ -37,22 +37,22 @@ func (q *Queries) CreateSpeciesPrediction(ctx context.Context, arg CreateSpecies
 }
 
 const deleteSpeciesPredictionsByAsset = `-- name: DeleteSpeciesPredictionsByAsset :exec
-DELETE FROM species_predictions WHERE asset_id = $1
+DELETE FROM species_predictions WHERE asset_id = ?1
 `
 
-func (q *Queries) DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteSpeciesPredictionsByAsset, assetID)
+func (q *Queries) DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteSpeciesPredictionsByAsset, assetID)
 	return err
 }
 
 const getSpeciesPredictionsByAsset = `-- name: GetSpeciesPredictionsByAsset :many
 SELECT prediction_id, asset_id, label, score, created_at FROM species_predictions
-WHERE asset_id = $1
+WHERE asset_id = ?1
 ORDER BY score DESC
 `
 
-func (q *Queries) GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error) {
-	rows, err := q.db.Query(ctx, getSpeciesPredictionsByAsset, assetID)
+func (q *Queries) GetSpeciesPredictionsByAsset(ctx context.Context, assetID uuid.UUID) ([]SpeciesPrediction, error) {
+	rows, err := q.db.QueryContext(ctx, getSpeciesPredictionsByAsset, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +70,9 @@ func (q *Queries) GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgty
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -79,19 +82,19 @@ func (q *Queries) GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgty
 
 const getSpeciesPredictionsByLabel = `-- name: GetSpeciesPredictionsByLabel :many
 SELECT prediction_id, asset_id, label, score, created_at FROM species_predictions
-WHERE label = $1
+WHERE label = ?1
 ORDER BY score DESC
-LIMIT $2 OFFSET $3
+LIMIT ?2 OFFSET ?3
 `
 
 type GetSpeciesPredictionsByLabelParams struct {
 	Label  string `db:"label" json:"label"`
-	Limit  int32  `db:"limit" json:"limit"`
-	Offset int32  `db:"offset" json:"offset"`
+	Limit  int64  `db:"limit" json:"limit"`
+	Offset int64  `db:"offset" json:"offset"`
 }
 
 func (q *Queries) GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error) {
-	rows, err := q.db.Query(ctx, getSpeciesPredictionsByLabel, arg.Label, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, getSpeciesPredictionsByLabel, arg.Label, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +112,9 @@ func (q *Queries) GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeci
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -125,13 +131,13 @@ FROM species_predictions
 `
 
 type GetSpeciesStatsRow struct {
-	TotalAssets      int64   `db:"total_assets" json:"total_assets"`
-	TotalPredictions int64   `db:"total_predictions" json:"total_predictions"`
-	AvgScore         float64 `db:"avg_score" json:"avg_score"`
+	TotalAssets      int64    `db:"total_assets" json:"total_assets"`
+	TotalPredictions int64    `db:"total_predictions" json:"total_predictions"`
+	AvgScore         *float64 `db:"avg_score" json:"avg_score"`
 }
 
 func (q *Queries) GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, error) {
-	row := q.db.QueryRow(ctx, getSpeciesStats)
+	row := q.db.QueryRowContext(ctx, getSpeciesStats)
 	var i GetSpeciesStatsRow
 	err := row.Scan(&i.TotalAssets, &i.TotalPredictions, &i.AvgScore)
 	return i, err
@@ -139,19 +145,19 @@ func (q *Queries) GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, erro
 
 const getTopSpeciesForAsset = `-- name: GetTopSpeciesForAsset :many
 SELECT prediction_id, asset_id, label, score, created_at FROM species_predictions
-WHERE asset_id = $1 AND score >= $2
+WHERE asset_id = ?1 AND score >= ?2
 ORDER BY score DESC
-LIMIT $3
+LIMIT ?3
 `
 
 type GetTopSpeciesForAssetParams struct {
-	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
-	Score   float32     `db:"score" json:"score"`
-	Limit   int32       `db:"limit" json:"limit"`
+	AssetID uuid.UUID `db:"asset_id" json:"asset_id"`
+	Score   float64   `db:"score" json:"score"`
+	Limit   int64     `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error) {
-	rows, err := q.db.Query(ctx, getTopSpeciesForAsset, arg.AssetID, arg.Score, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, getTopSpeciesForAsset, arg.AssetID, arg.Score, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +176,9 @@ func (q *Queries) GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesFo
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -181,17 +190,17 @@ SELECT label, COUNT(DISTINCT asset_id) as asset_count, AVG(score) as avg_score
 FROM species_predictions
 GROUP BY label
 ORDER BY asset_count DESC
-LIMIT $1
+LIMIT ?1
 `
 
 type GetTopSpeciesLabelsRow struct {
-	Label      string  `db:"label" json:"label"`
-	AssetCount int64   `db:"asset_count" json:"asset_count"`
-	AvgScore   float64 `db:"avg_score" json:"avg_score"`
+	Label      string   `db:"label" json:"label"`
+	AssetCount int64    `db:"asset_count" json:"asset_count"`
+	AvgScore   *float64 `db:"avg_score" json:"avg_score"`
 }
 
-func (q *Queries) GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTopSpeciesLabelsRow, error) {
-	rows, err := q.db.Query(ctx, getTopSpeciesLabels, limit)
+func (q *Queries) GetTopSpeciesLabels(ctx context.Context, limit int64) ([]GetTopSpeciesLabelsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getTopSpeciesLabels, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +213,9 @@ func (q *Queries) GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTo
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -211,18 +223,18 @@ func (q *Queries) GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTo
 }
 
 const searchAssetsBySpecies = `-- name: SearchAssetsBySpecies :many
-WITH page_ids AS MATERIALIZED (
+WITH page_ids AS (
     SELECT
         a.asset_id,
         MAX(sp.score) AS best_score,
         a.upload_time
     FROM assets a
     JOIN species_predictions sp ON a.asset_id = sp.asset_id
-    WHERE sp.label ILIKE '%' || $1::text || '%'
+    WHERE sp.label LIKE '%' || ?1 || '%'
       AND a.is_deleted = false
     GROUP BY a.asset_id, a.upload_time
     ORDER BY MAX(sp.score) DESC, a.upload_time DESC, a.asset_id DESC
-    LIMIT $3 OFFSET $2
+    LIMIT ?3 OFFSET ?2
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -231,13 +243,13 @@ ORDER BY p.best_score DESC, p.upload_time DESC, p.asset_id DESC
 `
 
 type SearchAssetsBySpeciesParams struct {
-	Query  string `db:"query" json:"query"`
-	Offset int32  `db:"offset" json:"offset"`
-	Limit  int32  `db:"limit" json:"limit"`
+	Query  *string `db:"query" json:"query"`
+	Offset int64   `db:"offset" json:"offset"`
+	Limit  int64   `db:"limit" json:"limit"`
 }
 
 func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, searchAssetsBySpecies, arg.Query, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, searchAssetsBySpecies, arg.Query, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -279,6 +291,9 @@ func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsByS
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

@@ -2,30 +2,30 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
+	"server/internal/db/dbtypes"
 	statusdb "server/internal/db/dbtypes/status"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const getAssetStatusForUpdate = `
 SELECT status
 FROM assets
-WHERE asset_id = $1 AND is_deleted = false
-FOR UPDATE
+WHERE asset_id = ?1 AND is_deleted = false
 `
 
 type txStarter interface {
-	Begin(context.Context) (pgx.Tx, error)
+	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
 }
 
 // MutateAssetStatus applies a status mutation under a transaction so concurrent
 // workers do not clobber each other's updates.
 func (q *Queries) MutateAssetStatus(
 	ctx context.Context,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 	mutator func(statusdb.AssetStatus) (statusdb.AssetStatus, error),
 ) error {
 	starter, ok := q.db.(txStarter)
@@ -33,17 +33,17 @@ func (q *Queries) MutateAssetStatus(
 		return q.mutateAssetStatus(ctx, q, assetID, mutator)
 	}
 
-	tx, err := starter.Begin(ctx)
+	tx, err := starter.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin asset status tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	if err := q.mutateAssetStatus(ctx, q.WithTx(tx), assetID, mutator); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit asset status tx: %w", err)
 	}
 	return nil
@@ -52,18 +52,18 @@ func (q *Queries) MutateAssetStatus(
 func (q *Queries) mutateAssetStatus(
 	ctx context.Context,
 	queries *Queries,
-	assetID pgtype.UUID,
+	assetID uuid.UUID,
 	mutator func(statusdb.AssetStatus) (statusdb.AssetStatus, error),
 ) error {
 	var rawStatus []byte
-	if err := queries.db.QueryRow(ctx, getAssetStatusForUpdate, assetID).Scan(&rawStatus); err != nil {
+	if err := queries.db.QueryRowContext(ctx, getAssetStatusForUpdate, assetID).Scan(&rawStatus); err != nil {
 		return fmt.Errorf("lock asset status: %w", err)
 	}
 
 	var current statusdb.AssetStatus
 	if len(rawStatus) > 0 {
 		var err error
-		current, err = statusdb.FromJSONB(rawStatus)
+		current, err = statusdb.FromJSON(rawStatus)
 		if err != nil {
 			return fmt.Errorf("parse asset status: %w", err)
 		}
@@ -74,14 +74,14 @@ func (q *Queries) mutateAssetStatus(
 		return err
 	}
 
-	statusJSON, err := updated.ToJSONB()
+	statusJSON, err := updated.ToJSON()
 	if err != nil {
 		return fmt.Errorf("marshal asset status: %w", err)
 	}
 
 	if _, err := queries.UpdateAssetStatus(ctx, UpdateAssetStatusParams{
 		AssetID: assetID,
-		Status:  statusJSON,
+		Status:  dbtypes.JSON(statusJSON),
 	}); err != nil {
 		return fmt.Errorf("persist asset status: %w", err)
 	}

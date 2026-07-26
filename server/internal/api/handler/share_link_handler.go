@@ -13,13 +13,13 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // ShareLinkHandler serves both the authenticated share-link management API
@@ -333,7 +333,7 @@ func (h *ShareLinkHandler) GetPublicShare(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.service.RecordView(c.Request.Context(), uuid.UUID(link.ShareID.Bytes)); err != nil {
+	if err := h.service.RecordView(c.Request.Context(), link.ShareID); err != nil {
 		log.Printf("Failed to record share view: %v", err)
 	}
 	c.Header("Cache-Control", "private, max-age=0, no-store")
@@ -424,7 +424,7 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 		return
 	}
 
-	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), uuid.UUID(asset.AssetID.Bytes), size)
+	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), asset.AssetID, size)
 	if err != nil {
 		api.GinNotFound(c, err, "Thumbnail not found")
 		return
@@ -601,22 +601,21 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 
 	targetIDs := link.AssetIds
 	if len(req.AssetIDs) > 0 {
-		filtered := make([]pgtype.UUID, 0, len(req.AssetIDs))
+		filtered := make(dbtypes.UUIDs, 0, len(req.AssetIDs))
 		for _, raw := range req.AssetIDs {
 			id, err := uuid.Parse(raw)
 			if err != nil {
 				continue
 			}
 			if h.service.AssetInShare(link, id) {
-				filtered = append(filtered, pgtype.UUID{Bytes: id, Valid: true})
+				filtered = append(filtered, id)
 			}
 		}
 		targetIDs = filtered
 	}
 
 	files := make([]assetDownloadFile, 0, len(targetIDs))
-	for _, pgID := range targetIDs {
-		assetID := uuid.UUID(pgID.Bytes)
+	for _, assetID := range targetIDs {
 		asset, err := h.assetService.GetAssetAny(c.Request.Context(), assetID)
 		if err != nil {
 			continue

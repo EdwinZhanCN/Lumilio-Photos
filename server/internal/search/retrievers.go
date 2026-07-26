@@ -2,26 +2,24 @@ package search
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pgvector/pgvector-go"
 )
 
 type EmbeddingRetriever struct {
-	pool         *pgxpool.Pool
+	pool         *sql.DB
 	embed        EmbedQueryFunc
 	resolveSpace ResolveEmbeddingSpaceFunc
 	weight       float64
 }
 
-func NewEmbeddingRetriever(pool *pgxpool.Pool, embed EmbedQueryFunc, resolveSpace ResolveEmbeddingSpaceFunc, weight float64) *EmbeddingRetriever {
+func NewEmbeddingRetriever(pool *sql.DB, embed EmbedQueryFunc, resolveSpace ResolveEmbeddingSpaceFunc, weight float64) *EmbeddingRetriever {
 	return &EmbeddingRetriever{pool: pool, embed: embed, resolveSpace: resolveSpace, weight: weight}
 }
 
@@ -39,8 +37,13 @@ func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candi
 	}
 
 	builder := &sqlBuilder{}
-	queryVector := pgvector.NewVector(embedding.Vector)
-	vectorPlaceholder := builder.addArg(&queryVector)
+	queryVector := dbtypes.NewVector(embedding.Vector)
+	vectorPlaceholder := builder.addArg(queryVector)
+	knnLimit := req.TopK * 8
+	if knnLimit < req.TopK {
+		knnLimit = req.TopK
+	}
+	knnLimitPlaceholder := builder.addArg(knnLimit)
 	spacePlaceholder := builder.addArg(space.ID)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
@@ -49,27 +52,40 @@ func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candi
 	conditions = append(conditions,
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
 	)
-	// L2 distance over the fixed-dimension search_embeddings table (vectors are
-	// unit-length, so L2 ranks identically to cosine). Assets may carry multiple
-	// vectors (video frames), so rank each asset by its best (nearest) frame via
-	// MIN — a max-pool over the per-asset frame set.
-	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", space.Dimensions, vectorPlaceholder, space.Dimensions)
 	limitPlaceholder := builder.addArg(req.TopK)
 
 	query := fmt.Sprintf(`
+WITH nearest AS (
+  SELECT rowid, distance
+  FROM search_embeddings_vec
+  WHERE embedding MATCH %s
+    AND k = %s
+),
+ranked AS (
+  SELECT
+    a.asset_id,
+    e.frame_ts_ms,
+    nearest.distance,
+    ROW_NUMBER() OVER (
+      PARTITION BY a.asset_id
+      ORDER BY nearest.distance, e.frame_ts_ms IS NULL, e.frame_ts_ms
+    ) AS distance_rank
+  FROM nearest
+  JOIN search_embeddings e ON e.id = nearest.rowid
+  JOIN assets a ON a.asset_id = e.asset_id
+  WHERE %s
+)
 SELECT
-  a.asset_id,
-  MIN(%s)::float8 AS raw_score,
-  (array_agg(e.frame_ts_ms ORDER BY %s ASC NULLS LAST))[1] AS best_ts
-FROM search_embeddings e
-JOIN assets a ON a.asset_id = e.asset_id
-WHERE %s
-GROUP BY a.asset_id
-ORDER BY raw_score, a.asset_id DESC
+  asset_id,
+  MIN(distance) AS raw_score,
+  MAX(CASE WHEN distance_rank = 1 THEN frame_ts_ms END) AS best_ts
+FROM ranked
+GROUP BY asset_id
+ORDER BY raw_score, asset_id DESC
 LIMIT %s
-`, distanceExpr, distanceExpr, joinConditions(conditions), limitPlaceholder)
+`, vectorPlaceholder, knnLimitPlaceholder, joinConditions(conditions), limitPlaceholder)
 
-	rows, err := r.pool.Query(ctx, query, builder.args...)
+	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, fmt.Errorf("embedding retrieve: %w", err)
 	}
@@ -126,16 +142,16 @@ func (r *EmbeddingRetriever) resolveQuerySpace(ctx context.Context, req Request)
 }
 
 type TextRetriever struct {
-	pool   *pgxpool.Pool
+	pool   *sql.DB
 	source string
 	weight float64
 }
 
-func NewOCRRetriever(pool *pgxpool.Pool, weight float64) *TextRetriever {
+func NewOCRRetriever(pool *sql.DB, weight float64) *TextRetriever {
 	return &TextRetriever{pool: pool, source: SourceOCR, weight: weight}
 }
 
-func NewPlaceRetriever(pool *pgxpool.Pool, weight float64) *TextRetriever {
+func NewPlaceRetriever(pool *sql.DB, weight float64) *TextRetriever {
 	return &TextRetriever{pool: pool, source: SourcePlace, weight: weight}
 }
 
@@ -171,44 +187,34 @@ func (r *TextRetriever) CountQuery(ctx context.Context, builder *sqlBuilder, req
 }
 
 func (r *TextRetriever) retrieveOCR(ctx context.Context, req Request) ([]Candidate, error) {
-	tokenized := TokenizeQuery(req.Query)
-	if tokenized == "" {
+	matchQuery := ftsMatchQuery(req.Query)
+	if matchQuery == "" {
 		return nil, nil
 	}
 
 	builder := &sqlBuilder{}
-	queryPlaceholder := builder.addArg(tokenized)
+	queryPlaceholder := builder.addArg(matchQuery)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
 		return nil, err
 	}
-	conditions = append(conditions,
-		fmt.Sprintf("r.full_text %%> %s", queryPlaceholder))
+	conditions = append(conditions, fmt.Sprintf("ocr_search_fts MATCH %s", queryPlaceholder))
 	limitPlaceholder := builder.addArg(req.TopK)
 
 	query := fmt.Sprintf(`
 SELECT
   a.asset_id,
-  word_similarity(%s, r.full_text)::float8 AS raw_score,
-  NULL::int AS best_ts
+  -bm25(ocr_search_fts) AS raw_score,
+  NULL AS best_ts
 FROM ocr_results r
+JOIN ocr_search_fts ON ocr_search_fts.rowid = r.rowid
 JOIN assets a ON a.asset_id = r.asset_id
 WHERE %s
 ORDER BY raw_score DESC, a.asset_id DESC
 LIMIT %s
-`, queryPlaceholder, joinConditions(conditions), limitPlaceholder)
+`, joinConditions(conditions), limitPlaceholder)
 
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("ocr retrieve begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	if _, err := tx.Exec(ctx, "SET LOCAL pg_trgm.word_similarity_threshold = 0.15"); err != nil {
-		return nil, fmt.Errorf("ocr retrieve set threshold: %w", err)
-	}
-
-	rows, err := tx.Query(ctx, query, builder.args...)
+	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, fmt.Errorf("ocr retrieve: %w", err)
 	}
@@ -219,53 +225,57 @@ LIMIT %s
 		return nil, err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("ocr retrieve commit: %w", err)
-	}
 	return candidates, nil
 }
 
 func (r *TextRetriever) ocrCountQuery(builder *sqlBuilder, req Request) (string, error) {
-	tokenized := TokenizeQuery(req.Query)
-	if tokenized == "" {
-		return "SELECT NULL::uuid AS asset_id WHERE false", nil
+	matchQuery := ftsMatchQuery(req.Query)
+	if matchQuery == "" {
+		return "SELECT NULL AS asset_id WHERE false", nil
 	}
 
-	queryPlaceholder := builder.addArg(tokenized)
+	queryPlaceholder := builder.addArg(matchQuery)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
 		return "", err
 	}
-	conditions = append(conditions,
-		fmt.Sprintf("r.full_text %%> %s", queryPlaceholder))
+	conditions = append(conditions, fmt.Sprintf("ocr_search_fts MATCH %s", queryPlaceholder))
 
 	return fmt.Sprintf(`
 SELECT a.asset_id
 FROM ocr_results r
+JOIN ocr_search_fts ON ocr_search_fts.rowid = r.rowid
 JOIN assets a ON a.asset_id = r.asset_id
 WHERE %s
 `, joinConditions(conditions)), nil
 }
 
 func (r *TextRetriever) retrievePlace(ctx context.Context, req Request) ([]Candidate, error) {
+	matchQuery := ftsMatchQuery(req.Query)
+	if matchQuery == "" {
+		return nil, nil
+	}
 	builder := &sqlBuilder{}
-	queryPlaceholder := builder.addArg(req.Query)
+	queryPlaceholder := builder.addArg(matchQuery)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
 		return nil, err
 	}
-	conditions = append(conditions, "lc.search_vector @@ q.query")
 	limitPlaceholder := builder.addArg(req.TopK)
 
 	query := fmt.Sprintf(`
-WITH q AS (SELECT plainto_tsquery('simple', %s) AS query)
+WITH matched_locations AS (
+  SELECT lc.cluster_id, -bm25(location_search_fts) AS score
+  FROM location_search_fts
+  JOIN location_clusters lc ON lc.rowid = location_search_fts.rowid
+  WHERE location_search_fts MATCH %s
+)
 SELECT
   a.asset_id,
-  MAX(ts_rank_cd(lc.search_vector, q.query))::float8 AS raw_score,
-  NULL::int AS best_ts
-FROM q
-JOIN location_clusters lc ON lc.search_vector @@ q.query
-JOIN location_cluster_assets lca ON lca.cluster_id = lc.cluster_id
+  MAX(ml.score) AS raw_score,
+  NULL AS best_ts
+FROM matched_locations ml
+JOIN location_cluster_assets lca ON lca.cluster_id = ml.cluster_id
 JOIN assets a ON a.asset_id = lca.asset_id
 WHERE %s
 GROUP BY a.asset_id
@@ -273,7 +283,7 @@ ORDER BY raw_score DESC, a.asset_id DESC
 LIMIT %s
 `, queryPlaceholder, joinConditions(conditions), limitPlaceholder)
 
-	rows, err := r.pool.Query(ctx, query, builder.args...)
+	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
 	if err != nil {
 		return nil, fmt.Errorf("place retrieve: %w", err)
 	}
@@ -283,37 +293,39 @@ LIMIT %s
 }
 
 func (r *TextRetriever) placeCountQuery(builder *sqlBuilder, req Request) (string, error) {
-	queryPlaceholder := builder.addArg(req.Query)
+	matchQuery := ftsMatchQuery(req.Query)
+	if matchQuery == "" {
+		return "SELECT NULL AS asset_id WHERE false", nil
+	}
+	queryPlaceholder := builder.addArg(matchQuery)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
 		return "", err
 	}
-	conditions = append(conditions, fmt.Sprintf("lc.search_vector @@ plainto_tsquery('simple', %s)", queryPlaceholder))
+	conditions = append(conditions, fmt.Sprintf("location_search_fts MATCH %s", queryPlaceholder))
 
 	return fmt.Sprintf(`
 SELECT a.asset_id
-FROM location_clusters lc
+FROM location_search_fts
+JOIN location_clusters lc ON lc.rowid = location_search_fts.rowid
 JOIN location_cluster_assets lca ON lca.cluster_id = lc.cluster_id
 JOIN assets a ON a.asset_id = lca.asset_id
 WHERE %s
 `, joinConditions(conditions)), nil
 }
 
-func collectCandidates(rows pgx.Rows, source string) ([]Candidate, error) {
+func collectCandidates(rows *sql.Rows, source string) ([]Candidate, error) {
 	candidates := []Candidate{}
 	rank := 1
 	for rows.Next() {
-		var assetID pgtype.UUID
+		var assetID uuid.UUID
 		var rawScore float64
 		var bestTs *int32
 		if err := rows.Scan(&assetID, &rawScore, &bestTs); err != nil {
 			return nil, fmt.Errorf("scan %s candidate: %w", source, err)
 		}
-		if !assetID.Valid {
-			continue
-		}
 		candidates = append(candidates, Candidate{
-			AssetID:  uuid.UUID(assetID.Bytes),
+			AssetID:  assetID,
 			Source:   source,
 			Rank:     rank,
 			RawScore: rawScore,
@@ -327,46 +339,36 @@ func collectCandidates(rows pgx.Rows, source string) ([]Candidate, error) {
 	return candidates, nil
 }
 
-func HydrateAssets(ctx context.Context, pool *pgxpool.Pool, rankedIDs []uuid.UUID, includeDeleted bool) ([]repo.Asset, error) {
+func HydrateAssets(ctx context.Context, pool *sql.DB, rankedIDs []uuid.UUID, includeDeleted bool) ([]repo.Asset, error) {
 	if len(rankedIDs) == 0 {
 		return []repo.Asset{}, nil
 	}
-	pgIDs := make([]pgtype.UUID, 0, len(rankedIDs))
+	ids := make([]uuid.UUID, 0, len(rankedIDs))
 	for _, id := range rankedIDs {
 		if id == uuid.Nil {
 			continue
 		}
-		pgIDs = append(pgIDs, pgtype.UUID{Bytes: id, Valid: true})
+		ids = append(ids, id)
 	}
-	if len(pgIDs) == 0 {
+	if len(ids) == 0 {
 		return []repo.Asset{}, nil
 	}
 
-	query := `
-SELECT a.*
-FROM assets a
-WHERE a.asset_id = ANY($1::uuid[])`
-	if !includeDeleted {
-		query += `
-  AND a.is_deleted = false`
+	queries := repo.New(pool)
+	var assets []repo.Asset
+	var err error
+	if includeDeleted {
+		assets, err = queries.GetAssetsByIDsAny(ctx, ids)
+	} else {
+		assets, err = queries.GetAssetsByIDs(ctx, ids)
 	}
-
-	rows, err := pool.Query(ctx, query, pgIDs)
-	if err != nil {
-		return nil, fmt.Errorf("hydrate ranked assets: %w", err)
-	}
-	defer rows.Close()
-
-	assets, err := pgx.CollectRows(rows, pgx.RowToStructByName[repo.Asset])
 	if err != nil {
 		return nil, fmt.Errorf("decode ranked assets: %w", err)
 	}
 
 	byID := make(map[uuid.UUID]repo.Asset, len(assets))
 	for _, asset := range assets {
-		if asset.AssetID.Valid {
-			byID[uuid.UUID(asset.AssetID.Bytes)] = asset
-		}
+		byID[asset.AssetID] = asset
 	}
 
 	ordered := make([]repo.Asset, 0, len(rankedIDs))
@@ -376,6 +378,18 @@ WHERE a.asset_id = ANY($1::uuid[])`
 		}
 	}
 	return ordered, nil
+}
+
+func ftsMatchQuery(raw string) string {
+	fields := strings.Fields(TokenizeQuery(raw))
+	if len(fields) == 0 {
+		return ""
+	}
+	quoted := make([]string, 0, len(fields))
+	for _, field := range fields {
+		quoted = append(quoted, `"`+strings.ReplaceAll(field, `"`, `""`)+`"`)
+	}
+	return strings.Join(quoted, " AND ")
 }
 
 func hasTextQuery(req Request) bool {

@@ -3,7 +3,7 @@ package jobs
 import (
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
@@ -14,8 +14,8 @@ import (
 // Duplicated here (instead of importing processors) to avoid import cycles.
 // Keep this in sync with processors.SemanticPayload.
 type ProcessSemanticArgs struct {
-	AssetID           pgtype.UUID `json:"assetId"`
-	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+	AssetID           uuid.UUID `json:"assetId"`
+	PreprocessVersion string    `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessSemanticArgs) Kind() string { return "process_semantic" }
@@ -57,7 +57,7 @@ const (
 // classification. It scores the asset's already-stored semantic image embedding
 // against classifier prototypes; it does not re-run any ML model.
 type ZeroshotClassifyArgs struct {
-	AssetID pgtype.UUID `json:"assetId"`
+	AssetID uuid.UUID `json:"assetId"`
 }
 
 func (ZeroshotClassifyArgs) Kind() string { return "classify_zeroshot" }
@@ -69,8 +69,8 @@ func (ZeroshotClassifyArgs) InsertOpts() river.InsertOpts {
 // ProcessBioClipArgs is the River job payload for BioCLIP classification.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessBioClipArgs struct {
-	AssetID           pgtype.UUID `json:"assetId"`
-	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+	AssetID           uuid.UUID `json:"assetId"`
+	PreprocessVersion string    `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessBioClipArgs) Kind() string { return "process_bioclip" }
@@ -109,8 +109,8 @@ func (AssetRetryPayload) InsertOpts() river.InsertOpts {
 // ProcessOcrArgs is the River job payload for OCR text extraction.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessOcrArgs struct {
-	AssetID           pgtype.UUID `json:"assetId"`
-	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+	AssetID           uuid.UUID `json:"assetId"`
+	PreprocessVersion string    `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessOcrArgs) Kind() string { return "process_ocr" }
@@ -122,8 +122,8 @@ func (ProcessOcrArgs) InsertOpts() river.InsertOpts {
 // ProcessFaceArgs is the River job payload for face detection and recognition.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessFaceArgs struct {
-	AssetID           pgtype.UUID `json:"assetId"`
-	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+	AssetID           uuid.UUID `json:"assetId"`
+	PreprocessVersion string    `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessFaceArgs) Kind() string { return "process_face" }
@@ -136,8 +136,8 @@ func (ProcessFaceArgs) InsertOpts() river.InsertOpts {
 // embedding. Frames are extracted from the transcoded web.mp4 and written as
 // multi-row search_embeddings with frame_ts_ms set.
 type ProcessVideoFramesArgs struct {
-	AssetID           pgtype.UUID `json:"assetId"`
-	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+	AssetID           uuid.UUID `json:"assetId"`
+	PreprocessVersion string    `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessVideoFramesArgs) Kind() string { return "process_video_frames" }
@@ -213,7 +213,7 @@ func (DetectStacksArgs) InsertOpts() river.InsertOpts {
 
 // LivePhotoMatchArgs triggers exact Apple Live Photo matching for a single asset.
 type LivePhotoMatchArgs struct {
-	AssetID pgtype.UUID `json:"assetId" river:"unique"`
+	AssetID uuid.UUID `json:"assetId" river:"unique"`
 }
 
 func (LivePhotoMatchArgs) Kind() string { return "match_live_photo" }
@@ -227,7 +227,7 @@ func (LivePhotoMatchArgs) InsertOpts() river.InsertOpts {
 
 // ProcessPHashArgs triggers perceptual hash computation for duplicate detection.
 type ProcessPHashArgs struct {
-	AssetID pgtype.UUID `json:"assetId"`
+	AssetID uuid.UUID `json:"assetId"`
 }
 
 func (ProcessPHashArgs) Kind() string { return "process_phash" }
@@ -288,7 +288,7 @@ func (DiscoverAssetArgs) InsertOpts() river.InsertOpts {
 
 // MetadataArgs triggers EXIF/ffprobe metadata extraction per asset.
 type MetadataArgs struct {
-	AssetID          pgtype.UUID       `json:"assetId"`
+	AssetID          uuid.UUID         `json:"assetId"`
 	RepoPath         string            `json:"repoPath"`
 	StoragePath      string            `json:"storagePath"`
 	AssetType        dbtypes.AssetType `json:"assetType"`
@@ -305,7 +305,7 @@ func (MetadataArgs) InsertOpts() river.InsertOpts {
 
 // ThumbnailArgs triggers thumbnail generation per asset.
 type ThumbnailArgs struct {
-	AssetID     pgtype.UUID       `json:"assetId"`
+	AssetID     uuid.UUID         `json:"assetId"`
 	RepoPath    string            `json:"repoPath"`
 	StoragePath string            `json:"storagePath"`
 	AssetType   dbtypes.AssetType `json:"assetType"`
@@ -319,7 +319,7 @@ func (ThumbnailArgs) InsertOpts() river.InsertOpts {
 
 // TranscodeArgs triggers audio/video transcoding per asset.
 type TranscodeArgs struct {
-	AssetID     pgtype.UUID       `json:"assetId"`
+	AssetID     uuid.UUID         `json:"assetId"`
 	RepoPath    string            `json:"repoPath"`
 	StoragePath string            `json:"storagePath"`
 	AssetType   dbtypes.AssetType `json:"assetType"`

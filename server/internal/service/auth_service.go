@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -14,14 +15,12 @@ import (
 	"time"
 
 	"server/config"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -100,7 +99,7 @@ type AuthResponse struct {
 // AuthService handles JWT authentication operations
 type AuthService struct {
 	queries                   *repo.Queries
-	db                        *pgxpool.Pool
+	db                        *sql.DB
 	jwtSecret                 []byte
 	mfaTokenSecret            []byte
 	passkeyTokenSecret        []byte
@@ -143,7 +142,7 @@ const csrfTokenPrefix = "v1."
 // NewAuthService creates a new authentication service. An optional zap logger
 // can be supplied for structured auth/audit logging; when omitted, a no-op
 // logger is used so callers (and tests) without logging stay valid.
-func NewAuthService(queries *repo.Queries, db *pgxpool.Pool, cfg config.AuthConfig, loggers ...*zap.Logger) (*AuthService, error) {
+func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, loggers ...*zap.Logger) (*AuthService, error) {
 	logger := zap.NewNop()
 	securityLogger := zap.NewNop()
 	if len(loggers) > 0 && loggers[0] != nil {
@@ -238,13 +237,13 @@ func (s *AuthService) GetLoginOptions(ctx context.Context, username string) (Log
 
 	user, err := s.queries.GetUserByUsername(ctx, normalized)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return resolveLoginOptions(false, false, 0), nil
 		}
 		return LoginOptions{}, fmt.Errorf("get user by username: %w", err)
 	}
 
-	if user.IsActive == nil || !*user.IsActive {
+	if !user.IsActive {
 		return resolveLoginOptions(true, false, 0), nil
 	}
 
@@ -265,7 +264,7 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 	}
 
 	// Check if user is active
-	if user.IsActive == nil || !*user.IsActive {
+	if !user.IsActive {
 		return nil, ErrUserNotFound // Don't reveal that user exists but is inactive
 	}
 
@@ -317,7 +316,7 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 	// holding the old one is an attacker (or vice versa). Treat reuse as a
 	// breach and revoke the user's entire token family to force every device
 	// to re-authenticate.
-	if refreshToken.IsRevoked != nil && *refreshToken.IsRevoked {
+	if refreshToken.IsRevoked {
 		if err := s.queries.RevokeUserRefreshTokens(context.Background(), refreshToken.UserID); err != nil {
 			s.logger.Error("failed to revoke refresh token family after reuse",
 				zap.Int32("user_id", refreshToken.UserID), zap.Error(err))
@@ -351,7 +350,7 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 	}
 
 	// Check if user is still active
-	if user.IsActive == nil || !*user.IsActive {
+	if !user.IsActive {
 		// Revoke token for inactive user
 		s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID)
 		return nil, ErrUserNotFound
@@ -406,7 +405,7 @@ func (s *AuthService) AuthenticateAccessToken(ctx context.Context, tokenString s
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	if user.IsActive == nil || !*user.IsActive || user.PasswordChangeRequired || user.AuthVersion != claims.AuthVersion {
+	if !user.IsActive || user.PasswordChangeRequired || user.AuthVersion != claims.AuthVersion {
 		return nil, ErrInvalidToken
 	}
 	response := ConvertUserToResponse(user)
@@ -415,7 +414,7 @@ func (s *AuthService) AuthenticateAccessToken(ctx context.Context, tokenString s
 
 func (s *AuthService) GenerateMediaToken(ctx context.Context, userID int) (string, time.Time, error) {
 	user, err := s.queries.GetUserByID(ctx, int32(userID))
-	if err != nil || user.IsActive == nil || !*user.IsActive || user.PasswordChangeRequired {
+	if err != nil || !user.IsActive || user.PasswordChangeRequired {
 		return "", time.Time{}, ErrInvalidToken
 	}
 	now := time.Now()
@@ -465,7 +464,7 @@ func (s *AuthService) ValidateMediaToken(ctx context.Context, tokenString string
 		return nil, ErrInvalidToken
 	}
 	user, err := s.queries.GetUserByID(ctx, int32(claims.UserID))
-	if err != nil || user.IsActive == nil || !*user.IsActive || user.PasswordChangeRequired || user.AuthVersion != claims.AuthVersion {
+	if err != nil || !user.IsActive || user.PasswordChangeRequired || user.AuthVersion != claims.AuthVersion {
 		return nil, ErrInvalidToken
 	}
 
@@ -485,13 +484,13 @@ func (s *AuthService) RevokeRefreshToken(refreshTokenString string) error {
 func (s *AuthService) GetCurrentUser(userID int) (*UserResponse, error) {
 	user, err := s.queries.GetUserByID(context.Background(), int32(userID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserNotFound
 		}
 		return nil, fmt.Errorf("error getting current user: %w", err)
 	}
 
-	if user.IsActive == nil || !*user.IsActive {
+	if !user.IsActive {
 		return nil, ErrUserNotFound
 	}
 
@@ -558,8 +557,7 @@ func (s *AuthService) generateRefreshToken(userID int) (string, error) {
 	tokenString := hex.EncodeToString(tokenBytes)
 
 	// Create refresh token record
-	expiresAt := pgtype.Timestamptz{}
-	expiresAt.Scan(time.Now().Add(s.refreshTokenTTL))
+	expiresAt := dbtypes.NewTimestamp(time.Now().Add(s.refreshTokenTTL))
 
 	params := repo.CreateRefreshTokenParams{
 		UserID:    int32(userID),
@@ -594,46 +592,42 @@ func ConvertUserToResponse(user repo.User) UserResponse {
 		AvatarAssetID: uuidToOptionalString(user.AvatarAssetID),
 		CreatedAt:     user.CreatedAt.Time,
 		UpdatedAt:     user.UpdatedAt.Time,
-		IsActive:      user.IsActive != nil && *user.IsActive,
+		IsActive:      user.IsActive,
 		LastLogin:     lastLogin,
 		Role:          string(role),
 		Permissions:   PermissionsForRole(role),
 	}
 }
 
-func uuidToOptionalString(value pgtype.UUID) *string {
+func uuidToOptionalString(value uuid.NullUUID) *string {
 	if !value.Valid {
 		return nil
 	}
 
-	id := uuid.UUID(value.Bytes).String()
+	id := value.UUID.String()
 	return &id
 }
 
-func optionalStringToUUID(value *string) (pgtype.UUID, error) {
+func optionalStringToUUID(value *string) (uuid.NullUUID, error) {
 	if value == nil {
-		return pgtype.UUID{}, nil
+		return uuid.NullUUID{}, nil
 	}
 
 	parsed, err := uuid.Parse(*value)
 	if err != nil {
-		return pgtype.UUID{}, err
+		return uuid.NullUUID{}, err
 	}
 
-	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
+	return uuid.NullUUID{UUID: parsed, Valid: true}, nil
 }
 
-func (s *AuthService) updateUserLastLogin(ctx context.Context, userID int32) (pgtype.Timestamptz, error) {
-	now := pgtype.Timestamptz{}
-	if err := now.Scan(time.Now()); err != nil {
-		return pgtype.Timestamptz{}, fmt.Errorf("scan current time: %w", err)
-	}
-
+func (s *AuthService) updateUserLastLogin(ctx context.Context, userID int32) (dbtypes.Timestamp, error) {
+	now := dbtypes.NewTimestamp(time.Now())
 	if err := s.queries.UpdateUserLastLogin(ctx, repo.UpdateUserLastLoginParams{
 		UserID:    userID,
 		LastLogin: now,
 	}); err != nil {
-		return pgtype.Timestamptz{}, err
+		return dbtypes.Timestamp{}, err
 	}
 
 	return now, nil

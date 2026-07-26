@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -13,11 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -207,7 +207,7 @@ func (s *AuthService) DisableTOTP(ctx context.Context, userID int, currentPasswo
 	}
 
 	if _, err := s.queries.GetUserTOTPCredential(ctx, user.UserID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return MFAStatus{}, ErrMFANotEnabled
 		}
 		return MFAStatus{}, fmt.Errorf("get totp credential: %w", err)
@@ -244,7 +244,7 @@ func (s *AuthService) RegenerateRecoveryCodes(ctx context.Context, userID int, c
 	}
 
 	if _, err := s.queries.GetUserTOTPCredential(ctx, user.UserID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return RecoveryCodesResponse{}, ErrMFANotEnabled
 		}
 		return RecoveryCodesResponse{}, fmt.Errorf("get totp credential: %w", err)
@@ -403,13 +403,13 @@ func coerceOptionalTime(value interface{}) *time.Time {
 		}
 		copied := *typed
 		return &copied
-	case pgtype.Timestamptz:
+	case dbtypes.Timestamp:
 		if !typed.Valid {
 			return nil
 		}
 		copied := typed.Time
 		return &copied
-	case *pgtype.Timestamptz:
+	case *dbtypes.Timestamp:
 		if typed == nil || !typed.Valid {
 			return nil
 		}
@@ -423,13 +423,13 @@ func coerceOptionalTime(value interface{}) *time.Time {
 func (s *AuthService) getActiveUserByID(ctx context.Context, userID int) (repo.User, error) {
 	user, err := s.queries.GetUserByID(ctx, int32(userID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return repo.User{}, ErrUserNotFound
 		}
 		return repo.User{}, fmt.Errorf("get user by id: %w", err)
 	}
 
-	if user.IsActive == nil || !*user.IsActive {
+	if !user.IsActive {
 		return repo.User{}, ErrUserNotFound
 	}
 
@@ -439,7 +439,7 @@ func (s *AuthService) getActiveUserByID(ctx context.Context, userID int) (repo.U
 func (s *AuthService) verifyUserTOTP(ctx context.Context, userID int32, code string) error {
 	credential, err := s.queries.GetUserTOTPCredential(ctx, userID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ErrMFANotEnabled
 		}
 		return fmt.Errorf("get totp credential: %w", err)
@@ -472,7 +472,7 @@ func (s *AuthService) consumeRecoveryCode(ctx context.Context, userID int32, cod
 		UserID:   userID,
 		CodeHash: hash,
 	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ErrInvalidMFACode
 		}
 		return fmt.Errorf("use recovery code: %w", err)
@@ -594,17 +594,17 @@ func (s *AuthService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 		return fn(s.queries)
 	}
 
-	tx, err := s.db.Begin(ctx)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
 	if err := fn(s.queries.WithTx(tx)); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
 

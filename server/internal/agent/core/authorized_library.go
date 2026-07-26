@@ -8,11 +8,11 @@ import (
 
 	"server/internal/agent/facets"
 	"server/internal/agent/ref"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/search"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // AuthorizedLibraryFactory is the only construction boundary for Agent
@@ -45,20 +45,10 @@ type AuthorizedLibrary struct {
 
 func (l *AuthorizedLibrary) UserID() int32 { return l.userID }
 
-func pgUUIDs(ids []uuid.UUID) []pgtype.UUID {
-	out := make([]pgtype.UUID, len(ids))
-	for i, id := range ids {
-		out[i] = pgtype.UUID{Bytes: id, Valid: true}
-	}
-	return out
-}
-
-func uuidSet(ids []pgtype.UUID) map[uuid.UUID]struct{} {
+func uuidSet(ids []uuid.UUID) map[uuid.UUID]struct{} {
 	out := make(map[uuid.UUID]struct{}, len(ids))
 	for _, id := range ids {
-		if id.Valid {
-			out[uuid.UUID(id.Bytes)] = struct{}{}
-		}
+		out[id] = struct{}{}
 	}
 	return out
 }
@@ -74,8 +64,8 @@ func (l *AuthorizedLibrary) AuthorizeAssetIDs(ctx context.Context, userID int32,
 		return nil, nil
 	}
 	rows, err := l.queries.GetAuthorizedAssetIDs(ctx, repo.GetAuthorizedAssetIDsParams{
-		AssetIds: pgUUIDs(ids),
-		OwnerID:  l.userID,
+		AssetIds: ids,
+		OwnerID:  &l.userID,
 	})
 	if err != nil {
 		return nil, err
@@ -94,10 +84,10 @@ func (l *AuthorizedLibrary) AuthorizeAssetIDs(ctx context.Context, userID int32,
 	return out, nil
 }
 
-func (l *AuthorizedLibrary) FilterAssetIDs(ctx context.Context, params repo.GetAssetIDsUnifiedParams) ([]pgtype.UUID, error) {
+func (l *AuthorizedLibrary) FilterAssetIDs(ctx context.Context, params repo.GetAssetIDsUnifiedParams) ([]uuid.UUID, error) {
 	params.OwnerID = &l.userID
-	if params.AlbumID != nil {
-		if _, err := l.Album(ctx, *params.AlbumID); err != nil {
+	if albumID, ok := int32Value(params.AlbumID); ok {
+		if _, err := l.Album(ctx, albumID); err != nil {
 			return nil, sql.ErrNoRows
 		}
 	}
@@ -118,21 +108,21 @@ func (l *AuthorizedLibrary) SearchOCR(ctx context.Context, query string, maxResu
 	return l.search.SearchAssetIDsOCRForOwner(ctx, l.userID, query, maxResults)
 }
 
-func (l *AuthorizedLibrary) SearchPeople(ctx context.Context, personIDs []int32, limit int32) ([]pgtype.UUID, error) {
+func (l *AuthorizedLibrary) SearchPeople(ctx context.Context, personIDs []int32, limit int32) ([]uuid.UUID, error) {
 	return l.queries.GetAssetIDsByPersonIDs(ctx, repo.GetAssetIDsByPersonIDsParams{
-		UserID: l.userID, PersonIds: personIDs, Limit: limit,
+		UserID: &l.userID, PersonIds: personIDs, Limit: int64(limit),
 	})
 }
 
 func (l *AuthorizedLibrary) LookupPeople(ctx context.Context, query *string, limit int32) ([]repo.AgentLookupPeopleRow, error) {
 	return l.queries.AgentLookupPeople(ctx, repo.AgentLookupPeopleParams{
-		UserID: l.userID, NameQuery: query, Limit: limit,
+		UserID: &l.userID, NameQuery: query, Limit: int64(limit),
 	})
 }
 
 func (l *AuthorizedLibrary) LookupAlbums(ctx context.Context, query *string, limit int32) ([]repo.AgentLookupAlbumsRow, error) {
 	return l.queries.AgentLookupAlbums(ctx, repo.AgentLookupAlbumsParams{
-		UserID: l.userID, TitleQuery: query, Limit: limit,
+		UserID: &l.userID, TitleQuery: query, Limit: int64(limit),
 	})
 }
 
@@ -156,7 +146,7 @@ func (l *AuthorizedLibrary) Assets(ctx context.Context, ids []uuid.UUID) ([]repo
 		return nil, err
 	}
 	return l.queries.GetAssetsByIDsForOwner(ctx, repo.GetAssetsByIDsForOwnerParams{
-		AssetIds: pgUUIDs(ids), OwnerID: l.userID,
+		AssetIds: ids, OwnerID: &l.userID,
 	})
 }
 
@@ -169,37 +159,37 @@ func (l *AuthorizedLibrary) BuildFacets(ctx context.Context, r *ref.Ref) (*ref.F
 
 func (l *AuthorizedLibrary) AestheticScores(ctx context.Context, ids []uuid.UUID) ([]repo.AgentAssetAestheticScoresRow, error) {
 	return l.queries.AgentAssetAestheticScores(ctx, repo.AgentAssetAestheticScoresParams{
-		AssetIds: pgUUIDs(ids), UserID: l.userID,
+		AssetIds: ids, UserID: &l.userID,
 	})
 }
 
 func (l *AuthorizedLibrary) InspectAssets(ctx context.Context, ids []uuid.UUID) ([]repo.AgentInspectAssetsRow, error) {
 	return l.queries.AgentInspectAssets(ctx, repo.AgentInspectAssetsParams{
-		AssetIds: pgUUIDs(ids), UserID: l.userID,
+		AssetIds: ids, UserID: &l.userID,
 	})
 }
 
 func (l *AuthorizedLibrary) PeekAssets(ctx context.Context, ids []uuid.UUID) ([]repo.AgentPeekAssetsRow, error) {
 	return l.queries.AgentPeekAssets(ctx, repo.AgentPeekAssetsParams{
-		AssetIds: pgUUIDs(ids), UserID: l.userID,
+		AssetIds: ids, UserID: &l.userID,
 	})
 }
 
-func (l *AuthorizedLibrary) RankByTime(ctx context.Context, ids []uuid.UUID) ([]pgtype.UUID, error) {
+func (l *AuthorizedLibrary) RankByTime(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
 	return l.queries.AgentRankAssetIDsByTime(ctx, repo.AgentRankAssetIDsByTimeParams{
-		AssetIds: pgUUIDs(ids), UserID: l.userID,
+		AssetIds: ids, UserID: &l.userID,
 	})
 }
 
-func (l *AuthorizedLibrary) RankByQuality(ctx context.Context, ids []uuid.UUID) ([]pgtype.UUID, error) {
+func (l *AuthorizedLibrary) RankByQuality(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
 	return l.queries.RankAssetIDsByQuality(ctx, repo.RankAssetIDsByQualityParams{
-		AssetIds: pgUUIDs(ids), UserID: l.userID,
+		AssetIds: ids, UserID: &l.userID,
 	})
 }
 
-func (l *AuthorizedLibrary) CapturedTimes(ctx context.Context, ids []uuid.UUID) ([]pgtype.Timestamptz, error) {
+func (l *AuthorizedLibrary) CapturedTimes(ctx context.Context, ids []uuid.UUID) ([]dbtypes.Timestamp, error) {
 	return l.queries.AgentCapturedTimes(ctx, repo.AgentCapturedTimesParams{
-		AssetIds: pgUUIDs(ids), UserID: l.userID,
+		AssetIds: ids, UserID: &l.userID,
 	})
 }
 
@@ -208,9 +198,29 @@ func (l *AuthorizedLibrary) PHashEmbeddings(ctx context.Context, ids []uuid.UUID
 	if err != nil {
 		return nil, err
 	}
-	return l.queries.GetPHashEmbeddingsByAssetIDs(ctx, pgUUIDs(authorized))
+	return l.queries.GetPHashEmbeddingsByAssetIDs(ctx, authorized)
 }
 
 func (l *AuthorizedLibrary) String() string {
 	return fmt.Sprintf("authorized-library(user=%d)", l.userID)
+}
+
+func int32Value(value any) (int32, bool) {
+	switch typed := value.(type) {
+	case int32:
+		return typed, true
+	case int64:
+		return int32(typed), true
+	case int:
+		return int32(typed), true
+	case *int32:
+		if typed != nil {
+			return *typed, true
+		}
+	case *int:
+		if typed != nil {
+			return int32(*typed), true
+		}
+	}
+	return 0, false
 }

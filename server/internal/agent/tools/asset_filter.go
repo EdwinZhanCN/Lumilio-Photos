@@ -10,13 +10,13 @@ import (
 
 	"server/internal/agent/core"
 	"server/internal/agent/ref"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // AssetFilterInput defines how the LLM calls filter_assets.
@@ -72,7 +72,7 @@ func RegisterFilterAssets() {
 				rows = rows[:ref.MaxSnapshotSize]
 			}
 
-			snapshot := fromPgUUIDs(rows)
+			snapshot := copyUUIDs(rows)
 			qualityNote := ""
 			if input.MinQualityPercentile != nil {
 				filtered, note, qErr := applyMinQualityPercentile(ctx, deps, snapshot, *input.MinQualityPercentile)
@@ -126,7 +126,7 @@ func applyMinQualityPercentile(
 	}
 	scoreOf := make(map[uuid.UUID]float32, len(rows))
 	for _, row := range rows {
-		scoreOf[uuid.UUID(row.AssetID.Bytes)] = row.Score
+		scoreOf[row.AssetID] = float32(row.Score)
 	}
 
 	kept, cut, scored := keepAtOrAboveQualityPercentile(snapshot, scoreOf, percentile)
@@ -147,7 +147,7 @@ func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams,
 		if err != nil {
 			return nil, ref.InvalidArgument(fmt.Sprintf("date_from %q is not YYYY-MM-DD", input.DateFrom))
 		}
-		params.DateFrom = pgtype.Timestamptz{Time: t, Valid: true}
+		params.DateFrom = dbtypes.NewTimestamp(t)
 	}
 	if input.DateTo != "" {
 		t, err := time.Parse("2006-01-02", input.DateTo)
@@ -156,7 +156,7 @@ func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams,
 		}
 		// Inclusive end of day.
 		t = t.Add(24*time.Hour - time.Nanosecond)
-		params.DateTo = pgtype.Timestamptz{Time: t, Valid: true}
+		params.DateTo = dbtypes.NewTimestamp(t)
 	}
 	if input.Type != "" {
 		assetType := strings.ToUpper(strings.TrimSpace(input.Type))

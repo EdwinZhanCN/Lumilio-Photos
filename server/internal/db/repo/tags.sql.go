@@ -7,24 +7,22 @@ package repo
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTag = `-- name: CreateTag :one
 INSERT INTO tags (tag_name, category, is_ai_generated)
-VALUES ($1, $2, $3)
+VALUES (?1, ?2, ?3)
 RETURNING tag_id, tag_name, category, is_ai_generated
 `
 
 type CreateTagParams struct {
 	TagName       string  `db:"tag_name" json:"tag_name"`
 	Category      *string `db:"category" json:"category"`
-	IsAiGenerated *bool   `db:"is_ai_generated" json:"is_ai_generated"`
+	IsAiGenerated bool    `db:"is_ai_generated" json:"is_ai_generated"`
 }
 
 func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error) {
-	row := q.db.QueryRow(ctx, createTag, arg.TagName, arg.Category, arg.IsAiGenerated)
+	row := q.db.QueryRowContext(ctx, createTag, arg.TagName, arg.Category, arg.IsAiGenerated)
 	var i Tag
 	err := row.Scan(
 		&i.TagID,
@@ -36,20 +34,20 @@ func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, erro
 }
 
 const deleteTag = `-- name: DeleteTag :exec
-DELETE FROM tags WHERE tag_id = $1
+DELETE FROM tags WHERE tag_id = ?1
 `
 
 func (q *Queries) DeleteTag(ctx context.Context, tagID int32) error {
-	_, err := q.db.Exec(ctx, deleteTag, tagID)
+	_, err := q.db.ExecContext(ctx, deleteTag, tagID)
 	return err
 }
 
 const getTagByID = `-- name: GetTagByID :one
-SELECT tag_id, tag_name, category, is_ai_generated FROM tags WHERE tag_id = $1
+SELECT tag_id, tag_name, category, is_ai_generated FROM tags WHERE tag_id = ?1
 `
 
 func (q *Queries) GetTagByID(ctx context.Context, tagID int32) (Tag, error) {
-	row := q.db.QueryRow(ctx, getTagByID, tagID)
+	row := q.db.QueryRowContext(ctx, getTagByID, tagID)
 	var i Tag
 	err := row.Scan(
 		&i.TagID,
@@ -61,11 +59,11 @@ func (q *Queries) GetTagByID(ctx context.Context, tagID int32) (Tag, error) {
 }
 
 const getTagByName = `-- name: GetTagByName :one
-SELECT tag_id, tag_name, category, is_ai_generated FROM tags WHERE tag_name = $1
+SELECT tag_id, tag_name, category, is_ai_generated FROM tags WHERE tag_name = ?1
 `
 
 func (q *Queries) GetTagByName(ctx context.Context, tagName string) (Tag, error) {
-	row := q.db.QueryRow(ctx, getTagByName, tagName)
+	row := q.db.QueryRowContext(ctx, getTagByName, tagName)
 	var i Tag
 	err := row.Scan(
 		&i.TagID,
@@ -77,42 +75,57 @@ func (q *Queries) GetTagByName(ctx context.Context, tagName string) (Tag, error)
 }
 
 const getTagSummaries = `-- name: GetTagSummaries :many
+WITH ranked AS (
+  SELECT
+    t.tag_id,
+    t.tag_name,
+    at.source,
+    a.asset_id,
+    a.taken_time,
+    a.upload_time,
+    ROW_NUMBER() OVER (
+      PARTITION BY t.tag_id, at.source
+      ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+    ) AS cover_rank
+  FROM asset_tags at
+  JOIN tags t ON t.tag_id = at.tag_id
+  JOIN assets a ON a.asset_id = at.asset_id
+  WHERE a.is_deleted = false
+    AND (?3 IS NULL OR a.owner_id = ?3)
+    AND (?4 IS NULL OR a.repository_id = ?4)
+    AND (?5 IS NULL OR at.source = ?5)
+    AND (?6 IS NULL OR t.tag_name LIKE '%' || ?6 || '%')
+)
 SELECT
   t.tag_id,
   t.tag_name,
-  at.source,
-  COUNT(DISTINCT a.asset_id)::bigint AS asset_count,
-  (ARRAY_AGG(a.asset_id ORDER BY COALESCE(a.taken_time, a.upload_time) DESC))[1]::uuid AS cover_asset_id,
-  MAX(COALESCE(a.taken_time, a.upload_time))::timestamptz AS last_used_at
-FROM asset_tags at
-JOIN tags t ON t.tag_id = at.tag_id
-JOIN assets a ON a.asset_id = at.asset_id
-WHERE a.is_deleted = false
-  AND ($1::integer IS NULL OR a.owner_id = $1)
-  AND ($2::uuid IS NULL OR a.repository_id = $2)
-  AND ($3::text IS NULL OR at.source = $3)
-  AND ($4::text IS NULL OR t.tag_name ILIKE '%' || $4::text || '%')
-GROUP BY t.tag_id, t.tag_name, at.source
+  t.source,
+  COUNT(DISTINCT a.asset_id) AS asset_count,
+  MAX(CASE WHEN t.cover_rank = 1 THEN a.asset_id END) AS cover_asset_id,
+  MAX(COALESCE(a.taken_time, a.upload_time)) AS last_used_at
+FROM ranked AS t
+JOIN assets a ON a.asset_id = t.asset_id
+GROUP BY t.tag_id, t.tag_name, t.source
 ORDER BY asset_count DESC, t.tag_name ASC
-LIMIT $6 OFFSET $5
+LIMIT ?2 OFFSET ?1
 `
 
 type GetTagSummariesParams struct {
-	OwnerID      *int32      `db:"owner_id" json:"owner_id"`
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Source       *string     `db:"source" json:"source"`
-	Query        *string     `db:"query" json:"query"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	Source       interface{} `db:"source" json:"source"`
+	Query        interface{} `db:"query" json:"query"`
 }
 
 type GetTagSummariesRow struct {
-	TagID        int32              `db:"tag_id" json:"tag_id"`
-	TagName      string             `db:"tag_name" json:"tag_name"`
-	Source       string             `db:"source" json:"source"`
-	AssetCount   int64              `db:"asset_count" json:"asset_count"`
-	CoverAssetID pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
-	LastUsedAt   pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+	TagID        int32       `db:"tag_id" json:"tag_id"`
+	TagName      string      `db:"tag_name" json:"tag_name"`
+	Source       string      `db:"source" json:"source"`
+	AssetCount   int64       `db:"asset_count" json:"asset_count"`
+	CoverAssetID interface{} `db:"cover_asset_id" json:"cover_asset_id"`
+	LastUsedAt   interface{} `db:"last_used_at" json:"last_used_at"`
 }
 
 // Browsable tag vocabulary with counts/cover, distinct from
@@ -120,13 +133,13 @@ type GetTagSummariesRow struct {
 // source) because the same tag_id can carry manual assignments on some
 // assets and AI/system assignments on others.
 func (q *Queries) GetTagSummaries(ctx context.Context, arg GetTagSummariesParams) ([]GetTagSummariesRow, error) {
-	rows, err := q.db.Query(ctx, getTagSummaries,
+	rows, err := q.db.QueryContext(ctx, getTagSummaries,
+		arg.Offset,
+		arg.Limit,
 		arg.OwnerID,
 		arg.RepositoryID,
 		arg.Source,
 		arg.Query,
-		arg.Offset,
-		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -147,6 +160,9 @@ func (q *Queries) GetTagSummaries(ctx context.Context, arg GetTagSummariesParams
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -155,12 +171,12 @@ func (q *Queries) GetTagSummaries(ctx context.Context, arg GetTagSummariesParams
 
 const getTagsByCategory = `-- name: GetTagsByCategory :many
 SELECT tag_id, tag_name, category, is_ai_generated FROM tags
-WHERE category = $1
+WHERE category = ?1
 ORDER BY tag_name ASC
 `
 
 func (q *Queries) GetTagsByCategory(ctx context.Context, category *string) ([]Tag, error) {
-	rows, err := q.db.Query(ctx, getTagsByCategory, category)
+	rows, err := q.db.QueryContext(ctx, getTagsByCategory, category)
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +193,9 @@ func (q *Queries) GetTagsByCategory(ctx context.Context, category *string) ([]Ta
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -187,16 +206,16 @@ func (q *Queries) GetTagsByCategory(ctx context.Context, category *string) ([]Ta
 const listTags = `-- name: ListTags :many
 SELECT tag_id, tag_name, category, is_ai_generated FROM tags
 ORDER BY tag_name ASC
-LIMIT $1 OFFSET $2
+LIMIT ?1 OFFSET ?2
 `
 
 type ListTagsParams struct {
-	Limit  int32 `db:"limit" json:"limit"`
-	Offset int32 `db:"offset" json:"offset"`
+	Limit  int64 `db:"limit" json:"limit"`
+	Offset int64 `db:"offset" json:"offset"`
 }
 
 func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error) {
-	rows, err := q.db.Query(ctx, listTags, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listTags, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +232,9 @@ func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, erro
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -222,19 +244,19 @@ func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, erro
 
 const searchTagsByName = `-- name: SearchTagsByName :many
 SELECT tag_id, tag_name, category, is_ai_generated FROM tags
-WHERE $2::text IS NULL
-   OR tag_name ILIKE '%' || $2::text || '%'
+WHERE ?2 IS NULL
+   OR tag_name LIKE '%' || ?2 || '%'
 ORDER BY tag_name ASC
-LIMIT $1
+LIMIT ?1
 `
 
 type SearchTagsByNameParams struct {
-	Limit int32   `db:"limit" json:"limit"`
-	Query *string `db:"query" json:"query"`
+	Limit int64       `db:"limit" json:"limit"`
+	Query interface{} `db:"query" json:"query"`
 }
 
 func (q *Queries) SearchTagsByName(ctx context.Context, arg SearchTagsByNameParams) ([]Tag, error) {
-	rows, err := q.db.Query(ctx, searchTagsByName, arg.Limit, arg.Query)
+	rows, err := q.db.QueryContext(ctx, searchTagsByName, arg.Limit, arg.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -252,6 +274,9 @@ func (q *Queries) SearchTagsByName(ctx context.Context, arg SearchTagsByNamePara
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -260,8 +285,8 @@ func (q *Queries) SearchTagsByName(ctx context.Context, arg SearchTagsByNamePara
 
 const updateTag = `-- name: UpdateTag :one
 UPDATE tags
-SET tag_name = $2, category = $3, is_ai_generated = $4
-WHERE tag_id = $1
+SET tag_name = ?2, category = ?3, is_ai_generated = ?4
+WHERE tag_id = ?1
 RETURNING tag_id, tag_name, category, is_ai_generated
 `
 
@@ -269,11 +294,11 @@ type UpdateTagParams struct {
 	TagID         int32   `db:"tag_id" json:"tag_id"`
 	TagName       string  `db:"tag_name" json:"tag_name"`
 	Category      *string `db:"category" json:"category"`
-	IsAiGenerated *bool   `db:"is_ai_generated" json:"is_ai_generated"`
+	IsAiGenerated bool    `db:"is_ai_generated" json:"is_ai_generated"`
 }
 
 func (q *Queries) UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error) {
-	row := q.db.QueryRow(ctx, updateTag,
+	row := q.db.QueryRowContext(ctx, updateTag,
 		arg.TagID,
 		arg.TagName,
 		arg.Category,

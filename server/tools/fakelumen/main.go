@@ -2,7 +2,7 @@
 // by the isolated browser E2E stack. It implements the public Lumen gRPC
 // contract, advertises only semantic image/text embedding, and returns one
 // stable 768-dimensional vector for every request. Product code still exercises
-// discovery, gRPC streaming, image preprocessing, queues, PostgreSQL vector
+// discovery, gRPC streaming, image preprocessing, queues, SQLite vector
 // storage, retrieval, and best-frame selection; only model inference is faked.
 package main
 

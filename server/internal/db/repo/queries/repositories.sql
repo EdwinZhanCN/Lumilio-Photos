@@ -11,16 +11,16 @@ INSERT INTO repositories (
     updated_at,
     root_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
 ) RETURNING *;
 
 -- name: GetRepository :one
 SELECT * FROM repositories
-WHERE repo_id = $1;
+WHERE repo_id = ?1;
 
 -- name: GetRepositoryByPath :one
 SELECT * FROM repositories
-WHERE path = $1;
+WHERE path = ?1;
 
 -- name: GetPrimaryRepository :one
 SELECT * FROM repositories
@@ -31,16 +31,16 @@ WHERE role = 'primary'
 -- The primary repository pins the Host Owner after bootstrap. Before the
 -- primary exists, the first account is the initial administrator and therefore
 -- the Host Owner.
-SELECT candidate.owner_id::integer AS host_owner_id
+SELECT candidate.owner_id AS host_owner_id
 FROM (
-    SELECT default_owner_id AS owner_id, 0 AS priority, created_at, repo_id::text AS tie_breaker
+    SELECT default_owner_id AS owner_id, 0 AS priority, created_at, repo_id AS tie_breaker
     FROM repositories
     WHERE role = 'primary'
       AND default_owner_id IS NOT NULL
 
     UNION ALL
 
-    SELECT user_id AS owner_id, 1 AS priority, created_at, user_id::text AS tie_breaker
+    SELECT user_id AS owner_id, 1 AS priority, created_at, user_id AS tie_breaker
     FROM users
 ) candidate
 ORDER BY candidate.priority ASC, candidate.created_at ASC, candidate.tie_breaker ASC
@@ -65,51 +65,51 @@ WHERE role = 'primary';
 -- name: UpdateRepository :one
 UPDATE repositories
 SET
-    name = $2,
-    config = $3,
-    default_owner_id = $4,
-    updated_at = $5
-WHERE repo_id = $1
+    name = ?2,
+    config = ?3,
+    default_owner_id = ?4,
+    updated_at = ?5
+WHERE repo_id = ?1
 RETURNING *;
 
 -- name: UpdateRepositoryPath :one
 UPDATE repositories
 SET
-    path = $2,
-    root_id = $3,
-    status = $4,
-    updated_at = $5
-WHERE repo_id = $1
+    path = ?2,
+    root_id = ?3,
+    status = ?4,
+    updated_at = ?5
+WHERE repo_id = ?1
 RETURNING *;
 
 -- name: UpdateRepositoryStatus :one
 UPDATE repositories
 SET
-    status = $2,
-    updated_at = $3
-WHERE repo_id = $1
+    status = ?2,
+    updated_at = ?3
+WHERE repo_id = ?1
 RETURNING *;
 
 -- name: UpdateRepositoryLastSync :one
 UPDATE repositories
 SET
-    last_sync = $2,
-    updated_at = $3
-WHERE repo_id = $1
+    last_sync = ?2,
+    updated_at = ?3
+WHERE repo_id = ?1
 RETURNING *;
 
 -- name: DeleteRepository :exec
 DELETE FROM repositories
-WHERE repo_id = $1;
+WHERE repo_id = ?1;
 
 -- name: DeleteRepositories :exec
 DELETE FROM repositories
-WHERE repo_id = ANY($1::uuid[]);
+WHERE repo_id IN (sqlc.slice('repo_ids'));
 
 -- name: RepositoryExists :one
 SELECT EXISTS(
     SELECT 1 FROM repositories
-    WHERE path = $1
+    WHERE path = ?1
 );
 
 -- name: CountRepositories :one
@@ -117,11 +117,11 @@ SELECT COUNT(*) FROM repositories;
 
 -- name: CountRepositoriesByStatus :one
 SELECT COUNT(*) FROM repositories
-WHERE status = $1;
+WHERE status = ?1;
 
 -- name: SetUnownedRepositoryHostOwner :exec
 UPDATE repositories
 SET
-    default_owner_id = $1,
-    updated_at = NOW()
+    default_owner_id = ?1,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE default_owner_id IS NULL;

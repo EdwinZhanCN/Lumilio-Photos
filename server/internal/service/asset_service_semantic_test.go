@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"server/internal/db/repo"
@@ -11,8 +10,7 @@ import (
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
+	"github.com/google/uuid"
 )
 
 type semanticTestLumenStub struct {
@@ -81,27 +79,27 @@ type semanticTestEmbeddingStub struct {
 	resolveFn func(ctx context.Context, embeddingType EmbeddingType, model string, dimensions int) (repo.EmbeddingSpace, error)
 }
 
-func (s *semanticTestEmbeddingStub) SaveEmbedding(context.Context, pgtype.UUID, EmbeddingType, string, []float32, bool) error {
+func (s *semanticTestEmbeddingStub) SaveEmbedding(context.Context, uuid.UUID, EmbeddingType, string, []float32, bool) error {
 	panic("not implemented")
 }
 
-func (s *semanticTestEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, pgtype.UUID, string, []VideoFrameEmbedding) error {
+func (s *semanticTestEmbeddingStub) SaveVideoFrameEmbeddings(context.Context, uuid.UUID, string, []VideoFrameEmbedding) error {
 	return nil
 }
 
-func (s *semanticTestEmbeddingStub) SaveAestheticScore(context.Context, pgtype.UUID, float32, string) error {
+func (s *semanticTestEmbeddingStub) SaveAestheticScore(context.Context, uuid.UUID, float32, string) error {
 	panic("not implemented")
 }
 
-func (s *semanticTestEmbeddingStub) GetEmbedding(context.Context, pgtype.UUID, EmbeddingType, string) (repo.Embedding, error) {
+func (s *semanticTestEmbeddingStub) GetEmbedding(context.Context, uuid.UUID, EmbeddingType, string) (repo.Embedding, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestEmbeddingStub) GetAssetEmbeddingInfo(context.Context, pgtype.UUID) (map[EmbeddingType]EmbeddingInfo, error) {
+func (s *semanticTestEmbeddingStub) GetAssetEmbeddingInfo(context.Context, uuid.UUID) (map[EmbeddingType]EmbeddingInfo, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestEmbeddingStub) DeleteEmbedding(context.Context, pgtype.UUID, EmbeddingType, string) error {
+func (s *semanticTestEmbeddingStub) DeleteEmbedding(context.Context, uuid.UUID, EmbeddingType, string) error {
 	panic("not implemented")
 }
 
@@ -109,7 +107,7 @@ func (s *semanticTestEmbeddingStub) ResolveDefaultSearchSpace(ctx context.Contex
 	return s.resolveFn(ctx, embeddingType, model, dimensions)
 }
 
-func (s *semanticTestEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, pgtype.UUID, EmbeddingType) (PrimaryEmbedding, error) {
+func (s *semanticTestEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, uuid.UUID, EmbeddingType) (PrimaryEmbedding, error) {
 	return PrimaryEmbedding{}, nil
 }
 
@@ -178,74 +176,6 @@ func TestQueryAssetsVectorReturnsSemanticUnavailableOnSpaceMismatch(t *testing.T
 	}
 }
 
-func TestBuildSemanticSearchBaseSQLUsesSpaceIsolation(t *testing.T) {
-	t.Parallel()
-
-	svc := &assetService{}
-	builder := &semanticSQLBuilder{}
-	vector := pgvector.NewVector([]float32{0.1, 0.2, 0.3})
-	assetType := AssetTypePhoto
-	cameraModel := "X100VI"
-	params := QueryAssetsParams{
-		AssetType:   &assetType,
-		AssetTypes:  []string{AssetTypePhoto, AssetTypeVideo},
-		CameraModel: &cameraModel,
-	}
-
-	baseSQL, distanceExpr, err := svc.buildSemanticSearchBaseSQL(builder, params, repo.EmbeddingSpace{
-		ID:         42,
-		Dimensions: 768,
-	}, &vector)
-	if err != nil {
-		t.Fatalf("buildSemanticSearchBaseSQL returned error: %v", err)
-	}
-
-	if !strings.Contains(baseSQL, "e.space_id = $2") {
-		t.Fatalf("expected search SQL to filter by space_id, got:\n%s", baseSQL)
-	}
-	if strings.Contains(baseSQL, "e.embedding_type") {
-		t.Fatalf("search SQL should not filter by embedding_type anymore, got:\n%s", baseSQL)
-	}
-	if !strings.Contains(distanceExpr, "vector(768)") {
-		t.Fatalf("expected distance expression to cast to vector(768), got %s", distanceExpr)
-	}
-	if !strings.Contains(baseSQL, "a.type = ANY(") {
-		t.Fatalf("expected asset type array filter to be preserved, got:\n%s", baseSQL)
-	}
-	if !strings.Contains(baseSQL, "a.specific_metadata->>'camera_model'") {
-		t.Fatalf("expected camera model filter to be preserved, got:\n%s", baseSQL)
-	}
-}
-
-func TestBuildSemanticSearchBaseSQLTreatsUnratedAndUnlikedAsEmptyStates(t *testing.T) {
-	t.Parallel()
-
-	svc := &assetService{}
-	builder := &semanticSQLBuilder{}
-	vector := pgvector.NewVector([]float32{0.1, 0.2, 0.3})
-	rating := 0
-	liked := false
-	params := QueryAssetsParams{
-		Rating: &rating,
-		Liked:  &liked,
-	}
-
-	baseSQL, _, err := svc.buildSemanticSearchBaseSQL(builder, params, repo.EmbeddingSpace{
-		ID:         42,
-		Dimensions: 768,
-	}, &vector)
-	if err != nil {
-		t.Fatalf("buildSemanticSearchBaseSQL returned error: %v", err)
-	}
-
-	if !strings.Contains(baseSQL, "(a.rating IS NULL OR a.rating = 0)") {
-		t.Fatalf("expected unrated filter to include NULL and zero ratings, got:\n%s", baseSQL)
-	}
-	if !strings.Contains(baseSQL, "(a.liked IS NULL OR a.liked = false)") {
-		t.Fatalf("expected unliked filter to include NULL and false liked states, got:\n%s", baseSQL)
-	}
-}
-
 func TestNormalizeSearchAssetsParamsCapsTopResultsAt200(t *testing.T) {
 	t.Parallel()
 
@@ -262,31 +192,5 @@ func TestNormalizeSearchAssetsParamsCapsTopResultsAt200(t *testing.T) {
 	preserved := normalizeSearchAssetsParams(SearchAssetsParams{TopResultsLimit: 199})
 	if preserved.TopResultsLimit != 199 {
 		t.Fatalf("expected top results limit 199 to be preserved, got %d", preserved.TopResultsLimit)
-	}
-}
-
-func TestBuildSemanticSearchBaseSQLDoesNotApplyHardDistanceThreshold(t *testing.T) {
-	t.Parallel()
-
-	svc := &assetService{}
-	builder := &semanticSQLBuilder{}
-	vector := pgvector.NewVector([]float32{0.1, 0.2, 0.3})
-
-	baseSQL, _, err := svc.buildSemanticSearchBaseSQL(builder, QueryAssetsParams{}, repo.EmbeddingSpace{
-		ID:         42,
-		Dimensions: 768,
-	}, &vector)
-	if err != nil {
-		t.Fatalf("buildSemanticSearchBaseSQL returned error: %v", err)
-	}
-
-	if strings.Contains(baseSQL, "<->") {
-		t.Fatalf("semantic search SQL should rank by distance without filtering by distance, got:\n%s", baseSQL)
-	}
-	if len(builder.args) != 3 {
-		t.Fatalf("expected vector, space, and default trash-state arguments, got %d", len(builder.args))
-	}
-	if builder.args[2] != false {
-		t.Fatalf("expected semantic search to default to non-trash assets, got %v", builder.args[2])
 	}
 }

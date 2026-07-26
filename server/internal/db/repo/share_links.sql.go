@@ -8,31 +8,32 @@ package repo
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"server/internal/db/dbtypes"
 )
 
 const createShareLink = `-- name: CreateShareLink :one
 INSERT INTO share_links (owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
 RETURNING share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count
 `
 
 type CreateShareLinkParams struct {
-	OwnerID          int32              `db:"owner_id" json:"owner_id"`
-	TokenHash        []byte             `db:"token_hash" json:"token_hash"`
-	Title            string             `db:"title" json:"title"`
-	Description      *string            `db:"description" json:"description"`
-	SourceKind       string             `db:"source_kind" json:"source_kind"`
-	SourceRef        *string            `db:"source_ref" json:"source_ref"`
-	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
-	AssetCount       int32              `db:"asset_count" json:"asset_count"`
-	AllowDownload    bool               `db:"allow_download" json:"allow_download"`
-	IncludeOriginals bool               `db:"include_originals" json:"include_originals"`
-	ExpiresAt        pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	OwnerID          int32             `db:"owner_id" json:"owner_id"`
+	TokenHash        []byte            `db:"token_hash" json:"token_hash"`
+	Title            string            `db:"title" json:"title"`
+	Description      *string           `db:"description" json:"description"`
+	SourceKind       string            `db:"source_kind" json:"source_kind"`
+	SourceRef        *string           `db:"source_ref" json:"source_ref"`
+	AssetIds         dbtypes.UUIDs     `db:"asset_ids" json:"asset_ids"`
+	AssetCount       int64             `db:"asset_count" json:"asset_count"`
+	AllowDownload    bool              `db:"allow_download" json:"allow_download"`
+	IncludeOriginals bool              `db:"include_originals" json:"include_originals"`
+	ExpiresAt        dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) CreateShareLink(ctx context.Context, arg CreateShareLinkParams) (ShareLink, error) {
-	row := q.db.QueryRow(ctx, createShareLink,
+	row := q.db.QueryRowContext(ctx, createShareLink,
 		arg.OwnerID,
 		arg.TokenHash,
 		arg.Title,
@@ -71,37 +72,38 @@ func (q *Queries) CreateShareLink(ctx context.Context, arg CreateShareLinkParams
 
 const deleteShareLink = `-- name: DeleteShareLink :execrows
 DELETE FROM share_links
-WHERE share_id = $1 AND owner_id = $2 AND (status = 'revoked' OR expires_at < CURRENT_TIMESTAMP)
+WHERE share_id = ?1 AND owner_id = ?2
+  AND (status = 'revoked' OR expires_at < CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 `
 
 type DeleteShareLinkParams struct {
-	ShareID pgtype.UUID `db:"share_id" json:"share_id"`
-	OwnerID int32       `db:"owner_id" json:"owner_id"`
+	ShareID uuid.UUID `db:"share_id" json:"share_id"`
+	OwnerID int32     `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) DeleteShareLink(ctx context.Context, arg DeleteShareLinkParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteShareLink, arg.ShareID, arg.OwnerID)
+	result, err := q.db.ExecContext(ctx, deleteShareLink, arg.ShareID, arg.OwnerID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected(), nil
+	return result.RowsAffected()
 }
 
 const extendShareLinkExpiry = `-- name: ExtendShareLinkExpiry :one
 UPDATE share_links
-SET expires_at = $3, updated_at = CURRENT_TIMESTAMP
-WHERE share_id = $1 AND owner_id = $2
+SET expires_at = ?3, updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE share_id = ?1 AND owner_id = ?2
 RETURNING share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count
 `
 
 type ExtendShareLinkExpiryParams struct {
-	ShareID   pgtype.UUID        `db:"share_id" json:"share_id"`
-	OwnerID   int32              `db:"owner_id" json:"owner_id"`
-	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ShareID   uuid.UUID         `db:"share_id" json:"share_id"`
+	OwnerID   int32             `db:"owner_id" json:"owner_id"`
+	ExpiresAt dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLinkExpiryParams) (ShareLink, error) {
-	row := q.db.QueryRow(ctx, extendShareLinkExpiry, arg.ShareID, arg.OwnerID, arg.ExpiresAt)
+	row := q.db.QueryRowContext(ctx, extendShareLinkExpiry, arg.ShareID, arg.OwnerID, arg.ExpiresAt)
 	var i ShareLink
 	err := row.Scan(
 		&i.ShareID,
@@ -128,11 +130,12 @@ func (q *Queries) ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLink
 
 const getActiveShareLinkByTokenHash = `-- name: GetActiveShareLinkByTokenHash :one
 SELECT share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count FROM share_links
-WHERE token_hash = $1 AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
+WHERE token_hash = ?1 AND status = 'active'
+  AND expires_at > CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 `
 
 func (q *Queries) GetActiveShareLinkByTokenHash(ctx context.Context, tokenHash []byte) (ShareLink, error) {
-	row := q.db.QueryRow(ctx, getActiveShareLinkByTokenHash, tokenHash)
+	row := q.db.QueryRowContext(ctx, getActiveShareLinkByTokenHash, tokenHash)
 	var i ShareLink
 	err := row.Scan(
 		&i.ShareID,
@@ -158,16 +161,16 @@ func (q *Queries) GetActiveShareLinkByTokenHash(ctx context.Context, tokenHash [
 }
 
 const getShareLinkByID = `-- name: GetShareLinkByID :one
-SELECT share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count FROM share_links WHERE share_id = $1 AND owner_id = $2
+SELECT share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count FROM share_links WHERE share_id = ?1 AND owner_id = ?2
 `
 
 type GetShareLinkByIDParams struct {
-	ShareID pgtype.UUID `db:"share_id" json:"share_id"`
-	OwnerID int32       `db:"owner_id" json:"owner_id"`
+	ShareID uuid.UUID `db:"share_id" json:"share_id"`
+	OwnerID int32     `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetShareLinkByID(ctx context.Context, arg GetShareLinkByIDParams) (ShareLink, error) {
-	row := q.db.QueryRow(ctx, getShareLinkByID, arg.ShareID, arg.OwnerID)
+	row := q.db.QueryRowContext(ctx, getShareLinkByID, arg.ShareID, arg.OwnerID)
 	var i ShareLink
 	err := row.Scan(
 		&i.ShareID,
@@ -194,21 +197,22 @@ func (q *Queries) GetShareLinkByID(ctx context.Context, arg GetShareLinkByIDPara
 
 const incrementShareLinkView = `-- name: IncrementShareLinkView :exec
 UPDATE share_links
-SET view_count = view_count + 1, last_viewed_at = CURRENT_TIMESTAMP
-WHERE share_id = $1
+SET view_count = view_count + 1,
+    last_viewed_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE share_id = ?1
 `
 
-func (q *Queries) IncrementShareLinkView(ctx context.Context, shareID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, incrementShareLinkView, shareID)
+func (q *Queries) IncrementShareLinkView(ctx context.Context, shareID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, incrementShareLinkView, shareID)
 	return err
 }
 
 const listShareLinksByOwner = `-- name: ListShareLinksByOwner :many
-SELECT share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count FROM share_links WHERE owner_id = $1 ORDER BY created_at DESC
+SELECT share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count FROM share_links WHERE owner_id = ?1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error) {
-	rows, err := q.db.Query(ctx, listShareLinksByOwner, ownerID)
+	rows, err := q.db.QueryContext(ctx, listShareLinksByOwner, ownerID)
 	if err != nil {
 		return nil, err
 	}
@@ -240,6 +244,9 @@ func (q *Queries) ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]S
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -248,18 +255,20 @@ func (q *Queries) ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]S
 
 const revokeShareLink = `-- name: RevokeShareLink :one
 UPDATE share_links
-SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-WHERE share_id = $1 AND owner_id = $2
+SET status = 'revoked',
+    revoked_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE share_id = ?1 AND owner_id = ?2
 RETURNING share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count
 `
 
 type RevokeShareLinkParams struct {
-	ShareID pgtype.UUID `db:"share_id" json:"share_id"`
-	OwnerID int32       `db:"owner_id" json:"owner_id"`
+	ShareID uuid.UUID `db:"share_id" json:"share_id"`
+	OwnerID int32     `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams) (ShareLink, error) {
-	row := q.db.QueryRow(ctx, revokeShareLink, arg.ShareID, arg.OwnerID)
+	row := q.db.QueryRowContext(ctx, revokeShareLink, arg.ShareID, arg.OwnerID)
 	var i ShareLink
 	err := row.Scan(
 		&i.ShareID,
@@ -286,22 +295,23 @@ func (q *Queries) RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams
 
 const updateShareLinkSettings = `-- name: UpdateShareLinkSettings :one
 UPDATE share_links
-SET title = $3, description = $4, allow_download = $5, include_originals = $6, updated_at = CURRENT_TIMESTAMP
-WHERE share_id = $1 AND owner_id = $2
+SET title = ?3, description = ?4, allow_download = ?5, include_originals = ?6,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE share_id = ?1 AND owner_id = ?2
 RETURNING share_id, owner_id, token_hash, title, description, source_kind, source_ref, asset_ids, asset_count, allow_download, include_originals, status, expires_at, created_at, updated_at, revoked_at, last_viewed_at, view_count
 `
 
 type UpdateShareLinkSettingsParams struct {
-	ShareID          pgtype.UUID `db:"share_id" json:"share_id"`
-	OwnerID          int32       `db:"owner_id" json:"owner_id"`
-	Title            string      `db:"title" json:"title"`
-	Description      *string     `db:"description" json:"description"`
-	AllowDownload    bool        `db:"allow_download" json:"allow_download"`
-	IncludeOriginals bool        `db:"include_originals" json:"include_originals"`
+	ShareID          uuid.UUID `db:"share_id" json:"share_id"`
+	OwnerID          int32     `db:"owner_id" json:"owner_id"`
+	Title            string    `db:"title" json:"title"`
+	Description      *string   `db:"description" json:"description"`
+	AllowDownload    bool      `db:"allow_download" json:"allow_download"`
+	IncludeOriginals bool      `db:"include_originals" json:"include_originals"`
 }
 
 func (q *Queries) UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error) {
-	row := q.db.QueryRow(ctx, updateShareLinkSettings,
+	row := q.db.QueryRowContext(ctx, updateShareLinkSettings,
 		arg.ShareID,
 		arg.OwnerID,
 		arg.Title,

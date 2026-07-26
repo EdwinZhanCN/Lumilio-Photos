@@ -8,7 +8,6 @@ import (
 	"server/internal/utils/imagesource"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
@@ -41,12 +40,6 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 		return nil
 	}
 
-	// Convert UUID to pgtype.UUID for database operations
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	// If task temporarily unavailable, snooze
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
@@ -73,7 +66,7 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	processingTimeMs := int(time.Since(startTime).Milliseconds())
 
 	// Save face results using FaceService (conversion, crops, clustering, and cleanup happen there).
-	err = w.FaceService.SaveFaceResults(ctx, pgUUID, faceV1, imageData.EncodedSource, processingTimeMs)
+	err = w.FaceService.SaveFaceResults(ctx, assetID, faceV1, imageData.EncodedSource, processingTimeMs)
 	if err != nil {
 		return fmt.Errorf("failed to save face results: %w", err)
 	}

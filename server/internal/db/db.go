@@ -2,205 +2,389 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
-	"strings"
+	"path/filepath"
+	"sync"
+	"time"
 
 	"server/config"
 	"server/internal/db/repo"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
+	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-// DB wraps the database connection and provides access to queries
+const (
+	applicationID = 0x4c554d49 // "LUMI"
+	fileMode      = 0o600
+	directoryMode = 0o700
+)
+
+var registerVectorExtension sync.Once
+
+// DB is the single SQLite runtime boundary used by application queries, River,
+// and short application transactions.
 type DB struct {
-	Pool    *pgxpool.Pool
+	SQL     *sql.DB
 	Queries *repo.Queries
+	Path    string
 }
 
-// New creates a new database connection with the given configuration
-func New(cfg config.DatabaseConfig) (*DB, error) {
-	// A Unix-socket directory host (desktop runtime) cannot be expressed in a
-	// URL-form DSN, so use the keyword/value form there. TCP hosts keep the
-	// existing URL form unchanged.
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		cfg.User,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.DBName,
-		cfg.SSL,
+// CatalogInfo is the independently verified identity and schema state of a
+// SQLite catalog or backup snapshot.
+type CatalogInfo struct {
+	Path                     string
+	LibraryID                string
+	SQLiteVersion            string
+	VectorVersion            string
+	ApplicationMigration     int64
+	RiverMigration           int64
+	SizeBytes                int64
+	QuickCheck               string
+	ForeignKeyViolationCount int
+}
+
+// Open creates or opens the configured library catalog and applies the fixed
+// connection policy. The one physical connection is intentionally never
+// recycled because SQLite pragmas and statically registered extensions are
+// connection-local.
+func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
+	path, err := normalizePath(cfg.Path)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePrivateParent(path); err != nil {
+		return nil, err
+	}
+
+	registerVectorExtension.Do(sqlitevec.Auto)
+
+	dsn := (&url.URL{Scheme: "file", Path: path}).String()
+	database, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open SQLite catalog %s: %w", safeLocation(path), err)
+	}
+	database.SetMaxOpenConns(1)
+	database.SetMaxIdleConns(1)
+	database.SetConnMaxLifetime(0)
+	database.SetConnMaxIdleTime(0)
+
+	closeOnError := func(operation string, cause error) (*DB, error) {
+		_ = database.Close()
+		return nil, fmt.Errorf("%s SQLite catalog %s: %w", operation, safeLocation(path), cause)
+	}
+	if err := database.PingContext(ctx); err != nil {
+		return closeOnError("open", err)
+	}
+	if err := applyPragmas(ctx, database); err != nil {
+		return closeOnError("configure", err)
+	}
+	if err := claimOrVerifyCatalog(ctx, database); err != nil {
+		return closeOnError("verify identity of", err)
+	}
+	if err := validateIntegrity(ctx, database); err != nil {
+		return closeOnError("validate", err)
+	}
+	if err := os.Chmod(path, fileMode); err != nil {
+		return closeOnError("secure", err)
+	}
+
+	var sqliteVersion, vectorVersion string
+	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec_version()").Scan(&sqliteVersion, &vectorVersion); err != nil {
+		return closeOnError("probe versions for", err)
+	}
+	log.Printf(
+		"SQLite catalog opened: location=%s sqlite=%s vector=%s writer_connections=1",
+		safeLocation(path),
+		sqliteVersion,
+		vectorVersion,
 	)
-	if isSocketHost(cfg.Host) {
-		dsn = socketDSN(cfg, nil)
-	}
-
-	poolCfg, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection config: %w", err)
-	}
-
-	// Resolve the rotated credential on every new connection rather than baking
-	// the bootstrap password into the pool. First-run setup rotates the database
-	// role password (ALTER USER) and writes the new secret to disk; without this
-	// hook the pool would keep opening connections with the stale bootstrap
-	// password and fail SASL auth (notably River's producer fetching jobs).
-	secretPath := strings.TrimSpace(cfg.RotatedPasswordFile)
-	poolCfg.BeforeConnect = func(_ context.Context, connConfig *pgx.ConnConfig) error {
-		if password := readRotatedPassword(secretPath); password != "" {
-			connConfig.Password = password
-		}
-		return nil
-	}
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection pool: %w", err)
-	}
-
-	// Test the connection
-	if err := pool.Ping(context.Background()); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	queries := repo.New(pool)
-
-	log.Printf("📊 Database connection successful: %s:%s/%s", cfg.Host, cfg.Port, cfg.DBName)
 
 	return &DB{
-		Pool:    pool,
-		Queries: queries,
+		SQL:     database,
+		Queries: repo.New(database),
+		Path:    path,
 	}, nil
 }
 
-// readRotatedPassword returns the rotated database password persisted on disk,
-// or an empty string when the secret file is missing or empty. A missing file is
-// expected on first boot, where the bootstrap password from the DSN still applies.
-func readRotatedPassword(secretPath string) string {
-	data, err := os.ReadFile(secretPath)
+// WithTx runs fn in a short write transaction shared by application queries
+// and River InsertTx calls.
+func (d *DB) WithTx(ctx context.Context, fn func(*sql.Tx, *repo.Queries) error) error {
+	started := time.Now()
+	tx, err := d.SQL.BeginTx(ctx, nil)
 	if err != nil {
-		return ""
+		return fmt.Errorf("begin SQLite transaction: %w", err)
 	}
-	return strings.TrimSpace(string(data))
-}
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
-// Close closes the database connection
-func (db *DB) Close() {
-	if db.Pool != nil {
-		db.Pool.Close()
-		log.Println("Database connection closed")
-	}
-}
-
-// WithTx executes a function within a database transaction
-func (db *DB) WithTx(ctx context.Context, fn func(*repo.Queries) error) error {
-	tx, err := db.Pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	queries := db.Queries.WithTx(tx)
-	if err := fn(queries); err != nil {
+	if err := fn(tx, d.Queries.WithTx(tx)); err != nil {
 		return err
 	}
-
-	return tx.Commit(ctx)
-}
-
-// SelfHealPassword checks if the current password fails authentication but the
-// bootstrap password succeeds. If so, it updates the user's password in the
-// database to match the one in the secret file.
-func SelfHealPassword(ctx context.Context, cfg *config.DatabaseConfig) error {
-	if cfg.BootstrapPassword == "" || cfg.BootstrapPassword == cfg.Password {
-		return nil
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit SQLite transaction after %s: %w", time.Since(started), err)
 	}
-
-	// 1. Try to connect with the current configured password (from the file).
-	dsnCur := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		cfg.User,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.DBName,
-		cfg.SSL,
-	)
-	if isSocketHost(cfg.Host) {
-		dsnCur = socketDSN(*cfg, nil)
-	}
-
-	connCur, err := pgx.Connect(ctx, dsnCur)
-	if err == nil {
-		// Connection succeeded with the file's password! No healing needed.
-		connCur.Close(ctx)
-		return nil
-	}
-
-	// Check if the connection failed specifically due to SASL/password authentication failure.
-	var pgErr *pgconn.PgError
-	isAuthFailure := false
-	if errors.As(err, &pgErr) && pgErr.Code == "28P01" {
-		isAuthFailure = true
-	} else if strings.Contains(err.Error(), "password authentication failed") || strings.Contains(err.Error(), "SASL auth") {
-		isAuthFailure = true
-	}
-
-	if !isAuthFailure {
-		// It's a different error (e.g. connection refused, network timeout). Do not try to heal.
-		return nil
-	}
-
-	// 2. Try to connect with the bootstrap password.
-	dsnBootstrap := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		cfg.User,
-		cfg.BootstrapPassword,
-		cfg.Host,
-		cfg.Port,
-		cfg.DBName,
-		cfg.SSL,
-	)
-	if isSocketHost(cfg.Host) {
-		tempCfg := *cfg
-		tempCfg.Password = cfg.BootstrapPassword
-		dsnBootstrap = socketDSN(tempCfg, nil)
-	}
-
-	connBootstrap, err := pgx.Connect(ctx, dsnBootstrap)
-	if err != nil {
-		// The bootstrap password also failed. We can't do anything.
-		return nil
-	}
-	defer connBootstrap.Close(ctx)
-
-	// Connection succeeded using the bootstrap password!
-	// This means the DB is using the default/bootstrap password, but the secret file has a rotated one.
-	// Rotate the password in the DB to match the secret file (cfg.Password).
-	log.Printf("⚠️ Database password authentication failed with secret file, but succeeded with bootstrap password.")
-	log.Printf("🔄 Re-aligning database password with the existing secret file...")
-
-	stmt := fmt.Sprintf("ALTER USER %s WITH PASSWORD %s",
-		quoteSQLIdentifier(cfg.User),
-		quoteSQLLiteral(cfg.Password),
-	)
-	if _, err := connBootstrap.Exec(ctx, stmt); err != nil {
-		return fmt.Errorf("failed to alter user password to match secret file: %w", err)
-	}
-
-	log.Printf("✅ Database password updated successfully to match secret file.")
 	return nil
 }
 
-// quoteSQLIdentifier safely double-quotes a SQL identifier (e.g. a role name).
-func quoteSQLIdentifier(name string) string {
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+// Check validates the live catalog after migrations or before a destructive
+// restore boundary.
+func (d *DB) Check(ctx context.Context) error {
+	if err := validateIntegrity(ctx, d.SQL); err != nil {
+		return fmt.Errorf("validate SQLite catalog %s: %w", safeLocation(d.Path), err)
+	}
+	return nil
 }
 
-// quoteSQLLiteral safely single-quotes a SQL string literal.
-func quoteSQLLiteral(value string) string {
-	return `'` + strings.ReplaceAll(value, `'`, `''`) + `'`
+// InspectCatalog opens a catalog through an independent read-only connection
+// and verifies that it is a healthy Lumilio SQLite database. Backup validation
+// deliberately does not reuse the live application handle.
+func InspectCatalog(ctx context.Context, path string) (CatalogInfo, error) {
+	cleanPath, err := filepath.Abs(path)
+	if err != nil {
+		return CatalogInfo{}, fmt.Errorf("resolve SQLite catalog %q: %w", path, err)
+	}
+	cleanPath = filepath.Clean(cleanPath)
+
+	registerVectorExtension.Do(sqlitevec.Auto)
+	location := &url.URL{Scheme: "file", Path: cleanPath}
+	query := location.Query()
+	query.Set("mode", "ro")
+	location.RawQuery = query.Encode()
+
+	database, err := sql.Open("sqlite3", location.String())
+	if err != nil {
+		return CatalogInfo{}, fmt.Errorf("open SQLite catalog snapshot %s: %w", safeLocation(cleanPath), err)
+	}
+	database.SetMaxOpenConns(1)
+	database.SetMaxIdleConns(1)
+	defer database.Close()
+
+	var catalogApplicationID int
+	if err := database.QueryRowContext(ctx, "PRAGMA application_id").Scan(&catalogApplicationID); err != nil {
+		return CatalogInfo{}, fmt.Errorf("read SQLite application_id: %w", err)
+	}
+	if catalogApplicationID != applicationID {
+		return CatalogInfo{}, fmt.Errorf("SQLite application_id = %#x, want %#x", catalogApplicationID, applicationID)
+	}
+
+	info := CatalogInfo{Path: cleanPath}
+	if err := database.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&info.QuickCheck); err != nil {
+		return CatalogInfo{}, fmt.Errorf("run SQLite quick_check: %w", err)
+	}
+	if info.QuickCheck != "ok" {
+		return CatalogInfo{}, fmt.Errorf("SQLite quick_check failed: %s", info.QuickCheck)
+	}
+
+	rows, err := database.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		return CatalogInfo{}, fmt.Errorf("run SQLite foreign_key_check: %w", err)
+	}
+	for rows.Next() {
+		info.ForeignKeyViolationCount++
+	}
+	if err := rows.Close(); err != nil {
+		return CatalogInfo{}, fmt.Errorf("close SQLite foreign_key_check rows: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return CatalogInfo{}, fmt.Errorf("iterate SQLite foreign_key_check: %w", err)
+	}
+	if info.ForeignKeyViolationCount != 0 {
+		return CatalogInfo{}, fmt.Errorf("SQLite foreign_key_check found %d violations", info.ForeignKeyViolationCount)
+	}
+
+	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec_version()").Scan(&info.SQLiteVersion, &info.VectorVersion); err != nil {
+		return CatalogInfo{}, fmt.Errorf("probe SQLite snapshot versions: %w", err)
+	}
+	if err := database.QueryRowContext(ctx, "SELECT library_id FROM system_state WHERE id = 1").Scan(&info.LibraryID); err != nil {
+		return CatalogInfo{}, fmt.Errorf("read SQLite library identity: %w", err)
+	}
+	if err := database.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM lumilio_schema_migrations").Scan(&info.ApplicationMigration); err != nil {
+		return CatalogInfo{}, fmt.Errorf("read application migration version: %w", err)
+	}
+	if err := database.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM river_migration WHERE line = 'main'").Scan(&info.RiverMigration); err != nil {
+		return CatalogInfo{}, fmt.Errorf("read River migration version: %w", err)
+	}
+	fileInfo, err := os.Stat(cleanPath)
+	if err != nil {
+		return CatalogInfo{}, fmt.Errorf("stat SQLite catalog snapshot: %w", err)
+	}
+	info.SizeBytes = fileInfo.Size()
+	return info, nil
+}
+
+// Close performs bounded maintenance after HTTP and River have drained, then
+// closes the sole connection.
+func (d *DB) Close(ctx context.Context) error {
+	if d == nil || d.SQL == nil {
+		return nil
+	}
+
+	var maintenanceErr error
+	if _, err := d.SQL.ExecContext(ctx, "PRAGMA optimize"); err != nil {
+		maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf("optimize SQLite catalog: %w", err))
+	}
+	var busy, logPages, checkpointed int
+	if err := d.SQL.QueryRowContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logPages, &checkpointed); err != nil {
+		maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf("checkpoint SQLite catalog: %w", err))
+	} else if busy != 0 {
+		maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf(
+			"checkpoint SQLite catalog remained busy: log_pages=%d checkpointed=%d",
+			logPages,
+			checkpointed,
+		))
+	}
+	if err := d.SQL.Close(); err != nil {
+		maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf("close SQLite catalog: %w", err))
+	}
+	if maintenanceErr == nil {
+		log.Printf("SQLite catalog closed: location=%s", safeLocation(d.Path))
+	}
+	return maintenanceErr
+}
+
+func normalizePath(value string) (string, error) {
+	if value == "" || value == ":memory:" {
+		return "", errors.New("SQLite database.path must be a persistent filesystem path")
+	}
+	path, err := filepath.Abs(value)
+	if err != nil {
+		return "", fmt.Errorf("resolve SQLite database.path %q: %w", value, err)
+	}
+	return filepath.Clean(path), nil
+}
+
+func ensurePrivateParent(path string) error {
+	parent := filepath.Dir(path)
+	info, err := os.Stat(parent)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		if err := os.MkdirAll(parent, directoryMode); err != nil {
+			return fmt.Errorf("create SQLite parent directory %s: %w", safeLocation(parent), err)
+		}
+	case err != nil:
+		return fmt.Errorf("inspect SQLite parent directory %s: %w", safeLocation(parent), err)
+	case !info.IsDir():
+		return fmt.Errorf("SQLite parent path %s is not a directory", safeLocation(parent))
+	case info.Mode().Perm()&0o077 != 0:
+		return fmt.Errorf("SQLite parent directory %s must not be accessible by group or others", safeLocation(parent))
+	}
+	return nil
+}
+
+func applyPragmas(ctx context.Context, database *sql.DB) error {
+	statements := []string{
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA synchronous = NORMAL",
+		"PRAGMA busy_timeout = 5000",
+		"PRAGMA temp_store = MEMORY",
+		"PRAGMA wal_autocheckpoint = 1000",
+	}
+	for _, statement := range statements {
+		if _, err := database.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("apply %q: %w", statement, err)
+		}
+	}
+
+	var journalMode string
+	if err := database.QueryRowContext(ctx, "PRAGMA journal_mode = WAL").Scan(&journalMode); err != nil {
+		return fmt.Errorf("enable WAL: %w", err)
+	}
+	if journalMode != "wal" {
+		return fmt.Errorf("journal_mode = %q, want wal", journalMode)
+	}
+
+	checks := []struct {
+		name string
+		want int
+	}{
+		{name: "foreign_keys", want: 1},
+		{name: "synchronous", want: 1},
+		{name: "busy_timeout", want: 5000},
+		{name: "temp_store", want: 2},
+		{name: "wal_autocheckpoint", want: 1000},
+	}
+	for _, check := range checks {
+		var got int
+		if err := database.QueryRowContext(ctx, "PRAGMA "+check.name).Scan(&got); err != nil {
+			return fmt.Errorf("read PRAGMA %s: %w", check.name, err)
+		}
+		if got != check.want {
+			return fmt.Errorf("PRAGMA %s = %d, want %d", check.name, got, check.want)
+		}
+	}
+	return nil
+}
+
+func claimOrVerifyCatalog(ctx context.Context, database *sql.DB) error {
+	var got int
+	if err := database.QueryRowContext(ctx, "PRAGMA application_id").Scan(&got); err != nil {
+		return fmt.Errorf("read application_id: %w", err)
+	}
+	if got == applicationID {
+		return nil
+	}
+	if got != 0 {
+		return fmt.Errorf("application_id = %#x, want Lumilio %#x", got, applicationID)
+	}
+
+	var userTables int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM sqlite_schema
+		WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+	`).Scan(&userTables); err != nil {
+		return fmt.Errorf("inspect unclaimed catalog: %w", err)
+	}
+	if userTables != 0 {
+		return fmt.Errorf("unrecognized SQLite catalog has %d user tables and no Lumilio application_id", userTables)
+	}
+	if _, err := database.ExecContext(ctx, fmt.Sprintf("PRAGMA application_id = %d", applicationID)); err != nil {
+		return fmt.Errorf("set application_id: %w", err)
+	}
+	return nil
+}
+
+func validateIntegrity(ctx context.Context, database *sql.DB) error {
+	var quickCheck string
+	if err := database.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&quickCheck); err != nil {
+		return fmt.Errorf("quick_check: %w", err)
+	}
+	if quickCheck != "ok" {
+		return fmt.Errorf("quick_check: %s", quickCheck)
+	}
+
+	rows, err := database.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		return fmt.Errorf("foreign_key_check: %w", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		var table, parent string
+		var rowID, foreignKeyID any
+		if err := rows.Scan(&table, &rowID, &parent, &foreignKeyID); err != nil {
+			return fmt.Errorf("scan foreign_key_check result: %w", err)
+		}
+		return fmt.Errorf(
+			"foreign_key_check: table=%s rowid=%v parent=%s foreign_key=%v",
+			table,
+			rowID,
+			parent,
+			foreignKeyID,
+		)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate foreign_key_check: %w", err)
+	}
+	return nil
+}
+
+func safeLocation(path string) string {
+	return filepath.Clean(path)
 }

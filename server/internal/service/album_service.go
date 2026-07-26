@@ -5,7 +5,6 @@ import (
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AlbumService interface {
@@ -19,7 +18,7 @@ type AlbumService interface {
 	AddAssetToAlbum(ctx context.Context, params repo.AddAssetToAlbumParams) error
 	RemoveAssetFromAlbum(ctx context.Context, params repo.RemoveAssetFromAlbumParams) error
 	UpdateAssetPositionInAlbum(ctx context.Context, params repo.UpdateAssetPositionInAlbumParams) error
-	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]repo.GetAssetAlbumsRow, error)
+	GetAssetAlbums(ctx context.Context, assetID uuid.UUID) ([]repo.GetAssetAlbumsRow, error)
 }
 
 type albumService struct {
@@ -35,12 +34,12 @@ type NewAlbumRequest struct {
 	CoverAssetID string `json:"cover_asset_id" binding:"required,uuid4"`
 }
 
-func (r NewAlbumRequest) CoverAssetAsPG() (pgtype.UUID, error) {
+func (r NewAlbumRequest) CoverAssetAsUUID() (uuid.UUID, error) {
 	u, err := uuid.Parse(r.CoverAssetID)
 	if err != nil {
-		return pgtype.UUID{}, err
+		return uuid.Nil, err
 	}
-	return pgtype.UUID{Bytes: u, Valid: true}, nil
+	return u, nil
 }
 
 func NewAlbumService(q *repo.Queries) AlbumService {
@@ -100,6 +99,6 @@ func (s *albumService) UpdateAssetPositionInAlbum(ctx context.Context, params re
 }
 
 // GetAssetAlbums retrieves all albums that contain a specific asset
-func (s *albumService) GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]repo.GetAssetAlbumsRow, error) {
+func (s *albumService) GetAssetAlbums(ctx context.Context, assetID uuid.UUID) ([]repo.GetAssetAlbumsRow, error) {
 	return s.queries.GetAssetAlbums(ctx, assetID)
 }

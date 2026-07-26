@@ -8,11 +8,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/cloud"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 )
@@ -468,7 +468,7 @@ func toCloudAuthChallengeDTO(challenge *cloud.AuthChallenge) *dto.CloudAuthChall
 
 func toCloudCredentialDTO(credential repo.CloudCredential, providerTitle string) dto.CloudCredentialDTO {
 	return dto.CloudCredentialDTO{
-		ID:             uuid.UUID(credential.CredentialID.Bytes).String(),
+		ID:             credential.CredentialID.String(),
 		Provider:       credential.Provider,
 		ProviderTitle:  providerTitle,
 		DisplayName:    credential.DisplayName,
@@ -476,16 +476,16 @@ func toCloudCredentialDTO(credential repo.CloudCredential, providerTitle string)
 		Status:         credential.Status,
 		OwnerID:        credential.OwnerID,
 		PublicConfig:   publicConfigMap(credential.PublicConfig),
-		CreatedAt:      pgTimeOrZero(credential.CreatedAt),
-		UpdatedAt:      pgTimeOrZero(credential.UpdatedAt),
+		CreatedAt:      dbTimeOrZero(credential.CreatedAt),
+		UpdatedAt:      dbTimeOrZero(credential.UpdatedAt),
 	}
 }
 
 func toCloudImportRunDTO(run repo.CloudImportRun) dto.CloudImportRunDTO {
 	return dto.CloudImportRunDTO{
-		ID:              uuid.UUID(run.RunID.Bytes).String(),
-		RepositoryID:    uuid.UUID(run.RepositoryID.Bytes).String(),
-		CredentialID:    uuid.UUID(run.CredentialID.Bytes).String(),
+		ID:              run.RunID.String(),
+		RepositoryID:    run.RepositoryID.String(),
+		CredentialID:    run.CredentialID.String(),
 		Provider:        run.Provider,
 		Status:          run.Status,
 		OwnerID:         run.OwnerID,
@@ -495,10 +495,10 @@ func toCloudImportRunDTO(run repo.CloudImportRun) dto.CloudImportRunDTO {
 		SkippedCount:    run.SkippedCount,
 		FailedCount:     run.FailedCount,
 		Error:           run.Error,
-		StartedAt:       pgTimePtr(run.StartedAt),
-		FinishedAt:      pgTimePtr(run.FinishedAt),
-		CreatedAt:       pgTimeOrZero(run.CreatedAt),
-		UpdatedAt:       pgTimeOrZero(run.UpdatedAt),
+		StartedAt:       dbTimePtr(run.StartedAt),
+		FinishedAt:      dbTimePtr(run.FinishedAt),
+		CreatedAt:       dbTimeOrZero(run.CreatedAt),
+		UpdatedAt:       dbTimeOrZero(run.UpdatedAt),
 	}
 }
 
@@ -512,7 +512,7 @@ func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus, cloudService
 		OwnerID:  status.Binding.OwnerID,
 	}
 	if status.Binding.LastImportRunID.Valid {
-		result.LastImportRun = uuid.UUID(status.Binding.LastImportRunID.Bytes).String()
+		result.LastImportRun = status.Binding.LastImportRunID.UUID.String()
 	}
 	if status.Credential != nil {
 		credential := toCloudCredentialDTO(*status.Credential, cloudService.ProviderTitle(cloud.ProviderKind(status.Credential.Provider)))
@@ -540,7 +540,7 @@ func writeCloudAccessError(c *gin.Context, err error, message string) {
 	api.GinInternalError(c, err, message)
 }
 
-func publicConfigMap(data []byte) map[string]string {
+func publicConfigMap(data dbtypes.JSON) map[string]string {
 	if len(data) == 0 {
 		return nil
 	}
@@ -551,14 +551,14 @@ func publicConfigMap(data []byte) map[string]string {
 	return config
 }
 
-func pgTimeOrZero(value pgtype.Timestamptz) time.Time {
+func dbTimeOrZero(value dbtypes.Timestamp) time.Time {
 	if !value.Valid {
 		return time.Time{}
 	}
 	return value.Time
 }
 
-func pgTimePtr(value pgtype.Timestamptz) *time.Time {
+func dbTimePtr(value dbtypes.Timestamp) *time.Time {
 	if !value.Valid {
 		return nil
 	}

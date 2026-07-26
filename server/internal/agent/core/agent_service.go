@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"server/internal/agent/ref"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/llm"
 	"server/internal/settings"
@@ -20,9 +21,6 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const CurrentAgentPolicyVersion = ref.CurrentPolicyVersion
@@ -54,10 +52,10 @@ type AgentService interface {
 
 type agentService struct {
 	queries        *repo.Queries
-	pool           *pgxpool.Pool
+	pool           *sql.DB
 	registry       *ToolRegistry
 	configProvider LLMConfigProvider
-	store          *PostgresStore
+	store          *CheckpointStore
 	refStore       ref.Store
 	libraries      *AuthorizedLibraryFactory
 	effects        *EffectRuntime
@@ -66,11 +64,11 @@ type agentService struct {
 	auditLogPath   string
 }
 
-func NewAgentService(queries *repo.Queries, pool *pgxpool.Pool, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string) AgentService {
+func NewAgentService(queries *repo.Queries, pool *sql.DB, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string) AgentService {
 	registry := GetRegistry()
 	return &agentService{
 		queries: queries, pool: pool, registry: registry, configProvider: configProvider,
-		store: NewPostgresStore(queries), refStore: refStore, libraries: libraries,
+		store: NewCheckpointStore(queries), refStore: refStore, libraries: libraries,
 		effects: NewEffectRuntime(pool, queries, registry), runs: NewRunRegistry(),
 		conversations: conversations, auditLogPath: strings.TrimSpace(auditLogPath),
 	}
@@ -100,8 +98,10 @@ func (s *agentService) EnsureThread(ctx context.Context, userID int32, threadID,
 	}
 	return s.queries.UpsertAgentThread(ctx, repo.UpsertAgentThreadParams{
 		UserID: userID, ThreadID: threadID, CheckpointKey: CheckpointKey(userID, threadID),
-		Mode: mode, ContextBindings: bindings.Context, MentionBindings: bindings.Mentions,
+		Mode: mode, ContextBindings: dbtypes.JSON(bindings.Context), MentionBindings: dbtypes.JSON(bindings.Mentions),
 		PolicyVersion: CurrentAgentPolicyVersion,
+		CreatedAt:     dbtypes.NewTimestamp(time.Now()),
+		UpdatedAt:     dbtypes.NewTimestamp(time.Now()),
 	})
 }
 
@@ -194,11 +194,15 @@ func buildInstruction(today string, hasRefs bool, mode string) string {
 }
 
 func (s *agentService) createRun(ctx context.Context, thread repo.AgentThread) (uuid.UUID, error) {
-	row, err := s.queries.CreateAgentRun(ctx, repo.CreateAgentRunParams{UserID: thread.UserID, ThreadID: thread.ThreadID})
+	now := dbtypes.NewTimestamp(time.Now())
+	row, err := s.queries.CreateAgentRun(ctx, repo.CreateAgentRunParams{
+		RunID: uuid.New(), UserID: thread.UserID, ThreadID: thread.ThreadID,
+		StartedAt: now, CreatedAt: now, UpdatedAt: now,
+	})
 	if err != nil {
 		return uuid.Nil, err
 	}
-	return uuid.UUID(row.RunID.Bytes), nil
+	return row.RunID, nil
 }
 
 func sideChannelOf(channels []chan<- *SideChannelEvent) chan<- *SideChannelEvent {
@@ -244,9 +248,10 @@ func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID s
 		!IsValidMode(thread.Mode) {
 		return nil, sql.ErrNoRows
 	}
-	oldRunID := uuid.UUID(thread.ActiveRunID.Bytes)
+	oldRunID := thread.ActiveRunID.UUID
 	if err := s.queries.ClearAwaitingAgentRun(ctx, repo.ClearAwaitingAgentRunParams{
-		RunID: thread.ActiveRunID, UserID: userID, ThreadID: threadID,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now()),
+		RunID:     thread.ActiveRunID.UUID, UserID: userID, ThreadID: threadID,
 	}); err != nil {
 		return nil, err
 	}
@@ -274,12 +279,13 @@ func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID s
 
 func (s *agentService) CancelRun(ctx context.Context, userID int32, threadID string, runID uuid.UUID) (string, error) {
 	_, err := s.queries.RequestAgentRunCancel(ctx, repo.RequestAgentRunCancelParams{
-		RunID: pgtype.UUID{Bytes: runID, Valid: true}, UserID: userID, ThreadID: threadID,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now()),
+		RunID:     runID, UserID: userID, ThreadID: threadID,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			existing, getErr := s.queries.GetAgentRun(ctx, repo.GetAgentRunParams{
-				RunID: pgtype.UUID{Bytes: runID, Valid: true}, UserID: userID, ThreadID: threadID,
+				RunID: runID, UserID: userID, ThreadID: threadID,
 			})
 			if getErr != nil {
 				return "", sql.ErrNoRows
@@ -305,17 +311,17 @@ func (s *agentService) FinishRun(ctx context.Context, userID int32, threadID str
 	s.runs.Delete(userID, threadID, runID)
 	if status == "cancelled" {
 		committed, err := s.queries.AgentRunHasCommittedEffect(ctx, repo.AgentRunHasCommittedEffectParams{
-			RunID: pgtype.UUID{Bytes: runID, Valid: true}, UserID: userID, ThreadID: threadID,
+			RunID: uuid.NullUUID{UUID: runID, Valid: true}, UserID: userID, ThreadID: threadID,
 		})
 		if err != nil {
 			return "", err
 		}
-		if committed {
+		if committed != 0 {
 			status = "completed"
 		}
 	}
 	if err := s.queries.FinishAgentRun(ctx, repo.FinishAgentRunParams{
-		Status: status, RunID: pgtype.UUID{Bytes: runID, Valid: true},
+		Status: status, UpdatedAt: dbtypes.NewTimestamp(time.Now()), RunID: runID,
 		UserID: userID, ThreadID: threadID,
 	}); err != nil {
 		return "", err
@@ -344,7 +350,9 @@ func (s *agentService) FinishRun(ctx context.Context, userID int32, threadID str
 
 func (s *agentService) cleanupCancelled(ctx context.Context, userID int32, threadID string, runID uuid.UUID) error {
 	s.runs.Delete(userID, threadID, runID)
-	if err := s.queries.CancelPendingAgentEffects(ctx, repo.CancelPendingAgentEffectsParams{UserID: userID, ThreadID: threadID}); err != nil {
+	if err := s.queries.CancelPendingAgentEffects(ctx, repo.CancelPendingAgentEffectsParams{
+		UserID: userID, ThreadID: threadID, UpdatedAt: dbtypes.NewTimestamp(time.Now()),
+	}); err != nil {
 		return err
 	}
 	if err := s.store.Delete(ctx, CheckpointKey(userID, threadID)); err != nil {
@@ -354,7 +362,7 @@ func (s *agentService) cleanupCancelled(ctx context.Context, userID int32, threa
 		return err
 	}
 	return s.queries.FinishAgentRun(ctx, repo.FinishAgentRunParams{
-		Status: "cancelled", RunID: pgtype.UUID{Bytes: runID, Valid: true},
+		Status: "cancelled", UpdatedAt: dbtypes.NewTimestamp(time.Now()), RunID: runID,
 		UserID: userID, ThreadID: threadID,
 	})
 }

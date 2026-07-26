@@ -5,13 +5,12 @@ import (
 
 	"server/internal/db/repo"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestToAssetDTONilStoragePath(t *testing.T) {
-	var assetID pgtype.UUID
-	require.NoError(t, assetID.Scan("11111111-1111-1111-1111-111111111111"))
+	assetID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 
 	got := ToAssetDTO(repo.Asset{
 		AssetID:          assetID,

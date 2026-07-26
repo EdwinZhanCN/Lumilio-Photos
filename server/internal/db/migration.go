@@ -4,155 +4,209 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io/fs"
 	"log"
+	"sort"
+	"strconv"
 	"strings"
+	"time"
 
-	"server/config"
 	migrations "server/migrations"
 
-	"github.com/golang-migrate/migrate/v4"
-	mgpg "github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/riverdriver/riversqlite"
 	"github.com/riverqueue/river/rivermigrate"
 )
 
-// MigrationConfig holds configuration for running migrations.
-type MigrationConfig struct {
-	DatabaseConfig config.DatabaseConfig
+const migrationTable = "lumilio_schema_migrations"
+
+type embeddedMigration struct {
+	version int64
+	name    string
+	file    string
+	sql     string
 }
 
-// NewMigrationConfig returns a MigrationConfig with sensible defaults.
-func NewMigrationConfig(dbConfig config.DatabaseConfig) *MigrationConfig {
-	return &MigrationConfig{
-		DatabaseConfig: dbConfig,
+// Migrate applies Lumilio's embedded transactional migrations followed by
+// River's official SQLite migrations against the same single-writer pool.
+func (d *DB) Migrate(ctx context.Context) error {
+	if err := migrateApplication(ctx, d.SQL); err != nil {
+		return fmt.Errorf("migrate Lumilio schema: %w", err)
 	}
+	if err := migrateRiver(ctx, d.SQL); err != nil {
+		return fmt.Errorf("migrate River schema: %w", err)
+	}
+	if err := d.Check(ctx); err != nil {
+		return fmt.Errorf("post-migration integrity check: %w", err)
+	}
+	return nil
 }
 
-// buildURL constructs a Postgres connection string with explicit ssl options
-// and search_path. For a Unix-socket directory host (desktop runtime) it uses
-// the keyword/value form, which—unlike a URL—can carry a filesystem path in the
-// host position. TCP hosts keep the existing URL form unchanged.
-func (m *MigrationConfig) buildURL() string {
-	if isSocketHost(m.DatabaseConfig.Host) {
-		return socketDSN(m.DatabaseConfig, map[string]string{"search_path": "public"})
+func migrateApplication(ctx context.Context, database *sql.DB) error {
+	available, err := loadEmbeddedMigrations()
+	if err != nil {
+		return err
 	}
-	return fmt.Sprintf(
-		"postgresql://%s:%s@%s:%s/%s?sslmode=%s&search_path=public",
-		m.DatabaseConfig.User,
-		m.DatabaseConfig.Password,
-		m.DatabaseConfig.Host,
-		m.DatabaseConfig.Port,
-		m.DatabaseConfig.DBName,
-		m.DatabaseConfig.SSL,
-	)
+	if _, err := database.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS lumilio_schema_migrations (
+			version INTEGER PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			applied_at INTEGER NOT NULL
+		) STRICT
+	`); err != nil {
+		return fmt.Errorf("create migration ledger: %w", err)
+	}
+
+	applied, err := readAppliedMigrations(ctx, database)
+	if err != nil {
+		return err
+	}
+	known := make(map[int64]embeddedMigration, len(available))
+	for _, migration := range available {
+		known[migration.version] = migration
+	}
+	for version, name := range applied {
+		migration, ok := known[version]
+		if !ok {
+			return fmt.Errorf("catalog has unknown future migration %06d_%s", version, name)
+		}
+		if migration.name != name {
+			return fmt.Errorf(
+				"catalog migration %06d name = %q, embedded name = %q",
+				version,
+				name,
+				migration.name,
+			)
+		}
+	}
+
+	for _, migration := range available {
+		if _, ok := applied[migration.version]; ok {
+			continue
+		}
+		started := time.Now()
+		if err := applyMigration(ctx, database, migration); err != nil {
+			return err
+		}
+		log.Printf(
+			"Lumilio migration applied: version=%06d name=%s duration=%s",
+			migration.version,
+			migration.name,
+			time.Since(started),
+		)
+	}
+	return nil
 }
 
-// migrateUp applies all pending "up" migrations from the embedded migration set.
-// Using the embedded files (via the iofs source) means migrations do not depend
-// on the working directory or on the .sql files existing on disk, which is what
-// lets the desktop bundle run them.
-func (m *MigrationConfig) migrateUp(ctx context.Context) error {
-	source, err := iofs.New(migrations.FS, ".")
+func loadEmbeddedMigrations() ([]embeddedMigration, error) {
+	entries, err := fs.ReadDir(migrations.FS, ".")
 	if err != nil {
-		return fmt.Errorf("open embedded migrations: %w", err)
+		return nil, fmt.Errorf("read embedded migrations: %w", err)
 	}
-	defer source.Close()
+	var result []embeddedMigration
+	seen := make(map[int64]string)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".up.sql") {
+			continue
+		}
+		filename := entry.Name()
+		parts := strings.SplitN(strings.TrimSuffix(filename, ".up.sql"), "_", 2)
+		if len(parts) != 2 || len(parts[0]) != 6 || parts[1] == "" {
+			return nil, fmt.Errorf("invalid embedded migration filename %q", filename)
+		}
+		version, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil || version <= 0 {
+			return nil, fmt.Errorf("invalid embedded migration version in %q", filename)
+		}
+		if prior, ok := seen[version]; ok {
+			return nil, fmt.Errorf("duplicate embedded migration version %06d: %s and %s", version, prior, filename)
+		}
+		body, err := migrations.FS.ReadFile(filename)
+		if err != nil {
+			return nil, fmt.Errorf("read embedded migration %s: %w", filename, err)
+		}
+		seen[version] = filename
+		result = append(result, embeddedMigration{
+			version: version,
+			name:    parts[1],
+			file:    filename,
+			sql:     string(body),
+		})
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no embedded up migrations")
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].version < result[j].version
+	})
+	return result, nil
+}
 
-	// Use pgx stdlib with database/sql so postgresql:// URLs (and keyword/value
-	// DSNs) work.
-	db, err := sql.Open("pgx", m.buildURL())
+func readAppliedMigrations(ctx context.Context, database *sql.DB) (map[int64]string, error) {
+	rows, err := database.QueryContext(ctx, `
+		SELECT version, name
+		FROM lumilio_schema_migrations
+		ORDER BY version
+	`)
 	if err != nil {
-		return fmt.Errorf("sql open (pgx): %w", err)
+		return nil, fmt.Errorf("read migration ledger: %w", err)
 	}
-	defer db.Close()
+	defer rows.Close()
 
-	if err := db.PingContext(ctx); err != nil {
-		return fmt.Errorf("db ping: %w", err)
+	applied := make(map[int64]string)
+	for rows.Next() {
+		var version int64
+		var name string
+		if err := rows.Scan(&version, &name); err != nil {
+			return nil, fmt.Errorf("scan migration ledger: %w", err)
+		}
+		applied[version] = name
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate migration ledger: %w", err)
+	}
+	return applied, nil
+}
 
-	pgDriver, err := mgpg.WithInstance(db, &mgpg.Config{})
+func applyMigration(ctx context.Context, database *sql.DB, migration embeddedMigration) error {
+	tx, err := database.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("postgres driver instance: %w", err)
-	}
-
-	log.Printf("🚀 Applying DB migrations (embedded)")
-	migrator, err := migrate.NewWithInstance("iofs", source, "postgres", pgDriver)
-	if err != nil {
-		return fmt.Errorf("init migrator: %w", err)
+		return fmt.Errorf("begin migration %s: %w", migration.file, err)
 	}
 	defer func() {
-		if _, derr := migrator.Close(); derr != nil && !strings.Contains(derr.Error(), "no such file or directory") {
-			log.Printf("migration close warning: %v", derr)
-		}
+		_ = tx.Rollback()
 	}()
 
-	if err := migrator.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("migrate up: %w", err)
-	} else if err == migrate.ErrNoChange {
-		log.Printf("ℹ️ No migration needed. Database schema is up-to-date.")
-	} else {
-		log.Printf("✅ Database migrations applied successfully.")
+	if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
+		return fmt.Errorf("execute migration %s: %w", migration.file, err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO lumilio_schema_migrations (version, name, applied_at)
+		VALUES (?, ?, ?)
+	`, migration.version, migration.name, time.Now().UTC().UnixMicro()); err != nil {
+		return fmt.Errorf("record migration %s: %w", migration.file, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration %s: %w", migration.file, err)
 	}
 	return nil
 }
 
-// runRiverMigrations applies River queue schema migrations through River's Go API.
-func (m *MigrationConfig) runRiverMigrations(ctx context.Context) error {
-	pool, err := pgxpool.New(ctx, m.buildURL())
+func migrateRiver(ctx context.Context, database *sql.DB) error {
+	migrator, err := rivermigrate.New(riversqlite.New(database), nil)
 	if err != nil {
-		return fmt.Errorf("river migration pool: %w", err)
+		return fmt.Errorf("initialize River migrator: %w", err)
 	}
-	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
-		return fmt.Errorf("river migration db ping: %w", err)
-	}
-
-	migrator, err := rivermigrate.New(riverpgxv5.New(pool), &rivermigrate.Config{
-		Schema: "public",
-	})
-	if err != nil {
-		return fmt.Errorf("river migrator init: %w", err)
-	}
-
-	log.Printf("🌊 Running River migrations...")
 	result, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
 	if err != nil {
-		return fmt.Errorf("river migrations failed: %w", err)
+		return fmt.Errorf("apply River migrations: %w", err)
 	}
-	if len(result.Versions) == 0 {
-		log.Printf("ℹ️ River schema is up-to-date.")
-		return nil
-	}
-
 	for _, version := range result.Versions {
-		log.Printf("River migration applied: version=%d name=%s duration=%s", version.Version, version.Name, version.Duration)
+		log.Printf(
+			"River migration applied: version=%d name=%s duration=%s",
+			version.Version,
+			version.Name,
+			version.Duration,
+		)
 	}
-	log.Printf("✅ River migrations applied successfully.")
 	return nil
-}
-
-// RunMigrations applies DB migrations using golang-migrate and then applies River migrations.
-func (m *MigrationConfig) RunMigrations(ctx context.Context) error {
-	// Apply DB migrations (up).
-	if err := m.migrateUp(ctx); err != nil {
-		return err
-	}
-
-	// Apply River migrations.
-	if err := m.runRiverMigrations(ctx); err != nil {
-		return err
-	}
-
-	log.Printf("✅ All migrations completed successfully.")
-	return nil
-}
-
-// AutoMigrate is a convenience wrapper used by main() to run migrations at startup.
-func AutoMigrate(ctx context.Context, dbConfig config.DatabaseConfig) error {
-	m := NewMigrationConfig(dbConfig)
-	return m.RunMigrations(ctx)
 }

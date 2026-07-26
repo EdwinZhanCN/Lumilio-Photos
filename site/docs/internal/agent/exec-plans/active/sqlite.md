@@ -1080,12 +1080,12 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 
 - [x] Phase 0：基线与inventory
 - [x] Phase 1：driver/River/vector spike
-- [ ] Phase 2：config与DB runtime
-- [ ] Phase 3：SQLite baseline与sqlc
-- [ ] Phase 4：业务层去pgx
-- [ ] Phase 5：River与事务性ingest
-- [ ] Phase 6：FTS与vector
-- [ ] Phase 7：backup/restore与runtime generation
+- [x] Phase 2：config与DB runtime
+- [x] Phase 3：SQLite baseline与sqlc
+- [x] Phase 4：业务层去pgx
+- [x] Phase 5：River与事务性ingest
+- [x] Phase 6：FTS与vector
+- [x] Phase 7：backup/restore与runtime generation
 - [ ] Phase 8：Docker
 - [ ] Phase 9：Desktop
 - [ ] Phase 10：dev/CI/docs/cleanup
@@ -1194,6 +1194,46 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 - macOS SDK 对 `sqlite3_auto_extension` 给出 deprecated/process-global auto-extension warning，但同进程多连接的 extension registration 与 vector query 实测通过。升级 SQLite/vector binding 或切换显式 connection hook 前必须保留该兼容性测试。
 - Desktop gate 暴露现有 Homebrew `objects`/`vips`/`libraw` deployment target warning；它与 SQLite 链接无关且不阻塞本迁移。
 - 代表性 library 规模的 vector latency、内存、WAL checkpoint 行为和 ANN/sidecar 阈值留到 Phase 6/P2；本 Phase 只证明 exact search 正确性。
+
+### Phase 2–7 执行记录（2026-07-26）
+
+#### Phase 2：config 与唯一 DB runtime
+
+- manifest schema 已提升为 v2；`[database]` 只接受完整、显式的持久化 `path`。旧 host/port/user/name/SSL、数据库 password file、tool bin 和环境 override 已删除，v1 会被明确拒绝。
+- `db.Open` 是唯一生产数据库边界：一个 `database/sql` writer connection，固定 pragmas、静态 sqlite-vec 注册、application id、启动 quick/integrity check、`WithTx`、shutdown optimize 与 WAL truncate checkpoint。`dsn.go` 和 password self-heal 已删除。
+- embedded Lumilio migration 与 River SQLite migration 在同一文件、同一 pool 上按顺序运行。新增 runtime 测试覆盖 fresh migrate、重复 migrate、close/reopen、pragma、catalog identity、持久路径拒绝和 corrupt catalog 拒绝。
+
+#### Phase 3：fresh baseline、sqlc 与 domain types
+
+- 14 组旧 migration 已替换为单一 `000001_sqlite_baseline.up.sql`：52 个应用表、STRICT/foreign key/check/partial index、同步 aggregate trigger、FTS5 trigger 和 sqlite-vec derived index 均在 fresh catalog 创建。旧 migration 文件与旧 generated 聚合文件已删除。
+- `server/sqlc.yaml` 已切换到 SQLite + `database/sql`；451 个原 query 按 SQLite parser 限制拆分但保持 domain/name 语义，UUID、nullable UUID、Unix microseconds、JSON TEXT、collection 和 vector BLOB 通过集中 `dbtypes` 映射。生成命令：`cd server && sqlc generate`。
+- baseline/schema、UUID/time/JSON/vector round-trip、foreign key/unique/partial-index 和 fresh asset insert 均由测试覆盖。真实 ingest transaction test 发现并修复了 `assets.asset_id`、`upload_time`、`updated_at` 从旧 engine defaults 脱落的问题；ID 现由 Go 显式生成，时间由 SQL 显式写入。
+
+#### Phase 4：业务层 SQLite 化
+
+- `server/app`、`server/internal`、handler、service、worker、Agent、cloud、storage 和 benchmark tooling 已移除直接 pgx/pgtype/pgconn/pgvector 使用，统一为 `*db.DB`、`*sql.DB`、`*sql.Tx`、`*repo.Queries`、`google/uuid` 与 `dbtypes`。
+- setup/bootstrap gate 现在只检查应用设置、owner、primary repository 和 secret；queue admin、auth、asset、people、stats、repository scan 等 raw SQL 均已改为 SQLite 语义。
+- `go mod tidy` 删除 direct pgx、pgvector、riverpgxv5、Postgres migrate driver 和 lib/pq。River v0.24 自身的 production `testsignal → riversharedtest` import 仍会把 pgx 作为不可调用的 upstream transitive code 拉入 compiled graph；Phase 10 architecture guard 前必须通过窄的 upstream patch/replacement 或升级消除，不能把它误报为已完成的 runtime guard。
+
+#### Phase 5：River SQLite 与事务性 ingest
+
+- River client、workers、periodic jobs 和 admin handler 使用 `riversqlite` 与 `river.Client[*sql.Tx]`；应用表和 River jobs 共享单 writer transaction。
+- staging ingest 先提交 prepared asset + logical media item，再移动文件，最后用一个短事务更新 target/status 并 `InsertTx` 全部 metadata/thumbnail/transcode jobs。in-place create/update 与全部 core jobs 在一个短事务内完成。
+- prepared status 保存 deterministic inbox target；job retry可识别“staging 已移动、final 已存在”并补完 transaction；两侧文件都不存在会进入可见 failed/retryable 状态，不删除未知文件。
+- `TestAssetMediaAndPipelineCommitOrRollbackTogether` 在真实 fresh catalog 上证明 asset、media item、relation 和多个 River jobs 同时 commit；在一个 job 已插入后制造错误时四者全部 rollback。Phase 1 worker/retry/reopen 测试继续覆盖 River execute/retry。
+
+#### Phase 6：FTS5 与 sqlite-vec
+
+- OCR、location、filename/label/species search 已改为 FTS5（content sync trigger + `bm25`）；CJK bigram tokenizer 继续保持 storage/query 一致。aggregate filter 使用 positional bind、`json_each`、SQLite date/JSON/LIKE 语义。
+- semantic 768D 与 face 512D 权威向量保存在 STRICT ordinary tables，`vec0` 只作为同 transaction trigger 维护的可重建 exact-search structure；video frame vectors与默认 search space在短 transaction 中替换。
+- spike 的 768D/512D insert/top-k/delete 与 production search/service tests 全部通过。代表性真实 library 规模 latency、内存和 ANN threshold 仍是 Hardening，不阻塞 experimental goal。
+
+#### Phase 7：native snapshot、restore 与 runtime generation
+
+- backup 使用 mattn SQLite Online Backup API 创建独立 snapshot，不复制 live WAL 文件。数据库与 paired manifest 都经过 temp-file、fsync、atomic rename；manifest记录 library identity、SHA-256/size、app/config/application/River migration、SQLite/vector version与完整性结果。
+- restore 先独立 read-only 校验 identity、checksum、quick check、foreign key、migration/version compatibility，再写 staged marker。`app.Run` 仅在旧 HTTP/River/DB generation 完全 drain/close 后替换文件并启动新 generation。
+- 原 catalog 保留为 restore point；新 listener、wiring、settings/users health 成功后才完成 marker，启动失败会 rollback 原 catalog。测试覆盖 standalone snapshot、checksum拒绝、staged apply、restore point、rollback/retention和forced scheduler。
+- `go test -tags=sqlite_fts5 ./...` 在上述 Phase 2–7 完成后全量通过。
 
 ## Decision Log
 

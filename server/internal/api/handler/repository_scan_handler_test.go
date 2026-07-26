@@ -15,7 +15,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type createRepositoryManagerStub struct {
@@ -32,7 +31,7 @@ func (s *createRepositoryManagerStub) CreateRepository(_ context.Context, spec s
 	s.createdSpec = spec
 	return &storage.CreateRepositoryResult{
 		Repository: &repo.Repository{
-			RepoID:         pgtype.UUID{Bytes: uuid.MustParse("7e32cc57-bfe0-42b2-943b-d43e0510e0bd"), Valid: true},
+			RepoID:         uuid.MustParse("7e32cc57-bfe0-42b2-943b-d43e0510e0bd"),
 			Name:           spec.Name,
 			Role:           dbtypes.RepoRoleRegular,
 			Status:         dbtypes.RepoStatusActive,

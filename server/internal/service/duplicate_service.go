@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,9 +16,6 @@ import (
 	"server/internal/utils/phash"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
@@ -181,7 +179,7 @@ type AssetDeleter interface {
 
 type duplicateService struct {
 	queries      *repo.Queries
-	pool         *pgxpool.Pool
+	pool         *sql.DB
 	logger       *zap.Logger
 	assetDeleter AssetDeleter
 }
@@ -189,7 +187,7 @@ type duplicateService struct {
 // NewDuplicateService constructs the default DuplicateService implementation.
 func NewDuplicateService(
 	queries *repo.Queries,
-	pool *pgxpool.Pool,
+	pool *sql.DB,
 	logger *zap.Logger,
 	assetDeleter AssetDeleter,
 ) DuplicateService {
@@ -214,7 +212,7 @@ type detectionAsset struct {
 	fileSize   int64
 	takenTime  time.Time
 	uploadTime time.Time
-	rating     int32
+	rating     int64
 	phash      uint64
 	hasPHash   bool
 }
@@ -241,15 +239,16 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 	pgRepoID := uuidToPG(repositoryID)
 
 	// 1. Gather exact-hash candidates, pHash embeddings, and stack membership.
-	exactRows, err := s.queries.GetExactDuplicateCandidates(ctx, pgRepoID)
+	repositoryFilter := optionalUUID(&repositoryID)
+	exactRows, err := s.queries.GetExactDuplicateCandidates(ctx, repositoryFilter)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("load exact candidates: %w", err)
 	}
-	phashRows, err := s.queries.ListPHashEmbeddingsForRepository(ctx, pgRepoID)
+	phashRows, err := s.queries.ListPHashEmbeddingsForRepository(ctx, repositoryFilter)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("load phash embeddings: %w", err)
 	}
-	stackRows, err := s.queries.GetStackMembershipForRepository(ctx, pgRepoID)
+	stackRows, err := s.queries.GetStackMembershipForRepository(ctx, repositoryFilter)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("load stack membership: %w", err)
 	}
@@ -363,11 +362,11 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 
 	// 6. Persist groups in a single transaction so the UI never sees a partial
 	// graph if the detection run fails halfway.
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("begin detection tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 	txQueries := s.queries.WithTx(tx)
 
 	if err := txQueries.DeletePendingDuplicateGroupsByRepository(ctx, pgRepoID); err != nil {
@@ -403,9 +402,9 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 			RepositoryID:             pgRepoID,
 			OwnerID:                  c.members[0].owner,
 			Method:                   method,
-			AssetCount:               int32(len(c.members)),
+			AssetCount:               int64(len(c.members)),
 			TotalSize:                totalSize,
-			RecommendedKeeperAssetID: uuidToPG(recommended),
+			RecommendedKeeperAssetID: uuid.NullUUID{UUID: recommended, Valid: true},
 			DetectionVersion:         DuplicateDetectionVersion,
 		})
 		if err != nil {
@@ -444,7 +443,7 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("commit detection tx: %w", err)
 	}
 
@@ -674,12 +673,12 @@ func (s *duplicateService) GetSummary(ctx context.Context, repositoryID *uuid.UU
 		PendingGroups:     row.PendingGroups,
 		MergedGroups:      row.MergedGroups,
 		DismissedGroups:   row.DismissedGroups,
-		PendingAssets:     row.PendingAssets,
-		RecoverableAssets: row.RecoverableAssets,
-		RecoverableBytes:  row.RecoverableBytes,
+		PendingAssets:     sqliteInt64(row.PendingAssets),
+		RecoverableAssets: sqliteInt64(row.RecoverableAssets),
+		RecoverableBytes:  sqliteInt64(row.RecoverableBytes),
 	}
-	if row.LastDetectedAt.Valid {
-		t := row.LastDetectedAt.Time
+	if detectedAt := sqliteOptionalTime(row.LastDetectedAt); detectedAt != nil {
+		t := *detectedAt
 		summary.LastDetectedAt = &t
 	}
 	return summary, nil
@@ -706,8 +705,8 @@ func (s *duplicateService) ListGroups(ctx context.Context, params ListDuplicateG
 		RepositoryID: pgRepo,
 		OwnerID:      params.OwnerID,
 		Status:       pgStatus,
-		Limit:        int32(limit),
-		Offset:       int32(offset),
+		Limit:        int64(limit),
+		Offset:       int64(offset),
 	})
 	if err != nil {
 		return ListDuplicateGroupsResult{}, err
@@ -725,7 +724,7 @@ func (s *duplicateService) ListGroups(ctx context.Context, params ListDuplicateG
 		return ListDuplicateGroupsResult{Total: total}, nil
 	}
 
-	ids := make([]pgtype.UUID, 0, len(groups))
+	ids := make([]uuid.UUID, 0, len(groups))
 	for _, g := range groups {
 		ids = append(ids, g.GroupID)
 	}
@@ -754,7 +753,7 @@ func (s *duplicateService) GetGroup(ctx context.Context, groupID uuid.UUID, requ
 	pgID := uuidToPG(groupID)
 	group, err := s.queries.GetDuplicateGroupByID(ctx, pgID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return DuplicateGroupDetail{}, ErrDuplicateGroupNotFound
 		}
 		return DuplicateGroupDetail{}, err
@@ -785,7 +784,7 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 	pgGroupID := uuidToPG(params.GroupID)
 	group, err := s.queries.GetDuplicateGroupByID(ctx, pgGroupID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return MergeGroupResult{}, ErrDuplicateGroupNotFound
 		}
 		return MergeGroupResult{}, err
@@ -842,11 +841,11 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 
 	// Stage 1: metadata merge in a single transaction so partial failures leave
 	// no half-merged keeper.
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return MergeGroupResult{}, fmt.Errorf("begin merge tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 	txQueries := s.queries.WithTx(tx)
 
 	keeperAsset, err := txQueries.GetAssetByID(ctx, uuidToPG(params.KeeperAssetID))
@@ -913,12 +912,12 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 
 	if err := txQueries.MarkDuplicateGroupMerged(ctx, repo.MarkDuplicateGroupMergedParams{
 		GroupID:       pgGroupID,
-		KeeperAssetID: uuidToPG(params.KeeperAssetID),
+		KeeperAssetID: uuid.NullUUID{UUID: params.KeeperAssetID, Valid: true},
 	}); err != nil {
 		return MergeGroupResult{}, fmt.Errorf("mark group merged: %w", err)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return MergeGroupResult{}, fmt.Errorf("commit merge tx: %w", err)
 	}
 
@@ -957,7 +956,7 @@ func (s *duplicateService) DismissGroup(ctx context.Context, groupID uuid.UUID, 
 	pgID := uuidToPG(groupID)
 	group, err := s.queries.GetDuplicateGroupByID(ctx, pgID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ErrDuplicateGroupNotFound
 		}
 		return err
@@ -991,9 +990,9 @@ func computeKeeperPreferences(
 	keeper repo.Asset,
 	duplicates []uuid.UUID,
 	policy MergeMetadataPolicy,
-) (*int32, *bool, *string, error) {
+) (*int64, *bool, *string, error) {
 	var (
-		rating      *int32
+		rating      *int64
 		liked       *bool
 		description *string
 	)
@@ -1002,8 +1001,8 @@ func computeKeeperPreferences(
 		v := *keeper.Rating
 		rating = &v
 	}
-	if policy.Liked && keeper.Liked != nil {
-		v := *keeper.Liked
+	if policy.Liked {
+		v := keeper.Liked
 		liked = &v
 	}
 
@@ -1018,7 +1017,7 @@ func computeKeeperPreferences(
 				rating = &v
 			}
 		}
-		if policy.Liked && dup.Liked != nil && *dup.Liked {
+		if policy.Liked && dup.Liked {
 			t := true
 			liked = &t
 		}
@@ -1095,29 +1094,50 @@ func (u *unionFind) union(a, b uuid.UUID) {
 	}
 }
 
-func uuidToPG(id uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: id, Valid: true}
+func uuidToPG(id uuid.UUID) uuid.UUID {
+	return id
 }
 
-func pgToUUID(id pgtype.UUID) uuid.UUID {
-	if !id.Valid {
-		return uuid.Nil
-	}
-	return uuid.UUID(id.Bytes)
+func pgToUUID(id uuid.UUID) uuid.UUID {
+	return id
 }
 
-func optionalUUID(id *uuid.UUID) pgtype.UUID {
+func optionalUUID(id *uuid.UUID) uuid.NullUUID {
 	if id == nil {
-		return pgtype.UUID{Valid: false}
+		return uuid.NullUUID{}
 	}
-	return uuidToPG(*id)
+	return uuid.NullUUID{UUID: *id, Valid: true}
 }
 
-func timestamptzOrZero(t pgtype.Timestamptz) time.Time {
+func timestamptzOrZero(t dbtypes.Timestamp) time.Time {
 	if !t.Valid {
 		return time.Time{}
 	}
 	return t.Time
+}
+
+func sqliteInt64(value any) int64 {
+	switch typed := value.(type) {
+	case int64:
+		return typed
+	case int:
+		return int64(typed)
+	case int32:
+		return int64(typed)
+	case float64:
+		return int64(typed)
+	default:
+		return 0
+	}
+}
+
+func sqliteOptionalTime(value any) *time.Time {
+	var timestamp dbtypes.Timestamp
+	if err := timestamp.Scan(value); err != nil || !timestamp.Valid {
+		return nil
+	}
+	copied := timestamp.Time
+	return &copied
 }
 
 func derefString(p *string) string {

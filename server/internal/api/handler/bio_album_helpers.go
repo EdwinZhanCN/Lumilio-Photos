@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"server/internal/db/dbtypes"
@@ -9,7 +10,6 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/service"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 )
 
@@ -32,7 +32,7 @@ func bioClipRuntimeAvailable(ctx context.Context, settingsService service.Settin
 	return service.IsIndexingTaskRuntimeAvailable(lumenService, service.AssetIndexingTaskBioCLIP), nil
 }
 
-func enqueueBioClipAsset(ctx context.Context, queueClient *river.Client[pgx.Tx], asset repo.Asset) error {
+func enqueueBioClipAsset(ctx context.Context, queueClient *river.Client[*sql.Tx], asset repo.Asset) error {
 	if queueClient == nil {
 		return fmt.Errorf("queue client is not configured")
 	}

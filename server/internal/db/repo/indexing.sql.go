@@ -7,8 +7,6 @@ package repo
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countBioAlbumPhotoAssets = `-- name: CountBioAlbumPhotoAssets :one
@@ -19,11 +17,11 @@ JOIN assets a ON a.asset_id = aa.asset_id
 WHERE al.album_type = 'bio'
   AND a.type = 'PHOTO'
   AND a.is_deleted = false
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountBioAlbumPhotoAssets(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countBioAlbumPhotoAssets, repositoryID)
+func (q *Queries) CountBioAlbumPhotoAssets(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBioAlbumPhotoAssets, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -42,11 +40,11 @@ WHERE al.album_type = 'bio'
     FROM species_predictions sp
     WHERE sp.asset_id = a.asset_id
   )
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countBioAlbumPhotoAssetsWithSpeciesPredictions, repositoryID)
+func (q *Queries) CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBioAlbumPhotoAssetsWithSpeciesPredictions, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -57,11 +55,11 @@ SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countPhotoAssetsForIndexing, repositoryID)
+func (q *Queries) CountPhotoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPhotoAssetsForIndexing, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -77,11 +75,11 @@ WHERE a.type = 'PHOTO'
     FROM face_results f
     WHERE f.asset_id = a.asset_id
   )
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countPhotoAssetsWithFaceResults, repositoryID)
+func (q *Queries) CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPhotoAssetsWithFaceResults, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -97,11 +95,11 @@ WHERE a.type = 'PHOTO'
     FROM ocr_results o
     WHERE o.asset_id = a.asset_id
   )
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countPhotoAssetsWithOCRResults, repositoryID)
+func (q *Queries) CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPhotoAssetsWithOCRResults, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -118,11 +116,11 @@ WHERE a.type = 'PHOTO'
     WHERE se.asset_id = a.asset_id
       AND se.frame_ts_ms IS NULL
   )
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountPhotoAssetsWithSemanticEmbedding(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countPhotoAssetsWithSemanticEmbedding, repositoryID)
+func (q *Queries) CountPhotoAssetsWithSemanticEmbedding(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPhotoAssetsWithSemanticEmbedding, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -133,11 +131,11 @@ SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'VIDEO'
   AND a.is_deleted = false
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountVideoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countVideoAssetsForIndexing, repositoryID)
+func (q *Queries) CountVideoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countVideoAssetsForIndexing, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -154,28 +152,28 @@ WHERE a.type = 'VIDEO'
     WHERE se.asset_id = a.asset_id
       AND se.frame_ts_ms IS NOT NULL
   )
-  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND (?1 IS NULL OR a.repository_id = ?1)
 `
 
-func (q *Queries) CountVideoAssetsWithSemanticFrames(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countVideoAssetsWithSemanticFrames, repositoryID)
+func (q *Queries) CountVideoAssetsWithSemanticFrames(ctx context.Context, repositoryID interface{}) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countVideoAssetsWithSemanticFrames, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const listPhotoAssetsForIndexingBatch = `-- name: ListPhotoAssetsForIndexingBatch :many
-WITH page_ids AS MATERIALIZED (
+WITH page_ids AS (
   SELECT
     a.asset_id,
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
     AND a.is_deleted = false
-    AND ($1::uuid IS NULL OR a.repository_id = $1)
+    AND (?1 IS NULL OR a.repository_id = ?1)
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT $3
-  OFFSET $2
+  LIMIT ?3
+  OFFSET ?2
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -184,13 +182,13 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type ListPhotoAssetsForIndexingBatchParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listPhotoAssetsForIndexingBatch, arg.RepositoryID, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listPhotoAssetsForIndexingBatch, arg.RepositoryID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -233,6 +231,9 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -240,7 +241,7 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 }
 
 const listPhotoAssetsMissingFaceResults = `-- name: ListPhotoAssetsMissingFaceResults :many
-WITH page_ids AS MATERIALIZED (
+WITH page_ids AS (
   SELECT
     a.asset_id,
     COALESCE(a.taken_time, a.upload_time) AS sort_time
@@ -252,10 +253,10 @@ WITH page_ids AS MATERIALIZED (
       FROM face_results f
       WHERE f.asset_id = a.asset_id
     )
-    AND ($1::uuid IS NULL OR a.repository_id = $1)
+    AND (?1 IS NULL OR a.repository_id = ?1)
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT $3
-  OFFSET $2
+  LIMIT ?3
+  OFFSET ?2
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -264,13 +265,13 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type ListPhotoAssetsMissingFaceResultsParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listPhotoAssetsMissingFaceResults, arg.RepositoryID, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listPhotoAssetsMissingFaceResults, arg.RepositoryID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -313,6 +314,9 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -320,7 +324,7 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 }
 
 const listPhotoAssetsMissingOCRResults = `-- name: ListPhotoAssetsMissingOCRResults :many
-WITH page_ids AS MATERIALIZED (
+WITH page_ids AS (
   SELECT
     a.asset_id,
     COALESCE(a.taken_time, a.upload_time) AS sort_time
@@ -332,10 +336,10 @@ WITH page_ids AS MATERIALIZED (
       FROM ocr_results o
       WHERE o.asset_id = a.asset_id
     )
-    AND ($1::uuid IS NULL OR a.repository_id = $1)
+    AND (?1 IS NULL OR a.repository_id = ?1)
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT $3
-  OFFSET $2
+  LIMIT ?3
+  OFFSET ?2
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -344,13 +348,13 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type ListPhotoAssetsMissingOCRResultsParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listPhotoAssetsMissingOCRResults, arg.RepositoryID, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listPhotoAssetsMissingOCRResults, arg.RepositoryID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -393,6 +397,9 @@ func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg List
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -400,7 +407,7 @@ func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg List
 }
 
 const listPhotoAssetsMissingSemanticEmbedding = `-- name: ListPhotoAssetsMissingSemanticEmbedding :many
-WITH page_ids AS MATERIALIZED (
+WITH page_ids AS (
   SELECT
     a.asset_id,
     COALESCE(a.taken_time, a.upload_time) AS sort_time
@@ -413,10 +420,10 @@ WITH page_ids AS MATERIALIZED (
       WHERE se.asset_id = a.asset_id
         AND se.frame_ts_ms IS NULL
     )
-    AND ($1::uuid IS NULL OR a.repository_id = $1)
+    AND (?1 IS NULL OR a.repository_id = ?1)
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT $3
-  OFFSET $2
+  LIMIT ?3
+  OFFSET ?2
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -425,13 +432,13 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type ListPhotoAssetsMissingSemanticEmbeddingParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, arg ListPhotoAssetsMissingSemanticEmbeddingParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listPhotoAssetsMissingSemanticEmbedding, arg.RepositoryID, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listPhotoAssetsMissingSemanticEmbedding, arg.RepositoryID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -473,6 +480,9 @@ func (q *Queries) ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, a
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -481,17 +491,17 @@ func (q *Queries) ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, a
 }
 
 const listVideoAssetsForIndexingBatch = `-- name: ListVideoAssetsForIndexingBatch :many
-WITH page_ids AS MATERIALIZED (
+WITH page_ids AS (
   SELECT
     a.asset_id,
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'VIDEO'
     AND a.is_deleted = false
-    AND ($1::uuid IS NULL OR a.repository_id = $1)
+    AND (?1 IS NULL OR a.repository_id = ?1)
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT $3
-  OFFSET $2
+  LIMIT ?3
+  OFFSET ?2
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -500,13 +510,13 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type ListVideoAssetsForIndexingBatchParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListVideoAssetsForIndexingBatchParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listVideoAssetsForIndexingBatch, arg.RepositoryID, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listVideoAssetsForIndexingBatch, arg.RepositoryID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -549,6 +559,9 @@ func (q *Queries) ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListV
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -556,7 +569,7 @@ func (q *Queries) ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListV
 }
 
 const listVideoAssetsMissingSemanticFrames = `-- name: ListVideoAssetsMissingSemanticFrames :many
-WITH page_ids AS MATERIALIZED (
+WITH page_ids AS (
   SELECT
     a.asset_id,
     COALESCE(a.taken_time, a.upload_time) AS sort_time
@@ -569,10 +582,10 @@ WITH page_ids AS MATERIALIZED (
       WHERE se.asset_id = a.asset_id
         AND se.frame_ts_ms IS NOT NULL
     )
-    AND ($1::uuid IS NULL OR a.repository_id = $1)
+    AND (?1 IS NULL OR a.repository_id = ?1)
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT $3
-  OFFSET $2
+  LIMIT ?3
+  OFFSET ?2
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
@@ -581,13 +594,13 @@ ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type ListVideoAssetsMissingSemanticFramesParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Offset       int32       `db:"offset" json:"offset"`
-	Limit        int32       `db:"limit" json:"limit"`
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	Offset       int64       `db:"offset" json:"offset"`
+	Limit        int64       `db:"limit" json:"limit"`
 }
 
 func (q *Queries) ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg ListVideoAssetsMissingSemanticFramesParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listVideoAssetsMissingSemanticFrames, arg.RepositoryID, arg.Offset, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listVideoAssetsMissingSemanticFrames, arg.RepositoryID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -629,6 +642,9 @@ func (q *Queries) ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg 
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

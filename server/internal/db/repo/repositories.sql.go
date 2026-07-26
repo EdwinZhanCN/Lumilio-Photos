@@ -7,8 +7,9 @@ package repo
 
 import (
 	"context"
+	"strings"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
 	"server/internal/storage/repocfg"
 )
@@ -19,7 +20,7 @@ WHERE role = 'primary'
 `
 
 func (q *Queries) CountPrimaryRepositories(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countPrimaryRepositories)
+	row := q.db.QueryRowContext(ctx, countPrimaryRepositories)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -30,7 +31,7 @@ SELECT COUNT(*) FROM repositories
 `
 
 func (q *Queries) CountRepositories(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countRepositories)
+	row := q.db.QueryRowContext(ctx, countRepositories)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -38,11 +39,11 @@ func (q *Queries) CountRepositories(ctx context.Context) (int64, error) {
 
 const countRepositoriesByStatus = `-- name: CountRepositoriesByStatus :one
 SELECT COUNT(*) FROM repositories
-WHERE status = $1
+WHERE status = ?1
 `
 
 func (q *Queries) CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error) {
-	row := q.db.QueryRow(ctx, countRepositoriesByStatus, status)
+	row := q.db.QueryRowContext(ctx, countRepositoriesByStatus, status)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -61,25 +62,25 @@ INSERT INTO repositories (
     updated_at,
     root_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
 ) RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type CreateRepositoryParams struct {
-	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	RepoID         uuid.UUID                `db:"repo_id" json:"repo_id"`
 	Name           string                   `db:"name" json:"name"`
 	Path           string                   `db:"path" json:"path"`
 	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
 	Role           dbtypes.RepoRole         `db:"role" json:"role"`
 	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
 	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
-	CreatedAt      pgtype.Timestamptz       `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	RootID         pgtype.UUID              `db:"root_id" json:"root_id"`
+	CreatedAt      dbtypes.Timestamp        `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
+	RootID         uuid.NullUUID            `db:"root_id" json:"root_id"`
 }
 
 func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
-	row := q.db.QueryRow(ctx, createRepository,
+	row := q.db.QueryRowContext(ctx, createRepository,
 		arg.RepoID,
 		arg.Name,
 		arg.Path,
@@ -110,35 +111,45 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 
 const deleteRepositories = `-- name: DeleteRepositories :exec
 DELETE FROM repositories
-WHERE repo_id = ANY($1::uuid[])
+WHERE repo_id IN (/*SLICE:repo_ids*/?)
 `
 
-func (q *Queries) DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteRepositories, dollar_1)
+func (q *Queries) DeleteRepositories(ctx context.Context, repoIds []uuid.UUID) error {
+	query := deleteRepositories
+	var queryParams []interface{}
+	if len(repoIds) > 0 {
+		for _, v := range repoIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:repo_ids*/?", strings.Repeat(",?", len(repoIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:repo_ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
 	return err
 }
 
 const deleteRepository = `-- name: DeleteRepository :exec
 DELETE FROM repositories
-WHERE repo_id = $1
+WHERE repo_id = ?1
 `
 
-func (q *Queries) DeleteRepository(ctx context.Context, repoID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteRepository, repoID)
+func (q *Queries) DeleteRepository(ctx context.Context, repoID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteRepository, repoID)
 	return err
 }
 
 const getHostOwnerID = `-- name: GetHostOwnerID :one
-SELECT candidate.owner_id::integer AS host_owner_id
+SELECT candidate.owner_id AS host_owner_id
 FROM (
-    SELECT default_owner_id AS owner_id, 0 AS priority, created_at, repo_id::text AS tie_breaker
+    SELECT default_owner_id AS owner_id, 0 AS priority, created_at, repo_id AS tie_breaker
     FROM repositories
     WHERE role = 'primary'
       AND default_owner_id IS NOT NULL
 
     UNION ALL
 
-    SELECT user_id AS owner_id, 1 AS priority, created_at, user_id::text AS tie_breaker
+    SELECT user_id AS owner_id, 1 AS priority, created_at, user_id AS tie_breaker
     FROM users
 ) candidate
 ORDER BY candidate.priority ASC, candidate.created_at ASC, candidate.tie_breaker ASC
@@ -149,7 +160,7 @@ LIMIT 1
 // primary exists, the first account is the initial administrator and therefore
 // the Host Owner.
 func (q *Queries) GetHostOwnerID(ctx context.Context) (int32, error) {
-	row := q.db.QueryRow(ctx, getHostOwnerID)
+	row := q.db.QueryRowContext(ctx, getHostOwnerID)
 	var host_owner_id int32
 	err := row.Scan(&host_owner_id)
 	return host_owner_id, err
@@ -162,7 +173,7 @@ WHERE role = 'primary'
 `
 
 func (q *Queries) GetPrimaryRepository(ctx context.Context) (Repository, error) {
-	row := q.db.QueryRow(ctx, getPrimaryRepository)
+	row := q.db.QueryRowContext(ctx, getPrimaryRepository)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,
@@ -182,11 +193,11 @@ func (q *Queries) GetPrimaryRepository(ctx context.Context) (Repository, error) 
 
 const getRepository = `-- name: GetRepository :one
 SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
-WHERE repo_id = $1
+WHERE repo_id = ?1
 `
 
-func (q *Queries) GetRepository(ctx context.Context, repoID pgtype.UUID) (Repository, error) {
-	row := q.db.QueryRow(ctx, getRepository, repoID)
+func (q *Queries) GetRepository(ctx context.Context, repoID uuid.UUID) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, getRepository, repoID)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,
@@ -206,11 +217,11 @@ func (q *Queries) GetRepository(ctx context.Context, repoID pgtype.UUID) (Reposi
 
 const getRepositoryByPath = `-- name: GetRepositoryByPath :one
 SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
-WHERE path = $1
+WHERE path = ?1
 `
 
 func (q *Queries) GetRepositoryByPath(ctx context.Context, path string) (Repository, error) {
-	row := q.db.QueryRow(ctx, getRepositoryByPath, path)
+	row := q.db.QueryRowContext(ctx, getRepositoryByPath, path)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,
@@ -235,7 +246,7 @@ ORDER BY created_at DESC
 `
 
 func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, error) {
-	rows, err := q.db.Query(ctx, listActiveRepositories)
+	rows, err := q.db.QueryContext(ctx, listActiveRepositories)
 	if err != nil {
 		return nil, err
 	}
@@ -259,6 +270,9 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -272,7 +286,7 @@ ORDER BY created_at DESC
 `
 
 func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
-	rows, err := q.db.Query(ctx, listRepositories)
+	rows, err := q.db.QueryContext(ctx, listRepositories)
 	if err != nil {
 		return nil, err
 	}
@@ -297,6 +311,9 @@ func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -306,54 +323,54 @@ func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
 const repositoryExists = `-- name: RepositoryExists :one
 SELECT EXISTS(
     SELECT 1 FROM repositories
-    WHERE path = $1
+    WHERE path = ?1
 )
 `
 
-func (q *Queries) RepositoryExists(ctx context.Context, path string) (bool, error) {
-	row := q.db.QueryRow(ctx, repositoryExists, path)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
+func (q *Queries) RepositoryExists(ctx context.Context, path string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, repositoryExists, path)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const setUnownedRepositoryHostOwner = `-- name: SetUnownedRepositoryHostOwner :exec
 UPDATE repositories
 SET
-    default_owner_id = $1,
-    updated_at = NOW()
+    default_owner_id = ?1,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE default_owner_id IS NULL
 `
 
 func (q *Queries) SetUnownedRepositoryHostOwner(ctx context.Context, defaultOwnerID *int32) error {
-	_, err := q.db.Exec(ctx, setUnownedRepositoryHostOwner, defaultOwnerID)
+	_, err := q.db.ExecContext(ctx, setUnownedRepositoryHostOwner, defaultOwnerID)
 	return err
 }
 
 const updateRepository = `-- name: UpdateRepository :one
 UPDATE repositories
 SET
-    name = $2,
-    config = $3,
-    default_owner_id = $4,
-    updated_at = $5
-WHERE repo_id = $1
+    name = ?2,
+    config = ?3,
+    default_owner_id = ?4,
+    updated_at = ?5
+WHERE repo_id = ?1
 RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryParams struct {
-	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	RepoID         uuid.UUID                `db:"repo_id" json:"repo_id"`
 	Name           string                   `db:"name" json:"name"`
 	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
 	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
-	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	UpdatedAt      dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
 }
 
 // Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
 // Letting a settings edit write status resurrects a repository that reconcile
 // has marked offline.
 func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error) {
-	row := q.db.QueryRow(ctx, updateRepository,
+	row := q.db.QueryRowContext(ctx, updateRepository,
 		arg.RepoID,
 		arg.Name,
 		arg.Config,
@@ -380,20 +397,20 @@ func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryPara
 const updateRepositoryLastSync = `-- name: UpdateRepositoryLastSync :one
 UPDATE repositories
 SET
-    last_sync = $2,
-    updated_at = $3
-WHERE repo_id = $1
+    last_sync = ?2,
+    updated_at = ?3
+WHERE repo_id = ?1
 RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryLastSyncParams struct {
-	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
-	LastSync  pgtype.Timestamptz `db:"last_sync" json:"last_sync"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RepoID    uuid.UUID         `db:"repo_id" json:"repo_id"`
+	LastSync  dbtypes.Timestamp `db:"last_sync" json:"last_sync"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error) {
-	row := q.db.QueryRow(ctx, updateRepositoryLastSync, arg.RepoID, arg.LastSync, arg.UpdatedAt)
+	row := q.db.QueryRowContext(ctx, updateRepositoryLastSync, arg.RepoID, arg.LastSync, arg.UpdatedAt)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,
@@ -414,24 +431,24 @@ func (q *Queries) UpdateRepositoryLastSync(ctx context.Context, arg UpdateReposi
 const updateRepositoryPath = `-- name: UpdateRepositoryPath :one
 UPDATE repositories
 SET
-    path = $2,
-    root_id = $3,
-    status = $4,
-    updated_at = $5
-WHERE repo_id = $1
+    path = ?2,
+    root_id = ?3,
+    status = ?4,
+    updated_at = ?5
+WHERE repo_id = ?1
 RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryPathParams struct {
-	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
+	RepoID    uuid.UUID          `db:"repo_id" json:"repo_id"`
 	Path      string             `db:"path" json:"path"`
-	RootID    pgtype.UUID        `db:"root_id" json:"root_id"`
+	RootID    uuid.NullUUID      `db:"root_id" json:"root_id"`
 	Status    dbtypes.RepoStatus `db:"status" json:"status"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedAt dbtypes.Timestamp  `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error) {
-	row := q.db.QueryRow(ctx, updateRepositoryPath,
+	row := q.db.QueryRowContext(ctx, updateRepositoryPath,
 		arg.RepoID,
 		arg.Path,
 		arg.RootID,
@@ -458,20 +475,20 @@ func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepository
 const updateRepositoryStatus = `-- name: UpdateRepositoryStatus :one
 UPDATE repositories
 SET
-    status = $2,
-    updated_at = $3
-WHERE repo_id = $1
+    status = ?2,
+    updated_at = ?3
+WHERE repo_id = ?1
 RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryStatusParams struct {
-	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
+	RepoID    uuid.UUID          `db:"repo_id" json:"repo_id"`
 	Status    dbtypes.RepoStatus `db:"status" json:"status"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedAt dbtypes.Timestamp  `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error) {
-	row := q.db.QueryRow(ctx, updateRepositoryStatus, arg.RepoID, arg.Status, arg.UpdatedAt)
+	row := q.db.QueryRowContext(ctx, updateRepositoryStatus, arg.RepoID, arg.Status, arg.UpdatedAt)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,

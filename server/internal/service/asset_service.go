@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,10 +20,6 @@ import (
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pgvector/pgvector-go"
 	"go.uber.org/zap"
 )
 
@@ -83,7 +80,7 @@ type AssetService interface {
 	// SearchTags returns tag definitions for autocomplete; empty query lists all.
 	SearchTags(ctx context.Context, query string, limit int) ([]repo.Tag, error)
 
-	CreateThumbnail(ctx context.Context, assetID pgtype.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
+	CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
 	SaveAssetIndex(ctx context.Context, taskID string, hash string) error
 	CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error)
@@ -257,7 +254,7 @@ type PhotoMapPoint struct {
 
 type assetService struct {
 	queries                *repo.Queries
-	pool                   *pgxpool.Pool
+	pool                   *sql.DB
 	lumen                  LumenService
 	embeddingService       EmbeddingService
 	aggregateSearch        aggregatesearch.Service
@@ -270,7 +267,7 @@ type assetService struct {
 	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
 }
 
-func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
+func NewAssetService(q *repo.Queries, pool *sql.DB, l LumenService, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
 	logger := zap.NewNop()
 	if len(loggers) > 0 && loggers[0] != nil {
 		logger = loggers[0]
@@ -319,6 +316,9 @@ func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, e Embe
 func (s *assetService) CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error) {
 	// Note: taken_time will be set to NULL initially and updated later when EXIF is processed
 	// This is because we need to extract the time from the actual file content, not just the parameters
+	if params.AssetID == uuid.Nil {
+		params.AssetID = uuid.New()
+	}
 	asset, err := s.queries.CreateAsset(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create asset: %w", err)
@@ -329,12 +329,7 @@ func (s *assetService) CreateAssetRecord(ctx context.Context, params repo.Create
 
 // GetAsset retrieves an asset by its ID
 func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	dbAsset, err := s.queries.GetAssetByID(ctx, pgUUID)
+	dbAsset, err := s.queries.GetAssetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset: %w", err)
 	}
@@ -344,12 +339,7 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 
 // GetAssetAny retrieves an asset by ID regardless of Trash state.
 func (s *assetService) GetAssetAny(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	dbAsset, err := s.queries.GetAssetByIDAny(ctx, pgUUID)
+	dbAsset, err := s.queries.GetAssetByIDAny(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset: %w", err)
 	}
@@ -358,17 +348,12 @@ func (s *assetService) GetAssetAny(ctx context.Context, id uuid.UUID) (*repo.Ass
 }
 
 func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.RawMessage, error) {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	exifRaw, err := s.queries.GetAssetExifRaw(ctx, pgUUID)
+	exifRaw, err := s.queries.GetAssetExifRaw(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset exif: %w", err)
 	}
 
-	return exifRaw, nil
+	return json.RawMessage(exifRaw), nil
 }
 
 // GetAssetRelations returns a single asset together with its aggregated
@@ -377,12 +362,7 @@ func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.
 // dto.AssetDetailDTO, honoring the include_* query flags. Trash state is not
 // filtered here; handler auth decides access.
 func (s *assetService) GetAssetRelations(ctx context.Context, id uuid.UUID) (repo.GetAssetWithRelationsRow, error) {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return repo.GetAssetWithRelationsRow{}, fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	row, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
+	row, err := s.queries.GetAssetWithRelations(ctx, id)
 	if err != nil {
 		return repo.GetAssetWithRelationsRow{}, fmt.Errorf("failed to get asset with relations: %w", err)
 	}
@@ -393,8 +373,8 @@ func (s *assetService) GetAssetRelations(ctx context.Context, id uuid.UUID) (rep
 func (s *assetService) GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByTypeParams{
 		Type:   assetType,
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		Limit:  int64(limit),
+		Offset: int64(offset),
 	}
 
 	return s.queries.GetAssetsByType(ctx, params)
@@ -404,8 +384,8 @@ func (s *assetService) GetAssetsByType(ctx context.Context, assetType string, li
 func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByOwnerParams{
 		OwnerID: int32PtrFromIntPtr(&ownerID),
-		Limit:   int32(limit),
-		Offset:  int32(offset),
+		Limit:   int64(limit),
+		Offset:  int64(offset),
 	}
 
 	return s.queries.GetAssetsByOwner(ctx, params)
@@ -415,9 +395,8 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByOwnerSortedParams{
 		OwnerID: int32PtrFromIntPtr(&ownerID),
-		Column2: sortOrder,
-		Limit:   int32(limit),
-		Offset:  int32(offset),
+		Limit:   int64(limit),
+		Offset:  int64(offset),
 	}
 
 	return s.queries.GetAssetsByOwnerSorted(ctx, params)
@@ -426,10 +405,9 @@ func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, 
 // GetAssetsByTypesSorted retrieves assets by multiple types sorted by taken_time
 func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByTypesSortedParams{
-		Types:     assetTypes,
-		SortOrder: sortOrder,
-		Limit:     int32(limit),
-		Offset:    int32(offset),
+		Types:  assetTypes,
+		Limit:  int64(limit),
+		Offset: int64(offset),
 	}
 
 	return s.queries.GetAssetsByTypesSorted(ctx, params)
@@ -438,11 +416,10 @@ func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []
 // GetAssetsByOwnerAndTypes retrieves assets by owner and multiple types sorted by taken_time
 func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByOwnerAndTypesSortedParams{
-		OwnerID:   int32PtrFromIntPtr(&ownerID),
-		Types:     assetTypes,
-		SortOrder: sortOrder,
-		Limit:     int32(limit),
-		Offset:    int32(offset),
+		OwnerID: int32PtrFromIntPtr(&ownerID),
+		Types:   assetTypes,
+		Limit:   int64(limit),
+		Offset:  int64(offset),
 	}
 
 	return s.queries.GetAssetsByOwnerAndTypesSorted(ctx, params)
@@ -459,13 +436,8 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 }
 
 func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, exifRaw json.RawMessage) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	// Get the asset to determine its type for taken_time extraction
-	asset, err := s.queries.GetAssetByID(ctx, pgUUID)
+	asset, err := s.queries.GetAssetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get asset for metadata update: %w", err)
 	}
@@ -499,20 +471,22 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 	gpsGeohash5, gpsGeohash7 = geohashesForGPS(gpsLatitude, gpsLongitude)
 
 	// Use the new query that updates both metadata and taken_time
-	var takenTimeParam pgtype.Timestamptz
+	var takenTimeParam any
 	if takenTime != nil {
-		takenTimeParam = pgtype.Timestamptz{
-			Time:  *takenTime,
-			Valid: true,
-		}
+		takenTimeParam = dbtypes.NewTimestamp(*takenTime)
+	}
+	var captureOffset *int64
+	if captureOffsetMinutes != nil {
+		value := int64(*captureOffsetMinutes)
+		captureOffset = &value
 	}
 
 	params := repo.UpdateAssetMetadataWithTakenTimeParams{
-		AssetID:              pgUUID,
+		AssetID:              id,
 		SpecificMetadata:     metadata,
-		ExifRaw:              []byte(exifRaw),
+		ExifRaw:              dbtypes.JSON(exifRaw),
 		TakenTime:            takenTimeParam,
-		CaptureOffsetMinutes: captureOffsetMinutes,
+		CaptureOffsetMinutes: captureOffset,
 		GpsLatitude:          gpsLatitude,
 		GpsLongitude:         gpsLongitude,
 		GpsGeohash5:          gpsGeohash5,
@@ -551,33 +525,18 @@ func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
 
 // DeleteAsset moves an asset into the app Trash via a database soft-delete.
 func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	return s.queries.DeleteAsset(ctx, pgUUID)
+	return s.queries.DeleteAsset(ctx, id)
 }
 
 // RestoreAsset restores an asset from the app Trash.
 func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	return s.queries.RestoreAsset(ctx, pgUUID)
+	return s.queries.RestoreAsset(ctx, id)
 }
 
 // AddAssetToAlbum adds an asset to an album
 func (s *assetService) AddAssetToAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	params := repo.AddAssetToAlbumParams{
-		AssetID: pgUUID,
+		AssetID: assetID,
 		AlbumID: int32(albumID),
 	}
 
@@ -586,13 +545,8 @@ func (s *assetService) AddAssetToAlbum(ctx context.Context, assetID uuid.UUID, a
 
 // RemoveAssetFromAlbum removes an asset from an album
 func (s *assetService) RemoveAssetFromAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	params := repo.RemoveAssetFromAlbumParams{
-		AssetID: pgUUID,
+		AssetID: assetID,
 		AlbumID: int32(albumID),
 	}
 
@@ -601,20 +555,10 @@ func (s *assetService) RemoveAssetFromAlbum(ctx context.Context, assetID uuid.UU
 
 // AddTagToAsset adds a tag to an asset
 func (s *assetService) AddTagToAsset(ctx context.Context, assetID uuid.UUID, tagID int, confidence float32, source string) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	confidenceNumeric := pgtype.Numeric{}
-	if err := confidenceNumeric.Scan(fmt.Sprintf("%.3f", confidence)); err != nil {
-		return fmt.Errorf("failed to convert confidence: %w", err)
-	}
-
 	params := repo.AddTagToAssetParams{
-		AssetID:    pgUUID,
+		AssetID:    assetID,
 		TagID:      int32(tagID),
-		Confidence: confidenceNumeric,
+		Confidence: float64(confidence),
 		Source:     source,
 	}
 
@@ -623,13 +567,8 @@ func (s *assetService) AddTagToAsset(ctx context.Context, assetID uuid.UUID, tag
 
 // RemoveTagFromAsset removes a tag from an asset
 func (s *assetService) RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID, tagID int) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	params := repo.RemoveTagFromAssetParams{
-		AssetID: pgUUID,
+		AssetID: assetID,
 		TagID:   int32(tagID),
 	}
 
@@ -658,18 +597,13 @@ func (s *assetService) AddManualTagToAsset(ctx context.Context, assetID uuid.UUI
 
 // GetAssetTags returns the raw JSON tag aggregate for an asset.
 func (s *assetService) GetAssetTags(ctx context.Context, assetID uuid.UUID) (json.RawMessage, error) {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
-	}
-
-	row, err := s.queries.GetAssetWithTags(ctx, pgUUID)
+	row, err := s.queries.GetAssetWithTags(ctx, assetID)
 	if err != nil {
 		return nil, err
 	}
 
-	// pgx decodes the json aggregate column into interface{}; normalize to raw
-	// JSON bytes for the caller to unmarshal.
+	// The SQLite driver exposes aggregate expressions dynamically; normalize
+	// the result to raw JSON bytes for the caller to unmarshal.
 	switch v := row.Tags.(type) {
 	case nil:
 		return json.RawMessage("[]"), nil
@@ -698,7 +632,7 @@ func (s *assetService) SearchTags(ctx context.Context, query string, limit int) 
 	}
 
 	return s.queries.SearchTagsByName(ctx, repo.SearchTagsByNameParams{
-		Limit: int32(limit),
+		Limit: int64(limit),
 		Query: q,
 	})
 }
@@ -759,7 +693,7 @@ func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, f
 // ================================
 
 // CreateThumbnail creates or updates a thumbnail record for an asset
-func (s *assetService) CreateThumbnail(ctx context.Context, assetID pgtype.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
+func (s *assetService) CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
 	params := repo.CreateThumbnailParams{
 		AssetID:     assetID,
 		Size:        size,
@@ -787,13 +721,8 @@ func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*
 
 // GetThumbnailByAssetIDAndSize retrieves a thumbnail by asset ID and size
 func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error) {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	params := repo.GetThumbnailByAssetAndSizeParams{
-		AssetID: pgUUID,
+		AssetID: assetID,
 		Size:    size,
 	}
 
@@ -861,8 +790,7 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 		return fmt.Errorf("no data written for thumbnail")
 	}
 
-	assetUUID, _ := uuid.FromBytes(asset.AssetID.Bytes[:])
-	log.Printf("Saved thumbnail for asset %s: size=%s, path=%s, bytes=%d", assetUUID.String(), size, thumbnailPath, written)
+	log.Printf("Saved thumbnail for asset %s: size=%s, path=%s, bytes=%d", asset.AssetID.String(), size, thumbnailPath, written)
 
 	// Create database record with relative path
 	relPath := filepath.Join(".lumilio/assets/thumbnails", size, filename)
@@ -889,7 +817,7 @@ func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category 
 	// Tag doesn't exist, create it
 	params := repo.CreateTagParams{
 		TagName:       name,
-		IsAiGenerated: &isAIGenerated,
+		IsAiGenerated: isAIGenerated,
 	}
 
 	if category != "" {
@@ -990,27 +918,18 @@ func (s *assetService) GetDistinctLenses(ctx context.Context) ([]string, error) 
 // Rating management methods implementation
 
 func (s *assetService) UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
+	value := int64(rating)
 	params := repo.UpdateAssetRatingParams{
-		AssetID: pgUUID,
-		Rating:  int32(rating),
+		AssetID: id,
+		Rating:  &value,
 	}
 
 	return s.queries.UpdateAssetRating(ctx, params)
 }
 
 func (s *assetService) UpdateAssetLike(ctx context.Context, id uuid.UUID, liked bool) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	params := repo.UpdateAssetLikeParams{
-		AssetID: pgUUID,
+		AssetID: id,
 		Liked:   liked,
 	}
 
@@ -1018,14 +937,10 @@ func (s *assetService) UpdateAssetLike(ctx context.Context, id uuid.UUID, liked 
 }
 
 func (s *assetService) UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUID, rating int, liked bool) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
+	value := int64(rating)
 	params := repo.UpdateAssetRatingAndLikeParams{
-		AssetID: pgUUID,
-		Rating:  int32(rating),
+		AssetID: id,
+		Rating:  &value,
 		Liked:   liked,
 	}
 
@@ -1033,13 +948,8 @@ func (s *assetService) UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUI
 }
 
 func (s *assetService) UpdateAssetDescription(ctx context.Context, id uuid.UUID, description string) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	params := repo.UpdateAssetDescriptionParams{
-		AssetID:     pgUUID,
+		AssetID:     id,
 		Description: description,
 	}
 
@@ -1047,11 +957,12 @@ func (s *assetService) UpdateAssetDescription(ctx context.Context, id uuid.UUID,
 }
 
 func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, ownerID *int32, limit, offset int) ([]repo.Asset, error) {
+	ratingValue := int64(rating)
 	params := repo.GetAssetsByRatingParams{
-		Rating:  int32(rating),
+		Rating:  &ratingValue,
 		OwnerID: ownerID,
-		Limit:   int32(limit),
-		Offset:  int32(offset),
+		Limit:   int64(limit),
+		Offset:  int64(offset),
 	}
 
 	return s.queries.GetAssetsByRating(ctx, params)
@@ -1060,8 +971,8 @@ func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, ownerI
 func (s *assetService) GetLikedAssets(ctx context.Context, ownerID *int32, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetLikedAssetsParams{
 		OwnerID: ownerID,
-		Limit:   int32(limit),
-		Offset:  int32(offset),
+		Limit:   int64(limit),
+		Offset:  int64(offset),
 	}
 
 	return s.queries.GetLikedAssets(ctx, params)
@@ -1123,8 +1034,7 @@ func (s *assetService) SaveVideoVersion(ctx context.Context, repoPath string, vi
 		return fmt.Errorf("no data written for video version")
 	}
 
-	assetUUID, _ := uuid.FromBytes(asset.AssetID.Bytes[:])
-	log.Printf("Saved video version %s for asset %s at path %s, bytes=%d", version, assetUUID.String(), videoPath, written)
+	log.Printf("Saved video version %s for asset %s at path %s, bytes=%d", version, asset.AssetID.String(), videoPath, written)
 	return nil
 }
 
@@ -1184,19 +1094,13 @@ func (s *assetService) SaveAudioVersion(ctx context.Context, repoPath string, au
 		return fmt.Errorf("no data written for audio version")
 	}
 
-	assetUUID, _ := uuid.FromBytes(asset.AssetID.Bytes[:])
-	log.Printf("Saved audio version %s for asset %s at path %s, bytes=%d", version, assetUUID.String(), audioPath, written)
+	log.Printf("Saved audio version %s for asset %s at path %s, bytes=%d", version, asset.AssetID.String(), audioPath, written)
 	return nil
 }
 
 func (s *assetService) UpdateAssetDuration(ctx context.Context, id uuid.UUID, duration float64) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
 	params := repo.UpdateAssetDurationParams{
-		AssetID:  pgUUID,
+		AssetID:  id,
 		Duration: &duration,
 	}
 
@@ -1204,15 +1108,12 @@ func (s *assetService) UpdateAssetDuration(ctx context.Context, id uuid.UUID, du
 }
 
 func (s *assetService) UpdateAssetDimensions(ctx context.Context, id uuid.UUID, width, height int32) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(id.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
+	widthValue := int64(width)
+	heightValue := int64(height)
 	params := repo.UpdateAssetDimensionsParams{
-		AssetID: pgUUID,
-		Width:   &width,
-		Height:  &height,
+		AssetID: id,
+		Width:   &widthValue,
+		Height:  &heightValue,
 	}
 
 	return s.queries.UpdateAssetDimensions(ctx, params)
@@ -1267,18 +1168,25 @@ func assetSetSourceUUIDs(source *AssetSetSource) []uuid.UUID {
 	return cloneUUIDSlice(source.AssetIDs)
 }
 
-func assetSetSourcePgUUIDs(source *AssetSetSource) []pgtype.UUID {
+func assetSetSourceSQLiteUUIDs(source *AssetSetSource) any {
 	if source == nil {
 		return nil
 	}
-	ids := make([]pgtype.UUID, 0, len(source.AssetIDs))
+	ids := make(dbtypes.UUIDs, 0, len(source.AssetIDs))
 	for _, id := range source.AssetIDs {
 		if id == uuid.Nil {
 			continue
 		}
-		ids = append(ids, pgtype.UUID{Bytes: id, Valid: true})
+		ids = append(ids, id)
 	}
 	return ids
+}
+
+func sqliteStrings(values []string) any {
+	if len(values) == 0 {
+		return nil
+	}
+	return dbtypes.Strings(values)
 }
 
 func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
@@ -1447,13 +1355,13 @@ func aggregateCandidatePoolSize(limit, offset int) int {
 }
 
 func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
-	var repoUUID pgtype.UUID
+	var repoUUID uuid.NullUUID
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
 		parsedUUID, err := uuid.Parse(*params.RepositoryID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("invalid repository ID: %w", err)
 		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+		repoUUID = uuid.NullUUID{UUID: parsedUUID, Valid: true}
 	}
 
 	var ratingPtr *int32
@@ -1462,12 +1370,12 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		ratingPtr = &r
 	}
 
-	var fromTime, toTime pgtype.Timestamptz
+	var fromTime, toTime dbtypes.Timestamp
 	if params.DateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
+		fromTime = dbtypes.NewTimestamp(*params.DateFrom)
 	}
 	if params.DateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
+		toTime = dbtypes.NewTimestamp(*params.DateTo)
 	}
 
 	var queryPtr *string
@@ -1484,13 +1392,13 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		s := "date_captured"
 		sortByPtr = &s
 	}
-	sourceAssetIDs := assetSetSourcePgUUIDs(params.Source)
+	sourceAssetIDs := assetSetSourceSQLiteUUIDs(params.Source)
 
 	// Get total count
 	countResult, err := s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
 		AssetIds:         sourceAssetIDs,
 		AssetType:        params.AssetType,
-		AssetTypes:       params.AssetTypes,
+		AssetTypes:       sqliteStrings(params.AssetTypes),
 		RepositoryID:     repoUUID,
 		PersonID:         params.PersonID,
 		OwnerID:          params.OwnerID,
@@ -1505,7 +1413,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		LensModel:        params.LensModel,
 		TagName:          params.TagName,
 		TagSource:        params.TagSource,
-		TagNames:         params.TagNames,
+		TagNames:         sqliteStrings(params.TagNames),
 		FolderPath:       params.FolderPath,
 		FolderRecursive:  params.FolderRecursive,
 		LocationNorth:    params.LocationNorth,
@@ -1514,7 +1422,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		LocationWest:     params.LocationWest,
 		DateFrom:         fromTime,
 		DateTo:           toTime,
-		IsDeleted:        params.IsDeleted,
+		IsDeleted:        params.IsDeleted != nil && *params.IsDeleted,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count assets: %w", err)
@@ -1524,7 +1432,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 	assets, err := s.queries.GetAssetsUnified(ctx, repo.GetAssetsUnifiedParams{
 		AssetIds:         sourceAssetIDs,
 		AssetType:        params.AssetType,
-		AssetTypes:       params.AssetTypes,
+		AssetTypes:       sqliteStrings(params.AssetTypes),
 		RepositoryID:     repoUUID,
 		PersonID:         params.PersonID,
 		OwnerID:          params.OwnerID,
@@ -1539,7 +1447,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		LensModel:        params.LensModel,
 		TagName:          params.TagName,
 		TagSource:        params.TagSource,
-		TagNames:         params.TagNames,
+		TagNames:         sqliteStrings(params.TagNames),
 		FolderPath:       params.FolderPath,
 		FolderRecursive:  params.FolderRecursive,
 		LocationNorth:    params.LocationNorth,
@@ -1549,9 +1457,9 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		SortBy:           sortByPtr,
 		DateFrom:         fromTime,
 		DateTo:           toTime,
-		IsDeleted:        params.IsDeleted,
-		Limit:            int32(params.Limit),
-		Offset:           int32(params.Offset),
+		IsDeleted:        params.IsDeleted != nil && *params.IsDeleted,
+		Limit:            int64(params.Limit),
+		Offset:           int64(params.Offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -1561,12 +1469,36 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 }
 
 func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
-	embeddingResult, err := s.resolveSemanticQueryEmbedding(ctx, params.Query, false)
+	if s.semanticRetriever == nil {
+		return nil, 0, ErrSemanticSearchUnavailable
+	}
+	filter, err := buildAggregateSearchFilter(params)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	return s.searchAssetsInResolvedSpace(ctx, params, embeddingResult.ModelID, embeddingResult.Vector, params.Limit, params.Offset, true)
+	candidates, _, err := s.semanticRetriever.RetrieveSet(ctx, aggregatesearch.Request{
+		Query:  params.Query,
+		Filter: filter,
+	}, aggregatesearch.StrictnessNormal, fusedSetCap)
+	if err != nil {
+		return nil, 0, err
+	}
+	total := int64(len(candidates))
+	if params.Offset < 0 {
+		params.Offset = 0
+	}
+	if params.Limit <= 0 {
+		params.Limit = 50
+	}
+	if params.Offset >= len(candidates) {
+		return []repo.Asset{}, total, nil
+	}
+	end := params.Offset + params.Limit
+	if end > len(candidates) {
+		end = len(candidates)
+	}
+	assets, err := s.hydrateAssetsInOrder(ctx, candidateIDs(candidates[params.Offset:end]), params.IsDeleted)
+	return assets, total, err
 }
 
 func (s *assetService) resolveSemanticQueryEmbedding(ctx context.Context, query string, fast bool) (*types.EmbeddingV1, error) {
@@ -1600,259 +1532,25 @@ func (s *assetService) resolveSemanticQueryEmbedding(ctx context.Context, query 
 }
 
 func (s *assetService) searchAssetsInResolvedSpace(ctx context.Context, params QueryAssetsParams, model string, vector []float32, limit, offset int, includeCount bool) ([]repo.Asset, int64, error) {
-	space, err := s.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeSemantic, model, len(vector))
-	if err != nil {
-		return nil, 0, err
-	}
-
-	queryVector := pgvector.NewVector(vector)
-	assets, err := s.searchAssetsBySemanticSpace(ctx, params, space, &queryVector, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-
+	_ = model
+	_ = vector
+	params.Limit = limit
+	params.Offset = offset
+	assets, total, err := s.queryAssetsVector(ctx, params)
 	if !includeCount {
-		return assets, 0, nil
+		total = 0
 	}
-
-	total, err := s.countAssetsBySemanticSpace(ctx, params, space, &queryVector)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return assets, total, nil
-}
-
-type semanticSQLBuilder struct {
-	args []any
-}
-
-func (b *semanticSQLBuilder) addArg(value any) string {
-	b.args = append(b.args, value)
-	return fmt.Sprintf("$%d", len(b.args))
-}
-
-func (s *assetService) searchAssetsBySemanticSpace(ctx context.Context, params QueryAssetsParams, space repo.EmbeddingSpace, vector *pgvector.Vector, limit, offset int) ([]repo.Asset, error) {
-	builder := &semanticSQLBuilder{}
-	baseSQL, distanceExpr, err := s.buildSemanticSearchBaseSQL(builder, params, space, vector)
-	if err != nil {
-		return nil, err
-	}
-
-	limitPlaceholder := builder.addArg(limit)
-	offsetPlaceholder := builder.addArg(offset)
-	// Assets may carry multiple vectors (video frames); rank each asset by its
-	// best (nearest) frame via MIN — a max-pool over the per-asset frame set.
-	query := fmt.Sprintf(`
-WITH candidate_ids AS MATERIALIZED (
-  SELECT
-    a.asset_id,
-    MIN(%s) AS distance,
-    (array_agg(e.frame_ts_ms ORDER BY %s ASC NULLS LAST))[1] AS best_ts
-  %s
-  GROUP BY a.asset_id
-  ORDER BY distance, a.asset_id DESC
-  LIMIT %s OFFSET %s
-)
-SELECT a.*
-FROM candidate_ids c
-JOIN assets a ON a.asset_id = c.asset_id
-ORDER BY c.distance, c.asset_id DESC
-`, distanceExpr, distanceExpr, baseSQL, limitPlaceholder, offsetPlaceholder)
-
-	rows, err := s.pool.Query(ctx, query, builder.args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search assets: %w", err)
-	}
-	defer rows.Close()
-
-	assets, err := pgx.CollectRows(rows, pgx.RowToStructByName[repo.Asset])
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode semantic search rows: %w", err)
-	}
-
-	return assets, nil
-}
-
-func (s *assetService) countAssetsBySemanticSpace(ctx context.Context, params QueryAssetsParams, space repo.EmbeddingSpace, vector *pgvector.Vector) (int64, error) {
-	builder := &semanticSQLBuilder{}
-	baseSQL, _, err := s.buildSemanticSearchBaseSQL(builder, params, space, vector)
-	if err != nil {
-		return 0, err
-	}
-
-	query := "SELECT COUNT(DISTINCT a.asset_id) " + baseSQL
-	var count int64
-	if err := s.pool.QueryRow(ctx, query, builder.args...).Scan(&count); err != nil {
-		return 0, fmt.Errorf("failed to count assets: %w", err)
-	}
-
-	return count, nil
-}
-
-func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, params QueryAssetsParams, space repo.EmbeddingSpace, vector *pgvector.Vector) (string, string, error) {
-	if vector == nil {
-		return "", "", fmt.Errorf("semantic query vector is nil")
-	}
-	if space.ID <= 0 || space.Dimensions <= 0 {
-		return "", "", fmt.Errorf("invalid semantic search space")
-	}
-
-	embeddingPlaceholder := builder.addArg(vector)
-	spacePlaceholder := builder.addArg(space.ID)
-
-	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", space.Dimensions, embeddingPlaceholder, space.Dimensions)
-	isDeleted := false
-	if params.IsDeleted != nil {
-		isDeleted = *params.IsDeleted
-	}
-	conditions := []string{
-		fmt.Sprintf("a.is_deleted = %s", builder.addArg(isDeleted)),
-		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
-	}
-
-	if params.Source != nil {
-		conditions = append(conditions, fmt.Sprintf("a.asset_id = ANY(%s::uuid[])", builder.addArg(assetSetSourceUUIDs(params.Source))))
-	}
-	if params.AssetType != nil {
-		conditions = append(conditions, fmt.Sprintf("a.type = %s", builder.addArg(*params.AssetType)))
-	}
-	if len(params.AssetTypes) > 0 {
-		conditions = append(conditions, fmt.Sprintf("a.type = ANY(%s::text[])", builder.addArg(params.AssetTypes)))
-	}
-	if params.OwnerID != nil {
-		conditions = append(conditions, fmt.Sprintf("a.owner_id = %s", builder.addArg(*params.OwnerID)))
-	}
-	if params.RepositoryID != nil && *params.RepositoryID != "" {
-		repositoryID, err := uuid.Parse(*params.RepositoryID)
-		if err != nil {
-			return "", "", fmt.Errorf("invalid repository ID: %w", err)
-		}
-		conditions = append(conditions, fmt.Sprintf("a.repository_id = %s", builder.addArg(repositoryID)))
-	}
-	if params.PersonID != nil {
-		personPlaceholder := builder.addArg(*params.PersonID)
-		conditions = append(conditions, fmt.Sprintf(`EXISTS (
-			SELECT 1
-			FROM face_cluster_members fcm
-			JOIN face_items fi_person ON fi_person.id = fcm.face_id
-			WHERE fcm.cluster_id = %s
-			  AND fi_person.asset_id = a.asset_id
-		)`, personPlaceholder))
-	}
-	if params.AlbumID != nil {
-		albumPlaceholder := builder.addArg(*params.AlbumID)
-		conditions = append(conditions, fmt.Sprintf(`EXISTS (
-			SELECT 1
-			FROM album_assets aa
-			WHERE aa.asset_id = a.asset_id
-			  AND aa.album_id = %s
-		)`, albumPlaceholder))
-	}
-	if params.TagName != nil {
-		tagNamePlaceholder := builder.addArg(*params.TagName)
-		tagSourceCondition := ""
-		if params.TagSource != nil {
-			tagSourcePlaceholder := builder.addArg(*params.TagSource)
-			tagSourceCondition = fmt.Sprintf("\n			  AND at.source = %s", tagSourcePlaceholder)
-		}
-		conditions = append(conditions, fmt.Sprintf(`EXISTS (
-			SELECT 1
-			FROM asset_tags at
-			JOIN tags t ON t.tag_id = at.tag_id
-			WHERE at.asset_id = a.asset_id
-			  AND t.tag_name = %s%s
-		)`, tagNamePlaceholder, tagSourceCondition))
-	}
-	if len(params.TagNames) > 0 {
-		tagNamesPlaceholder := builder.addArg(params.TagNames)
-		// Match assets carrying every requested tag (AND semantics).
-		conditions = append(conditions, fmt.Sprintf(`(
-			SELECT COUNT(DISTINCT t.tag_name)
-			FROM asset_tags at
-			JOIN tags t ON t.tag_id = at.tag_id
-			WHERE at.asset_id = a.asset_id
-			  AND t.tag_name = ANY(%s::text[])
-		) = cardinality(%s::text[])`, tagNamesPlaceholder, tagNamesPlaceholder))
-	}
-	if params.FilenameValue != nil {
-		filenamePlaceholder := builder.addArg(*params.FilenameValue)
-		switch {
-		case params.FilenameOperator != nil && *params.FilenameOperator == "matches":
-			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE %s", filenamePlaceholder))
-		case params.FilenameOperator != nil && *params.FilenameOperator == "starts_with":
-			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE %s || '%%'", filenamePlaceholder))
-		case params.FilenameOperator != nil && *params.FilenameOperator == "ends_with":
-			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE '%%' || %s", filenamePlaceholder))
-		default:
-			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE '%%' || %s || '%%'", filenamePlaceholder))
-		}
-	}
-	if params.DateFrom != nil {
-		conditions = append(conditions, fmt.Sprintf("COALESCE(a.taken_time, a.upload_time) >= %s", builder.addArg(*params.DateFrom)))
-	}
-	if params.DateTo != nil {
-		conditions = append(conditions, fmt.Sprintf("COALESCE(a.taken_time, a.upload_time) <= %s", builder.addArg(*params.DateTo)))
-	}
-	if params.IsRaw != nil {
-		if *params.IsRaw {
-			conditions = append(conditions, "a.specific_metadata->>'is_raw' = 'true'")
-		} else {
-			conditions = append(conditions, "(a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL)")
-		}
-	}
-	if params.Rating != nil {
-		if *params.Rating == 0 {
-			conditions = append(conditions, "(a.rating IS NULL OR a.rating = 0)")
-		} else {
-			conditions = append(conditions, fmt.Sprintf("a.rating = %s", builder.addArg(*params.Rating)))
-		}
-	}
-	if params.Liked != nil {
-		if *params.Liked {
-			conditions = append(conditions, "a.liked = true")
-		} else {
-			conditions = append(conditions, "(a.liked IS NULL OR a.liked = false)")
-		}
-	}
-	if params.CameraModel != nil {
-		conditions = append(conditions, fmt.Sprintf("a.specific_metadata->>'camera_model' = %s", builder.addArg(*params.CameraModel)))
-	}
-	if params.LensModel != nil {
-		conditions = append(conditions, fmt.Sprintf("a.specific_metadata->>'lens_model' = %s", builder.addArg(*params.LensModel)))
-	}
-	if params.LocationNorth != nil && params.LocationSouth != nil && params.LocationEast != nil && params.LocationWest != nil {
-		northPlaceholder := builder.addArg(*params.LocationNorth)
-		southPlaceholder := builder.addArg(*params.LocationSouth)
-		eastPlaceholder := builder.addArg(*params.LocationEast)
-		westPlaceholder := builder.addArg(*params.LocationWest)
-		conditions = append(conditions, fmt.Sprintf(`a.gps_latitude IS NOT NULL
-  AND a.gps_longitude IS NOT NULL
-  AND a.gps_latitude BETWEEN LEAST(%s::float8, %s::float8) AND GREATEST(%s::float8, %s::float8)
-  AND (
-    CASE
-      WHEN %s::float8 <= %s::float8 THEN a.gps_longitude BETWEEN %s::float8 AND %s::float8
-      ELSE a.gps_longitude >= %s::float8 OR a.gps_longitude <= %s::float8
-    END
-  )`, southPlaceholder, northPlaceholder, southPlaceholder, northPlaceholder, westPlaceholder, eastPlaceholder, westPlaceholder, eastPlaceholder, westPlaceholder, eastPlaceholder))
-	}
-
-	baseSQL := fmt.Sprintf(`
-FROM search_embeddings e
-JOIN assets a ON a.asset_id = e.asset_id
-WHERE %s`, strings.Join(conditions, "\n  AND "))
-
-	return baseSQL, distanceExpr, nil
+	return assets, total, err
 }
 
 func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error) {
-	var repoUUID pgtype.UUID
+	var repoUUID uuid.NullUUID
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
 		parsedUUID, err := uuid.Parse(*params.RepositoryID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("invalid repository ID: %w", err)
 		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+		repoUUID = uuid.NullUUID{UUID: parsedUUID, Valid: true}
 	}
 
 	total, err := s.queries.CountPhotoMapPoints(ctx, repo.CountPhotoMapPointsParams{
@@ -1874,8 +1572,8 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 		North:        params.North,
 		West:         params.West,
 		East:         params.East,
-		Limit:        int32(params.Limit),
-		Offset:       int32(params.Offset),
+		Limit:        int64(params.Limit),
+		Offset:       int64(params.Offset),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query photo map points: %w", err)
@@ -1883,12 +1581,7 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 
 	points := make([]PhotoMapPoint, 0, len(rows))
 	for _, row := range rows {
-		if !row.AssetID.Valid || !row.UploadTime.Valid || row.GpsLatitude == nil || row.GpsLongitude == nil {
-			continue
-		}
-
-		assetID, err := uuid.FromBytes(row.AssetID.Bytes[:])
-		if err != nil {
+		if row.AssetID == uuid.Nil || !row.UploadTime.Valid || row.GpsLatitude == nil || row.GpsLongitude == nil {
 			continue
 		}
 
@@ -1899,7 +1592,7 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 		}
 
 		points = append(points, PhotoMapPoint{
-			AssetID:          assetID.String(),
+			AssetID:          row.AssetID.String(),
 			OriginalFilename: row.OriginalFilename,
 			UploadTime:       row.UploadTime.Time,
 			TakenTime:        takenTime,
@@ -1981,7 +1674,7 @@ func (s *assetService) SearchAssetIDsOCRForOwner(ctx context.Context, ownerID in
 // channel of the Results tier.
 func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedParams {
 	out := repo.GetAssetIDsUnifiedParams{Limit: fusedSetCap}
-	out.AssetIds = assetSetSourcePgUUIDs(params.Source)
+	out.AssetIds = assetSetSourceSQLiteUUIDs(params.Source)
 	if params.Query != "" {
 		operator := "contains"
 		filename := params.Query
@@ -1989,28 +1682,28 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedP
 		out.FilenameOperator = &operator
 	}
 	out.AssetType = params.AssetType
-	out.AssetTypes = params.AssetTypes
+	out.AssetTypes = sqliteStrings(params.AssetTypes)
 	out.OwnerID = params.OwnerID
 	out.PersonID = params.PersonID
 	out.AlbumID = params.AlbumID
 	out.TagName = params.TagName
-	out.TagNames = params.TagNames
+	out.TagNames = sqliteStrings(params.TagNames)
 	out.TagSource = params.TagSource
 	out.FolderPath = params.FolderPath
 	out.FolderRecursive = params.FolderRecursive
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
 		if parsed, err := uuid.Parse(strings.TrimSpace(*params.RepositoryID)); err == nil {
-			out.RepositoryID = pgtype.UUID{Bytes: parsed, Valid: true}
+			out.RepositoryID = uuid.NullUUID{UUID: parsed, Valid: true}
 		}
 	}
 	if params.DateFrom != nil {
-		out.DateFrom = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
+		out.DateFrom = dbtypes.NewTimestamp(*params.DateFrom)
 	}
 	if params.DateTo != nil {
-		out.DateTo = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
+		out.DateTo = dbtypes.NewTimestamp(*params.DateTo)
 	}
 	out.IsRaw = params.IsRaw
-	out.IsDeleted = params.IsDeleted
+	out.IsDeleted = params.IsDeleted != nil && *params.IsDeleted
 	if params.Rating != nil {
 		rating := int32(*params.Rating)
 		out.Rating = &rating

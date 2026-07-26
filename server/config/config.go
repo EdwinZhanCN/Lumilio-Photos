@@ -16,7 +16,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // AppConfig is the fully resolved, runtime-immutable configuration consumed by
 // server/app. Production hosts obtain it only from LoadAppConfig.
@@ -42,16 +42,7 @@ type AppConfig struct {
 func (c AppConfig) LoadedFromManifest() bool { return c.loaded }
 
 type DatabaseConfig struct {
-	Host                  string
-	Port                  string
-	User                  string
-	Password              string
-	DBName                string
-	SSL                   string
-	BootstrapPasswordFile string
-	RotatedPasswordFile   string
-	BootstrapPassword     string
-	ToolsBinDir           string
+	Path string
 }
 
 type ServerConfig struct {
@@ -162,14 +153,7 @@ type manifest struct {
 }
 
 type databaseManifest struct {
-	Host                  *string `toml:"host"`
-	Port                  *string `toml:"port"`
-	User                  *string `toml:"user"`
-	Name                  *string `toml:"name"`
-	SSL                   *string `toml:"ssl"`
-	BootstrapPasswordFile *string `toml:"bootstrap_password_file"`
-	RotatedPasswordFile   *string `toml:"rotated_password_file"`
-	ToolsBinDir           *string `toml:"tools_bin_dir"`
+	Path *string `toml:"path"`
 }
 type serverManifest struct {
 	Port               *string   `toml:"port"`
@@ -298,14 +282,7 @@ func validateManifestPresence(m manifest) []string {
 	requiredSection(&p, "lumen", m.Lumen)
 	requiredSection(&p, "tools", m.Tools)
 	if m.Database != nil {
-		required(&p, "database.host", m.Database.Host)
-		required(&p, "database.port", m.Database.Port)
-		required(&p, "database.user", m.Database.User)
-		required(&p, "database.name", m.Database.Name)
-		required(&p, "database.ssl", m.Database.SSL)
-		required(&p, "database.bootstrap_password_file", m.Database.BootstrapPasswordFile)
-		required(&p, "database.rotated_password_file", m.Database.RotatedPasswordFile)
-		required(&p, "database.tools_bin_dir", m.Database.ToolsBinDir)
+		required(&p, "database.path", m.Database.Path)
 	}
 	if m.Server != nil {
 		required(&p, "server.port", m.Server.Port)
@@ -404,30 +381,11 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 		p = append(p, "environment must be one of development, production, test")
 	}
 
-	db := DatabaseConfig{
-		Host: resolveHost(base, *m.Database.Host), Port: strings.TrimSpace(*m.Database.Port), User: strings.TrimSpace(*m.Database.User),
-		DBName: strings.TrimSpace(*m.Database.Name), SSL: strings.ToLower(strings.TrimSpace(*m.Database.SSL)),
-		BootstrapPasswordFile: resolvePath(base, *m.Database.BootstrapPasswordFile), RotatedPasswordFile: resolvePath(base, *m.Database.RotatedPasswordFile),
-		ToolsBinDir: resolveOptionalPath(base, *m.Database.ToolsBinDir),
-	}
-	requireNonEmpty(&p, "database.host", db.Host)
-	requirePort(&p, "database.port", db.Port)
-	requireNonEmpty(&p, "database.user", db.User)
-	requireNonEmpty(&p, "database.name", db.DBName)
-	requireOneOf(&p, "database.ssl", db.SSL, "disable", "require", "verify-ca", "verify-full")
-	requireNonEmpty(&p, "database.bootstrap_password_file", strings.TrimSpace(*m.Database.BootstrapPasswordFile))
-	requireNonEmpty(&p, "database.rotated_password_file", strings.TrimSpace(*m.Database.RotatedPasswordFile))
-	bootstrap, err := readRequiredSecret(db.BootstrapPasswordFile)
-	if err != nil {
-		p = append(p, fmt.Sprintf("database.bootstrap_password_file: %v", err))
-	} else {
-		db.BootstrapPassword = bootstrap
-		db.Password = bootstrap
-	}
-	if rotated, exists, err := readOptionalSecret(db.RotatedPasswordFile); err != nil {
-		p = append(p, fmt.Sprintf("database.rotated_password_file: %v", err))
-	} else if exists {
-		db.Password = rotated
+	rawDatabasePath := strings.TrimSpace(*m.Database.Path)
+	db := DatabaseConfig{Path: resolvePath(base, rawDatabasePath)}
+	requireNonEmpty(&p, "database.path", rawDatabasePath)
+	if rawDatabasePath == ":memory:" {
+		p = append(p, "database.path must be a persistent filesystem path")
 	}
 
 	server := ServerConfig{Port: strings.TrimSpace(*m.Server.Port), CORSAllowedOrigins: cleanStrings(*m.Server.CORSAllowedOrigins), WebRoot: resolveOptionalPath(base, *m.Server.WebRoot)}
@@ -453,8 +411,8 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requireOutsidePath(&p, "storage.cloud_state_path", storage.CloudStatePath, storage.Path)
 	requireOutsidePath(&p, "storage.backups_path", storage.BackupsPath, storage.Path)
 	requireOutsidePath(&p, "logging.dir", logging.LogDir, storage.Path)
-	requireOutsidePath(&p, "database.bootstrap_password_file", db.BootstrapPasswordFile, storage.Path)
-	requireOutsidePath(&p, "database.rotated_password_file", db.RotatedPasswordFile, storage.Path)
+	requireOutsidePath(&p, "database.path", db.Path, storage.Path)
+	requireOutsidePath(&p, "database.path", db.Path, storage.BackupsPath)
 	scan := RepositoryScanConfig{Enabled: *m.RepositoryScan.Enabled, IntervalSeconds: *m.RepositoryScan.IntervalSeconds, SettleSeconds: *m.RepositoryScan.SettleSeconds, MaxConcurrentRepos: *m.RepositoryScan.MaxConcurrentRepos, BatchSize: *m.RepositoryScan.BatchSize}
 	requirePositive(&p, "repository_scan.interval_seconds", scan.IntervalSeconds)
 	requirePositive(&p, "repository_scan.settle_seconds", scan.SettleSeconds)
@@ -659,36 +617,4 @@ func resolveCommand(base, value string) string {
 		return value
 	}
 	return resolvePath(base, value)
-}
-func resolveHost(base, value string) string {
-	value = strings.TrimSpace(value)
-	if filepath.IsAbs(value) || strings.HasPrefix(value, ".") || strings.ContainsAny(value, `/\`) {
-		return resolvePath(base, value)
-	}
-	return value
-}
-func readRequiredSecret(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	secret := strings.TrimSpace(string(data))
-	if secret == "" {
-		return "", errors.New("secret file is empty")
-	}
-	return secret, nil
-}
-func readOptionalSecret(path string) (string, bool, error) {
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, err
-	}
-	secret := strings.TrimSpace(string(data))
-	if secret == "" {
-		return "", true, errors.New("secret file is empty")
-	}
-	return secret, true, nil
 }

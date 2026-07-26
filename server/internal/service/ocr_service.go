@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -10,17 +11,15 @@ import (
 	"server/internal/search"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/google/uuid"
 )
 
 // OCRService defines OCR related operations interface
 type OCRService interface {
-	SaveOCRResults(ctx context.Context, assetID pgtype.UUID, ocrResult *types.OCRV1, processingTimeMs int) error
-	GetOCRResults(ctx context.Context, assetID pgtype.UUID) (*OCRResultWithItems, error)
+	SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error
+	GetOCRResults(ctx context.Context, assetID uuid.UUID) (*OCRResultWithItems, error)
 	SearchAssetsByText(ctx context.Context, searchText string, limit, offset int, minConfidence float32) ([]repo.Asset, error)
-	DeleteOCRResults(ctx context.Context, assetID pgtype.UUID) error
+	DeleteOCRResults(ctx context.Context, assetID uuid.UUID) error
 	GetOCRStats(ctx context.Context) (*dbtypes.OCRStats, error)
 }
 
@@ -32,11 +31,11 @@ type OCRResultWithItems struct {
 
 type ocrService struct {
 	queries *repo.Queries
-	pool    *pgxpool.Pool
+	pool    *sql.DB
 }
 
 // NewOCRService creates OCR service instance
-func NewOCRService(queries *repo.Queries, pool *pgxpool.Pool) OCRService {
+func NewOCRService(queries *repo.Queries, pool *sql.DB) OCRService {
 	return &ocrService{
 		queries: queries,
 		pool:    pool,
@@ -44,16 +43,16 @@ func NewOCRService(queries *repo.Queries, pool *pgxpool.Pool) OCRService {
 }
 
 // SaveOCRResults saves OCR results to database
-func (s *ocrService) SaveOCRResults(ctx context.Context, assetID pgtype.UUID, ocrResult *types.OCRV1, processingTimeMs int) error {
+func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error {
 	if err := s.queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
 		return fmt.Errorf("failed to delete existing OCR results: %w", err)
 	}
 
-	processingTimePtr := int32(processingTimeMs)
+	processingTimePtr := int64(processingTimeMs)
 	_, err := s.queries.CreateOCRResult(ctx, repo.CreateOCRResultParams{
 		AssetID:          assetID,
 		ModelID:          ocrResult.ModelID,
-		TotalCount:       int32(len(ocrResult.Items)),
+		TotalCount:       int64(len(ocrResult.Items)),
 		ProcessingTimeMs: &processingTimePtr,
 	})
 	if err != nil {
@@ -70,14 +69,14 @@ func (s *ocrService) SaveOCRResults(ctx context.Context, assetID pgtype.UUID, oc
 			return fmt.Errorf("failed to serialize bounding box for item %d: %w", i, err)
 		}
 
-		areaFloat32 := float32(area)
+		areaFloat64 := float64(area)
 		_, err = s.queries.CreateOCRTextItem(ctx, repo.CreateOCRTextItemParams{
 			AssetID:     assetID,
 			TextContent: item.Text,
-			Confidence:  item.Confidence,
-			BoundingBox: boundingBoxJSON,
-			TextLength:  int32(len(item.Text)),
-			AreaPixels:  &areaFloat32,
+			Confidence:  float64(item.Confidence),
+			BoundingBox: dbtypes.JSON(boundingBoxJSON),
+			TextLength:  int64(len(item.Text)),
+			AreaPixels:  &areaFloat64,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create OCR text item %d: %w", i, err)
@@ -100,7 +99,7 @@ func (s *ocrService) SaveOCRResults(ctx context.Context, assetID pgtype.UUID, oc
 }
 
 // GetOCRResults gets OCR results for specified asset
-func (s *ocrService) GetOCRResults(ctx context.Context, assetID pgtype.UUID) (*OCRResultWithItems, error) {
+func (s *ocrService) GetOCRResults(ctx context.Context, assetID uuid.UUID) (*OCRResultWithItems, error) {
 	result, err := s.queries.GetOCRResultByAsset(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get OCR result: %w", err)
@@ -123,43 +122,19 @@ func (s *ocrService) SearchAssetsByText(ctx context.Context, searchText string, 
 		return []repo.Asset{}, nil
 	}
 
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("search assets by OCR text: begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	if _, err := tx.Exec(ctx, "SET LOCAL pg_trgm.word_similarity_threshold = 0.15"); err != nil {
-		return nil, fmt.Errorf("search assets by OCR text: set threshold: %w", err)
-	}
-
-	query := `
-SELECT a.*
-FROM ocr_results r
-JOIN assets a ON a.asset_id = r.asset_id
-WHERE r.full_text %> $1
-ORDER BY word_similarity($1, r.full_text) DESC, a.asset_id DESC
-LIMIT $2 OFFSET $3
-`
-	rows, err := tx.Query(ctx, query, tokenized, limit, offset)
+	assets, err := s.queries.SearchAssetsByOCRText(ctx, repo.SearchAssetsByOCRTextParams{
+		Query:  tokenized,
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("search assets by OCR text: %w", err)
-	}
-	defer rows.Close()
-
-	assets, err := pgx.CollectRows(rows, pgx.RowToStructByName[repo.Asset])
-	if err != nil {
-		return nil, fmt.Errorf("scan OCR search results: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("search assets by OCR text: commit: %w", err)
 	}
 	return assets, nil
 }
 
 // DeleteOCRResults deletes OCR results for specified asset
-func (s *ocrService) DeleteOCRResults(ctx context.Context, assetID pgtype.UUID) error {
+func (s *ocrService) DeleteOCRResults(ctx context.Context, assetID uuid.UUID) error {
 	return s.queries.DeleteOCRResultByAsset(ctx, assetID)
 }
 
@@ -195,32 +170,32 @@ func (s *ocrService) GetOCRStats(ctx context.Context) (*dbtypes.OCRStats, error)
 	return &dbtypes.OCRStats{
 		ModelID:           firstStat.ModelID,
 		TotalAssets:       int(firstStat.TotalAssets),
-		TotalTextItems:    int(firstStat.TotalTextItems),
-		AvgItemsPerAsset:  firstStat.AvgItemsPerAsset,
+		TotalTextItems:    int(derefFloat64(firstStat.TotalTextItems)),
+		AvgItemsPerAsset:  derefFloat64(firstStat.AvgItemsPerAsset),
 		MinProcessingTime: minTime,
 		MaxProcessingTime: maxTime,
-		AvgProcessingTime: firstStat.AvgProcessingTime,
+		AvgProcessingTime: derefFloat64(firstStat.AvgProcessingTime),
 	}, nil
 }
 
 // GetOCRTextItemsByAssetWithLimit gets OCR text items for specified asset (with limit)
-func (s *ocrService) GetOCRTextItemsByAssetWithLimit(ctx context.Context, assetID pgtype.UUID, limit int) ([]repo.OcrTextItem, error) {
+func (s *ocrService) GetOCRTextItemsByAssetWithLimit(ctx context.Context, assetID uuid.UUID, limit int) ([]repo.OcrTextItem, error) {
 	return s.queries.GetOCRTextItemsByAssetWithLimit(ctx, repo.GetOCRTextItemsByAssetWithLimitParams{
 		AssetID: assetID,
-		Limit:   int32(limit),
+		Limit:   int64(limit),
 	})
 }
 
 // GetHighConfidenceTextItems gets high confidence text items
 func (s *ocrService) GetHighConfidenceTextItems(ctx context.Context, minConfidence float32, limit int) ([]repo.OcrTextItem, error) {
 	return s.queries.GetHighConfidenceTextItems(ctx, repo.GetHighConfidenceTextItemsParams{
-		Confidence: minConfidence,
-		Limit:      int32(limit),
+		Confidence: float64(minConfidence),
+		Limit:      int64(limit),
 	})
 }
 
 // ConvertOCRToJSONMetadata converts OCR results to JSON metadata format
-func (s *ocrService) ConvertOCRToJSONMetadata(ctx context.Context, assetID pgtype.UUID) (*dbtypes.OCRResultMeta, error) {
+func (s *ocrService) ConvertOCRToJSONMetadata(ctx context.Context, assetID uuid.UUID) (*dbtypes.OCRResultMeta, error) {
 	result, err := s.queries.GetOCRResultByAsset(ctx, assetID)
 	if err != nil {
 		return nil, err

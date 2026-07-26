@@ -5,209 +5,116 @@
 package repo
 
 import (
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
-
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
+	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
 	"server/internal/storage/repocfg"
 )
 
-type AlbumType string
-
-const (
-	AlbumTypeDefault AlbumType = "default"
-	AlbumTypeBio     AlbumType = "bio"
-)
-
-func (e *AlbumType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = AlbumType(s)
-	case string:
-		*e = AlbumType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for AlbumType: %T", src)
-	}
-	return nil
-}
-
-type NullAlbumType struct {
-	AlbumType AlbumType `json:"album_type"`
-	Valid     bool      `json:"valid"` // Valid is true if AlbumType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullAlbumType) Scan(value interface{}) error {
-	if value == nil {
-		ns.AlbumType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.AlbumType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullAlbumType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.AlbumType), nil
-}
-
-type StackRelation string
-
-const (
-	StackRelationRawOriginal    StackRelation = "raw_original"
-	StackRelationJpegOriginal   StackRelation = "jpeg_original"
-	StackRelationEditedVersion  StackRelation = "edited_version"
-	StackRelationAlternative    StackRelation = "alternative"
-	StackRelationLivePhotoStill StackRelation = "live_photo_still"
-	StackRelationLivePhotoVideo StackRelation = "live_photo_video"
-)
-
-func (e *StackRelation) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = StackRelation(s)
-	case string:
-		*e = StackRelation(s)
-	default:
-		return fmt.Errorf("unsupported scan type for StackRelation: %T", src)
-	}
-	return nil
-}
-
-type NullStackRelation struct {
-	StackRelation StackRelation `json:"stack_relation"`
-	Valid         bool          `json:"valid"` // Valid is true if StackRelation is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullStackRelation) Scan(value interface{}) error {
-	if value == nil {
-		ns.StackRelation, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.StackRelation.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullStackRelation) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.StackRelation), nil
-}
-
 type AgentCheckpoint struct {
-	ID        string             `db:"id" json:"id"`
-	Data      []byte             `db:"data" json:"data"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID        string            `db:"id" json:"id"`
+	Data      []byte            `db:"data" json:"data"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type AgentPendingEffect struct {
-	EffectID           pgtype.UUID        `db:"effect_id" json:"effect_id"`
-	UserID             int32              `db:"user_id" json:"user_id"`
-	ThreadID           string             `db:"thread_id" json:"thread_id"`
-	InitiatingRunID    pgtype.UUID        `db:"initiating_run_id" json:"initiating_run_id"`
-	ExecutingRunID     pgtype.UUID        `db:"executing_run_id" json:"executing_run_id"`
-	ToolName           string             `db:"tool_name" json:"tool_name"`
-	EffectClass        string             `db:"effect_class" json:"effect_class"`
-	PolicyVersion      int32              `db:"policy_version" json:"policy_version"`
-	MembershipSnapshot []pgtype.UUID      `db:"membership_snapshot" json:"membership_snapshot"`
-	Payload            []byte             `db:"payload" json:"payload"`
-	Target             []byte             `db:"target" json:"target"`
-	IdempotencyKey     string             `db:"idempotency_key" json:"idempotency_key"`
-	Status             string             `db:"status" json:"status"`
-	Receipt            []byte             `db:"receipt" json:"receipt"`
-	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	CommittedAt        pgtype.Timestamptz `db:"committed_at" json:"committed_at"`
-	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EffectID           uuid.UUID         `db:"effect_id" json:"effect_id"`
+	UserID             int32             `db:"user_id" json:"user_id"`
+	ThreadID           string            `db:"thread_id" json:"thread_id"`
+	InitiatingRunID    uuid.UUID         `db:"initiating_run_id" json:"initiating_run_id"`
+	ExecutingRunID     uuid.NullUUID     `db:"executing_run_id" json:"executing_run_id"`
+	ToolName           string            `db:"tool_name" json:"tool_name"`
+	EffectClass        string            `db:"effect_class" json:"effect_class"`
+	PolicyVersion      int64             `db:"policy_version" json:"policy_version"`
+	MembershipSnapshot dbtypes.UUIDs     `db:"membership_snapshot" json:"membership_snapshot"`
+	Payload            dbtypes.JSON      `db:"payload" json:"payload"`
+	Target             dbtypes.JSON      `db:"target" json:"target"`
+	IdempotencyKey     string            `db:"idempotency_key" json:"idempotency_key"`
+	Status             string            `db:"status" json:"status"`
+	Receipt            dbtypes.JSON      `db:"receipt" json:"receipt"`
+	CreatedAt          dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	CommittedAt        dbtypes.Timestamp `db:"committed_at" json:"committed_at"`
+	UpdatedAt          dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type AgentPin struct {
-	PinID                   pgtype.UUID        `db:"pin_id" json:"pin_id"`
-	UserID                  int32              `db:"user_id" json:"user_id"`
-	Title                   string             `db:"title" json:"title"`
-	Widget                  string             `db:"widget" json:"widget"`
-	Mode                    string             `db:"mode" json:"mode"`
-	Plan                    []byte             `db:"plan" json:"plan"`
-	Summary                 string             `db:"summary" json:"summary"`
-	AssetIds                []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
-	Truncated               bool               `db:"truncated" json:"truncated"`
-	LayoutX                 int32              `db:"layout_x" json:"layout_x"`
-	LayoutY                 int32              `db:"layout_y" json:"layout_y"`
-	LayoutW                 int32              `db:"layout_w" json:"layout_w"`
-	LayoutH                 int32              `db:"layout_h" json:"layout_h"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	LastSuccessfulRefreshAt pgtype.Timestamptz `db:"last_successful_refresh_at" json:"last_successful_refresh_at"`
+	PinID                   uuid.UUID         `db:"pin_id" json:"pin_id"`
+	UserID                  int32             `db:"user_id" json:"user_id"`
+	Title                   string            `db:"title" json:"title"`
+	Widget                  string            `db:"widget" json:"widget"`
+	Mode                    string            `db:"mode" json:"mode"`
+	Plan                    dbtypes.JSON      `db:"plan" json:"plan"`
+	Summary                 string            `db:"summary" json:"summary"`
+	AssetIds                dbtypes.UUIDs     `db:"asset_ids" json:"asset_ids"`
+	Truncated               bool              `db:"truncated" json:"truncated"`
+	LayoutX                 int64             `db:"layout_x" json:"layout_x"`
+	LayoutY                 int64             `db:"layout_y" json:"layout_y"`
+	LayoutW                 int64             `db:"layout_w" json:"layout_w"`
+	LayoutH                 int64             `db:"layout_h" json:"layout_h"`
+	CreatedAt               dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt               dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	LastSuccessfulRefreshAt dbtypes.Timestamp `db:"last_successful_refresh_at" json:"last_successful_refresh_at"`
 }
 
 type AgentRef struct {
-	UserID         int32              `db:"user_id" json:"user_id"`
-	ThreadID       string             `db:"thread_id" json:"thread_id"`
-	RefID          string             `db:"ref_id" json:"ref_id"`
-	Sequence       int32              `db:"sequence" json:"sequence"`
-	Plan           []byte             `db:"plan" json:"plan"`
-	AssetIds       []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
-	Summary        string             `db:"summary" json:"summary"`
-	Truncated      bool               `db:"truncated" json:"truncated"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	LastAccessedAt pgtype.Timestamptz `db:"last_accessed_at" json:"last_accessed_at"`
-	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UserID         int32             `db:"user_id" json:"user_id"`
+	ThreadID       string            `db:"thread_id" json:"thread_id"`
+	RefID          string            `db:"ref_id" json:"ref_id"`
+	Sequence       int64             `db:"sequence" json:"sequence"`
+	Plan           dbtypes.JSON      `db:"plan" json:"plan"`
+	AssetIds       dbtypes.UUIDs     `db:"asset_ids" json:"asset_ids"`
+	Summary        string            `db:"summary" json:"summary"`
+	Truncated      bool              `db:"truncated" json:"truncated"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	LastAccessedAt dbtypes.Timestamp `db:"last_accessed_at" json:"last_accessed_at"`
+	ExpiresAt      dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 type AgentRun struct {
-	RunID             pgtype.UUID        `db:"run_id" json:"run_id"`
-	UserID            int32              `db:"user_id" json:"user_id"`
-	ThreadID          string             `db:"thread_id" json:"thread_id"`
-	Status            string             `db:"status" json:"status"`
-	CancelRequestedAt pgtype.Timestamptz `db:"cancel_requested_at" json:"cancel_requested_at"`
-	StartedAt         pgtype.Timestamptz `db:"started_at" json:"started_at"`
-	FinishedAt        pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
-	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RunID             uuid.UUID         `db:"run_id" json:"run_id"`
+	UserID            int32             `db:"user_id" json:"user_id"`
+	ThreadID          string            `db:"thread_id" json:"thread_id"`
+	Status            string            `db:"status" json:"status"`
+	CancelRequestedAt dbtypes.Timestamp `db:"cancel_requested_at" json:"cancel_requested_at"`
+	StartedAt         dbtypes.Timestamp `db:"started_at" json:"started_at"`
+	FinishedAt        dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type AgentThread struct {
-	UserID          int32              `db:"user_id" json:"user_id"`
-	ThreadID        string             `db:"thread_id" json:"thread_id"`
-	CheckpointKey   string             `db:"checkpoint_key" json:"checkpoint_key"`
-	Mode            string             `db:"mode" json:"mode"`
-	ContextBindings []byte             `db:"context_bindings" json:"context_bindings"`
-	MentionBindings []byte             `db:"mention_bindings" json:"mention_bindings"`
-	PolicyVersion   int32              `db:"policy_version" json:"policy_version"`
-	Status          string             `db:"status" json:"status"`
-	ActiveRunID     pgtype.UUID        `db:"active_run_id" json:"active_run_id"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UserID          int32             `db:"user_id" json:"user_id"`
+	ThreadID        string            `db:"thread_id" json:"thread_id"`
+	CheckpointKey   string            `db:"checkpoint_key" json:"checkpoint_key"`
+	Mode            string            `db:"mode" json:"mode"`
+	ContextBindings dbtypes.JSON      `db:"context_bindings" json:"context_bindings"`
+	MentionBindings dbtypes.JSON      `db:"mention_bindings" json:"mention_bindings"`
+	PolicyVersion   int64             `db:"policy_version" json:"policy_version"`
+	Status          string            `db:"status" json:"status"`
+	ActiveRunID     uuid.NullUUID     `db:"active_run_id" json:"active_run_id"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type Album struct {
-	AlbumID      int32              `db:"album_id" json:"album_id"`
-	UserID       int32              `db:"user_id" json:"user_id"`
-	AlbumName    string             `db:"album_name" json:"album_name"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	Description  *string            `db:"description" json:"description"`
-	CoverAssetID pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
-	AlbumType    AlbumType          `db:"album_type" json:"album_type"`
+	AlbumID      int32             `db:"album_id" json:"album_id"`
+	UserID       int32             `db:"user_id" json:"user_id"`
+	AlbumName    string            `db:"album_name" json:"album_name"`
+	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	Description  *string           `db:"description" json:"description"`
+	CoverAssetID uuid.NullUUID     `db:"cover_asset_id" json:"cover_asset_id"`
+	AlbumType    string            `db:"album_type" json:"album_type"`
 }
 
 type AlbumAsset struct {
-	AlbumID   int32              `db:"album_id" json:"album_id"`
-	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Position  *int32             `db:"position" json:"position"`
-	AddedTime pgtype.Timestamptz `db:"added_time" json:"added_time"`
+	AlbumID   int32             `db:"album_id" json:"album_id"`
+	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Position  int64             `db:"position" json:"position"`
+	AddedTime dbtypes.Timestamp `db:"added_time" json:"added_time"`
 }
 
 type Asset struct {
-	AssetID                 pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
 	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
 	Type                    string                   `db:"type" json:"type"`
 	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
@@ -217,536 +124,556 @@ type Asset struct {
 	ContentHash             string                   `db:"content_hash" json:"content_hash"`
 	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
 	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int32                   `db:"width" json:"width"`
-	Height                  *int32                   `db:"height" json:"height"`
+	Width                   *int64                   `db:"width" json:"width"`
+	Height                  *int64                   `db:"height" json:"height"`
 	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime               pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int32                   `db:"rating" json:"rating"`
-	Liked                   *bool                    `db:"liked" json:"liked"`
-	RepositoryID            pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status                  []byte                   `db:"status" json:"status"`
-	UpdatedAt               pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	Rating                  *int64                   `db:"rating" json:"rating"`
+	Liked                   bool                     `db:"liked" json:"liked"`
+	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
+	Status                  dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
 	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
 	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 json.RawMessage          `db:"exif_raw" json:"exif_raw"`
+	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
 }
 
 type AssetQualityScore struct {
-	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Score        float32            `db:"score" json:"score"`
-	ModelVersion string             `db:"model_version" json:"model_version"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	AssetID      uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Score        float64           `db:"score" json:"score"`
+	ModelVersion string            `db:"model_version" json:"model_version"`
+	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type AssetSearchFt struct {
+	OriginalFilename string `db:"original_filename" json:"original_filename"`
 }
 
 type AssetStack struct {
-	StackID          pgtype.UUID        `db:"stack_id" json:"stack_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	StackKind        string             `db:"stack_kind" json:"stack_kind"`
-	CoverMediaItemID pgtype.UUID        `db:"cover_media_item_id" json:"cover_media_item_id"`
-	GroupKey         *string            `db:"group_key" json:"group_key"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	StackID          uuid.UUID         `db:"stack_id" json:"stack_id"`
+	OwnerID          *int32            `db:"owner_id" json:"owner_id"`
+	RepositoryID     uuid.NullUUID     `db:"repository_id" json:"repository_id"`
+	StackKind        string            `db:"stack_kind" json:"stack_kind"`
+	CoverMediaItemID uuid.NullUUID     `db:"cover_media_item_id" json:"cover_media_item_id"`
+	GroupKey         *string           `db:"group_key" json:"group_key"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type AssetStackMember struct {
-	MediaItemID pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
-	StackID     pgtype.UUID        `db:"stack_id" json:"stack_id"`
-	Position    *int32             `db:"position" json:"position"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	MediaItemID uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	StackID     uuid.UUID         `db:"stack_id" json:"stack_id"`
+	Position    int64             `db:"position" json:"position"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type AssetTag struct {
-	AssetID    pgtype.UUID    `db:"asset_id" json:"asset_id"`
-	TagID      int32          `db:"tag_id" json:"tag_id"`
-	Confidence pgtype.Numeric `db:"confidence" json:"confidence"`
-	Source     string         `db:"source" json:"source"`
+	AssetID    uuid.UUID `db:"asset_id" json:"asset_id"`
+	TagID      int32     `db:"tag_id" json:"tag_id"`
+	Confidence float64   `db:"confidence" json:"confidence"`
+	Source     string    `db:"source" json:"source"`
 }
 
 type ClassifierDefinition struct {
-	ID                  int32              `db:"id" json:"id"`
-	Slug                string             `db:"slug" json:"slug"`
-	DisplayName         string             `db:"display_name" json:"display_name"`
-	TagName             string             `db:"tag_name" json:"tag_name"`
-	Category            string             `db:"category" json:"category"`
-	PositivePrompts     []string           `db:"positive_prompts" json:"positive_prompts"`
-	NegativePrompts     []string           `db:"negative_prompts" json:"negative_prompts"`
-	Threshold           float32            `db:"threshold" json:"threshold"`
-	Enabled             bool               `db:"enabled" json:"enabled"`
-	PositivePrototype   *pgvector.Vector   `db:"positive_prototype" json:"positive_prototype"`
-	NegativePrototype   *pgvector.Vector   `db:"negative_prototype" json:"negative_prototype"`
-	PrototypeModel      *string            `db:"prototype_model" json:"prototype_model"`
-	PrototypeDimensions *int32             `db:"prototype_dimensions" json:"prototype_dimensions"`
-	PrototypeBuiltAt    pgtype.Timestamptz `db:"prototype_built_at" json:"prototype_built_at"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                  int32             `db:"id" json:"id"`
+	Slug                string            `db:"slug" json:"slug"`
+	DisplayName         string            `db:"display_name" json:"display_name"`
+	TagName             string            `db:"tag_name" json:"tag_name"`
+	Category            string            `db:"category" json:"category"`
+	PositivePrompts     dbtypes.Strings   `db:"positive_prompts" json:"positive_prompts"`
+	NegativePrompts     dbtypes.Strings   `db:"negative_prompts" json:"negative_prompts"`
+	Threshold           float64           `db:"threshold" json:"threshold"`
+	Enabled             bool              `db:"enabled" json:"enabled"`
+	PositivePrototype   dbtypes.Vector    `db:"positive_prototype" json:"positive_prototype"`
+	NegativePrototype   dbtypes.Vector    `db:"negative_prototype" json:"negative_prototype"`
+	PrototypeModel      *string           `db:"prototype_model" json:"prototype_model"`
+	PrototypeDimensions *int64            `db:"prototype_dimensions" json:"prototype_dimensions"`
+	PrototypeBuiltAt    dbtypes.Timestamp `db:"prototype_built_at" json:"prototype_built_at"`
+	CreatedAt           dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt           dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type CloudCredential struct {
-	CredentialID     pgtype.UUID        `db:"credential_id" json:"credential_id"`
-	Provider         string             `db:"provider" json:"provider"`
-	DisplayName      string             `db:"display_name" json:"display_name"`
-	IdentityHash     string             `db:"identity_hash" json:"identity_hash"`
-	MaskedIdentity   string             `db:"masked_identity" json:"masked_identity"`
-	Status           string             `db:"status" json:"status"`
-	ArtifactDir      *string            `db:"artifact_dir" json:"artifact_dir"`
-	OwnerID          int32              `db:"owner_id" json:"owner_id"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	PublicConfig     []byte             `db:"public_config" json:"public_config"`
-	SecretCiphertext []byte             `db:"secret_ciphertext" json:"secret_ciphertext"`
+	CredentialID     uuid.UUID         `db:"credential_id" json:"credential_id"`
+	Provider         string            `db:"provider" json:"provider"`
+	DisplayName      string            `db:"display_name" json:"display_name"`
+	IdentityHash     string            `db:"identity_hash" json:"identity_hash"`
+	MaskedIdentity   string            `db:"masked_identity" json:"masked_identity"`
+	Status           string            `db:"status" json:"status"`
+	ArtifactDir      *string           `db:"artifact_dir" json:"artifact_dir"`
+	OwnerID          int32             `db:"owner_id" json:"owner_id"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	PublicConfig     dbtypes.JSON      `db:"public_config" json:"public_config"`
+	SecretCiphertext []byte            `db:"secret_ciphertext" json:"secret_ciphertext"`
 }
 
 type CloudImportRun struct {
-	RunID           pgtype.UUID        `db:"run_id" json:"run_id"`
-	RepositoryID    pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	CredentialID    pgtype.UUID        `db:"credential_id" json:"credential_id"`
-	Provider        string             `db:"provider" json:"provider"`
-	Status          string             `db:"status" json:"status"`
-	TotalSeen       int64              `db:"total_seen" json:"total_seen"`
-	DownloadedCount int64              `db:"downloaded_count" json:"downloaded_count"`
-	ImportedCount   int64              `db:"imported_count" json:"imported_count"`
-	SkippedCount    int64              `db:"skipped_count" json:"skipped_count"`
-	FailedCount     int64              `db:"failed_count" json:"failed_count"`
-	Error           *string            `db:"error" json:"error"`
-	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
-	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	OwnerID         int32              `db:"owner_id" json:"owner_id"`
+	RunID           uuid.UUID         `db:"run_id" json:"run_id"`
+	RepositoryID    uuid.UUID         `db:"repository_id" json:"repository_id"`
+	CredentialID    uuid.UUID         `db:"credential_id" json:"credential_id"`
+	OwnerID         int32             `db:"owner_id" json:"owner_id"`
+	Provider        string            `db:"provider" json:"provider"`
+	Status          string            `db:"status" json:"status"`
+	TotalSeen       int64             `db:"total_seen" json:"total_seen"`
+	DownloadedCount int64             `db:"downloaded_count" json:"downloaded_count"`
+	ImportedCount   int64             `db:"imported_count" json:"imported_count"`
+	SkippedCount    int64             `db:"skipped_count" json:"skipped_count"`
+	FailedCount     int64             `db:"failed_count" json:"failed_count"`
+	Error           *string           `db:"error" json:"error"`
+	StartedAt       dbtypes.Timestamp `db:"started_at" json:"started_at"`
+	FinishedAt      dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type CloudSyncCursor struct {
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	Provider     string             `db:"provider" json:"provider"`
-	CursorValue  string             `db:"cursor_value" json:"cursor_value"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	CredentialID pgtype.UUID        `db:"credential_id" json:"credential_id"`
+	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Provider     string            `db:"provider" json:"provider"`
+	CursorValue  string            `db:"cursor_value" json:"cursor_value"`
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	CredentialID uuid.UUID         `db:"credential_id" json:"credential_id"`
 }
 
 type CloudSyncFile struct {
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	Provider     string             `db:"provider" json:"provider"`
-	RemoteKey    string             `db:"remote_key" json:"remote_key"`
-	Etag         string             `db:"etag" json:"etag"`
-	LocalHash    string             `db:"local_hash" json:"local_hash"`
-	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	SyncedAt     pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
-	CredentialID pgtype.UUID        `db:"credential_id" json:"credential_id"`
+	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Provider     string            `db:"provider" json:"provider"`
+	RemoteKey    string            `db:"remote_key" json:"remote_key"`
+	Etag         string            `db:"etag" json:"etag"`
+	LocalHash    string            `db:"local_hash" json:"local_hash"`
+	AssetID      uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+	SyncedAt     dbtypes.Timestamp `db:"synced_at" json:"synced_at"`
+	CredentialID uuid.UUID         `db:"credential_id" json:"credential_id"`
 }
 
 type DuplicateGroup struct {
-	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
-	RepositoryID             pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	OwnerID                  *int32             `db:"owner_id" json:"owner_id"`
-	Method                   string             `db:"method" json:"method"`
-	Status                   string             `db:"status" json:"status"`
-	AssetCount               int32              `db:"asset_count" json:"asset_count"`
-	TotalSize                int64              `db:"total_size" json:"total_size"`
-	RecommendedKeeperAssetID pgtype.UUID        `db:"recommended_keeper_asset_id" json:"recommended_keeper_asset_id"`
-	KeeperAssetID            pgtype.UUID        `db:"keeper_asset_id" json:"keeper_asset_id"`
-	DetectionVersion         string             `db:"detection_version" json:"detection_version"`
-	DetectedAt               pgtype.Timestamptz `db:"detected_at" json:"detected_at"`
-	ResolvedAt               pgtype.Timestamptz `db:"resolved_at" json:"resolved_at"`
-	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	GroupID                  uuid.UUID         `db:"group_id" json:"group_id"`
+	RepositoryID             uuid.UUID         `db:"repository_id" json:"repository_id"`
+	OwnerID                  *int32            `db:"owner_id" json:"owner_id"`
+	Method                   string            `db:"method" json:"method"`
+	Status                   string            `db:"status" json:"status"`
+	AssetCount               int64             `db:"asset_count" json:"asset_count"`
+	TotalSize                int64             `db:"total_size" json:"total_size"`
+	RecommendedKeeperAssetID uuid.NullUUID     `db:"recommended_keeper_asset_id" json:"recommended_keeper_asset_id"`
+	KeeperAssetID            uuid.NullUUID     `db:"keeper_asset_id" json:"keeper_asset_id"`
+	DetectionVersion         string            `db:"detection_version" json:"detection_version"`
+	DetectedAt               dbtypes.Timestamp `db:"detected_at" json:"detected_at"`
+	ResolvedAt               dbtypes.Timestamp `db:"resolved_at" json:"resolved_at"`
+	CreatedAt                dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt                dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type DuplicateGroupAsset struct {
-	GroupID  pgtype.UUID `db:"group_id" json:"group_id"`
-	AssetID  pgtype.UUID `db:"asset_id" json:"asset_id"`
-	Role     string      `db:"role" json:"role"`
-	FileSize int64       `db:"file_size" json:"file_size"`
+	GroupID  uuid.UUID `db:"group_id" json:"group_id"`
+	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
+	Role     string    `db:"role" json:"role"`
+	FileSize int64     `db:"file_size" json:"file_size"`
 }
 
 type DuplicateGroupEdge struct {
-	GroupID    pgtype.UUID `db:"group_id" json:"group_id"`
-	AssetIDA   pgtype.UUID `db:"asset_id_a" json:"asset_id_a"`
-	AssetIDB   pgtype.UUID `db:"asset_id_b" json:"asset_id_b"`
-	Method     string      `db:"method" json:"method"`
-	Distance   float64     `db:"distance" json:"distance"`
-	Confidence float64     `db:"confidence" json:"confidence"`
+	GroupID    uuid.UUID `db:"group_id" json:"group_id"`
+	AssetIDA   uuid.UUID `db:"asset_id_a" json:"asset_id_a"`
+	AssetIDB   uuid.UUID `db:"asset_id_b" json:"asset_id_b"`
+	Method     string    `db:"method" json:"method"`
+	Distance   float64   `db:"distance" json:"distance"`
+	Confidence float64   `db:"confidence" json:"confidence"`
 }
 
 type Embedding struct {
-	ID                  int32              `db:"id" json:"id"`
-	AssetID             pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	EmbeddingType       string             `db:"embedding_type" json:"embedding_type"`
-	EmbeddingModel      string             `db:"embedding_model" json:"embedding_model"`
-	EmbeddingDimensions int32              `db:"embedding_dimensions" json:"embedding_dimensions"`
-	Vector              *pgvector.Vector   `db:"vector" json:"vector"`
-	IsPrimary           *bool              `db:"is_primary" json:"is_primary"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	SpaceID             int64              `db:"space_id" json:"space_id"`
+	ID                  int64             `db:"id" json:"id"`
+	AssetID             uuid.UUID         `db:"asset_id" json:"asset_id"`
+	EmbeddingType       string            `db:"embedding_type" json:"embedding_type"`
+	EmbeddingModel      string            `db:"embedding_model" json:"embedding_model"`
+	EmbeddingDimensions int64             `db:"embedding_dimensions" json:"embedding_dimensions"`
+	Vector              dbtypes.Vector    `db:"vector" json:"vector"`
+	IsPrimary           bool              `db:"is_primary" json:"is_primary"`
+	CreatedAt           dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt           dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	SpaceID             int64             `db:"space_id" json:"space_id"`
 }
 
 type EmbeddingSpace struct {
-	ID              int64              `db:"id" json:"id"`
-	EmbeddingType   string             `db:"embedding_type" json:"embedding_type"`
-	ModelID         string             `db:"model_id" json:"model_id"`
-	Dimensions      int32              `db:"dimensions" json:"dimensions"`
-	DistanceMetric  string             `db:"distance_metric" json:"distance_metric"`
-	SearchEnabled   bool               `db:"search_enabled" json:"search_enabled"`
-	IsDefaultSearch bool               `db:"is_default_search" json:"is_default_search"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID              int64             `db:"id" json:"id"`
+	EmbeddingType   string            `db:"embedding_type" json:"embedding_type"`
+	ModelID         string            `db:"model_id" json:"model_id"`
+	Dimensions      int64             `db:"dimensions" json:"dimensions"`
+	DistanceMetric  string            `db:"distance_metric" json:"distance_metric"`
+	SearchEnabled   bool              `db:"search_enabled" json:"search_enabled"`
+	IsDefaultSearch bool              `db:"is_default_search" json:"is_default_search"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type FaceCluster struct {
-	ClusterID            int32              `db:"cluster_id" json:"cluster_id"`
-	OwnerID              *int32             `db:"owner_id" json:"owner_id"`
-	ClusterName          *string            `db:"cluster_name" json:"cluster_name"`
-	RepresentativeFaceID *int32             `db:"representative_face_id" json:"representative_face_id"`
-	ConfidenceScore      *float32           `db:"confidence_score" json:"confidence_score"`
-	MemberCount          *int32             `db:"member_count" json:"member_count"`
-	IsConfirmed          *bool              `db:"is_confirmed" json:"is_confirmed"`
-	IsHidden             bool               `db:"is_hidden" json:"is_hidden"`
-	HiddenAt             pgtype.Timestamptz `db:"hidden_at" json:"hidden_at"`
-	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ClusterID            int32             `db:"cluster_id" json:"cluster_id"`
+	OwnerID              *int32            `db:"owner_id" json:"owner_id"`
+	ClusterName          *string           `db:"cluster_name" json:"cluster_name"`
+	RepresentativeFaceID *int64            `db:"representative_face_id" json:"representative_face_id"`
+	ConfidenceScore      float64           `db:"confidence_score" json:"confidence_score"`
+	MemberCount          int64             `db:"member_count" json:"member_count"`
+	IsConfirmed          bool              `db:"is_confirmed" json:"is_confirmed"`
+	IsHidden             bool              `db:"is_hidden" json:"is_hidden"`
+	HiddenAt             dbtypes.Timestamp `db:"hidden_at" json:"hidden_at"`
+	CreatedAt            dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt            dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type FaceClusterMember struct {
-	ID              int32              `db:"id" json:"id"`
-	ClusterID       int32              `db:"cluster_id" json:"cluster_id"`
-	FaceID          int32              `db:"face_id" json:"face_id"`
-	SimilarityScore float32            `db:"similarity_score" json:"similarity_score"`
-	Confidence      float32            `db:"confidence" json:"confidence"`
-	IsManual        *bool              `db:"is_manual" json:"is_manual"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID              int32             `db:"id" json:"id"`
+	ClusterID       int32             `db:"cluster_id" json:"cluster_id"`
+	FaceID          int32             `db:"face_id" json:"face_id"`
+	SimilarityScore float64           `db:"similarity_score" json:"similarity_score"`
+	Confidence      float64           `db:"confidence" json:"confidence"`
+	IsManual        bool              `db:"is_manual" json:"is_manual"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type FaceItem struct {
-	ID             int32              `db:"id" json:"id"`
-	AssetID        pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	FaceID         *string            `db:"face_id" json:"face_id"`
-	BoundingBox    []byte             `db:"bounding_box" json:"bounding_box"`
-	Confidence     float32            `db:"confidence" json:"confidence"`
-	AgeGroup       *string            `db:"age_group" json:"age_group"`
-	Gender         *string            `db:"gender" json:"gender"`
-	Ethnicity      *string            `db:"ethnicity" json:"ethnicity"`
-	Expression     *string            `db:"expression" json:"expression"`
-	FaceSize       *int32             `db:"face_size" json:"face_size"`
-	FaceImagePath  *string            `db:"face_image_path" json:"face_image_path"`
-	Embedding      *pgvector.Vector   `db:"embedding" json:"embedding"`
-	EmbeddingModel *string            `db:"embedding_model" json:"embedding_model"`
-	IsPrimary      *bool              `db:"is_primary" json:"is_primary"`
-	QualityScore   *float32           `db:"quality_score" json:"quality_score"`
-	BlurScore      *float32           `db:"blur_score" json:"blur_score"`
-	PoseAngles     []byte             `db:"pose_angles" json:"pose_angles"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID             int32             `db:"id" json:"id"`
+	AssetID        uuid.UUID         `db:"asset_id" json:"asset_id"`
+	FaceID         *string           `db:"face_id" json:"face_id"`
+	BoundingBox    dbtypes.JSON      `db:"bounding_box" json:"bounding_box"`
+	Confidence     float64           `db:"confidence" json:"confidence"`
+	AgeGroup       *string           `db:"age_group" json:"age_group"`
+	Gender         *string           `db:"gender" json:"gender"`
+	Ethnicity      *string           `db:"ethnicity" json:"ethnicity"`
+	Expression     *string           `db:"expression" json:"expression"`
+	FaceSize       *int64            `db:"face_size" json:"face_size"`
+	FaceImagePath  *string           `db:"face_image_path" json:"face_image_path"`
+	Embedding      dbtypes.Vector    `db:"embedding" json:"embedding"`
+	EmbeddingModel *string           `db:"embedding_model" json:"embedding_model"`
+	IsPrimary      bool              `db:"is_primary" json:"is_primary"`
+	QualityScore   *float64          `db:"quality_score" json:"quality_score"`
+	BlurScore      *float64          `db:"blur_score" json:"blur_score"`
+	PoseAngles     dbtypes.JSON      `db:"pose_angles" json:"pose_angles"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type FaceResult struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	ModelID          string             `db:"model_id" json:"model_id"`
-	TotalFaces       int32              `db:"total_faces" json:"total_faces"`
-	ProcessingTimeMs *int32             `db:"processing_time_ms" json:"processing_time_ms"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
+	ModelID          string            `db:"model_id" json:"model_id"`
+	TotalFaces       int64             `db:"total_faces" json:"total_faces"`
+	ProcessingTimeMs *int64            `db:"processing_time_ms" json:"processing_time_ms"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type LocationCluster struct {
-	ClusterID         pgtype.UUID        `db:"cluster_id" json:"cluster_id"`
-	OwnerID           *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID      pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	Geohash           string             `db:"geohash" json:"geohash"`
-	Precision         int32              `db:"precision" json:"precision"`
-	CentroidLatitude  float64            `db:"centroid_latitude" json:"centroid_latitude"`
-	CentroidLongitude float64            `db:"centroid_longitude" json:"centroid_longitude"`
-	PhotoCount        int32              `db:"photo_count" json:"photo_count"`
-	Label             *string            `db:"label" json:"label"`
-	Country           *string            `db:"country" json:"country"`
-	Region            *string            `db:"region" json:"region"`
-	City              *string            `db:"city" json:"city"`
-	Provider          *string            `db:"provider" json:"provider"`
-	GeocodeStatus     string             `db:"geocode_status" json:"geocode_status"`
-	GeocodedAt        pgtype.Timestamptz `db:"geocoded_at" json:"geocoded_at"`
-	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	SearchVector      string             `db:"search_vector" json:"search_vector"`
+	ClusterID         uuid.UUID         `db:"cluster_id" json:"cluster_id"`
+	OwnerID           *int32            `db:"owner_id" json:"owner_id"`
+	RepositoryID      uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Geohash           string            `db:"geohash" json:"geohash"`
+	Precision         int64             `db:"precision" json:"precision"`
+	CentroidLatitude  float64           `db:"centroid_latitude" json:"centroid_latitude"`
+	CentroidLongitude float64           `db:"centroid_longitude" json:"centroid_longitude"`
+	PhotoCount        int64             `db:"photo_count" json:"photo_count"`
+	Label             *string           `db:"label" json:"label"`
+	Country           *string           `db:"country" json:"country"`
+	Region            *string           `db:"region" json:"region"`
+	City              *string           `db:"city" json:"city"`
+	Provider          *string           `db:"provider" json:"provider"`
+	GeocodeStatus     string            `db:"geocode_status" json:"geocode_status"`
+	GeocodedAt        dbtypes.Timestamp `db:"geocoded_at" json:"geocoded_at"`
+	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type LocationClusterAsset struct {
-	ClusterID pgtype.UUID        `db:"cluster_id" json:"cluster_id"`
-	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ClusterID uuid.UUID         `db:"cluster_id" json:"cluster_id"`
+	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
+	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
+}
+
+type LocationSearchFt struct {
+	Label   string `db:"label" json:"label"`
+	Country string `db:"country" json:"country"`
+	Region  string `db:"region" json:"region"`
+	City    string `db:"city" json:"city"`
+	Geohash string `db:"geohash" json:"geohash"`
 }
 
 type MediaItem struct {
-	MediaItemID    pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
-	OwnerID        *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID   pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	MediaKind      string             `db:"media_kind" json:"media_kind"`
-	PrimaryAssetID pgtype.UUID        `db:"primary_asset_id" json:"primary_asset_id"`
-	GroupKey       *string            `db:"group_key" json:"group_key"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	MediaItemID    uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	OwnerID        *int32            `db:"owner_id" json:"owner_id"`
+	RepositoryID   uuid.NullUUID     `db:"repository_id" json:"repository_id"`
+	MediaKind      string            `db:"media_kind" json:"media_kind"`
+	PrimaryAssetID uuid.NullUUID     `db:"primary_asset_id" json:"primary_asset_id"`
+	GroupKey       *string           `db:"group_key" json:"group_key"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type MediaItemAsset struct {
-	AssetID     pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	MediaItemID pgtype.UUID        `db:"media_item_id" json:"media_item_id"`
-	Relation    StackRelation      `db:"relation" json:"relation"`
-	Position    *int32             `db:"position" json:"position"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	AssetID     uuid.UUID         `db:"asset_id" json:"asset_id"`
+	MediaItemID uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	Relation    string            `db:"relation" json:"relation"`
+	Position    int64             `db:"position" json:"position"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type OcrResult struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	ModelID          string             `db:"model_id" json:"model_id"`
-	TotalCount       int32              `db:"total_count" json:"total_count"`
-	ProcessingTimeMs *int32             `db:"processing_time_ms" json:"processing_time_ms"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	FullText         string             `db:"full_text" json:"full_text"`
+	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
+	ModelID          string            `db:"model_id" json:"model_id"`
+	TotalCount       int64             `db:"total_count" json:"total_count"`
+	ProcessingTimeMs *int64            `db:"processing_time_ms" json:"processing_time_ms"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	FullText         string            `db:"full_text" json:"full_text"`
+}
+
+type OcrSearchFt struct {
+	FullText string `db:"full_text" json:"full_text"`
 }
 
 type OcrTextItem struct {
-	ID          int32              `db:"id" json:"id"`
-	AssetID     pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	TextContent string             `db:"text_content" json:"text_content"`
-	Confidence  float32            `db:"confidence" json:"confidence"`
-	BoundingBox []byte             `db:"bounding_box" json:"bounding_box"`
-	TextLength  int32              `db:"text_length" json:"text_length"`
-	AreaPixels  *float32           `db:"area_pixels" json:"area_pixels"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID          int32             `db:"id" json:"id"`
+	AssetID     uuid.UUID         `db:"asset_id" json:"asset_id"`
+	TextContent string            `db:"text_content" json:"text_content"`
+	Confidence  float64           `db:"confidence" json:"confidence"`
+	BoundingBox dbtypes.JSON      `db:"bounding_box" json:"bounding_box"`
+	TextLength  int64             `db:"text_length" json:"text_length"`
+	AreaPixels  *float64          `db:"area_pixels" json:"area_pixels"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type RefreshToken struct {
-	TokenID   int32              `db:"token_id" json:"token_id"`
-	UserID    int32              `db:"user_id" json:"user_id"`
-	Token     string             `db:"token" json:"token"`
-	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	IsRevoked *bool              `db:"is_revoked" json:"is_revoked"`
+	TokenID   int64             `db:"token_id" json:"token_id"`
+	UserID    int32             `db:"user_id" json:"user_id"`
+	Token     string            `db:"token" json:"token"`
+	ExpiresAt dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	IsRevoked bool              `db:"is_revoked" json:"is_revoked"`
 }
 
 type RegistrationSession struct {
-	SessionID            pgtype.UUID        `db:"session_id" json:"session_id"`
-	Username             string             `db:"username" json:"username"`
-	PasswordHash         string             `db:"password_hash" json:"password_hash"`
-	Role                 string             `db:"role" json:"role"`
-	WebauthnUserHandle   []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
-	TotpSecretCiphertext []byte             `db:"totp_secret_ciphertext" json:"totp_secret_ciphertext"`
-	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	ExpiresAt            pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	SessionID            uuid.UUID         `db:"session_id" json:"session_id"`
+	Username             string            `db:"username" json:"username"`
+	PasswordHash         string            `db:"password_hash" json:"password_hash"`
+	Role                 string            `db:"role" json:"role"`
+	WebauthnUserHandle   []byte            `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	TotpSecretCiphertext []byte            `db:"totp_secret_ciphertext" json:"totp_secret_ciphertext"`
+	CreatedAt            dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	ExpiresAt            dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 type Repository struct {
-	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	RepoID         uuid.UUID                `db:"repo_id" json:"repo_id"`
 	Name           string                   `db:"name" json:"name"`
 	Path           string                   `db:"path" json:"path"`
 	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
 	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
-	LastSync       pgtype.Timestamptz       `db:"last_sync" json:"last_sync"`
-	CreatedAt      pgtype.Timestamptz       `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	LastSync       dbtypes.Timestamp        `db:"last_sync" json:"last_sync"`
+	CreatedAt      dbtypes.Timestamp        `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
 	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
 	Role           dbtypes.RepoRole         `db:"role" json:"role"`
-	RootID         pgtype.UUID              `db:"root_id" json:"root_id"`
+	RootID         uuid.NullUUID            `db:"root_id" json:"root_id"`
 }
 
 type RepositoryCloudBinding struct {
-	RepositoryID    pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	CredentialID    pgtype.UUID        `db:"credential_id" json:"credential_id"`
-	Provider        string             `db:"provider" json:"provider"`
-	Enabled         bool               `db:"enabled" json:"enabled"`
-	LastImportRunID pgtype.UUID        `db:"last_import_run_id" json:"last_import_run_id"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	OwnerID         int32              `db:"owner_id" json:"owner_id"`
+	RepositoryID    uuid.UUID         `db:"repository_id" json:"repository_id"`
+	CredentialID    uuid.UUID         `db:"credential_id" json:"credential_id"`
+	OwnerID         int32             `db:"owner_id" json:"owner_id"`
+	Provider        string            `db:"provider" json:"provider"`
+	Enabled         bool              `db:"enabled" json:"enabled"`
+	LastImportRunID uuid.NullUUID     `db:"last_import_run_id" json:"last_import_run_id"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryDefault struct {
-	ID                int32              `db:"id" json:"id"`
-	Strategy          string             `db:"strategy" json:"strategy"`
-	DuplicateHandling string             `db:"duplicate_handling" json:"duplicate_handling"`
-	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                int64             `db:"id" json:"id"`
+	Strategy          string            `db:"strategy" json:"strategy"`
+	DuplicateHandling string            `db:"duplicate_handling" json:"duplicate_handling"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryRoot struct {
-	RootID    pgtype.UUID                  `db:"root_id" json:"root_id"`
+	RootID    uuid.UUID                    `db:"root_id" json:"root_id"`
 	Name      string                       `db:"name" json:"name"`
 	Path      string                       `db:"path" json:"path"`
 	Kind      dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
 	Status    dbtypes.RepositoryRootStatus `db:"status" json:"status"`
-	CreatedAt pgtype.Timestamptz           `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz           `db:"updated_at" json:"updated_at"`
+	CreatedAt dbtypes.Timestamp            `db:"created_at" json:"created_at"`
+	UpdatedAt dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryScanRun struct {
-	ScanID          pgtype.UUID        `db:"scan_id" json:"scan_id"`
-	RepositoryID    pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	Mode            string             `db:"mode" json:"mode"`
-	RequestedBy     *string            `db:"requested_by" json:"requested_by"`
-	Status          string             `db:"status" json:"status"`
-	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
-	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
-	DiscoveredCount int64              `db:"discovered_count" json:"discovered_count"`
-	UpdatedCount    int64              `db:"updated_count" json:"updated_count"`
-	DeletedCount    int64              `db:"deleted_count" json:"deleted_count"`
-	SkippedCount    int64              `db:"skipped_count" json:"skipped_count"`
-	Error           *string            `db:"error" json:"error"`
+	ScanID          uuid.UUID         `db:"scan_id" json:"scan_id"`
+	RepositoryID    uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Mode            string            `db:"mode" json:"mode"`
+	RequestedBy     *string           `db:"requested_by" json:"requested_by"`
+	Status          string            `db:"status" json:"status"`
+	StartedAt       dbtypes.Timestamp `db:"started_at" json:"started_at"`
+	FinishedAt      dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	DiscoveredCount int64             `db:"discovered_count" json:"discovered_count"`
+	UpdatedCount    int64             `db:"updated_count" json:"updated_count"`
+	DeletedCount    int64             `db:"deleted_count" json:"deleted_count"`
+	SkippedCount    int64             `db:"skipped_count" json:"skipped_count"`
+	Error           *string           `db:"error" json:"error"`
 }
 
 type ReverseGeocodeCache struct {
-	CacheKey    string             `db:"cache_key" json:"cache_key"`
-	Provider    string             `db:"provider" json:"provider"`
-	Language    string             `db:"language" json:"language"`
-	Latitude    float64            `db:"latitude" json:"latitude"`
-	Longitude   float64            `db:"longitude" json:"longitude"`
-	Label       *string            `db:"label" json:"label"`
-	Country     *string            `db:"country" json:"country"`
-	Region      *string            `db:"region" json:"region"`
-	City        *string            `db:"city" json:"city"`
-	RawResponse []byte             `db:"raw_response" json:"raw_response"`
-	QueriedAt   pgtype.Timestamptz `db:"queried_at" json:"queried_at"`
-	ExpiresAt   pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CacheKey    string            `db:"cache_key" json:"cache_key"`
+	Provider    string            `db:"provider" json:"provider"`
+	Language    string            `db:"language" json:"language"`
+	Latitude    float64           `db:"latitude" json:"latitude"`
+	Longitude   float64           `db:"longitude" json:"longitude"`
+	Label       *string           `db:"label" json:"label"`
+	Country     *string           `db:"country" json:"country"`
+	Region      *string           `db:"region" json:"region"`
+	City        *string           `db:"city" json:"city"`
+	RawResponse dbtypes.JSON      `db:"raw_response" json:"raw_response"`
+	QueriedAt   dbtypes.Timestamp `db:"queried_at" json:"queried_at"`
+	ExpiresAt   dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 }
 
 type SearchEmbedding struct {
-	ID        int64              `db:"id" json:"id"`
-	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	SpaceID   int64              `db:"space_id" json:"space_id"`
-	FrameTsMs *int32             `db:"frame_ts_ms" json:"frame_ts_ms"`
-	Vector    *pgvector.Vector   `db:"vector" json:"vector"`
-	ModelID   string             `db:"model_id" json:"model_id"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID        int64             `db:"id" json:"id"`
+	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
+	SpaceID   int64             `db:"space_id" json:"space_id"`
+	FrameTsMs *int64            `db:"frame_ts_ms" json:"frame_ts_ms"`
+	Vector    dbtypes.Vector    `db:"vector" json:"vector"`
+	ModelID   string            `db:"model_id" json:"model_id"`
+	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type Setting struct {
-	ID                          int32              `db:"id" json:"id"`
-	LlmAgentEnabled             bool               `db:"llm_agent_enabled" json:"llm_agent_enabled"`
-	LlmProvider                 string             `db:"llm_provider" json:"llm_provider"`
-	LlmModelName                string             `db:"llm_model_name" json:"llm_model_name"`
-	LlmBaseUrl                  string             `db:"llm_base_url" json:"llm_base_url"`
-	LlmApiKeyCiphertext         []byte             `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
-	LlmApiKeyConfigured         bool               `db:"llm_api_key_configured" json:"llm_api_key_configured"`
-	MlAuto                      string             `db:"ml_auto" json:"ml_auto"`
-	MlSemanticEnabled           bool               `db:"ml_semantic_enabled" json:"ml_semantic_enabled"`
-	MlOcrEnabled                bool               `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
-	MlCaptionEnabled            bool               `db:"ml_caption_enabled" json:"ml_caption_enabled"`
-	MlFaceEnabled               bool               `db:"ml_face_enabled" json:"ml_face_enabled"`
-	CreatedAt                   pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UpdatedBy                   *int32             `db:"updated_by" json:"updated_by"`
-	MlBioclipEnabled            bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
-	BackupEnabled               bool               `db:"backup_enabled" json:"backup_enabled"`
-	BackupIntervalHours         int32              `db:"backup_interval_hours" json:"backup_interval_hours"`
-	BackupKeepLast              int32              `db:"backup_keep_last" json:"backup_keep_last"`
-	MlVideoSemanticEnabled      bool               `db:"ml_video_semantic_enabled" json:"ml_video_semantic_enabled"`
-	MlVideoMaxFrames            int32              `db:"ml_video_max_frames" json:"ml_video_max_frames"`
-	MlVideoLongThresholdSeconds int32              `db:"ml_video_long_threshold_seconds" json:"ml_video_long_threshold_seconds"`
-	MlVideoSceneThreshold       float64            `db:"ml_video_scene_threshold" json:"ml_video_scene_threshold"`
+	ID                          int64             `db:"id" json:"id"`
+	LlmAgentEnabled             bool              `db:"llm_agent_enabled" json:"llm_agent_enabled"`
+	LlmProvider                 string            `db:"llm_provider" json:"llm_provider"`
+	LlmModelName                string            `db:"llm_model_name" json:"llm_model_name"`
+	LlmBaseUrl                  string            `db:"llm_base_url" json:"llm_base_url"`
+	LlmApiKeyCiphertext         []byte            `db:"llm_api_key_ciphertext" json:"llm_api_key_ciphertext"`
+	LlmApiKeyConfigured         bool              `db:"llm_api_key_configured" json:"llm_api_key_configured"`
+	MlAuto                      string            `db:"ml_auto" json:"ml_auto"`
+	MlSemanticEnabled           bool              `db:"ml_semantic_enabled" json:"ml_semantic_enabled"`
+	MlOcrEnabled                bool              `db:"ml_ocr_enabled" json:"ml_ocr_enabled"`
+	MlCaptionEnabled            bool              `db:"ml_caption_enabled" json:"ml_caption_enabled"`
+	MlFaceEnabled               bool              `db:"ml_face_enabled" json:"ml_face_enabled"`
+	MlBioclipEnabled            bool              `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
+	MlVideoSemanticEnabled      bool              `db:"ml_video_semantic_enabled" json:"ml_video_semantic_enabled"`
+	MlVideoMaxFrames            int64             `db:"ml_video_max_frames" json:"ml_video_max_frames"`
+	MlVideoLongThresholdSeconds int64             `db:"ml_video_long_threshold_seconds" json:"ml_video_long_threshold_seconds"`
+	MlVideoSceneThreshold       float64           `db:"ml_video_scene_threshold" json:"ml_video_scene_threshold"`
+	BackupEnabled               bool              `db:"backup_enabled" json:"backup_enabled"`
+	BackupIntervalHours         int64             `db:"backup_interval_hours" json:"backup_interval_hours"`
+	BackupKeepLast              int64             `db:"backup_keep_last" json:"backup_keep_last"`
+	CreatedAt                   dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt                   dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	UpdatedBy                   *int32            `db:"updated_by" json:"updated_by"`
 }
 
 type ShareLink struct {
-	ShareID          pgtype.UUID        `db:"share_id" json:"share_id"`
-	OwnerID          int32              `db:"owner_id" json:"owner_id"`
-	TokenHash        []byte             `db:"token_hash" json:"token_hash"`
-	Title            string             `db:"title" json:"title"`
-	Description      *string            `db:"description" json:"description"`
-	SourceKind       string             `db:"source_kind" json:"source_kind"`
-	SourceRef        *string            `db:"source_ref" json:"source_ref"`
-	AssetIds         []pgtype.UUID      `db:"asset_ids" json:"asset_ids"`
-	AssetCount       int32              `db:"asset_count" json:"asset_count"`
-	AllowDownload    bool               `db:"allow_download" json:"allow_download"`
-	IncludeOriginals bool               `db:"include_originals" json:"include_originals"`
-	Status           string             `db:"status" json:"status"`
-	ExpiresAt        pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	RevokedAt        pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
-	LastViewedAt     pgtype.Timestamptz `db:"last_viewed_at" json:"last_viewed_at"`
-	ViewCount        int64              `db:"view_count" json:"view_count"`
+	ShareID          uuid.UUID         `db:"share_id" json:"share_id"`
+	OwnerID          int32             `db:"owner_id" json:"owner_id"`
+	TokenHash        []byte            `db:"token_hash" json:"token_hash"`
+	Title            string            `db:"title" json:"title"`
+	Description      *string           `db:"description" json:"description"`
+	SourceKind       string            `db:"source_kind" json:"source_kind"`
+	SourceRef        *string           `db:"source_ref" json:"source_ref"`
+	AssetIds         dbtypes.UUIDs     `db:"asset_ids" json:"asset_ids"`
+	AssetCount       int64             `db:"asset_count" json:"asset_count"`
+	AllowDownload    bool              `db:"allow_download" json:"allow_download"`
+	IncludeOriginals bool              `db:"include_originals" json:"include_originals"`
+	Status           string            `db:"status" json:"status"`
+	ExpiresAt        dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	RevokedAt        dbtypes.Timestamp `db:"revoked_at" json:"revoked_at"`
+	LastViewedAt     dbtypes.Timestamp `db:"last_viewed_at" json:"last_viewed_at"`
+	ViewCount        int64             `db:"view_count" json:"view_count"`
 }
 
 type SpeciesPrediction struct {
-	PredictionID int32              `db:"prediction_id" json:"prediction_id"`
-	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Label        string             `db:"label" json:"label"`
-	Score        float32            `db:"score" json:"score"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	PredictionID int32             `db:"prediction_id" json:"prediction_id"`
+	AssetID      uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Label        string            `db:"label" json:"label"`
+	Score        float64           `db:"score" json:"score"`
+	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
+}
+
+type SpeciesSearchFt struct {
+	Label string `db:"label" json:"label"`
 }
 
 type SystemState struct {
-	ID             int32              `db:"id" json:"id"`
-	BootstrapPhase string             `db:"bootstrap_phase" json:"bootstrap_phase"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             int64             `db:"id" json:"id"`
+	LibraryID      string            `db:"library_id" json:"library_id"`
+	BootstrapPhase string            `db:"bootstrap_phase" json:"bootstrap_phase"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type Tag struct {
 	TagID         int32   `db:"tag_id" json:"tag_id"`
 	TagName       string  `db:"tag_name" json:"tag_name"`
 	Category      *string `db:"category" json:"category"`
-	IsAiGenerated *bool   `db:"is_ai_generated" json:"is_ai_generated"`
+	IsAiGenerated bool    `db:"is_ai_generated" json:"is_ai_generated"`
 }
 
 type Thumbnail struct {
-	ThumbnailID int32              `db:"thumbnail_id" json:"thumbnail_id"`
-	AssetID     pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Size        string             `db:"size" json:"size"`
-	StoragePath string             `db:"storage_path" json:"storage_path"`
-	MimeType    string             `db:"mime_type" json:"mime_type"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ThumbnailID int32             `db:"thumbnail_id" json:"thumbnail_id"`
+	AssetID     uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Size        string            `db:"size" json:"size"`
+	StoragePath string            `db:"storage_path" json:"storage_path"`
+	MimeType    string            `db:"mime_type" json:"mime_type"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
 type User struct {
-	UserID                 int32              `db:"user_id" json:"user_id"`
-	Username               string             `db:"username" json:"username"`
-	Password               string             `db:"password" json:"password"`
-	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	IsActive               *bool              `db:"is_active" json:"is_active"`
-	LastLogin              pgtype.Timestamptz `db:"last_login" json:"last_login"`
-	DisplayName            string             `db:"display_name" json:"display_name"`
-	AvatarAssetID          pgtype.UUID        `db:"avatar_asset_id" json:"avatar_asset_id"`
-	Role                   string             `db:"role" json:"role"`
-	WebauthnUserHandle     []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
-	AuthVersion            int64              `db:"auth_version" json:"auth_version"`
-	PasswordChangeRequired bool               `db:"password_change_required" json:"password_change_required"`
+	UserID                 int32             `db:"user_id" json:"user_id"`
+	Username               string            `db:"username" json:"username"`
+	Password               string            `db:"password" json:"password"`
+	CreatedAt              dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt              dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	IsActive               bool              `db:"is_active" json:"is_active"`
+	LastLogin              dbtypes.Timestamp `db:"last_login" json:"last_login"`
+	DisplayName            string            `db:"display_name" json:"display_name"`
+	AvatarAssetID          uuid.NullUUID     `db:"avatar_asset_id" json:"avatar_asset_id"`
+	Role                   string            `db:"role" json:"role"`
+	WebauthnUserHandle     []byte            `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	AuthVersion            int64             `db:"auth_version" json:"auth_version"`
+	PasswordChangeRequired bool              `db:"password_change_required" json:"password_change_required"`
 }
 
 type UserMfaRecoveryCode struct {
-	RecoveryCodeID int32              `db:"recovery_code_id" json:"recovery_code_id"`
-	UserID         int32              `db:"user_id" json:"user_id"`
-	CodeHash       string             `db:"code_hash" json:"code_hash"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UsedAt         pgtype.Timestamptz `db:"used_at" json:"used_at"`
+	RecoveryCodeID int64             `db:"recovery_code_id" json:"recovery_code_id"`
+	UserID         int32             `db:"user_id" json:"user_id"`
+	CodeHash       string            `db:"code_hash" json:"code_hash"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UsedAt         dbtypes.Timestamp `db:"used_at" json:"used_at"`
 }
 
 type UserMfaTotpCredential struct {
-	UserID           int32              `db:"user_id" json:"user_id"`
-	SecretCiphertext []byte             `db:"secret_ciphertext" json:"secret_ciphertext"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	EnabledAt        pgtype.Timestamptz `db:"enabled_at" json:"enabled_at"`
-	LastUsedAt       pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+	UserID           int32             `db:"user_id" json:"user_id"`
+	SecretCiphertext []byte            `db:"secret_ciphertext" json:"secret_ciphertext"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EnabledAt        dbtypes.Timestamp `db:"enabled_at" json:"enabled_at"`
+	LastUsedAt       dbtypes.Timestamp `db:"last_used_at" json:"last_used_at"`
 }
 
 type UserWebauthnCredential struct {
-	UserWebauthnCredentialID int32              `db:"user_webauthn_credential_id" json:"user_webauthn_credential_id"`
-	CredentialID             []byte             `db:"credential_id" json:"credential_id"`
-	UserID                   int32              `db:"user_id" json:"user_id"`
-	PublicKey                []byte             `db:"public_key" json:"public_key"`
-	SignCount                int64              `db:"sign_count" json:"sign_count"`
-	Transports               []byte             `db:"transports" json:"transports"`
-	AttestationType          string             `db:"attestation_type" json:"attestation_type"`
-	Aaguid                   []byte             `db:"aaguid" json:"aaguid"`
-	UserPresent              bool               `db:"user_present" json:"user_present"`
-	UserVerified             bool               `db:"user_verified" json:"user_verified"`
-	BackupEligible           bool               `db:"backup_eligible" json:"backup_eligible"`
-	BackupState              bool               `db:"backup_state" json:"backup_state"`
-	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	LastUsedAt               pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+	UserWebauthnCredentialID int64             `db:"user_webauthn_credential_id" json:"user_webauthn_credential_id"`
+	CredentialID             []byte            `db:"credential_id" json:"credential_id"`
+	UserID                   int32             `db:"user_id" json:"user_id"`
+	PublicKey                []byte            `db:"public_key" json:"public_key"`
+	SignCount                int64             `db:"sign_count" json:"sign_count"`
+	Transports               dbtypes.Strings   `db:"transports" json:"transports"`
+	AttestationType          string            `db:"attestation_type" json:"attestation_type"`
+	Aaguid                   []byte            `db:"aaguid" json:"aaguid"`
+	UserPresent              bool              `db:"user_present" json:"user_present"`
+	UserVerified             bool              `db:"user_verified" json:"user_verified"`
+	BackupEligible           bool              `db:"backup_eligible" json:"backup_eligible"`
+	BackupState              bool              `db:"backup_state" json:"backup_state"`
+	CreatedAt                dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	LastUsedAt               dbtypes.Timestamp `db:"last_used_at" json:"last_used_at"`
 }

@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"time"
@@ -9,30 +10,21 @@ import (
 	"server/internal/settings"
 )
 
-// Scheduler decides on each periodic tick whether a routine dump is due and,
-// if so, runs it and prunes retention. All policy comes from runtime settings
-// read at tick time, so schedule changes take effect without re-registering
-// the River periodic job.
+// Scheduler decides on each River tick whether a routine SQLite snapshot is
+// due, then applies count-based retention.
 type Scheduler struct {
-	Conn        Conn
-	Pool        RowQuerier
-	ToolsBinDir string // optional override (desktop bundle); empty = autodetect
-	Dir         string // explicit private dump target
-	AppVersion  string
-	Ready       func(ctx context.Context) (bool, error)
-	Settings    func(ctx context.Context) (settings.Backup, error)
-	Logf        Logf
+	Source   *sql.DB
+	Dir      string
+	Metadata SnapshotMetadata
+	Ready    func(ctx context.Context) (bool, error)
+	Settings func(ctx context.Context) (settings.Backup, error)
+	Logf     Logf
 
-	// now is a test seam; nil means time.Now.
 	now func() time.Time
 }
 
-// Run performs one scheduler pass. On a periodic tick (force=false), skips
-// (disabled, not yet due, storage unreachable) return nil — only actual
-// dump/prune failures are errors, so River retries real failures but never
-// "retries" a skip. A forced run (admin "back up now") bypasses the enabled
-// and due checks, and an unreachable backup destination becomes an error the
-// API can surface instead of a silent skip.
+// Run performs one scheduler pass. Periodic skips are silent; a forced admin
+// request bypasses enabled/due checks and surfaces an unreachable destination.
 func (s *Scheduler) Run(ctx context.Context, force bool) error {
 	logf := s.Logf
 	if logf == nil {
@@ -43,9 +35,6 @@ func (s *Scheduler) Run(ctx context.Context, force bool) error {
 		nowFn = time.Now
 	}
 
-	// A pre-setup database has no administrator or primary repository and cannot
-	// pass restore verification. Do not create a misleading automatic snapshot
-	// during the small window between server startup and first-run setup.
 	if s.Ready != nil {
 		ready, err := s.Ready(ctx)
 		if err != nil {
@@ -74,9 +63,6 @@ func (s *Scheduler) Run(ctx context.Context, force bool) error {
 		}
 	}
 
-	// The backup destination is explicit and independent from repository mounts.
-	// Never redirect it when unavailable: periodic work skips and a forced admin
-	// request gets a useful error.
 	if _, err := os.Stat(s.Dir); err != nil {
 		if force {
 			return fmt.Errorf("backup destination %s unreachable: %w", s.Dir, err)
@@ -84,17 +70,7 @@ func (s *Scheduler) Run(ctx context.Context, force bool) error {
 		logf("backup: destination %s unreachable, skipping this run: %v", s.Dir, err)
 		return nil
 	}
-
-	pgVersion, major, err := ServerVersion(ctx, s.Pool)
-	if err != nil {
-		return err
-	}
-	toolsDir, err := LocateTools(s.ToolsBinDir, major)
-	if err != nil {
-		return err
-	}
-
-	if _, err := Dump(ctx, s.Conn, toolsDir, s.Dir, s.AppVersion, pgVersion, logf); err != nil {
+	if _, err := CreateSnapshot(ctx, s.Source, s.Dir, "", s.Metadata, logf); err != nil {
 		return err
 	}
 	if _, err := Prune(s.Dir, cfg.KeepLast, logf); err != nil {

@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"io"
-	"net/http"
 
 	"server/internal/api"
 	"server/internal/api/dto"
@@ -62,10 +61,6 @@ func (h *SetupHandler) Setup(c *gin.Context) {
 
 	result, err := h.setupService.Initialize(c.Request.Context(), service.SetupRequest{})
 	if err != nil {
-		if errors.Is(err, service.ErrSystemAlreadyInitialized) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "System already initialized")
-			return
-		}
 		api.GinInternalError(c, err, "Failed to initialize system")
 		return
 	}
