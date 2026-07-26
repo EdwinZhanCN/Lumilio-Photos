@@ -2,7 +2,9 @@ package db
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"log"
@@ -20,10 +22,16 @@ import (
 const migrationTable = "lumilio_schema_migrations"
 
 type embeddedMigration struct {
-	version int64
-	name    string
-	file    string
-	sql     string
+	version  int64
+	name     string
+	file     string
+	sql      string
+	checksum string
+}
+
+type appliedMigration struct {
+	name     string
+	checksum string
 }
 
 // Migrate applies Lumilio's embedded transactional migrations followed by
@@ -50,6 +58,7 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS lumilio_schema_migrations (
 			version INTEGER PRIMARY KEY,
 			name TEXT NOT NULL UNIQUE,
+			checksum TEXT NOT NULL CHECK (length(checksum) = 64),
 			applied_at INTEGER NOT NULL
 		) STRICT
 	`); err != nil {
@@ -64,17 +73,26 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 	for _, migration := range available {
 		known[migration.version] = migration
 	}
-	for version, name := range applied {
+	for version, recorded := range applied {
 		migration, ok := known[version]
 		if !ok {
-			return fmt.Errorf("catalog has unknown future migration %06d_%s", version, name)
+			return fmt.Errorf("catalog has unknown future migration %06d_%s", version, recorded.name)
 		}
-		if migration.name != name {
+		if migration.name != recorded.name {
 			return fmt.Errorf(
 				"catalog migration %06d name = %q, embedded name = %q",
 				version,
-				name,
+				recorded.name,
 				migration.name,
+			)
+		}
+		if migration.checksum != recorded.checksum {
+			return fmt.Errorf(
+				"catalog migration %06d_%s checksum = %q, embedded checksum = %q; historical migrations are immutable",
+				version,
+				migration.name,
+				recorded.checksum,
+				migration.checksum,
 			)
 		}
 	}
@@ -124,12 +142,14 @@ func loadEmbeddedMigrations() ([]embeddedMigration, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read embedded migration %s: %w", filename, err)
 		}
+		digest := sha256.Sum256(body)
 		seen[version] = filename
 		result = append(result, embeddedMigration{
-			version: version,
-			name:    parts[1],
-			file:    filename,
-			sql:     string(body),
+			version:  version,
+			name:     parts[1],
+			file:     filename,
+			sql:      string(body),
+			checksum: hex.EncodeToString(digest[:]),
 		})
 	}
 	if len(result) == 0 {
@@ -141,9 +161,9 @@ func loadEmbeddedMigrations() ([]embeddedMigration, error) {
 	return result, nil
 }
 
-func readAppliedMigrations(ctx context.Context, database *sql.DB) (map[int64]string, error) {
+func readAppliedMigrations(ctx context.Context, database *sql.DB) (map[int64]appliedMigration, error) {
 	rows, err := database.QueryContext(ctx, `
-		SELECT version, name
+		SELECT version, name, checksum
 		FROM lumilio_schema_migrations
 		ORDER BY version
 	`)
@@ -152,14 +172,14 @@ func readAppliedMigrations(ctx context.Context, database *sql.DB) (map[int64]str
 	}
 	defer rows.Close()
 
-	applied := make(map[int64]string)
+	applied := make(map[int64]appliedMigration)
 	for rows.Next() {
 		var version int64
-		var name string
-		if err := rows.Scan(&version, &name); err != nil {
+		var migration appliedMigration
+		if err := rows.Scan(&version, &migration.name, &migration.checksum); err != nil {
 			return nil, fmt.Errorf("scan migration ledger: %w", err)
 		}
-		applied[version] = name
+		applied[version] = migration
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate migration ledger: %w", err)
@@ -180,9 +200,9 @@ func applyMigration(ctx context.Context, database *sql.DB, migration embeddedMig
 		return fmt.Errorf("execute migration %s: %w", migration.file, err)
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO lumilio_schema_migrations (version, name, applied_at)
-		VALUES (?, ?, ?)
-	`, migration.version, migration.name, time.Now().UTC().UnixMicro()); err != nil {
+		INSERT INTO lumilio_schema_migrations (version, name, checksum, applied_at)
+		VALUES (?, ?, ?, ?)
+	`, migration.version, migration.name, migration.checksum, time.Now().UTC().UnixMicro()); err != nil {
 		return fmt.Errorf("record migration %s: %w", migration.file, err)
 	}
 	if err := tx.Commit(); err != nil {

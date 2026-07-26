@@ -50,10 +50,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// shutdownTimeout bounds how long graceful shutdown (HTTP drain + queue drain)
-// may take before the process exits anyway. Mirrors the desktop shutdown budget
-// in site/docs/internal/agent/exec-plans/active/desktop-wails-v3.md.
-const shutdownTimeout = 10 * time.Second
+// Each subsystem owns an independent shutdown budget. In particular, time used
+// by HTTP draining never reduces River's opportunity to relinquish SQLite.
+const (
+	shutdownTimeout  = 10 * time.Second
+	queueStopTimeout = 10 * time.Second
+	queueKillTimeout = 10 * time.Second
+)
+
+var errSQLiteOwnershipRetained = errors.New("SQLite ownership was not relinquished")
 
 // OperatorControls are explicit, single-run host controls. They do not modify
 // AppConfig and are never read from the environment inside the application.
@@ -81,6 +86,18 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 	}
 	dbConfig := appConfig.DatabaseConfig
 
+	pprofHost, err := startPprofHost(strings.TrimSpace(controls.PprofAddr))
+	if err != nil {
+		return err
+	}
+	if pprofHost != nil {
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+			defer cancel()
+			_ = pprofHost.shutdown(shutdownCtx)
+		}()
+	}
+
 	// govips owns process-global libvips state and cannot be restarted after a
 	// shutdown. Keep it alive across in-process SQLite restore generations and
 	// repeated embedded Run calls; process exit releases the native runtime.
@@ -100,7 +117,7 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 		err := run(generationCtx, appConfig, dbConfig, controls, requestRestart)
 		cancelGeneration()
 		if err != nil {
-			if dbbackup.HasAppliedRestore(dbConfig.Path) {
+			if dbbackup.HasAppliedRestore(dbConfig.Path) && !errors.Is(err, errSQLiteOwnershipRetained) {
 				rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 				rollbackErr := dbbackup.RollbackPendingRestore(rollbackCtx, dbConfig.Path, nil)
 				rollbackCancel()
@@ -126,7 +143,7 @@ func run(
 	dbConfig config.DatabaseConfig,
 	controls OperatorControls,
 	requestRestart func(),
-) error {
+) (runErr error) {
 	agentRefUserBudget := controls.AgentRefUserHotBudgetBytes
 	if agentRefUserBudget <= 0 {
 		agentRefUserBudget = ref.DefaultUserHotBudget
@@ -190,11 +207,23 @@ func run(
 	if err != nil {
 		return fmt.Errorf("open SQLite database: %w", err)
 	}
+	databaseCloseAllowed := true
 	defer func() {
+		if !databaseCloseAllowed {
+			runErr = errors.Join(
+				runErr,
+				fmt.Errorf("%w: database left open and restore swap blocked", errSQLiteOwnershipRetained),
+			)
+			return
+		}
 		closeCtx, closeCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer closeCancel()
 		if err := database.Close(closeCtx); err != nil {
 			appLogger.Warn("SQLite close maintenance failed", zap.Error(err))
+			runErr = errors.Join(
+				runErr,
+				fmt.Errorf("%w: close SQLite database: %v", errSQLiteOwnershipRetained, err),
+			)
 		}
 	}()
 
@@ -415,11 +444,14 @@ func run(
 		if queueStopped {
 			return
 		}
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer stopCancel()
-		if err := queueClient.Stop(stopCtx); err != nil {
+		if err := stopRiverQueue(queueClient, queueStopTimeout, queueKillTimeout); err != nil {
+			databaseCloseAllowed = false
 			appLogger.Warn("queue client cleanup failed", zap.Error(err))
+			runErr = errors.Join(runErr, fmt.Errorf("stop River during cleanup: %w", err))
+			return
 		}
+		queueStopped = true
+		databaseCloseAllowed = true
 	}()
 	appLogger.Info("queues initialized successfully", zap.String("operation", "queue.init"))
 
@@ -567,16 +599,6 @@ func run(
 		}
 	}()
 
-	// Conditionally start pprof from the explicit CLI operator control.
-	if pprofAddr := strings.TrimSpace(controls.PprofAddr); pprofAddr != "" {
-		go func() {
-			appLogger.Info("pprof server listening", zap.String("addr", pprofAddr))
-			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
-				appLogger.Warn("pprof server stopped", zap.Error(err))
-			}
-		}()
-	}
-
 	select {
 	case err := <-serverErr:
 		return fmt.Errorf("http server: %w", err)
@@ -584,20 +606,141 @@ func run(
 		appLogger.Info("shutdown signal received, draining", zap.String("operation", "server.shutdown"))
 	}
 
-	// Graceful shutdown: stop accepting HTTP connections and drain in-flight
-	// jobs, both bounded by shutdownTimeout. Remaining resources (scheduler,
-	// lumen, database, libvips, logger) are released by the deferred cleanups.
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer shutdownCancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		appLogger.Warn("http server shutdown error", zap.String("operation", "server.shutdown"), zap.Error(err))
+	// HTTP and River have independent budgets. A subsystem that cannot prove it
+	// has stopped blocks SQLite close and therefore blocks an in-process restore
+	// swap; the process host may still choose to terminate normally.
+	httpCtx, httpCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	httpErr := srv.Shutdown(httpCtx)
+	httpCancel()
+	if httpErr != nil {
+		databaseCloseAllowed = false
+		appLogger.Warn("http server shutdown error", zap.String("operation", "server.shutdown"), zap.Error(httpErr))
 	}
-	if err := queueClient.Stop(shutdownCtx); err != nil {
-		appLogger.Warn("queue client shutdown error", zap.String("operation", "queue.shutdown"), zap.Error(err))
+	queueErr := stopRiverQueue(queueClient, queueStopTimeout, queueKillTimeout)
+	if queueErr != nil {
+		databaseCloseAllowed = false
+		appLogger.Warn("queue client shutdown error", zap.String("operation", "queue.shutdown"), zap.Error(queueErr))
+	} else {
+		queueStopped = true
 	}
-	queueStopped = true
+	if httpErr != nil || queueErr != nil {
+		return errors.Join(
+			wrapOptionalError("drain HTTP server", httpErr),
+			wrapOptionalError("stop River queue", queueErr),
+		)
+	}
 	appLogger.Info("shutdown complete", zap.String("operation", "server.shutdown"))
 	return nil
+}
+
+type riverStopper interface {
+	Stop(context.Context) error
+	StopAndCancel(context.Context) error
+	Stopped() <-chan struct{}
+}
+
+func stopRiverQueue(client riverStopper, gracefulBudget, forcedBudget time.Duration) error {
+	stopped := client.Stopped()
+	gracefulCtx, gracefulCancel := context.WithTimeout(context.Background(), gracefulBudget)
+	gracefulErr := client.Stop(gracefulCtx)
+	if gracefulErr == nil {
+		select {
+		case <-stopped:
+		case <-gracefulCtx.Done():
+			gracefulErr = gracefulCtx.Err()
+		}
+	}
+	gracefulCancel()
+	if channelClosed(stopped) {
+		return nil
+	}
+	if gracefulErr == nil {
+		gracefulErr = errors.New("River Stop returned without closing Stopped")
+	}
+
+	forcedCtx, forcedCancel := context.WithTimeout(context.Background(), forcedBudget)
+	forcedErr := client.StopAndCancel(forcedCtx)
+	if forcedErr == nil {
+		select {
+		case <-stopped:
+		case <-forcedCtx.Done():
+			forcedErr = forcedCtx.Err()
+		}
+	}
+	forcedCancel()
+	if channelClosed(stopped) {
+		return nil
+	}
+	if forcedErr == nil {
+		forcedErr = errors.New("River StopAndCancel returned without closing Stopped")
+	}
+	return errors.Join(
+		fmt.Errorf("graceful River drain: %w", gracefulErr),
+		fmt.Errorf("forced River cancellation: %w", forcedErr),
+	)
+}
+
+func channelClosed(channel <-chan struct{}) bool {
+	select {
+	case <-channel:
+		return true
+	default:
+		return false
+	}
+}
+
+func wrapOptionalError(operation string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", operation, err)
+}
+
+type pprofServerHost struct {
+	server *http.Server
+	done   chan error
+}
+
+func startPprofHost(addr string) (*pprofServerHost, error) {
+	if addr == "" {
+		return nil, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("listen for pprof on %s: %w", addr, err)
+	}
+	server := &http.Server{
+		Addr:              listener.Addr().String(),
+		Handler:           http.DefaultServeMux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	host := &pprofServerHost{
+		server: server,
+		done:   make(chan error, 1),
+	}
+	go func() {
+		host.done <- server.Serve(listener)
+	}()
+	return host, nil
+}
+
+func (host *pprofServerHost) shutdown(ctx context.Context) error {
+	if host == nil {
+		return nil
+	}
+	shutdownErr := host.server.Shutdown(ctx)
+	if shutdownErr != nil {
+		shutdownErr = errors.Join(shutdownErr, host.server.Close())
+	}
+	select {
+	case serveErr := <-host.done:
+		if errors.Is(serveErr, http.ErrServerClosed) {
+			serveErr = nil
+		}
+		return errors.Join(shutdownErr, serveErr)
+	case <-ctx.Done():
+		return errors.Join(shutdownErr, ctx.Err())
+	}
 }
 
 func initMLServices(

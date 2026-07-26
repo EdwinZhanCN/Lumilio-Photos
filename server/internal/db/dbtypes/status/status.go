@@ -44,6 +44,28 @@ type TaskStatus struct {
 	UpdatedAt string    `json:"updated_at"`
 }
 
+// IngestPhase is the machine-readable materialization phase. User-facing
+// status messages are deliberately not part of recovery decisions.
+type IngestPhase string
+
+const (
+	IngestPhasePrepared       IngestPhase = "prepared"
+	IngestPhaseCommitFailed   IngestPhase = "commit_failed"
+	IngestPhaseConflict       IngestPhase = "conflict"
+	IngestPhasePipelineQueued IngestPhase = "pipeline_queued"
+	IngestPhaseInPlaceQueued  IngestPhase = "in_place_queued"
+)
+
+// IngestStatus records the durable recovery state before the ordinary media
+// processing tasks own the asset. StagingPath is repository-relative so status
+// payloads never expose an absolute host path.
+type IngestStatus struct {
+	Phase       IngestPhase `json:"phase"`
+	Code        string      `json:"code,omitempty"`
+	Recoverable bool        `json:"recoverable,omitempty"`
+	StagingPath string      `json:"staging_path,omitempty"`
+}
+
 // AssetStatus represents the complete status information for an asset
 type AssetStatus struct {
 	State     AssetState            `json:"state"`
@@ -51,6 +73,7 @@ type AssetStatus struct {
 	Errors    []ErrorDetail         `json:"errors,omitempty"`
 	UpdatedAt string                `json:"updated_at"`
 	Tasks     map[string]TaskStatus `json:"tasks,omitempty"`
+	Ingest    *IngestStatus         `json:"ingest,omitempty"`
 }
 
 func nowRFC3339() string {
@@ -100,6 +123,18 @@ func NewTrackedProcessingStatus(message string, tasks []string) AssetStatus {
 	status := NewProcessingStatus(message)
 	status.EnsureTasks(tasks)
 	return status
+}
+
+// SetIngestState updates the structured materialization state independently of
+// the human-readable summary.
+func (s *AssetStatus) SetIngestState(phase IngestPhase, code, stagingPath string, recoverable bool) {
+	s.Ingest = &IngestStatus{
+		Phase:       phase,
+		Code:        code,
+		Recoverable: recoverable,
+		StagingPath: stagingPath,
+	}
+	s.UpdatedAt = nowRFC3339()
 }
 
 // AddError adds an error to the status

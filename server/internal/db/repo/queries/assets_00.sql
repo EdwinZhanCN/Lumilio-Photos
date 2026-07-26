@@ -257,7 +257,7 @@ WHERE content_hash = ?1 AND repository_id = ?2 AND is_deleted = false;
 WITH filter_params AS (
   SELECT CAST(sqlc.narg('content_hashes') AS TEXT) AS content_hashes_json
 )
-SELECT asset_id, content_hash, file_size, original_filename
+SELECT asset_id, content_hash, file_size, original_filename, storage_path
 FROM assets
 WHERE content_hash IN (
     SELECT CAST(value AS TEXT)

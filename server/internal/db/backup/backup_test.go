@@ -198,6 +198,162 @@ func TestStagedRestoreReplacesOnlyBetweenGenerations(t *testing.T) {
 	closeTestCatalog(t, restored)
 }
 
+func TestRestoreSwapReconcilesInjectedCrashBoundaries(t *testing.T) {
+	points := []string{
+		faultAfterStagedCopy,
+		faultAfterPreviousRename,
+		faultAfterActiveRename,
+		faultBeforeActiveMarker,
+		faultAfterActiveMarker,
+		faultAfterVerifiedMarker,
+	}
+	for _, point := range points {
+		t.Run(point, func(t *testing.T) {
+			activePath := preparePendingRestore(t)
+			fired := false
+			_, err := applyPendingRestore(context.Background(), activePath, t.Logf, func(candidate string) error {
+				if !fired && candidate == point {
+					fired = true
+					return errors.New("simulated process loss")
+				}
+				return nil
+			})
+			if err == nil || !fired {
+				t.Fatalf("injected restore fault %q = %v, fired=%t", point, err, fired)
+			}
+
+			applied, err := ApplyPendingRestore(context.Background(), activePath, t.Logf)
+			if err != nil || !applied {
+				t.Fatalf("reconcile restore after %q = %t/%v", point, applied, err)
+			}
+			marker, err := readPendingRestore(PendingRestorePath(activePath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if marker.State != pendingStateVerified {
+				t.Fatalf("reconciled marker state = %q, want %q", marker.State, pendingStateVerified)
+			}
+			if phase := catalogBootstrapPhase(t, activePath); phase != "admin_created" {
+				t.Fatalf("restored phase = %q", phase)
+			}
+			if err := CompletePendingRestore(context.Background(), activePath); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRestoreReplacesPartialStagedCopyAfterCrash(t *testing.T) {
+	activePath := preparePendingRestore(t)
+	marker, err := readPendingRestore(PendingRestorePath(activePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker.StagedPath, []byte("partial copy"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	applied, err := ApplyPendingRestore(context.Background(), activePath, t.Logf)
+	if err != nil || !applied {
+		t.Fatalf("ApplyPendingRestore with partial staged copy = %t/%v", applied, err)
+	}
+	if phase := catalogBootstrapPhase(t, activePath); phase != "admin_created" {
+		t.Fatalf("restored phase = %q", phase)
+	}
+	if err := CompletePendingRestore(context.Background(), activePath); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRestoreRollbackReconcilesInjectedCrashBoundaries(t *testing.T) {
+	points := []string{
+		faultAfterFailedRename,
+		faultAfterRollbackRename,
+		faultAfterRollbackMarker,
+	}
+	for _, point := range points {
+		t.Run(point, func(t *testing.T) {
+			activePath := preparePendingRestore(t)
+			applied, err := ApplyPendingRestore(context.Background(), activePath, t.Logf)
+			if err != nil || !applied {
+				t.Fatalf("ApplyPendingRestore = %t/%v", applied, err)
+			}
+
+			fired := false
+			err = rollbackPendingRestore(context.Background(), activePath, t.Logf, func(candidate string) error {
+				if !fired && candidate == point {
+					fired = true
+					return errors.New("simulated process loss")
+				}
+				return nil
+			})
+			if err == nil || !fired {
+				t.Fatalf("injected rollback fault %q = %v, fired=%t", point, err, fired)
+			}
+
+			applied, err = ApplyPendingRestore(context.Background(), activePath, t.Logf)
+			if err != nil || applied {
+				t.Fatalf("startup rollback reconciliation after %q = %t/%v", point, applied, err)
+			}
+			if phase := catalogBootstrapPhase(t, activePath); phase != "ready" {
+				t.Fatalf("rolled-back phase = %q", phase)
+			}
+			if _, err := os.Stat(PendingRestorePath(activePath)); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("rollback marker remains: %v", err)
+			}
+		})
+	}
+}
+
+func preparePendingRestore(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	activePath := filepath.Join(root, "app-state", "library.sqlite3")
+	catalog := openTestCatalog(t, activePath)
+	setCatalogBootstrapPhase(t, catalog, "admin_created")
+	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2}
+	snapshot, err := CreateSnapshot(
+		context.Background(),
+		catalog.SQL,
+		filepath.Join(root, "backups"),
+		"",
+		metadata,
+		t.Logf,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compatibility := compatibilityFor(t, catalog, metadata.ConfigSchemaVersion)
+	setCatalogBootstrapPhase(t, catalog, "ready")
+	if err := StageRestore(context.Background(), activePath, snapshot.Path, metadata, compatibility); err != nil {
+		t.Fatal(err)
+	}
+	closeTestCatalog(t, catalog)
+	return activePath
+}
+
+func setCatalogBootstrapPhase(t *testing.T, catalog *db.DB, phase string) {
+	t.Helper()
+	if _, err := catalog.SQL.ExecContext(context.Background(), `
+		UPDATE system_state SET bootstrap_phase = ?, updated_at = ? WHERE id = 1
+	`, phase, time.Now().UTC().UnixMicro()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func catalogBootstrapPhase(t *testing.T, activePath string) string {
+	t.Helper()
+	database, err := sql.Open("sqlite3", activePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	var phase string
+	if err := database.QueryRowContext(context.Background(), "SELECT bootstrap_phase FROM system_state WHERE id = 1").Scan(&phase); err != nil {
+		t.Fatal(err)
+	}
+	return phase
+}
+
 func TestCorruptSnapshotRejectedBeforeMarker(t *testing.T) {
 	root := t.TempDir()
 	activePath := filepath.Join(root, "app-state", "library.sqlite3")

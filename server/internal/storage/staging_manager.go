@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,9 +87,10 @@ func (sm *DefaultStagingManager) CreateStagingFile(repoPath, filename string) (*
 }
 
 // CommitStagingFile moves a staging file to its final repository-relative
-// destination. The destination filename is decided upstream (uniqueInboxFilename
-// for rename/uuid, the original for overwrite), so this performs an atomic rename
-// that intentionally replaces an existing file under the "overwrite" strategy.
+// destination. It never replaces an existing file: the materializer must first
+// verify an existing target by size and full content hash. A hard link gives
+// the common same-filesystem path an atomic no-replace commit; the copy fallback
+// preserves the source across filesystems and removes partial destinations.
 func (sm *DefaultStagingManager) CommitStagingFile(stagingFile *StagingFile, finalPath string) error {
 	if stagingFile == nil {
 		return fmt.Errorf("staging file is nil")
@@ -107,10 +110,79 @@ func (sm *DefaultStagingManager) CommitStagingFile(stagingFile *StagingFile, fin
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	if err := os.Rename(stagingFile.Path, destFullPath); err != nil {
+	if err := moveFileNoReplace(stagingFile.Path, destFullPath); err != nil {
 		return fmt.Errorf("failed to move staged file: %w", err)
 	}
 	return nil
+}
+
+func moveFileNoReplace(sourcePath, destinationPath string) error {
+	if err := os.Link(sourcePath, destinationPath); err == nil {
+		if err := syncStagingFile(destinationPath); err != nil {
+			return fmt.Errorf("sync linked staging file: %w", err)
+		}
+		if err := syncStagingDirectory(filepath.Dir(destinationPath)); err != nil {
+			return fmt.Errorf("sync linked staging destination: %w", err)
+		}
+		if err := os.Remove(sourcePath); err != nil {
+			return fmt.Errorf("remove linked staging source: %w", err)
+		}
+		return syncStagingDirectory(filepath.Dir(sourcePath))
+	} else if errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("destination already exists: %w", err)
+	}
+
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("open staging source: %w", err)
+	}
+	defer source.Close()
+	info, err := source.Stat()
+	if err != nil {
+		return fmt.Errorf("stat staging source: %w", err)
+	}
+	destination, err := os.OpenFile(
+		destinationPath,
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
+		info.Mode().Perm(),
+	)
+	if err != nil {
+		return fmt.Errorf("create destination without replacement: %w", err)
+	}
+	cleanupDestination := true
+	defer func() {
+		if cleanupDestination {
+			_ = os.Remove(destinationPath)
+		}
+	}()
+	if _, err := io.Copy(destination, source); err != nil {
+		_ = destination.Close()
+		return fmt.Errorf("copy staging source: %w", err)
+	}
+	if err := destination.Sync(); err != nil {
+		_ = destination.Close()
+		return fmt.Errorf("sync staging destination: %w", err)
+	}
+	if err := destination.Close(); err != nil {
+		return fmt.Errorf("close staging destination: %w", err)
+	}
+	if err := syncStagingDirectory(filepath.Dir(destinationPath)); err != nil {
+		return fmt.Errorf("sync copied staging destination: %w", err)
+	}
+	cleanupDestination = false
+	if err := os.Remove(sourcePath); err != nil {
+		return fmt.Errorf("remove copied staging source: %w", err)
+	}
+	return syncStagingDirectory(filepath.Dir(sourcePath))
+}
+
+func syncStagingFile(path string) error {
+	file, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return file.Sync()
 }
 
 // CommitStagingFileToInbox commits a staging file to the inbox using repository configuration
@@ -154,6 +226,7 @@ func (sm *DefaultStagingManager) MoveStagingToFailed(stagingFile *StagingFile) e
 	if err := sm.CommitStagingFile(stagingFile, failedPath); err != nil {
 		return fmt.Errorf("failed to move staging file to failed directory: %w", err)
 	}
+	stagingFile.Path = filepath.Join(stagingFile.RepoPath, failedPath)
 	return nil
 }
 

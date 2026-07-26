@@ -19,16 +19,20 @@ import (
 	"server/platform/sqliteuri"
 
 	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 )
 
 const (
-	applicationID = 0x4c554d49 // "LUMI"
-	fileMode      = 0o600
-	directoryMode = 0o700
+	applicationID    = 0x4c554d49 // "LUMI"
+	fileMode         = 0o600
+	directoryMode    = 0o700
+	sqliteDriverName = "lumilio_sqlite3"
 )
 
-var registerVectorExtension sync.Once
+var (
+	registerVectorExtension sync.Once
+	registerSQLiteDriver    sync.Once
+)
 
 // DB is the single SQLite runtime boundary used by application queries, River,
 // and short application transactions.
@@ -53,9 +57,8 @@ type CatalogInfo struct {
 }
 
 // Open creates or opens the configured library catalog and applies the fixed
-// connection policy. The one physical connection is intentionally never
-// recycled because SQLite pragmas and statically registered extensions are
-// connection-local.
+// policy to every physical connection. DSN parameters own pragmas supported by
+// go-sqlite3; the driver hook owns the remaining connection-local settings.
 func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	path, err := normalizePath(cfg.Path)
 	if err != nil {
@@ -66,9 +69,20 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	}
 
 	registerVectorExtension.Do(sqlitevec.Auto)
+	registerSQLiteDriver.Do(func() {
+		sql.Register(sqliteDriverName, &sqlite3.SQLiteDriver{
+			ConnectHook: configureSQLiteConnection,
+		})
+	})
 
-	dsn := sqliteuri.DSN(path, nil)
-	database, err := sql.Open("sqlite3", dsn)
+	query := url.Values{
+		"_busy_timeout": {"5000"},
+		"_foreign_keys": {"on"},
+		"_journal_mode": {"WAL"},
+		"_synchronous":  {"NORMAL"},
+	}
+	dsn := sqliteuri.DSN(path, query)
+	database, err := sql.Open(sqliteDriverName, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open SQLite catalog %s: %w", safeLocation(path), err)
 	}
@@ -84,8 +98,8 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	if err := database.PingContext(ctx); err != nil {
 		return closeOnError("open", err)
 	}
-	if err := applyPragmas(ctx, database); err != nil {
-		return closeOnError("configure", err)
+	if err := verifyPragmas(ctx, database); err != nil {
+		return closeOnError("verify connection policy for", err)
 	}
 	if err := claimOrVerifyCatalog(ctx, database); err != nil {
 		return closeOnError("verify identity of", err)
@@ -312,23 +326,23 @@ func ensurePrivateParent(path string) error {
 	return nil
 }
 
-func applyPragmas(ctx context.Context, database *sql.DB) error {
+func configureSQLiteConnection(connection *sqlite3.SQLiteConn) error {
 	statements := []string{
-		"PRAGMA foreign_keys = ON",
-		"PRAGMA synchronous = NORMAL",
-		"PRAGMA busy_timeout = 5000",
 		"PRAGMA temp_store = MEMORY",
 		"PRAGMA wal_autocheckpoint = 1000",
 	}
 	for _, statement := range statements {
-		if _, err := database.ExecContext(ctx, statement); err != nil {
+		if _, err := connection.Exec(statement, nil); err != nil {
 			return fmt.Errorf("apply %q: %w", statement, err)
 		}
 	}
+	return nil
+}
 
+func verifyPragmas(ctx context.Context, database *sql.DB) error {
 	var journalMode string
-	if err := database.QueryRowContext(ctx, "PRAGMA journal_mode = WAL").Scan(&journalMode); err != nil {
-		return fmt.Errorf("enable WAL: %w", err)
+	if err := database.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&journalMode); err != nil {
+		return fmt.Errorf("read journal_mode: %w", err)
 	}
 	if journalMode != "wal" {
 		return fmt.Errorf("journal_mode = %q, want wal", journalMode)

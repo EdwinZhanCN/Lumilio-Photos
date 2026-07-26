@@ -230,7 +230,7 @@ CREATE TABLE albums (
     updated_at INTEGER NOT NULL,
     description TEXT,
     cover_asset_id TEXT REFERENCES assets(asset_id) ON DELETE SET NULL,
-    album_type TEXT NOT NULL DEFAULT 'default' CHECK (album_type IN ('default', 'smart'))
+    album_type TEXT NOT NULL DEFAULT 'default' CHECK (album_type IN ('default', 'smart', 'bio'))
 ) STRICT;
 
 CREATE TABLE album_assets (

@@ -3,7 +3,6 @@ package cloud
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -59,8 +58,8 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 				zap.String("filename", candidate.OriginalFilename),
 				zap.Error(err),
 			)
-			// Clean up staging file on failure
-			os.Remove(candidate.SourcePath)
+			// Materialization owns staging recovery. A commit or quarantine
+			// error must leave the original bytes available for retry.
 			c.progress(ImportProgressDelta{Failed: 1})
 			continue
 		}

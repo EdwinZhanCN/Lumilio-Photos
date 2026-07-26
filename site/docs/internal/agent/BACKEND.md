@@ -58,6 +58,10 @@ the CLI host and passed separately from `AppConfig`. Desktop resource-location
 env, test/conformance opt-ins, and third-party container env are host/harness
 contracts, not server configuration.
 
+The optional pprof listener belongs to the outer `app.Run` host lifecycle. It
+is started once, remains stable across in-process database restore generations,
+and is shut down when the host run exits.
+
 ## Important Packages
 
 - `internal/api/router.go`: Gin route tree, CORS, auth boundaries.
@@ -117,8 +121,10 @@ Owner identity is instance-local database policy rather than portable
 ## Database And API Contracts
 
 - `github.com/mattn/go-sqlite3` is the only database driver. `internal/db.Open`
-  fixes the writer pool at one connection, applies the required pragmas, and
-  registers sqlite-vec statically.
+  fixes the writer pool at one connection, registers sqlite-vec statically, and
+  applies fixed pragmas to every physical connection through driver DSN options
+  plus a connection hook. Startup reads the effective values back and fails
+  closed if policy differs.
 - Application tables and River queues share the same catalog and can commit
   business state plus `InsertTx` jobs in one short `database/sql` transaction.
 - A running catalog must never be opened or copied through a host/container
@@ -127,7 +133,14 @@ Owner identity is instance-local database policy rather than portable
   inspect the catalog only after a graceful application stop.
 - FTS5 and sqlite-vec tables are derived query structures; authoritative text
   and embedding data remains in ordinary application tables.
-- Migrations live in `server/migrations`.
+- Migrations live in `server/migrations`. The application migration ledger
+  records SHA-256 for every applied SQL file; version, name, and checksum must
+  continue to match embedded history, so historical migrations are immutable.
+- SQLite restore is a generation boundary, not a live-handle operation. Its
+  journal progresses through `staged`, `previous_preserved`,
+  `active_installed`, `verified`, and `completed`; rollback has corresponding
+  durable phases. Startup reconciles the marker with active/staged/previous/
+  failed files after any interrupted rename.
 - Generated sqlc code lives under `server/internal/db/repo`.
 - Generated OpenAPI output lives in `server/docs`.
 - Frontend generated types live in `web/src/lib/http-commons/schema.d.ts`.
@@ -216,6 +229,13 @@ Accepted uploads expose their user-scoped ingest lifecycle at
 River ingest job reached a terminal state, not merely that multipart transport
 returned 2xx. Repository scans expose run lifecycle through the existing
 `/api/v1/repositories/{id}/scans/latest` endpoint.
+
+Materialization owns staging files. A commit error is always returned to River
+or the caller; failed quarantine never deletes the source. Existing physical
+targets and instant-upload duplicates require exact size plus BLAKE3
+verification before staging removal, and conflicts retain both files with a
+structured recoverable ingest phase. HTTP/cloud callers must not add their own
+error cleanup around this boundary.
 
 `GET /api/v1/assets/map-points` accepts an optional complete
 `south,north,west,east` WGS-84 viewport. All four values must be supplied

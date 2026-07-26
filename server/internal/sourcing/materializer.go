@@ -36,6 +36,9 @@ const (
 
 	preparedStatusMessage = "Asset ingestion prepared"
 	queuedStatusMessage   = "Asset queued for processing"
+
+	ingestCodeCommitFailed = "staging_commit_failed"
+	ingestCodeConflict     = "final_path_conflict"
 )
 
 // SourceMaterializer validates an IngestSource, materializes the file into the
@@ -146,11 +149,8 @@ func (m *SourceMaterializer) materializeFromStaging(
 	if err != nil {
 		return nil, err
 	}
-	if existing != nil && !isPreparedAsset(existing) {
-		if removeErr := os.Remove(source.SourcePath); removeErr != nil && !os.IsNotExist(removeErr) {
-			return nil, fmt.Errorf("remove duplicate staging file: %w", removeErr)
-		}
-		return existing, nil
+	if existing != nil && !isRecoverableStagingAsset(existing) {
+		return m.reconcileDuplicateStaging(ctx, source, repository, existing, hashes.ContentHash, fileSize)
 	}
 
 	targetPath, err := m.stagingManager.ResolveInboxPath(repository.Path, source.OriginalFilename, hashes.ContentHash)
@@ -169,7 +169,21 @@ func (m *SourceMaterializer) materializeFromStaging(
 		CreatedAt: source.Timestamp,
 	}
 
-	preparedStatus, err := buildTrackedProcessingStatus(validation.AssetType, preparedStatusMessage)
+	stagingPath, err := relativeRepositoryPath(repository.Path, source.SourcePath)
+	if err != nil {
+		// Cross-filesystem importers may stage outside the repository. The River
+		// payload still carries the source path for retries, but status never
+		// persists an absolute host path.
+		stagingPath = ""
+	}
+	preparedStatus, err := buildTrackedIngestStatus(
+		validation.AssetType,
+		preparedStatusMessage,
+		statusdb.IngestPhasePrepared,
+		"",
+		stagingPath,
+		true,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("marshal status: %w", err)
 	}
@@ -208,11 +222,8 @@ func (m *SourceMaterializer) materializeFromStaging(
 			if created == nil {
 				return nil, fmt.Errorf("prepared asset conflict has no matching row")
 			}
-			if !isPreparedAsset(created) {
-				if removeErr := os.Remove(source.SourcePath); removeErr != nil && !os.IsNotExist(removeErr) {
-					return nil, fmt.Errorf("remove duplicate staging file: %w", removeErr)
-				}
-				return created, nil
+			if !isRecoverableStagingAsset(created) {
+				return m.reconcileDuplicateStaging(ctx, source, repository, created, hashes.ContentHash, fileSize)
 			}
 			if created.StoragePath == nil || *created.StoragePath == "" {
 				return nil, fmt.Errorf("prepared asset %s has no inbox target", created.AssetID)
@@ -222,17 +233,35 @@ func (m *SourceMaterializer) materializeFromStaging(
 		asset = created
 	}
 
-	finalPath := filepath.Join(repository.Path, filepath.FromSlash(targetPath))
+	_, finalPath, err := resolveRepositoryRelativePath(repository.Path, targetPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve prepared inbox target: %w", err)
+	}
 	if _, statErr := os.Stat(finalPath); statErr != nil {
 		if !os.IsNotExist(statErr) {
 			return nil, fmt.Errorf("inspect prepared inbox target: %w", statErr)
 		}
 		if err := m.stagingManager.CommitStagingFile(stagingFile, targetPath); err != nil {
-			m.handleStagingFailure(ctx, stagingFile, repository.Path, asset.AssetID, err)
-			return asset, nil
+			if _, finalErr := os.Stat(finalPath); finalErr == nil {
+				if reconcileErr := verifyFinalAndRemoveStaging("", finalPath, hashes.ContentHash, fileSize); reconcileErr != nil {
+					m.markStagingConflict(ctx, asset.AssetID, repository.Path, source.SourcePath, reconcileErr)
+					return nil, fmt.Errorf("commit staging file: %w", errors.Join(err, reconcileErr))
+				}
+				// Even when the destination is a verified partial success, the
+				// commit contract failed. Preserve/quarantine any remaining
+				// source and make the caller retry the durable reconciliation.
+				m.handleStagingFailure(ctx, stagingFile, repository.Path, asset.AssetID, err)
+				return nil, fmt.Errorf("commit staging file: %w", err)
+			} else if !os.IsNotExist(finalErr) {
+				return nil, fmt.Errorf("inspect inbox target after commit failure: %w", finalErr)
+			} else {
+				m.handleStagingFailure(ctx, stagingFile, repository.Path, asset.AssetID, err)
+				return nil, fmt.Errorf("commit staging file: %w", err)
+			}
 		}
-	} else if removeErr := os.Remove(source.SourcePath); removeErr != nil && !os.IsNotExist(removeErr) {
-		return nil, fmt.Errorf("remove redundant staging file after recovery: %w", removeErr)
+	} else if reconcileErr := verifyFinalAndRemoveStaging(source.SourcePath, finalPath, hashes.ContentHash, fileSize); reconcileErr != nil {
+		m.markStagingConflict(ctx, asset.AssetID, repository.Path, source.SourcePath, reconcileErr)
+		return nil, fmt.Errorf("reconcile existing inbox target: %w", reconcileErr)
 	}
 
 	assetType := dbtypes.AssetType(asset.Type)
@@ -266,9 +295,15 @@ func (m *SourceMaterializer) materializeInPlace(
 ) (*repo.Asset, error) {
 	repoID := repository.RepoID
 
-	// source.SourcePath must be a repository-relative path
-	storagePath := filepath.ToSlash(filepath.Clean(source.SourcePath))
-	fullPath := filepath.Join(repository.Path, filepath.FromSlash(storagePath))
+	// source.SourcePath must resolve to an existing file within the repository.
+	// Symlinks are accepted only when their resolved target also stays inside it.
+	storagePath, fullPath, err := resolveInPlaceSource(repository.Path, source.SourcePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
 
 	info, err := os.Stat(fullPath)
 	if err != nil {
@@ -287,7 +322,14 @@ func (m *SourceMaterializer) materializeInPlace(
 		return nil, fmt.Errorf("calculate hash: %w", err)
 	}
 
-	statusJSON, err := buildTrackedProcessingStatus(validation.AssetType, "Asset discovery queued for processing")
+	statusJSON, err := buildTrackedIngestStatus(
+		validation.AssetType,
+		"Asset discovery queued for processing",
+		statusdb.IngestPhaseInPlaceQueued,
+		"",
+		"",
+		false,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("marshal status: %w", err)
 	}
@@ -478,7 +520,14 @@ func (m *SourceMaterializer) finalizeAssetAndEnqueue(
 	storagePath string,
 	assetType dbtypes.AssetType,
 ) (*repo.Asset, error) {
-	queuedStatus, err := buildTrackedProcessingStatus(assetType, queuedStatusMessage)
+	queuedStatus, err := buildTrackedIngestStatus(
+		assetType,
+		queuedStatusMessage,
+		statusdb.IngestPhasePipelineQueued,
+		"",
+		"",
+		false,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("marshal queued status: %w", err)
 	}
@@ -518,20 +567,44 @@ func (m *SourceMaterializer) recoverMovedStaging(
 	if existing == nil {
 		return nil, fmt.Errorf("staged file not found and no prepared asset exists")
 	}
-	if !isPreparedAsset(existing) {
+	if !isRecoverableStagingAsset(existing) {
 		return existing, nil
+	}
+	if recoveredPath, recoverErr := recoverableStagingPath(repository.Path, existing.Status); recoverErr != nil {
+		return nil, recoverErr
+	} else if recoveredPath != "" {
+		if _, statErr := os.Stat(recoveredPath); statErr == nil {
+			source.SourcePath = recoveredPath
+			return m.materializeFromStaging(ctx, source, repository, &file.ValidationResult{
+				Valid:     true,
+				AssetType: assetType,
+				MimeType:  existing.MimeType,
+			})
+		} else if !os.IsNotExist(statErr) {
+			return nil, fmt.Errorf("inspect recoverable staging file: %w", statErr)
+		}
 	}
 	if existing.StoragePath == nil || *existing.StoragePath == "" {
-		_ = m.markAssetFailed(ctx, existing.AssetID, "reconcile_staging", "prepared asset has no inbox target")
-		return existing, nil
+		detail := "prepared asset has no inbox target"
+		_ = m.markAssetIngestFailure(ctx, existing.AssetID, statusdb.IngestPhaseCommitFailed, ingestCodeCommitFailed, "", detail)
+		return nil, errors.New(detail)
 	}
-	finalPath := filepath.Join(repository.Path, filepath.FromSlash(*existing.StoragePath))
+	_, finalPath, err := resolveRepositoryRelativePath(repository.Path, *existing.StoragePath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve prepared inbox path: %w", err)
+	}
 	if _, err := os.Stat(finalPath); err != nil {
 		if os.IsNotExist(err) {
-			_ = m.markAssetFailed(ctx, existing.AssetID, "reconcile_staging", "prepared asset has neither staging nor inbox file")
-			return existing, nil
+			detail := "prepared asset has neither staging nor inbox file"
+			_ = m.markAssetIngestFailure(ctx, existing.AssetID, statusdb.IngestPhaseCommitFailed, ingestCodeCommitFailed, "", detail)
+			return nil, errors.New(detail)
 		}
 		return nil, fmt.Errorf("inspect prepared inbox file: %w", err)
+	}
+	expectedHash := strings.ToLower(strings.TrimSpace(*source.ContentHash))
+	if err := verifyFinalAndRemoveStaging("", finalPath, expectedHash, existing.FileSize); err != nil {
+		m.markStagingConflict(ctx, existing.AssetID, repository.Path, "", err)
+		return nil, fmt.Errorf("reconcile prepared inbox file: %w", err)
 	}
 	finalized, err := m.finalizeAssetAndEnqueue(ctx, repository, existing, *existing.StoragePath, assetType)
 	if err != nil {
@@ -541,12 +614,20 @@ func (m *SourceMaterializer) recoverMovedStaging(
 	return finalized, nil
 }
 
-func isPreparedAsset(asset *repo.Asset) bool {
+func isRecoverableStagingAsset(asset *repo.Asset) bool {
 	if asset == nil {
 		return false
 	}
 	status, err := statusdb.FromJSON(asset.Status)
-	return err == nil && status.State == statusdb.StateProcessing && status.Message == preparedStatusMessage
+	if err != nil || status.Ingest == nil || !status.Ingest.Recoverable {
+		return false
+	}
+	switch status.Ingest.Phase {
+	case statusdb.IngestPhasePrepared, statusdb.IngestPhaseCommitFailed, statusdb.IngestPhaseConflict:
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *SourceMaterializer) resolveLayeredHash(source IngestSource) (*hash.LayeredHashResult, error) {
@@ -572,8 +653,9 @@ func (m *SourceMaterializer) resolveLayeredHash(source IngestSource) (*hash.Laye
 	return result, nil
 }
 
-// handleStagingFailure attempts to move a failed staging file to the failed
-// directory and marks the asset record as failed.
+// handleStagingFailure attempts to quarantine a failed staging file and marks
+// the asset as recoverable. A quarantine failure always leaves the source file
+// in place; original media is never deleted as an error fallback.
 func (m *SourceMaterializer) handleStagingFailure(
 	ctx context.Context,
 	stagingFile *storage.StagingFile,
@@ -582,6 +664,7 @@ func (m *SourceMaterializer) handleStagingFailure(
 	commitErr error,
 ) {
 	failureDetail := fmt.Sprintf("commit staging to inbox failed: %v", commitErr)
+	recoveryPath := stagingFile.Path
 
 	if moveErr := m.stagingManager.MoveStagingToFailed(stagingFile); moveErr != nil {
 		m.logger.Warn("failed to move staging file to failed dir",
@@ -593,17 +676,24 @@ func (m *SourceMaterializer) handleStagingFailure(
 			zap.String("asset_id", assetID.String()),
 			zap.String("staging_path", stagingFile.Path),
 		)
-		if removeErr := os.Remove(stagingFile.Path); removeErr != nil && !os.IsNotExist(removeErr) {
-			m.logger.Warn("failed to remove staging file after move failure",
-				zap.String("operation", "source.materialize"),
-				zap.String("staging_path", stagingFile.Path),
-				zap.Error(removeErr),
-			)
-		}
 		failureDetail = fmt.Sprintf("%s; move to failed dir failed: %v", failureDetail, moveErr)
+	} else {
+		recoveryPath = stagingFile.Path
 	}
 
-	if markErr := m.markAssetFailed(ctx, assetID, "commit_staging", failureDetail); markErr != nil {
+	recoveryRelative, relativeErr := relativeRepositoryPath(repoPath, recoveryPath)
+	if relativeErr != nil {
+		failureDetail = fmt.Sprintf("%s; record recovery path failed: %v", failureDetail, relativeErr)
+		recoveryRelative = ""
+	}
+	if markErr := m.markAssetIngestFailure(
+		ctx,
+		assetID,
+		statusdb.IngestPhaseCommitFailed,
+		ingestCodeCommitFailed,
+		recoveryRelative,
+		failureDetail,
+	); markErr != nil {
 		m.logger.Warn("failed to mark asset as failed after staging commit error",
 			zap.String("operation", "source.materialize"),
 			zap.String("asset_id", assetID.String()),
@@ -614,6 +704,86 @@ func (m *SourceMaterializer) handleStagingFailure(
 		zap.String("asset_id", assetID.String()),
 		zap.String("original_filename", stagingFile.Filename),
 	)
+}
+
+func (m *SourceMaterializer) reconcileDuplicateStaging(
+	ctx context.Context,
+	source IngestSource,
+	repository repo.Repository,
+	existing *repo.Asset,
+	expectedHash string,
+	expectedSize int64,
+) (*repo.Asset, error) {
+	if existing.StoragePath == nil || strings.TrimSpace(*existing.StoragePath) == "" {
+		err := errors.New("existing asset has no storage path")
+		m.markStagingConflict(ctx, existing.AssetID, repository.Path, source.SourcePath, err)
+		return nil, fmt.Errorf("reconcile duplicate staging file: %w", err)
+	}
+	_, finalPath, err := resolveRepositoryRelativePath(repository.Path, *existing.StoragePath)
+	if err != nil {
+		m.markStagingConflict(ctx, existing.AssetID, repository.Path, source.SourcePath, err)
+		return nil, fmt.Errorf("resolve existing asset path: %w", err)
+	}
+	if err := verifyFinalAndRemoveStaging(source.SourcePath, finalPath, expectedHash, expectedSize); err != nil {
+		m.markStagingConflict(ctx, existing.AssetID, repository.Path, source.SourcePath, err)
+		return nil, fmt.Errorf("reconcile duplicate staging file: %w", err)
+	}
+	return existing, nil
+}
+
+func (m *SourceMaterializer) markStagingConflict(
+	ctx context.Context,
+	assetID uuid.UUID,
+	repositoryPath string,
+	stagingPath string,
+	conflictErr error,
+) {
+	recoveryPath := ""
+	if stagingPath != "" {
+		if relative, err := relativeRepositoryPath(repositoryPath, stagingPath); err == nil {
+			recoveryPath = relative
+		} else {
+			m.logger.Warn("failed to record conflicting staging path",
+				zap.String("asset_id", assetID.String()),
+				zap.String("staging_path", stagingPath),
+				zap.Error(err),
+			)
+		}
+	}
+	if err := m.markAssetIngestFailure(
+		ctx,
+		assetID,
+		statusdb.IngestPhaseConflict,
+		ingestCodeConflict,
+		recoveryPath,
+		conflictErr.Error(),
+	); err != nil {
+		m.logger.Warn("failed to mark staging conflict",
+			zap.String("asset_id", assetID.String()),
+			zap.Error(err),
+		)
+	}
+	m.audit(repositoryPath).Error("asset.materialize.conflict", conflictErr,
+		zap.String("asset_id", assetID.String()),
+		zap.String("staging_path", stagingPath),
+	)
+}
+
+func (m *SourceMaterializer) markAssetIngestFailure(
+	ctx context.Context,
+	assetID uuid.UUID,
+	phase statusdb.IngestPhase,
+	code string,
+	stagingPath string,
+	detail string,
+) error {
+	return m.queries.MutateAssetStatus(ctx, assetID, func(current statusdb.AssetStatus) (statusdb.AssetStatus, error) {
+		current.State = statusdb.StateFailed
+		current.Message = "Asset ingestion failed"
+		current.AddError("materialize_asset", detail)
+		current.SetIngestState(phase, code, stagingPath, true)
+		return current, nil
+	})
 }
 
 // resolveRepository looks up a repository by UUID, falling back to primary.
@@ -698,27 +868,6 @@ func (m *SourceMaterializer) enqueuePipelineTx(
 	return nil
 }
 
-// markAssetFailed updates the asset status to failed with a single error detail.
-func (m *SourceMaterializer) markAssetFailed(ctx context.Context, assetID uuid.UUID, taskName string, detail string) error {
-	failedStatus := statusdb.NewFailedStatus("Asset ingestion failed", []statusdb.ErrorDetail{
-		{
-			Task:  taskName,
-			Error: detail,
-			Time:  time.Now().Format(time.RFC3339),
-		},
-	})
-	statusJSON, err := failedStatus.ToJSON()
-	if err != nil {
-		return fmt.Errorf("marshal failed status: %w", err)
-	}
-
-	_, err = m.queries.UpdateAssetStatusWithErrors(ctx, repo.UpdateAssetStatusWithErrorsParams{
-		AssetID: assetID,
-		Status:  statusJSON,
-	})
-	return err
-}
-
 // markPipelineTasksFailed marks individual pipeline tasks as failed in the
 // asset status before they were ever queued.
 func (m *SourceMaterializer) markPipelineTasksFailed(ctx context.Context, assetID uuid.UUID, tasks []string, cause error) {
@@ -777,6 +926,140 @@ func BuildTrackedProcessingStatus(assetType dbtypes.AssetType, message string) (
 func buildTrackedProcessingStatus(assetType dbtypes.AssetType, message string) ([]byte, error) {
 	s := statusdb.NewTrackedProcessingStatus(message, pipelineTaskNames(assetType))
 	return s.ToJSON()
+}
+
+func buildTrackedIngestStatus(
+	assetType dbtypes.AssetType,
+	message string,
+	phase statusdb.IngestPhase,
+	code string,
+	stagingPath string,
+	recoverable bool,
+) ([]byte, error) {
+	s := statusdb.NewTrackedProcessingStatus(message, pipelineTaskNames(assetType))
+	s.SetIngestState(phase, code, stagingPath, recoverable)
+	return s.ToJSON()
+}
+
+func recoverableStagingPath(repositoryPath string, rawStatus []byte) (string, error) {
+	status, err := statusdb.FromJSON(rawStatus)
+	if err != nil {
+		return "", fmt.Errorf("parse recoverable ingest status: %w", err)
+	}
+	if status.Ingest == nil || !status.Ingest.Recoverable || status.Ingest.StagingPath == "" {
+		return "", nil
+	}
+	_, fullPath, err := resolveRepositoryRelativePath(repositoryPath, status.Ingest.StagingPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve recoverable staging path: %w", err)
+	}
+	return fullPath, nil
+}
+
+func relativeRepositoryPath(repositoryPath, fullPath string) (string, error) {
+	root, err := filepath.Abs(filepath.Clean(repositoryPath))
+	if err != nil {
+		return "", fmt.Errorf("resolve repository root: %w", err)
+	}
+	path, err := filepath.Abs(filepath.Clean(fullPath))
+	if err != nil {
+		return "", fmt.Errorf("resolve repository file: %w", err)
+	}
+	relative, err := filepath.Rel(root, path)
+	if err != nil {
+		return "", fmt.Errorf("make repository-relative path: %w", err)
+	}
+	if escapesRepository(relative) {
+		return "", errors.New("path escapes repository root")
+	}
+	return filepath.ToSlash(relative), nil
+}
+
+func resolveRepositoryRelativePath(repositoryPath, relativePath string) (string, string, error) {
+	if strings.TrimSpace(relativePath) == "" {
+		return "", "", errors.New("repository-relative path is empty")
+	}
+	if storage.IsRootedPath(relativePath) {
+		return "", "", errors.New("repository-relative path is rooted or volume-qualified")
+	}
+
+	normalized := strings.ReplaceAll(relativePath, `\`, "/")
+	cleanRelative := filepath.Clean(filepath.FromSlash(normalized))
+	root, err := filepath.Abs(filepath.Clean(repositoryPath))
+	if err != nil {
+		return "", "", fmt.Errorf("resolve repository root: %w", err)
+	}
+	fullPath := filepath.Join(root, cleanRelative)
+	contained, err := filepath.Rel(root, fullPath)
+	if err != nil {
+		return "", "", fmt.Errorf("check repository containment: %w", err)
+	}
+	if escapesRepository(contained) {
+		return "", "", errors.New("path escapes repository root")
+	}
+	return filepath.ToSlash(contained), fullPath, nil
+}
+
+func resolveInPlaceSource(repositoryPath, sourcePath string) (string, string, error) {
+	storagePath, fullPath, err := resolveRepositoryRelativePath(repositoryPath, sourcePath)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve in-place source: %w", err)
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(repositoryPath)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve repository symlinks: %w", err)
+	}
+	resolvedRoot, err = filepath.Abs(filepath.Clean(resolvedRoot))
+	if err != nil {
+		return "", "", fmt.Errorf("resolve repository root: %w", err)
+	}
+	resolvedFile, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve in-place source symlinks: %w", err)
+	}
+	resolvedFile, err = filepath.Abs(filepath.Clean(resolvedFile))
+	if err != nil {
+		return "", "", fmt.Errorf("resolve in-place source: %w", err)
+	}
+	relative, err := filepath.Rel(resolvedRoot, resolvedFile)
+	if err != nil {
+		return "", "", fmt.Errorf("check resolved source containment: %w", err)
+	}
+	if escapesRepository(relative) {
+		return "", "", errors.New("in-place source symlink escapes repository root")
+	}
+	return storagePath, fullPath, nil
+}
+
+func escapesRepository(relative string) bool {
+	return relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+func verifyFinalAndRemoveStaging(stagingPath, finalPath, expectedHash string, expectedSize int64) error {
+	info, err := os.Stat(finalPath)
+	if err != nil {
+		return fmt.Errorf("inspect final file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("final path is not a regular file")
+	}
+	if info.Size() != expectedSize {
+		return fmt.Errorf("final file size conflict: got %d, want %d", info.Size(), expectedSize)
+	}
+	actualHash, err := hash.CalculateBLAKE3(finalPath)
+	if err != nil {
+		return fmt.Errorf("hash final file: %w", err)
+	}
+	if !strings.EqualFold(actualHash, expectedHash) {
+		return errors.New("final file content conflict: BLAKE3 mismatch")
+	}
+	if stagingPath == "" {
+		return nil
+	}
+	if err := os.Remove(stagingPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove verified duplicate staging file: %w", err)
+	}
+	return nil
 }
 
 func ownerOrRepoDefault(owner *int32, defaultOwner *int32) *int32 {

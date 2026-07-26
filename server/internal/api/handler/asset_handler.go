@@ -248,9 +248,19 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		return
 	}
 	if duplicate != nil {
-		h.removeUploadTempFile(stagingFile.Path)
-		api.JSONOK(c, dto.UploadResponseDTO{Status: uploadStatusDuplicate, FileName: header.Filename, Size: header.Size, ContentHash: hashResult.ContentHash, Message: "File already exists in repository"})
-		return
+		verified, verifyErr := verifyDuplicateAssetFile(
+			repository.Path,
+			duplicate,
+			hashResult.ContentHash,
+			hashResult.FileSize,
+		)
+		if verifyErr != nil {
+			log.Printf("Existing duplicate asset %s could not be verified: %v", duplicate.assetID, verifyErr)
+		} else if verified {
+			h.removeUploadTempFile(stagingFile.Path)
+			api.JSONOK(c, dto.UploadResponseDTO{Status: uploadStatusDuplicate, FileName: header.Filename, Size: header.Size, ContentHash: hashResult.ContentHash, Message: "File already exists in repository"})
+			return
+		}
 	}
 
 	// Get user ID from JWT claims
@@ -3710,7 +3720,6 @@ func (h *AssetHandler) handleUploadFailureFile(repoPath, filePath, filename, rea
 		}
 		if err := h.stagingManager.MoveStagingToFailed(stagingFile); err != nil {
 			log.Printf("Failed to move upload file to failed dir (%s): %v", reason, err)
-			h.removeUploadTempFile(filePath)
 		}
 		return
 	}
@@ -4063,19 +4072,24 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	}
 
 	if duplicate != nil {
-		log.Printf("Duplicate upload skipped: %s matches asset %s (hash %s)", header.Filename, duplicate.assetID, finalHash)
-		h.removeUploadTempFile(stagingFilePath)
-		size := header.Size
-		status := uploadStatusDuplicate
-		message := "File already exists in repository"
-		return &dto.BatchUploadResultDTO{
-			Success:     true,
-			FileName:    header.Filename,
-			ContentHash: finalHash,
-			Status:      &status,
-			Size:        &size,
-			Message:     &message,
-		}, nil
+		verified, verifyErr := verifyDuplicateAssetFile(repository.Path, duplicate, finalHash, header.Size)
+		if verifyErr != nil {
+			log.Printf("Existing duplicate asset %s could not be verified: %v", duplicate.assetID, verifyErr)
+		} else if verified {
+			log.Printf("Duplicate upload skipped: %s matches asset %s (hash %s)", header.Filename, duplicate.assetID, finalHash)
+			h.removeUploadTempFile(stagingFilePath)
+			size := header.Size
+			status := uploadStatusDuplicate
+			message := "File already exists in repository"
+			return &dto.BatchUploadResultDTO{
+				Success:     true,
+				FileName:    header.Filename,
+				ContentHash: finalHash,
+				Status:      &status,
+				Size:        &size,
+				Message:     &message,
+			}, nil
+		}
 	}
 
 	// Enqueue for processing
@@ -4122,8 +4136,8 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 
 // duplicateAsset identifies the already-stored asset that a candidate upload matches.
 type duplicateAsset struct {
-	assetID  string
-	filename string
+	assetID     string
+	storagePath *string
 }
 
 // findDuplicateByHash reports an existing asset with the same authoritative
@@ -4146,11 +4160,63 @@ func (h *AssetHandler) findDuplicateByHash(ctx context.Context, contentHash stri
 			continue
 		}
 		return &duplicateAsset{
-			assetID:  row.AssetID.String(),
-			filename: row.OriginalFilename,
+			assetID:     row.AssetID.String(),
+			storagePath: row.StoragePath,
 		}, nil
 	}
 	return nil, nil
+}
+
+func verifyDuplicateAssetFile(repositoryPath string, duplicate *duplicateAsset, expectedHash string, expectedSize int64) (bool, error) {
+	if duplicate == nil || duplicate.storagePath == nil || strings.TrimSpace(*duplicate.storagePath) == "" {
+		return false, nil
+	}
+	if storage.IsRootedPath(*duplicate.storagePath) {
+		return false, errors.New("duplicate asset storage path is rooted or volume-qualified")
+	}
+	normalized := strings.ReplaceAll(*duplicate.storagePath, `\`, "/")
+	root, err := filepath.Abs(filepath.Clean(repositoryPath))
+	if err != nil {
+		return false, fmt.Errorf("resolve repository root: %w", err)
+	}
+	target := filepath.Join(root, filepath.Clean(filepath.FromSlash(normalized)))
+	relative, err := filepath.Rel(root, target)
+	if err != nil {
+		return false, fmt.Errorf("check duplicate asset containment: %w", err)
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return false, errors.New("duplicate asset storage path escapes repository")
+	}
+	info, err := os.Stat(target)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("inspect duplicate asset file: %w", err)
+	}
+	if !info.Mode().IsRegular() || info.Size() != expectedSize {
+		return false, nil
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return false, fmt.Errorf("resolve repository symlinks: %w", err)
+	}
+	resolvedTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		return false, fmt.Errorf("resolve duplicate asset symlinks: %w", err)
+	}
+	resolvedRelative, err := filepath.Rel(resolvedRoot, resolvedTarget)
+	if err != nil {
+		return false, fmt.Errorf("check duplicate symlink containment: %w", err)
+	}
+	if resolvedRelative == ".." || strings.HasPrefix(resolvedRelative, ".."+string(filepath.Separator)) {
+		return false, errors.New("duplicate asset symlink escapes repository")
+	}
+	actualHash, err := hash.CalculateBLAKE3(target)
+	if err != nil {
+		return false, fmt.Errorf("hash duplicate asset file: %w", err)
+	}
+	return strings.EqualFold(actualHash, expectedHash), nil
 }
 
 // ReprocessAsset reprocesses a failed or warning asset
