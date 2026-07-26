@@ -213,7 +213,7 @@ export default defineConfig({
 
   staged: {
     "*.{js,jsx,ts,tsx}": "vp check --fix",
-    "*.{css,scss,json,md,yml,yaml}": "vp fmt . --write",
+    "*.{css,scss,json,md,yml,yaml}": "vp fmt --write",
   },
 
   optimizeDeps: {
