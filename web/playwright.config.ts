@@ -11,7 +11,7 @@ export default defineConfig({
     : "list",
   outputDir: "test-results",
   use: {
-    baseURL: process.env.LUMILIO_E2E_BASE_URL ?? "http://127.0.0.1:16657",
+    baseURL: process.env.LUMILIO_E2E_BASE_URL ?? "http://localhost:16657",
     browserName: "chromium",
     headless: true,
     // Pins the language i18next detects from `navigator`, so accessible names

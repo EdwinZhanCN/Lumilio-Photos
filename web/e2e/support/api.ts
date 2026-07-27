@@ -1,4 +1,4 @@
-export const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://127.0.0.1:16657";
+export const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://localhost:16657";
 
 type RequestInitLike = {
   method?: string;
