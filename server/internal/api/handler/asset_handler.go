@@ -538,14 +538,16 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			if err != nil {
 				errMsg := err.Error()
 				results = append(results, dto.BatchUploadResultDTO{
-					Success:  false,
-					FileName: state.filename,
-					Error:    &errMsg,
+					Success:   false,
+					SessionID: sessionID,
+					FileName:  state.filename,
+					Error:     &errMsg,
 				})
 				continue
 			}
 
 			h.sessionManager.UpdateSessionStatus(sessionID, "completed")
+			result.SessionID = sessionID
 			results = append(results, *result)
 			continue
 		}
@@ -557,10 +559,11 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			status := "uploading"
 			message := fmt.Sprintf("Upload in progress: %.1f%% complete", progress*100)
 			results = append(results, dto.BatchUploadResultDTO{
-				Success:  true,
-				FileName: state.filename,
-				Status:   &status,
-				Message:  &message,
+				Success:   true,
+				SessionID: sessionID,
+				FileName:  state.filename,
+				Status:    &status,
+				Message:   &message,
 			})
 			continue
 		}
@@ -572,9 +575,10 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			h.sessionManager.SetSessionError(sessionID, errMsg)
 			h.chunkMerger.CleanupChunks(sessionID)
 			results = append(results, dto.BatchUploadResultDTO{
-				Success:  false,
-				FileName: state.filename,
-				Error:    &errMsg,
+				Success:   false,
+				SessionID: sessionID,
+				FileName:  state.filename,
+				Error:     &errMsg,
 			})
 			continue
 		}
@@ -598,9 +602,10 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			errMsg := err.Error()
 			h.sessionManager.SetSessionError(sessionID, errMsg)
 			results = append(results, dto.BatchUploadResultDTO{
-				Success:  false,
-				FileName: state.filename,
-				Error:    &errMsg,
+				Success:   false,
+				SessionID: sessionID,
+				FileName:  state.filename,
+				Error:     &errMsg,
 			})
 			continue
 		}
@@ -609,6 +614,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		if result.TaskID != nil {
 			h.sessionManager.SetSessionTaskID(sessionID, *result.TaskID)
 		}
+		result.SessionID = sessionID
 		results = append(results, *result)
 	}
 
@@ -921,7 +927,8 @@ func (h *AssetHandler) GetUploadJobStatus(c *gin.Context) {
 // @Success 200 {string} string "SSE stream"
 // @Router /api/v1/assets/batch/jobs/stream [get]
 func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
-	if _, err := parseUploadTaskIDs(c.Query("task_ids")); err != nil {
+	requestedIDs, err := parseUploadTaskIDs(c.Query("task_ids"))
+	if err != nil {
 		api.GinBadRequest(c, err, "Invalid upload task IDs")
 		return
 	}
@@ -957,7 +964,7 @@ func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
 		if !send("jobs", dto.UploadJobStatusResponseDTO{Jobs: statuses}) {
 			return
 		}
-		if len(statuses) > 0 && allUploadJobsTerminal(statuses) {
+		if allRequestedUploadJobsTerminal(requestedIDs, statuses) {
 			send("done", dto.UploadJobStatusResponseDTO{Jobs: statuses})
 			return
 		}
@@ -1013,9 +1020,20 @@ func (h *AssetHandler) loadUploadJobStatuses(c *gin.Context, raw string) ([]dto.
 	return statuses, nil
 }
 
-func allUploadJobsTerminal(statuses []dto.UploadJobStatusDTO) bool {
+// allRequestedUploadJobsTerminal is true only when every requested task ID is
+// present in statuses and marked terminal. A partial/ownership-filtered set must
+// not end the SSE stream early.
+func allRequestedUploadJobsTerminal(requested []int64, statuses []dto.UploadJobStatusDTO) bool {
+	if len(requested) == 0 {
+		return false
+	}
+	byID := make(map[int64]dto.UploadJobStatusDTO, len(statuses))
 	for _, status := range statuses {
-		if !status.Terminal {
+		byID[status.TaskID] = status
+	}
+	for _, id := range requested {
+		status, ok := byID[id]
+		if !ok || !status.Terminal {
 			return false
 		}
 	}
@@ -3956,10 +3974,11 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 		log.Printf("processChunkedFileSession: returning progress: %s", message)
 
 		result := &dto.BatchUploadResultDTO{
-			Success:  true,
-			FileName: filename,
-			Status:   &status,
-			Message:  &message,
+			Success:   true,
+			SessionID: sessionID,
+			FileName:  filename,
+			Status:    &status,
+			Message:   &message,
 		}
 		log.Printf("processChunkedFileSession: returning progress result: %+v", result)
 		return result, nil
@@ -4083,6 +4102,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 			message := "File already exists in repository"
 			return &dto.BatchUploadResultDTO{
 				Success:     true,
+				SessionID:   session.SessionID,
 				FileName:    header.Filename,
 				ContentHash: finalHash,
 				Status:      &status,
@@ -4125,6 +4145,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 
 	return &dto.BatchUploadResultDTO{
 		Success:     true,
+		SessionID:   session.SessionID,
 		FileName:    header.Filename,
 		ContentHash: finalHash,
 		TaskID:      &taskID,

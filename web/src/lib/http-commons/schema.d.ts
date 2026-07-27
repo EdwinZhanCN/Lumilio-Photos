@@ -12005,6 +12005,7 @@ export interface components {
             error?: string;
             file_name?: string;
             message?: string;
+            session_id?: string;
             size?: number;
             status?: string;
             success?: boolean;

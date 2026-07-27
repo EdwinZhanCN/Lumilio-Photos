@@ -43,16 +43,13 @@ export const runUploadProcess = async (
   const fileArray = Array.from(files);
   if (fileArray.length === 0) return { results: [], resultSessions: new Map() };
 
-  const plannedSessions: PlannedFileUploadSession[] = fileArray.map((file) => {
-    const chunked = shouldUseChunks(file);
-    return {
-      file,
-      sessionId: chunked
-        ? getResumableSessionId(file, dependencies.repositoryId)
-        : generateSessionId(),
-      shouldUseChunks: chunked,
-    };
-  });
+  const plannedSessions: PlannedFileUploadSession[] = fileArray.map((file) => ({
+    file,
+    // UI progress key stays stable; resumable server session ids are resolved
+    // after the content hash is available.
+    sessionId: generateSessionId(),
+    shouldUseChunks: shouldUseChunks(file),
+  }));
   dependencies.initializeFileProgress(plannedSessions);
 
   const transport = createUploadTransport(dependencies);
@@ -75,6 +72,9 @@ export const runUploadProcess = async (
       const sessionWithHash: FileUploadSession = {
         ...session,
         hash: hashResult.hash,
+        uploadSessionId: session.shouldUseChunks
+          ? getResumableSessionId(session.file, dependencies.repositoryId, hashResult.hash)
+          : undefined,
       };
       if (sessionWithHash.shouldUseChunks) {
         uploadTasks.push(transport.uploadChunked(sessionWithHash));

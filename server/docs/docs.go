@@ -1564,6 +1564,9 @@ const docTemplate = `{
                     "message": {
                         "type": "string"
                     },
+                    "session_id": {
+                        "type": "string"
+                    },
                     "size": {
                         "type": "integer"
                     },

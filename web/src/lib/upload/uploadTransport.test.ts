@@ -1,5 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { precheckUploads, uploadFile } from "./uploadTransport";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import {
+  clearResumableSessionId,
+  getResumableSessionId,
+  precheckUploads,
+  uploadFile,
+} from "./uploadTransport";
 
 describe("upload transport error mapping", () => {
   afterEach(() => {
@@ -34,5 +39,49 @@ describe("upload transport error mapping", () => {
     await expect(precheckUploads([{ hash: "abcd", size: 5 }])).rejects.toThrow(
       "Upload precheck failed with status 503",
     );
+  });
+});
+
+describe("resumable session keys", () => {
+  const store = new Map<string, string>();
+
+  beforeEach(() => {
+    store.clear();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value);
+      },
+      removeItem: (key: string) => {
+        store.delete(key);
+      },
+      clear: () => {
+        store.clear();
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("scopes resumable ids by content hash", () => {
+    const file = new File(["photo"], "photo.jpg");
+    const first = getResumableSessionId(file, "repo", "hash-a");
+    const same = getResumableSessionId(file, "repo", "hash-a");
+    const other = getResumableSessionId(file, "repo", "hash-b");
+    expect(same).toBe(first);
+    expect(other).not.toBe(first);
+  });
+
+  it("migrates a legacy name-size-mtime key into the hash-scoped key", () => {
+    const file = new File(["photo"], "photo.jpg");
+    Object.defineProperty(file, "lastModified", { value: 123 });
+    const legacyKey = `lumilio.upload.session.v1:repo:${file.name}:${file.size}:${file.lastModified}`;
+    localStorage.setItem(legacyKey, "legacy-session");
+    expect(getResumableSessionId(file, "repo", "hash-a")).toBe("legacy-session");
+    expect(localStorage.getItem(legacyKey)).toBeNull();
+    clearResumableSessionId(file, "repo", "hash-a");
+    expect(getResumableSessionId(file, "repo", "hash-a")).not.toBe("legacy-session");
   });
 });

@@ -35,6 +35,32 @@ export interface UploadTransport {
 const getErrorMessage = (error: unknown, fallback: string): string =>
   error instanceof Error ? error.message : fallback;
 
+const transportSessionId = (session: FileUploadSession): string =>
+  session.uploadSessionId ?? session.sessionId;
+
+/** Prefer server session_id; fall back to file_name for older responses. */
+export const matchBatchUploadResult = (
+  result: BatchUploadResult,
+  sessionsByUploadId: Map<string, FileUploadSession>,
+  sessionsByFileName: Map<string, FileUploadSession[]>,
+): FileUploadSession | undefined => {
+  if (result.session_id) {
+    const matched = sessionsByUploadId.get(result.session_id);
+    if (matched) {
+      sessionsByUploadId.delete(result.session_id);
+      const bucket = sessionsByFileName.get(matched.file.name);
+      const index = bucket?.indexOf(matched) ?? -1;
+      if (bucket && index >= 0) bucket.splice(index, 1);
+      return matched;
+    }
+  }
+  const fromName = sessionsByFileName.get(result.file_name || "")?.shift();
+  if (fromName) {
+    sessionsByUploadId.delete(fromName.uploadSessionId ?? fromName.sessionId);
+  }
+  return fromName;
+};
+
 export const createUploadTransport = (
   dependencies: UploadTransportDependencies,
 ): UploadTransport => {
@@ -69,7 +95,7 @@ export const createUploadTransport = (
       (isDuplicateResult(normalizedResult) || Boolean(normalizedResult.task_id))
     ) {
       if (session.shouldUseChunks) {
-        clearResumableSessionId(session.file, dependencies.repositoryId);
+        clearResumableSessionId(session.file, dependencies.repositoryId, session.hash);
       }
       if (normalizedResult.task_id) {
         materializationSessions.set(normalizedResult.task_id, session);
@@ -148,7 +174,7 @@ export const createUploadTransport = (
       const response = await dependencies.batchUpload({
         files: sessions.map((session) => ({
           file: session.file,
-          sessionId: session.sessionId,
+          sessionId: transportSessionId(session),
         })),
         repositoryId: dependencies.repositoryId,
         options: {
@@ -162,6 +188,9 @@ export const createUploadTransport = (
         },
       });
 
+      const sessionsByUploadId = new Map(
+        sessions.map((session) => [transportSessionId(session), session] as const),
+      );
       const sessionsByFileName = new Map<string, FileUploadSession[]>();
       sessions.forEach((session) => {
         const bucket = sessionsByFileName.get(session.file.name);
@@ -170,12 +199,12 @@ export const createUploadTransport = (
       });
 
       (response.results ?? []).forEach((result) => {
-        const match = sessionsByFileName.get(result.file_name || "")?.shift();
+        const match = matchBatchUploadResult(result, sessionsByUploadId, sessionsByFileName);
         if (match) recordResult(result, match);
       });
 
-      sessionsByFileName.forEach((remaining) => {
-        remaining.forEach((session) => recordFailure(session, dependencies.messages.noResult));
+      sessionsByUploadId.forEach((session) => {
+        recordFailure(session, dependencies.messages.noResult);
       });
     } catch (error) {
       const message = getErrorMessage(error, dependencies.messages.uploadFailed);
@@ -194,7 +223,7 @@ export const createUploadTransport = (
       dependencies.updateFileProgress(session.sessionId, { status: "uploading" });
       const response = await dependencies.chunkedUpload({
         file: session.file,
-        sessionId: session.sessionId,
+        sessionId: transportSessionId(session),
         hash: session.hash,
         repositoryId: dependencies.repositoryId,
         onProgress: (progress) => {
@@ -224,6 +253,7 @@ export const createUploadTransport = (
     const taskIds = Array.from(materializationSessions.keys());
     if (taskIds.length === 0) return;
 
+    const settledTerminal = new Set<number>();
     try {
       await waitForUploadJobs(taskIds, {
         onUpdate: (job) => {
@@ -238,6 +268,7 @@ export const createUploadTransport = (
             return;
           }
 
+          settledTerminal.add(job.task_id);
           const result = materializationResults.get(job.task_id);
           if (!job.success && result) {
             result.success = false;
@@ -253,6 +284,7 @@ export const createUploadTransport = (
     } catch (error) {
       const message = getErrorMessage(error, dependencies.messages.processFailed);
       taskIds.forEach((taskId) => {
+        if (settledTerminal.has(taskId)) return;
         const session = materializationSessions.get(taskId);
         const result = materializationResults.get(taskId);
         if (result) {
@@ -262,6 +294,7 @@ export const createUploadTransport = (
         if (session) {
           dependencies.updateFileProgress(session.sessionId, {
             status: "failed",
+            progress: 0,
             error: message,
           });
         }
