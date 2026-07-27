@@ -8,6 +8,7 @@ const expectedLayers = [
   { name: "overlay", className: "z-overlay", value: "300" },
   { name: "modal", className: "z-modal", value: "400" },
   { name: "lightbox", className: "z-lightbox", value: "500" },
+  { name: "agent", className: "z-agent", value: "550" },
   { name: "tooltip", className: "z-tooltip", value: "600" },
   { name: "toast", className: "z-toast", value: "700" },
 ] as const;

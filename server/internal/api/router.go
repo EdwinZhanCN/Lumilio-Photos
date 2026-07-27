@@ -688,7 +688,7 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 func corsMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Content-Hash, X-CSRF-Token")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Content-Hash, X-CSRF-Token, X-Upload-Fingerprint")
 		c.Writer.Header().Add("Vary", "Origin")
 		c.Writer.Header().Add("Vary", "Access-Control-Request-Method")
 		c.Writer.Header().Add("Vary", "Access-Control-Request-Headers")

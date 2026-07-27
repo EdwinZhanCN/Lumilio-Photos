@@ -89,6 +89,7 @@ func TestCORSMiddlewareSeparatesCredentialedAndOpenAPIRequests(t *testing.T) {
 		require.Equal(t, "*", recorder.Header().Get("Access-Control-Allow-Origin"))
 		require.Contains(t, recorder.Header().Get("Access-Control-Allow-Headers"), "Authorization")
 		require.Contains(t, recorder.Header().Get("Access-Control-Allow-Headers"), "X-CSRF-Token")
+		require.Contains(t, recorder.Header().Get("Access-Control-Allow-Headers"), "X-Upload-Fingerprint")
 	})
 }
 

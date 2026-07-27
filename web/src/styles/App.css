@@ -33,6 +33,7 @@
   --z-index-overlay: 300;
   --z-index-modal: 400;
   --z-index-lightbox: 500;
+  --z-index-agent: 550;
   --z-index-tooltip: 600;
   --z-index-toast: 700;
 }
