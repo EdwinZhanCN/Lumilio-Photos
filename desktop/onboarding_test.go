@@ -152,6 +152,18 @@ func TestOnboardingStateEndpoint(t *testing.T) {
 	if got.Runtime.Phase != supervisor.RuntimeStopped || !got.Runtime.CanRestart {
 		t.Errorf("typed runtime snapshot = %+v, want stopped/restartable", got.Runtime)
 	}
+	var contract map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &contract); err != nil {
+		t.Fatal(err)
+	}
+	for _, retired := range []string{"ready", "serverURL", "stage", "network"} {
+		if _, ok := contract[retired]; ok {
+			t.Errorf("retired compatibility field %q is still present", retired)
+		}
+	}
+	if _, ok := contract["networkHost"]; !ok {
+		t.Error("networkHost facts missing from typed panel state")
+	}
 }
 
 func TestRuntimeConfigReadValidateAndStaleFingerprintEndpoints(t *testing.T) {

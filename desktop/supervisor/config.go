@@ -31,9 +31,9 @@ const (
 )
 
 // DesktopSettings are host/control-plane choices that persist across launches.
-// Runtime policy lives in runtime.toml; the network fields below are transient
-// compatibility values populated from that intent (or decoded from v1 solely
-// for migration) and are never written by the v2 disk schema.
+// Runtime policy lives in runtime.toml; the network fields below are working
+// values used only by explicit v1 migration and candidate patch normalization.
+// Settings never populates them from v2 and the v2 disk schema never writes them.
 type DesktopSettings struct {
 	Version                       int         `json:"version"`
 	NetworkMode                   NetworkMode `json:"network_mode"`

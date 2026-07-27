@@ -32,10 +32,19 @@ fail startup. Relative paths use the manifest directory. Startup logs the
 absolute path, schema version, and source SHA-256 without logging secret content.
 
 Desktop is a host wrapper, not a second server bootstrap: the supervisor prepares
-app-data paths, bundled media tools, and the SPA root, compiles
-`desktop/supervisor/server.template.toml`, atomically writes
-app-data `config/server.toml` with mode `0600`, reloads it through the same
-strict loader, then calls `app.Run`. A write or reload error blocks startup.
+app-data paths, bundled media tools, and the SPA root. Persistent
+`config/runtime.toml` is strict-loaded, copied, and projected with host-owned
+paths before Desktop atomically writes app-data `config/server.toml` with mode
+`0600` and calls `app.Run`. A write or reload error blocks startup.
+
+DesktopSettings v2 contains host/control-plane choices, not Server network
+policy. Structured network edits and raw TOML edits both patch one fingerprinted
+runtime candidate. Apply is serialized across restart/shutdown, journals
+`candidate_staged → candidate_promoted → rolling_back`, proves the previous
+generation exited before promotion, and updates last-known-good only after
+readiness. `Prepare` reconciles an interrupted journal before starting. The
+host-level single-instance lock spans all generations and is released only by
+Desktop shutdown.
 
 `server.primary_origin` is the sole canonical browser and WebAuthn Origin.
 `internal/httporigin` resolves direct/proxied request context, and
@@ -212,8 +221,10 @@ served by its own asset handler and calls only the host-owned `/__onb/*`
 control plane; it does not participate in product accounts, refresh cookies,
 server CORS, or this CSRF protocol. The React product Web runs in the user's
 default browser and is served by `server/app` on the same localhost origin as
-the API. Desktop's `BrowserOrigin` manifest binding remains the WebAuthn RP
-Origin for that product Web; it is not a CORS entry.
+the API. The Control Panel receives the typed Supervisor runtime snapshot and
+can validate/apply/restore runtime intent even when ordinary Server startup
+fails. Desktop's `server.primary_origin` binding remains the WebAuthn RP Origin
+for the product Web; it is not a CORS entry.
 
 ## Queues And Processing
 

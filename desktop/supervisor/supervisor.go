@@ -216,20 +216,11 @@ func (s *Supervisor) Settings() (DesktopSettings, error) {
 	if err := s.ensureRuntimeIntent(settings); err != nil {
 		return DesktopSettings{}, err
 	}
-	data, err := os.ReadFile(s.paths.RuntimeConfigFile())
+	settings, err = LoadSettings(s.paths.DesktopSettingsFile())
 	if err != nil {
-		return DesktopSettings{}, fmt.Errorf("read runtime settings: %w", err)
+		return DesktopSettings{}, err
 	}
-	_, cfg, err := s.materializeRuntimeBytes(data)
-	if err != nil {
-		return DesktopSettings{}, fmt.Errorf("load runtime settings: %w", err)
-	}
-	network := runtimeNetworkSettings(cfg, settings.LANHTTPWarningAcceptedVersion)
 	settings.Version = desktopSettingsVersion
-	settings.NetworkMode = network.NetworkMode
-	settings.PrimaryOrigin = network.PrimaryOrigin
-	settings.Listen = network.Listen
-	settings.TrustedProxyCIDRs = network.TrustedProxyCIDRs
 	settings.legacyNetwork = false
 	return settings, nil
 }
@@ -307,9 +298,10 @@ func (s *Supervisor) ServerURL() string {
 	if origin := s.RuntimeSnapshot().BrowserURL; origin != "" {
 		return origin
 	}
-	settings, err := s.Settings()
-	if err == nil {
-		return settings.PrimaryOrigin
+	if err := s.ensurePaths(); err == nil {
+		if _, cfg, loadErr := s.runtimeIntent(); loadErr == nil {
+			return cfg.ServerConfig.PrimaryOrigin
+		}
 	}
 	return "http://localhost:" + serverPort
 }

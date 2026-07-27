@@ -268,21 +268,6 @@ func runtimePathValue(document map[string]any, path string) (any, bool) {
 	return current, true
 }
 
-func runtimeNetworkSettings(cfg serverconfig.AppConfig, warningVersion int) DesktopSettings {
-	summary := networkSummaryFromConfig(cfg)
-	settings := DesktopSettings{
-		Version:                       desktopSettingsVersion,
-		NetworkMode:                   summary.Mode,
-		Listen:                        cfg.ServerConfig.Listen,
-		PrimaryOrigin:                 cfg.ServerConfig.PrimaryOrigin,
-		LANHTTPWarningAcceptedVersion: warningVersion,
-	}
-	for _, prefix := range cfg.ServerConfig.Proxy.TrustedCIDRs {
-		settings.TrustedProxyCIDRs = append(settings.TrustedProxyCIDRs, prefix.String())
-	}
-	return settings
-}
-
 func (s *Supervisor) runtimeIntent() ([]byte, serverconfig.AppConfig, error) {
 	settings, err := LoadSettings(s.paths.DesktopSettingsFile())
 	if err != nil {

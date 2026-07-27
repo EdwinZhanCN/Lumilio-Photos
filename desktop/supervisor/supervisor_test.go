@@ -284,8 +284,8 @@ func TestDesktopSettingsV1MigratesExternalNetworkToRuntimeIntent(t *testing.T) {
 		t.Fatalf("migrate v1 settings: %v", err)
 	}
 	if settings.Version != desktopSettingsVersion ||
-		settings.NetworkMode != NetworkExternalHTTPS ||
-		settings.PrimaryOrigin != "https://photos.example.com" ||
+		settings.NetworkMode != "" ||
+		settings.PrimaryOrigin != "" ||
 		settings.Language != "zh" {
 		t.Fatalf("migrated settings = %+v", settings)
 	}

@@ -60,7 +60,7 @@ func TestDesktopRuntimeFirstAndSecondLaunch(t *testing.T) {
 	t.Logf("desktop SQLite first/second launch OK: library_id=%s", firstLibraryID)
 }
 
-func TestDesktopNetworkRestartRollback(t *testing.T) {
+func TestDesktopRuntimeConfigRollback(t *testing.T) {
 	appData := t.TempDir()
 	webRoot := t.TempDir()
 	resources := t.TempDir()
@@ -114,12 +114,12 @@ func TestDesktopNetworkRestartRollback(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	settings, err := supervisor.Settings()
+	view, err = supervisor.ReadRuntimeConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.NetworkMode != NetworkLocal || supervisor.ServerURL() != "http://localhost:6680" {
-		t.Fatalf("rollback settings = %+v, URL = %s", settings, supervisor.ServerURL())
+	if view.Network.Mode != NetworkLocal || supervisor.ServerURL() != "http://localhost:6680" {
+		t.Fatalf("rollback runtime network = %+v, URL = %s", view.Network, supervisor.ServerURL())
 	}
 	assertDesktopHTTP(t, &http.Client{Timeout: 5 * time.Second}, supervisor.ServerURL(), "ROLLBACK_OK")
 }

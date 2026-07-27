@@ -55,9 +55,15 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 - `desktop/`: Wails v3 tray host; runs `server/app` and the machine-local
   `library.sqlite3` in-process and serves the React SPA at `localhost:6680`.
-  Its supervisor compiles the
-  versioned template to app-data `config/server.toml`, atomically writes it with
-  mode `0600`, and reloads it through `LoadAppConfig`. See `desktop/README.md`.
+  Its supervisor owns the host-lifetime lock and one runtime generation.
+  App-data `config/runtime.toml` is the persistent schema-v3 intent; Desktop
+  validates it with `LoadAppConfigBytes`, projects host-owned paths, and writes
+  the immutable per-generation `config/server.toml` with mode `0600`.
+  Candidate apply is journaled and readiness-gated, with
+  `runtime.last-known-good.toml` rollback and launch-time reconciliation. The
+  private Wails Control Panel consumes the supervisor's typed runtime snapshot
+  and remains available after recoverable startup failures. See
+  `desktop/README.md`.
 
 ## Contracts
 

@@ -10,10 +10,10 @@ UI opens at the configured canonical `server.primary_origin`.
 Wails v3 system tray + private native control-panel webview
   → "Open Lumilio Photos" opens the persisted primary origin
 desktop/supervisor
-  → owns the machine-local app-state paths and single-instance lock
-  → compiles supervisor/server.template.toml (schema v3)
-  → atomically writes config/server.toml with mode 0600
-  → reloads it through server/config.LoadAppConfig(...)
+  → owns the host-lifetime single-instance lock and one server generation
+  → validates persistent config/runtime.toml through the strict Server loader
+  → projects machine-owned paths into generated config/server.toml (mode 0600)
+  → journals candidate apply/readiness/last-known-good rollback
   → runs server/app.Run(ctx, cfg, controls) in-process
 server/app
   → opens/migrates <app-data>/library.sqlite3
@@ -57,6 +57,18 @@ LUMILIO_PANEL_API=http://host:port vp dev
 The first command uses the built-in `/__onb` mock API; the second proxies to a
 live app.
 
+The mock accepts deterministic scenario parameters, for example:
+
+```text
+?mode=dashboard&runtime=failed&network=external&lumen=failed
+?mode=dashboard&network=lan&lumen=starting&apply=rollback
+```
+
+`runtime` supports `stopped|starting|running|restarting|failed`; `network`
+supports `local|lan|external`; `lumen` supports
+`disabled|starting|running|failed`; and `apply` supports
+`success|rollback|failure`.
+
 ## App data
 
 On macOS, machine-local state lives under:
@@ -67,6 +79,9 @@ On macOS, machine-local state lives under:
 ├── backups/
 ├── cloud/
 ├── config/
+│   ├── runtime.toml
+│   ├── runtime.last-known-good.toml
+│   └── server.toml
 ├── logs/
 ├── lumen/
 ├── secrets/
@@ -78,11 +93,23 @@ Windows uses `%LocalAppData%\Lumilio Photos`. The SQLite catalog, credentials,
 configuration, and optional AI runtime always stay in app data; only explicitly
 authorized media repositories may live on external Storage Locations.
 
-`config/server.toml` is regenerated on every launch from the tracked schema-v3
-template and is the authoritative immutable input for that run. Persisted user
-choices live separately in versioned `desktop-settings.json`. Network changes
-use candidate validation, atomic save, restart, internal readiness, and
-last-known-good rollback.
+`config/runtime.toml` is the complete persistent schema-v3 runtime intent.
+`config/server.toml` is regenerated for each server generation after Desktop
+projects machine-owned paths and is the immutable input for that run.
+`desktop-settings.json` v2 stores only host/control-plane choices such as
+onboarding, download region, LAN-risk acknowledgement, and Lumen settings; it
+does not duplicate network policy.
+
+Runtime and structured network edits share one candidate. Apply writes
+`runtime.candidate.toml` and `runtime-apply.json`, proves the previous generation
+stopped, promotes the candidate, waits for internal readiness, then updates
+`runtime.last-known-good.toml`. Failed readiness restores LKG. An interrupted
+journal is reconciled on the next Desktop launch.
+
+The Wails Control Panel consumes a typed stopped/starting/running/restarting/
+failed snapshot and remains available after ordinary Server startup failures.
+The host lock is released only when Desktop quits; a shutdown timeout retains
+generation ownership and blocks a second listener/SQLite runtime.
 
 Development and test overrides:
 

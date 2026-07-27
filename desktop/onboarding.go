@@ -87,13 +87,8 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			"version":    appVersion(),
 			"tosRev":     tosVersion,
 			"runtime":    runtime,
-			"ready":      runtime.Phase == supervisor.RuntimeRunning,
-			"serverURL":  runtime.BrowserURL,
-			"stage":      runtime.Stage,
 			"paths":      paths,
-			"network": map[string]any{
-				"mode": settings.NetworkMode, "primaryOrigin": settings.PrimaryOrigin,
-				"listen": settings.Listen, "trustedProxyCIDRs": settings.TrustedProxyCIDRs,
+			"networkHost": map[string]any{
 				"lanWarningAcceptedVersion": settings.LANHTTPWarningAcceptedVersion,
 				"lanAddresses":              supervisor.LANAddresses(),
 			},

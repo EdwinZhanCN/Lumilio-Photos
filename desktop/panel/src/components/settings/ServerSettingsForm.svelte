@@ -9,6 +9,7 @@
   } from "../../lib/runtime-draft.svelte.ts";
   import { refreshState, store } from "../../lib/store.svelte.ts";
   import type { NetworkInfo, NetworkMode } from "../../lib/types.ts";
+  import { networkDraftFromResolvedState, proxyLocationFor } from "./network-draft.ts";
 
   let {
     open,
@@ -24,26 +25,23 @@
     canSave?: boolean;
   } = $props();
 
-  let initial = $state<NetworkInfo>(store.data!.network);
-  let mode = $state<NetworkMode>(store.data!.network.mode);
-  let primaryOrigin = $state(store.data!.network.primaryOrigin);
-  let listen = $state(store.data!.network.listen);
+  function currentNetwork(): NetworkInfo {
+    return networkDraftFromResolvedState(store.data!.runtime.network, store.data!.networkHost);
+  }
+
+  const initialNetwork = currentNetwork();
+  let initial = $state<NetworkInfo>(initialNetwork);
+  let mode = $state<NetworkMode>(initialNetwork.mode);
+  let primaryOrigin = $state(initialNetwork.primaryOrigin);
+  let listen = $state(initialNetwork.listen);
   let proxyLocation = $state<"same_host" | "remote">("same_host");
   let trustedCIDRs = $state("");
   let acceptLANWarning = $state(false);
   let message = $state("");
   let error = $state("");
 
-  function proxyLocationFor(network: NetworkInfo): "same_host" | "remote" {
-    return network.trustedProxyCIDRs.some(
-      (cidr) => cidr !== "127.0.0.1/32" && cidr !== "::1/128",
-    )
-      ? "remote"
-      : "same_host";
-  }
-
   function seed(): void {
-    initial = structuredClone(store.data!.network);
+    initial = structuredClone(currentNetwork());
     mode = initial.mode;
     primaryOrigin = initial.primaryOrigin;
     listen = initial.listen;
