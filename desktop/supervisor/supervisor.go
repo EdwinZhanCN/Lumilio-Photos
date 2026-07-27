@@ -77,9 +77,10 @@ type Supervisor struct {
 	lock            *InstanceLock
 	applyReconciled bool
 
-	operationMu sync.Mutex
-	generation  *runtimeGeneration
-	stopTimeout time.Duration
+	operationMu  sync.Mutex
+	generation   *runtimeGeneration
+	stopTimeout  time.Duration
+	readyTimeout time.Duration
 
 	snapshotMu sync.RWMutex
 	snapshot   RuntimeSnapshot
@@ -122,6 +123,7 @@ func New(opts Options) *Supervisor {
 		logf: logf, onStage: opts.OnStage, onSnapshot: opts.OnSnapshot,
 		operatorControls: opts.OperatorControls,
 		stopTimeout:      serverStopTimeout,
+		readyTimeout:     serverReadyTimeout,
 		snapshot:         initialRuntimeSnapshot(),
 	}
 	hostHook := s.operatorControls.RepositoryManagerReady
@@ -705,11 +707,21 @@ func (s *Supervisor) checkListenAvailable(address string) error {
 }
 
 // waitForServer polls the generation's internal health endpoint until it
-// responds or the exact generation exits.
+// responds with HTTP 200 or the exact generation exits. Redirects, 4xx, and
+// 5xx must not promote a candidate to last-known-good.
 func (s *Supervisor) waitForServer(ctx context.Context, generation *runtimeGeneration, listen string) error {
 	url := internalHealthURL(listen)
-	client := &http.Client{Timeout: 2 * time.Second}
-	deadline := time.Now().Add(serverReadyTimeout)
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	timeout := s.readyTimeout
+	if timeout <= 0 {
+		timeout = serverReadyTimeout
+	}
+	deadline := time.Now().Add(timeout)
 
 	for {
 		select {
@@ -724,17 +736,22 @@ func (s *Supervisor) waitForServer(ctx context.Context, generation *runtimeGener
 		}
 
 		if resp, err := client.Get(url); err == nil {
+			status := resp.StatusCode
 			resp.Body.Close()
-			if resp.StatusCode < http.StatusInternalServerError {
+			if readinessStatusOK(status) {
 				return nil
 			}
 		}
 
 		if time.Now().After(deadline) {
-			return fmt.Errorf("api server not ready after %s", serverReadyTimeout)
+			return fmt.Errorf("api server not ready after %s", timeout)
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
+}
+
+func readinessStatusOK(statusCode int) bool {
+	return statusCode == http.StatusOK
 }
 
 func internalHealthURL(listen string) string {

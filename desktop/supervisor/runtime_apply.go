@@ -220,65 +220,75 @@ func (s *Supervisor) applyStagedRuntimeLocked(ctx context.Context, journal runti
 		s.failRuntime(fmt.Errorf("promote runtime candidate: %w", err))
 		return
 	}
-	if candidateErr := s.startRuntimeLockedWithOperation(ctx, RuntimeRestarting, true); candidateErr == nil {
+	candidateErr := s.startRuntimeLockedWithOperation(ctx, RuntimeRestarting, true)
+	if candidateErr == nil {
 		if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), candidate); err != nil {
-			s.failRuntime(fmt.Errorf("update last-known-good runtime: %w", err))
+			// Plan A: a readiness-confirmed candidate that cannot be persisted as
+			// LKG must not keep running while the dashboard reports failure.
+			// Stop it and roll back to the previous LKG so Open / restart state
+			// stay consistent with the durable recovery source.
+			candidateErr = fmt.Errorf("update last-known-good runtime: %w", err)
+			if stopErr := s.stopGenerationLocked(); stopErr != nil {
+				_ = s.writeApplyJournal(journal)
+				s.failRuntime(errors.Join(candidateErr, stopErr))
+				return
+			}
+		} else {
+			if err := s.cleanupRuntimeApply(); err != nil {
+				s.logf("cleanup successful runtime apply: %v", err)
+			}
+			s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
+				snapshot.LastKnownGoodAvailable = true
+				snapshot.OperationActive = false
+			})
 			return
 		}
-		if err := s.cleanupRuntimeApply(); err != nil {
-			s.logf("cleanup successful runtime apply: %v", err)
-		}
-		s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
-			snapshot.LastKnownGoodAvailable = true
-			snapshot.OperationActive = false
-		})
-		return
-	} else {
-		s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
-			snapshot.Phase = RuntimeRestarting
-			snapshot.ErrorCode = ""
-			snapshot.ErrorMessage = ""
-			snapshot.OperationActive = true
-		})
-		journal.Phase = applyRollingBack
-		journal.CandidateError = runtimeErrorMessage(candidateErr)
-		if err := s.writeApplyJournal(journal); err != nil {
-			s.failRuntime(errors.Join(candidateErr, err))
-			return
-		}
-		lkg, err := os.ReadFile(s.paths.RuntimeLastKnownGoodFile())
-		if err != nil {
-			journal.RollbackError = err.Error()
-			_ = s.writeApplyJournal(journal)
-			s.failRuntime(errors.Join(candidateErr, fmt.Errorf("read last-known-good runtime: %w", err)))
-			return
-		}
-		if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), lkg); err != nil {
-			journal.RollbackError = err.Error()
-			_ = s.writeApplyJournal(journal)
-			s.failRuntime(errors.Join(candidateErr, fmt.Errorf("restore last-known-good runtime: %w", err)))
-			return
-		}
-		if rollbackErr := s.startRuntimeLockedWithOperation(ctx, RuntimeRestarting, true); rollbackErr != nil {
-			journal.RollbackError = runtimeErrorMessage(rollbackErr)
-			_ = s.writeApplyJournal(journal)
-			s.failRuntime(errors.Join(
-				fmt.Errorf("candidate runtime rejected: %w", candidateErr),
-				fmt.Errorf("last-known-good runtime failed: %w", rollbackErr),
-			))
-			return
-		}
-		if err := s.cleanupRuntimeApply(); err != nil {
-			s.logf("cleanup rolled-back runtime apply: %v", err)
-		}
-		s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
-			snapshot.ErrorCode = "candidate_rolled_back"
-			snapshot.ErrorMessage = "Candidate runtime failed readiness and was rolled back: " +
-				runtimeErrorMessage(candidateErr)
-			snapshot.LastKnownGoodAvailable = true
-			snapshot.OperationActive = false
-		})
 	}
+
+	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
+		snapshot.Phase = RuntimeRestarting
+		snapshot.ErrorCode = ""
+		snapshot.ErrorMessage = ""
+		snapshot.OperationActive = true
+	})
+	journal.Phase = applyRollingBack
+	journal.CandidateError = runtimeErrorMessage(candidateErr)
+	if err := s.writeApplyJournal(journal); err != nil {
+		s.failRuntime(errors.Join(candidateErr, err))
+		return
+	}
+	lkg, err := os.ReadFile(s.paths.RuntimeLastKnownGoodFile())
+	if err != nil {
+		journal.RollbackError = err.Error()
+		_ = s.writeApplyJournal(journal)
+		s.failRuntime(errors.Join(candidateErr, fmt.Errorf("read last-known-good runtime: %w", err)))
+		return
+	}
+	if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), lkg); err != nil {
+		journal.RollbackError = err.Error()
+		_ = s.writeApplyJournal(journal)
+		s.failRuntime(errors.Join(candidateErr, fmt.Errorf("restore last-known-good runtime: %w", err)))
+		return
+	}
+	if rollbackErr := s.startRuntimeLockedWithOperation(ctx, RuntimeRestarting, true); rollbackErr != nil {
+		journal.RollbackError = runtimeErrorMessage(rollbackErr)
+		_ = s.writeApplyJournal(journal)
+		s.failRuntime(errors.Join(
+			fmt.Errorf("candidate runtime rejected: %w", candidateErr),
+			fmt.Errorf("last-known-good runtime failed: %w", rollbackErr),
+		))
+		return
+	}
+	if err := s.cleanupRuntimeApply(); err != nil {
+		s.logf("cleanup rolled-back runtime apply: %v", err)
+	}
+	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
+		snapshot.ErrorCode = "candidate_rolled_back"
+		snapshot.ErrorMessage = "Candidate runtime was rolled back: " +
+			runtimeErrorMessage(candidateErr)
+		snapshot.LastKnownGoodAvailable = true
+		snapshot.OperationActive = false
+	})
 }
 
 func (s *Supervisor) RestoreLastKnownGoodAsync(ctx context.Context) (RuntimeConfigValidation, error) {

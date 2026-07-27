@@ -324,8 +324,11 @@ jobs:
             # CGO deps: both the complete Server suite and the Desktop module
             # compile govips/libraw. SQLite, FTS5, and sqlite-vec are linked
             # into the test binary, so no database service is staged.
-            - name: Install libvips and libraw
-              run: brew install vips libraw
+            # ffmpeg/exiftool are required because Desktop hostProjection writes
+            # absolute tools.* paths into the strict runtime manifest; CI has no
+            # app bundle, so LookPath must resolve development installs.
+            - name: Install libvips, libraw, and media tools
+              run: brew install vips libraw ffmpeg exiftool
 
             - name: Run complete embedded Server tests
               run: make server-test
@@ -371,6 +374,7 @@ jobs:
                       mingw-w64-x86_64-pkgconf
                       mingw-w64-x86_64-libvips
                       mingw-w64-x86_64-libraw
+                      mingw-w64-x86_64-ffmpeg
 
             - uses: voidzero-dev/setup-vp@v1
               with:
@@ -379,6 +383,25 @@ jobs:
 
             - name: Build control panel
               run: cd desktop/panel && vp install && vp run build
+
+            # MSYS2 ships ffmpeg/ffprobe but not exiftool. Desktop hostProjection
+            # only needs a resolvable absolute path for strict manifest load in
+            # tests; create a no-op stub so LookPath succeeds. Keep the stub
+            # under the workspace so MSYS2 PATH does not depend on Windows
+            # RUNNER_TEMP orthography.
+            - name: Provide exiftool stub for Desktop tests
+              shell: msys2 {0}
+              run: |
+                  stub_dir="$(pwd)/.cache/lumilio-tool-stubs"
+                  mkdir -p "${stub_dir}"
+                  printf '%s\n' '#!/bin/sh' 'exit 0' > "${stub_dir}/exiftool"
+                  printf '%s\n' '#!/bin/sh' 'exit 0' > "${stub_dir}/exiftool.exe"
+                  chmod +x "${stub_dir}/exiftool" "${stub_dir}/exiftool.exe"
+                  echo "LUMILIO_TOOL_STUBS=${stub_dir}" >> "${GITHUB_ENV}"
+                  export PATH="${stub_dir}:${PATH}"
+                  command -v ffmpeg
+                  command -v ffprobe
+                  command -v exiftool
 
             - name: Run complete embedded Server tests
               shell: msys2 {0}
@@ -392,6 +415,7 @@ jobs:
             - name: Run complete Desktop tests
               shell: msys2 {0}
               run: |
+                  export PATH="${LUMILIO_TOOL_STUBS}:${PATH}"
                   cd desktop
                   go test ./...
 

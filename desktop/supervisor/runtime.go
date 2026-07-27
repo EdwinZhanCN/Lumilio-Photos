@@ -107,8 +107,11 @@ func networkSummaryFromConfig(cfg serverconfig.AppConfig) NetworkSummary {
 	case serverconfig.TLSModeExternal:
 		mode = NetworkExternalHTTPS
 	default:
-		host, _, _ := net.SplitHostPort(cfg.ServerConfig.Listen)
-		if host == "" || host == "0.0.0.0" || host == "::" {
+		// Only proven loopback listeners are "local". Unspecified binds
+		// (0.0.0.0/::), concrete LAN/public IPs, and unproven hostnames are
+		// plaintext network exposure and must surface as lan_http so Apply
+		// requires the LAN warning acknowledgement.
+		if !isLoopbackListen(cfg.ServerConfig.Listen) {
 			mode = NetworkLANHTTP
 		}
 	}
@@ -128,6 +131,27 @@ func networkSummaryFromConfig(cfg serverconfig.AppConfig) NetworkSummary {
 		summary.TrustedProxyCIDRs = append(summary.TrustedProxyCIDRs, prefix.String())
 	}
 	return summary
+}
+
+// isLoopbackListen reports whether listen is proven loopback-only.
+// Empty host, unspecified addresses, non-loopback IPs, and hostnames that are
+// not exactly "localhost" are treated as network-exposed.
+func isLoopbackListen(listen string) bool {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(listen))
+	if err != nil {
+		return false
+	}
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback()
 }
 
 func runtimeErrorCode(err error) string {

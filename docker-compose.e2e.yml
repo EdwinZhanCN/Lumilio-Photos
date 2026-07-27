@@ -25,7 +25,9 @@ services:
         volumes:
             - storage_data:/data/storage
             - app_state_data:/data/app-state
-            - ./web/e2e/support/server.e2e.toml:/app/config/server.toml:ro
+            # Production images read the immutable manifest from app-state.
+            # Mounting under /app/config is ignored by the default CMD.
+            - ./web/e2e/support/server.e2e.toml:/data/app-state/server.toml:ro
         ports:
             - "${LUMILIO_E2E_PORT:-16657}:6680"
         healthcheck:

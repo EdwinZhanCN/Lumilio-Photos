@@ -579,9 +579,14 @@ func TestGenerateDockerProductionProfiles(t *testing.T) {
 			check: func(t *testing.T, cfg AppConfig) {
 				if cfg.ServerConfig.TLS.Mode != TLSModeACME ||
 					cfg.ServerConfig.Listen != "0.0.0.0:8443" ||
-					cfg.ServerConfig.TLS.HTTPListen != "0.0.0.0:8080" ||
-					cfg.ServerConfig.TLS.StoragePath != "/data/app-state/tls" {
+					cfg.ServerConfig.TLS.HTTPListen != "0.0.0.0:8080" {
 					t.Fatalf("ACME config = %+v", cfg.ServerConfig)
+				}
+				// Docker profiles emit Linux container paths. On Windows hosts
+				// filepath.IsAbs("/data/...") is false, so LoadAppConfig joins
+				// them to the manifest directory; only the suffix is stable.
+				if !strings.HasSuffix(filepath.ToSlash(cfg.ServerConfig.TLS.StoragePath), "/data/app-state/tls") {
+					t.Fatalf("ACME tls storage path = %q", cfg.ServerConfig.TLS.StoragePath)
 				}
 			},
 		},
@@ -606,6 +611,9 @@ func TestGenerateDockerProductionProfiles(t *testing.T) {
 			data, err := GenerateManifest(test.options)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if test.name == "ACME" && !strings.Contains(string(data), `/data/app-state/tls`) {
+				t.Fatalf("generated ACME manifest missing container tls path:\n%s", data)
 			}
 			path := filepath.Join(t.TempDir(), "server.toml")
 			if err := os.WriteFile(path, data, 0o600); err != nil {
