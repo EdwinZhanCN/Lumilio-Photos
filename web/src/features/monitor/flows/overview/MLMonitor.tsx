@@ -252,7 +252,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
       </div>
 
       {reindexModal && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div className="modal-box max-w-sm">
             <h3 className="font-semibold text-lg">
               {t("monitor.ml.reindexModal.title", {

@@ -80,7 +80,7 @@ export function ExportPanel({
   const setSizeMode = (sizeMode: ExportSizeMode) => onChange({ ...settings, sizeMode });
 
   return (
-    <dialog className={`modal ${open ? "modal-open" : ""}`}>
+    <dialog className={`modal z-modal ${open ? "modal-open" : ""}`}>
       <div className="modal-box max-w-md">
         <h3 className="text-base font-semibold">
           {t("studio.export.title", { defaultValue: "Export" })}

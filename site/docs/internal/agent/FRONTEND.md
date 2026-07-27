@@ -253,14 +253,25 @@ Three rules, in priority order:
 | --- | --- | --- |
 | `z-sticky` | 100 | Sticky headers, save bars |
 | `z-dropdown` | 200 | Dropdown menus, popovers, autocomplete |
-| `z-overlay` | 300 | FABs, floating docks, drag overlays |
-| `z-modal` | 400 | Modals, drawers, mobile bottom-sheets |
+| `z-overlay` | 300 | FABs, application drawers, floating docks, drag overlays |
+| `z-modal` | 400 | Modals and modal bottom-sheets |
 | `z-lightbox` | 500 | Fullscreen viewers (AssetViewer, PublicShareLightbox) |
 | `z-tooltip` | 600 | Portaled tooltips/popovers that escape a lightbox |
+| `z-toast` | 700 | App-wide notifications above other document-layer floating UI |
 
-Inline styles use `var(--z-<token>)`. Do not introduce new numeric z-index
-values for cross-component layers; extend the token scale if a new tier is
-genuinely needed.
+Apply a global token once, on the floating layer's stacking-context root. Its
+children should use DOM order or small local values. If an in-tree floating
+layer is trapped by a component's `isolate`, portal the layer root to
+`document.body`.
+
+React-controlled daisyUI `.modal-open` roots must carry `z-modal`, which
+overrides daisyUI's library default. Native dialogs opened with `showModal()`
+live in the browser top layer and are the exception: do not add a token merely
+to compete with document stacking contexts.
+
+Inline styles use `var(--z-index-<token-name>)`. Do not introduce new numeric
+z-index values for cross-component layers; extend the token scale if a new tier
+is genuinely needed.
 
 ## Test layers
 

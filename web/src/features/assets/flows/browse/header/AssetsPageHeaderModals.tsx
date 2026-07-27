@@ -49,7 +49,7 @@ export default function AssetsPageHeaderModals({ bulk }: AssetsPageHeaderModalsP
   return (
     <>
       {confirmableBulkAction && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div className="modal-box border-t-4 border-primary">
             <div className="mb-4 flex items-center gap-3 text-primary">
               {confirmableBulkAction.type === "rating" ? <Star size={24} /> : <Heart size={24} />}
@@ -89,7 +89,7 @@ export default function AssetsPageHeaderModals({ bulk }: AssetsPageHeaderModalsP
       )}
 
       {confirmableCustomAction && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div
             className={`modal-box border-t-4 ${
               confirmableCustomAction.tone === "danger" ? "border-error" : "border-primary"
@@ -144,7 +144,7 @@ export default function AssetsPageHeaderModals({ bulk }: AssetsPageHeaderModalsP
       )}
 
       {isDeleteConfirmOpen && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div className="modal-box border-t-4 border-error">
             <div className="flex items-center gap-3 text-error mb-4">
               <AlertTriangle size={24} />
@@ -177,7 +177,7 @@ export default function AssetsPageHeaderModals({ bulk }: AssetsPageHeaderModalsP
       )}
 
       {isAlbumModalOpen && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div className="modal-box max-w-md h-[80vh] flex flex-col p-0 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-base-200 shrink-0">
               <h3 className="font-bold text-lg flex items-center gap-2">
@@ -264,7 +264,7 @@ export default function AssetsPageHeaderModals({ bulk }: AssetsPageHeaderModalsP
       )}
 
       {isTagsModalOpen && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div className="modal-box max-w-md flex flex-col p-0 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-base-200 shrink-0">
               <h3 className="font-bold text-lg flex items-center gap-2">

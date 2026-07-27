@@ -446,7 +446,7 @@ export function AssetBrowser({
               onNavigate={replaceViewerAsset}
             />
             {isLocatingAsset && (
-              <div className="fixed inset-0 bg-black/70 z-overlay flex items-center justify-center">
+              <div className="fixed inset-0 z-lightbox flex items-center justify-center bg-black/70">
                 <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
                   <div className="loading loading-spinner loading-lg mb-4"></div>
                   <p className="text-lg font-medium mb-2">{t("assets.all.locating_asset")}</p>

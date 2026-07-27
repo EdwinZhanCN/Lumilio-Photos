@@ -119,7 +119,7 @@ export default function AudioInfoView({ asset, onAssetUpdate, onClose }: AudioIn
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-10 font-mono sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-5 sm:right-5">
+    <div className="fixed inset-x-0 bottom-0 z-20 font-mono sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-5 sm:right-5">
       <div className="card w-full sm:w-[380px] max-h-[75vh] sm:max-h-[calc(100vh-40px)] rounded-b-none sm:rounded-box bg-base-100 shadow-sm overflow-hidden flex flex-col">
         <div className="card-body p-0 flex flex-col overflow-hidden">
           {/* Header - Fixed */}

@@ -213,14 +213,14 @@ const AssetViewer = ({
       <button
         type="button"
         onClick={handleClose}
-        className="btn btn-ghost btn-sm absolute top-2 left-4 text-white z-20"
+        className="btn btn-ghost btn-sm absolute top-2 left-4 text-white z-30"
         aria-label={t("common.close")}
       >
         <X className="w-6 h-6" />
       </button>
       {/* Mirrors the close button on the right. Sits below the info panel
-       * (z-10) so an open FullScreenBasicInfo covers it, as intended. */}
-      <AgentDockButton className="absolute top-2 right-4 z-[5]" />
+       * (z-20) so an open FullScreenBasicInfo covers it, as intended. */}
+      <AgentDockButton className="absolute top-2 right-4 z-10" />
       <Swiper
         ref={swiperRef}
         modules={[Virtual, Navigation, Pagination]}
