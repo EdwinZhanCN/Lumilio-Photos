@@ -182,6 +182,7 @@
               bind:this={serverForm}
               {open}
               {session}
+              active={tab === "server"}
               bind:dirty={serverDirty}
               bind:saving={serverSaving}
               bind:canSave={serverCanSave}

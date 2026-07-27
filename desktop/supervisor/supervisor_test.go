@@ -305,6 +305,39 @@ func TestDesktopSettingsV1MigratesExternalNetworkToRuntimeIntent(t *testing.T) {
 		!view.LastKnownGoodAvailable {
 		t.Fatalf("migrated runtime view = %+v", view)
 	}
+
+	// Simulate a process exit after runtime.toml was created but before LKG and
+	// desktop-settings.json v2 were durably written. The next launch must finish
+	// the migration without losing the equivalent external HTTPS profile.
+	if err := os.Remove(s.paths.RuntimeLastKnownGoodFile()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settingsPath, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resumed := New(Options{Logf: func(string, ...any) {}})
+	if _, err := resumed.Settings(); err != nil {
+		t.Fatalf("resume interrupted v1 migration: %v", err)
+	}
+	active, err := os.ReadFile(resumed.paths.RuntimeConfigFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	lkg, err := os.ReadFile(resumed.paths.RuntimeLastKnownGoodFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(active) != string(lkg) {
+		t.Fatal("resumed migration did not restore the active intent as initial LKG")
+	}
+	resumedView, err := resumed.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumedView.Network.Mode != NetworkExternalHTTPS ||
+		resumedView.Network.PrimaryOrigin != "https://photos.example.com" {
+		t.Fatalf("resumed migration runtime view = %+v", resumedView)
+	}
 }
 
 func TestRuntimeCandidateFingerprintHostProjectionAndSemantics(t *testing.T) {
@@ -331,6 +364,13 @@ func TestRuntimeCandidateFingerprintHostProjectionAndSemantics(t *testing.T) {
 	}
 	if _, err := s.ValidateRuntimeConfig("sha256:stale", patched.CandidateTOML); !errors.Is(err, ErrStaleRuntimeConfig) {
 		t.Fatalf("stale fingerprint error = %v", err)
+	}
+	if _, err := s.PatchRuntimeNetwork(
+		"sha256:stale",
+		view.CandidateTOML,
+		NetworkCandidatePatch{Mode: NetworkExternalHTTPS, ProxyLocation: "invalid"},
+	); !errors.Is(err, ErrStaleRuntimeConfig) {
+		t.Fatalf("stale structured patch error = %v", err)
 	}
 
 	document, err := parseRuntimeDocument([]byte(view.CandidateTOML))
@@ -363,6 +403,102 @@ func TestRuntimeCandidateFingerprintHostProjectionAndSemantics(t *testing.T) {
 	}
 }
 
+func TestInvalidRuntimeIntentRemainsEditableAndRestorable(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+	s := New(Options{Logf: func(string, ...any) {}})
+	initial, err := s.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lkg, err := os.ReadFile(s.paths.RuntimeLastKnownGoodFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("strictly invalid current can be edited", func(t *testing.T) {
+		invalid := []byte(initial.CurrentTOML + "\nunknown_runtime_field = true\n")
+		if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), invalid); err != nil {
+			t.Fatal(err)
+		}
+		view, err := s.ReadRuntimeConfig()
+		if err != nil {
+			t.Fatalf("read invalid active intent: %v", err)
+		}
+		if len(view.Issues) == 0 || view.Issues[0].Code != "invalid_active_manifest" ||
+			view.BaseFingerprint != runtimeFingerprint(invalid) {
+			t.Fatalf("invalid active view = %+v", view)
+		}
+		validation, err := s.ValidateRuntimeConfig(view.BaseFingerprint, string(lkg))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !validation.Valid {
+			t.Fatalf("valid replacement rejected against invalid active intent: %+v", validation)
+		}
+	})
+
+	t.Run("syntactically broken current can build an LKG recovery candidate", func(t *testing.T) {
+		invalid := []byte("[server\ninvalid")
+		if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), invalid); err != nil {
+			t.Fatal(err)
+		}
+		view, err := s.ReadRuntimeConfig()
+		if err != nil {
+			t.Fatalf("read syntactically broken active intent: %v", err)
+		}
+		if len(view.Issues) == 0 || view.BaseFingerprint != runtimeFingerprint(invalid) {
+			t.Fatalf("broken active view = %+v", view)
+		}
+		projection, err := s.hostProjection()
+		if err != nil {
+			t.Fatal(err)
+		}
+		candidate, err := candidateWithRecoveryHostFields(invalid, lkg, projection)
+		if err != nil {
+			t.Fatal(err)
+		}
+		validation, err := s.ValidateRuntimeConfig(view.BaseFingerprint, string(candidate))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !validation.Valid {
+			t.Fatalf("LKG recovery candidate rejected: %+v", validation)
+		}
+	})
+}
+
+func TestInvalidRuntimeIntentKeepsReturningUserOutOfOnboarding(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+	s := New(Options{Logf: func(string, ...any) {}})
+	settings, err := s.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.OnboardingCompleted = true
+	settings.TOSAcceptedVersion = "current"
+	settings.Language = "zh"
+	if err := s.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAtomicPrivate(
+		s.paths.RuntimeConfigFile(),
+		[]byte("[server\ninvalid"),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.Settings()
+	if err != nil {
+		t.Fatalf("read host settings with invalid runtime intent: %v", err)
+	}
+	if !got.OnboardingCompleted || got.Language != "zh" {
+		t.Fatalf("host settings changed by invalid runtime intent: %+v", got)
+	}
+	if s.NeedsOnboarding("current") {
+		t.Fatal("invalid runtime intent sent a returning user back to onboarding")
+	}
+}
+
 func TestRuntimeApplyStopTimeoutDoesNotPromoteCandidate(t *testing.T) {
 	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
 	s := New(Options{Logf: func(string, ...any) {}})
@@ -388,6 +524,10 @@ func TestRuntimeApplyStopTimeoutDoesNotPromoteCandidate(t *testing.T) {
 		false,
 	); err != nil {
 		t.Fatal(err)
+	}
+	if snapshot := s.RuntimeSnapshot(); snapshot.Phase != RuntimeRestarting ||
+		!snapshot.OperationActive {
+		t.Fatalf("accepted apply did not synchronously publish busy snapshot: %+v", snapshot)
 	}
 	deadline := time.Now().Add(time.Second)
 	for s.RuntimeSnapshot().ErrorCode != "stop_timeout" && time.Now().Before(deadline) {
@@ -418,11 +558,33 @@ func TestRuntimeApplyJournalReconciliation(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		phase      runtimeApplyPhase
+		active     string
 		wantActive string
 	}{
-		{name: "candidate staged keeps current", phase: applyCandidateStaged, wantActive: "current"},
-		{name: "candidate promoted restores LKG", phase: applyCandidatePromoted, wantActive: "lkg"},
-		{name: "rolling back restores LKG", phase: applyRollingBack, wantActive: "lkg"},
+		{
+			name:       "candidate staged keeps current",
+			phase:      applyCandidateStaged,
+			active:     "current",
+			wantActive: "current",
+		},
+		{
+			name:       "promotion intent before rename restores LKG",
+			phase:      applyCandidatePromoted,
+			active:     "current",
+			wantActive: "lkg",
+		},
+		{
+			name:       "promotion after rename restores LKG",
+			phase:      applyCandidatePromoted,
+			active:     "candidate",
+			wantActive: "lkg",
+		},
+		{
+			name:       "rolling back restores LKG",
+			phase:      applyRollingBack,
+			active:     "lkg",
+			wantActive: "lkg",
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
@@ -430,7 +592,7 @@ func TestRuntimeApplyJournalReconciliation(t *testing.T) {
 			if err := s.ensurePaths(); err != nil {
 				t.Fatal(err)
 			}
-			if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte("current")); err != nil {
+			if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), []byte(test.active)); err != nil {
 				t.Fatal(err)
 			}
 			if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), []byte("lkg")); err != nil {

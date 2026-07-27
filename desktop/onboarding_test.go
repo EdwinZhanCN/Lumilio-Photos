@@ -166,6 +166,47 @@ func TestOnboardingStateEndpoint(t *testing.T) {
 	}
 }
 
+func TestInvalidRuntimeIntentStillServesReturningUserDashboardState(t *testing.T) {
+	appData := t.TempDir()
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	d := &desktopApp{onboardCh: make(chan struct{}), lang: "en"}
+	d.sup = supervisor.New(supervisor.Options{Logf: func(string, ...any) {}})
+	settings, err := d.sup.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.OnboardingCompleted = true
+	settings.TOSAcceptedVersion = tosVersion
+	if err := d.sup.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(appData, "config", "runtime.toml"),
+		[]byte("[server\ninvalid"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	d.onboardingHandler().ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/__onb/state", nil),
+	)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("state status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var state struct {
+		Mode string `json:"mode"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	if state.Mode != "dashboard" {
+		t.Fatalf("invalid runtime state mode = %q, want recovery dashboard", state.Mode)
+	}
+}
+
 func TestRuntimeConfigReadValidateAndStaleFingerprintEndpoints(t *testing.T) {
 	d := newTestApp(t)
 	handler := d.onboardingHandler()
@@ -255,6 +296,27 @@ func TestRuntimeConfigApplyRejectsInvalidCandidateAndRetiredNetworkEndpoint(t *t
 	)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("retired network endpoint status = %d, want 404", rec.Code)
+	}
+
+	for _, request := range []*http.Request{
+		httptest.NewRequest(http.MethodPost, "/__onb/runtime/config", nil),
+		httptest.NewRequest(http.MethodGet, "/__onb/runtime/restart", nil),
+		httptest.NewRequest(http.MethodGet, "/__onb/runtime/config/validate", nil),
+		httptest.NewRequest(http.MethodGet, "/__onb/runtime/config/patch-network", nil),
+		httptest.NewRequest(http.MethodGet, "/__onb/runtime/config/apply", nil),
+		httptest.NewRequest(http.MethodGet, "/__onb/runtime/config/restore", nil),
+	} {
+		rec = httptest.NewRecorder()
+		handler.ServeHTTP(rec, request)
+		if rec.Code != http.StatusMethodNotAllowed || rec.Header().Get("Allow") == "" {
+			t.Errorf(
+				"runtime endpoint %s %s = %d Allow=%q, want 405 with Allow",
+				request.Method,
+				request.URL.Path,
+				rec.Code,
+				rec.Header().Get("Allow"),
+			)
+		}
 	}
 }
 

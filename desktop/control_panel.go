@@ -39,7 +39,34 @@ type runtimeConfigPatchNetworkRequest struct {
 	Network         supervisor.NetworkCandidatePatch `json:"network"`
 }
 
-func (d *desktopApp) handleRuntimeConfigRead(w http.ResponseWriter, _ *http.Request) {
+type runtimeAPIError struct {
+	Code    string                   `json:"code"`
+	Message string                   `json:"message"`
+	Issues  []supervisor.ConfigIssue `json:"issues,omitempty"`
+}
+
+type runtimeAcceptedResponse struct {
+	Accepted bool `json:"accepted"`
+}
+
+type runtimeConfigApplyResponse struct {
+	Accepted   bool                               `json:"accepted"`
+	Validation supervisor.RuntimeConfigValidation `json:"validation"`
+}
+
+func requireRuntimeMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method == method {
+		return true
+	}
+	w.Header().Set("Allow", method)
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	return false
+}
+
+func (d *desktopApp) handleRuntimeConfigRead(w http.ResponseWriter, r *http.Request) {
+	if !requireRuntimeMethod(w, r, http.MethodGet) {
+		return
+	}
 	view, err := d.sup.ReadRuntimeConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -49,6 +76,9 @@ func (d *desktopApp) handleRuntimeConfigRead(w http.ResponseWriter, _ *http.Requ
 }
 
 func (d *desktopApp) handleRuntimeConfigValidate(w http.ResponseWriter, r *http.Request) {
+	if !requireRuntimeMethod(w, r, http.MethodPost) {
+		return
+	}
 	var body runtimeConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -58,7 +88,7 @@ func (d *desktopApp) handleRuntimeConfigValidate(w http.ResponseWriter, r *http.
 	if errors.Is(err, supervisor.ErrStaleRuntimeConfig) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
-		writeJSON(w, map[string]any{"code": "stale_fingerprint", "message": err.Error()})
+		writeJSON(w, runtimeAPIError{Code: "stale_fingerprint", Message: err.Error()})
 		return
 	}
 	if err != nil {
@@ -69,6 +99,9 @@ func (d *desktopApp) handleRuntimeConfigValidate(w http.ResponseWriter, r *http.
 }
 
 func (d *desktopApp) handleRuntimeConfigPatchNetwork(w http.ResponseWriter, r *http.Request) {
+	if !requireRuntimeMethod(w, r, http.MethodPost) {
+		return
+	}
 	var body runtimeConfigPatchNetworkRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -78,7 +111,7 @@ func (d *desktopApp) handleRuntimeConfigPatchNetwork(w http.ResponseWriter, r *h
 	if errors.Is(err, supervisor.ErrStaleRuntimeConfig) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
-		writeJSON(w, map[string]any{"code": "stale_fingerprint", "message": err.Error()})
+		writeJSON(w, runtimeAPIError{Code: "stale_fingerprint", Message: err.Error()})
 		return
 	}
 	if err != nil {
@@ -89,6 +122,9 @@ func (d *desktopApp) handleRuntimeConfigPatchNetwork(w http.ResponseWriter, r *h
 }
 
 func (d *desktopApp) handleRuntimeConfigApply(w http.ResponseWriter, r *http.Request) {
+	if !requireRuntimeMethod(w, r, http.MethodPost) {
+		return
+	}
 	var body runtimeConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -109,15 +145,15 @@ func (d *desktopApp) handleRuntimeConfigApply(w http.ResponseWriter, r *http.Req
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
-		writeJSON(w, map[string]any{"code": code, "message": err.Error()})
+		writeJSON(w, runtimeAPIError{Code: code, Message: err.Error()})
 		return
 	case err != nil:
 		var validationErr *supervisor.RuntimeConfigValidationError
 		if errors.As(err, &validationErr) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSON(w, map[string]any{
-				"code": "invalid_candidate", "message": err.Error(), "issues": validationErr.Issues,
+			writeJSON(w, runtimeAPIError{
+				Code: "invalid_candidate", Message: err.Error(), Issues: validationErr.Issues,
 			})
 			return
 		}
@@ -126,17 +162,23 @@ func (d *desktopApp) handleRuntimeConfigApply(w http.ResponseWriter, r *http.Req
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	writeJSON(w, map[string]any{"accepted": true, "validation": result})
+	writeJSON(w, runtimeConfigApplyResponse{Accepted: true, Validation: result})
 }
 
-func (d *desktopApp) handleRuntimeConfigRestore(w http.ResponseWriter, _ *http.Request) {
+func (d *desktopApp) handleRuntimeConfigRestore(w http.ResponseWriter, r *http.Request) {
+	if !requireRuntimeMethod(w, r, http.MethodPost) {
+		return
+	}
 	_, err := d.sup.RestoreLastKnownGoodAsync(d.ctx)
-	if errors.Is(err, supervisor.ErrOperationInProgress) {
+	if errors.Is(err, supervisor.ErrOperationInProgress) ||
+		errors.Is(err, supervisor.ErrStaleRuntimeConfig) {
+		code := "operation_in_progress"
+		if errors.Is(err, supervisor.ErrStaleRuntimeConfig) {
+			code = "stale_fingerprint"
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
-		writeJSON(w, map[string]any{
-			"code": "operation_in_progress", "message": err.Error(),
-		})
+		writeJSON(w, runtimeAPIError{Code: code, Message: err.Error()})
 		return
 	}
 	if err != nil {
@@ -145,18 +187,18 @@ func (d *desktopApp) handleRuntimeConfigRestore(w http.ResponseWriter, _ *http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	writeJSON(w, map[string]any{"accepted": true})
+	writeJSON(w, runtimeAcceptedResponse{Accepted: true})
 }
 
-func (d *desktopApp) handleRuntimeRestart(w http.ResponseWriter, _ *http.Request) {
+func (d *desktopApp) handleRuntimeRestart(w http.ResponseWriter, r *http.Request) {
+	if !requireRuntimeMethod(w, r, http.MethodPost) {
+		return
+	}
 	if err := d.sup.RestartAsync(d.ctx); err != nil {
 		if errors.Is(err, supervisor.ErrOperationInProgress) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
-			writeJSON(w, map[string]any{
-				"code":    "operation_in_progress",
-				"message": err.Error(),
-			})
+			writeJSON(w, runtimeAPIError{Code: "operation_in_progress", Message: err.Error()})
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -164,7 +206,7 @@ func (d *desktopApp) handleRuntimeRestart(w http.ResponseWriter, _ *http.Request
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	writeJSON(w, map[string]any{"accepted": true})
+	writeJSON(w, runtimeAcceptedResponse{Accepted: true})
 }
 
 func (d *desktopApp) handleStorageLocations(w http.ResponseWriter, r *http.Request) {

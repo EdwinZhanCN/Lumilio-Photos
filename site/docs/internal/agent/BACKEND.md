@@ -41,10 +41,14 @@ DesktopSettings v2 contains host/control-plane choices, not Server network
 policy. Structured network edits and raw TOML edits both patch one fingerprinted
 runtime candidate. Apply is serialized across restart/shutdown, journals
 `candidate_staged → candidate_promoted → rolling_back`, proves the previous
-generation exited before promotion, and updates last-known-good only after
-readiness. `Prepare` reconciles an interrupted journal before starting. The
-host-level single-instance lock spans all generations and is released only by
-Desktop shutdown.
+generation exited, durably records promotion intent before the atomic file
+replacement, and updates last-known-good only after readiness. `Prepare`
+reconciles an interrupted journal before starting, including either side of the
+promotion boundary. The host-level single-instance lock is acquired before
+settings migration or Wails UI, spans all generations, and is released only by
+Desktop shutdown. Control-plane reads deliberately expose an invalid active
+intent plus structured issues for recovery; candidate acceptance still uses
+`LoadAppConfigBytes`.
 
 `server.primary_origin` is the sole canonical browser and WebAuthn Origin.
 `internal/httporigin` resolves direct/proxied request context, and

@@ -974,8 +974,8 @@ RuntimeFailed snapshot
    - 删除 staged candidate/journal
    - 保持 runtime.toml 不变
    - 不启动第二个 generation
-8. 将 candidate 原子替换为 runtime.toml
-9. journal phase=candidate_promoted
+8. journal phase=candidate_promoted（先持久化恢复决策，关闭rename前后的崩溃窗口）
+9. 将 candidate 原子替换为 runtime.toml
 10. StartRuntime
 11. readiness成功：
     - runtime.toml → runtime.last-known-good.toml
@@ -1940,6 +1940,28 @@ rollback
   - The explicitly non-blocking P1 scope remains deferred: sanitized diagnostics ZIP, update
     badge, backend-proven uptime/free-space, and a richer stage timeline. Core documentation and
     this execution record are complete.
+- [x] Completion audit：requirement-by-requirement verification
+  - Reconfirmed the sole baseline is an ancestor of the implementation and audited every numbered
+    objective, P0 item, forbidden scope, API, file role, validation gate, and DoD against current
+    source rather than the checked boxes in this record.
+  - Moved host preparation ahead of persisted settings reads and Wails UI construction. A direct
+    test proves construction is side-effect-free, a second host is rejected before UI, and the
+    lock becomes available only after the first host closes.
+  - Closed the apply crash window by durably writing `candidate_promoted` before atomic promotion.
+    Reconciliation tests now cover crashes both before and after the rename.
+  - Made interrupted v1 migration recreate its strictly validated initial LKG before committing v2
+    settings, preserving the external HTTPS profile.
+  - Decoupled established v2 host settings from strict active-intent loading. A corrupt
+    `runtime.toml` no longer sends a returning user back to onboarding: `/state` stays in dashboard
+    mode, config read returns raw bytes/fingerprint plus structured issues, and LKG restore can
+    replace even syntactically broken intent through the normal strict apply engine.
+  - Added a real SQLite/HTTP E2E for invalid-intent startup failure → retained host → LKG restore →
+    readiness, including continued single-instance ownership.
+  - Candidate state now retains backend-resolved network facts. Entering the Server tab validates
+    an unvalidated Raw draft without persisting it, then seeds the structured form from that same
+    candidate instead of the running snapshot. Runtime also has an explicit validate-only action.
+  - Runtime APIs enforce their documented GET/POST methods, use typed response structs, and publish
+    async busy state before returning `202`.
 
 ## Decision Log
 
@@ -1970,6 +1992,10 @@ rollback
 | 2026-07-26 | Reserve `/__onb/` as an API namespace with a 404 fallback | The SPA fallback otherwise turns removed or misspelled private endpoints into misleading HTML 200 responses | Retired `/__onb/network` is observably absent and future client mistakes fail closed |
 | 2026-07-26 | Separate `networkHost` from strict-derived `runtime.network` | LAN interface addresses and warning acknowledgement are host facts, while listen/origin/TLS/proxy/CIDRs are runtime policy | The final panel contract removes compatibility fields without pretending host observations came from Server validation |
 | 2026-07-26 | Use roving tabindex and cyclic arrow/Home/End navigation for Settings tabs | A role=tablist needs predictable keyboard behavior beyond pointer activation | One tab is in the normal tab order; keyboard users can traverse and focus every settings section |
+| 2026-07-26 | Acquire the host lock before any persisted settings access or Wails UI | The host lifecycle begins before onboarding and Server startup | Construction is side-effect-free; a second host cannot race migration or onboarding |
+| 2026-07-26 | Persist `candidate_promoted` before replacing active intent | A crash between rename and the journal update could otherwise boot an unproven candidate | Either side of the promotion boundary reconciles to LKG |
+| 2026-07-26 | Treat invalid active intent as readable recovery data, not an unreadable settings failure | Startup failure must retain Raw editing and LKG restore without weakening candidate validation | Returning users stay on Dashboard; replacements still use `LoadAppConfigBytes` |
+| 2026-07-26 | Keep backend-resolved candidate network in the shared dialog draft | Seeding Server from the running snapshot could overwrite Raw network edits | Structured and Raw tabs now present and mutate the same validated candidate |
 
 ## Surprises & Discoveries
 
@@ -2012,11 +2038,23 @@ rollback
 - The first Phase 6 production build surfaced three Svelte warnings that the faster check output
   did not print: draft fields captured a rune state's initial value. Seeding them from one plain
   immutable snapshot removed the warnings without making background polling overwrite edits.
+- The completion audit found that the original promotion order had a small but real crash gap:
+  active intent could be replaced while the journal still said `candidate_staged`. Persisting the
+  recovery decision first makes both possible crash states converge safely.
+- The host lock was generation-independent after Phase 1 but still acquired by `Start`, after
+  constructor-time settings access and possible onboarding. Moving `Prepare` before Wails creation
+  completes the intended host-lifetime boundary.
+- Strict-loading current intent in every `Settings`/config read accidentally removed the recovery
+  surface for the exact invalid-manifest failure it was meant to repair. Separating raw control
+  reads from strict candidate acceptance keeps both recoverability and validation.
+- The Raw and Server tabs shared one TOML string but not one resolved network view. The additional
+  candidate-state test caught that presentation drift and now proves only backend-resolved facts
+  seed the structured form.
 
 ## Outcomes & Retrospective
 
-- Final implementation commit: `834338d3 refactor(desktop): finalize control panel contract`；
-  plan closeout由本记录归档提交承载。
+- Final implementation commit: the completion-audit commit carrying this record；prior phase
+  closure was `834338d3 refactor(desktop): finalize control panel contract`.
 - Final component tree:
   `Dashboard → Header + (ServerCard, HubCard) + StorageLocationsPanel + SupportPanel(LogPanel,
   PathsPanel) + SettingsDialog(GeneralSettingsForm, ServerSettingsForm, LumenSettingsForm,
@@ -2052,12 +2090,14 @@ rollback
 - Removed components/endpoints: 删除presentation-only `PhotosCard`、旧inline
   `SettingsPanel`、独立Lumen `ConfigureDialog`、顶层`ready/serverURL/stage/network`
   compatibility contract、`saveNetwork`、`ApplyNetworkSettings`和`/__onb/network`。
-- Panel validation: `vp check --fix`通过（37 files）；`vp test`通过（4 files / 17 tests）；
+- Panel validation: `vp check --fix`通过（38 files）；`vp test`通过（5 files / 20 tests）；
   `vp build`通过（689 modules）。Safari/Computer Use实际观察light running和
   failed/external/Lumen-failed状态、EN/ZH、Settings键盘导航/Escape和Runtime dirty draft。
-- Desktop validation: `make desktop-test`通过；`make desktop-build`通过并生成ad-hoc signed
-  `desktop/build/Lumilio Photos.app`。仅有既有Homebrew dylib/macOS deployment linker
-  warnings，无构建失败。
+- Desktop validation: `make desktop-test`通过，包括损坏active intent后真实
+  SQLite/HTTP LKG恢复、host-before-UI lock、migration resume、promotion-boundary
+  reconciliation和原有first/second launch；`make desktop-build`通过并生成ad-hoc signed
+  `desktop/build/Lumilio Photos.app`，`codesign --verify --deep --strict`通过。仅有既有
+  Homebrew dylib/macOS deployment linker warnings，无构建失败。
 - Server validation: `make server-test`通过；共享`LoadAppConfigBytes`覆盖strict candidate
   validation，未在TypeScript复制TOML安全规则。
 - Known limitations: in-app Browser没有可用实例；Computer Use不能精确设置Wails

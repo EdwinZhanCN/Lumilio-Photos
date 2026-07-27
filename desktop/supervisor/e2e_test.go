@@ -197,6 +197,68 @@ func TestDesktopRuntimeConfigApplySuccess(t *testing.T) {
 	}
 }
 
+func TestDesktopInvalidRuntimeCanRestoreLastKnownGood(t *testing.T) {
+	appData := t.TempDir()
+	webRoot := t.TempDir()
+	resources := t.TempDir()
+	const marker = "RESTORE_INVALID_OK"
+	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte(marker), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffmpeg")))
+	writeStubTool(t, filepath.Join(resources, "ffmpeg", toolExe("ffprobe")))
+	writeStubTool(t, filepath.Join(resources, "exiftool", toolExe("exiftool")))
+	t.Setenv("LUMILIO_APP_DATA", appData)
+	t.Setenv("LUMILIO_WEB_ROOT", webRoot)
+	t.Setenv("LUMILIO_RESOURCES_DIR", resources)
+
+	supervisor := startDesktopRuntime(t)
+	if err := supervisor.StopRuntime(); err != nil {
+		t.Fatal(err)
+	}
+	invalid := []byte("[server\ninvalid")
+	if err := writeAtomicPrivate(filepath.Join(appData, "config", "runtime.toml"), invalid); err != nil {
+		t.Fatal(err)
+	}
+	if err := supervisor.Restart(context.Background()); err == nil {
+		t.Fatal("syntactically invalid runtime intent unexpectedly restarted")
+	}
+	if snapshot := supervisor.RuntimeSnapshot(); snapshot.Phase != RuntimeFailed {
+		t.Fatalf("invalid runtime snapshot = %+v", snapshot)
+	}
+	if _, err := supervisor.RestoreLastKnownGoodAsync(context.Background()); err != nil {
+		t.Fatalf("restore LKG from invalid active intent: %v", err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		snapshot := supervisor.RuntimeSnapshot()
+		if snapshot.Phase == RuntimeRunning && !snapshot.OperationActive {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("LKG restore did not settle: %+v", snapshot)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	active, err := os.ReadFile(filepath.Join(appData, "config", "runtime.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lkg, err := os.ReadFile(filepath.Join(appData, "config", "runtime.last-known-good.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(active) != string(lkg) {
+		t.Fatal("restored active intent does not match readiness-confirmed LKG")
+	}
+	assertDesktopHTTP(t, &http.Client{Timeout: 5 * time.Second}, supervisor.ServerURL(), marker)
+
+	other := New(Options{Logf: t.Logf})
+	if err := other.Prepare(); err != ErrAlreadyRunning {
+		t.Fatalf("host lock after recovery = %v, want ErrAlreadyRunning", err)
+	}
+}
+
 func TestDesktopRuntimeRestart(t *testing.T) {
 	appData := t.TempDir()
 	webRoot := t.TempDir()

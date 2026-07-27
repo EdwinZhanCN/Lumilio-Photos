@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"desktop/supervisor"
@@ -45,6 +47,25 @@ func TestOnlyHostLockConflictQuitsAfterRuntimeStartFailure(t *testing.T) {
 	require.True(t, runtimeStartFailureIsHostFatal(fmt.Errorf("wrapped: %w", supervisor.ErrAlreadyRunning)))
 	require.False(t, runtimeStartFailureIsHostFatal(supervisor.ErrPortInUse))
 	require.False(t, runtimeStartFailureIsHostFatal(errors.New("strict manifest rejected")))
+}
+
+func TestDesktopHostLocksBeforePersistedStateOrUI(t *testing.T) {
+	appData := filepath.Join(t.TempDir(), "appdata")
+	t.Setenv("LUMILIO_APP_DATA", appData)
+
+	first := newDesktopApp()
+	t.Cleanup(first.cancel)
+	_, err := os.Stat(appData)
+	require.ErrorIs(t, err, os.ErrNotExist, "constructor must not touch persisted state before host lock")
+
+	require.NoError(t, first.prepareHost())
+	second := newDesktopApp()
+	t.Cleanup(second.cancel)
+	require.ErrorIs(t, second.prepareHost(), supervisor.ErrAlreadyRunning)
+
+	require.NoError(t, first.sup.Close())
+	require.NoError(t, second.prepareHost(), "lock should be available after the first host closes")
+	require.NoError(t, second.sup.Close())
 }
 
 func TestParseDesktopCLIDoesNotReadStandaloneEnvironment(t *testing.T) {
