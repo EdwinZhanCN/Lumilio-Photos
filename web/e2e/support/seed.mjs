@@ -1,6 +1,6 @@
 import process from "node:process";
 
-const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://127.0.0.1:16657";
+const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://localhost:16657";
 const username = process.env.LUMILIO_E2E_USERNAME ?? "e2e-admin";
 const password = process.env.LUMILIO_E2E_PASSWORD ?? "Lumilio-E2E-2026!";
 
