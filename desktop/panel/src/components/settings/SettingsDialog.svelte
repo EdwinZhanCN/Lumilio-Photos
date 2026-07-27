@@ -1,11 +1,18 @@
 <script module lang="ts">
-  export type SettingsTab = "general" | "server" | "lumen" | "runtime";
+  export type { SettingsTab } from "./settings-dialog.ts";
 </script>
 
 <script lang="ts">
   import { Dialog } from "bits-ui";
   import { t } from "../../lib/i18n.svelte.ts";
   import { loadRuntimeDraft } from "../../lib/runtime-draft.svelte.ts";
+  import {
+    settingsCloseAllowed,
+    settingsSaveLabelKey,
+    settingsTabAfterKey,
+    settingsTabs,
+    type SettingsTab,
+  } from "./settings-dialog.ts";
   import GeneralSettingsForm from "./GeneralSettingsForm.svelte";
   import LumenSettingsForm from "./LumenSettingsForm.svelte";
   import RuntimeSettingsForm from "./RuntimeSettingsForm.svelte";
@@ -36,12 +43,12 @@
   let runtimeDirty = $state(false);
   let runtimeSaving = $state(false);
 
-  const tabs: Array<{ id: SettingsTab; label: () => string }> = [
-    { id: "general", label: () => t("settingsTabGeneral") },
-    { id: "server", label: () => t("settingsTabServer") },
-    { id: "lumen", label: () => t("settingsTabLumen") },
-    { id: "runtime", label: () => t("settingsTabRuntime") },
-  ];
+  const tabLabels = {
+    general: () => t("settingsTabGeneral"),
+    server: () => t("settingsTabServer"),
+    lumen: () => t("settingsTabLumen"),
+    runtime: () => t("settingsTabRuntime"),
+  } satisfies Record<SettingsTab, () => string>;
 
   const anyDirty = $derived(generalDirty || serverDirty || lumenDirty || runtimeDirty);
   const activeDirty = $derived(
@@ -63,15 +70,7 @@
           : runtimeSaving,
   );
   const activeCanSave = $derived(tab !== "server" || serverCanSave);
-  const saveLabel = $derived(
-    tab === "runtime"
-      ? t("validateApplyRestart")
-      : tab === "server"
-      ? t("networkSave")
-      : tab === "lumen" && lumenConfirmingMove
-        ? t("confirmMove")
-        : t("saveChanges"),
-  );
+  const saveLabel = $derived(t(settingsSaveLabelKey(tab, lumenConfirmingMove)));
 
   $effect(() => {
     if (!open) return;
@@ -84,8 +83,16 @@
       open = true;
       return;
     }
-    if (anyDirty && !window.confirm(t("discardSettingsConfirm"))) return;
+    if (!settingsCloseAllowed(anyDirty, () => window.confirm(t("discardSettingsConfirm")))) return;
     open = false;
+  }
+
+  function handleTabKey(event: KeyboardEvent, current: SettingsTab): void {
+    const next = settingsTabAfterKey(current, event.key);
+    if (!next) return;
+    event.preventDefault();
+    tab = next;
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`#settings-tab-${next}`)?.focus());
   }
 
   async function saveActive(): Promise<void> {
@@ -126,22 +133,24 @@
           role="tablist"
           aria-label={t("settingsSections")}
         >
-          {#each tabs as item (item.id)}
+          {#each settingsTabs as item (item)}
             <button
               type="button"
               role="tab"
-              id={`settings-tab-${item.id}`}
-              aria-selected={tab === item.id}
-              aria-controls={`settings-panel-${item.id}`}
+              id={`settings-tab-${item}`}
+              aria-selected={tab === item}
+              aria-controls={`settings-panel-${item}`}
+              tabindex={tab === item ? 0 : -1}
               class="btn btn-ghost btn-sm justify-start whitespace-nowrap data-[active=true]:bg-accent-soft data-[active=true]:text-base-content"
-              data-active={tab === item.id}
-              onclick={() => (tab = item.id)}
+              data-active={tab === item}
+              onclick={() => (tab = item)}
+              onkeydown={(event) => handleTabKey(event, item)}
             >
-              {item.label()}
-              {#if (item.id === "general" && generalDirty) ||
-              (item.id === "server" && serverDirty) ||
-              (item.id === "lumen" && lumenDirty) ||
-              (item.id === "runtime" && runtimeDirty)}
+              {tabLabels[item]()}
+              {#if (item === "general" && generalDirty) ||
+              (item === "server" && serverDirty) ||
+              (item === "lumen" && lumenDirty) ||
+              (item === "runtime" && runtimeDirty)}
                 <span class="status status-warning status-sm" aria-label={t("unsavedChanges")}></span>
               {/if}
             </button>

@@ -147,7 +147,6 @@ const en = {
   semanticChanges: "Semantic changes",
   hostManagedFields: "Desktop-managed fields",
   hostManagedFieldsHint: "These values are visible but cannot be changed from the raw editor.",
-  validateCandidate: "Validate candidate",
   validateApplyRestart: "Validate, apply, and restart",
   runtimeConfigurationUnavailable: "Runtime configuration is not available.",
   restoreAccepted: "Last-known-good restore accepted. Restarting the runtime…",
@@ -172,7 +171,6 @@ const en = {
     "The proxy must terminate HTTPS and send Forwarded or X-Forwarded-Proto/Host. Direct requests are rejected.",
   networkRPWarning:
     "Changing the hostname changes the Passkey RP ID. Existing passkeys remain stored but cannot sign in at the new hostname; use password + TOTP and register new passkeys.",
-  networkSaved: "Network profile applied and the server restarted.",
   networkApplyAccepted: "Network candidate accepted. Restarting the runtime…",
   networkSave: "Apply and restart",
   localPaths: "Local paths",
@@ -355,7 +353,6 @@ const zh: typeof en = {
   semanticChanges: "语义变化",
   hostManagedFields: "Desktop 管理的字段",
   hostManagedFieldsHint: "这些值可见，但不能从原始编辑器修改。",
-  validateCandidate: "验证候选",
   validateApplyRestart: "验证、应用并重启",
   runtimeConfigurationUnavailable: "运行时配置当前不可用。",
   restoreAccepted: "已接受最近可用配置恢复，正在重启运行时…",
@@ -379,7 +376,6 @@ const zh: typeof en = {
     "代理必须终止 HTTPS，并发送 Forwarded 或 X-Forwarded-Proto/Host；直接请求会被拒绝。",
   networkRPWarning:
     "修改主机名会改变 Passkey RP ID。已有 Passkey 会保留，但无法在新主机名登录；请用密码 + TOTP 登录后重新注册。",
-  networkSaved: "网络配置已应用，服务已重新启动。",
   networkApplyAccepted: "网络候选已接受，正在重启运行时…",
   networkSave: "应用并重启",
   localPaths: "本机路径",

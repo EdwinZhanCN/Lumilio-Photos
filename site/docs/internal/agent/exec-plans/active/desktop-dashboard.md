@@ -1903,7 +1903,34 @@ rollback
   - Verification: focused apply and private-endpoint tests passed; full `make desktop-test`
     passed with Panel Svelte diagnostics at 0 errors / 0 warnings. Explicit Panel
     `vp check --fix`, `vp test` (1 file / 7 tests), and production build also passed.
-- [ ] Phase 6：Mock/A11y/i18n/cleanup
+- [x] Phase 6：Mock/A11y/i18n/cleanup
+  - Removed the top-level `ready`, `serverURL`, `stage`, and `network` panel compatibility
+    contract. Server facts now come only from the typed runtime snapshot. Strict-derived
+    `runtime.network` includes trusted proxy CIDRs; LAN addresses and the persisted warning
+    acknowledgement are explicitly separated as host-only `networkHost` facts.
+  - `Supervisor.Settings()` no longer projects runtime policy into transient network fields,
+    including on the first v1 migration call. `ServerURL()` reads the strict runtime intent when
+    no running snapshot exists. Explicit v1 structs and network normalization remain only for
+    migration and candidate patching.
+  - Expanded the development mock query matrix for every runtime phase, local/LAN/external
+    network, disabled/starting/running/failed Lumen, validation error, successful apply,
+    candidate rollback, rollback failure, and LKG restore. Production has no preview controls.
+  - Added focused Panel tests for mock contract/scenarios, strict+host network draft composition,
+    runtime status/actions, Settings footer semantics, cyclic arrow/Home/End tab navigation, and
+    dirty-close confirmation. Settings tabs use roving tabindex; Bits UI continues to own modal
+    focus trapping and Escape behavior.
+  - All visible new recovery/configuration copy exists in the existing EN/ZH table; two obsolete
+    compatibility strings were removed. Service badges and error/recovery alerts retain textual
+    status, and the existing global `prefers-reduced-motion` rule covers panel animation.
+  - Preserved the declared 760×720 / 640×620 Wails window contract and responsive one/two-column
+    layout. A second Browser-plugin attempt still returned no browser instances, so light/dark,
+    both exact window sizes, locale, and long-value screenshots are not claimed as visually
+    observed in this environment.
+  - Updated `desktop/README.md`, internal architecture, and backend runtime-boundary docs with
+    typed lifecycle ownership, runtime/LKG/candidate/journal/server file roles, host projection,
+    recovery behavior, and deterministic mock parameters.
+  - Verification: `make desktop-test` passed; Panel `vp check --fix` passed for 37 files,
+    `vp test` passed (4 files / 17 tests), and `vp build` passed without Svelte diagnostics.
 - [ ] Phase 7：Optional P1/docs
 
 ## Decision Log
@@ -1933,6 +1960,8 @@ rollback
 | 2026-07-26 | Keep apply ownership active until LKG persistence and journal cleanup finish | RuntimeRunning alone does not prove the transaction metadata has converged | Panel polling and tests cannot observe active intent with a stale LKG |
 | 2026-07-26 | Restore LKG by projecting current host fields and using the normal candidate engine | Machine-owned paths may have changed since an older LKG was written, while recovery needs identical safety semantics | Restore validates, stages, stops, promotes, starts, and journals exactly like any other apply |
 | 2026-07-26 | Reserve `/__onb/` as an API namespace with a 404 fallback | The SPA fallback otherwise turns removed or misspelled private endpoints into misleading HTML 200 responses | Retired `/__onb/network` is observably absent and future client mistakes fail closed |
+| 2026-07-26 | Separate `networkHost` from strict-derived `runtime.network` | LAN interface addresses and warning acknowledgement are host facts, while listen/origin/TLS/proxy/CIDRs are runtime policy | The final panel contract removes compatibility fields without pretending host observations came from Server validation |
+| 2026-07-26 | Use roving tabindex and cyclic arrow/Home/End navigation for Settings tabs | A role=tablist needs predictable keyboard behavior beyond pointer activation | One tab is in the normal tab order; keyboard users can traverse and focus every settings section |
 
 ## Surprises & Discoveries
 
@@ -1966,6 +1995,13 @@ rollback
   test assumed the TOML encoder always used double quotes. Keeping the operation claimed through
   transaction cleanup and asserting the parsed `logging.level` made both the runtime contract and
   the test semantic.
+- Removing the last Settings compatibility projection exposed a first-call migration asymmetry:
+  disk was already v2 but the caller still held the decoded v1 struct. Reloading the just-written
+  v2 file after `ensureRuntimeIntent` makes the migration call return the same host-only contract
+  as every later call.
+- The first Phase 6 production build surfaced three Svelte warnings that the faster check output
+  did not print: draft fields captured a rune state's initial value. Seeding them from one plain
+  immutable snapshot removed the warnings without making background polling overwrite edits.
 
 ## Outcomes & Retrospective
 

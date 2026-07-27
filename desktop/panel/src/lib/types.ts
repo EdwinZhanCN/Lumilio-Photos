@@ -82,6 +82,7 @@ export interface RuntimeNetworkSummary {
   primaryOrigin: string;
   tlsMode: "off" | "external";
   proxyMode: "disabled" | "required";
+  trustedProxyCIDRs: string[];
   passkeyOrigin: string;
   rpID: string;
   passkeyEnabled: boolean;
@@ -143,12 +144,8 @@ export interface PanelState {
   version: string;
   tosRev: string;
   runtime: RuntimeSnapshot;
-  /** Temporary compatibility fields removed after the Dashboard migration. */
-  ready: boolean;
-  serverURL: string;
-  stage: string;
   paths: DashboardPaths;
-  network: NetworkInfo;
+  networkHost: Pick<NetworkInfo, "lanWarningAcceptedVersion" | "lanAddresses">;
   lumen: LumenInfo;
   backends: BackendChoice[];
   presets: Preset[];

@@ -8,7 +8,9 @@ interface MockState {
   mode: "onboarding" | "dashboard";
   region: string;
   path: string;
-  ready: boolean;
+  runtimePhase: MockRuntimePhase;
+  runtimeErrorCode: string;
+  runtimeErrorMessage: string;
   lumen: {
     enabled: boolean;
     state: string;
@@ -67,7 +69,9 @@ const mock: MockState = {
   mode: "onboarding",
   region: "other",
   path: `${HOME}/Library/Application Support/Lumilio Photos/storage`,
-  ready: false,
+  runtimePhase: "starting",
+  runtimeErrorCode: "",
+  runtimeErrorMessage: "",
   lumen: {
     enabled: false,
     state: "",
@@ -170,32 +174,131 @@ hardware_accel = "auto"
 
 const MOCK_FINGERPRINT = `sha256:${"a".repeat(64)}`;
 
-function statePayload(runtimeOverride?: string | null, modeOverride?: string | null) {
-  const runtimePhase: MockRuntimePhase = isMockRuntimePhase(runtimeOverride)
-    ? runtimeOverride
-    : mock.ready
-      ? "running"
-      : "starting";
-  const runtimeNetwork = {
+type MockNetwork = "local" | "lan" | "external";
+type MockLumen = "disabled" | "starting" | "running" | "failed";
+type MockApply = "success" | "rollback" | "failure";
+
+function mockQuery(req: Parameters<Connect.NextHandleFunction>[0]): URLSearchParams {
+  return new URL(req.headers.referer ?? "http://localhost", "http://localhost").searchParams;
+}
+
+export function networkPayload(network: MockNetwork | null) {
+  if (network === "lan") {
+    return {
+      mode: "lan_http",
+      listen: "0.0.0.0:6680",
+      primaryOrigin: "http://localhost:6680",
+      tlsMode: "off",
+      proxyMode: "disabled",
+      trustedProxyCIDRs: [],
+      passkeyOrigin: "http://localhost:6680",
+      rpID: "localhost",
+      passkeyEnabled: true,
+      remotePasskeyAvailable: false,
+    };
+  }
+  if (network === "external") {
+    return {
+      mode: "external_https",
+      listen: "127.0.0.1:6680",
+      primaryOrigin: "https://photos.example.com",
+      tlsMode: "external",
+      proxyMode: "required",
+      trustedProxyCIDRs: ["127.0.0.1/32", "::1/128"],
+      passkeyOrigin: "https://photos.example.com",
+      rpID: "photos.example.com",
+      passkeyEnabled: true,
+      remotePasskeyAvailable: true,
+    };
+  }
+  return {
     mode: "local",
     listen: "127.0.0.1:6680",
     primaryOrigin: "http://localhost:6680",
     tlsMode: "off",
     proxyMode: "disabled",
+    trustedProxyCIDRs: [],
     passkeyOrigin: "http://localhost:6680",
     rpID: "localhost",
     passkeyEnabled: true,
     remotePasskeyAvailable: false,
   };
+}
+
+export function lumenPayload(override: MockLumen | null) {
+  if (override === "disabled") {
+    return { ...mock.lumen, enabled: false, state: "off", phase: "", error: "", download: null };
+  }
+  if (override === "starting") {
+    return {
+      ...mock.lumen,
+      enabled: true,
+      state: "starting",
+      phase: "downloading",
+      error: "",
+      download: {
+        model: "bioclip-v2",
+        file: "burn/vision.fp32.bpk",
+        bytesDone: 480_000_000,
+        bytesTotal: 1_200_000_000,
+        filesDone: 2,
+        filesTotal: 4,
+      },
+    };
+  }
+  if (override === "running") {
+    return {
+      ...mock.lumen,
+      enabled: true,
+      state: "running",
+      phase: "ready",
+      error: "",
+      installedVersion: mock.lumen.installedVersion || "0.9.1",
+      download: null,
+    };
+  }
+  if (override === "failed") {
+    return {
+      ...mock.lumen,
+      enabled: true,
+      state: "failed",
+      phase: "failed",
+      error: "Model initialization failed: Metal device is unavailable.",
+      download: null,
+    };
+  }
+  return mock.lumen;
+}
+
+export function statePayload(
+  runtimeOverride?: string | null,
+  modeOverride?: string | null,
+  networkOverride?: string | null,
+  lumenOverride?: string | null,
+) {
+  const runtimePhase: MockRuntimePhase = isMockRuntimePhase(runtimeOverride)
+    ? runtimeOverride
+    : mock.runtimePhase;
+  const network =
+    networkOverride === "lan" || networkOverride === "external" ? networkOverride : "local";
+  const runtimeNetwork = networkPayload(network);
+  const lumen =
+    lumenOverride === "disabled" ||
+    lumenOverride === "starting" ||
+    lumenOverride === "running" ||
+    lumenOverride === "failed"
+      ? lumenPayload(lumenOverride)
+      : mock.lumen;
+  const forcedFailure = runtimePhase === "failed" && mock.runtimePhase !== "failed";
   return {
-    ...mock,
     mode: modeOverride === "dashboard" ? "dashboard" : mock.mode,
+    region: mock.region,
+    path: mock.path,
+    lumen,
     lang: "en",
     validation,
     version: "0.9.0-dev",
     tosRev: "dev",
-    serverURL: "http://localhost:6680",
-    stage: mock.ready ? "running" : "starting",
     runtime: {
       phase: runtimePhase,
       stage:
@@ -204,23 +307,20 @@ function statePayload(runtimeOverride?: string | null, modeOverride?: string | n
           : runtimePhase === "failed"
             ? "starting_server"
             : "preparing",
-      errorCode: runtimePhase === "failed" ? "startup_failed" : "",
-      errorMessage:
-        runtimePhase === "failed"
-          ? "The runtime manifest is invalid: server.primary_origin must be an exact origin."
-          : "",
-      browserURL: "http://localhost:6680",
+      errorCode: forcedFailure ? "startup_failed" : mock.runtimeErrorCode,
+      errorMessage: forcedFailure
+        ? "The runtime manifest is invalid: server.primary_origin must be an exact origin."
+        : mock.runtimeErrorMessage,
+      browserURL: runtimeNetwork.primaryOrigin,
       canOpen: runtimePhase === "running",
       canRestart: ["stopped", "running", "failed"].includes(runtimePhase),
       lastKnownGoodAvailable: true,
       network: runtimeNetwork,
       operationActive: runtimePhase === "starting" || runtimePhase === "restarting",
     },
-    network: {
-      ...runtimeNetwork,
-      lanWarningAcceptedVersion: 0,
+    networkHost: {
+      lanWarningAcceptedVersion: network === "lan" ? 1 : 0,
       lanAddresses: ["192.168.1.42"],
-      trustedProxyCIDRs: [],
     },
     paths: {
       storage: mock.path,
@@ -241,6 +341,30 @@ function statePayload(runtimeOverride?: string | null, modeOverride?: string | n
     recommendedPreset: "basic",
     memoryGB: 16,
     cacheValidation: validation,
+  };
+}
+
+export function validationPayload(candidateToml: string, network: MockNetwork | null) {
+  const acme = candidateToml.includes('mode = "acme"');
+  return {
+    valid: !acme,
+    candidateToml,
+    baseFingerprint: MOCK_FINGERPRINT,
+    network: networkPayload(network),
+    issues: acme
+      ? [
+          {
+            field: "server.tls.mode",
+            code: "unsupported_desktop_tls",
+            message: "Desktop supports TLS modes off and external; ACME is not available",
+          },
+        ]
+      : [],
+    semanticChanges:
+      candidateToml === MOCK_RUNTIME_TOML
+        ? []
+        : [{ field: "logging.level", before: "info", after: "debug" }],
+    requiresRestart: candidateToml !== MOCK_RUNTIME_TOML,
   };
 }
 
@@ -267,10 +391,15 @@ export function mockPanelApi(): Plugin {
 
         switch (url.pathname) {
           case "/__onb/state": {
-            const pageURL = new URL(req.headers.referer ?? "http://localhost", "http://localhost");
+            const query = mockQuery(req);
             return json(
               res,
-              statePayload(pageURL.searchParams.get("runtime"), pageURL.searchParams.get("mode")),
+              statePayload(
+                query.get("runtime"),
+                query.get("mode"),
+                query.get("network"),
+                query.get("lumen"),
+              ),
             );
           }
           case "/__onb/pick":
@@ -340,7 +469,7 @@ export function mockPanelApi(): Plugin {
               });
               setTimeout(simulateHubStartup, 1500);
             }
-            setTimeout(() => (mock.ready = true), 4000);
+            setTimeout(() => (mock.runtimePhase = "running"), 4000);
             return json(res, { ok: true });
           }
           case "/__onb/region": {
@@ -349,10 +478,13 @@ export function mockPanelApi(): Plugin {
             return json(res, { ok: true, region: mock.region });
           }
           case "/__onb/runtime/restart":
-            mock.ready = false;
-            setTimeout(() => (mock.ready = true), 1800);
+            mock.runtimePhase = "restarting";
+            mock.runtimeErrorCode = "";
+            mock.runtimeErrorMessage = "";
+            setTimeout(() => (mock.runtimePhase = "running"), 1800);
             return json(res, { accepted: true });
-          case "/__onb/runtime/config":
+          case "/__onb/runtime/config": {
+            const query = mockQuery(req);
             return json(res, {
               currentToml: MOCK_RUNTIME_TOML,
               candidateToml: MOCK_RUNTIME_TOML,
@@ -364,47 +496,64 @@ export function mockPanelApi(): Plugin {
                 "server.web_root",
                 "logging.dir",
               ],
-              network: statePayload().runtime.network,
+              network: statePayload(null, null, query.get("network"), query.get("lumen")).runtime
+                .network,
               issues: [],
               semanticChanges: [],
             });
+          }
           case "/__onb/runtime/config/validate":
           case "/__onb/runtime/config/patch-network": {
             const body = await readBody(req);
             const candidateToml = String(body.toml ?? MOCK_RUNTIME_TOML);
-            const acme = candidateToml.includes('mode = "acme"');
-            return json(res, {
-              valid: !acme,
-              candidateToml,
-              baseFingerprint: MOCK_FINGERPRINT,
-              network: statePayload().runtime.network,
-              issues: acme
-                ? [
-                    {
-                      field: "server.tls.mode",
-                      code: "unsupported_desktop_tls",
-                      message: "Desktop supports TLS modes off and external; ACME is not available",
-                    },
-                  ]
-                : [],
-              semanticChanges:
-                candidateToml === MOCK_RUNTIME_TOML
-                  ? []
-                  : [{ field: "logging.level", before: "info", after: "debug" }],
-              requiresRestart: candidateToml !== MOCK_RUNTIME_TOML,
-            });
+            const requestedMode = String(body.network?.mode ?? "");
+            const network =
+              url.pathname.endsWith("/patch-network") && requestedMode === "lan_http"
+                ? "lan"
+                : url.pathname.endsWith("/patch-network") && requestedMode === "external_https"
+                  ? "external"
+                  : mockQuery(req).get("network");
+            return json(
+              res,
+              validationPayload(
+                candidateToml,
+                network === "lan" || network === "external" ? network : "local",
+              ),
+            );
           }
           case "/__onb/runtime/config/apply": {
             const body = await readBody(req);
-            mock.ready = false;
-            setTimeout(() => (mock.ready = true), 1800);
+            const apply = mockQuery(req).get("apply") as MockApply | null;
+            mock.runtimePhase = "restarting";
+            mock.runtimeErrorCode = "";
+            mock.runtimeErrorMessage = "";
+            setTimeout(() => {
+              if (apply === "rollback") {
+                mock.runtimePhase = "running";
+                mock.runtimeErrorCode = "candidate_rolled_back";
+                mock.runtimeErrorMessage =
+                  "Candidate runtime failed readiness and was rolled back to last-known-good.";
+              } else if (apply === "failure") {
+                mock.runtimePhase = "failed";
+                mock.runtimeErrorCode = "startup_failed";
+                mock.runtimeErrorMessage =
+                  "Candidate runtime failed readiness; last-known-good rollback also failed.";
+              } else {
+                mock.runtimePhase = "running";
+              }
+            }, 1800);
             return json(res, {
               accepted: true,
               validation: {
                 valid: true,
                 candidateToml: String(body.toml ?? MOCK_RUNTIME_TOML),
                 baseFingerprint: MOCK_FINGERPRINT,
-                network: statePayload().runtime.network,
+                network: statePayload(
+                  null,
+                  null,
+                  mockQuery(req).get("network"),
+                  mockQuery(req).get("lumen"),
+                ).runtime.network,
                 issues: [],
                 semanticChanges: [],
                 requiresRestart: true,
@@ -412,8 +561,10 @@ export function mockPanelApi(): Plugin {
             });
           }
           case "/__onb/runtime/config/restore":
-            mock.ready = false;
-            setTimeout(() => (mock.ready = true), 1800);
+            mock.runtimePhase = "restarting";
+            mock.runtimeErrorCode = "";
+            mock.runtimeErrorMessage = "";
+            setTimeout(() => (mock.runtimePhase = "running"), 1800);
             return json(res, { accepted: true });
           case "/__onb/lumen-save": {
             const body = await readBody(req);

@@ -29,6 +29,7 @@ type NetworkSummary struct {
 	PrimaryOrigin          string      `json:"primaryOrigin"`
 	TLSMode                string      `json:"tlsMode"`
 	ProxyMode              string      `json:"proxyMode"`
+	TrustedProxyCIDRs      []string    `json:"trustedProxyCIDRs"`
 	PasskeyOrigin          string      `json:"passkeyOrigin"`
 	RPID                   string      `json:"rpID"`
 	PasskeyEnabled         bool        `json:"passkeyEnabled"`
@@ -111,17 +112,22 @@ func networkSummaryFromConfig(cfg serverconfig.AppConfig) NetworkSummary {
 			mode = NetworkLANHTTP
 		}
 	}
-	return NetworkSummary{
+	summary := NetworkSummary{
 		Mode:                   mode,
 		Listen:                 cfg.ServerConfig.Listen,
 		PrimaryOrigin:          cfg.ServerConfig.PrimaryOrigin,
 		TLSMode:                string(cfg.ServerConfig.TLS.Mode),
 		ProxyMode:              string(cfg.ServerConfig.Proxy.Mode),
+		TrustedProxyCIDRs:      []string{},
 		PasskeyOrigin:          cfg.Auth.PasskeyIdentity.Origin,
 		RPID:                   cfg.Auth.PasskeyIdentity.RPID,
 		PasskeyEnabled:         cfg.Auth.Passkey.Enabled,
 		RemotePasskeyAvailable: cfg.Auth.Passkey.Enabled && cfg.ServerConfig.TLS.Mode == serverconfig.TLSModeExternal,
 	}
+	for _, prefix := range cfg.ServerConfig.Proxy.TrustedCIDRs {
+		summary.TrustedProxyCIDRs = append(summary.TrustedProxyCIDRs, prefix.String())
+	}
+	return summary
 }
 
 func runtimeErrorCode(err error) string {
