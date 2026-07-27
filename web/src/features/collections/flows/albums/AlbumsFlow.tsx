@@ -161,7 +161,7 @@ function AlbumsContent() {
       />
 
       {isDeleteConfirmOpen && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-modal">
           <div className="modal-box border-t-4 border-error">
             <div className="mb-4 flex items-center gap-3 text-error">
               <AlertTriangle size={24} />

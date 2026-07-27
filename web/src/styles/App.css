@@ -34,6 +34,7 @@
   --z-index-modal: 400;
   --z-index-lightbox: 500;
   --z-index-tooltip: 600;
+  --z-index-toast: 700;
 }
 
 @plugin "daisyui/theme" {

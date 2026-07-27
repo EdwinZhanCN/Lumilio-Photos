@@ -59,9 +59,8 @@ export function SpeciesReferenceTrigger({ prediction }: { prediction: ParsedSpec
         position: "fixed",
         left: position.left,
         top: position.top,
-        zIndex: "var(--z-index-tooltip)" as unknown as number,
       }}
-      className="w-[min(520px,calc(100vw-96px))] rounded-xl border border-white/12 bg-zinc-950/95 p-3 text-left text-white shadow-2xl shadow-black/40 backdrop-blur-xl"
+      className="z-tooltip w-[min(520px,calc(100vw-96px))] rounded-xl border border-white/12 bg-zinc-950/95 p-3 text-left text-white shadow-2xl shadow-black/40 backdrop-blur-xl"
       role="tooltip"
       onMouseEnter={open}
       onMouseLeave={close}

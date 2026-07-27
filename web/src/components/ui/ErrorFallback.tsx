@@ -94,7 +94,9 @@ export default function ErrorFallback({
             <div className="collapse collapse-arrow border border-base-300 bg-base-100">
               <input
                 type="checkbox"
-                aria-label={t("errorFallback.toggleDetails", { defaultValue: "Toggle error details" })}
+                aria-label={t("errorFallback.toggleDetails", {
+                  defaultValue: "Toggle error details",
+                })}
               />
               <div className="collapse-title text-left font-medium flex items-center justify-between gap-2">
                 <span>
@@ -120,7 +122,9 @@ export default function ErrorFallback({
             {resetErrorBoundary && (
               <button type="button" onClick={resetErrorBoundary} className="btn btn-secondary">
                 <RefreshCw className="size-4" aria-hidden="true" />
-                <span className="ml-1">{t("errorFallback.tryAgain", { defaultValue: "Try again" })}</span>
+                <span className="ml-1">
+                  {t("errorFallback.tryAgain", { defaultValue: "Try again" })}
+                </span>
               </button>
             )}
 
@@ -131,7 +135,9 @@ export default function ErrorFallback({
               className="btn btn-outline"
             >
               <Bug className="size-4" aria-hidden="true" />
-              <span className="ml-1">{t("errorFallback.reportIssue", { defaultValue: "Report issue" })}</span>
+              <span className="ml-1">
+                {t("errorFallback.reportIssue", { defaultValue: "Report issue" })}
+              </span>
               <ExternalLink className="size-4 ml-1" aria-hidden="true" />
             </a>
 
@@ -148,7 +154,7 @@ export default function ErrorFallback({
       </div>
 
       {copied && (
-        <div className="toast toast-end">
+        <div className="toast toast-end z-toast">
           <div className="alert alert-success">
             <span>
               {t("errorFallback.copiedToast", {

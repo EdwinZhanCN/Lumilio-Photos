@@ -51,12 +51,12 @@ export function SearchFAB({ className, query, onQueryChange }: SearchFABProps) {
   };
 
   return (
-    <>
+    <div className="pointer-events-none fixed inset-0 z-overlay isolate">
       {/* Backdrop — visible while search input is shown */}
       {hasSearch && (
         <div
           aria-hidden="true"
-          className="fixed bottom-0 right-0 z-overlay h-[40vh] w-[28rem] pointer-events-none"
+          className="absolute bottom-0 right-0 h-[40vh] w-[28rem]"
           style={{
             backdropFilter: "blur(4px)",
             WebkitBackdropFilter: "blur(4px)",
@@ -81,7 +81,7 @@ export function SearchFAB({ className, query, onQueryChange }: SearchFABProps) {
         - fab-open class keeps children visible when browsing search results
       */}
       <div
-        className={`fab fixed bottom-6 right-4 z-overlay flex items-center gap-2 ${hasSearch ? "fab-open" : ""} ${className ?? ""}`}
+        className={`fab pointer-events-auto absolute bottom-6 right-4 flex items-center gap-2 ${hasSearch ? "fab-open" : ""} ${className ?? ""}`}
         style={{ flexDirection: "row-reverse" }}
       >
         {/* ── Trigger button (focusable, first child) ── */}
@@ -129,6 +129,6 @@ export function SearchFAB({ className, query, onQueryChange }: SearchFABProps) {
           </div>
         </form>
       </div>
-    </>
+    </div>
   );
 }

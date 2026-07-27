@@ -68,72 +68,65 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({ isOpen, o
   if (!isOpen) return null;
 
   return (
-    <>
-      {/* Modal backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-modal backdrop-blur-sm" onClick={onClose} />
+    <dialog open className="modal modal-open z-modal">
+      <div className="modal-box max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-2xl">{t("upload.SupportedFormatsModal.title")}</h3>
+          <button
+            onClick={onClose}
+            className="btn btn-sm btn-circle btn-ghost"
+            aria-label={t("upload.SupportedFormatsModal.close_button_aria_label")}
+          >
+            ✕
+          </button>
+        </div>
 
-      {/* Modal dialog */}
-      <dialog open className="modal modal-open z-modal">
-        <div className="modal-box max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-2xl">{t("upload.SupportedFormatsModal.title")}</h3>
-            <button
-              onClick={onClose}
-              className="btn btn-sm btn-circle btn-ghost"
-              aria-label={t("upload.SupportedFormatsModal.close_button_aria_label")}
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Format groups */}
-          <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar">
-            <div className="space-y-6">
-              {formatGroups.map((group: FormatGroup) => (
-                <div key={group.category} className="card bg-base-200">
-                  <div className="card-body p-4">
-                    {/* Category header */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="text-primary">{getCategoryIcon(group.category)}</div>
-                      <h4 className="font-semibold text-lg">{getCategoryLabel(group.category)}</h4>
-                      <div className={`badge ${getCategoryColor(group.category)} badge-sm`}>
-                        {t("upload.SupportedFormatsModal.formats_count", {
-                          count: group.formats.length,
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Format grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {group.formats.map((format) => (
-                        <div
-                          key={format.ext}
-                          className="flex items-center gap-2 p-2 bg-base-100 rounded hover:bg-base-300 transition-colors"
-                        >
-                          <code className="text-xs font-mono text-primary">{format.ext}</code>
-                          <span className="text-xs text-base-content/70 truncate">
-                            {format.name}
-                          </span>
-                        </div>
-                      ))}
+        {/* Format groups */}
+        <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar">
+          <div className="space-y-6">
+            {formatGroups.map((group: FormatGroup) => (
+              <div key={group.category} className="card bg-base-200">
+                <div className="card-body p-4">
+                  {/* Category header */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="text-primary">{getCategoryIcon(group.category)}</div>
+                    <h4 className="font-semibold text-lg">{getCategoryLabel(group.category)}</h4>
+                    <div className={`badge ${getCategoryColor(group.category)} badge-sm`}>
+                      {t("upload.SupportedFormatsModal.formats_count", {
+                        count: group.formats.length,
+                      })}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Footer */}
-          <div className="modal-action mt-4">
-            <button onClick={onClose} className="btn btn-primary">
-              {t("upload.SupportedFormatsModal.got_it_button")}
-            </button>
+                  {/* Format grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {group.formats.map((format) => (
+                      <div
+                        key={format.ext}
+                        className="flex items-center gap-2 p-2 bg-base-100 rounded hover:bg-base-300 transition-colors"
+                      >
+                        <code className="text-xs font-mono text-primary">{format.ext}</code>
+                        <span className="text-xs text-base-content/70 truncate">{format.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Custom scrollbar styles */}
-        <style>{`
+        {/* Footer */}
+        <div className="modal-action mt-4">
+          <button onClick={onClose} className="btn btn-primary">
+            {t("upload.SupportedFormatsModal.got_it_button")}
+          </button>
+        </div>
+      </div>
+
+      {/* Custom scrollbar styles */}
+      <style>{`
           .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
           }
@@ -148,8 +141,13 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({ isOpen, o
             background: hsl(var(--bc) / 0.3);
           }
         `}</style>
-      </dialog>
-    </>
+      <button
+        type="button"
+        className="modal-backdrop bg-black/50 backdrop-blur-sm"
+        aria-label={t("upload.SupportedFormatsModal.close_button_aria_label")}
+        onClick={onClose}
+      />
+    </dialog>
   );
 };
 

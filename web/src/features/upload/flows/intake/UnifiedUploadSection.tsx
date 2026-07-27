@@ -112,7 +112,7 @@ function UnifiedUploadSection(): React.JSX.Element {
 
         {/* Info Button (Tooltip) */}
         <div className="absolute top-4 right-4">
-          <div className="dropdown dropdown-end">
+          <div className="dropdown dropdown-end isolate">
             <label tabIndex={0} className="btn btn-circle btn-ghost btn-sm">
               <Info className="w-5 h-5" />
             </label>
