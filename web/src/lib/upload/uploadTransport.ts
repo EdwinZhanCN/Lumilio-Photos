@@ -357,11 +357,25 @@ export const generateSessionId = (): string => {
   return crypto.randomUUID();
 };
 
-export const getResumableSessionId = (file: File, repositoryId?: string): string => {
-  const key = resumableSessionKey(file, repositoryId);
+export const getResumableSessionId = (
+  file: File,
+  repositoryId: string | undefined,
+  contentHash: string,
+): string => {
+  const key = resumableSessionKey(file, repositoryId, contentHash);
   try {
     const existing = localStorage.getItem(key);
     if (existing) return existing;
+
+    // Migrate sessions created before the content-hash key existed.
+    const legacyKey = resumableSessionKeyLegacy(file, repositoryId);
+    const legacy = localStorage.getItem(legacyKey);
+    if (legacy) {
+      localStorage.setItem(key, legacy);
+      localStorage.removeItem(legacyKey);
+      return legacy;
+    }
+
     const created = generateSessionId();
     localStorage.setItem(key, created);
     return created;
@@ -370,12 +384,24 @@ export const getResumableSessionId = (file: File, repositoryId?: string): string
   }
 };
 
-const resumableSessionKey = (file: File, repositoryId?: string): string =>
+const resumableSessionKey = (
+  file: File,
+  repositoryId: string | undefined,
+  contentHash: string,
+): string =>
+  `lumilio.upload.session.v1:${repositoryId ?? "primary"}:${contentHash}:${file.name}:${file.size}:${file.lastModified}`;
+
+const resumableSessionKeyLegacy = (file: File, repositoryId?: string): string =>
   `lumilio.upload.session.v1:${repositoryId ?? "primary"}:${file.name}:${file.size}:${file.lastModified}`;
 
-export const clearResumableSessionId = (file: File, repositoryId?: string): void => {
+export const clearResumableSessionId = (
+  file: File,
+  repositoryId?: string,
+  contentHash?: string,
+): void => {
   try {
-    localStorage.removeItem(resumableSessionKey(file, repositoryId));
+    if (contentHash) localStorage.removeItem(resumableSessionKey(file, repositoryId, contentHash));
+    localStorage.removeItem(resumableSessionKeyLegacy(file, repositoryId));
   } catch {
     /* storage is optional */
   }

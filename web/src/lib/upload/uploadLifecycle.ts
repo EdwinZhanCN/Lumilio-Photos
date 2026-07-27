@@ -12,6 +12,22 @@ export interface WaitForUploadJobsOptions {
   onUpdate?: (job: UploadJobStatus) => void;
 }
 
+/** Backend `/batch/jobs` and `/batch/jobs/stream` accept at most this many IDs. */
+export const UPLOAD_JOB_ID_LIMIT = 100;
+
+export const chunkUploadJobIds = (
+  taskIds: number[],
+  limit: number = UPLOAD_JOB_ID_LIMIT,
+): number[][] => {
+  const ids = Array.from(new Set(taskIds));
+  if (ids.length === 0) return [];
+  const chunks: number[][] = [];
+  for (let index = 0; index < ids.length; index += limit) {
+    chunks.push(ids.slice(index, index + limit));
+  }
+  return chunks;
+};
+
 const wait = (durationMs: number, signal?: AbortSignal): Promise<void> =>
   new Promise((resolve, reject) => {
     const timeout = globalThis.setTimeout(resolve, durationMs);
@@ -47,7 +63,16 @@ async function pollUploadJobs(
 
     const jobs = data?.jobs ?? [];
     jobs.forEach((job) => options.onUpdate?.(job));
-    if (jobs.length === ids.length && jobs.every((job) => job.terminal)) return jobs;
+    const byId = new Map(
+      jobs
+        .filter(
+          (job): job is UploadJobStatus & { task_id: number } => typeof job.task_id === "number",
+        )
+        .map((job) => [job.task_id, job] as const),
+    );
+    if (ids.every((id) => byId.get(id)?.terminal)) {
+      return ids.map((id) => byId.get(id)!);
+    }
     await wait(intervalMs, options.signal);
   }
 
@@ -96,8 +121,7 @@ async function streamUploadJobs(
 
 class UploadStreamComplete extends Error {}
 
-/** Uses SSE first and falls back to /batch/jobs polling if streaming is unavailable. */
-export async function waitForUploadJobs(
+async function waitForUploadJobsBatch(
   taskIds: number[],
   options: WaitForUploadJobsOptions = {},
 ): Promise<UploadJobStatus[]> {
@@ -109,4 +133,29 @@ export async function waitForUploadJobs(
     if (options.signal?.aborted) throw error;
     return pollUploadJobs(ids, options);
   }
+}
+
+/** Uses SSE first and falls back to /batch/jobs polling if streaming is unavailable. */
+export async function waitForUploadJobs(
+  taskIds: number[],
+  options: WaitForUploadJobsOptions = {},
+): Promise<UploadJobStatus[]> {
+  const batches = chunkUploadJobIds(taskIds);
+  if (batches.length === 0) return [];
+  if (batches.length === 1) return waitForUploadJobsBatch(batches[0], options);
+
+  const settled = await Promise.allSettled(
+    batches.map((batch) => waitForUploadJobsBatch(batch, options)),
+  );
+  const jobs: UploadJobStatus[] = [];
+  let firstError: unknown;
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      jobs.push(...result.value);
+      continue;
+    }
+    firstError ??= result.reason;
+  }
+  if (firstError) throw firstError;
+  return jobs;
 }

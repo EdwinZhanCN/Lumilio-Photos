@@ -5,6 +5,8 @@ import (
 
 	"github.com/riverqueue/river/rivertype"
 	"github.com/stretchr/testify/require"
+
+	"server/internal/api/dto"
 )
 
 func TestUploadJobStatusForCallerEnforcesOwnershipAndTerminalState(t *testing.T) {
@@ -38,4 +40,23 @@ func TestUploadJobStatusForCallerReportsRunningAsNonTerminal(t *testing.T) {
 	require.True(t, ok)
 	require.False(t, status.Terminal)
 	require.False(t, status.Success)
+}
+
+func TestAllRequestedUploadJobsTerminalRequiresFullCoverage(t *testing.T) {
+	requested := []int64{1, 2, 3}
+	partial := []dto.UploadJobStatusDTO{
+		{TaskID: 1, Terminal: true, Success: true},
+		{TaskID: 2, Terminal: true, Success: true},
+	}
+	require.False(t, allRequestedUploadJobsTerminal(requested, partial))
+
+	complete := []dto.UploadJobStatusDTO{
+		{TaskID: 1, Terminal: true, Success: true},
+		{TaskID: 2, Terminal: true, Success: true},
+		{TaskID: 3, Terminal: false, Success: false},
+	}
+	require.False(t, allRequestedUploadJobsTerminal(requested, complete))
+
+	complete[2].Terminal = true
+	require.True(t, allRequestedUploadJobsTerminal(requested, complete))
 }

@@ -52,9 +52,12 @@
  *
  * A successful HTTP response means transport was accepted, not that an asset
  * exists yet. {@link waitForUploadJobs} follows the returned ingest task ids
- * through `/api/v1/assets/batch/jobs`; {@link FileUploadProgress} remains in
+ * through `/api/v1/assets/batch/jobs` (chunked to the backend's 100-id limit,
+ * SSE first with poll fallback); {@link FileUploadProgress} remains in
  * `processing` until every task reaches a backend terminal state. Asset
  * list/search queries are invalidated only after successful materialization.
+ * Status-wait failures only mark unsettled tasks failed — already-terminal
+ * successes are preserved.
  *
  * ## Instant upload
  *

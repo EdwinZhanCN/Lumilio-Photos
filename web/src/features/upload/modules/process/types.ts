@@ -39,6 +39,8 @@ export interface PlannedFileUploadSession {
 
 export interface FileUploadSession extends PlannedFileUploadSession {
   hash: string;
+  /** Server/chunk session id; may differ from UI sessionId for resumable uploads. */
+  uploadSessionId?: string;
 }
 
 export interface UploadTransportConfig {

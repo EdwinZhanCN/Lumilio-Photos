@@ -112,6 +112,7 @@ type BatchUploadResponseDTO struct {
 // BatchUploadResultDTO represents a single result in a batch upload
 type BatchUploadResultDTO struct {
 	Success     bool    `json:"success"`
+	SessionID   string  `json:"session_id,omitempty"`
 	FileName    string  `json:"file_name,omitempty"`
 	ContentHash string  `json:"content_hash"`
 	TaskID      *int64  `json:"task_id,omitempty"`
