@@ -46,6 +46,7 @@ MANIFEST
 *.test
 /.cache/lumilio-assets/
 /.cache/e2e/
+/.cache/lumilio-tool-stubs/
 
 # Production
 *.env

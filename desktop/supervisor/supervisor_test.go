@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	serverapp "server/app"
+	serverconfig "server/config"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -691,6 +693,175 @@ func TestInternalHealthURLIsIndependentFromPrimaryOrigin(t *testing.T) {
 	}
 	if got, want := internalHealthURL("[::1]:7780"), "http://[::1]:7780/api/v1/health/ready"; got != want {
 		t.Fatalf("IPv6 health URL = %q, want %q", got, want)
+	}
+}
+
+func TestNetworkSummaryFromConfigClassifiesListenExposure(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		listen  string
+		tlsMode serverconfig.TLSMode
+		want    NetworkMode
+	}{
+		{name: "loopback ipv4", listen: "127.0.0.1:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
+		{name: "loopback ipv4 subnet", listen: "127.0.0.42:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
+		{name: "loopback ipv6", listen: "[::1]:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
+		{name: "localhost hostname", listen: "localhost:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
+		{name: "unspecified ipv4", listen: "0.0.0.0:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "unspecified empty host", listen: ":6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "unspecified ipv6", listen: "[::]:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "concrete lan ipv4", listen: "192.168.1.20:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "rfc1918 10/8", listen: "10.0.0.5:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "rfc1918 172.16", listen: "172.16.4.8:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "public ipv4", listen: "203.0.113.10:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "non-loopback ipv6", listen: "[2001:db8::1]:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "unproven hostname", listen: "photos.local:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
+		{name: "external tls wins", listen: "192.168.1.20:6680", tlsMode: serverconfig.TLSModeExternal, want: NetworkExternalHTTPS},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := serverconfig.AppConfig{}
+			cfg.ServerConfig.Listen = test.listen
+			cfg.ServerConfig.TLS.Mode = test.tlsMode
+			got := networkSummaryFromConfig(cfg)
+			if got.Mode != test.want {
+				t.Fatalf("mode = %q, want %q for listen %q tls %q", got.Mode, test.want, test.listen, test.tlsMode)
+			}
+		})
+	}
+}
+
+func TestConcreteLANListenRequiresWarningAcknowledgement(t *testing.T) {
+	t.Setenv("LUMILIO_APP_DATA", filepath.Join(t.TempDir(), "appdata"))
+	s := New(Options{Logf: func(string, ...any) {}})
+	view, err := s.ReadRuntimeConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, err := parseRuntimeDocument([]byte(view.CandidateTOML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	setRuntimePath(document, "server.listen", "192.168.1.20:6680")
+	candidate, err := toml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	validation, err := s.ValidateRuntimeConfig(view.BaseFingerprint, string(candidate))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !validation.Valid || validation.Network.Mode != NetworkLANHTTP {
+		t.Fatalf("concrete LAN candidate not classified as lan_http: %+v", validation)
+	}
+
+	_, err = s.ApplyRuntimeConfigAsync(context.Background(), view.BaseFingerprint, string(candidate), false)
+	var validationErr *RuntimeConfigValidationError
+	if !errors.As(err, &validationErr) || !hasConfigIssue(validationErr.Issues, "lan_warning_required") {
+		t.Fatalf("concrete LAN apply without acknowledgement = %v", err)
+	}
+}
+
+func TestReadinessStatusRequiresOK(t *testing.T) {
+	for _, test := range []struct {
+		status int
+		ok     bool
+	}{
+		{http.StatusOK, true},
+		{http.StatusMovedPermanently, false},
+		{http.StatusFound, false},
+		{http.StatusForbidden, false},
+		{http.StatusNotFound, false},
+		{http.StatusTooManyRequests, false},
+		{http.StatusInternalServerError, false},
+		{http.StatusServiceUnavailable, false},
+	} {
+		if got := readinessStatusOK(test.status); got != test.ok {
+			t.Fatalf("status %d: ready = %v, want %v", test.status, got, test.ok)
+		}
+	}
+}
+
+func TestWaitForServerRejectsNonOKStatuses(t *testing.T) {
+	for _, status := range []int{
+		http.StatusMovedPermanently,
+		http.StatusForbidden,
+		http.StatusNotFound,
+		http.StatusTooManyRequests,
+		http.StatusInternalServerError,
+	} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			ln, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Skipf("loopback listen unavailable: %v", err)
+			}
+			defer ln.Close()
+
+			server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v1/health/ready" {
+					http.NotFound(w, r)
+					return
+				}
+				if status >= 300 && status < 400 {
+					http.Redirect(w, r, "/elsewhere", status)
+					return
+				}
+				w.WriteHeader(status)
+			})}
+			go server.Serve(ln)
+			defer server.Close()
+
+			s := New(Options{Logf: func(string, ...any) {}})
+			// Keep the probe budget short: non-OK responses must keep polling
+			// until timeout rather than succeeding.
+			s.readyTimeout = 400 * time.Millisecond
+
+			generation := &runtimeGeneration{done: make(chan struct{})}
+			err = s.waitForServer(context.Background(), generation, ln.Addr().String())
+			if err == nil {
+				t.Fatalf("status %d was treated as ready", status)
+			}
+			if !strings.Contains(err.Error(), "not ready") {
+				t.Fatalf("waitForServer error = %v, want not-ready timeout", err)
+			}
+		})
+	}
+}
+
+func TestWaitForServerAcceptsOK(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("loopback listen unavailable: %v", err)
+	}
+	defer ln.Close()
+
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/health/ready" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})}
+	go server.Serve(ln)
+	defer server.Close()
+
+	s := New(Options{Logf: func(string, ...any) {}})
+	generation := &runtimeGeneration{done: make(chan struct{})}
+	if err := s.waitForServer(context.Background(), generation, ln.Addr().String()); err != nil {
+		t.Fatalf("HTTP 200 readiness failed: %v", err)
+	}
+}
+
+func TestWaitForServerFailsWhenGenerationExits(t *testing.T) {
+	s := New(Options{Logf: func(string, ...any) {}})
+	generation := &runtimeGeneration{
+		done: make(chan struct{}),
+		err:  errors.New("boom"),
+	}
+	close(generation.done)
+	err := s.waitForServer(context.Background(), generation, "127.0.0.1:1")
+	if err == nil || !strings.Contains(err.Error(), "exited during startup") {
+		t.Fatalf("generation exit error = %v", err)
 	}
 }
 
