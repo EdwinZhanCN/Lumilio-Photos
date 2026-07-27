@@ -12,10 +12,6 @@ require (
 	github.com/edwinzhancn/lumen-sdk v1.3.2
 )
 
-replace github.com/riverqueue/river/rivershared => ../third_party/river-rivershared
-
-replace github.com/riverqueue/river => ./third_party/river
-
 require (
 	github.com/asg017/sqlite-vec-go-bindings v0.1.6
 	github.com/caddyserver/certmagic v0.25.3

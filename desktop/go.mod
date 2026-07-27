@@ -174,7 +174,3 @@ require (
 )
 
 replace server => ../server
-
-replace github.com/riverqueue/river/rivershared => ../third_party/river-rivershared
-
-replace github.com/riverqueue/river => ../server/third_party/river
