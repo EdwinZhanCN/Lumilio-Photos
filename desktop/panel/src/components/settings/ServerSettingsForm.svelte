@@ -5,6 +5,7 @@
   import {
     acceptRuntimeValidation,
     loadRuntimeDraft,
+    resolvedRuntimeDraftNetwork,
     runtimeDraft,
   } from "../../lib/runtime-draft.svelte.ts";
   import { refreshState, store } from "../../lib/store.svelte.ts";
@@ -13,12 +14,14 @@
 
   let {
     open,
+    active,
     session,
     dirty = $bindable(false),
     saving = $bindable(false),
     canSave = $bindable(true),
   }: {
     open: boolean;
+    active: boolean;
     session: number;
     dirty?: boolean;
     saving?: boolean;
@@ -39,9 +42,10 @@
   let acceptLANWarning = $state(false);
   let message = $state("");
   let error = $state("");
+  let candidateSyncToken = 0;
 
-  function seed(): void {
-    initial = structuredClone(currentNetwork());
+  function seed(network = currentNetwork()): void {
+    initial = structuredClone(network);
     mode = initial.mode;
     primaryOrigin = initial.primaryOrigin;
     listen = initial.listen;
@@ -52,10 +56,56 @@
     error = "";
   }
 
+  function fieldsDirty(): boolean {
+    return (
+      mode !== initial.mode ||
+      primaryOrigin !== initial.primaryOrigin ||
+      listen !== initial.listen ||
+      proxyLocation !== proxyLocationFor(initial) ||
+      trustedCIDRs !== initial.trustedProxyCIDRs.join("\n") ||
+      acceptLANWarning !== (initial.lanWarningAcceptedVersion >= 1)
+    );
+  }
+
+  async function syncResolvedCandidateNetwork(): Promise<void> {
+    if (!runtimeDraft.view || fieldsDirty()) return;
+    const token = ++candidateSyncToken;
+    const candidate = runtimeDraft.candidateToml;
+    let resolved = resolvedRuntimeDraftNetwork();
+    if (!resolved) {
+      try {
+        const validation = await api.validateRuntimeConfig({
+          baseFingerprint: runtimeDraft.view.baseFingerprint,
+          toml: candidate,
+        });
+        if (token !== candidateSyncToken || candidate !== runtimeDraft.candidateToml) return;
+        acceptRuntimeValidation(validation);
+        if (!validation.valid) {
+          error = validation.issues.map((issue) => issue.message).join("; ");
+          return;
+        }
+        resolved = validation.network;
+      } catch (cause) {
+        if (token === candidateSyncToken) {
+          error = cause instanceof Error ? cause.message : String(cause);
+        }
+        return;
+      }
+    }
+    if (token !== candidateSyncToken || !active || fieldsDirty()) return;
+    seed(networkDraftFromResolvedState(resolved, store.data!.networkHost));
+  }
+
   $effect(() => {
     if (!open) return;
     void session;
     untrack(seed);
+  });
+
+  $effect(() => {
+    if (!open || !active || !runtimeDraft.view) return;
+    void runtimeDraft.candidateToml;
+    untrack(() => void syncResolvedCandidateNetwork());
   });
 
   function hostname(origin: string): string {
@@ -73,13 +123,7 @@
   );
 
   $effect(() => {
-    dirty =
-      mode !== initial.mode ||
-      primaryOrigin !== initial.primaryOrigin ||
-      listen !== initial.listen ||
-      proxyLocation !== proxyLocationFor(initial) ||
-      trustedCIDRs !== initial.trustedProxyCIDRs.join("\n") ||
-      acceptLANWarning !== (initial.lanWarningAcceptedVersion >= 1);
+    dirty = fieldsDirty();
     canSave = mode !== "lan_http" || acceptLANWarning;
   });
 

@@ -161,6 +161,12 @@ func (s *Supervisor) ApplyRuntimeConfigAsync(
 		s.operationMu.Unlock()
 		return RuntimeConfigValidation{}, err
 	}
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeRestarting
+	snapshot.ErrorCode = ""
+	snapshot.ErrorMessage = ""
+	snapshot.OperationActive = true
+	s.setSnapshot(snapshot)
 	go func() {
 		defer s.operationMu.Unlock()
 		s.applyStagedRuntimeLocked(ctx, journal)
@@ -187,6 +193,23 @@ func (s *Supervisor) applyStagedRuntimeLocked(ctx context.Context, journal runti
 		s.failRuntime(fmt.Errorf("stop runtime before candidate promotion: %w", err))
 		return
 	}
+	// Persist the recovery decision before replacing runtime.toml. From this
+	// point forward, startup reconciliation must restore LKG whether a crash
+	// happens immediately before or immediately after the atomic promotion.
+	// Writing this phase after the rename would leave a window where the active
+	// file is the unproven candidate but the journal still says it was only
+	// staged.
+	journal.Phase = applyCandidatePromoted
+	if err := s.writeApplyJournal(journal); err != nil {
+		_ = s.cleanupRuntimeApply()
+		if wasRunning {
+			if restartErr := s.startRuntimeLocked(ctx, RuntimeRestarting); restartErr != nil {
+				err = errors.Join(err, fmt.Errorf("restart current runtime after journal failure: %w", restartErr))
+			}
+		}
+		s.failRuntime(fmt.Errorf("record runtime candidate promotion: %w", err))
+		return
+	}
 	if err := writeAtomicPrivate(s.paths.RuntimeConfigFile(), candidate); err != nil {
 		_ = s.cleanupRuntimeApply()
 		if wasRunning {
@@ -195,11 +218,6 @@ func (s *Supervisor) applyStagedRuntimeLocked(ctx context.Context, journal runti
 			}
 		}
 		s.failRuntime(fmt.Errorf("promote runtime candidate: %w", err))
-		return
-	}
-	journal.Phase = applyCandidatePromoted
-	if err := s.writeApplyJournal(journal); err != nil {
-		s.failRuntime(err)
 		return
 	}
 	if candidateErr := s.startRuntimeLockedWithOperation(ctx, RuntimeRestarting, true); candidateErr == nil {
@@ -264,10 +282,7 @@ func (s *Supervisor) applyStagedRuntimeLocked(ctx context.Context, journal runti
 }
 
 func (s *Supervisor) RestoreLastKnownGoodAsync(ctx context.Context) (RuntimeConfigValidation, error) {
-	if err := s.ensurePaths(); err != nil {
-		return RuntimeConfigValidation{}, err
-	}
-	view, err := s.ReadRuntimeConfig()
+	current, err := s.readRuntimeIntentForControl()
 	if err != nil {
 		return RuntimeConfigValidation{}, err
 	}
@@ -275,26 +290,37 @@ func (s *Supervisor) RestoreLastKnownGoodAsync(ctx context.Context) (RuntimeConf
 	if err != nil {
 		return RuntimeConfigValidation{}, fmt.Errorf("read last-known-good runtime: %w", err)
 	}
-	candidate, err := candidateWithCurrentHostFields([]byte(view.CurrentTOML), lkg)
+	projection, err := s.hostProjection()
 	if err != nil {
 		return RuntimeConfigValidation{}, err
 	}
-	return s.ApplyRuntimeConfigAsync(ctx, view.BaseFingerprint, string(candidate), true)
+	candidate, err := candidateWithRecoveryHostFields(current, lkg, projection)
+	if err != nil {
+		return RuntimeConfigValidation{}, err
+	}
+	return s.ApplyRuntimeConfigAsync(ctx, runtimeFingerprint(current), string(candidate), true)
 }
 
-func candidateWithCurrentHostFields(current, candidate []byte) ([]byte, error) {
-	currentDocument, err := parseRuntimeDocument(current)
+func candidateWithRecoveryHostFields(
+	current, candidate []byte,
+	projection hostProjection,
+) ([]byte, error) {
+	currentDocument, currentErr := parseRuntimeDocument(current)
+	candidateDocument, err := parseRuntimeDocument(candidate)
 	if err != nil {
 		return nil, err
 	}
-	candidateDocument, err := parseRuntimeDocument(candidate)
+	expectedHostDocument, err := normalizedHostProjectionDocument(projection)
 	if err != nil {
 		return nil, err
 	}
 	for _, path := range hostManagedRuntimePaths {
 		value, ok := runtimePathValue(currentDocument, path)
+		if currentErr != nil || !ok {
+			value, ok = runtimePathValue(expectedHostDocument, path)
+		}
 		if !ok {
-			return nil, fmt.Errorf("current runtime is missing host-managed field %s", path)
+			return nil, fmt.Errorf("Desktop host projection is missing field %s", path)
 		}
 		setRuntimePath(candidateDocument, path, value)
 	}

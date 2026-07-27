@@ -61,6 +61,9 @@ This is the compact system map for agents. Keep details here stable and useful; 
   the immutable per-generation `config/server.toml` with mode `0600`.
   Candidate apply is journaled and readiness-gated, with
   `runtime.last-known-good.toml` rollback and launch-time reconciliation. The
+  host lock is acquired before settings migration or Wails UI construction.
+  Recovery reads invalid active intent as raw, fingerprinted control-plane data
+  while every replacement candidate still passes the strict Server loader. The
   private Wails Control Panel consumes the supervisor's typed runtime snapshot
   and remains available after recoverable startup failures. See
   `desktop/README.md`.

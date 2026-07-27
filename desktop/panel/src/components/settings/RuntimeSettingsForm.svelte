@@ -17,6 +17,7 @@
     saving?: boolean;
   } = $props();
   let notice = $state("");
+  let validating = $state(false);
 
   $effect(() => {
     dirty = runtimeDraftDirty();
@@ -51,6 +52,24 @@
       return false;
     } finally {
       saving = false;
+    }
+  }
+
+  async function validateCandidate(): Promise<void> {
+    if (!runtimeDraft.view) return;
+    validating = true;
+    runtimeDraft.error = "";
+    notice = "";
+    try {
+      const validation = await api.validateRuntimeConfig({
+        baseFingerprint: runtimeDraft.view.baseFingerprint,
+        toml: runtimeDraft.candidateToml,
+      });
+      acceptRuntimeValidation(validation);
+    } catch (cause) {
+      runtimeDraft.error = cause instanceof Error ? cause.message : String(cause);
+    } finally {
+      validating = false;
     }
   }
 
@@ -107,6 +126,13 @@
     </p>
 
     <div class="flex flex-wrap gap-2">
+      <button
+        class="btn btn-secondary btn-sm"
+        disabled={saving || validating}
+        onclick={() => void validateCandidate()}
+      >
+        {validating ? t("validatingCandidate") : t("validateCandidate")}
+      </button>
       <button class="btn btn-ghost btn-sm" disabled={!dirty} onclick={resetRuntimeDraft}>
         {t("resetCandidate")}
       </button>

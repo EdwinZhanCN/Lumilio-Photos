@@ -102,14 +102,19 @@ does not duplicate network policy.
 
 Runtime and structured network edits share one candidate. Apply writes
 `runtime.candidate.toml` and `runtime-apply.json`, proves the previous generation
-stopped, promotes the candidate, waits for internal readiness, then updates
-`runtime.last-known-good.toml`. Failed readiness restores LKG. An interrupted
-journal is reconciled on the next Desktop launch.
+stopped, durably records promotion intent, atomically promotes the candidate,
+waits for internal readiness, then updates `runtime.last-known-good.toml`.
+Failed readiness restores LKG. An interrupted journal is reconciled on the next
+Desktop launch, including crashes immediately before or after promotion.
 
 The Wails Control Panel consumes a typed stopped/starting/running/restarting/
 failed snapshot and remains available after ordinary Server startup failures.
-The host lock is released only when Desktop quits; a shutdown timeout retains
-generation ownership and blocks a second listener/SQLite runtime.
+The host lock is acquired before persisted settings are read or Wails creates
+UI, and is released only when Desktop quits; a shutdown timeout retains
+generation ownership and blocks a second listener/SQLite runtime. The control
+plane can still read and fingerprint an invalid active `runtime.toml`, so Raw
+editing and last-known-good restore remain available while startup is failed;
+replacement candidates still pass the real strict Server loader.
 
 Development and test overrides:
 

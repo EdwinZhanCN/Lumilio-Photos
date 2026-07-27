@@ -149,12 +149,14 @@ func (s *Supervisor) ensureRuntimeIntent(settings DesktopSettings) error {
 	if err != nil {
 		return err
 	}
+	migratingSettings := settings.Version != desktopSettingsVersion || settings.legacyNetwork
 	path := s.paths.RuntimeConfigFile()
 	data, readErr := os.ReadFile(path)
 	if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
 		return fmt.Errorf("read runtime intent: %w", readErr)
 	}
-	if errors.Is(readErr, fs.ErrNotExist) {
+	creatingIntent := errors.Is(readErr, fs.ErrNotExist)
+	if creatingIntent {
 		network := settings
 		if !settings.legacyNetwork {
 			network = DesktopSettings{}
@@ -173,14 +175,23 @@ func (s *Supervisor) ensureRuntimeIntent(settings DesktopSettings) error {
 		if err := writeAtomicPrivate(path, data); err != nil {
 			return fmt.Errorf("write runtime intent: %w", err)
 		}
-		if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), data); err != nil {
-			return fmt.Errorf("write initial last-known-good runtime: %w", err)
-		}
 	}
 	if _, _, err := s.materializeRuntimeBytes(data); err != nil {
 		return fmt.Errorf("validate runtime intent: %w", err)
 	}
-	if settings.Version != desktopSettingsVersion || settings.legacyNetwork {
+	// A new intent and an interrupted v1 migration both need the same initial
+	// recovery point. Write it only after the real materialized manifest passes
+	// strict validation, and before replacing desktop-settings.json with v2.
+	if creatingIntent || migratingSettings {
+		if _, err := os.Stat(s.paths.RuntimeLastKnownGoodFile()); errors.Is(err, fs.ErrNotExist) {
+			if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), data); err != nil {
+				return fmt.Errorf("write initial last-known-good runtime: %w", err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("inspect initial last-known-good runtime: %w", err)
+		}
+	}
+	if migratingSettings {
 		if err := SaveSettings(s.paths.DesktopSettingsFile(), settings); err != nil {
 			return fmt.Errorf("migrate desktop settings to v2: %w", err)
 		}
@@ -228,6 +239,20 @@ func projectRuntimeHostFields(document map[string]any, p hostProjection) {
 	setRuntimePath(document, "tools.ffprobe_path", p.FFprobePath)
 	setRuntimePath(document, "lumen.discovery_static_nodes", []string{p.LumenStaticNode})
 	setRuntimePath(document, "lumen.deployment_id", "desktop")
+}
+
+func normalizedHostProjectionDocument(p hostProjection) (map[string]any, error) {
+	document := make(map[string]any)
+	projectRuntimeHostFields(document, p)
+	data, err := toml.Marshal(document)
+	if err != nil {
+		return nil, fmt.Errorf("encode Desktop host projection: %w", err)
+	}
+	document, err = parseRuntimeDocument(data)
+	if err != nil {
+		return nil, fmt.Errorf("normalize Desktop host projection: %w", err)
+	}
+	return document, nil
 }
 
 func parseRuntimeDocument(data []byte) (map[string]any, error) {
@@ -299,56 +324,100 @@ func (s *Supervisor) materializeRuntimeConfig() (serverconfig.AppConfig, error) 
 	return cfg, nil
 }
 
-func (s *Supervisor) ReadRuntimeConfig() (RuntimeConfigView, error) {
+// readRuntimeIntentForControl returns the exact persisted bytes without
+// requiring the active intent to be valid. The recovery dashboard must remain
+// able to display, fingerprint, repair, or replace a manifest that prevented
+// the Server generation from starting.
+func (s *Supervisor) readRuntimeIntentForControl() ([]byte, error) {
 	if err := s.ensurePaths(); err != nil {
-		return RuntimeConfigView{}, err
+		return nil, err
 	}
-	current, cfg, err := s.runtimeIntent()
+	data, err := os.ReadFile(s.paths.RuntimeConfigFile())
+	if errors.Is(err, fs.ErrNotExist) {
+		settings, settingsErr := LoadSettings(s.paths.DesktopSettingsFile())
+		if settingsErr != nil {
+			return nil, settingsErr
+		}
+		if ensureErr := s.ensureRuntimeIntent(settings); ensureErr != nil {
+			return nil, ensureErr
+		}
+		data, err = os.ReadFile(s.paths.RuntimeConfigFile())
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read runtime intent: %w", err)
+	}
+	return data, nil
+}
+
+func (s *Supervisor) ReadRuntimeConfig() (RuntimeConfigView, error) {
+	current, err := s.readRuntimeIntentForControl()
 	if err != nil {
 		return RuntimeConfigView{}, err
 	}
 	_, lkgErr := os.Stat(s.paths.RuntimeLastKnownGoodFile())
-	return RuntimeConfigView{
+	view := RuntimeConfigView{
 		CurrentTOML:            string(current),
 		CandidateTOML:          string(current),
 		BaseFingerprint:        runtimeFingerprint(current),
 		LastKnownGoodAvailable: lkgErr == nil,
 		HostManagedPaths:       append([]string(nil), hostManagedRuntimePaths...),
-		Network:                networkSummaryFromConfig(cfg),
 		Issues:                 []ConfigIssue{},
 		SemanticChanges:        []SemanticChange{},
-	}, nil
+	}
+	_, cfg, loadErr := s.materializeRuntimeBytes(current)
+	if loadErr != nil {
+		view.Network = s.RuntimeSnapshot().Network
+		view.Issues = append(view.Issues, ConfigIssue{
+			Code: "invalid_active_manifest", Message: loadErr.Error(),
+		})
+		return view, nil
+	}
+	view.Network = networkSummaryFromConfig(cfg)
+	return view, nil
+}
+
+func (s *Supervisor) runtimeIntentMatchingFingerprint(baseFingerprint string) ([]byte, error) {
+	current, err := s.readRuntimeIntentForControl()
+	if err != nil {
+		return nil, err
+	}
+	if baseFingerprint != runtimeFingerprint(current) {
+		return nil, ErrStaleRuntimeConfig
+	}
+	return current, nil
 }
 
 func (s *Supervisor) ValidateRuntimeConfig(baseFingerprint, candidate string) (RuntimeConfigValidation, error) {
-	if err := s.ensurePaths(); err != nil {
-		return RuntimeConfigValidation{}, err
-	}
-	current, currentConfig, err := s.runtimeIntent()
+	current, err := s.runtimeIntentMatchingFingerprint(baseFingerprint)
 	if err != nil {
 		return RuntimeConfigValidation{}, err
 	}
 	fingerprint := runtimeFingerprint(current)
-	if baseFingerprint != fingerprint {
-		return RuntimeConfigValidation{}, ErrStaleRuntimeConfig
-	}
 	result := RuntimeConfigValidation{
 		BaseFingerprint: fingerprint,
 		Issues:          []ConfigIssue{},
 		SemanticChanges: []SemanticChange{},
 		RequiresRestart: true,
 	}
-	currentDocument, err := parseRuntimeDocument(current)
-	if err != nil {
-		return RuntimeConfigValidation{}, err
-	}
+	currentDocument, currentDocumentErr := parseRuntimeDocument(current)
 	candidateDocument, err := parseRuntimeDocument([]byte(candidate))
 	if err != nil {
 		result.Issues = append(result.Issues, ConfigIssue{Code: "invalid_toml", Message: err.Error()})
 		return result, nil
 	}
+	projection, err := s.hostProjection()
+	if err != nil {
+		return RuntimeConfigValidation{}, err
+	}
+	expectedHostDocument, err := normalizedHostProjectionDocument(projection)
+	if err != nil {
+		return RuntimeConfigValidation{}, err
+	}
 	for _, path := range hostManagedRuntimePaths {
 		before, beforeOK := runtimePathValue(currentDocument, path)
+		if currentDocumentErr != nil || !beforeOK {
+			before, beforeOK = runtimePathValue(expectedHostDocument, path)
+		}
 		after, afterOK := runtimePathValue(candidateDocument, path)
 		if beforeOK != afterOK || !reflect.DeepEqual(before, after) {
 			result.Issues = append(result.Issues, ConfigIssue{
@@ -379,8 +448,10 @@ func (s *Supervisor) ValidateRuntimeConfig(baseFingerprint, candidate string) (R
 	}
 	result.Valid = true
 	result.Network = networkSummaryFromConfig(candidateConfig)
-	result.SemanticChanges = runtimeSemanticChanges(currentConfig, candidateConfig)
-	result.RequiresRestart = len(result.SemanticChanges) != 0
+	if _, currentConfig, currentErr := s.materializeRuntimeBytes(current); currentErr == nil {
+		result.SemanticChanges = runtimeSemanticChanges(currentConfig, candidateConfig)
+		result.RequiresRestart = len(result.SemanticChanges) != 0
+	}
 	return result, nil
 }
 
@@ -388,6 +459,9 @@ func (s *Supervisor) PatchRuntimeNetwork(
 	baseFingerprint, candidate string,
 	patch NetworkCandidatePatch,
 ) (RuntimeConfigValidation, error) {
+	if _, err := s.runtimeIntentMatchingFingerprint(baseFingerprint); err != nil {
+		return RuntimeConfigValidation{}, err
+	}
 	network := DesktopSettings{
 		NetworkMode: patch.Mode, PrimaryOrigin: strings.TrimSpace(patch.PrimaryOrigin),
 		Listen: strings.TrimSpace(patch.Listen), TrustedProxyCIDRs: patch.TrustedProxyCIDRs,

@@ -213,12 +213,23 @@ func (s *Supervisor) Settings() (DesktopSettings, error) {
 	if err != nil {
 		return DesktopSettings{}, err
 	}
-	if err := s.ensureRuntimeIntent(settings); err != nil {
-		return DesktopSettings{}, err
+	_, runtimeErr := os.Stat(s.paths.RuntimeConfigFile())
+	needsRuntimeInitialization := errors.Is(runtimeErr, os.ErrNotExist)
+	if runtimeErr != nil && !needsRuntimeInitialization {
+		return DesktopSettings{}, fmt.Errorf("inspect runtime intent: %w", runtimeErr)
 	}
-	settings, err = LoadSettings(s.paths.DesktopSettingsFile())
-	if err != nil {
-		return DesktopSettings{}, err
+	// Host settings remain readable when an established v2 runtime intent is
+	// invalid, so a returning user reaches the recovery Dashboard rather than
+	// being misclassified as first-run onboarding. Runtime creation and the
+	// explicit v1 migration still complete as one ordered operation.
+	if needsRuntimeInitialization || settings.legacyNetwork {
+		if err := s.ensureRuntimeIntent(settings); err != nil {
+			return DesktopSettings{}, err
+		}
+		settings, err = LoadSettings(s.paths.DesktopSettingsFile())
+		if err != nil {
+			return DesktopSettings{}, err
+		}
 	}
 	settings.Version = desktopSettingsVersion
 	settings.legacyNetwork = false
@@ -606,6 +617,12 @@ func (s *Supervisor) RestartAsync(ctx context.Context) error {
 	if !s.operationMu.TryLock() {
 		return ErrOperationInProgress
 	}
+	snapshot := s.RuntimeSnapshot()
+	snapshot.Phase = RuntimeRestarting
+	snapshot.ErrorCode = ""
+	snapshot.ErrorMessage = ""
+	snapshot.OperationActive = true
+	s.setSnapshot(snapshot)
 	go func() {
 		defer s.operationMu.Unlock()
 		_ = s.restartLocked(ctx)

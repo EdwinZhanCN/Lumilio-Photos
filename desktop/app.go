@@ -83,14 +83,33 @@ func newDesktopApp(controls ...serverapp.OperatorControls) *desktopApp {
 		OnSnapshot:       d.onRuntimeSnapshot,
 		OperatorControls: operatorControls,
 	})
-	// Resolve the native-chrome language up front so tray/dialogs are localized
-	// from the first frame; onboarding may refine it.
-	d.lang = d.onboardingLang()
+	// Do not read or migrate persisted settings until run has acquired the host
+	// lock. The OS locale is sufficient for construction-time fallback chrome.
+	d.lang = detectOSLang()
 	return d
 }
 
-// run creates the menubar item and blocks until the app quits.
+// prepareHost acquires the single-instance boundary before Wails creates any
+// tray or window. Only another live Desktop host is fatal here; ordinary
+// config/reconciliation failures are retried by Start and surfaced through the
+// retained recovery dashboard.
+func (d *desktopApp) prepareHost() error {
+	if err := d.sup.Prepare(); err != nil {
+		if runtimeStartFailureIsHostFatal(err) {
+			return err
+		}
+		log.Printf("desktop host preparation deferred to runtime recovery: %v", err)
+	}
+	d.lang = d.onboardingLang()
+	return nil
+}
+
+// run owns the host lock, creates the menubar item, and blocks until the app
+// quits. No persisted host state is read before prepareHost.
 func (d *desktopApp) run() error {
+	if err := d.prepareHost(); err != nil {
+		return err
+	}
 	d.app = application.New(application.Options{
 		Name:        "Lumilio Photos",
 		Description: "Local-first photo management",
