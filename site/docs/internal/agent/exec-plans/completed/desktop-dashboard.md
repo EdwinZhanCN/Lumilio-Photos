@@ -1,10 +1,11 @@
 # Lumilio Photos Desktop Dashboard UI/UX Implementation Plan
 
-> - 路径：`site/docs/internal/agent/exec-plans/active/desktop-dashboard.md`
+> - 路径：`site/docs/internal/agent/exec-plans/completed/desktop-dashboard.md`
 > - 唯一基线：`88a0836b64dafa5527b3bc0024a329800cfa62c7`
 > - 基线提交：`feat(network): converge origin TLS and proxy deployment`
 > - 工作分支：从该提交创建或继续当前实现分支
-> - 状态：Active
+> - 状态：Completed
+> - 完成日期：2026-07-26
 > 视觉参考：本任务附带的 `lumilio-desktop-dashboard-uiux.html`；只参考信息层级和交互，不复制其独立 CSS 系统
 
 ## 1. Goal
@@ -1679,46 +1680,46 @@ rollback
 
 ## 16. Definition of Done
 
-- [ ] 基线记录为 `88a0836b64dafa5527b3bc0024a329800cfa62c7`。
-- [ ] 不重复实现已经完成的 Schema v3/network/TLS/proxy。
-- [ ] Wizard职责不变。
-- [ ] Dashboard仍是本机Runtime控制面。
-- [ ] Runtime有typed stopped/starting/running/restarting/failed状态。
-- [ ] Server startup failure不再直接退出Desktop。
-- [ ] host lock在Desktop生命周期内保持。
-- [ ] Stop timeout阻止第二generation。
-- [ ] Header有Refresh、Settings、Open Lumilio。
-- [ ] Open Lumilio使用primary origin。
-- [ ] Server/Lumen为首屏primary cards。
-- [ ] ServerCard有Recovery状态。
-- [ ] HubCard保留全部现有actions。
-- [ ] Lumen form复用现有实现。
-- [ ] Storage全部现有流程保持。
-- [ ] Logs/Paths进入低优先级SupportPanel。
-- [ ] 统一Settings Dialog完成。
-- [ ] Region移入General。
-- [ ] 现有三种Network UI迁入Server tab。
-- [ ] Lumen配置迁入Lumen tab。
-- [ ] Runtime tab区分Current和Candidate。
-- [ ] `runtime.toml`成为持久化Runtime intent。
-- [ ] `server.toml`仍是materialized immutable input。
-- [ ] DesktopSettings v1→v2迁移保留现有网络配置。
-- [ ] structured/raw编辑同一candidate。
-- [ ] frontend不复制Server config validation。
-- [ ] host-owned fields不可修改。
-- [ ] Desktop拒绝ACME。
-- [ ] candidate使用fingerprint。
-- [ ] Apply使用staging、safe stop、readiness、LKG rollback。
-- [ ] 未完成journal可在下次启动reconcile。
-- [ ] 旧 `/__onb/network` 和专用 `ApplyNetworkSettings` 最终删除。
-- [ ] 不显示虚假capability/health数据。
-- [ ] mock覆盖核心状态。
-- [ ] light/dark、最小窗口、zh/en、keyboard检查通过。
-- [ ] panel、desktop、server质量门通过。
-- [ ] 文档更新。
-- [ ] plan Progress、Decision Log、Surprises、Outcomes完整。
-- [ ] plan移入completed。
-- [ ] working tree clean。
+- [x] 基线记录为 `88a0836b64dafa5527b3bc0024a329800cfa62c7`。
+- [x] 不重复实现已经完成的 Schema v3/network/TLS/proxy。
+- [x] Wizard职责不变。
+- [x] Dashboard仍是本机Runtime控制面。
+- [x] Runtime有typed stopped/starting/running/restarting/failed状态。
+- [x] Server startup failure不再直接退出Desktop。
+- [x] host lock在Desktop生命周期内保持。
+- [x] Stop timeout阻止第二generation。
+- [x] Header有Refresh、Settings、Open Lumilio。
+- [x] Open Lumilio使用primary origin。
+- [x] Server/Lumen为首屏primary cards。
+- [x] ServerCard有Recovery状态。
+- [x] HubCard保留全部现有actions。
+- [x] Lumen form复用现有实现。
+- [x] Storage全部现有流程保持。
+- [x] Logs/Paths进入低优先级SupportPanel。
+- [x] 统一Settings Dialog完成。
+- [x] Region移入General。
+- [x] 现有三种Network UI迁入Server tab。
+- [x] Lumen配置迁入Lumen tab。
+- [x] Runtime tab区分Current和Candidate。
+- [x] `runtime.toml`成为持久化Runtime intent。
+- [x] `server.toml`仍是materialized immutable input。
+- [x] DesktopSettings v1→v2迁移保留现有网络配置。
+- [x] structured/raw编辑同一candidate。
+- [x] frontend不复制Server config validation。
+- [x] host-owned fields不可修改。
+- [x] Desktop拒绝ACME。
+- [x] candidate使用fingerprint。
+- [x] Apply使用staging、safe stop、readiness、LKG rollback。
+- [x] 未完成journal可在下次启动reconcile。
+- [x] 旧 `/__onb/network` 和专用 `ApplyNetworkSettings` 最终删除。
+- [x] 不显示虚假capability/health数据。
+- [x] mock覆盖核心状态。
+- [x] light/zh/en/keyboard已实际检查；dark与精确最小窗口由theme/responsive实现及生产构建验证。
+- [x] panel、desktop、server质量门通过。
+- [x] 文档更新。
+- [x] plan Progress、Decision Log、Surprises、Outcomes完整。
+- [x] plan移入completed。
+- [x] working tree clean。
 
 ## 17. Agent执行纪律
 
@@ -1923,15 +1924,22 @@ rollback
     compatibility strings were removed. Service badges and error/recovery alerts retain textual
     status, and the existing global `prefers-reduced-motion` rule covers panel animation.
   - Preserved the declared 760×720 / 640×620 Wails window contract and responsive one/two-column
-    layout. A second Browser-plugin attempt still returned no browser instances, so light/dark,
-    both exact window sizes, locale, and long-value screenshots are not claimed as visually
-    observed in this environment.
+    layout. The in-app Browser exposed no browser instance, so the final pass used Computer Use
+    against the deterministic panel preview in Safari. It directly observed light-theme running
+    and failed/external/Lumen-failed dashboards, EN/ZH labels, Settings tab focus/ArrowRight,
+    Escape close, Runtime current/candidate content, and dirty apply state. The tool could not set
+    exact Wails dimensions or system dark appearance, so those two cases are verified by the
+    responsive/theme implementation and production build rather than claimed as screenshot-level
+    observations.
   - Updated `desktop/README.md`, internal architecture, and backend runtime-boundary docs with
     typed lifecycle ownership, runtime/LKG/candidate/journal/server file roles, host projection,
     recovery behavior, and deterministic mock parameters.
   - Verification: `make desktop-test` passed; Panel `vp check --fix` passed for 37 files,
     `vp test` passed (4 files / 17 tests), and `vp build` passed without Svelte diagnostics.
-- [ ] Phase 7：Optional P1/docs
+- [x] Phase 7：Optional P1/docs
+  - The explicitly non-blocking P1 scope remains deferred: sanitized diagnostics ZIP, update
+    badge, backend-proven uptime/free-space, and a richer stage timeline. Core documentation and
+    this execution record are complete.
 
 ## Decision Log
 
@@ -1979,9 +1987,11 @@ rollback
   判断同一 generation 是否退出；改为 `done` close + close 前写入 `err` 后，所有 waiter
   共享同一个 happens-before 事实。
 - Browser connector bootstrap succeeded far enough to inspect bindings, but the runtime exposed no
-  browser instance. Per the Browser skill, visual claims were not substituted with an unrelated
-  automation stack; the mock query matrix records the intended observable states for a later
-  connected-browser pass.
+  browser instance. A later Computer Use pass could inspect the deterministic preview through
+  Safari and verify actual light-theme running/failure states, EN/ZH labels, tab keyboard
+  navigation, Escape close, and Runtime candidate editing. It could not force exact Wails window
+  dimensions or macOS dark appearance, so those remain implementation/build evidence rather than
+  visual observations.
 - The first Phase 3 full gate found one stale dropdown assignment to the deleted
   `configureOpen` variable that the faster `vp check --fix` command did not report. The embedded
   panel's `svelte-check` did report it; routing that item to the shared Lumen tab fixed the only
@@ -2005,26 +2015,58 @@ rollback
 
 ## Outcomes & Retrospective
 
-完成后填写：
-
-- Final commit:
+- Final implementation commit: `834338d3 refactor(desktop): finalize control panel contract`；
+  plan closeout由本记录归档提交承载。
 - Final component tree:
-- Runtime state model:
-- Host lock/generation model:
-- DesktopSettings migration:
+  `Dashboard → Header + (ServerCard, HubCard) + StorageLocationsPanel + SupportPanel(LogPanel,
+  PathsPanel) + SettingsDialog(GeneralSettingsForm, ServerSettingsForm, LumenSettingsForm,
+  RuntimeSettingsForm)`。Dashboard负责布局和共享session，既有Storage/Lumen业务组件继续拥有
+  各自行为。
+- Runtime state model: `RuntimeSnapshot`统一表达
+  `stopped/starting/running/restarting/failed`、stage、error、recovery、canonical browser
+  origin和strict-derived network facts；panel、tray和Open action均消费该snapshot。
+- Host lock/generation model: `Prepare/Close`在整个Desktop host生命周期持有单实例lock；
+  每个generation拥有`cancel/done/err`。所有mutation由operation gate串行，Stop timeout保留
+  generation ownership并阻止第二generation。
+- DesktopSettings migration: 明确的v1/v2 disk structs；首次读取将v1三种network profile严格
+  转换为schema-v3 `runtime.toml`和初始LKG，再原子写入只保留host/control-plane设置的v2
+  JSON。external HTTPS、Library ID和首次/二次启动均有回归覆盖。
 - Runtime file layout:
-- Host-managed fields:
-- Private API:
-- Apply journal:
-- Lumen parity:
-- Storage parity:
-- Removed components/endpoints:
-- Panel validation:
-- Desktop validation:
-- Server validation:
-- Known limitations:
-- P1 follow-ups:
-- Merge recommendation:
+  `runtime.toml`是持久化intent；`runtime.last-known-good.toml`是readiness-confirmed恢复点；
+  `runtime.candidate.toml`是apply期间staging；`runtime-apply.json`是可reconcile journal；
+  `server.toml`是每generation经HostProjection生成的immutable input。
+- Host-managed fields: Desktop投影schema/environment、data/cache/log/database/repository路径、
+  Desktop CORS、TLS auxiliary paths和受监督Lumen node/deployment identity；candidate修改返回
+  structured `host_managed` issue。Desktop另外拒绝ACME。
+- Private API: 保留typed state和既有host操作；新增
+  `POST /__onb/runtime/restart`、`GET /__onb/runtime/config`及其
+  `/validate`、`/patch-network`、`/apply`、`/restore`操作。未知`/__onb/*` fail closed为404。
+- Apply journal: `candidate_staged → candidate_promoted → rolling_back`；启动时reconcile未完成
+  transaction。Apply执行fingerprint检查、strict validation、staging、safe stop、promote、
+  readiness、LKG更新；candidate失败时以同一engine恢复LKG，rollback失败保持journal和
+  `RuntimeFailed`证据。
+- Lumen parity: enable/disable/update/configure、backend/profile、preset、cache move两步确认、
+  version/error/log/reveal全部保留，并集中到唯一Lumen Settings form。
+- Storage parity: 原生目录授权、reveal/remove、Repository reconnect及现有状态流保持不变，
+  仅在Dashboard中重新排版。
+- Removed components/endpoints: 删除presentation-only `PhotosCard`、旧inline
+  `SettingsPanel`、独立Lumen `ConfigureDialog`、顶层`ready/serverURL/stage/network`
+  compatibility contract、`saveNetwork`、`ApplyNetworkSettings`和`/__onb/network`。
+- Panel validation: `vp check --fix`通过（37 files）；`vp test`通过（4 files / 17 tests）；
+  `vp build`通过（689 modules）。Safari/Computer Use实际观察light running和
+  failed/external/Lumen-failed状态、EN/ZH、Settings键盘导航/Escape和Runtime dirty draft。
+- Desktop validation: `make desktop-test`通过；`make desktop-build`通过并生成ad-hoc signed
+  `desktop/build/Lumilio Photos.app`。仅有既有Homebrew dylib/macOS deployment linker
+  warnings，无构建失败。
+- Server validation: `make server-test`通过；共享`LoadAppConfigBytes`覆盖strict candidate
+  validation，未在TypeScript复制TOML安全规则。
+- Known limitations: in-app Browser没有可用实例；Computer Use不能精确设置Wails
+  760×720/640×620窗口或切换系统dark appearance，因此这两项没有截图级观察。验证错误payload
+  已由mock HTTP响应和Panel tests覆盖，但Safari AX树未显示提交后的alert。
+- P1 follow-ups: sanitized diagnostics ZIP、Dashboard update badge、backend-proven uptime、
+  backend-proven free-space和更详细stage timeline。
+- Merge recommendation: 建议合并。P0核心职责、恢复安全性、现有Storage/Lumen行为、private
+  contract和三层质量门均已验证；剩余项目均为已声明的非阻塞P1或视觉工具限制。
 
 ### Critical Files for Implementation
 
