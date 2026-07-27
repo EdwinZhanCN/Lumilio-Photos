@@ -1224,7 +1224,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 
 #### Phase 6：FTS5 与 sqlite-vec
 
-- OCR、location、filename/label/species search 已改为 FTS5（content sync trigger + `bm25`）；CJK bigram tokenizer 继续保持 storage/query 一致。aggregate filter 使用 positional bind、`json_each`、SQLite date/JSON/LIKE 语义。
+- location、filename/label/species search 已改为 FTS5（content sync trigger + `bm25`）；OCR 后续由 revisioned outbox 驱动的 Bleve 双 analyzer sidecar 取代。aggregate filter 使用 positional bind、`json_each`、SQLite date/JSON/LIKE 语义。
 - semantic 768D 与 face 512D 权威向量保存在 STRICT ordinary tables，`vec0` 只作为同 transaction trigger 维护的可重建 exact-search structure；video frame vectors与默认 search space在短 transaction 中替换。
 - spike 的 768D/512D insert/top-k/delete 与 production search/service tests 全部通过。代表性真实 library 规模 latency、内存和 ANN threshold 仍是 Hardening，不阻塞 experimental goal。
 

@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	AcknowledgeOCRIndexOutbox(ctx context.Context, arg AcknowledgeOCRIndexOutboxParams) (int64, error)
 	AddAssetToAlbum(ctx context.Context, arg AddAssetToAlbumParams) error
 	AddStackMember(ctx context.Context, arg AddStackMemberParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
@@ -63,10 +64,12 @@ type Querier interface {
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
+	BumpOCRIndexRevision(ctx context.Context, assetID uuid.UUID) (int64, error)
 	CancelPendingAgentEffects(ctx context.Context, arg CancelPendingAgentEffectsParams) error
 	CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error)
 	ClearAwaitingAgentRun(ctx context.Context, arg ClearAwaitingAgentRunParams) error
 	ClearDefaultSearchSpaceByType(ctx context.Context, embeddingType string) error
+	ClearOCRIndexOutbox(ctx context.Context) error
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
@@ -335,6 +338,8 @@ type Querier interface {
 	// members live in a different repository, same owner.
 	GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error)
 	GetNextStackPosition(ctx context.Context, stackID uuid.UUID) (int64, error)
+	GetOCRDocumentsByAssetIDs(ctx context.Context, assetIds string) ([]GetOCRDocumentsByAssetIDsRow, error)
+	GetOCRDocumentsForRebuild(ctx context.Context, arg GetOCRDocumentsForRebuildParams) ([]GetOCRDocumentsForRebuildRow, error)
 	GetOCRResultByAsset(ctx context.Context, assetID uuid.UUID) (OcrResult, error)
 	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
 	GetOCRTextItemStatsByAsset(ctx context.Context, assetID uuid.UUID) (GetOCRTextItemStatsByAssetRow, error)
@@ -436,6 +441,7 @@ type Querier interface {
 	ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error)
 	ListLocationClusterCandidatesForScope(ctx context.Context, arg ListLocationClusterCandidatesForScopeParams) ([]ListLocationClusterCandidatesForScopeRow, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
+	ListOCRIndexOutboxBatch(ctx context.Context, limit int64) ([]ListOCRIndexOutboxBatchRow, error)
 	// Loads pHash embeddings for every non-deleted photo in a repository so the
 	// service layer can build a similarity graph in-memory. owner_id is included
 	// because duplicate edges never cross owners.
@@ -512,7 +518,6 @@ type Querier interface {
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
-	SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error)
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SearchTagsByName(ctx context.Context, arg SearchTagsByNameParams) ([]Tag, error)
 	SetAgentThreadActiveRun(ctx context.Context, arg SetAgentThreadActiveRunParams) error
@@ -554,7 +559,6 @@ type Querier interface {
 	UpdateLocationClusterGeocode(ctx context.Context, arg UpdateLocationClusterGeocodeParams) error
 	UpdateMediaItemAfterStructuralMerge(ctx context.Context, arg UpdateMediaItemAfterStructuralMergeParams) error
 	UpdateMediaItemAsLivePhoto(ctx context.Context, arg UpdateMediaItemAsLivePhotoParams) error
-	UpdateOCRFullText(ctx context.Context, arg UpdateOCRFullTextParams) error
 	UpdateOCRResultStats(ctx context.Context, assetID uuid.UUID) error
 	UpdatePendingAgentEffect(ctx context.Context, arg UpdatePendingAgentEffectParams) error
 	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
@@ -585,6 +589,7 @@ type Querier interface {
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
 	// Embedding spaces
 	UpsertEmbeddingSpace(ctx context.Context, arg UpsertEmbeddingSpaceParams) (EmbeddingSpace, error)
+	UpsertOCRIndexOutbox(ctx context.Context, arg UpsertOCRIndexOutboxParams) error
 	UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	UpsertRepositoryDefaults(ctx context.Context, arg UpsertRepositoryDefaultsParams) (RepositoryDefault, error)
 	UpsertRepositoryRoot(ctx context.Context, arg UpsertRepositoryRootParams) (RepositoryRoot, error)

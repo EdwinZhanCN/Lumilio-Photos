@@ -37,18 +37,85 @@ LIMIT ?2;
 -- name: DeleteOCRTextItemsByAsset :exec
 DELETE FROM ocr_text_items WHERE asset_id = ?1;
 
--- name: UpdateOCRFullText :exec
-UPDATE ocr_results SET full_text = ?2 WHERE asset_id = ?1;
+-- name: BumpOCRIndexRevision :one
+INSERT INTO ocr_index_metadata (
+    asset_id, revision, updated_at
+)
+VALUES (
+    ?1, 1, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
+ON CONFLICT (asset_id) DO UPDATE SET
+    revision = ocr_index_metadata.revision + 1,
+    updated_at = excluded.updated_at
+RETURNING revision;
 
--- name: SearchAssetsByOCRText :many
-SELECT a.*
-FROM ocr_search_fts
-JOIN ocr_results r ON r.rowid = ocr_search_fts.rowid
+-- name: UpsertOCRIndexOutbox :exec
+INSERT INTO ocr_index_outbox (
+    asset_id, revision, updated_at
+)
+VALUES (
+    ?1, ?2, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
+ON CONFLICT (asset_id) DO UPDATE SET
+    revision = excluded.revision,
+    updated_at = excluded.updated_at;
+
+-- name: ListOCRIndexOutboxBatch :many
+SELECT asset_id, revision
+FROM ocr_index_outbox
+ORDER BY updated_at, asset_id
+LIMIT ?1;
+
+-- name: AcknowledgeOCRIndexOutbox :execrows
+DELETE FROM ocr_index_outbox
+WHERE asset_id = ?1 AND revision = ?2;
+
+-- name: ClearOCRIndexOutbox :exec
+DELETE FROM ocr_index_outbox;
+
+-- name: GetOCRDocumentsByAssetIDs :many
+WITH filter_params AS (
+    SELECT CAST(sqlc.arg('asset_ids') AS TEXT) AS asset_ids_json
+)
+SELECT
+    a.asset_id,
+    a.owner_id,
+    a.repository_id,
+    a.type AS asset_type,
+    a.is_deleted,
+    m.revision,
+    ti.text_content
+FROM ocr_results r
 JOIN assets a ON a.asset_id = r.asset_id
-WHERE ocr_search_fts.full_text MATCH sqlc.arg('query')
-  AND a.is_deleted = false
-ORDER BY ocr_search_fts.rank, a.asset_id DESC
-LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+JOIN ocr_index_metadata m ON m.asset_id = r.asset_id
+LEFT JOIN ocr_text_items ti ON ti.asset_id = r.asset_id
+WHERE r.asset_id IN (
+    SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params))
+)
+ORDER BY a.asset_id, ti.id;
+
+-- name: GetOCRDocumentsForRebuild :many
+WITH batch_assets AS (
+    SELECT r.asset_id
+    FROM ocr_results r
+    WHERE r.asset_id > sqlc.arg('after_asset_id')
+    ORDER BY r.asset_id
+    LIMIT sqlc.arg('batch_size')
+)
+SELECT
+    a.asset_id,
+    a.owner_id,
+    a.repository_id,
+    a.type AS asset_type,
+    a.is_deleted,
+    m.revision,
+    ti.text_content
+FROM batch_assets b
+JOIN ocr_results r ON r.asset_id = b.asset_id
+JOIN assets a ON a.asset_id = r.asset_id
+JOIN ocr_index_metadata m ON m.asset_id = r.asset_id
+LEFT JOIN ocr_text_items ti ON ti.asset_id = r.asset_id
+ORDER BY a.asset_id, ti.id;
 
 -- name: GetOCRStatsByModel :many
 SELECT

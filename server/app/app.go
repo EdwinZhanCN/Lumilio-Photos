@@ -38,6 +38,7 @@ import (
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/queue/jobs"
+	"server/internal/search/bleveocr"
 	"server/internal/servertransport"
 	"server/internal/service"
 	"server/internal/settings"
@@ -110,10 +111,12 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 	// repeated embedded Run calls; process exit releases the native runtime.
 	imaging.StartVips()
 
+	forceOCRRebuild := false
 	for {
 		if _, err := dbbackup.ApplyPendingRestore(context.WithoutCancel(ctx), dbConfig.Path, nil); err != nil {
 			return fmt.Errorf("apply pending SQLite restore: %w", err)
 		}
+		appliedRestore := dbbackup.HasAppliedRestore(dbConfig.Path)
 
 		generationCtx, cancelGeneration := context.WithCancel(ctx)
 		var restartRequested atomic.Bool
@@ -121,7 +124,16 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 			restartRequested.Store(true)
 			cancelGeneration()
 		}
-		err := run(generationCtx, appConfig, dbConfig, originPolicy, controls, requestRestart)
+		err := run(
+			generationCtx,
+			appConfig,
+			dbConfig,
+			originPolicy,
+			controls,
+			requestRestart,
+			appliedRestore || forceOCRRebuild,
+		)
+		forceOCRRebuild = false
 		cancelGeneration()
 		if err != nil {
 			if dbbackup.HasAppliedRestore(dbConfig.Path) && !errors.Is(err, errSQLiteOwnershipRetained) {
@@ -132,6 +144,7 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 					return errors.Join(err, fmt.Errorf("rollback failed SQLite restore: %w", rollbackErr))
 				}
 				if ctx.Err() == nil {
+					forceOCRRebuild = true
 					continue
 				}
 			}
@@ -151,6 +164,7 @@ func run(
 	originPolicy *httporigin.Policy,
 	controls OperatorControls,
 	requestRestart func(),
+	forceOCRRebuild bool,
 ) (runErr error) {
 	agentRefUserBudget := controls.AgentRefUserHotBudgetBytes
 	if agentRefUserBudget <= 0 {
@@ -244,6 +258,22 @@ func run(
 	}
 	sqlDB := database.SQL
 	queries := database.Queries
+	ocrIndex, err := bleveocr.Open(
+		ctx,
+		database.Path,
+		queries,
+		forceOCRRebuild,
+		appLogger.Named("ocr_index"),
+	)
+	if err != nil {
+		return fmt.Errorf("initialize OCR Bleve index: %w", err)
+	}
+	defer func() {
+		if err := ocrIndex.Close(); err != nil {
+			runErr = errors.Join(runErr, err)
+		}
+	}()
+	ocrIndexWriter := bleveocr.NewWriter(sqlDB, queries, ocrIndex)
 
 	settingsService := service.NewSettingsService(queries, settings.Default(appConfig.Environment), appConfig.Auth.SecretKeyFile)
 	if err := settingsService.EnsureInitialized(ctx); err != nil {
@@ -307,6 +337,9 @@ func run(
 	if err != nil {
 		return fmt.Errorf("initialize queue: %w", err)
 	}
+	river.AddWorker[queue.ProcessOCROutboxArgs](workers, &queue.ProcessOCROutboxWorker{
+		Writer: ocrIndexWriter,
+	})
 	faceService := service.NewFaceService(queries, repoManager, sqlDB)
 
 	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, queries, workers, appLogger, lumenLogger, settingsService, faceService)
@@ -322,7 +355,14 @@ func run(
 		}
 	}()
 
-	assetService, err := service.NewAssetService(queries, sqlDB, lumenService, embeddingService, appLogger.Named("asset_service"))
+	assetService, err := service.NewAssetService(
+		queries,
+		sqlDB,
+		lumenService,
+		embeddingService,
+		ocrIndex,
+		appLogger.Named("asset_service"),
+	)
 	if err != nil {
 		return fmt.Errorf("initialize asset service: %w", err)
 	}
@@ -486,6 +526,13 @@ func run(
 			return jobs.DatabaseBackupArgs{}, nil
 		},
 		&river.PeriodicJobOpts{ID: "database_backup", RunOnStart: true},
+	))
+	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
+		river.PeriodicInterval(time.Second),
+		func() (river.JobArgs, *river.InsertOpts) {
+			return jobs.ProcessOCROutboxArgs{}, nil
+		},
+		&river.PeriodicJobOpts{ID: "ocr_index_outbox", RunOnStart: true},
 	))
 
 	// Initialize controllers with new storage system

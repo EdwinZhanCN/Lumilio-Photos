@@ -93,7 +93,6 @@ func (s *AggregateService) Search(ctx context.Context, req Request) (Response, e
 	failures := []error{}
 	allCandidates := make([]Candidate, 0)
 	weights := make(map[string]float64)
-	successfulSources := make(map[string]struct{})
 	for result := range results {
 		meta := SourceMeta{
 			Type:           result.source,
@@ -113,7 +112,6 @@ func (s *AggregateService) Search(ctx context.Context, req Request) (Response, e
 			)
 		} else {
 			successes++
-			successfulSources[result.source] = struct{}{}
 			allCandidates = append(allCandidates, result.candidates...)
 			s.logger.Debug("aggregate search retriever completed",
 				zap.String("source", result.source),
@@ -133,13 +131,6 @@ func (s *AggregateService) Search(ctx context.Context, req Request) (Response, e
 
 	fused := fuseWeightedRRF(allCandidates, weights, s.rrfK)
 	totalCandidates := len(fused)
-	if req.CountTotal {
-		total, err := s.countTotalCandidates(ctx, req, successfulSources)
-		if err != nil {
-			return Response{Sources: sourceMetas, TotalCandidates: totalCandidates, CandidatePoolSize: req.TopK}, err
-		}
-		totalCandidates = total
-	}
 	page := pageRanked(fused, req.Limit, req.Offset)
 	rankedIDs := make([]uuid.UUID, 0, len(page))
 	for _, item := range page {
@@ -172,49 +163,6 @@ func (s *AggregateService) Search(ctx context.Context, req Request) (Response, e
 	)
 
 	return response, nil
-}
-
-type countQueryRetriever interface {
-	Retriever
-	CountQuery(ctx context.Context, builder *sqlBuilder, req Request) (string, error)
-}
-
-func (s *AggregateService) countTotalCandidates(ctx context.Context, req Request, successfulSources map[string]struct{}) (int, error) {
-	builder := &sqlBuilder{}
-	subqueries := []string{}
-	for _, retriever := range s.retrievers {
-		if retriever == nil {
-			continue
-		}
-		if _, ok := successfulSources[retriever.Source()]; !ok {
-			continue
-		}
-		countRetriever, ok := retriever.(countQueryRetriever)
-		if !ok {
-			continue
-		}
-		subquery, err := countRetriever.CountQuery(ctx, builder, req)
-		if err != nil {
-			return 0, fmt.Errorf("%s count: %w", retriever.Source(), err)
-		}
-		subqueries = append(subqueries, subquery)
-	}
-	if len(subqueries) == 0 {
-		return 0, nil
-	}
-
-	query := fmt.Sprintf(`
-SELECT COUNT(DISTINCT asset_id)
-FROM (
-  %s
-) aggregate_candidates
-`, strings.Join(subqueries, "\nUNION\n"))
-
-	var total int64
-	if err := s.pool.QueryRowContext(ctx, query, builder.args...).Scan(&total); err != nil {
-		return 0, fmt.Errorf("count aggregate candidates: %w", err)
-	}
-	return int(total), nil
 }
 
 type fusedCandidate struct {

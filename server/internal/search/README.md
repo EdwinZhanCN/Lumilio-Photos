@@ -1,31 +1,41 @@
 # Aggregate Search
 
-`server/internal/search` owns the SQLite aggregate-search path for non-empty
-queries. SQLite performs candidate retrieval and filtering; Go orchestrates the
-retrievers, applies weighted reciprocal-rank fusion, paginates, hydrates assets,
-and emits optional debug metadata.
+`server/internal/search` owns aggregate search for non-empty queries. SQLite
+performs semantic/place retrieval and authoritative relational filtering;
+Bleve performs OCR retrieval. Go orchestrates the retrievers, applies weighted
+reciprocal-rank fusion, paginates, hydrates assets, and emits optional debug
+metadata.
 
 ## Retrievers
 
 - `embedding`: resolves the default semantic-search space, embeds text through
   Lumen, and queries the `search_embeddings_vec` sqlite-vec virtual table.
-- `ocr`: searches `ocr_search_fts` with FTS5 and ranks matches with `bm25`.
+- `ocr`: searches the rebuildable `bleve/ocr-v1` sidecar. `text_en` uses
+  Bleve's English analyzer; `text_zh` uses the `lumilio_zh` no-unigram CJK
+  bigram analyzer.
 - `place`: searches `location_search_fts` with FTS5, joins matches through
   `location_cluster_assets`, and ranks matches with `bm25`.
 
-Every retriever receives the same `Filter`, which mirrors the non-query parts of
-`AssetFilter`: repository, owner, album, person, type, filename filter, date
-range, RAW, rating, liked, camera/lens, and GPS bounding box.
+Every retriever receives the same `Filter`, which mirrors the non-query parts
+of `AssetFilter`: repository, owner, album, person, type, filename filter, date
+range, RAW, rating, liked, camera/lens, and GPS bounding box. Bleve pre-filters
+owner, repository, type, and Trash state; SQLite batch post-filters its bounded
+candidate IDs for every relational/JSON condition and authorization invariant.
 
 ## Text Tokenization and Indexes
 
-CJK character runs are split into overlapping two-character pairs before
-storage and at query time. Non-CJK text remains whole words. For example,
-`"听说你还在找白样"` becomes `"听说 说你 你还 还在 在找 找白 白样"`.
+OCR documents split Unicode scripts before analysis: Han text goes to
+`text_zh`, Latin text to `text_en`, and numeric/alphanumeric model tokens to
+both. Queries use the same split. Language clauses are required together; each
+language first searches with `AND`, then uses `OR` only to fill a short bounded
+result set. A single Han character produces no OCR search token.
 
-The baseline creates content-synchronized FTS5 indexes for OCR and location
-text. Semantic vectors use the sqlite-vec `vec0` table and a fixed canonical
-dimension; application rows retain their model and search-space metadata.
+SQLite `ocr_results` and `ocr_text_items` are authoritative. A revisioned
+SQLite outbox applies changes to Bleve in idempotent batches. A missing,
+corrupt, or mapping-mismatched sidecar is discarded and rebuilt from SQLite
+before HTTP starts; database restore always forces the same rebuild. Place text
+continues to use content-synchronized FTS5. Semantic vectors use sqlite-vec
+`vec0`.
 
 ## Fusion
 
@@ -45,9 +55,9 @@ Each retriever receives a top-K candidate pool sized from the requested page:
 topK = clamp((offset + limit) * 4, 50, 1000)
 ```
 
-Fusion happens over the combined candidate pool before page slicing. When an
-exact total is requested, the successful retrievers contribute set queries
-that SQLite unions before counting distinct asset IDs.
+Fusion happens over the combined bounded candidate pool before page slicing.
+The reported total is the size of that fused set; aggregate search does not
+promise an exact full-library count.
 
 ## Failure and Debug Metadata
 
@@ -56,4 +66,4 @@ Retrievers run concurrently. A single failure is logged and recorded in
 retrievers fail, aggregate search returns an error.
 
 With `debug: true`, the response includes fused scores and per-source rank,
-weight, raw SQLite score, and RRF contribution for top results.
+weight, raw retriever score, and RRF contribution for top results.

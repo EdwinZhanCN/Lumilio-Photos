@@ -8,8 +8,8 @@ import (
 
 // TokenizeForSearch converts raw text into a search-optimized string using CJK
 // bigram tokenization. CJK character runs are split into overlapping 2-character
-// pairs; non-CJK runs are kept as whole words. Both the write path (OCR ingest)
-// and the query path must use this function so that tokens align.
+// pairs; non-CJK runs are kept as whole words. This is retained for the SQLite
+// FTS query paths such as Place search; OCR owns its analyzer in bleveocr.
 //
 // Example: "听说你还在找白样 hello" → "听说 说你 你还 还在 在找 找白 白样 hello"
 func TokenizeForSearch(text string) string {

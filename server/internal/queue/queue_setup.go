@@ -60,6 +60,7 @@ func New(dbpool *sql.DB, workers *river.Workers, logger *slog.Logger) (*river.Cl
 		"process_semantic":          {MaxWorkers: 2},
 		"process_bioclip":           {MaxWorkers: 1},
 		"process_ocr":               {MaxWorkers: 2},
+		"ocr_index":                 {MaxWorkers: 1},
 		"process_face":              {MaxWorkers: 1},
 		"process_video_frames":      {MaxWorkers: 1},
 		"classify_zeroshot":         {MaxWorkers: 2},

@@ -8,6 +8,7 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/search/bleveocr"
 
 	"github.com/google/uuid"
 )
@@ -110,34 +111,6 @@ func expandedEmbeddingKNNLimit(topK int) int {
 	return topK * embeddingKNNExpansion
 }
 
-func (r *EmbeddingRetriever) CountQuery(ctx context.Context, builder *sqlBuilder, req Request) (string, error) {
-	if r == nil || r.pool == nil || r.embed == nil || r.resolveSpace == nil {
-		return "", fmt.Errorf("embedding retriever is not configured")
-	}
-
-	_, space, err := r.resolveQuerySpace(ctx, req)
-	if err != nil {
-		return "", err
-	}
-
-	spacePlaceholder := builder.addArg(space.ID)
-	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
-	if err != nil {
-		return "", err
-	}
-	conditions = append(conditions,
-		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
-	)
-
-	return fmt.Sprintf(`
-SELECT a.asset_id
-FROM search_embeddings e
-JOIN assets a ON a.asset_id = e.asset_id
-WHERE %s
-GROUP BY a.asset_id
-`, joinConditions(conditions)), nil
-}
-
 func (r *EmbeddingRetriever) resolveQuerySpace(ctx context.Context, req Request) (QueryEmbedding, repo.EmbeddingSpace, error) {
 	embedding, err := r.embed(ctx, req.Query, true)
 	if err != nil {
@@ -163,10 +136,6 @@ type TextRetriever struct {
 	weight float64
 }
 
-func NewOCRRetriever(pool *sql.DB, weight float64) *TextRetriever {
-	return &TextRetriever{pool: pool, source: SourceOCR, weight: weight}
-}
-
 func NewPlaceRetriever(pool *sql.DB, weight float64) *TextRetriever {
 	return &TextRetriever{pool: pool, source: SourcePlace, weight: weight}
 }
@@ -179,91 +148,11 @@ func (r *TextRetriever) Retrieve(ctx context.Context, req Request) ([]Candidate,
 		return nil, fmt.Errorf("%s retriever is not configured", r.source)
 	}
 	switch r.source {
-	case SourceOCR:
-		return r.retrieveOCR(ctx, req)
 	case SourcePlace:
 		return r.retrievePlace(ctx, req)
 	default:
 		return nil, fmt.Errorf("unknown text retriever source: %s", r.source)
 	}
-}
-
-func (r *TextRetriever) CountQuery(ctx context.Context, builder *sqlBuilder, req Request) (string, error) {
-	if r == nil || r.pool == nil {
-		return "", fmt.Errorf("%s retriever is not configured", r.source)
-	}
-	switch r.source {
-	case SourceOCR:
-		return r.ocrCountQuery(builder, req)
-	case SourcePlace:
-		return r.placeCountQuery(builder, req)
-	default:
-		return "", fmt.Errorf("unknown text retriever source: %s", r.source)
-	}
-}
-
-func (r *TextRetriever) retrieveOCR(ctx context.Context, req Request) ([]Candidate, error) {
-	matchQuery := ftsMatchQuery(req.Query)
-	if matchQuery == "" {
-		return nil, nil
-	}
-
-	builder := &sqlBuilder{}
-	queryPlaceholder := builder.addArg(matchQuery)
-	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
-	if err != nil {
-		return nil, err
-	}
-	conditions = append(conditions, fmt.Sprintf("ocr_search_fts MATCH %s", queryPlaceholder))
-	limitPlaceholder := builder.addArg(req.TopK)
-
-	query := fmt.Sprintf(`
-SELECT
-  a.asset_id,
-  -bm25(ocr_search_fts) AS raw_score,
-  NULL AS best_ts
-FROM ocr_results r
-JOIN ocr_search_fts ON ocr_search_fts.rowid = r.rowid
-JOIN assets a ON a.asset_id = r.asset_id
-WHERE %s
-ORDER BY raw_score DESC, a.asset_id DESC
-LIMIT %s
-`, joinConditions(conditions), limitPlaceholder)
-
-	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
-	if err != nil {
-		return nil, fmt.Errorf("ocr retrieve: %w", err)
-	}
-	defer rows.Close()
-
-	candidates, err := collectCandidates(rows, SourceOCR)
-	if err != nil {
-		return nil, err
-	}
-
-	return candidates, nil
-}
-
-func (r *TextRetriever) ocrCountQuery(builder *sqlBuilder, req Request) (string, error) {
-	matchQuery := ftsMatchQuery(req.Query)
-	if matchQuery == "" {
-		return "SELECT NULL AS asset_id WHERE false", nil
-	}
-
-	queryPlaceholder := builder.addArg(matchQuery)
-	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
-	if err != nil {
-		return "", err
-	}
-	conditions = append(conditions, fmt.Sprintf("ocr_search_fts MATCH %s", queryPlaceholder))
-
-	return fmt.Sprintf(`
-SELECT a.asset_id
-FROM ocr_results r
-JOIN ocr_search_fts ON ocr_search_fts.rowid = r.rowid
-JOIN assets a ON a.asset_id = r.asset_id
-WHERE %s
-`, joinConditions(conditions)), nil
 }
 
 func (r *TextRetriever) retrievePlace(ctx context.Context, req Request) ([]Candidate, error) {
@@ -308,26 +197,143 @@ LIMIT %s
 	return collectCandidates(rows, SourcePlace)
 }
 
-func (r *TextRetriever) placeCountQuery(builder *sqlBuilder, req Request) (string, error) {
-	matchQuery := ftsMatchQuery(req.Query)
-	if matchQuery == "" {
-		return "SELECT NULL AS asset_id WHERE false", nil
-	}
-	queryPlaceholder := builder.addArg(matchQuery)
-	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
-	if err != nil {
-		return "", err
-	}
-	conditions = append(conditions, fmt.Sprintf("location_search_fts MATCH %s", queryPlaceholder))
+const bleveOCRPageSize = 256
 
-	return fmt.Sprintf(`
-SELECT a.asset_id
-FROM location_search_fts
-JOIN location_clusters lc ON lc.rowid = location_search_fts.rowid
-JOIN location_cluster_assets lca ON lca.cluster_id = lc.cluster_id
-JOIN assets a ON a.asset_id = lca.asset_id
-WHERE %s
-`, joinConditions(conditions)), nil
+type BleveOCRRetriever struct {
+	pool   *sql.DB
+	index  *bleveocr.Index
+	weight float64
+}
+
+func NewBleveOCRRetriever(pool *sql.DB, index *bleveocr.Index, weight float64) *BleveOCRRetriever {
+	return &BleveOCRRetriever{pool: pool, index: index, weight: weight}
+}
+
+func (r *BleveOCRRetriever) Source() string  { return SourceOCR }
+func (r *BleveOCRRetriever) Weight() float64 { return r.weight }
+
+func (r *BleveOCRRetriever) Retrieve(ctx context.Context, req Request) ([]Candidate, error) {
+	if r == nil || r.pool == nil || r.index == nil {
+		return nil, fmt.Errorf("OCR Bleve retriever is not configured")
+	}
+	if req.TopK <= 0 || strings.TrimSpace(req.Query) == "" {
+		return []Candidate{}, nil
+	}
+
+	filters := bleveocr.BasicFilters{
+		OwnerID:    req.Filter.OwnerID,
+		AssetType:  req.Filter.AssetType,
+		AssetTypes: req.Filter.AssetTypes,
+		IsDeleted:  req.Filter.IsDeleted != nil && *req.Filter.IsDeleted,
+	}
+	if req.Filter.RepositoryID != nil {
+		repositoryID := req.Filter.RepositoryID.String()
+		filters.RepositoryID = &repositoryID
+	}
+
+	candidates := make([]Candidate, 0, req.TopK)
+	seen := make(map[uuid.UUID]struct{})
+	for _, mode := range []bleveocr.QueryMode{bleveocr.QueryStrict, bleveocr.QueryRelaxed} {
+		from := 0
+		for len(candidates) < req.TopK {
+			size := bleveOCRPageSize
+			page, err := r.index.SearchPage(ctx, req.Query, filters, mode, from, size)
+			if err != nil {
+				return nil, err
+			}
+			if len(page.Hits) == 0 {
+				break
+			}
+
+			hits := make([]bleveocr.Hit, 0, len(page.Hits))
+			for _, hit := range page.Hits {
+				assetID, err := uuid.Parse(hit.AssetID)
+				if err != nil {
+					return nil, fmt.Errorf("parse OCR Bleve asset id %q: %w", hit.AssetID, err)
+				}
+				if _, exists := seen[assetID]; exists {
+					continue
+				}
+				seen[assetID] = struct{}{}
+				hits = append(hits, hit)
+			}
+
+			allowed, err := r.filterCandidates(ctx, hits, req.Filter)
+			if err != nil {
+				return nil, err
+			}
+			for _, hit := range hits {
+				assetID := uuid.MustParse(hit.AssetID)
+				if _, ok := allowed[assetID]; !ok {
+					continue
+				}
+				candidates = append(candidates, Candidate{
+					AssetID:  assetID,
+					Source:   SourceOCR,
+					Rank:     len(candidates) + 1,
+					RawScore: hit.Score,
+				})
+				if len(candidates) == req.TopK {
+					break
+				}
+			}
+
+			from += len(page.Hits)
+			if uint64(from) >= page.Total {
+				break
+			}
+		}
+		if len(candidates) >= req.TopK {
+			break
+		}
+	}
+	return candidates, nil
+}
+
+func (r *BleveOCRRetriever) filterCandidates(ctx context.Context, hits []bleveocr.Hit, filter Filter) (map[uuid.UUID]struct{}, error) {
+	allowed := make(map[uuid.UUID]struct{}, len(hits))
+	if len(hits) == 0 {
+		return allowed, nil
+	}
+	ids := make([]uuid.UUID, 0, len(hits))
+	for _, hit := range hits {
+		assetID, err := uuid.Parse(hit.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("parse OCR Bleve candidate %q: %w", hit.AssetID, err)
+		}
+		ids = append(ids, assetID)
+	}
+
+	builder := &sqlBuilder{}
+	idsPlaceholder, err := builder.addJSONArg(ids)
+	if err != nil {
+		return nil, err
+	}
+	conditions, err := buildAssetFilterConditions(builder, filter, "a")
+	if err != nil {
+		return nil, err
+	}
+	conditions = append(conditions, fmt.Sprintf(
+		"a.asset_id IN (SELECT value FROM json_each(%s))",
+		idsPlaceholder,
+	))
+	query := fmt.Sprintf("SELECT a.asset_id FROM assets a WHERE %s", joinConditions(conditions))
+	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
+	if err != nil {
+		return nil, fmt.Errorf("post-filter OCR Bleve candidates: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var assetID uuid.UUID
+		if err := rows.Scan(&assetID); err != nil {
+			return nil, fmt.Errorf("scan post-filtered OCR candidate: %w", err)
+		}
+		allowed[assetID] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate post-filtered OCR candidates: %w", err)
+	}
+	return allowed, nil
 }
 
 func collectCandidates(rows *sql.Rows, source string) ([]Candidate, error) {

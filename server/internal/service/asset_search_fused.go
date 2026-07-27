@@ -10,11 +10,11 @@ import (
 )
 
 // The unified search pipeline: every channel is self-thresholded (calibrated
-// semantic set, tsquery-matched OCR/place, filename match), the rankings are
-// fused with weighted RRF and the fused set IS the search result. There is
-// no TopK anywhere — Best Results is simply the confidence-ordered Top-N
-// subset of this set, and the Results tier is the same set under the
-// requested presentation sort. Set/subset, nothing else.
+// semantic set, Bleve OCR, FTS-matched place, filename match), the rankings are
+// fused with weighted RRF and the fused set IS the search result. Each channel
+// has a bounded safety cap; Best Results is the confidence-ordered Top-N subset
+// of this set, and the Results tier is the same set under the requested
+// presentation sort. Set/subset, nothing else.
 
 // SourceFilename is the filename channel's RRF source name.
 const SourceFilename = "filename"
@@ -111,8 +111,8 @@ func (s *assetService) searchAssetsFusedSet(ctx context.Context, params SearchAs
 		set.SemanticDegraded = true
 	}
 
-	// OCR membership: BM25 matching is the threshold.
-	// Place membership: tsquery matching is the threshold.
+	// OCR membership: strict-then-relaxed Bleve matching is the threshold.
+	// Place membership: FTS matching is the threshold.
 	textReq := req
 	textReq.TopK = fusedSetCap
 	if s.ocrRetriever != nil {
