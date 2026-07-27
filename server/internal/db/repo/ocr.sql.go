@@ -12,6 +12,53 @@ import (
 	"server/internal/db/dbtypes"
 )
 
+const acknowledgeOCRIndexOutbox = `-- name: AcknowledgeOCRIndexOutbox :execrows
+DELETE FROM ocr_index_outbox
+WHERE asset_id = ?1 AND revision = ?2
+`
+
+type AcknowledgeOCRIndexOutboxParams struct {
+	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
+	Revision int64     `db:"revision" json:"revision"`
+}
+
+func (q *Queries) AcknowledgeOCRIndexOutbox(ctx context.Context, arg AcknowledgeOCRIndexOutboxParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, acknowledgeOCRIndexOutbox, arg.AssetID, arg.Revision)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const bumpOCRIndexRevision = `-- name: BumpOCRIndexRevision :one
+INSERT INTO ocr_index_metadata (
+    asset_id, revision, updated_at
+)
+VALUES (
+    ?1, 1, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
+ON CONFLICT (asset_id) DO UPDATE SET
+    revision = ocr_index_metadata.revision + 1,
+    updated_at = excluded.updated_at
+RETURNING revision
+`
+
+func (q *Queries) BumpOCRIndexRevision(ctx context.Context, assetID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, bumpOCRIndexRevision, assetID)
+	var revision int64
+	err := row.Scan(&revision)
+	return revision, err
+}
+
+const clearOCRIndexOutbox = `-- name: ClearOCRIndexOutbox :exec
+DELETE FROM ocr_index_outbox
+`
+
+func (q *Queries) ClearOCRIndexOutbox(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, clearOCRIndexOutbox)
+	return err
+}
+
 const createOCRResult = `-- name: CreateOCRResult :one
 INSERT INTO ocr_results (
     asset_id, model_id, total_count, processing_time_ms, created_at, updated_at
@@ -21,7 +68,7 @@ VALUES (
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
-RETURNING asset_id, model_id, total_count, processing_time_ms, created_at, updated_at, full_text
+RETURNING asset_id, model_id, total_count, processing_time_ms, created_at, updated_at
 `
 
 type CreateOCRResultParams struct {
@@ -46,7 +93,6 @@ func (q *Queries) CreateOCRResult(ctx context.Context, arg CreateOCRResultParams
 		&i.ProcessingTimeMs,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.FullText,
 	)
 	return i, err
 }
@@ -153,8 +199,141 @@ func (q *Queries) GetHighConfidenceTextItems(ctx context.Context, arg GetHighCon
 	return items, nil
 }
 
+const getOCRDocumentsByAssetIDs = `-- name: GetOCRDocumentsByAssetIDs :many
+WITH filter_params AS (
+    SELECT CAST(?1 AS TEXT) AS asset_ids_json
+)
+SELECT
+    a.asset_id,
+    a.owner_id,
+    a.repository_id,
+    a.type AS asset_type,
+    a.is_deleted,
+    m.revision,
+    ti.text_content
+FROM ocr_results r
+JOIN assets a ON a.asset_id = r.asset_id
+JOIN ocr_index_metadata m ON m.asset_id = r.asset_id
+LEFT JOIN ocr_text_items ti ON ti.asset_id = r.asset_id
+WHERE r.asset_id IN (
+    SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params))
+)
+ORDER BY a.asset_id, ti.id
+`
+
+type GetOCRDocumentsByAssetIDsRow struct {
+	AssetID      uuid.UUID     `db:"asset_id" json:"asset_id"`
+	OwnerID      *int32        `db:"owner_id" json:"owner_id"`
+	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	AssetType    string        `db:"asset_type" json:"asset_type"`
+	IsDeleted    bool          `db:"is_deleted" json:"is_deleted"`
+	Revision     int64         `db:"revision" json:"revision"`
+	TextContent  *string       `db:"text_content" json:"text_content"`
+}
+
+func (q *Queries) GetOCRDocumentsByAssetIDs(ctx context.Context, assetIds string) ([]GetOCRDocumentsByAssetIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getOCRDocumentsByAssetIDs, assetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOCRDocumentsByAssetIDsRow
+	for rows.Next() {
+		var i GetOCRDocumentsByAssetIDsRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.RepositoryID,
+			&i.AssetType,
+			&i.IsDeleted,
+			&i.Revision,
+			&i.TextContent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getOCRDocumentsForRebuild = `-- name: GetOCRDocumentsForRebuild :many
+WITH batch_assets AS (
+    SELECT r.asset_id
+    FROM ocr_results r
+    WHERE r.asset_id > ?1
+    ORDER BY r.asset_id
+    LIMIT ?2
+)
+SELECT
+    a.asset_id,
+    a.owner_id,
+    a.repository_id,
+    a.type AS asset_type,
+    a.is_deleted,
+    m.revision,
+    ti.text_content
+FROM batch_assets b
+JOIN ocr_results r ON r.asset_id = b.asset_id
+JOIN assets a ON a.asset_id = r.asset_id
+JOIN ocr_index_metadata m ON m.asset_id = r.asset_id
+LEFT JOIN ocr_text_items ti ON ti.asset_id = r.asset_id
+ORDER BY a.asset_id, ti.id
+`
+
+type GetOCRDocumentsForRebuildParams struct {
+	AfterAssetID uuid.UUID `db:"after_asset_id" json:"after_asset_id"`
+	BatchSize    int64     `db:"batch_size" json:"batch_size"`
+}
+
+type GetOCRDocumentsForRebuildRow struct {
+	AssetID      uuid.UUID     `db:"asset_id" json:"asset_id"`
+	OwnerID      *int32        `db:"owner_id" json:"owner_id"`
+	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	AssetType    string        `db:"asset_type" json:"asset_type"`
+	IsDeleted    bool          `db:"is_deleted" json:"is_deleted"`
+	Revision     int64         `db:"revision" json:"revision"`
+	TextContent  *string       `db:"text_content" json:"text_content"`
+}
+
+func (q *Queries) GetOCRDocumentsForRebuild(ctx context.Context, arg GetOCRDocumentsForRebuildParams) ([]GetOCRDocumentsForRebuildRow, error) {
+	rows, err := q.db.QueryContext(ctx, getOCRDocumentsForRebuild, arg.AfterAssetID, arg.BatchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOCRDocumentsForRebuildRow
+	for rows.Next() {
+		var i GetOCRDocumentsForRebuildRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.RepositoryID,
+			&i.AssetType,
+			&i.IsDeleted,
+			&i.Revision,
+			&i.TextContent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getOCRResultByAsset = `-- name: GetOCRResultByAsset :one
-SELECT asset_id, model_id, total_count, processing_time_ms, created_at, updated_at, full_text FROM ocr_results
+SELECT asset_id, model_id, total_count, processing_time_ms, created_at, updated_at FROM ocr_results
 WHERE asset_id = ?1
 `
 
@@ -168,7 +347,6 @@ func (q *Queries) GetOCRResultByAsset(ctx context.Context, assetID uuid.UUID) (O
 		&i.ProcessingTimeMs,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.FullText,
 	)
 	return i, err
 }
@@ -345,63 +523,28 @@ func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOC
 	return items, nil
 }
 
-const searchAssetsByOCRText = `-- name: SearchAssetsByOCRText :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
-FROM ocr_search_fts
-JOIN ocr_results r ON r.rowid = ocr_search_fts.rowid
-JOIN assets a ON a.asset_id = r.asset_id
-WHERE ocr_search_fts.full_text MATCH ?1
-  AND a.is_deleted = false
-ORDER BY ocr_search_fts.rank, a.asset_id DESC
-LIMIT ?3 OFFSET ?2
+const listOCRIndexOutboxBatch = `-- name: ListOCRIndexOutboxBatch :many
+SELECT asset_id, revision
+FROM ocr_index_outbox
+ORDER BY updated_at, asset_id
+LIMIT ?1
 `
 
-type SearchAssetsByOCRTextParams struct {
-	Query  string `db:"query" json:"query"`
-	Offset int64  `db:"offset" json:"offset"`
-	Limit  int64  `db:"limit" json:"limit"`
+type ListOCRIndexOutboxBatchRow struct {
+	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
+	Revision int64     `db:"revision" json:"revision"`
 }
 
-func (q *Queries) SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error) {
-	rows, err := q.db.QueryContext(ctx, searchAssetsByOCRText, arg.Query, arg.Offset, arg.Limit)
+func (q *Queries) ListOCRIndexOutboxBatch(ctx context.Context, limit int64) ([]ListOCRIndexOutboxBatchRow, error) {
+	rows, err := q.db.QueryContext(ctx, listOCRIndexOutboxBatch, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Asset
+	var items []ListOCRIndexOutboxBatchRow
 	for rows.Next() {
-		var i Asset
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-			&i.GpsLatitude,
-			&i.GpsLongitude,
-			&i.GpsGeohash5,
-			&i.GpsGeohash7,
-			&i.ExifRaw,
-		); err != nil {
+		var i ListOCRIndexOutboxBatchRow
+		if err := rows.Scan(&i.AssetID, &i.Revision); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -415,20 +558,6 @@ func (q *Queries) SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByO
 	return items, nil
 }
 
-const updateOCRFullText = `-- name: UpdateOCRFullText :exec
-UPDATE ocr_results SET full_text = ?2 WHERE asset_id = ?1
-`
-
-type UpdateOCRFullTextParams struct {
-	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
-	FullText string    `db:"full_text" json:"full_text"`
-}
-
-func (q *Queries) UpdateOCRFullText(ctx context.Context, arg UpdateOCRFullTextParams) error {
-	_, err := q.db.ExecContext(ctx, updateOCRFullText, arg.AssetID, arg.FullText)
-	return err
-}
-
 const updateOCRResultStats = `-- name: UpdateOCRResultStats :exec
 UPDATE ocr_results
 SET total_count = (
@@ -440,5 +569,27 @@ WHERE asset_id = ?1
 
 func (q *Queries) UpdateOCRResultStats(ctx context.Context, assetID uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, updateOCRResultStats, assetID)
+	return err
+}
+
+const upsertOCRIndexOutbox = `-- name: UpsertOCRIndexOutbox :exec
+INSERT INTO ocr_index_outbox (
+    asset_id, revision, updated_at
+)
+VALUES (
+    ?1, ?2, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+)
+ON CONFLICT (asset_id) DO UPDATE SET
+    revision = excluded.revision,
+    updated_at = excluded.updated_at
+`
+
+type UpsertOCRIndexOutboxParams struct {
+	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
+	Revision int64     `db:"revision" json:"revision"`
+}
+
+func (q *Queries) UpsertOCRIndexOutbox(ctx context.Context, arg UpsertOCRIndexOutboxParams) error {
+	_, err := q.db.ExecContext(ctx, upsertOCRIndexOutbox, arg.AssetID, arg.Revision)
 	return err
 }

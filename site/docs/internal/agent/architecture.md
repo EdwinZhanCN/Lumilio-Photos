@@ -39,6 +39,9 @@ This is the compact system map for agents. Keep details here stable and useful; 
 - `server/internal/db` and `server/migrations`: the single-writer SQLite runtime,
   application/River migrations, Online Backup snapshots, FTS5, and sqlite-vec
   derived indexes.
+- `server/internal/search/bleveocr`: rebuildable OCR search sidecar. SQLite OCR
+  rows remain authoritative; a revision outbox feeds
+  `<sqlite-directory>/indexes/bleve/ocr-v1/`.
 
 ## Frontend
 

@@ -150,8 +150,14 @@ Owner identity is instance-local database policy rather than portable
   mount with another SQLite process. Host and container VFS locking is not a
   supported coordination boundary; use the application Online Backup flow, or
   inspect the catalog only after a graceful application stop.
-- FTS5 and sqlite-vec tables are derived query structures; authoritative text
-  and embedding data remains in ordinary application tables.
+- FTS5, sqlite-vec tables, and the OCR Bleve sidecar are derived query
+  structures; authoritative text and embedding data remains in ordinary
+  application tables.
+- OCR search lives at
+  `<sqlite-directory>/indexes/bleve/ocr-v1/`. `ocr_results` and
+  `ocr_text_items` remain authoritative; a revisioned SQLite outbox drives
+  Bleve batch updates. Missing, corrupt, mapping-mismatched, and post-restore
+  indexes are deleted and rebuilt before HTTP starts.
 - Migrations live in `server/migrations`. The application migration ledger
   records SHA-256 for every applied SQL file; version, name, and checksum must
   continue to match embedded history, so historical migrations are immutable.

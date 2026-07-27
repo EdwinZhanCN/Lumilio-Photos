@@ -419,6 +419,18 @@ type MediaItemAsset struct {
 	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
+type OcrIndexMetadatum struct {
+	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Revision  int64             `db:"revision" json:"revision"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type OcrIndexOutbox struct {
+	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Revision  int64             `db:"revision" json:"revision"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type OcrResult struct {
 	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
 	ModelID          string            `db:"model_id" json:"model_id"`
@@ -426,11 +438,6 @@ type OcrResult struct {
 	ProcessingTimeMs *int64            `db:"processing_time_ms" json:"processing_time_ms"`
 	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-	FullText         string            `db:"full_text" json:"full_text"`
-}
-
-type OcrSearchFt struct {
-	FullText string `db:"full_text" json:"full_text"`
 }
 
 type OcrTextItem struct {

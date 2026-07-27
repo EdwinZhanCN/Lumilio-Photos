@@ -48,11 +48,10 @@ type Filter struct {
 type Request struct {
 	Query string
 	Filter
-	Limit      int
-	Offset     int
-	TopK       int
-	CountTotal bool
-	Debug      bool
+	Limit  int
+	Offset int
+	TopK   int
+	Debug  bool
 }
 
 type Response struct {

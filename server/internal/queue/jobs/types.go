@@ -119,6 +119,23 @@ func (ProcessOcrArgs) InsertOpts() river.InsertOpts {
 	return mlProcessInsertOpts()
 }
 
+// ProcessOCROutboxArgs is the periodic trigger for applying authoritative
+// SQLite OCR mutations to the rebuildable Bleve sidecar.
+type ProcessOCROutboxArgs struct{}
+
+func (ProcessOCROutboxArgs) Kind() string { return "process_ocr_outbox" }
+
+func (ProcessOCROutboxArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue:       "ocr_index",
+		MaxAttempts: 5,
+		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
+			ByPeriod: time.Second,
+		},
+	}
+}
+
 // ProcessFaceArgs is the River job payload for face detection and recognition.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessFaceArgs struct {

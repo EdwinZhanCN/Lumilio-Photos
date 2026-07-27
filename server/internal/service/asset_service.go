@@ -14,6 +14,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	aggregatesearch "server/internal/search"
+	"server/internal/search/bleveocr"
 	"server/internal/utils/geohash"
 	"strings"
 	"time"
@@ -259,7 +260,7 @@ type assetService struct {
 	embeddingService       EmbeddingService
 	aggregateSearch        aggregatesearch.Service
 	semanticRetriever      *aggregatesearch.EmbeddingRetriever
-	ocrRetriever           *aggregatesearch.TextRetriever
+	ocrRetriever           *aggregatesearch.BleveOCRRetriever
 	placeRetriever         *aggregatesearch.TextRetriever
 	queryAssetsUnifiedFn   func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
 	searchAssetsFusedSetFn func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool)
@@ -267,7 +268,14 @@ type assetService struct {
 	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
 }
 
-func NewAssetService(q *repo.Queries, pool *sql.DB, l LumenService, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
+func NewAssetService(
+	q *repo.Queries,
+	pool *sql.DB,
+	l LumenService,
+	e EmbeddingService,
+	ocrIndex *bleveocr.Index,
+	loggers ...*zap.Logger,
+) (AssetService, error) {
 	logger := zap.NewNop()
 	if len(loggers) > 0 && loggers[0] != nil {
 		logger = loggers[0]
@@ -298,7 +306,7 @@ func NewAssetService(q *repo.Queries, pool *sql.DB, l LumenService, e EmbeddingS
 		},
 		1.0,
 	)
-	svc.ocrRetriever = aggregatesearch.NewOCRRetriever(pool, 0.7)
+	svc.ocrRetriever = aggregatesearch.NewBleveOCRRetriever(pool, ocrIndex, 0.7)
 	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(pool, 0.8)
 	svc.aggregateSearch = aggregatesearch.NewAggregateService(pool, []aggregatesearch.Retriever{
 		svc.semanticRetriever,
@@ -528,12 +536,42 @@ func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
 
 // DeleteAsset moves an asset into the app Trash via a database soft-delete.
 func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
-	return s.queries.DeleteAsset(ctx, id)
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin asset Trash transaction: %w", err)
+	}
+	defer tx.Rollback()
+	queries := s.queries.WithTx(tx)
+	if err := queries.DeleteAsset(ctx, id); err != nil {
+		return err
+	}
+	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit asset Trash transaction: %w", err)
+	}
+	return nil
 }
 
 // RestoreAsset restores an asset from the app Trash.
 func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
-	return s.queries.RestoreAsset(ctx, id)
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin asset restore transaction: %w", err)
+	}
+	defer tx.Rollback()
+	queries := s.queries.WithTx(tx)
+	if err := queries.RestoreAsset(ctx, id); err != nil {
+		return err
+	}
+	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit asset restore transaction: %w", err)
+	}
+	return nil
 }
 
 // AddAssetToAlbum adds an asset to an album
@@ -1293,12 +1331,11 @@ func (s *assetService) queryAssetsAggregate(ctx context.Context, params QueryAss
 		return nil, 0, err
 	}
 	response, err := s.aggregateSearch.Search(ctx, aggregatesearch.Request{
-		Query:      params.Query,
-		Filter:     filter,
-		Limit:      params.Limit,
-		Offset:     params.Offset,
-		CountTotal: true,
-		Debug:      false,
+		Query:  params.Query,
+		Filter: filter,
+		Limit:  params.Limit,
+		Offset: params.Offset,
+		Debug:  false,
 	})
 	if err != nil {
 		return nil, 0, err

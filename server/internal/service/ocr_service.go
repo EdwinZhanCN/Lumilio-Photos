@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/search"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -18,7 +16,6 @@ import (
 type OCRService interface {
 	SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error
 	GetOCRResults(ctx context.Context, assetID uuid.UUID) (*OCRResultWithItems, error)
-	SearchAssetsByText(ctx context.Context, searchText string, limit, offset int, minConfidence float32) ([]repo.Asset, error)
 	DeleteOCRResults(ctx context.Context, assetID uuid.UUID) error
 	GetOCRStats(ctx context.Context) (*dbtypes.OCRStats, error)
 }
@@ -44,12 +41,19 @@ func NewOCRService(queries *repo.Queries, pool *sql.DB) OCRService {
 
 // SaveOCRResults saves OCR results to database
 func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error {
-	if err := s.queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin OCR result transaction: %w", err)
+	}
+	defer tx.Rollback()
+	queries := s.queries.WithTx(tx)
+
+	if err := queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
 		return fmt.Errorf("failed to delete existing OCR results: %w", err)
 	}
 
 	processingTimePtr := int64(processingTimeMs)
-	_, err := s.queries.CreateOCRResult(ctx, repo.CreateOCRResultParams{
+	_, err = queries.CreateOCRResult(ctx, repo.CreateOCRResultParams{
 		AssetID:          assetID,
 		ModelID:          ocrResult.ModelID,
 		TotalCount:       int64(len(ocrResult.Items)),
@@ -59,7 +63,6 @@ func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrR
 		return fmt.Errorf("failed to create OCR result: %w", err)
 	}
 
-	texts := make([]string, 0, len(ocrResult.Items))
 	for i, item := range ocrResult.Items {
 		boundingBox := dbtypes.NewBoundingBox(item.Box)
 		area := boundingBox.CalculateArea()
@@ -70,7 +73,7 @@ func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrR
 		}
 
 		areaFloat64 := float64(area)
-		_, err = s.queries.CreateOCRTextItem(ctx, repo.CreateOCRTextItemParams{
+		_, err = queries.CreateOCRTextItem(ctx, repo.CreateOCRTextItemParams{
 			AssetID:     assetID,
 			TextContent: item.Text,
 			Confidence:  float64(item.Confidence),
@@ -81,20 +84,14 @@ func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrR
 		if err != nil {
 			return fmt.Errorf("failed to create OCR text item %d: %w", i, err)
 		}
-
-		if t := strings.TrimSpace(item.Text); t != "" {
-			texts = append(texts, t)
-		}
 	}
 
-	fullText := search.TokenizeForSearch(strings.Join(texts, " "))
-	if err := s.queries.UpdateOCRFullText(ctx, repo.UpdateOCRFullTextParams{
-		AssetID:  assetID,
-		FullText: fullText,
-	}); err != nil {
-		return fmt.Errorf("failed to update OCR full text: %w", err)
+	if err := enqueueOCRIndexOutbox(ctx, queries, assetID); err != nil {
+		return err
 	}
-
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit OCR result transaction: %w", err)
+	}
 	return nil
 }
 
@@ -116,26 +113,38 @@ func (s *ocrService) GetOCRResults(ctx context.Context, assetID uuid.UUID) (*OCR
 	}, nil
 }
 
-func (s *ocrService) SearchAssetsByText(ctx context.Context, searchText string, limit, offset int, minConfidence float32) ([]repo.Asset, error) {
-	tokenized := search.TokenizeQuery(searchText)
-	if tokenized == "" {
-		return []repo.Asset{}, nil
-	}
-
-	assets, err := s.queries.SearchAssetsByOCRText(ctx, repo.SearchAssetsByOCRTextParams{
-		Query:  tokenized,
-		Limit:  int64(limit),
-		Offset: int64(offset),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("search assets by OCR text: %w", err)
-	}
-	return assets, nil
-}
-
 // DeleteOCRResults deletes OCR results for specified asset
 func (s *ocrService) DeleteOCRResults(ctx context.Context, assetID uuid.UUID) error {
-	return s.queries.DeleteOCRResultByAsset(ctx, assetID)
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin OCR delete transaction: %w", err)
+	}
+	defer tx.Rollback()
+	queries := s.queries.WithTx(tx)
+	if err := queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
+		return fmt.Errorf("delete OCR result: %w", err)
+	}
+	if err := enqueueOCRIndexOutbox(ctx, queries, assetID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit OCR delete transaction: %w", err)
+	}
+	return nil
+}
+
+func enqueueOCRIndexOutbox(ctx context.Context, queries *repo.Queries, assetID uuid.UUID) error {
+	revision, err := queries.BumpOCRIndexRevision(ctx, assetID)
+	if err != nil {
+		return fmt.Errorf("increment OCR index revision: %w", err)
+	}
+	if err := queries.UpsertOCRIndexOutbox(ctx, repo.UpsertOCRIndexOutboxParams{
+		AssetID:  assetID,
+		Revision: revision,
+	}); err != nil {
+		return fmt.Errorf("enqueue OCR index revision %d: %w", revision, err)
+	}
+	return nil
 }
 
 // GetOCRStats gets OCR processing statistics
