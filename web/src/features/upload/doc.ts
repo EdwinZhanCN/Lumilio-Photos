@@ -1,131 +1,84 @@
 /**
  * # Upload
  *
- * The Upload feature owns the client-side queue, drag-and-drop intake, hashing
- * pipeline, batch/chunk transport calls, and global upload status UI. It is
- * surfaced primarily on `/manage`, but the feature boundary is separate:
- * Manage decides where upload appears, while Upload decides how files move from
- * browser selection into the repository.
+ * Upload owns browser file intake, the in-session queue, hashing, duplicate
+ * precheck, batch/chunk transport, ingest-job tracking, and global progress UI.
+ * Manage chooses where the full editor appears; Upload owns how files reach a
+ * concrete repository.
  *
  * ## State
  *
- * {@link UploadProvider} wraps the app with {@link UploadContext}. The reducer
- * stores selected `UploadState.files`, placeholder preview slots, and
- * drag-over state. Consumers use {@link useUploadContext}; calling that hook
- * outside the provider is an error.
+ * {@link UploadProvider} wraps the application with {@link UploadContext}.
+ * {@link uploadReducer} is the queue-mutation boundary: {@link UploadState}
+ * holds files, index-aligned preview URLs, and drag-over state, while
+ * {@link UploadAction} defines additions, retries, preview replacement,
+ * clearing, and drag transitions. Clearing or replacing files revokes obsolete
+ * object URLs.
  *
- * Upload processing state comes from {@link useUploadProcess}. Its React state
- * bridge is isolated in {@link useUploadProgressState}; the hash/upload pipeline
- * is coordinated by {@link runUploadProcess}, and transport-specific behavior is
- * owned by {@link createUploadTransport}. The hook exposes the aggregate progress
- * number, per-file {@link FileUploadProgress}, hashing progress, and the two active
- * flags used by the provider: `isGeneratingHashCodes` and `isUploading`.
+ * {@link useUploadProcess} owns processing progress and active flags.
+ * {@link useUploadProgressState} bridges per-file {@link FileUploadProgress}
+ * into React state, while {@link runUploadProcess} coordinates the pipeline.
+ * The queue is global but intentionally not persisted, so progress remains
+ * visible across routes without pretending interrupted browser work is
+ * resumable after a reload.
  *
- * {@link UnifiedUploadSection} is the primary queue editor. It validates
- * selected files, adds them to the provider queue, lets the user clear the
- * queue while idle, starts upload, and exposes the working repository picker.
- * {@link NavbarUploadQueue} is only a compact global status surface; it reuses
- * provider state and links back to `/manage` for detailed control.
+ * ## Flows
+ *
+ * ```mermaid
+ * flowchart LR
+ *     PROVIDER["UploadProvider"] --> QUEUE["UnifiedUploadSection"]
+ *     PROVIDER --> NAV["NavbarUploadQueue"]
+ *     QUEUE --> PROCESS["useUploadProcess"]
+ *     PROCESS --> HASH["useGenerateHashcode"]
+ *     HASH --> PRECHECK["precheckUploads"]
+ *     PRECHECK --> TRANSPORT["Batch or chunk transport"]
+ *     TRANSPORT --> JOBS["waitForUploadJobs"]
+ *     JOBS --> REFRESH["Refresh asset queries"]
+ * ```
+ *
+ * {@link UnifiedUploadSection} validates files, edits the queue, chooses the
+ * working repository, and starts processing. {@link NavbarUploadQueue} is a
+ * compact global view over the same provider state and links back to Manage.
+ *
+ * {@link useGenerateHashcode} fingerprints files before
+ * {@link precheckUploads}. Known files are marked duplicate and skip transport;
+ * a failed precheck falls back to normal upload. Small files use
+ * {@link useBatchUploadMutation}, large files use
+ * {@link useChunkedUploadMutation}, and {@link waitForUploadJobs} follows
+ * accepted ingest tasks to terminal backend state before asset queries refresh.
  *
  * ## Data
  *
- * Upload target selection is the settings feature's working repository, read
- * through `useWorkingRepository`. The upload path requires one concrete
- * repository id; unlike browse scope, "all repositories" is not a valid target.
- * If the user has not selected a working repository, the settings hook resolves
- * primary/first repository fallback before upload transport receives the id.
+ * {@link useWorkingRepository} resolves the concrete destination. “All
+ * repositories” is valid for browsing but never for upload. {@link useUploadConfig}
+ * reads server-owned chunk and concurrency limits; client values are temporary
+ * resilience fallbacks while configuration is unavailable.
  *
- * {@link useUploadConfig} reads `/api/v1/assets/batch/config`. The server is
- * authoritative for chunk size and concurrency; {@link useUploadProcess} uses
- * fixed fallbacks only while that config is unavailable. Small files are sent
- * through {@link useBatchUploadMutation}; large files are sent through
- * {@link useChunkedUploadMutation}. Both pass the resolved repository id to the
- * upload transport layer.
+ * The browser fingerprint mirrors backend BLAKE3 policy: full content through
+ * 100 MiB, then a quick hash over little-endian size plus fixed first/last
+ * chunks. Size accompanies the hash during duplicate checks. Per-file success,
+ * duplicate, transport failure, and ingest failure remain distinct so retryable
+ * `File` objects stay in the queue while completed files leave it.
  *
- * Files are hashed before transport through `useGenerateHashcode`. Hashing is
- * pipelined with upload: each hashed large file can start chunked upload, and
- * small files are buffered into smart batches. The worker fingerprint mirrors
- * the backend BLAKE3 policy exactly: full hash up to 100 MiB, then quick hash
- * over little-endian file size plus fixed 1 MiB first/last chunks. Hash and
- * HTTP failures are terminal per-file failures: successful files leave the
- * editor queue, while failed `File` objects remain available for retry.
- *
- * A successful HTTP response means transport was accepted, not that an asset
- * exists yet. {@link waitForUploadJobs} follows the returned ingest task ids
- * through `/api/v1/assets/batch/jobs` (chunked to the backend's 100-id limit,
- * SSE first with poll fallback); {@link FileUploadProgress} remains in
- * `processing` until every task reaches a backend terminal state. Asset
- * list/search queries are invalidated only after successful materialization.
- * Status-wait failures only mark unsettled tasks failed — already-terminal
- * successes are preserved.
- *
- * ## Instant upload
- *
- * Because the worker fingerprint is byte-identical to the backend's, hashed
- * files can be checked against the repository before any bytes move.
- * {@link useUploadProcess} passes each hash and size to `precheckUploads`
- * (`/api/v1/assets/precheck`) just before transport — batched with the small-file
- * buffer, and as a single call ahead of each chunked upload. Files the server
- * already holds are marked `duplicate` in {@link FileUploadProgress} and never
- * transported.
- *
- * A duplicate is a success, not a failure: {@link NavbarUploadQueue} renders it in
- * the warning color with its own count, separate from the error count, and the
- * upload summary reports how many files were skipped. Precheck is an optimization
- * only. If the request fails the files upload normally, and the server repeats the
- * same check before ingest, returning the `duplicate` status the client also
- * understands from a transport response. Size is matched alongside the hash
- * because a quick hash only covers a large file's first and last chunk.
- *
- * ## Composition
- *
- * ```mermaid
- * flowchart TD
- *     PROVIDER["UploadProvider"] --> REDUCER["uploadReducer"]
- *     PROVIDER --> PROCESS["useUploadProcess"]
- *     UI["UnifiedUploadSection"] --> CTX["useUploadContext"]
- *     NAV["NavbarUploadQueue"] --> CTX
- *     UI --> PICKER["useWorkingRepository"]
- *     UI --> CONFIG["useUploadConfig"]
- *     PROCESS --> HASH["useGenerateHashcode"]
- *     PROCESS --> BATCH["useBatchUploadMutation"]
- *     PROCESS --> CHUNK["useChunkedUploadMutation"]
- *     BATCH --> TRANSPORT["uploadTransport"]
- *     CHUNK --> TRANSPORT
- * ```
- *
- * {@link FileDropZone} contributes drag/drop interaction, but validation and
- * queue mutation stay in {@link UnifiedUploadSection}. {@link NavbarUploadQueue}
- * renders the durable per-file queue that remains visible across routes.
- *
- * ## Decisions
- *
- * The upload queue is global because users can leave `/manage` while an upload
- * is still running. The navigation queue keeps progress inspectable without
- * duplicating transport logic.
- *
- * Transport parameters come from the server because the server owns memory,
- * chunk, and concurrency limits. Client fallbacks are resilience defaults, not
- * product configuration.
- *
- * The working repository boundary must stay separate from browse scope. Upload
- * creates new assets and therefore needs a concrete destination; browse pages
- * can intentionally aggregate multiple repositories.
+ * The feature root is the narrow public entry for application-level queue UI
+ * and upload state. Hashing, transport, progress, and lifecycle helpers remain
+ * internal to the feature or shared upload infrastructure.
  *
  * @module
  */
-import type { UploadProvider } from "./state/UploadProvider.tsx";
-import type FileDropZone from "./flows/intake/FileDropZone.tsx";
-import type NavbarUploadQueue from "./flows/queue/NavbarUploadQueue.tsx";
+import type { useBatchUploadMutation, useChunkedUploadMutation } from "./api/useUploadMutations.ts";
+import type { useUploadConfig } from "./api/useUploadQueries.ts";
 import type UnifiedUploadSection from "./flows/intake/UnifiedUploadSection.tsx";
-import type { useUploadContext } from "./state/useUploadContext.ts";
+import type NavbarUploadQueue from "./flows/queue/NavbarUploadQueue.tsx";
+import type { useGenerateHashcode } from "./modules/process/useGenerateHashcode.ts";
 import type { FileUploadProgress, useUploadProcess } from "./modules/process/useUploadProcess.tsx";
 import type { useUploadProgressState } from "./modules/process/progress.ts";
 import type { runUploadProcess } from "./modules/process/runner.ts";
-import type { createUploadTransport } from "./modules/process/transport.ts";
-import type { useBatchUploadMutation, useChunkedUploadMutation } from "./api/useUploadMutations.ts";
-import type { useUploadConfig } from "./api/useUploadQueries.ts";
-import type { UploadContext } from "./state/context.ts";
-import type { waitForUploadJobs } from "@/lib/upload/uploadLifecycle.ts";
+import type { UploadAction, UploadContext, UploadState } from "./state/context.ts";
+import type { UploadProvider } from "./state/UploadProvider.tsx";
+import type { uploadReducer } from "./state/reducer.ts";
+import type { waitForUploadJobs } from "../../lib/upload/uploadLifecycle.ts";
+import type { precheckUploads } from "../../lib/upload/uploadTransport.ts";
+import type { useWorkingRepository } from "../repositories/index.ts";
 
 export {};

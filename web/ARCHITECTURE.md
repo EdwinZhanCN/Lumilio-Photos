@@ -26,7 +26,6 @@ src/features/<feature>/
 ├── model/        # pure domain types, rules, codecs and transformations
 ├── flows/        # user workflows; each flow colocates its UI, hooks and local state
 ├── components/   # UI genuinely reused by multiple flows in this feature
-├── docs/         # feature-local supporting notes; doc.ts/doc.md remain at the root
 ├── hooks/        # rare feature-wide React mechanisms shared across flows
 ├── modules/      # technically isolated capabilities that are not user workflows
 ├── routes/       # router entry components
@@ -48,6 +47,9 @@ src/features/<feature>/
 - Tests and feature-specific styles stay beside the implementation they characterize.
 - A small feature omits unused directories. Uniformity means identical directory semantics, not identical directory counts.
 - The Assets feature expresses its main journeys as `flows/browse`, `flows/viewer`, and `flows/export`; pure filtering and browse-item rules live in `model`. It keeps `map/` and `picker/` as reviewed public sub-entry exceptions whose entry files remain narrow.
+- The only handwritten documentation sources under `web/` are this file and
+  feature-root `doc.ts` files. Put feature-specific architecture in `doc.ts`;
+  do not add feature `README.md` files or supporting `docs/` directories.
 
 ## Dependency rules
 

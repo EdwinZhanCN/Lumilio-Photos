@@ -1,6 +1,6 @@
 # Lumilio Photos SQLite-only 迁移执行计划
 
-> 仓库路径：`site/docs/internal/agent/exec-plans/completed/sqlite.md`
+> 仓库路径：`site/docs/internal/exec-plans/completed/sqlite.md`
 > 工作分支：`experimental/sqlite`
 > 状态：Completed
 > 迁移策略：允许 destructive migration；没有 PostgreSQL 数据导入义务

@@ -40,12 +40,10 @@ export const sharedConfig = withMermaid(defineConfig({
         'en/:rest*': ':rest*'
     },
     metaChunk: true,
-    // Agent harness docs are raw markdown written for GitHub (they contain
-    // `<...>`/`{...}` that the Vue markdown compiler can't parse). Keep them
-    // co-located under site/docs/internal/agent but out of the VitePress build,
-    // so they're never compiled, deployed, or searchable. internal/frontend
-    // (authored VitePress-safe) is built but kept out of nav/sidebar/search.
-    srcExclude: ['internal/agent/**'],
+    // Internal engineering docs are written for repository readers and may
+    // contain Markdown that Vue's compiler treats as template syntax. Keep the
+    // whole internal tree out of the public build, deployment, and search.
+    srcExclude: ['internal/**'],
     lang: 'en',
     title: "Lumilio Photos",
     description: "Next-Gen Lightweight High-performance Media Manage Web App",

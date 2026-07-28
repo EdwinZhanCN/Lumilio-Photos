@@ -3,7 +3,7 @@
 Status: **completed & verified** (2026-07). Destructive refactor done pre-production.
 Replaced the dimensionless polymorphic `embeddings.vector` column (no ANN index
 possible → brute-force scan) with a fixed-dimension, HNSW-indexed, unified search
-vector store. Prerequisite for [video-semantic-search](../active/video-semantic-search.md).
+vector store. Prerequisite for [video-semantic-search](video-semantic-search.md).
 
 ## Why
 
@@ -55,7 +55,7 @@ dimension with negligible retrieval/zero-shot loss.
   one primary row. `GetPrimaryEmbeddingVector(semantic)` reads the `frame_ts_ms IS
   NULL` row. Indexing stats queries repointed to `search_embeddings`.
 - `best_ts` (nearest-frame timestamp for video deep-linking) is **deferred to
-  [video-semantic-search](../active/video-semantic-search.md)**; not needed while
+  [video-semantic-search](video-semantic-search.md)**; not needed while
   only photos (single row) exist.
 
 ## Lumen SDK contract (v1.3.2)
@@ -84,7 +84,7 @@ detection.
 - Cross-model search (impossible without re-embed).
 - Moving pHash/attribute vectors into the ANN table.
 - Video frame extraction / `best_ts` plumbing — owned by
-  [video-semantic-search](../active/video-semantic-search.md).
+  [video-semantic-search](video-semantic-search.md).
 
 ## Follow-ups
 

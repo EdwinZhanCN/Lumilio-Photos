@@ -64,7 +64,8 @@ vp exec i18next-cli status     # step 3: verify zh coverage (must be 100%)
 ## Source Layout
 
 - `src/app`: root providers, router composition, application shell, and runtime status effects.
-- `src/features/*`: domain features. The enforced shape and dependency rules live in `web/ARCHITECTURE.md`; the quick placement guide is `web/src/features/README.md`.
+- `src/features/*`: domain features. The enforced shape and dependency rules
+  live in `web/ARCHITECTURE.md`.
 - `src/components`: reusable app components and UI pieces.
 - `src/contexts`: cross-cutting providers.
 - `src/lib`: API client, i18n, utilities, feature support libraries.
@@ -89,7 +90,8 @@ Feature roots use one optional vocabulary:
 - `modules/`: isolated technical capabilities that are not themselves a user journey.
 - `routes/`: thin router entries that delegate to a flow.
 - `utils/`: legacy/general pure helpers without domain vocabulary; prefer `model/` or a named lower-layer `lib/` owner for new code.
-- `docs/`: feature-local supporting notes; `doc.ts` and generated `doc.md` stay at the feature root.
+- `doc.ts`: the feature architecture source; generated `doc.md` stays beside it
+  at the feature root.
 
 Directories are optional. Do not create placeholders or alternate roots, and do
 not leave compatibility re-exports at old internal paths. Inside a feature use
@@ -295,6 +297,13 @@ The `unit` project excludes `*.browser.test.ts` and `src/workers/**` so an
 accidental browser dependency fails instead of hiding; `integration` and
 `browser` run real Chromium via the Playwright provider. Details per layer:
 Integration Specs and E2E have their own sections below.
+
+`src/workers/hash.test.ts` is a browser contract test selected through the
+worker directory even though it uses the shorter `.test.ts` suffix. The normal
+Web gate covers small files and the backend-compatible quick-hash path for
+files over 100 MiB. The 20 × 50 MiB throughput case is intentionally excluded;
+run it explicitly with `vp run test:hash-perf` when changing hash-worker
+performance.
 
 ### GPU / WebGL capability tests
 

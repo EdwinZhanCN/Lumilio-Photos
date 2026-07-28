@@ -1,134 +1,94 @@
 /**
  * # Collections
  *
- * The hub for every way of *grouping* assets that isn't the raw library
- * timeline: albums, places/trips, people, folders, tags, and utility views
- * (classifier albums, duplicates). {@link Collections} is the landing page —
- * rails that each preview a full route. Person *detail* lives in the
- * `people` feature; collections only owns the people rail/grid entry into it.
- * Folders sit alongside albums/places/people as their own hub rail — a
- * browsing concept, not a maintenance tool. Tags are reached through
- * {@link useUtilityShortcuts} alongside Duplicates and Trash, since it's a
- * browse-only utility-style view, not its own hub rail.
+ * Collections owns grouped ways of browsing the library: albums, places and
+ * derived trips, people entry surfaces, folders, tags, Liked, duplicate review,
+ * shared-link navigation, and classifier views. Person identity correction
+ * remains in People; asset presentation remains in Assets.
  *
  * ## State
  *
- * {@link AlbumsProvider} (read via {@link useAlbumsState}) holds only the
- * feature's transient UI state — album multi-select and which edit/create modal
- * is open — reduced by {@link albumsReducer} as {@link AlbumsAction}
- * over {@link AlbumsState}. Everything durable is server state in TanStack
- * Query; nothing fetched is mirrored here.
+ * Durable albums, folders, tag summaries, duplicate groups, and asset results
+ * are TanStack Query server state. {@link AlbumsProvider} keeps only the album
+ * flow's transient selection and modal interaction, reduced by
+ * {@link albumsReducer}. Repository scope comes from Repositories; scoped
+ * gallery search, filters, sort, and viewer identity remain URL state owned by
+ * Assets.
  *
- * ## Data
+ * Trips and utility classifiers are derived views, not client-persisted
+ * entities. Folder and tag route identities use
+ * {@link encodeFolderKey}/{@link decodeFolderKey} and
+ * {@link encodeTagKey}/{@link decodeTagKey} so paths and composite identities
+ * survive navigation without a second store.
  *
- * Each rail has a distinct backend story, and the differences are the point:
- *
- * - **Albums** — a real backend entity. {@link useAlbums} paginates
- *   `/api/v1/albums`; {@link mapAlbumToUI} shapes each DTO for the grid.
- * - **Duplicates** — a backend-computed graph. {@link useDuplicateSummary},
- *   {@link useDuplicateGroupList} and {@link useDetectDuplicates} wrap
- *   `/api/v1/duplicates/*`.
- * - **Utility classifier albums** — not entities at all: {@link UTILITY_CLASSIFIERS}
- *   is a static client table of saved tag-source queries (documents, receipts,
- *   illustration) rendered as virtual albums over the asset list. **Liked**
- *   ({@link Liked}) is the same shape over `{ liked: true }` — no favorites
- *   table, just the existing `assets.liked` column filtered through the
- *   normal list/search endpoints.
- * - **Places / trips** — fully derived client-side. {@link useCityTrips} segments
- *   map points by geohashed city + time gaps into trips. It explicitly drains
- *   both map-point and location-cluster pagination before claiming a complete
- *   result; there is **no backend
- *   trip entity**, so a trip is identity-less and editing it is meaningless.
- * - **Folders** — derived from `assets.storage_path` prefixes; there is no
- *   folders table. {@link useFolders} lists immediate child folders (recursive
- *   counts/covers) and {@link useFolderSummary} aggregates one folder path, both
- *   backed by new `/api/v1/assets/folders*` endpoints. Route identity is a
- *   `{ repositoryId, folderPath }` pair packed by {@link encodeFolderKey} /
- *   {@link decodeFolderKey} into an opaque `:folderKey` segment, since a raw
- *   path can contain slashes. Both queries exclude the app-managed
- *   `.lumilio/` and `inbox/` prefixes, so the rail only ever shows folders a
- *   human placed or scanned into the repository.
- * - **Tags** — a real vocabulary, but grouped by `(tag_id, source)` because the
- *   same tag name can carry both manual and AI/system assignments across
- *   different assets. {@link useTagSummaries} wraps the new
- *   `/api/v1/assets/tag-summaries` endpoint (counts/covers), distinct from the
- *   autocomplete-only `/api/v1/assets/tags` used by `@`-mentions. Route
- *   identity uses {@link encodeTagKey} / {@link decodeTagKey} over
- *   `{ tagName, source }`, matching the `tag_name` + `tag_source` filter pair
- *   `AssetFilterDTO` already supports.
- * - **Liked** — the utility rail ({@link useUtilityShortcuts}) also includes
- *   Liked alongside Duplicates and Trash. {@link Liked} scopes
- *   {@link AssetBrowser} to `{ liked: true }` and hides the default
- *   `set-liked` bulk menu in favor of a single scoped "remove from Liked"
- *   action, since setting liked=true is meaningless on a page already
- *   filtered to liked assets.
- *
- * ## Composition
+ * ## Flows
  *
  * ```mermaid
  * flowchart TD
- *     HUB["Collections · hub"]
- *     HUB --> UR["UtilitiesRail"] --> DUP["Duplicates"]
- *     UR --> UCA["UtilityClassifierAlbum"]
- *     UR --> TGS["Tags"] --> TD2["TagDetails"]
- *     HUB --> MR["MapRail"] --> TD["TripDetails"]
- *     HUB --> AR["AlbumRail"] --> AD["AlbumDetails · hero + edit"]
- *     HUB --> PR["PeopleRail"] -.->|people feature| PERSON["PersonDetails"]
- *     HUB --> FR["FoldersRail"] --> FD["FolderDetails"]
+ *     HUB["Collections hub"] --> ALBUMS["Albums"]
+ *     HUB --> PLACES["Places / trips"]
+ *     HUB --> PEOPLE["People entry"]
+ *     HUB --> FOLDERS["Folders"]
+ *     HUB --> UTILITIES["Utilities"]
+ *     UTILITIES --> TAGS["Tags / classifiers / liked"]
+ *     UTILITIES --> DUPLICATES["Duplicate review"]
+ *     ALBUMS --> BROWSER["AssetBrowser"]
+ *     PLACES --> BROWSER
+ *     FOLDERS --> BROWSER
+ *     TAGS --> BROWSER
  * ```
  *
- * {@link Folders} and {@link Tags} are the list pages that route into
- * {@link FolderDetails} and {@link TagDetails}.
+ * {@link Collections} renders preview rails driven by the same
+ * {@link useUtilityShortcuts} list used on the Utilities page.
+ * {@link AlbumDetails}, {@link TripDetails}, {@link FolderDetails},
+ * {@link TagDetails}, and {@link UtilityClassifierAlbum} all compose
+ * {@link AssetBrowser} with different constraints. Only album detail has an
+ * editable entity hero; folders provide navigation, and trips/tags/classifiers
+ * expose no entity editor. {@link Duplicates} is a review workflow rather than
+ * an asset grid.
  *
- * {@link AlbumDetails}, {@link TripDetails}, {@link UtilityClassifierAlbum},
- * {@link FolderDetails} and {@link TagDetails} all render through the shared
- * {@link AssetBrowser} orchestrator, differing only by injection points:
- * album scopes by `{ album_id }`, trip by `{ location(bbox), date }`, classifier
- * and tag detail by `{ tag_name, tag_source }`, folder detail by
- * `{ repository_id, folder_path, folder_recursive }`. Album detail carries an
- * *editable* hero — {@link CollectionHero} composed with {@link AlbumFormModal};
- * trips, classifier albums, and tag detail pass no `hero` and expose no edit,
- * because they have no entity to mutate. {@link FolderDetails} passes a `hero`
- * with breadcrumb/child-folder drilldown chips, not an edit surface — folders
- * still aren't a mutable entity. {@link Duplicates} is the one review-style
- * page, not an asset grid.
+ * ## Data
  *
- * ## Decisions
+ * {@link useAlbums} paginates real album entities.
+ * {@link useDuplicateSummary}, {@link useDuplicateGroupList}, and
+ * {@link useDetectDuplicates} wrap the duplicate graph and its maintenance
+ * command. {@link useFolders}/{@link useFolderSummary} derive folder summaries
+ * from repository storage paths, and {@link useTagSummaries} groups tag usage
+ * by name and source.
  *
- * Editing is modal-only — {@link AlbumFormModal} both creates and edits albums
- * over a shared modal shell, with no inline editing. Trips, classifier albums,
- * folders, and tags expose no edit affordance by design: they have no entity to
- * mutate (or, for tags, mutation is out of scope for v1 per the exec plan).
+ * {@link useCityTrips} derives trips from complete map-point and
+ * location-cluster pagination; there is no backend trip entity.
+ * {@link UTILITY_CLASSIFIERS} defines saved classifier constraints, while
+ * Liked is the ordinary asset browse contract constrained by `liked: true`.
+ * Biological album detail can enqueue an album-scoped BioCLIP rebuild and
+ * invalidates indexing coverage after acceptance. Only
+ * {@link useDetectDuplicates} is exported from the root public entry because
+ * Manage is its sole cross-feature consumer.
  *
  * @module
  */
-import type { AlbumsProvider, useAlbumsState } from "./flows/albums/state/AlbumsProvider.tsx";
-import type { albumsReducer } from "./flows/albums/state/reducer.ts";
-import type { AlbumsState, AlbumsAction } from "./flows/albums/state/types.ts";
-import type { useAlbums, mapAlbumToUI } from "./api/useAlbums.ts";
-import type { useCityTrips } from "./flows/places/useCityTrips.ts";
+import type { useAlbums } from "./api/useAlbums.ts";
 import type {
-  useDuplicateSummary,
-  useDuplicateGroupList,
   useDetectDuplicates,
+  useDuplicateGroupList,
+  useDuplicateSummary,
 } from "./api/useDuplicates.ts";
-import type { UTILITY_CLASSIFIERS } from "./model/utilityClassifiers.ts";
-import type { useFolders, useFolderSummary } from "./api/useFolders.ts";
+import type { useFolderSummary, useFolders } from "./api/useFolders.ts";
 import type { useTagSummaries } from "./api/useTagSummaries.ts";
-import type { encodeFolderKey, decodeFolderKey } from "./model/folderKey.ts";
-import type { encodeTagKey, decodeTagKey } from "./model/tagKey.ts";
-import type { useUtilityShortcuts } from "./flows/utilities/useUtilityShortcuts.ts";
-import type { AssetBrowser } from "@/features/assets";
-import type { CollectionHero } from "@/components/collection";
-import type Collections from "./flows/hub/CollectionsFlow.tsx";
 import type AlbumDetails from "./flows/albums/AlbumDetailsFlow.tsx";
-import type TripDetails from "./flows/places/TripDetailsFlow.tsx";
-import type UtilityClassifierAlbum from "./flows/utilities/UtilityClassifierFlow.tsx";
+import type { AlbumsProvider } from "./flows/albums/state/AlbumsProvider.tsx";
+import type { albumsReducer } from "./flows/albums/state/reducer.ts";
 import type Duplicates from "./flows/utilities/DuplicatesFlow.tsx";
-import type Liked from "./flows/utilities/LikedFlow.tsx";
-import type Folders from "./flows/folders/FoldersFlow.tsx";
 import type FolderDetails from "./flows/folders/FolderDetailsFlow.tsx";
-import type Tags from "./flows/tags/TagsFlow.tsx";
+import type Collections from "./flows/hub/CollectionsFlow.tsx";
+import type TripDetails from "./flows/places/TripDetailsFlow.tsx";
+import type { useCityTrips } from "./flows/places/useCityTrips.ts";
 import type TagDetails from "./flows/tags/TagDetailsFlow.tsx";
-import type { AlbumFormModal } from "./flows/albums/components/AlbumFormModal.tsx";
+import type UtilityClassifierAlbum from "./flows/utilities/UtilityClassifierFlow.tsx";
+import type { useUtilityShortcuts } from "./flows/utilities/useUtilityShortcuts.ts";
+import type { decodeFolderKey, encodeFolderKey } from "./model/folderKey.ts";
+import type { decodeTagKey, encodeTagKey } from "./model/tagKey.ts";
+import type { UTILITY_CLASSIFIERS } from "./model/utilityClassifiers.ts";
+import type { AssetBrowser } from "../assets/index.ts";
+
 export {};

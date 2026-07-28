@@ -26,7 +26,6 @@ const allowedFeatureEntries = new Set(["assets/map", "assets/picker"]);
 const standardFeatureDirectories = new Set([
   "api",
   "components",
-  "docs",
   "flows",
   "hooks",
   "model",

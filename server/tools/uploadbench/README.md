@@ -7,8 +7,7 @@ development or the production Compose stacks under `deploy/compose/`.
 
 A photo is **photo-ready** only when its `metadata_asset` *and* `thumbnail_asset`
 task states are both `complete`. HTTP upload acceptance is never treated as
-completion. See the plan at
-`site/docs/internal/agent/exec-plans/active/upload-bench.md`.
+completion.
 
 ## What it does
 
@@ -150,7 +149,7 @@ The release stack pulls the published unified GHCR image
 
 ```bash
 # 1. Commit + push your branch (adds this tool; server images unaffected).
-git add server/tools/uploadbench site/docs/internal/agent/exec-plans/active/upload-bench.md
+git add server/tools/uploadbench
 git commit -m "feat(bench): upload-to-photo-ready benchmark harness"
 git push origin main            # or your branch
 

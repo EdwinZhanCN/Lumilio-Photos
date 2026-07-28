@@ -1,6 +1,6 @@
 # Lumilio Photos Canonical Origin、TLS 与 Trusted Proxy 执行计划
 
-> - 路径：`site/docs/internal/agent/exec-plans/active/deployment-origin-tls-plan.md`
+> - 路径：`site/docs/internal/exec-plans/completed/deployment-origin-tls-plan.md`
 > - 目标分支：`experimental/sqlite`
 > - 状态：Implementation complete；真实公网 ACME release smoke 待外部条件
 > - 配置版本：Runtime Manifest Schema v2 → v3

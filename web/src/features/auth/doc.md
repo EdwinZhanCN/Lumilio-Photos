@@ -1,51 +1,60 @@
 # Authentication
 
-[AuthProvider](./state/AuthProvider.tsx) owns the verified user session and exposes login, MFA,
-completion, and logout commands. HTTP authentication is centralized in
-[authMiddleware](@/lib/http-commons/client.ts): it attaches the short-lived access token, supplies
-the session-bound CSRF proof to unsafe requests, and replays a failed request
-from a clone captured before its body was consumed.
+Authentication owns the verified browser session, public sign-in and
+registration flows, MFA and password challenges, first-run bootstrap, and
+application access gates. Profile editing and ordinary user administration
+remain in Users and Settings.
 
-The long-lived refresh credential exists only in a host-only `HttpOnly`
-cookie scoped to `/api/v1/auth`; browser JavaScript never receives or stores
-it. [refreshBrowserSession](@/lib/http-commons/client.ts) recovers a non-secret CSRF proof from the
-cookie session, rotates the cookie and access token under a cross-tab Web
-Lock, and is also the bootstrap session probe. [logoutBrowserSession](@/lib/http-commons/client.ts)
-uses the same lock so logout cannot race a refresh in another tab.
+## State
 
-Every session exit converges on [resetSession](./state/resetSession.ts). The reset invalidates
-late refresh responses, removes tokens, aborts Lumilio streams, cancels and
-clears TanStack Query work, clears notifications and agent context, removes
-persisted asset filters/search, and clears repository scope preferences.
-This boundary runs for explicit logout, failed bootstrap authentication, and
-refresh exhaustion so a later user cannot observe the prior user's state.
+[AuthProvider](./state/AuthProvider.tsx) owns the session reducer and the verified user. Browser
+JavaScript stores only the short-lived access token and session-bound CSRF
+proof; the refresh credential remains a host-only `HttpOnly` cookie.
+[refreshBrowserSession](../../lib/http-commons/client.ts) rotates the cookie and access token under a
+cross-tab Web Lock, and [logoutBrowserSession](../../lib/http-commons/client.ts) uses the same lock.
 
-[registerSessionExpiredHandler](../../lib/http-commons/sessionEvents.ts) connects transport-level refresh
-exhaustion back to the provider without making the HTTP client depend on
-React or browser navigation.
+Password-change and MFA challenges are one-use, session-scoped values; they
+are not written to URL history or browser persistence. Every session exit
+converges on [resetSession](./state/resetSession.ts), which removes credentials, resets feature
+and global runtime state, clears user-scoped preferences, cancels Query work,
+and clears the Query cache before another user can authenticate.
 
 ## Flows
 
-Route entries stay thin and delegate to workflow-owned implementations:
+```mermaid
+flowchart TD
+    PUBLIC["Login / Register"] --> AUTH["AuthProvider"]
+    AUTH --> MFA["MFA flow"]
+    AUTH --> PASSWORD["Password-change flow"]
+    SETUP["Bootstrap flow"] --> REGISTER["first admin"]
+    SETUP --> REPOSITORY["primary repository"]
+    AUTH --> GATES["ProtectedRoute / setup gates"]
+    GATES --> APP["authenticated app"]
+```
 
-- [useLoginFlow](./flows/sign-in/useLoginFlow.ts) owns identifier-first login, passkey selection,
-  password fallback, MFA challenge, and redirect recovery.
-- [useRegistrationFlow](./flows/registration/useRegistrationFlow.ts) owns registration plus optional TOTP,
-  passkey, and recovery-code onboarding.
-- [useMFAFlow](./flows/mfa/useMFAFlow.ts) owns authenticated MFA setup, disable, and recovery-code
-  regeneration. Its `mfa` and `action` URL parameters remain authoritative.
-- [useBootstrapFlow](./flows/bootstrap/useBootstrapFlow.ts) composes first-admin registration with primary
-  repository setup without copying either domain's server state.
-- Password-change workflows share [usePasswordConfirmation](./hooks/usePasswordConfirmation.ts) but keep
-  their one-use challenge in the session-scoped auth state boundary.
-
-## Capabilities and rules
+[useLoginFlow](./flows/sign-in/useLoginFlow.ts) coordinates identifier-first login, passkey selection,
+password fallback, MFA challenge, and redirect recovery.
+[useRegistrationFlow](./flows/registration/useRegistrationFlow.ts) handles registration plus optional TOTP,
+passkey, and recovery-code onboarding. [useMFAFlow](./flows/mfa/useMFAFlow.ts) owns authenticated
+MFA management, with its `mfa` and `action` URL parameters authoritative.
+[useBootstrapFlow](./flows/bootstrap/useBootstrapFlow.ts) composes first-admin registration with repository
+creation without copying either domain's server state.
 
 [ProtectedRoute](./modules/access/ProtectedRoute.tsx), [BootstrapGate](./modules/access/BootstrapGate.tsx), and
-[PrimaryRepositoryGate](./modules/access/PrimaryRepositoryGate.tsx) are access/setup capabilities used by app
-composition, not page components. Browser WebAuthn conversion stays in the
-isolated [getPasskeySupport](./modules/webauthn/webauthn.ts) module, while deterministic credential
-policy such as [normalizeUsernameInput](./model/credentialPolicy.ts) stays in the React-free model.
-[useBrowserCapabilities](./api/useBrowserCapabilities.ts) reads the server-resolved canonical-origin
-policy before login and registration, while [BrowserSecurityNotice](./components/BrowserSecurityNotice.tsx)
-keeps LAN HTTP transport risk visible on public and authenticated surfaces.
+[PrimaryRepositoryGate](./modules/access/PrimaryRepositoryGate.tsx) are composition capabilities, not page
+implementations. Route files only re-export their owning flows.
+
+## Data
+
+[authMiddleware](../../lib/http-commons/client.ts) attaches the access token and CSRF proof, then retries
+one failed request from a clone captured before body consumption.
+[registerSessionExpiredHandler](../../lib/http-commons/sessionEvents.ts) reports transport refresh exhaustion
+back to React without coupling the HTTP client to routing.
+
+Reusable auth queries and mutations live in `api/`; browser WebAuthn
+conversion stays in [getPasskeySupport](./modules/webauthn/webauthn.ts), and deterministic account
+policy stays in the React-free model through
+[normalizeUsernameInput](./model/credentialPolicy.ts). [useBrowserCapabilities](./api/useBrowserCapabilities.ts) reads the
+server-resolved origin/security contract used by public flows and
+[BrowserSecurityNotice](./components/BrowserSecurityNotice.tsx). The root `index.ts` is the only runtime
+cross-feature entry.

@@ -1,8 +1,8 @@
 # Destructive PR Plan: Logical Media Browse & Filtering
 
-> - 路径：`site/docs/internal/agent/exec-plans/active/logical-media-browse-filter-plan.md`
+> - 路径：`site/docs/internal/exec-plans/completed/logical-media-browse-filter-plan.md`
 > - 目标分支：`experimental/sqlite`
-> - 状态：In progress
+> - 状态：Completed
 > - PR Title：`feat(browse)!: make media items the canonical browse and filter unit`
 > - Merge strategy：单 PR 开发，最终 squash merge 为一个 breaking commit
 

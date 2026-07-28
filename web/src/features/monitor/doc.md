@@ -1,84 +1,49 @@
 # Monitor
 
-The Monitor feature owns the authenticated `/server-monitor` operational
-dashboard. It is an admin-only surface for queue health, ML indexing
-coverage, rebuild actions, and runtime capability status. It observes and
-triggers backend work, but it does not define queue semantics, ML task
-enablement, or repository configuration.
+Monitor owns the admin-only `/server-monitor` operational dashboard for
+River queues, ML indexing coverage, rebuild commands, and runtime
+capabilities. It observes and triggers backend work but does not define task
+enablement, queue semantics, or repository configuration.
 
 ## State
 
-[MonitorOverview](./flows/overview/MonitorOverview.tsx) gates the route to admin users through `useAuth`. Non-admin
-users get an access message before any monitor queries render. Admin users
-switch between three URL-addressable tabs: queue, ML, and capabilities. The
-default queue tab omits the `tab` query parameter; ML and capabilities store
-`?tab=ml` and `?tab=capabilities`.
+[MonitorOverview](./flows/overview/MonitorOverview.tsx) keeps the selected queue/ML/capabilities tab in the
+`tab` URL parameter. The ML view's optional repository scope is local to the
+route and is not persisted as browse or upload preference.
+[QueueSummaryList](./flows/overview/QueueSummaryList.tsx) keeps only expanded rows and transient copied status;
+[MLMonitor](./flows/overview/MLMonitor.tsx) keeps its confirmation dialog and missing-only/full choice.
 
-Monitor-local state is intentionally small:
+Queue, capability, and indexing results remain TanStack Query server state.
+The route checks the authenticated user before monitor queries render.
 
-- [MonitorOverview](./flows/overview/MonitorOverview.tsx) stores only the selected tab and the optional local
-  repository id used by the ML tab.
-- [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) stores expanded queue rows and the transient
-  "copied diagnostic" key.
-- [MLMonitor](./flows/overview/MLMonitor.tsx) stores the reindex confirmation modal and whether the
-  action should include already-indexed assets.
-
-## Data
-
-[StatMonitor](./flows/overview/StatMonitor.tsx) polls `/api/v1/admin/river/stats` every five seconds and
-summarizes active, completed, and issue jobs from [JobStatsResponse](./types.ts).
-
-[QueueSummaryList](./flows/overview/QueueSummaryList.tsx) polls `/api/v1/admin/river/queue-summary` every five
-seconds with a small error sample limit. The response shape is
-[QueueSummaryResponse](./types.ts); queue rows use [QueueSummaryDTO](./types.ts);
-expandable diagnostics use
-[QueueErrorSampleDTO](./types.ts) and copy a plain-text troubleshooting block to
-the clipboard.
-
-[MLMonitor](./flows/overview/MLMonitor.tsx) reads repository-aware indexing coverage through
-[useAssetIndexingStats](./api/useAssetIndexing.ts). It can trigger [useRebuildAssetIndexes](./api/useAssetIndexing.ts)
-for semantic, OCR, or face tasks, passing the selected repository id when
-the user narrows the ML view to one repository. The rebuild response is
-interpreted through [extractRebuildResponseData](./api/useAssetIndexing.ts) so disabled tasks can
-be reported without guessing from mutation shape.
-
-[CapabilitiesMonitor](./flows/overview/CapabilitiesMonitor.tsx) reads [useCapabilities](@/lib/capabilities/useCapabilities.ts) on a five-second
-interval. It reports ML node counts, task enabled/available state, and LLM
-agent configuration. Capability status is display-only here; durable toggles
-still belong in Settings.
-
-## Composition
+## Flows
 
 ```mermaid
 flowchart TD
-    ROUTE["/server-monitor"] --> MON["Monitor"]
-    MON --> AUTH["useAuth admin gate"]
-    MON --> HEADER["PageHeader tabs"]
-    MON --> QUEUE["Queue view"]
-    MON --> ML["ML view"]
-    MON --> CAP["Capabilities view"]
-    QUEUE --> STATS["StatMonitor"]
-    QUEUE --> SUMMARY["QueueSummaryList"]
-    ML --> REPOS["useRepositoryOptions"]
-    ML --> INDEX["useAssetIndexingStats"]
-    ML --> REBUILD["useRebuildAssetIndexes"]
-    CAP --> CAPHOOK["useCapabilities"]
+    ROUTE["/server-monitor"] --> ADMIN["admin gate"]
+    ADMIN --> TABS["queue / ML / capabilities"]
+    TABS --> QUEUE["StatMonitor + QueueSummaryList"]
+    TABS --> ML["MLMonitor"]
+    TABS --> CAP["CapabilitiesMonitor"]
+    ML --> REPOSITORY["optional repository scope"]
+    ML --> REBUILD["task rebuild"]
 ```
 
-Queue and capabilities views are pure monitor surfaces. The ML view borrows
-repository options from Repositories only to scope coverage and rebuild actions;
-it does not persist a browse or working repository preference.
+[StatMonitor](./flows/overview/StatMonitor.tsx) and [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) form the queue view.
+[MLMonitor](./flows/overview/MLMonitor.tsx) combines coverage, repository options, and one confirmed
+rebuild command. [CapabilitiesMonitor](./flows/overview/CapabilitiesMonitor.tsx) is display-only; durable ML and
+agent settings stay in Settings.
 
-## Decisions
+## Data
 
-Monitor is admin-only because it exposes operational failure details and can
-enqueue rebuild work. User-facing progress summaries should live in feature
-pages, not here.
+Queue stats and summary endpoints poll every five seconds. Queue summaries
+include bounded error samples suitable for copied diagnostics.
+[useCapabilities](../../lib/capabilities/useCapabilities.ts) also polls every five seconds.
 
-Polling is short and explicit. Queue and capability data are operationally
-volatile, so components own their own five-second intervals instead of
-relying on stale global state.
-
-Reindex actions stay task-scoped. The user confirms one ML task at a time
-and can choose missing-only or full rebuild, which avoids hiding expensive
-library-wide work behind a generic refresh button.
+[useAssetIndexingStats](./api/useAssetIndexing.ts) polls repository-aware coverage every fifteen
+seconds. [AssetIndexingStats](./api/useAssetIndexing.ts) distinguishes photo and video totals and
+semantic, video-semantic, BioCLIP, OCR, and face coverage.
+[useRebuildAssetIndexes](./api/useAssetIndexing.ts) can enqueue semantic, video-semantic, OCR, or
+face work; BioCLIP is visible here but its album-scoped rebuild belongs to
+Collections. [extractRebuildResponseData](./api/useAssetIndexing.ts) interprets accepted/disabled
+task results without inventing response shapes.
