@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 
+# Static regression guards for SQL generation and browse/search contracts.
 repo_root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 

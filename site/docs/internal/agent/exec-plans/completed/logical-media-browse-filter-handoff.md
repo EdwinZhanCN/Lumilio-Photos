@@ -80,7 +80,7 @@ Step 11–16 已全部完成（2026-07-27），细节见下。剩余的唯一未
 | 13 | event/date grouping 改为直接对 BrowseItem 分组（`groupBrowseItemsBySort` 不再经 `asset_id` 往返，避免同 representative 的两行互相顶掉），分组键仍来自 representative 的日期 | ✅ |
 | 14 | 真实 SQLite browse 矩阵 `server/internal/db/browse_matrix_test.go`（composition × membership × kind × collapsed/expanded × list/count parity × 分页 × 部分命中 × cover fallback）＋ 7 条 invariant；handler contract 测试全量重写 | ✅ |
 | 15 | 前端测试按新契约重写（`filter`/`browseRouteState`/`filterState`/`legacyBrowseStateMigration`/`browseItems`/`StackedThumbnail`/`AssetsPageHeader`），新增 `MediaCompositionBadges.test.tsx`；Agent 侧新增 `asset_filter_test.go` 与 pins replay payload 测试 | ✅ |
-| 16 | `scripts/check-sqlite-architecture.sh` 新增三条 browse 守卫（见 §4.2）；`make server-test` / `make web-test` / `make dto` 全绿且生成物无漂移 | ✅ |
+| 16 | `scripts/check-architecture.sh` 新增三条 browse 守卫（见 §4.2）；`make server-test` / `make web-test` / `make dto` 全绿且生成物无漂移 | ✅ |
 
 ### 4.1 E2E：已跑通（12/12），并抓到一个真实产品 bug
 
@@ -129,7 +129,7 @@ vp run e2e:down
 
 ### 4.2 architecture guard 的边界（重要）
 
-`scripts/check-sqlite-architecture.sh` 现在多跑四条 grep 守卫，全部已用「注入回归 → 确认报错」验证过：
+`scripts/check-architecture.sh` 现在多跑四条 grep 守卫，全部已用「注入回归 → 确认报错」验证过：
 
 1. **retired RAW filter**：`IsRaw` / `filter.raw` / `raw?: boolean` / `raw: true|false` / `params.get("raw")`。白名单：`dbtypes.PhotoSpecificMetadata.is_raw`（EXIF 事实）、生成 SQL 的 component fact 列、`legacyBrowseStateMigration*`（读旧持久化，`raw` 是被**丢弃**的输入，不是过滤器）。
 2. **search stack_mode**：`asset_search_fused.go` 里出现 `StackMode` 即失败。
@@ -155,13 +155,13 @@ vp run e2e:down
 3. **handler 包曾因依赖 broken 的 agent/core 而整包跳过 type-check**——每次后端改动后跑全量 `go build ./...`，不要只 build 单包。
 4. `vp fmt` 会写文件；生成物（`src/wasm/**`、schema.d.ts、`doc.md`）不许手改。
 5. i18n 严格 extract-then-fill（见 Step 11 第 11 条）。
-6. 前端 `raw` 残留：现在只剩无关局部变量（`assetGroups.ts` 的 `const raw = key.slice(...)`、`MediaViewer.tsx` 的 `const raw = searchParams.get("t_ms")`）、`legacyBrowseStateMigration` 的旧持久化输入，以及 `MediaViewer.test.tsx` 里名为 "raw" 的 fixture asset。这些都是合法的，`check-sqlite-architecture.sh` 已覆盖真正的回归形态。
+6. 前端 `raw` 残留：现在只剩无关局部变量（`assetGroups.ts` 的 `const raw = key.slice(...)`、`MediaViewer.tsx` 的 `const raw = searchParams.get("t_ms")`）、`legacyBrowseStateMigration` 的旧持久化输入，以及 `MediaViewer.test.tsx` 里名为 "raw" 的 fixture asset。这些都是合法的，`check-architecture.sh` 已覆盖真正的回归形态。
 7. `AssetQueryRequestDTO.stack_mode` 保留是**有意的**（browse collapse/expand presentation），不要顺手删。
 8. 旧 agent pins replay payload 宽松处理（无新字段则过滤不生效）是**有意的**，不要加迁移。
 9. commit 约定：`feat(assets): …` / `fix: …` 等；本 PR 所有改动尚未 commit，是否 commit 由用户决定，**勿主动 commit**。
 
 ## 6. 当前状态与接手建议
 
-**全部质量门已绿**（2026-07-27）：`make test`（server + web）、`make dto`（生成物幂等无漂移）、`scripts/check-sqlite-architecture.sh`，以及 E2E 四个 suite 12/12。所有改动**仍未 commit**，是否 commit 由用户决定。
+**全部质量门已绿**（2026-07-27）：`make test`（server + web）、`make dto`（生成物幂等无漂移）、`scripts/check-architecture.sh`，以及 E2E 四个 suite 12/12。所有改动**仍未 commit**，是否 commit 由用户决定。
 
 剩余可选项：性能基准数字（§4.1.2）。本文件与 plan 已移入 `exec-plans/completed/`。
