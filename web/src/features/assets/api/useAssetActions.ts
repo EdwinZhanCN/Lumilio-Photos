@@ -29,20 +29,26 @@ const patchBrowseItemAsset = (
   let updated = false;
   let nextItem = item;
 
-  if (item.asset?.asset_id === assetId) {
+  if (item.media_item?.primary_asset?.asset_id === assetId) {
     nextItem = {
       ...nextItem,
-      asset: updateFn(item.asset as Asset),
+      media_item: {
+        ...item.media_item,
+        primary_asset: updateFn(item.media_item.primary_asset as Asset),
+      },
     };
     updated = true;
   }
 
-  if (item.stack?.cover_asset?.asset_id === assetId) {
+  if (item.stack?.cover?.primary_asset?.asset_id === assetId) {
     nextItem = {
       ...nextItem,
       stack: {
         ...item.stack,
-        cover_asset: updateFn(item.stack.cover_asset as Asset),
+        cover: {
+          ...item.stack.cover,
+          primary_asset: updateFn(item.stack.cover.primary_asset as Asset),
+        },
       },
     };
     updated = true;
@@ -52,7 +58,7 @@ const patchBrowseItemAsset = (
 };
 
 const isSearchAssetsPage = (page: AssetsListPage): page is SearchAssetsResponseDTO =>
-  "result_items" in page || "top_items" in page || "results_total_assets" in page;
+  "result_items" in page || "top_items" in page || "results_total_visible" in page;
 
 const patchAssetsListPage = (
   page: AssetsListPage,

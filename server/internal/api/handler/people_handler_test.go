@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"server/internal/api/dto"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 
@@ -245,10 +246,13 @@ func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(
 	gin.SetMode(gin.TestMode)
 
 	stackID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	coverUUID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-	memberUUID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	cover := testBrowseMediaItem(t, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "person-cover.jpg")
+	member := testBrowseMediaItem(t, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "person-member.jpg")
 
-	coverAsset := testHandlerAsset(t, coverUUID.String(), "person-cover.jpg")
+	members := []service.BrowseStackMember{
+		{MediaItemID: cover.MediaItemID, PrimaryAssetID: cover.PrimaryAsset.AssetID},
+		{MediaItemID: member.MediaItemID, PrimaryAssetID: member.PrimaryAsset.AssetID},
+	}
 
 	handler := NewPeopleHandler(
 		stubAssetService{
@@ -258,21 +262,12 @@ func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(
 				require.Equal(t, service.StackModeCollapsed, params.StackMode)
 				return service.BrowseQueryResult{
 					Items: []service.BrowseItem{
-						{
-							Type:  "stack",
-							ID:    "stack:" + stackID.String(),
-							Asset: coverAsset,
-							Stack: &service.BrowseStack{
-								StackID:          stackID,
-								CoverAssetID:     coverUUID,
-								MemberAssetIDs:   []uuid.UUID{coverUUID, memberUUID},
-								MatchedMemberIDs: []uuid.UUID{memberUUID},
-							},
-						},
+						testBrowseStackItem(t, stackID, dbtypes.StackKindBurst, cover, members, members[1:]),
 					},
-					TotalVisible: 1,
-					TotalAssets:  2,
-					StackMode:    service.StackModeCollapsed,
+					TotalVisible:    1,
+					TotalMediaItems: 2,
+					TotalFiles:      2,
+					StackMode:       service.StackModeCollapsed,
 				}, nil
 			},
 		},
@@ -319,12 +314,16 @@ func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Len(t, response.Items, 1)
 	require.Equal(t, "stack", response.Items[0].Type)
+	require.Equal(t, "stack:"+stackID.String(), response.Items[0].ID)
 	require.NotNil(t, response.Items[0].Stack)
-	require.Equal(t, coverUUID.String(), response.Items[0].Stack.CoverAssetID)
+	require.Equal(t, cover.MediaItemID.String(), response.Items[0].Stack.Cover.MediaItemID)
+	require.Len(t, response.Items[0].Stack.Members, 2)
 	require.NotNil(t, response.TotalVisible)
 	require.Equal(t, 1, *response.TotalVisible)
-	require.NotNil(t, response.TotalAssets)
-	require.Equal(t, 2, *response.TotalAssets)
+	require.NotNil(t, response.TotalMediaItems)
+	require.Equal(t, 2, *response.TotalMediaItems)
+	require.NotNil(t, response.TotalFiles)
+	require.Equal(t, 2, *response.TotalFiles)
 }
 
 func TestPeopleHandlerListPersonAssets_InvalidStackModeReturnsBadRequest(t *testing.T) {

@@ -48,23 +48,42 @@ func (s stubAssetService) QueryBrowseItems(ctx context.Context, params service.Q
 	if err != nil {
 		return service.BrowseQueryResult{}, err
 	}
+	items := testMediaItemBrowseItems(assets)
+	return service.BrowseQueryResult{
+		Items:           items,
+		TotalVisible:    total,
+		TotalMediaItems: total,
+		TotalFiles:      total,
+		StackMode:       service.StackModeCollapsed,
+	}, nil
+}
+
+// testMediaItemBrowseItems models the plain case: one media item per asset,
+// with the asset as its own primary component.
+func testMediaItemBrowseItems(assets []repo.Asset) []service.BrowseItem {
 	items := make([]service.BrowseItem, 0, len(assets))
 	for _, asset := range assets {
 		if asset.AssetID == uuid.Nil {
 			continue
 		}
-		items = append(items, service.BrowseItem{
-			Type:  "asset",
-			ID:    "asset:" + asset.AssetID.String(),
-			Asset: asset,
-		})
+		items = append(items, testMediaItemBrowseItem(asset))
 	}
-	return service.BrowseQueryResult{
-		Items:        items,
-		TotalVisible: total,
-		TotalAssets:  total,
-		StackMode:    service.StackModeCollapsed,
-	}, nil
+	return items
+}
+
+func testMediaItemBrowseItem(asset repo.Asset) service.BrowseItem {
+	media := service.BrowseMediaItem{
+		MediaItemID:    asset.AssetID,
+		MediaKind:      "photo",
+		PrimaryAsset:   asset,
+		ComponentCount: 1,
+		HasJPEG:        true,
+	}
+	return service.BrowseItem{
+		Type:      service.BrowseItemTypeMediaItem,
+		ID:        "media:" + asset.AssetID.String(),
+		MediaItem: &media,
+	}
 }
 
 func (s stubAssetService) SearchBrowseItems(ctx context.Context, params service.SearchAssetsParams) (service.SearchBrowseResult, error) {
@@ -76,28 +95,12 @@ func (s stubAssetService) SearchBrowseItems(ctx context.Context, params service.
 		return service.SearchBrowseResult{}, err
 	}
 
-	toBrowseItems := func(assets []repo.Asset) []service.BrowseItem {
-		items := make([]service.BrowseItem, 0, len(assets))
-		for _, asset := range assets {
-			if asset.AssetID == uuid.Nil {
-				continue
-			}
-			items = append(items, service.BrowseItem{
-				Type:  "asset",
-				ID:    "asset:" + asset.AssetID.String(),
-				Asset: asset,
-			})
-		}
-		return items
-	}
-
 	return service.SearchBrowseResult{
-		TopResults:          toBrowseItems(result.TopResults),
-		TopResultsMeta:      result.TopResultsMeta,
-		Results:             toBrowseItems(result.Results),
-		ResultsTotalVisible: result.ResultsTotal,
-		ResultsTotalAssets:  result.ResultsTotal,
-		StackMode:           service.StackModeCollapsed,
+		TopResults:             testMediaItemBrowseItems(result.TopResults),
+		TopResultsMeta:         result.TopResultsMeta,
+		Results:                testMediaItemBrowseItems(result.Results),
+		ResultsTotalVisible:    result.ResultsTotal,
+		ResultsTotalMediaItems: result.ResultsTotal,
 	}, nil
 }
 

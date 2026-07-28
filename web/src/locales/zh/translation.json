@@ -39,6 +39,9 @@
         "unlike": "取消喜欢",
         "unrated": "未评分"
       },
+      "activeFilters": {
+        "remove": "移除筛选条件"
+      },
       "addTagsModal": {
         "apply_one": "应用 {{count}} 个标签",
         "apply_other": "应用 {{count}} 个标签",
@@ -167,6 +170,18 @@
         "select_placeholder": "选择相机品牌",
         "title": "相机品牌"
       },
+      "common": {
+        "all": "全部",
+        "clear_choice": "清除此筛选"
+      },
+      "compositionSection": {
+        "contains_raw": "含 RAW",
+        "jpeg_raw": "JPEG+RAW",
+        "live_photo": "实况照片",
+        "no_raw": "不含 RAW",
+        "raw_unpaired": "RAW 未配对",
+        "title": "媒体构成"
+      },
       "dateSection": {
         "from": "从",
         "title": "日期",
@@ -214,7 +229,6 @@
         "active_filters_count_one": "已启用 {{count}} 个筛选器",
         "active_filters_count_other": "已启用 {{count}} 个筛选器",
         "apply_button": "应用",
-        "enable_toggle": "启用",
         "filters_button_title": "筛选器",
         "filters_header": "筛选器",
         "reset_button": "重置"
@@ -225,13 +239,16 @@
         "unrated_short": "U",
         "unrated_title": "未评分"
       },
-      "rawSection": {
-        "exclude": "排除",
-        "include": "包含",
-        "title": "RAW"
-      },
       "sectionShell": {
-        "enable": "启用"
+        "clear": "清除",
+        "locked": "此视图已锁定"
+      },
+      "stackSection": {
+        "burst": "连拍",
+        "manual": "手动堆叠",
+        "stacked": "所有堆叠",
+        "title": "分组",
+        "unstacked": "未分组"
       },
       "tagSection": {
         "loading": "加载中…",
@@ -270,6 +287,7 @@
       "asset_aria_label_prefix": "资源",
       "audio_file_fallback": "音频文件",
       "audio_sr_only": "音频",
+      "composition_sr_only": "媒体构成",
       "no_preview": "无预览",
       "unknown_file_fallback": "未知文件",
       "unknown_mime_fallback": "未知类型",
@@ -340,9 +358,12 @@
       "loading": "正在加载堆叠资源..."
     },
     "stackDetail": {
+      "burstKind": "连拍",
       "close": "关闭堆叠详情",
+      "manualKind": "手动堆叠",
       "openButton_one": "查看堆叠详情",
-      "openButton_other": "查看 {{count}} 个相关资源"
+      "openButton_other": "查看 {{count}} 个相关资源",
+      "partialMatch": "{{kind}}：{{total}} 项中有 {{matched}} 项符合当前筛选"
     },
     "tags": {
       "add": "添加标签",

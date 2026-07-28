@@ -385,7 +385,10 @@ func (h *ShareLinkHandler) ListPublicShareAssets(c *gin.Context) {
 
 	items := make([]dto.PublicAssetDTO, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, dto.ToPublicAssetDTO(item.Asset))
+		if item.MediaItem == nil {
+			continue
+		}
+		items = append(items, dto.ToPublicAssetDTO(item.MediaItem.PrimaryAsset))
 	}
 
 	c.Header("Cache-Control", "private, max-age=0, no-store")

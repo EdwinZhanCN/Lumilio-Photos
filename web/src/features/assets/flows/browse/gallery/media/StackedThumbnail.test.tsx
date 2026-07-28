@@ -39,14 +39,21 @@ const asset = {
   },
 } as Asset;
 
+const members = [
+  { mediaItemId: "media-1", primaryAssetId: "stack-cover" },
+  { mediaItemId: "media-2", primaryAssetId: "stack-member" },
+  { mediaItemId: "media-3", primaryAssetId: "stack-member-2" },
+];
+
 const plainBrowseStack: BrowseStackItem = {
   type: "stack",
   id: "stack:stack-1",
   stackId: "stack-1",
+  stackKind: "burst",
   representative: asset,
   assets: [asset],
-  memberAssetIds: ["stack-cover", "stack-member"],
-  matchedMemberIds: [],
+  members,
+  matchedMembers: members,
 };
 
 describe("StackedThumbnail", () => {
@@ -93,5 +100,27 @@ describe("StackedThumbnail", () => {
     await screen.getByRole("button", { name: "thumbnail" }).click();
 
     expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a matched/total count when the filter only hits part of the stack", async () => {
+    const screen = await renderWithProviders(
+      <StackedThumbnail
+        asset={asset}
+        stackInfo={asset.stack!}
+        browseStack={{ ...plainBrowseStack, matchedMembers: members.slice(0, 2) }}
+      />,
+      { router: false },
+    );
+
+    await expect.element(screen.getByText("2 / 3")).toBeVisible();
+  });
+
+  it("shows the plain member count when every member matches", async () => {
+    const screen = await renderWithProviders(
+      <StackedThumbnail asset={asset} stackInfo={asset.stack!} browseStack={plainBrowseStack} />,
+      { router: false },
+    );
+
+    await expect.element(screen.getByText("3")).toBeVisible();
   });
 });

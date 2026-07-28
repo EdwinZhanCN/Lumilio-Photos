@@ -46,7 +46,7 @@ func (values *repeatedStrings) Set(value string) error {
 func runConfigInit(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("server config init", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	profile := flags.String("profile", "", "docker-acme or docker-external-proxy")
+	profile := flags.String("profile", "", strings.Join(config.ProfileNames(true), " or "))
 	origin := flags.String("origin", "", "canonical public https origin")
 	email := flags.String("email", "", "ACME account email (docker-acme)")
 	output := flags.String("output", "", "destination server.toml")
@@ -65,14 +65,16 @@ func runConfigInit(args []string, stdout, stderr io.Writer) error {
 		return errors.New("config init requires --profile, --origin, and --output")
 	}
 
-	data, err := config.GenerateManifest(config.InitOptions{
-		Profile:             config.InitProfile(strings.TrimSpace(*profile)),
-		Origin:              strings.TrimSpace(*origin),
-		Email:               strings.TrimSpace(*email),
-		TrustedProxyCIDRs:   trustedProxies,
-		ApplicationStateDir: strings.TrimSpace(*stateDir),
-		StorageDir:          strings.TrimSpace(*storageDir),
-	})
+	data, err := config.GenerateManifest(
+		config.ProfileName(strings.TrimSpace(*profile)),
+		config.ProfileInputs{
+			Origin:            strings.TrimSpace(*origin),
+			Email:             strings.TrimSpace(*email),
+			TrustedProxyCIDRs: trustedProxies,
+			StateDir:          strings.TrimSpace(*stateDir),
+			StorageDir:        strings.TrimSpace(*storageDir),
+		},
+	)
 	if err != nil {
 		return err
 	}

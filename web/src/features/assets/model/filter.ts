@@ -4,6 +4,27 @@ type AssetFilterDTO = components["schemas"]["dto.AssetFilterDTO"];
 type AssetType = NonNullable<AssetFilterDTO["type"]>;
 type FilenameOperator = NonNullable<NonNullable<AssetFilterDTO["filename"]>["operator"]>;
 
+export type MediaComposition = NonNullable<
+  NonNullable<AssetFilterDTO["media_item"]>["composition"]
+>;
+export type StackMembership = NonNullable<NonNullable<AssetFilterDTO["stack"]>["membership"]>;
+export type StackKind = NonNullable<NonNullable<AssetFilterDTO["stack"]>["kinds"]>[number];
+
+export const MEDIA_COMPOSITIONS = [
+  "contains_raw",
+  "jpeg_raw",
+  "raw_unpaired",
+  "no_raw",
+  "live_photo",
+] as const satisfies readonly MediaComposition[];
+
+export const STACK_MEMBERSHIPS = [
+  "stacked",
+  "unstacked",
+] as const satisfies readonly StackMembership[];
+
+export const STACK_KINDS = ["burst", "manual"] as const satisfies readonly StackKind[];
+
 export type AssetBrowseConstraint = AssetFilterDTO;
 
 export type AssetLocationBBox = {
@@ -15,7 +36,13 @@ export type AssetLocationBBox = {
 
 export type AssetUserFilter = {
   type?: Extract<AssetType, "PHOTO" | "VIDEO">;
-  raw?: boolean;
+  media_item?: {
+    composition?: MediaComposition;
+  };
+  stack?: {
+    membership?: StackMembership;
+    kinds?: StackKind[];
+  };
   rating?: number;
   liked?: boolean;
   filename?: {
@@ -34,17 +61,23 @@ export type AssetUserFilter = {
 
 export type AssetUserFilterKey = keyof AssetUserFilter;
 
+/**
+ * Order matters for display only — active-filter chips render in this order, so
+ * it mirrors the filter panel's section order and the two never disagree.
+ * Counting, stripping and picking treat these keys as a set.
+ */
 export const ASSET_USER_FILTER_KEYS = [
   "type",
-  "raw",
-  "rating",
   "liked",
+  "rating",
+  "media_item",
+  "stack",
   "filename",
   "date",
+  "location",
   "camera_model",
   "lens",
   "tag_names",
-  "location",
 ] as const satisfies readonly AssetUserFilterKey[];
 
 const FILENAME_OPERATORS = new Set<FilenameOperator>([
@@ -53,6 +86,30 @@ const FILENAME_OPERATORS = new Set<FilenameOperator>([
   "starts_with",
   "ends_with",
 ]);
+
+const MEDIA_COMPOSITION_SET: ReadonlySet<string> = new Set(MEDIA_COMPOSITIONS);
+const STACK_MEMBERSHIP_SET: ReadonlySet<string> = new Set(STACK_MEMBERSHIPS);
+const STACK_KIND_SET: ReadonlySet<string> = new Set(STACK_KINDS);
+
+export const isMediaComposition = (value: unknown): value is MediaComposition =>
+  typeof value === "string" && MEDIA_COMPOSITION_SET.has(value);
+
+export const isStackMembership = (value: unknown): value is StackMembership =>
+  typeof value === "string" && STACK_MEMBERSHIP_SET.has(value);
+
+export const isStackKind = (value: unknown): value is StackKind =>
+  typeof value === "string" && STACK_KIND_SET.has(value);
+
+const normalizeStackKinds = (kinds: readonly string[] | undefined): StackKind[] | undefined => {
+  if (!kinds) return undefined;
+
+  const seen = new Set<StackKind>();
+  kinds.forEach((kind) => {
+    if (isStackKind(kind)) seen.add(kind);
+  });
+
+  return seen.size > 0 ? STACK_KINDS.filter((kind) => seen.has(kind)) : undefined;
+};
 
 const trimOptional = (value: string | undefined): string | undefined => {
   const normalized = value?.trim();
@@ -93,7 +150,23 @@ export function normalizeAssetUserFilter(filter: AssetUserFilter): AssetUserFilt
   const normalized: AssetUserFilter = {};
 
   if (filter.type === "PHOTO" || filter.type === "VIDEO") normalized.type = filter.type;
-  if (typeof filter.raw === "boolean") normalized.raw = filter.raw;
+
+  const composition = filter.media_item?.composition;
+  if (isMediaComposition(composition)) normalized.media_item = { composition };
+
+  const membership = isStackMembership(filter.stack?.membership)
+    ? filter.stack.membership
+    : undefined;
+  // Backend rejects `unstacked` together with kinds, so an unstacked selection drops kinds.
+  const stackKinds =
+    membership === "unstacked" ? undefined : normalizeStackKinds(filter.stack?.kinds);
+  if (membership || stackKinds) {
+    normalized.stack = {
+      ...(membership ? { membership } : {}),
+      ...(stackKinds ? { kinds: stackKinds } : {}),
+    };
+  }
+
   if (
     typeof filter.rating === "number" &&
     Number.isInteger(filter.rating) &&
@@ -137,7 +210,13 @@ export function isAssetUserFilterFieldActive(
   switch (key) {
     case "type":
       return filter.type === "PHOTO" || filter.type === "VIDEO";
-    case "raw":
+    case "media_item":
+      return isMediaComposition(filter.media_item?.composition);
+    case "stack":
+      return Boolean(
+        isStackMembership(filter.stack?.membership) ||
+        filter.stack?.kinds?.some((kind) => isStackKind(kind)),
+      );
     case "liked":
       return typeof filter[key] === "boolean";
     case "rating":
@@ -173,7 +252,8 @@ export function getConstraintUserFilter(
 
   return normalizeAssetUserFilter({
     type: constraint.type === "PHOTO" || constraint.type === "VIDEO" ? constraint.type : undefined,
-    raw: constraint.raw,
+    media_item: constraint.media_item,
+    stack: constraint.stack,
     rating: constraint.rating,
     liked: constraint.liked,
     filename:

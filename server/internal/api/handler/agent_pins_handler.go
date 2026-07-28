@@ -273,12 +273,20 @@ func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
 		req.SearchType = "filename"
 	}
 
-	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	params, err := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid filter parameters")
+		return
+	}
 	params = applyAssetOwnershipScope(c, params)
 	params.Source = source
 
 	result, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidBrowseFilter) {
+			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			return
+		}
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
 			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
 			return
@@ -327,8 +335,8 @@ func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
 		return
 	}
-	if err := validateStackMode(req.StackMode); err != nil {
-		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+	if err := rejectSearchStackMode(req.StackMode); err != nil {
+		api.GinBadRequest(c, err, "stack_mode is not supported for search; results are flat by media item")
 		return
 	}
 	if err := validateSearchEnhancementMode(req.EnhancementMode); err != nil {
@@ -339,7 +347,11 @@ func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
 	}
 
-	params := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	params, err := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, "", req.Filter, req.Pagination)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid filter parameters")
+		return
+	}
 	params = applyAssetOwnershipScope(c, params)
 	params.Source = source
 
@@ -350,6 +362,10 @@ func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 		Debug:             req.Debug,
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidBrowseFilter) {
+			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			return
+		}
 		log.Printf("Failed to search pin assets: %v", err)
 		api.GinInternalError(c, err, "Failed to search pin assets")
 		return

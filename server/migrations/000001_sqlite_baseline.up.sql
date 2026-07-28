@@ -751,9 +751,7 @@ CREATE INDEX idx_assets_gps_lat_lng ON assets (gps_latitude, gps_longitude)
 CREATE INDEX idx_assets_content_hash ON assets (content_hash);
 CREATE INDEX idx_assets_quick_fingerprint ON assets (quick_fingerprint, file_size)
     WHERE quick_fingerprint IS NOT NULL;
-CREATE INDEX idx_assets_is_raw_text_active
-    ON assets (json_extract(specific_metadata, '$.is_raw'))
-    WHERE is_deleted = 0 AND json_type(specific_metadata, '$.is_raw') IS NOT NULL;
+
 CREATE INDEX idx_assets_lens_model_active
     ON assets (json_extract(specific_metadata, '$.lens_model'))
     WHERE is_deleted = 0 AND json_type(specific_metadata, '$.lens_model') IS NOT NULL;
@@ -799,7 +797,12 @@ CREATE INDEX idx_asset_stack_members_stack ON asset_stack_members (stack_id);
 CREATE UNIQUE INDEX idx_asset_stacks_burst_group_key ON asset_stacks (group_key)
     WHERE stack_kind = 'burst' AND group_key IS NOT NULL;
 CREATE INDEX idx_media_item_assets_item ON media_item_assets (media_item_id);
+CREATE INDEX idx_media_item_assets_item_relation ON media_item_assets (media_item_id, relation, asset_id);
+CREATE INDEX idx_media_items_primary_asset ON media_items (primary_asset_id);
+CREATE INDEX idx_media_items_repository_owner ON media_items (repository_id, owner_id, media_item_id);
 CREATE INDEX idx_media_items_owner_repository ON media_items (owner_id, repository_id);
+CREATE INDEX idx_asset_stack_members_stack_position ON asset_stack_members (stack_id, position, media_item_id);
+CREATE INDEX idx_asset_stacks_kind ON asset_stacks (stack_kind, stack_id);
 CREATE INDEX idx_duplicate_group_assets_asset ON duplicate_group_assets (asset_id);
 CREATE INDEX idx_duplicate_group_edges_assets ON duplicate_group_edges (asset_id_a, asset_id_b);
 CREATE INDEX idx_duplicate_groups_repo_status ON duplicate_groups (repository_id, status, detected_at DESC);
@@ -1031,3 +1034,42 @@ CREATE TRIGGER ocr_text_items_count_delete AFTER DELETE ON ocr_text_items BEGIN
     SET total_count = (SELECT count(*) FROM ocr_text_items WHERE asset_id = old.asset_id)
     WHERE asset_id = old.asset_id;
 END;
+
+-- Canonical browse facts view: composition and stack filter derive exclusively from here.
+CREATE VIEW media_item_browse_facts AS
+SELECT
+    mi.media_item_id,
+    mi.owner_id,
+    mi.repository_id,
+    mi.media_kind,
+    mi.primary_asset_id,
+
+    COUNT(mia.asset_id) AS component_count,
+
+    MAX(CASE WHEN mia.relation = 'raw_original' THEN 1 ELSE 0 END) AS has_raw,
+    MAX(CASE WHEN mia.relation = 'jpeg_original' THEN 1 ELSE 0 END) AS has_jpeg,
+    MAX(CASE WHEN mia.relation = 'edited_version' THEN 1 ELSE 0 END) AS has_edited,
+    MAX(CASE WHEN mia.relation = 'live_photo_video' THEN 1 ELSE 0 END) AS has_live_motion,
+
+    asm.stack_id,
+    asm.position AS stack_position,
+    s.stack_kind
+
+FROM media_items mi
+JOIN media_item_assets mia
+  ON mia.media_item_id = mi.media_item_id
+LEFT JOIN asset_stack_members asm
+  ON asm.media_item_id = mi.media_item_id
+LEFT JOIN asset_stacks s
+  ON s.stack_id = asm.stack_id
+GROUP BY
+    mi.media_item_id,
+    mi.owner_id,
+    mi.repository_id,
+    mi.media_kind,
+    mi.primary_asset_id,
+    asm.stack_id,
+    asm.position,
+    s.stack_kind;
+
+PRAGMA user_version = 3;

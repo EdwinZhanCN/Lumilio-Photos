@@ -13,14 +13,15 @@ import (
 )
 
 const getStackKindsByIDs = `-- name: GetStackKindsByIDs :many
-SELECT stack_id, stack_kind
+SELECT stack_id, stack_kind, cover_media_item_id
 FROM asset_stacks
 WHERE stack_id IN (/*SLICE:stack_ids*/?)
 `
 
 type GetStackKindsByIDsRow struct {
-	StackID   uuid.UUID `db:"stack_id" json:"stack_id"`
-	StackKind string    `db:"stack_kind" json:"stack_kind"`
+	StackID          uuid.UUID     `db:"stack_id" json:"stack_id"`
+	StackKind        string        `db:"stack_kind" json:"stack_kind"`
+	CoverMediaItemID uuid.NullUUID `db:"cover_media_item_id" json:"cover_media_item_id"`
 }
 
 func (q *Queries) GetStackKindsByIDs(ctx context.Context, stackIds []uuid.UUID) ([]GetStackKindsByIDsRow, error) {
@@ -42,7 +43,7 @@ func (q *Queries) GetStackKindsByIDs(ctx context.Context, stackIds []uuid.UUID) 
 	var items []GetStackKindsByIDsRow
 	for rows.Next() {
 		var i GetStackKindsByIDsRow
-		if err := rows.Scan(&i.StackID, &i.StackKind); err != nil {
+		if err := rows.Scan(&i.StackID, &i.StackKind, &i.CoverMediaItemID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -39,6 +39,9 @@
         "unlike": "Unliked",
         "unrated": "Unrated"
       },
+      "activeFilters": {
+        "remove": "Remove filter"
+      },
       "addTagsModal": {
         "apply_one": "Apply {{count}} tags",
         "apply_other": "Apply {{count}} tags",
@@ -167,6 +170,18 @@
         "select_placeholder": "Select camera make",
         "title": "Camera Make"
       },
+      "common": {
+        "all": "All",
+        "clear_choice": "Clear this filter"
+      },
+      "compositionSection": {
+        "contains_raw": "Contains RAW",
+        "jpeg_raw": "JPEG + RAW",
+        "live_photo": "Live Photo",
+        "no_raw": "No RAW",
+        "raw_unpaired": "Unpaired RAW",
+        "title": "Media composition"
+      },
       "dateSection": {
         "from": "From",
         "title": "Date",
@@ -214,7 +229,6 @@
         "active_filters_count_one": "{{count}} filter active",
         "active_filters_count_other": "{{count}} filters active",
         "apply_button": "Apply",
-        "enable_toggle": "Enable",
         "filters_button_title": "Filters",
         "filters_header": "Filters",
         "reset_button": "Reset"
@@ -225,13 +239,16 @@
         "unrated_short": "U",
         "unrated_title": "Unrated"
       },
-      "rawSection": {
-        "exclude": "Exclude",
-        "include": "Include",
-        "title": "RAW"
-      },
       "sectionShell": {
-        "enable": "Enable"
+        "clear": "Clear",
+        "locked": "Locked by this view"
+      },
+      "stackSection": {
+        "burst": "Burst",
+        "manual": "Manual stack",
+        "stacked": "All stacks",
+        "title": "Grouping",
+        "unstacked": "Ungrouped"
       },
       "tagSection": {
         "loading": "Loading…",
@@ -270,6 +287,7 @@
       "asset_aria_label_prefix": "Asset",
       "audio_file_fallback": "Audio file",
       "audio_sr_only": "Audio",
+      "composition_sr_only": "Media composition",
       "no_preview": "No preview",
       "unknown_file_fallback": "Unknown file",
       "unknown_mime_fallback": "Unknown type",
@@ -340,9 +358,12 @@
       "loading": "Loading stack assets..."
     },
     "stackDetail": {
+      "burstKind": "Burst",
       "close": "Close stack details",
+      "manualKind": "Manual stack",
       "openButton_one": "View stack details",
-      "openButton_other": "View {{count}} related assets"
+      "openButton_other": "View {{count}} related assets",
+      "partialMatch": "{{kind}}: {{matched}} of {{total}} match the current filter"
     },
     "tags": {
       "add": "Add tag",

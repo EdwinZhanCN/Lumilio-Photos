@@ -1068,6 +1068,9 @@ const docTemplate = `{
                     "location": {
                         "$ref": "#/components/schemas/dto.LocationBBoxDTO"
                     },
+                    "media_item": {
+                        "$ref": "#/components/schemas/dto.MediaItemFilterDTO"
+                    },
                     "owner_id": {
                         "example": 123,
                         "type": "integer"
@@ -1082,13 +1085,12 @@ const docTemplate = `{
                         "minimum": 0,
                         "type": "integer"
                     },
-                    "raw": {
-                        "example": true,
-                        "type": "boolean"
-                    },
                     "repository_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
+                    },
+                    "stack": {
+                        "$ref": "#/components/schemas/dto.StackFilterDTO"
                     },
                     "tag_name": {
                         "example": "document",
@@ -1584,50 +1586,73 @@ const docTemplate = `{
             },
             "dto.BrowseItemDTO": {
                 "properties": {
-                    "asset": {
-                        "$ref": "#/components/schemas/dto.AssetDTO"
-                    },
                     "best_ts_ms": {
                         "example": 12500,
                         "type": "integer"
                     },
                     "id": {
-                        "example": "stack:550e8400-e29b-41d4-a716-446655440000",
+                        "example": "media:550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
+                    },
+                    "media_item": {
+                        "$ref": "#/components/schemas/dto.BrowseMediaItemDTO"
                     },
                     "stack": {
                         "$ref": "#/components/schemas/dto.BrowseStackDTO"
                     },
                     "type": {
                         "enum": [
-                            "asset",
+                            "media_item",
                             "stack"
                         ],
-                        "example": "stack",
+                        "example": "media_item",
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.BrowseMediaItemDTO": {
+                "properties": {
+                    "composition": {
+                        "$ref": "#/components/schemas/dto.MediaCompositionDTO"
+                    },
+                    "media_item_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "media_kind": {
+                        "enum": [
+                            "photo",
+                            "video",
+                            "audio"
+                        ],
+                        "example": "photo",
+                        "type": "string"
+                    },
+                    "primary_asset": {
+                        "$ref": "#/components/schemas/dto.AssetDTO"
+                    },
+                    "stack": {
+                        "$ref": "#/components/schemas/dto.StackPreviewDTO"
                     }
                 },
                 "type": "object"
             },
             "dto.BrowseStackDTO": {
                 "properties": {
-                    "cover_asset": {
-                        "$ref": "#/components/schemas/dto.AssetDTO"
+                    "cover": {
+                        "$ref": "#/components/schemas/dto.BrowseMediaItemDTO"
                     },
-                    "cover_asset_id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440001",
-                        "type": "string"
-                    },
-                    "matched_member_ids": {
+                    "matched_members": {
                         "items": {
-                            "type": "string"
+                            "$ref": "#/components/schemas/dto.BrowseStackMemberDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
                     },
-                    "member_asset_ids": {
+                    "members": {
                         "items": {
-                            "type": "string"
+                            "$ref": "#/components/schemas/dto.BrowseStackMemberDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -1643,10 +1668,19 @@ const docTemplate = `{
                         ],
                         "example": "burst",
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.BrowseStackMemberDTO": {
+                "properties": {
+                    "media_item_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
                     },
-                    "stack_size": {
-                        "example": 3,
-                        "type": "integer"
+                    "primary_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440001",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -3389,6 +3423,54 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.MediaComposition": {
+                "enum": [
+                    "contains_raw",
+                    "jpeg_raw",
+                    "raw_unpaired",
+                    "no_raw",
+                    "live_photo",
+                    "contains_raw",
+                    "jpeg_raw",
+                    "raw_unpaired",
+                    "no_raw",
+                    "live_photo"
+                ],
+                "example": "jpeg_raw",
+                "type": "string",
+                "x-enum-varnames": [
+                    "MediaCompositionContainsRAW",
+                    "MediaCompositionJPEGRAW",
+                    "MediaCompositionRAWUnpaired",
+                    "MediaCompositionNoRAW",
+                    "MediaCompositionLivePhoto"
+                ]
+            },
+            "dto.MediaCompositionDTO": {
+                "properties": {
+                    "component_count": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "has_edited": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "has_jpeg": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "has_live_motion": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "has_raw": {
+                        "example": true,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
             "dto.MediaItemByAssetResponseDTO": {
                 "properties": {
                     "asset_id": {
@@ -3445,6 +3527,14 @@ const docTemplate = `{
                     },
                     "primary_asset_id": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MediaItemFilterDTO": {
+                "properties": {
+                    "composition": {
+                        "$ref": "#/components/schemas/dto.MediaComposition"
                     }
                 },
                 "type": "object"
@@ -3960,7 +4050,11 @@ const docTemplate = `{
                         "example": "collapsed",
                         "type": "string"
                     },
-                    "total_assets": {
+                    "total_files": {
+                        "example": 213,
+                        "type": "integer"
+                    },
+                    "total_media_items": {
                         "example": 150,
                         "type": "integer"
                     },
@@ -4598,14 +4692,6 @@ const docTemplate = `{
                         "example": "date_captured",
                         "type": "string"
                     },
-                    "stack_mode": {
-                        "enum": [
-                            "collapsed",
-                            "expanded"
-                        ],
-                        "example": "collapsed",
-                        "type": "string"
-                    },
                     "top_results_limit": {
                         "example": 200,
                         "maximum": 200,
@@ -4636,21 +4722,13 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
-                    "results_total_assets": {
+                    "results_total_media_items": {
                         "example": 150,
                         "type": "integer"
                     },
                     "results_total_visible": {
                         "example": 120,
                         "type": "integer"
-                    },
-                    "stack_mode": {
-                        "enum": [
-                            "collapsed",
-                            "expanded"
-                        ],
-                        "example": "collapsed",
-                        "type": "string"
                     },
                     "top_items": {
                         "items": {
@@ -4999,6 +5077,25 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.StackFilterDTO": {
+                "properties": {
+                    "kinds": {
+                        "items": {
+                            "enum": [
+                                "burst",
+                                "manual"
+                            ],
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "membership": {
+                        "$ref": "#/components/schemas/dto.StackMembership"
+                    }
+                },
+                "type": "object"
+            },
             "dto.StackMemberDTO": {
                 "properties": {
                     "media_item_id": {
@@ -5015,6 +5112,20 @@ const docTemplate = `{
                     }
                 },
                 "type": "object"
+            },
+            "dto.StackMembership": {
+                "enum": [
+                    "stacked",
+                    "unstacked",
+                    "stacked",
+                    "unstacked"
+                ],
+                "example": "stacked",
+                "type": "string",
+                "x-enum-varnames": [
+                    "StackMembershipStacked",
+                    "StackMembershipUnstacked"
+                ]
             },
             "dto.StackPreviewDTO": {
                 "description": "Stack fields (populated when stack mode is enabled)",

@@ -15,3 +15,12 @@ web/src/wasm/**                 linguist-generated=true
 
 # docts renders each feature's doc.ts into its sibling doc.md
 web/src/features/*/doc.md       linguist-generated=true
+
+# Runtime manifest schema and per-scenario example manifests, generated from the
+# profile table in server/config/profiles.go by `make config-examples`.
+#
+# eol=lf is load-bearing, not cosmetic: a golden test compares these files
+# byte-for-byte against freshly generated output, and the Windows CI job runs
+# `go test ./...` after a checkout that would otherwise convert them to CRLF.
+server/config/schema/*.json          linguist-generated=true text eol=lf
+server/config/examples/**/*.toml     linguist-generated=true text eol=lf

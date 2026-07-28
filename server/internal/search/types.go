@@ -30,7 +30,6 @@ type Filter struct {
 	FilenameOperator *string
 	DateFrom         *time.Time
 	DateTo           *time.Time
-	IsRaw            *bool
 	IsDeleted        *bool
 	Rating           *int
 	Liked            *bool

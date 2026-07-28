@@ -35,6 +35,6 @@ export function useRepositoryAssetCount(repositoryId: string) {
 
   return {
     ...query,
-    assetCount: query.data?.total_assets ?? 0,
+    assetCount: query.data?.total_media_items ?? 0,
   };
 }

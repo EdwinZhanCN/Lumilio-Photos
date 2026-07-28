@@ -79,7 +79,9 @@ export function useAssetsSearch(
       enhancement_mode: "auto",
       top_results_limit: TOP_RESULTS_LIMIT,
       sort_by: normalizeAssetSort(definition.sortBy),
-      stack_mode: "collapsed",
+      // Search results are always flat by media item — collapsing would reorder
+      // the relevance set — so this request carries no stack-mode field at all;
+      // the endpoint rejects it with 400.
       viewer_timezone: viewerTimeZone,
     }),
     [apiFilter, definition.sortBy, pageSize, queryText, viewerTimeZone],

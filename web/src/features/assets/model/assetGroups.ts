@@ -97,7 +97,11 @@ const buildDateGroupKey = (assetDate: Date, now: Date, offsetMinutes?: number): 
   }
 };
 
-const getAssetGroupKey = (asset: Asset, sortBy: SortByType, now: Date): string => {
+export const getAssetGroupKey = (
+  asset: Asset,
+  sortBy: SortByType,
+  now: Date = new Date(),
+): string => {
   const sortDate = getSortDate(asset, sortBy);
   const captureOffsetMinutes =
     sortBy === "date_captured" ? asset.capture_offset_minutes : undefined;

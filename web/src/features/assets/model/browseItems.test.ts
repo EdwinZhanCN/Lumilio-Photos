@@ -17,6 +17,7 @@ import {
   getBrowseItemAssetId,
   resolveBrowseSelectedAssetIds,
   resolveSelectedBrowseItems,
+  type BrowseItemDTO,
 } from "./browseItems";
 
 const createAsset = (assetId: string, overrides: Partial<Asset> = {}): Asset =>
@@ -25,6 +26,45 @@ const createAsset = (assetId: string, overrides: Partial<Asset> = {}): Asset =>
     original_filename: `${assetId}.jpg`,
     ...overrides,
   }) as Asset;
+
+/** Server browse rows are media items; the media item id doubles as the asset id here. */
+const mediaItemDTO = (assetId: string, overrides: Partial<Asset> = {}): BrowseItemDTO => ({
+  type: "media_item",
+  id: `media:${assetId}`,
+  media_item: {
+    media_item_id: assetId,
+    primary_asset: createAsset(assetId, overrides),
+  },
+});
+
+const memberDTO = (assetId: string) => ({
+  media_item_id: assetId,
+  primary_asset_id: assetId,
+});
+
+const stackDTO = (
+  stackId: string,
+  options: {
+    coverAssetId: string;
+    coverOverrides?: Partial<Asset>;
+    memberAssetIds: string[];
+    matchedAssetIds?: string[];
+    stackKind?: "burst" | "manual";
+  },
+): BrowseItemDTO => ({
+  type: "stack",
+  id: `stack:${stackId}`,
+  stack: {
+    stack_id: stackId,
+    stack_kind: options.stackKind ?? "burst",
+    cover: {
+      media_item_id: options.coverAssetId,
+      primary_asset: createAsset(options.coverAssetId, options.coverOverrides),
+    },
+    members: options.memberAssetIds.map(memberDTO),
+    matched_members: (options.matchedAssetIds ?? options.memberAssetIds).map(memberDTO),
+  },
+});
 
 describe("browseItems", () => {
   it("creates asset items for non-stacked assets", () => {
@@ -38,7 +78,7 @@ describe("browseItems", () => {
     const browseGroups = createBrowseGroupsFromAssetGroups(groups);
     const items = flattenBrowseGroups(browseGroups);
 
-    expect(items.map((item) => item.id)).toEqual(["asset:a", "asset:b"]);
+    expect(items.map((item) => item.id)).toEqual(["media:a", "media:b"]);
     expect(items.map(getBrowseItemAssetId)).toEqual(["a", "b"]);
   });
 
@@ -62,7 +102,7 @@ describe("browseItems", () => {
     ]);
 
     expect(browseGroups).toHaveLength(1);
-    expect(browseGroups[0]?.items.map((item) => item.id)).toEqual(["stack:stack-1", "asset:solo"]);
+    expect(browseGroups[0]?.items.map((item) => item.id)).toEqual(["stack:stack-1", "media:solo"]);
   });
 
   it("collapses stacked assets within the same group", () => {
@@ -189,18 +229,13 @@ describe("browseItems", () => {
     expect(findBrowseItemIndexByAssetId(items, "solo")).toBe(1);
   });
 
-  it("finds stack items by memberAssetIds when only backend browse payload is loaded", () => {
+  it("finds stack items by member primary asset id when only the browse payload is loaded", () => {
     const items = createBrowseItemsFromBrowseItemDTOs([
-      {
-        type: "stack",
-        stack: {
-          stack_id: "stack-1",
-          cover_asset_id: "cover",
-          cover_asset: createAsset("cover"),
-          member_asset_ids: ["cover", "member"],
-          matched_member_ids: ["member"],
-        },
-      },
+      stackDTO("stack-1", {
+        coverAssetId: "cover",
+        memberAssetIds: ["cover", "member"],
+        matchedAssetIds: ["member"],
+      }),
     ]);
 
     expect(findBrowseItemIndexByAssetId(items, "member")).toBe(0);
@@ -237,7 +272,7 @@ describe("browseItems", () => {
 
     const deduped = dedupeBrowseItemsById(flattenBrowseGroups(browseGroups));
 
-    expect(deduped.map((item) => item.id)).toEqual(["stack:stack-1", "asset:solo"]);
+    expect(deduped.map((item) => item.id)).toEqual(["stack:stack-1", "media:solo"]);
     expect(getBrowseItemAsset(deduped[0]!).asset_id).toBe("cover");
   });
 
@@ -297,11 +332,11 @@ describe("browseItems", () => {
     );
 
     const resolved = resolveSelectedBrowseItems(
-      ["asset:solo", "stack:stack-1", "asset:missing"],
+      ["media:solo", "stack:stack-1", "media:missing"],
       items,
     );
 
-    expect(resolved.map((item) => item.id)).toEqual(["asset:solo", "stack:stack-1"]);
+    expect(resolved.map((item) => item.id)).toEqual(["media:solo", "stack:stack-1"]);
     expect(getBrowseItemAsset(resolved[1]!).asset_id).toBe("cover");
   });
 
@@ -332,29 +367,18 @@ describe("browseItems", () => {
     );
 
     expect(
-      resolveBrowseSelectedAssetIds(["stack:stack-1", "asset:solo", "asset:missing"], items),
+      resolveBrowseSelectedAssetIds(["stack:stack-1", "media:solo", "asset:missing"], items),
     ).toEqual(["cover", "solo"]);
   });
 
   it("resolves stack browse selection ids to all member asset ids for whole-stack actions", () => {
     const items = createBrowseItemsFromBrowseItemDTOs([
-      {
-        type: "stack",
-        stack: {
-          stack_id: "stack-1",
-          cover_asset_id: "cover",
-          cover_asset: createAsset("cover"),
-          member_asset_ids: ["cover", "member"],
-        },
-      },
-      {
-        type: "asset",
-        asset: createAsset("solo"),
-      },
+      stackDTO("stack-1", { coverAssetId: "cover", memberAssetIds: ["cover", "member"] }),
+      mediaItemDTO("solo"),
     ]);
 
     expect(
-      resolveBrowseSelectedAssetIds(["stack:stack-1", "asset:solo", "asset:missing"], items, {
+      resolveBrowseSelectedAssetIds(["stack:stack-1", "media:solo", "media:missing"], items, {
         stackMode: "whole-stack",
       }),
     ).toEqual(["cover", "member", "solo"]);
@@ -362,23 +386,12 @@ describe("browseItems", () => {
 
   it("dedupes resolved whole-stack member asset ids", () => {
     const items = createBrowseItemsFromBrowseItemDTOs([
-      {
-        type: "stack",
-        stack: {
-          stack_id: "stack-1",
-          cover_asset_id: "cover",
-          cover_asset: createAsset("cover"),
-          member_asset_ids: ["cover", "member"],
-        },
-      },
-      {
-        type: "asset",
-        asset: createAsset("member"),
-      },
+      stackDTO("stack-1", { coverAssetId: "cover", memberAssetIds: ["cover", "member"] }),
+      mediaItemDTO("member"),
     ]);
 
     expect(
-      resolveBrowseSelectedAssetIds(["stack:stack-1", "asset:member"], items, {
+      resolveBrowseSelectedAssetIds(["stack:stack-1", "media:member"], items, {
         stackMode: "whole-stack",
       }),
     ).toEqual(["cover", "member"]);
@@ -394,109 +407,134 @@ describe("browseItems", () => {
       ]),
     );
 
-    expect(findBrowseItemById(items, "asset:solo")?.id).toBe("asset:solo");
-    expect(findBrowseItemById(items, "asset:missing")).toBeUndefined();
+    expect(findBrowseItemById(items, "media:solo")?.id).toBe("media:solo");
+    expect(findBrowseItemById(items, "media:missing")).toBeUndefined();
   });
 
   it("maps query-like pages using BrowseItem DTO items", () => {
     const browseGroups = browseGroupsFromQueryLikePage({
       items: [
-        {
-          type: "stack",
-          stack: {
-            stack_id: "stack-1",
-            cover_asset_id: "cover",
-            cover_asset: createAsset("cover", {
-              stack: {
-                stack_id: "stack-1",
-                stack_size: 2,
-                stack_cover: true,
-              },
-            }),
-            member_asset_ids: ["cover", "member"],
+        stackDTO("stack-1", {
+          coverAssetId: "cover",
+          coverOverrides: {
+            stack: { stack_id: "stack-1", stack_size: 2, stack_cover: true },
           },
-        },
-        {
-          type: "asset",
-          asset: createAsset("solo"),
-        },
+          memberAssetIds: ["cover", "member"],
+        }),
+        mediaItemDTO("solo"),
       ],
       sortBy: "date_captured",
     });
 
     expect(flattenBrowseGroups(browseGroups).map((item) => item.id)).toEqual([
       "stack:stack-1",
-      "asset:solo",
+      "media:solo",
     ]);
   });
 
   it("keeps search top results in one flat section", () => {
     const browseGroups = browseGroupsFromSearchTop({
       topItems: [
-        {
-          type: "asset",
-          asset: createAsset("newer", { taken_time: "2026-05-02T00:00:00Z" }),
-        },
-        {
-          type: "asset",
-          asset: createAsset("older", { taken_time: "2024-01-01T00:00:00Z" }),
-        },
+        mediaItemDTO("newer", { taken_time: "2026-05-02T00:00:00Z" }),
+        mediaItemDTO("older", { taken_time: "2024-01-01T00:00:00Z" }),
       ],
     });
 
     expect(browseGroups).toHaveLength(1);
     expect(browseGroups[0]?.key).toBe("search:top_results");
     expect(flattenBrowseGroups(browseGroups).map((item) => item.id)).toEqual([
-      "asset:newer",
-      "asset:older",
+      "media:newer",
+      "media:older",
     ]);
   });
 
   it("keeps search result pages in one flat results section", () => {
     const browseGroups = browseGroupsFromSearchResultsPage({
       resultItems: [
-        {
-          type: "asset",
-          asset: createAsset("newer", { taken_time: "2026-05-02T00:00:00Z" }),
-        },
-        {
-          type: "asset",
-          asset: createAsset("older", { taken_time: "2024-01-01T00:00:00Z" }),
-        },
+        mediaItemDTO("newer", { taken_time: "2026-05-02T00:00:00Z" }),
+        mediaItemDTO("older", { taken_time: "2024-01-01T00:00:00Z" }),
       ],
     });
 
     expect(browseGroups).toHaveLength(1);
     expect(browseGroups[0]?.key).toBe("search:results");
     expect(flattenBrowseGroups(browseGroups).map((item) => item.id)).toEqual([
-      "asset:newer",
-      "asset:older",
+      "media:newer",
+      "media:older",
     ]);
   });
 
   it("creates browse items from backend browse dto payloads", () => {
     const items = createBrowseItemsFromBrowseItemDTOs([
+      mediaItemDTO("solo"),
+      stackDTO("stack-1", {
+        coverAssetId: "cover",
+        memberAssetIds: ["cover", "member"],
+        matchedAssetIds: ["member"],
+        stackKind: "manual",
+      }),
+    ]);
+
+    expect(items.map((item) => item.id)).toEqual(["media:solo", "stack:stack-1"]);
+    expect(items[1]).toMatchObject({
+      type: "stack",
+      stackKind: "manual",
+      members: [
+        { mediaItemId: "cover", primaryAssetId: "cover" },
+        { mediaItemId: "member", primaryAssetId: "member" },
+      ],
+      matchedMembers: [{ mediaItemId: "member", primaryAssetId: "member" }],
+    });
+  });
+
+  it("carries media item composition facts through the dto mapping", () => {
+    const items = createBrowseItemsFromBrowseItemDTOs([
       {
-        type: "asset",
-        asset: createAsset("solo"),
-      },
-      {
-        type: "stack",
-        stack: {
-          stack_id: "stack-1",
-          cover_asset_id: "cover",
-          cover_asset: createAsset("cover"),
-          member_asset_ids: ["cover", "member"],
-          matched_member_ids: ["member"],
+        type: "media_item",
+        id: "media:pair",
+        media_item: {
+          media_item_id: "pair",
+          primary_asset: createAsset("pair"),
+          composition: {
+            component_count: 2,
+            has_raw: true,
+            has_jpeg: true,
+            has_edited: false,
+            has_live_motion: false,
+          },
         },
       },
     ]);
 
-    expect(items.map((item) => item.id)).toEqual(["asset:solo", "stack:stack-1"]);
-    expect(items[1]).toMatchObject({
-      type: "stack",
-      memberAssetIds: ["cover", "member"],
-      matchedMemberIds: ["member"],
+    expect(items[0]).toMatchObject({
+      type: "media_item",
+      id: "media:pair",
+      composition: { componentCount: 2, hasRaw: true, hasJpeg: true },
+    });
+  });
+
+  it("grafts the stack preview onto the cover asset so overlays keep working", () => {
+    const items = createBrowseItemsFromBrowseItemDTOs([
+      {
+        type: "stack",
+        id: "stack:stack-1",
+        stack: {
+          stack_id: "stack-1",
+          stack_kind: "burst",
+          cover: {
+            media_item_id: "cover",
+            primary_asset: createAsset("cover"),
+            stack: { stack_id: "stack-1", stack_size: 3, stack_cover: true, stack_kind: "burst" },
+          },
+          members: ["cover", "member", "member-2"].map(memberDTO),
+          matched_members: [memberDTO("member")],
+        },
+      },
+    ]);
+
+    expect(getBrowseItemAsset(items[0]!).stack).toMatchObject({
+      stack_id: "stack-1",
+      stack_size: 3,
     });
   });
 });

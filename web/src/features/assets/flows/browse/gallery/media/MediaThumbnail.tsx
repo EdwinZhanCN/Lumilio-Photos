@@ -3,6 +3,8 @@ import { Play, Music, Video, Headphones, Check } from "lucide-react";
 import { formatDuration, getAssetAriaLabel, isAudio, isVideo } from "../../../../model/mediaTypes";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
+import MediaCompositionBadges from "./MediaCompositionBadges";
+import type { MediaCompositionFacts } from "../../../../types";
 
 interface MediaThumbnailProps {
   asset: Asset;
@@ -11,6 +13,8 @@ interface MediaThumbnailProps {
   onClick?: (e: React.MouseEvent) => void;
   isSelected?: boolean;
   isSelectionMode?: boolean;
+  /** Component facts of the logical media item this thumbnail stands for. */
+  composition?: MediaCompositionFacts;
 }
 
 /**
@@ -23,6 +27,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   onClick,
   isSelected = false,
   isSelectionMode = false,
+  composition,
 }) => {
   const { t } = useI18n();
   const videoAsset = isVideo(asset);
@@ -197,6 +202,9 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
           <div className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/65 px-2.5 py-1 text-xs text-white shadow-lg backdrop-blur-sm">
             {formatDuration(duration)}
           </div>
+        )}
+        {!isSelectionMode && (
+          <MediaCompositionBadges composition={composition} offsetTop={videoAsset} />
         )}
         {selectionOverlay}
       </div>

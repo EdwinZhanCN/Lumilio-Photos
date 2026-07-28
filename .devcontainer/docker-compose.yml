@@ -20,8 +20,6 @@ services:
 
             RUSTUP_HOME: /usr/local/rustup
             CARGO_HOME: /usr/local/cargo
-
-            VITE_API_URL: http://localhost:6680
         command: /bin/bash -c "while sleep 1000; do :; done"
         ports:
             - "6680:6680" # Go API server (make server-dev)

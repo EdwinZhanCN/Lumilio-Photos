@@ -9,42 +9,311 @@ import (
 	"context"
 )
 
-const countAssetsUnified = `-- name: CountAssetsUnified :one
+const countMediaItemFilesUnified = `-- name: CountMediaItemFilesUnified :one
 WITH filter_params AS (
   SELECT
-    CAST(?25 AS TEXT) AS asset_ids_json,
-    CAST(?26 AS TEXT) AS asset_types_json,
-    CAST(?27 AS TEXT) AS tag_names_json
+    CAST(?2 AS TEXT) AS asset_ids_json,
+    CAST(?3 AS TEXT) AS asset_types_json,
+    CAST(?4 AS TEXT) AS tag_names_json,
+    CAST(?5 AS TEXT) AS stack_kinds_json
+),
+matched_media AS (
+  SELECT facts.media_item_id
+  FROM media_item_browse_facts facts
+  JOIN assets pa ON pa.asset_id = facts.primary_asset_id
+  WHERE pa.is_deleted = COALESCE(?1, false)
+    AND (
+      (SELECT asset_ids_json FROM filter_params) IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM media_item_assets mia_scope
+        WHERE mia_scope.media_item_id = facts.media_item_id
+          AND mia_scope.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+      )
+    )
+    AND (
+      ?6 IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM media_item_assets mia_query
+        JOIN assets component_query ON component_query.asset_id = mia_query.asset_id
+        WHERE mia_query.media_item_id = facts.media_item_id
+          AND component_query.original_filename LIKE '%' || ?6 || '%'
+      )
+    )
+    AND (?7 IS NULL OR pa.type = ?7)
+    AND (
+      (SELECT asset_types_json FROM filter_params) IS NULL
+      OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
+    )
+    AND (?8 IS NULL OR facts.owner_id = ?8)
+    AND (?9 IS NULL OR facts.repository_id = ?9)
+    AND (
+      ?10 IS NULL
+      OR (
+        CASE
+          WHEN ?10 = '' THEN
+            CASE WHEN COALESCE(?11, true) THEN true
+              ELSE instr(pa.storage_path, '/') = 0
+            END
+          ELSE
+            CASE WHEN COALESCE(?11, true) THEN
+              pa.storage_path LIKE ?10 || '/%'
+            ELSE
+              pa.storage_path LIKE ?10 || '/%'
+              AND pa.storage_path NOT LIKE ?10 || '/%/%'
+            END
+        END
+      )
+    )
+    AND (
+      ?12 IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = ?12
+          AND fi_person.asset_id = pa.asset_id
+      )
+    )
+    AND (
+      ?13 IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = pa.asset_id
+          AND aa.album_id = ?13
+      )
+    )
+    AND (
+      ?14 IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM asset_tags at
+        JOIN tags t ON t.tag_id = at.tag_id
+        WHERE at.asset_id = pa.asset_id
+          AND t.tag_name = ?14
+          AND (?15 IS NULL OR at.source = ?15)
+      )
+    )
+    AND (
+      (SELECT tag_names_json FROM filter_params) IS NULL
+      OR (
+        SELECT COUNT(DISTINCT t2.tag_name)
+        FROM asset_tags at2
+        JOIN tags t2 ON t2.tag_id = at2.tag_id
+        WHERE at2.asset_id = pa.asset_id
+          AND t2.tag_name IN (SELECT value FROM json_each((SELECT tag_names_json FROM filter_params)))
+      ) = json_array_length((SELECT tag_names_json FROM filter_params))
+    )
+    AND (
+      ?16 IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM media_item_assets mia_name
+        JOIN assets component_name ON component_name.asset_id = mia_name.asset_id
+        WHERE mia_name.media_item_id = facts.media_item_id
+          AND CASE COALESCE(?17, 'contains')
+            WHEN 'matches' THEN component_name.original_filename LIKE ?16
+            WHEN 'starts_with' THEN component_name.original_filename LIKE ?16 || '%'
+            WHEN 'ends_with' THEN component_name.original_filename LIKE '%' || ?16
+            ELSE component_name.original_filename LIKE '%' || ?16 || '%'
+          END
+      )
+    )
+    AND (?18 IS NULL OR COALESCE(pa.taken_time, pa.upload_time) >= ?18)
+    AND (?19 IS NULL OR COALESCE(pa.taken_time, pa.upload_time) <= ?19)
+    AND (
+      ?20 IS NULL
+      OR CASE ?20
+        WHEN 'contains_raw' THEN facts.has_raw = 1
+        WHEN 'jpeg_raw' THEN facts.has_raw = 1 AND facts.has_jpeg = 1
+        WHEN 'raw_unpaired' THEN facts.has_raw = 1 AND facts.has_jpeg = 0
+        WHEN 'no_raw' THEN facts.has_raw = 0
+        WHEN 'live_photo' THEN facts.has_live_motion = 1
+        ELSE false
+      END
+    )
+    AND (
+      ?21 IS NULL
+      OR CASE ?21
+        WHEN 'stacked' THEN facts.stack_id IS NOT NULL
+        WHEN 'unstacked' THEN facts.stack_id IS NULL
+        ELSE false
+      END
+    )
+    AND (
+      (SELECT stack_kinds_json FROM filter_params) IS NULL
+      OR facts.stack_kind IN (SELECT value FROM json_each((SELECT stack_kinds_json FROM filter_params)))
+    )
+    AND (?22 IS NULL OR
+      CASE
+        WHEN ?22 = 0 THEN pa.rating IS NULL OR pa.rating = 0
+        ELSE pa.rating = ?22
+      END
+    )
+    AND (?23 IS NULL OR
+      CASE
+        WHEN ?23 = false THEN pa.liked IS NULL OR pa.liked = false
+        ELSE pa.liked = true
+      END
+    )
+    AND (?24 IS NULL OR json_extract(pa.specific_metadata, char(36) || '.camera_model') = ?24)
+    AND (?25 IS NULL OR json_extract(pa.specific_metadata, char(36) || '.lens_model') = ?25)
+    AND (
+      ?26 IS NULL
+      OR ?27 IS NULL
+      OR ?28 IS NULL
+      OR ?29 IS NULL
+      OR (
+        pa.gps_latitude IS NOT NULL
+        AND pa.gps_longitude IS NOT NULL
+        AND pa.gps_latitude
+          BETWEEN min(?27, ?26)
+          AND max(?27, ?26)
+        AND (
+          CASE
+            WHEN ?29 <= ?28 THEN
+              pa.gps_longitude BETWEEN ?29 AND ?28
+            ELSE
+              pa.gps_longitude >= ?29
+              OR pa.gps_longitude <= ?28
+          END
+        )
+      )
+    )
 )
-SELECT COUNT(*) as count
-FROM assets a
-WHERE a.is_deleted = COALESCE(?1, false)
+SELECT COUNT(*) AS count
+FROM matched_media mm
+JOIN media_item_assets mia ON mia.media_item_id = mm.media_item_id
+JOIN assets component ON component.asset_id = mia.asset_id
+WHERE component.is_deleted = COALESCE(?1, false)
+`
+
+type CountMediaItemFilesUnifiedParams struct {
+	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
+	AssetIds         *string     `db:"asset_ids" json:"asset_ids"`
+	AssetTypes       *string     `db:"asset_types" json:"asset_types"`
+	TagNames         *string     `db:"tag_names" json:"tag_names"`
+	StackKinds       *string     `db:"stack_kinds" json:"stack_kinds"`
+	Query            interface{} `db:"query" json:"query"`
+	AssetType        interface{} `db:"asset_type" json:"asset_type"`
+	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
+	RepositoryID     interface{} `db:"repository_id" json:"repository_id"`
+	FolderPath       interface{} `db:"folder_path" json:"folder_path"`
+	FolderRecursive  interface{} `db:"folder_recursive" json:"folder_recursive"`
+	PersonID         interface{} `db:"person_id" json:"person_id"`
+	AlbumID          interface{} `db:"album_id" json:"album_id"`
+	TagName          interface{} `db:"tag_name" json:"tag_name"`
+	TagSource        interface{} `db:"tag_source" json:"tag_source"`
+	FilenameVal      interface{} `db:"filename_val" json:"filename_val"`
+	FilenameOperator interface{} `db:"filename_operator" json:"filename_operator"`
+	DateFrom         interface{} `db:"date_from" json:"date_from"`
+	DateTo           interface{} `db:"date_to" json:"date_to"`
+	Composition      interface{} `db:"composition" json:"composition"`
+	StackMembership  interface{} `db:"stack_membership" json:"stack_membership"`
+	Rating           interface{} `db:"rating" json:"rating"`
+	Liked            interface{} `db:"liked" json:"liked"`
+	CameraModel      interface{} `db:"camera_model" json:"camera_model"`
+	LensModel        interface{} `db:"lens_model" json:"lens_model"`
+	LocationNorth    interface{} `db:"location_north" json:"location_north"`
+	LocationSouth    interface{} `db:"location_south" json:"location_south"`
+	LocationEast     interface{} `db:"location_east" json:"location_east"`
+	LocationWest     interface{} `db:"location_west" json:"location_west"`
+}
+
+// Count of component files belonging to the media items matched by
+// CountMediaItemsUnified (total_files). Components share the browse
+// is_deleted state so list/count predicates stay identical.
+func (q *Queries) CountMediaItemFilesUnified(ctx context.Context, arg CountMediaItemFilesUnifiedParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countMediaItemFilesUnified,
+		arg.IsDeleted,
+		arg.AssetIds,
+		arg.AssetTypes,
+		arg.TagNames,
+		arg.StackKinds,
+		arg.Query,
+		arg.AssetType,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.FolderPath,
+		arg.FolderRecursive,
+		arg.PersonID,
+		arg.AlbumID,
+		arg.TagName,
+		arg.TagSource,
+		arg.FilenameVal,
+		arg.FilenameOperator,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.Composition,
+		arg.StackMembership,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.LocationNorth,
+		arg.LocationSouth,
+		arg.LocationEast,
+		arg.LocationWest,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countMediaItemsUnified = `-- name: CountMediaItemsUnified :one
+WITH filter_params AS (
+  SELECT
+    CAST(?26 AS TEXT) AS asset_ids_json,
+    CAST(?27 AS TEXT) AS asset_types_json,
+    CAST(?28 AS TEXT) AS tag_names_json,
+    CAST(?29 AS TEXT) AS stack_kinds_json
+)
+SELECT COUNT(*) AS count
+FROM media_item_browse_facts facts
+JOIN assets pa ON pa.asset_id = facts.primary_asset_id
+WHERE pa.is_deleted = COALESCE(?1, false)
   AND (
     (SELECT asset_ids_json FROM filter_params) IS NULL
-    OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+    OR EXISTS (
+      SELECT 1
+      FROM media_item_assets mia_scope
+      WHERE mia_scope.media_item_id = facts.media_item_id
+        AND mia_scope.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+    )
   )
-  AND (?2 IS NULL OR a.original_filename LIKE '%' || ?2 || '%')
-  AND (?3 IS NULL OR a.type = ?3)
+  AND (
+    ?2 IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM media_item_assets mia_query
+      JOIN assets component_query ON component_query.asset_id = mia_query.asset_id
+      WHERE mia_query.media_item_id = facts.media_item_id
+        AND component_query.original_filename LIKE '%' || ?2 || '%'
+    )
+  )
+  AND (?3 IS NULL OR pa.type = ?3)
   AND (
     (SELECT asset_types_json FROM filter_params) IS NULL
-    OR a.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
+    OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
   )
-  AND (?4 IS NULL OR a.owner_id = ?4)
-  AND (?5 IS NULL OR a.repository_id = ?5)
+  AND (?4 IS NULL OR facts.owner_id = ?4)
+  AND (?5 IS NULL OR facts.repository_id = ?5)
   AND (
     ?6 IS NULL
     OR (
       CASE
         WHEN ?6 = '' THEN
           CASE WHEN COALESCE(?7, true) THEN true
-            ELSE instr(a.storage_path, '/') = 0
+            ELSE instr(pa.storage_path, '/') = 0
           END
         ELSE
           CASE WHEN COALESCE(?7, true) THEN
-            a.storage_path LIKE ?6 || '/%'
+            pa.storage_path LIKE ?6 || '/%'
           ELSE
-            a.storage_path LIKE ?6 || '/%'
-            AND a.storage_path NOT LIKE ?6 || '/%/%'
+            pa.storage_path LIKE ?6 || '/%'
+            AND pa.storage_path NOT LIKE ?6 || '/%/%'
           END
       END
     )
@@ -56,7 +325,7 @@ WHERE a.is_deleted = COALESCE(?1, false)
       FROM face_cluster_members fcm
       JOIN face_items fi_person ON fi_person.id = fcm.face_id
       WHERE fcm.cluster_id = ?8
-        AND fi_person.asset_id = a.asset_id
+        AND fi_person.asset_id = pa.asset_id
     )
   )
   AND (
@@ -64,7 +333,7 @@ WHERE a.is_deleted = COALESCE(?1, false)
     OR EXISTS (
       SELECT 1
       FROM album_assets aa
-      WHERE aa.asset_id = a.asset_id
+      WHERE aa.asset_id = pa.asset_id
         AND aa.album_id = ?9
     )
   )
@@ -74,7 +343,7 @@ WHERE a.is_deleted = COALESCE(?1, false)
       SELECT 1
       FROM asset_tags at
       JOIN tags t ON t.tag_id = at.tag_id
-      WHERE at.asset_id = a.asset_id
+      WHERE at.asset_id = pa.asset_id
         AND t.tag_name = ?10
         AND (?11 IS NULL OR at.source = ?11)
     )
@@ -85,65 +354,89 @@ WHERE a.is_deleted = COALESCE(?1, false)
       SELECT COUNT(DISTINCT t2.tag_name)
       FROM asset_tags at2
       JOIN tags t2 ON t2.tag_id = at2.tag_id
-      WHERE at2.asset_id = a.asset_id
+      WHERE at2.asset_id = pa.asset_id
         AND t2.tag_name IN (SELECT value FROM json_each((SELECT tag_names_json FROM filter_params)))
     ) = json_array_length((SELECT tag_names_json FROM filter_params))
   )
-  AND (?12 IS NULL OR
-    CASE COALESCE(?13, 'contains')
-      WHEN 'matches' THEN a.original_filename LIKE ?12
-      WHEN 'starts_with' THEN a.original_filename LIKE ?12 || '%'
-      WHEN 'ends_with' THEN a.original_filename LIKE '%' || ?12
-      ELSE a.original_filename LIKE '%' || ?12 || '%'
+  AND (
+    ?12 IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM media_item_assets mia_name
+      JOIN assets component_name ON component_name.asset_id = mia_name.asset_id
+      WHERE mia_name.media_item_id = facts.media_item_id
+        AND CASE COALESCE(?13, 'contains')
+          WHEN 'matches' THEN component_name.original_filename LIKE ?12
+          WHEN 'starts_with' THEN component_name.original_filename LIKE ?12 || '%'
+          WHEN 'ends_with' THEN component_name.original_filename LIKE '%' || ?12
+          ELSE component_name.original_filename LIKE '%' || ?12 || '%'
+        END
+    )
+  )
+  AND (?14 IS NULL OR COALESCE(pa.taken_time, pa.upload_time) >= ?14)
+  AND (?15 IS NULL OR COALESCE(pa.taken_time, pa.upload_time) <= ?15)
+  AND (
+    ?16 IS NULL
+    OR CASE ?16
+      WHEN 'contains_raw' THEN facts.has_raw = 1
+      WHEN 'jpeg_raw' THEN facts.has_raw = 1 AND facts.has_jpeg = 1
+      WHEN 'raw_unpaired' THEN facts.has_raw = 1 AND facts.has_jpeg = 0
+      WHEN 'no_raw' THEN facts.has_raw = 0
+      WHEN 'live_photo' THEN facts.has_live_motion = 1
+      ELSE false
     END
   )
-  AND (?14 IS NULL OR COALESCE(a.taken_time, a.upload_time) >= ?14)
-  AND (?15 IS NULL OR COALESCE(a.taken_time, a.upload_time) <= ?15)
-  AND (?16 IS NULL OR
-    CASE
-      WHEN ?16 = true THEN json_extract(a.specific_metadata, char(36) || '.is_raw') = 1
-      ELSE json_extract(a.specific_metadata, char(36) || '.is_raw') = 0 OR json_extract(a.specific_metadata, char(36) || '.is_raw') IS NULL
+  AND (
+    ?17 IS NULL
+    OR CASE ?17
+      WHEN 'stacked' THEN facts.stack_id IS NOT NULL
+      WHEN 'unstacked' THEN facts.stack_id IS NULL
+      ELSE false
     END
   )
-  AND (?17 IS NULL OR
-    CASE
-      WHEN ?17 = 0 THEN a.rating IS NULL OR a.rating = 0
-      ELSE a.rating = ?17
-    END
+  AND (
+    (SELECT stack_kinds_json FROM filter_params) IS NULL
+    OR facts.stack_kind IN (SELECT value FROM json_each((SELECT stack_kinds_json FROM filter_params)))
   )
   AND (?18 IS NULL OR
     CASE
-      WHEN ?18 = false THEN a.liked IS NULL OR a.liked = false
-      ELSE a.liked = true
+      WHEN ?18 = 0 THEN pa.rating IS NULL OR pa.rating = 0
+      ELSE pa.rating = ?18
     END
   )
-  AND (?19 IS NULL OR json_extract(a.specific_metadata, char(36) || '.camera_model') = ?19)
-  AND (?20 IS NULL OR json_extract(a.specific_metadata, char(36) || '.lens_model') = ?20)
+  AND (?19 IS NULL OR
+    CASE
+      WHEN ?19 = false THEN pa.liked IS NULL OR pa.liked = false
+      ELSE pa.liked = true
+    END
+  )
+  AND (?20 IS NULL OR json_extract(pa.specific_metadata, char(36) || '.camera_model') = ?20)
+  AND (?21 IS NULL OR json_extract(pa.specific_metadata, char(36) || '.lens_model') = ?21)
   AND (
-    ?21 IS NULL
-    OR ?22 IS NULL
+    ?22 IS NULL
     OR ?23 IS NULL
     OR ?24 IS NULL
+    OR ?25 IS NULL
     OR (
-    a.gps_latitude IS NOT NULL
-    AND a.gps_longitude IS NOT NULL
-    AND a.gps_latitude
-      BETWEEN min(?22, ?21)
-      AND max(?22, ?21)
-    AND (
-      CASE
-        WHEN ?24 <= ?23 THEN
-          a.gps_longitude BETWEEN ?24 AND ?23
-        ELSE
-          a.gps_longitude >= ?24
-          OR a.gps_longitude <= ?23
-      END
-    )
+      pa.gps_latitude IS NOT NULL
+      AND pa.gps_longitude IS NOT NULL
+      AND pa.gps_latitude
+        BETWEEN min(?23, ?22)
+        AND max(?23, ?22)
+      AND (
+        CASE
+          WHEN ?25 <= ?24 THEN
+            pa.gps_longitude BETWEEN ?25 AND ?24
+          ELSE
+            pa.gps_longitude >= ?25
+            OR pa.gps_longitude <= ?24
+        END
+      )
     )
   )
 `
 
-type CountAssetsUnifiedParams struct {
+type CountMediaItemsUnifiedParams struct {
 	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
@@ -159,7 +452,8 @@ type CountAssetsUnifiedParams struct {
 	FilenameOperator interface{} `db:"filename_operator" json:"filename_operator"`
 	DateFrom         interface{} `db:"date_from" json:"date_from"`
 	DateTo           interface{} `db:"date_to" json:"date_to"`
-	IsRaw            interface{} `db:"is_raw" json:"is_raw"`
+	Composition      interface{} `db:"composition" json:"composition"`
+	StackMembership  interface{} `db:"stack_membership" json:"stack_membership"`
 	Rating           interface{} `db:"rating" json:"rating"`
 	Liked            interface{} `db:"liked" json:"liked"`
 	CameraModel      interface{} `db:"camera_model" json:"camera_model"`
@@ -171,12 +465,13 @@ type CountAssetsUnifiedParams struct {
 	AssetIds         *string     `db:"asset_ids" json:"asset_ids"`
 	AssetTypes       *string     `db:"asset_types" json:"asset_types"`
 	TagNames         *string     `db:"tag_names" json:"tag_names"`
+	StackKinds       *string     `db:"stack_kinds" json:"stack_kinds"`
 }
 
-// Count query matching GetAssetsUnified WHERE clause
-// Returns total count of assets matching the filters (for pagination)
-func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAssetsUnified,
+// Count query matching GetMediaItemsUnified WHERE clause.
+// Returns the number of matching logical media items (total_media_items).
+func (q *Queries) CountMediaItemsUnified(ctx context.Context, arg CountMediaItemsUnifiedParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countMediaItemsUnified,
 		arg.IsDeleted,
 		arg.Query,
 		arg.AssetType,
@@ -192,7 +487,8 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 		arg.FilenameOperator,
 		arg.DateFrom,
 		arg.DateTo,
-		arg.IsRaw,
+		arg.Composition,
+		arg.StackMembership,
 		arg.Rating,
 		arg.Liked,
 		arg.CameraModel,
@@ -204,6 +500,7 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 		arg.AssetIds,
 		arg.AssetTypes,
 		arg.TagNames,
+		arg.StackKinds,
 	)
 	var count int64
 	err := row.Scan(&count)

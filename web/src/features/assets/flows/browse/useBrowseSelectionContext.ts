@@ -19,7 +19,7 @@ export function useBrowseSelectionContext(browseItems: BrowseItem[] = []) {
       browseItems.length > 0
         ? resolveBrowseSelectedAssetIds(selectedAsArray, browseItems)
         : selectedAsArray
-            .map((id) => id.replace(/^asset:/, ""))
+            .map((id) => id.replace(/^media:/, ""))
             .filter((id) => !id.startsWith("stack:"));
 
     if (!enabled || !hasSelection || assetIds.length === 0) {

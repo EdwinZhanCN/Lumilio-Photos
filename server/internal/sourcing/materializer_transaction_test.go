@@ -98,7 +98,7 @@ func TestAssetMediaAndPipelineCommitOrRollbackTogether(t *testing.T) {
 	var committed *repo.Asset
 	if err := catalog.WithTx(ctx, func(tx *sql.Tx, queries *repo.Queries) error {
 		var createErr error
-		committed, createErr = createAssetWithMediaItem(ctx, queries, create("commit"))
+		committed, createErr = createAssetWithMediaItem(ctx, queries, create("commit"), repo.StackRelationJpegOriginal)
 		if createErr != nil {
 			return createErr
 		}
@@ -112,7 +112,7 @@ func TestAssetMediaAndPipelineCommitOrRollbackTogether(t *testing.T) {
 	assertCatalogCount(t, catalog.SQL, "SELECT COUNT(*) FROM river_job WHERE queue IN ('metadata_asset', 'thumbnail_asset')", 2)
 
 	err = catalog.WithTx(ctx, func(tx *sql.Tx, queries *repo.Queries) error {
-		asset, createErr := createAssetWithMediaItem(ctx, queries, create("rollback"))
+		asset, createErr := createAssetWithMediaItem(ctx, queries, create("rollback"), repo.StackRelationJpegOriginal)
 		if createErr != nil {
 			return createErr
 		}

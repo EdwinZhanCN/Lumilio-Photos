@@ -318,17 +318,6 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		Message:     fmt.Sprintf("File received and queued for processing in repository '%s'", repository.Name),
 	}
 
-	// Merge structural media components and detect bursts asynchronously after upload.
-	if req.RepositoryID != "" {
-		go func(repoID string) {
-			if _, err := h.queueClient.Insert(context.Background(), jobs.DetectStacksArgs{
-				RepositoryID: repoID,
-			}, &river.InsertOpts{Queue: "detect_stacks"}); err != nil {
-				log.Printf("failed to enqueue detect stacks after upload: %v", err)
-			}
-		}(req.RepositoryID)
-	}
-
 	api.JSONOK(c, response)
 }
 
@@ -620,19 +609,6 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 	if len(sessions) > 0 {
 		go h.cleanupExpiredSessions()
-	}
-
-	// Merge structural media components and detect bursts asynchronously.
-	// This is best-effort: if metadata has not been extracted yet, the next
-	// scan or manual trigger will complete the stacking.
-	if repositoryID != "" {
-		go func(repoID string) {
-			if _, err := h.queueClient.Insert(context.Background(), jobs.DetectStacksArgs{
-				RepositoryID: repoID,
-			}, &river.InsertOpts{Queue: "detect_stacks"}); err != nil {
-				log.Printf("failed to enqueue detect stacks after upload: %v", err)
-			}
-		}(repositoryID)
 	}
 
 	api.JSONOK(c, dto.BatchUploadResponseDTO{Results: results})
@@ -2039,6 +2015,16 @@ func validateStackMode(mode string) error {
 	}
 }
 
+// rejectSearchStackMode enforces that search requests carry no stack_mode:
+// search results are always flat by media item (relevance order must not be
+// reordered by stack collapse).
+func rejectSearchStackMode(mode string) error {
+	if strings.TrimSpace(mode) != "" {
+		return errors.New("stack_mode is not supported for search")
+	}
+	return nil
+}
+
 func normalizeRebuildIndexLimit(limit int) int {
 	switch {
 	case limit <= 0:
@@ -2181,7 +2167,57 @@ func assetQueryDateLocation(viewerTimeZone string) *time.Location {
 	return location
 }
 
-func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) service.QueryAssetsParams {
+// browseFilterFromDTO validates and normalizes the media-item/stack filter
+// blocks: unknown enum values are rejected, empty kinds arrays normalize to
+// unset, and unstacked+kinds is contradictory (mirrors the service check so
+// the request fails fast with a 400).
+func browseFilterFromDTO(filter dto.AssetFilterDTO) (service.MediaComposition, service.StackMembership, []string, error) {
+	var composition service.MediaComposition
+	if filter.MediaItem != nil && filter.MediaItem.Composition != nil {
+		switch service.MediaComposition(*filter.MediaItem.Composition) {
+		case service.MediaCompositionContainsRAW, service.MediaCompositionJPEGRAW,
+			service.MediaCompositionRAWUnpaired, service.MediaCompositionNoRAW,
+			service.MediaCompositionLivePhoto:
+			composition = service.MediaComposition(*filter.MediaItem.Composition)
+		default:
+			return "", "", nil, fmt.Errorf("unknown media_item.composition: %q", string(*filter.MediaItem.Composition))
+		}
+	}
+
+	var membership service.StackMembership
+	var kinds []string
+	if filter.Stack != nil {
+		if filter.Stack.Membership != nil {
+			switch service.StackMembership(*filter.Stack.Membership) {
+			case service.StackMembershipStacked, service.StackMembershipUnstacked:
+				membership = service.StackMembership(*filter.Stack.Membership)
+			default:
+				return "", "", nil, fmt.Errorf("unknown stack.membership: %q", string(*filter.Stack.Membership))
+			}
+		}
+		for _, kind := range filter.Stack.Kinds {
+			kind = strings.ToLower(strings.TrimSpace(kind))
+			if kind == "" {
+				continue
+			}
+			if !dbtypes.StackKind(kind).Valid() {
+				return "", "", nil, fmt.Errorf("unknown stack.kinds value: %q", kind)
+			}
+			kinds = append(kinds, kind)
+		}
+		if membership == service.StackMembershipUnstacked && len(kinds) > 0 {
+			return "", "", nil, fmt.Errorf("stack.membership=unstacked excludes stack.kinds")
+		}
+	}
+	return composition, membership, kinds, nil
+}
+
+func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) (service.QueryAssetsParams, error) {
+	mediaComposition, stackMembership, stackKinds, err := browseFilterFromDTO(filter)
+	if err != nil {
+		return service.QueryAssetsParams{}, err
+	}
+
 	var dateFrom, dateTo *time.Time
 	if filter.Date != nil {
 		dateFrom = filter.Date.From
@@ -2244,7 +2280,9 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		FilenameOperator: filenameOperator,
 		DateFrom:         dateFrom,
 		DateTo:           dateTo,
-		IsRaw:            filter.RAW,
+		MediaComposition: mediaComposition,
+		StackMembership:  stackMembership,
+		StackKinds:       stackKinds,
 		IsDeleted:        filter.IsDeleted,
 		Rating:           filter.Rating,
 		Liked:            filter.Liked,
@@ -2264,7 +2302,7 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		StackMode:        strings.ToLower(strings.TrimSpace(stackMode)),
 		Limit:            pagination.Limit,
 		Offset:           pagination.Offset,
-	}
+	}, nil
 }
 
 func toAssetDTOs(assets []repo.Asset) []dto.AssetDTO {
@@ -2275,17 +2313,35 @@ func toAssetDTOs(assets []repo.Asset) []dto.AssetDTO {
 	return items
 }
 
-func uuidStrings(values []uuid.UUID) []string {
-	if len(values) == 0 {
-		return nil
+func toBrowseMediaItemDTO(media service.BrowseMediaItem) dto.BrowseMediaItemDTO {
+	item := dto.BrowseMediaItemDTO{
+		MediaItemID:  media.MediaItemID.String(),
+		MediaKind:    media.MediaKind,
+		PrimaryAsset: dto.ToAssetDTO(media.PrimaryAsset),
+		Composition: dto.MediaCompositionDTO{
+			ComponentCount: media.ComponentCount,
+			HasRAW:         media.HasRAW,
+			HasJPEG:        media.HasJPEG,
+			HasEdited:      media.HasEdited,
+			HasLiveMotion:  media.HasLiveMotion,
+		},
 	}
-
-	items := make([]string, 0, len(values))
-	for _, value := range values {
-		if value == uuid.Nil {
-			continue
+	if media.StackID != uuid.Nil {
+		item.Stack = &dto.StackPreviewDTO{
+			StackID:   media.StackID.String(),
+			StackKind: string(media.StackKind),
 		}
-		items = append(items, value.String())
+	}
+	return item
+}
+
+func toBrowseStackMemberDTOs(members []service.BrowseStackMember) []dto.BrowseStackMemberDTO {
+	items := make([]dto.BrowseStackMemberDTO, 0, len(members))
+	for _, member := range members {
+		items = append(items, dto.BrowseStackMemberDTO{
+			MediaItemID:    member.MediaItemID.String(),
+			PrimaryAssetID: member.PrimaryAssetID.String(),
+		})
 	}
 	return items
 }
@@ -2293,37 +2349,39 @@ func uuidStrings(values []uuid.UUID) []string {
 func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
 	dtos := make([]dto.BrowseItemDTO, 0, len(items))
 	for _, item := range items {
-		assetDTO := dto.ToAssetDTO(item.Asset)
-		if item.Type == "stack" && item.Stack != nil {
-			stackSize := len(item.Stack.MemberAssetIDs)
-			assetDTO.Stack = &dto.StackPreviewDTO{
+		if item.Type == service.BrowseItemTypeStack && item.Stack != nil {
+			cover := toBrowseMediaItemDTO(item.Stack.Cover)
+			stackSize := len(item.Stack.Members)
+			cover.Stack = &dto.StackPreviewDTO{
 				StackID:    item.Stack.StackID.String(),
 				StackKind:  string(item.Stack.Kind),
 				StackCover: true,
 				StackSize:  &stackSize,
 			}
 			dtos = append(dtos, dto.BrowseItemDTO{
-				Type:     item.Type,
+				Type:     service.BrowseItemTypeStack,
 				ID:       item.ID,
 				BestTsMs: item.BestTsMs,
 				Stack: &dto.BrowseStackDTO{
-					StackID:          item.Stack.StackID.String(),
-					StackKind:        string(item.Stack.Kind),
-					CoverAssetID:     item.Stack.CoverAssetID.String(),
-					CoverAsset:       assetDTO,
-					StackSize:        stackSize,
-					MemberAssetIDs:   uuidStrings(item.Stack.MemberAssetIDs),
-					MatchedMemberIDs: uuidStrings(item.Stack.MatchedMemberIDs),
+					StackID:        item.Stack.StackID.String(),
+					StackKind:      string(item.Stack.Kind),
+					Cover:          cover,
+					Members:        toBrowseStackMemberDTOs(item.Stack.Members),
+					MatchedMembers: toBrowseStackMemberDTOs(item.Stack.MatchedMembers),
 				},
 			})
 			continue
 		}
 
+		if item.MediaItem == nil {
+			continue
+		}
+		media := toBrowseMediaItemDTO(*item.MediaItem)
 		dtos = append(dtos, dto.BrowseItemDTO{
-			Type:     "asset",
-			ID:       item.ID,
-			Asset:    &assetDTO,
-			BestTsMs: item.BestTsMs,
+			Type:      service.BrowseItemTypeMediaItem,
+			ID:        item.ID,
+			MediaItem: &media,
+			BestTsMs:  item.BestTsMs,
 		})
 	}
 	return dtos
@@ -2331,21 +2389,23 @@ func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
 
 func toQueryBrowseResponseDTO(result service.BrowseQueryResult, limit, offset int) dto.QueryAssetsResponseDTO {
 	totalVisible := int(result.TotalVisible)
-	totalAssets := int(result.TotalAssets)
+	totalMediaItems := int(result.TotalMediaItems)
+	totalFiles := int(result.TotalFiles)
 	itemDTOs := toBrowseItemDTOs(result.Items)
 	return dto.QueryAssetsResponseDTO{
-		Items:        itemDTOs,
-		TotalVisible: &totalVisible,
-		TotalAssets:  &totalAssets,
-		StackMode:    result.StackMode,
-		Limit:        limit,
-		Offset:       offset,
+		Items:           itemDTOs,
+		TotalVisible:    &totalVisible,
+		TotalMediaItems: &totalMediaItems,
+		TotalFiles:      &totalFiles,
+		StackMode:       result.StackMode,
+		Limit:           limit,
+		Offset:          offset,
 	}
 }
 
 func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset int) dto.SearchAssetsResponseDTO {
 	resultsTotalVisible := int(result.ResultsTotalVisible)
-	resultsTotalAssets := int(result.ResultsTotalAssets)
+	resultsTotalMediaItems := int(result.ResultsTotalMediaItems)
 	topItemDTOs := toBrowseItemDTOs(result.TopResults)
 	resultItemDTOs := toBrowseItemDTOs(result.Results)
 	return dto.SearchAssetsResponseDTO{
@@ -2360,12 +2420,11 @@ func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset 
 			Sources:           toSearchSourceMetaDTOs(result.TopResultsMeta.Sources),
 			Debug:             toSearchDebugItemDTOs(result.TopResultsMeta.Debug),
 		},
-		ResultItems:         resultItemDTOs,
-		ResultsTotalVisible: &resultsTotalVisible,
-		ResultsTotalAssets:  &resultsTotalAssets,
-		StackMode:           result.StackMode,
-		Limit:               limit,
-		Offset:              offset,
+		ResultItems:            resultItemDTOs,
+		ResultsTotalVisible:    &resultsTotalVisible,
+		ResultsTotalMediaItems: &resultsTotalMediaItems,
+		Limit:                  limit,
+		Offset:                 offset,
 	}
 }
 
@@ -2442,11 +2501,19 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		req.SearchType = "filename"
 	}
 
-	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	params, err := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid filter parameters")
+		return
+	}
 	params = applyAssetOwnershipScope(c, params)
 
 	browseResult, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidBrowseFilter) {
+			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			return
+		}
 		// Check for semantic search unavailable error
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
 			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
@@ -2487,8 +2554,8 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
 		return
 	}
-	if err := validateStackMode(req.StackMode); err != nil {
-		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+	if err := rejectSearchStackMode(req.StackMode); err != nil {
+		api.GinBadRequest(c, err, "stack_mode is not supported for search; results are flat by media item")
 		return
 	}
 
@@ -2500,7 +2567,11 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
 	}
 
-	params := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	params, err := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, "", req.Filter, req.Pagination)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid filter parameters")
+		return
+	}
 	params = applyAssetOwnershipScope(c, params)
 
 	result, err := h.assetService.SearchBrowseItems(c.Request.Context(), service.SearchAssetsParams{
@@ -2510,6 +2581,10 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		Debug:             req.Debug,
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidBrowseFilter) {
+			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			return
+		}
 		log.Printf("Failed to search assets: %v", err)
 		api.GinInternalError(c, err, "Failed to search assets")
 		return

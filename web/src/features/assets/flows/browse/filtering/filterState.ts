@@ -1,5 +1,4 @@
 import {
-  isAssetUserFilterFieldActive,
   normalizeAssetUserFilter,
   pickAssetUserFilter,
   type AssetLocationBBox,
@@ -51,13 +50,6 @@ export function createLockedFieldSet(
   return new Set(lockedFields ?? []);
 }
 
-export function hasActiveLockedFields(
-  initial: AssetUserFilter,
-  lockedFieldSet: ReadonlySet<AssetUserFilterKey>,
-): boolean {
-  return Array.from(lockedFieldSet).some((field) => isAssetUserFilterFieldActive(initial, field));
-}
-
 export function buildLockedInitialFilter(
   initial: AssetUserFilter,
   lockedFieldSet: ReadonlySet<AssetUserFilterKey>,
@@ -76,34 +68,24 @@ export function mergeLockedInitialFilter(
   });
 }
 
-export function createFilterDraft(
-  initial: AssetUserFilter,
-  hasLockedInitialFilters: boolean,
-): FilterDraft {
+export function createFilterDraft(initial: AssetUserFilter): FilterDraft {
+  const normalized = normalizeAssetUserFilter(initial);
+
   return {
-    filterEnabled: Object.keys(initial).length > 0 || hasLockedInitialFilters,
-    typeEnabled: initial.type === "PHOTO" || initial.type === "VIDEO",
-    typeValue: initial.type === "VIDEO" ? "VIDEO" : "PHOTO",
-    rawEnabled: typeof initial.raw === "boolean",
-    rawMode: initial.raw === false ? "exclude" : "include",
-    ratingEnabled: typeof initial.rating === "number",
-    ratingValue: typeof initial.rating === "number" ? initial.rating : 5,
-    likedEnabled: typeof initial.liked === "boolean",
-    likedValue: initial.liked ?? true,
-    filenameEnabled: Boolean(initial.filename),
-    filenameOperator: initial.filename?.operator ?? "contains",
-    filenameValue: initial.filename?.value ?? "",
-    dateEnabled: Boolean(initial.date),
-    dateFrom: toDateInput(initial.date?.from ?? ""),
-    dateTo: toDateInput(initial.date?.to ?? ""),
-    locationEnabled: Boolean(initial.location),
-    location: initial.location ?? EMPTY_LOCATION_BBOX,
-    cameraModelEnabled: Boolean(initial.camera_model),
-    cameraModel: initial.camera_model ?? "",
-    lensEnabled: Boolean(initial.lens),
-    lens: initial.lens ?? "",
-    tagEnabled: Boolean(initial.tag_names?.length),
-    tagNames: initial.tag_names ?? [],
+    type: normalized.type,
+    composition: normalized.media_item?.composition,
+    stackMembership: normalized.stack?.membership,
+    stackKinds: normalized.stack?.kinds ?? [],
+    rating: normalized.rating,
+    liked: normalized.liked,
+    filenameOperator: normalized.filename?.operator ?? "contains",
+    filenameValue: normalized.filename?.value ?? "",
+    dateFrom: toDateInput(normalized.date?.from ?? ""),
+    dateTo: toDateInput(normalized.date?.to ?? ""),
+    location: normalized.location,
+    cameraModel: normalized.camera_model ?? "",
+    lens: normalized.lens ?? "",
+    tagNames: normalized.tag_names ?? [],
   };
 }
 
@@ -117,58 +99,40 @@ export function filterDraftReducer(state: FilterDraft, action: FilterDraftAction
   return { ...state, [action.key]: action.value };
 }
 
-export function countEnabledFilters(draft: FilterDraft, hasLockedInitialFilters: boolean): number {
-  if (!draft.filterEnabled && !hasLockedInitialFilters) return 0;
-
-  let count = 0;
-  if (draft.rawEnabled) count++;
-  if (draft.typeEnabled) count++;
-  if (draft.ratingEnabled) count++;
-  if (draft.likedEnabled) count++;
-  if (draft.filenameEnabled && draft.filenameValue.trim() !== "") count++;
-  if (draft.dateEnabled && (draft.dateFrom || draft.dateTo)) count++;
-  if (draft.locationEnabled && !isZeroBBox(draft.location)) count++;
-  if (draft.cameraModelEnabled && draft.cameraModel) count++;
-  if (draft.lensEnabled && draft.lens) count++;
-  if (draft.tagEnabled && draft.tagNames.length > 0) count++;
-  return count;
-}
-
 export function buildAssetUserFilter(
   draft: FilterDraft,
   initial: AssetUserFilter,
   lockedFieldSet: ReadonlySet<AssetUserFilterKey>,
-  hasLockedInitialFilters: boolean,
 ): AssetUserFilter {
-  if (!draft.filterEnabled && !hasLockedInitialFilters) return {};
-
   const filter: AssetUserFilter = {};
-  if (draft.filterEnabled && draft.typeEnabled) filter.type = draft.typeValue;
-  if (draft.filterEnabled && draft.rawEnabled) filter.raw = draft.rawMode === "include";
-  if (draft.filterEnabled && draft.ratingEnabled) filter.rating = draft.ratingValue;
-  if (draft.filterEnabled && draft.likedEnabled) filter.liked = draft.likedValue;
-  if (draft.filterEnabled && draft.filenameEnabled && draft.filenameValue.trim()) {
+  if (draft.type) filter.type = draft.type;
+  if (draft.composition) filter.media_item = { composition: draft.composition };
+  if (draft.stackMembership || draft.stackKinds.length > 0) {
+    filter.stack = {
+      ...(draft.stackMembership ? { membership: draft.stackMembership } : {}),
+      ...(draft.stackKinds.length > 0 ? { kinds: draft.stackKinds } : {}),
+    };
+  }
+  if (typeof draft.rating === "number") filter.rating = draft.rating;
+  if (typeof draft.liked === "boolean") filter.liked = draft.liked;
+  if (draft.filenameValue.trim()) {
     filter.filename = {
       operator: draft.filenameOperator,
       value: draft.filenameValue.trim(),
     };
   }
-  if (draft.filterEnabled && draft.dateEnabled && (draft.dateFrom || draft.dateTo)) {
+  if (draft.dateFrom || draft.dateTo) {
     filter.date = {
       from: draft.dateFrom || undefined,
       to: draft.dateTo || undefined,
     };
   }
-  if (draft.filterEnabled && draft.locationEnabled && !isZeroBBox(draft.location)) {
+  if (draft.location && !isZeroBBox(draft.location)) {
     filter.location = { ...draft.location };
   }
-  if (draft.filterEnabled && draft.cameraModelEnabled && draft.cameraModel) {
-    filter.camera_model = draft.cameraModel;
-  }
-  if (draft.filterEnabled && draft.lensEnabled && draft.lens) filter.lens = draft.lens;
-  if (draft.filterEnabled && draft.tagEnabled && draft.tagNames.length > 0) {
-    filter.tag_names = draft.tagNames;
-  }
+  if (draft.cameraModel) filter.camera_model = draft.cameraModel;
+  if (draft.lens) filter.lens = draft.lens;
+  if (draft.tagNames.length > 0) filter.tag_names = draft.tagNames;
 
   return mergeLockedInitialFilter(filter, initial, lockedFieldSet);
 }

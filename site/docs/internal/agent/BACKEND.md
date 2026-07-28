@@ -6,7 +6,13 @@ This document describes the current Go backend as implemented in `server/`.
 
 - Main process: `server/cmd/main.go`.
 - Config package: `server/config`.
-- Tracked config template: `server/config/server.example.toml`.
+- Tracked config templates: `server/config/examples/{dev,desktop,docker}/*.toml`,
+  generated from the profile table in `server/config/profiles.go` by
+  `make config-examples`. Never hand-edit them; a golden test enforces it.
+- Manifest JSON Schema: `server/config/schema/lumilio-server.schema.json`,
+  reflected from the manifest struct and referenced by each example's
+  `#:schema` directive. It covers presence, types, and closed value sets only —
+  conditional legality stays in `resolveManifest`.
 - Ignored local config file: `server/config/server.local.toml`.
 - Docker image: `server/Dockerfile`.
 

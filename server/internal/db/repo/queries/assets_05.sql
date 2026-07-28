@@ -1,44 +1,61 @@
 -- name: CountCollapsedBrowseItemsUnified :one
+-- Count of visible collapsed browse rows (total_visible in collapsed mode):
+-- one per presentation stack with any matched member plus one per unstacked
+-- matching media item. Predicates mirror GetCollapsedBrowseItemsUnified.
 WITH filter_params AS (
   SELECT
     CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json,
     CAST(sqlc.narg('asset_types') AS TEXT) AS asset_types_json,
-    CAST(sqlc.narg('tag_names') AS TEXT) AS tag_names_json
+    CAST(sqlc.narg('tag_names') AS TEXT) AS tag_names_json,
+    CAST(sqlc.narg('stack_kinds') AS TEXT) AS stack_kinds_json
 ),
-filtered AS (
+eligible AS (
   SELECT
-    a.asset_id,
-    asm.stack_id
-  FROM assets a
-  JOIN media_items mi ON mi.primary_asset_id = a.asset_id
-  LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
-  WHERE a.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
+    facts.media_item_id,
+    facts.stack_id
+  FROM media_item_browse_facts facts
+  JOIN assets pa ON pa.asset_id = facts.primary_asset_id
+  WHERE pa.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
     AND (
       (SELECT asset_ids_json FROM filter_params) IS NULL
-      OR a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+      OR EXISTS (
+        SELECT 1
+        FROM media_item_assets mia_scope
+        WHERE mia_scope.media_item_id = facts.media_item_id
+          AND mia_scope.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+      )
     )
-    AND (sqlc.narg('query') IS NULL OR a.original_filename LIKE '%' || sqlc.narg('query') || '%')
-    AND (sqlc.narg('asset_type') IS NULL OR a.type = sqlc.narg('asset_type'))
+    AND (
+      sqlc.narg('query') IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM media_item_assets mia_query
+        JOIN assets component_query ON component_query.asset_id = mia_query.asset_id
+        WHERE mia_query.media_item_id = facts.media_item_id
+          AND component_query.original_filename LIKE '%' || sqlc.narg('query') || '%'
+      )
+    )
+    AND (sqlc.narg('asset_type') IS NULL OR pa.type = sqlc.narg('asset_type'))
     AND (
       (SELECT asset_types_json FROM filter_params) IS NULL
-      OR a.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
+      OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
     )
-    AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('owner_id') IS NULL OR facts.owner_id = sqlc.narg('owner_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR facts.repository_id = sqlc.narg('repository_id'))
     AND (
       sqlc.narg('folder_path') IS NULL
       OR (
         CASE
           WHEN sqlc.narg('folder_path') = '' THEN
             CASE WHEN COALESCE(sqlc.narg('folder_recursive'), true) THEN true
-              ELSE instr(a.storage_path, '/') = 0
+              ELSE instr(pa.storage_path, '/') = 0
             END
           ELSE
             CASE WHEN COALESCE(sqlc.narg('folder_recursive'), true) THEN
-              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
+              pa.storage_path LIKE sqlc.narg('folder_path') || '/%'
             ELSE
-              a.storage_path LIKE sqlc.narg('folder_path') || '/%'
-              AND a.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
+              pa.storage_path LIKE sqlc.narg('folder_path') || '/%'
+              AND pa.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
             END
         END
       )
@@ -50,7 +67,7 @@ filtered AS (
         FROM face_cluster_members fcm
         JOIN face_items fi_person ON fi_person.id = fcm.face_id
         WHERE fcm.cluster_id = sqlc.narg('person_id')
-          AND fi_person.asset_id = a.asset_id
+          AND fi_person.asset_id = pa.asset_id
       )
     )
     AND (
@@ -58,7 +75,7 @@ filtered AS (
       OR EXISTS (
         SELECT 1
         FROM album_assets aa
-        WHERE aa.asset_id = a.asset_id
+        WHERE aa.asset_id = pa.asset_id
           AND aa.album_id = sqlc.narg('album_id')
       )
     )
@@ -68,7 +85,7 @@ filtered AS (
         SELECT 1
         FROM asset_tags at
         JOIN tags t ON t.tag_id = at.tag_id
-        WHERE at.asset_id = a.asset_id
+        WHERE at.asset_id = pa.asset_id
           AND t.tag_name = sqlc.narg('tag_name')
           AND (sqlc.narg('tag_source') IS NULL OR at.source = sqlc.narg('tag_source'))
       )
@@ -79,58 +96,82 @@ filtered AS (
         SELECT COUNT(DISTINCT t2.tag_name)
         FROM asset_tags at2
         JOIN tags t2 ON t2.tag_id = at2.tag_id
-        WHERE at2.asset_id = a.asset_id
+        WHERE at2.asset_id = pa.asset_id
           AND t2.tag_name IN (SELECT value FROM json_each((SELECT tag_names_json FROM filter_params)))
       ) = json_array_length((SELECT tag_names_json FROM filter_params))
     )
-    AND (sqlc.narg('filename_val') IS NULL OR
-      CASE COALESCE(sqlc.narg('filename_operator'), 'contains')
-        WHEN 'matches' THEN a.original_filename LIKE sqlc.narg('filename_val')
-        WHEN 'starts_with' THEN a.original_filename LIKE sqlc.narg('filename_val') || '%'
-        WHEN 'ends_with' THEN a.original_filename LIKE '%' || sqlc.narg('filename_val')
-        ELSE a.original_filename LIKE '%' || sqlc.narg('filename_val') || '%'
+    AND (
+      sqlc.narg('filename_val') IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM media_item_assets mia_name
+        JOIN assets component_name ON component_name.asset_id = mia_name.asset_id
+        WHERE mia_name.media_item_id = facts.media_item_id
+          AND CASE COALESCE(sqlc.narg('filename_operator'), 'contains')
+            WHEN 'matches' THEN component_name.original_filename LIKE sqlc.narg('filename_val')
+            WHEN 'starts_with' THEN component_name.original_filename LIKE sqlc.narg('filename_val') || '%'
+            WHEN 'ends_with' THEN component_name.original_filename LIKE '%' || sqlc.narg('filename_val')
+            ELSE component_name.original_filename LIKE '%' || sqlc.narg('filename_val') || '%'
+          END
+      )
+    )
+    AND (sqlc.narg('date_from') IS NULL OR COALESCE(pa.taken_time, pa.upload_time) >= sqlc.narg('date_from'))
+    AND (sqlc.narg('date_to') IS NULL OR COALESCE(pa.taken_time, pa.upload_time) <= sqlc.narg('date_to'))
+    AND (
+      sqlc.narg('composition') IS NULL
+      OR CASE sqlc.narg('composition')
+        WHEN 'contains_raw' THEN facts.has_raw = 1
+        WHEN 'jpeg_raw' THEN facts.has_raw = 1 AND facts.has_jpeg = 1
+        WHEN 'raw_unpaired' THEN facts.has_raw = 1 AND facts.has_jpeg = 0
+        WHEN 'no_raw' THEN facts.has_raw = 0
+        WHEN 'live_photo' THEN facts.has_live_motion = 1
+        ELSE false
       END
     )
-    AND (sqlc.narg('date_from') IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
-    AND (sqlc.narg('date_to') IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
-    AND (sqlc.narg('is_raw') IS NULL OR
-      CASE
-        WHEN sqlc.narg('is_raw') = true THEN json_extract(a.specific_metadata, char(36) || '.is_raw') = 1
-        ELSE json_extract(a.specific_metadata, char(36) || '.is_raw') = 0 OR json_extract(a.specific_metadata, char(36) || '.is_raw') IS NULL
+    AND (
+      sqlc.narg('stack_membership') IS NULL
+      OR CASE sqlc.narg('stack_membership')
+        WHEN 'stacked' THEN facts.stack_id IS NOT NULL
+        WHEN 'unstacked' THEN facts.stack_id IS NULL
+        ELSE false
       END
+    )
+    AND (
+      (SELECT stack_kinds_json FROM filter_params) IS NULL
+      OR facts.stack_kind IN (SELECT value FROM json_each((SELECT stack_kinds_json FROM filter_params)))
     )
     AND (sqlc.narg('rating') IS NULL OR
       CASE
-        WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL OR a.rating = 0
-        ELSE a.rating = sqlc.narg('rating')
+        WHEN sqlc.narg('rating') = 0 THEN pa.rating IS NULL OR pa.rating = 0
+        ELSE pa.rating = sqlc.narg('rating')
       END
     )
     AND (sqlc.narg('liked') IS NULL OR
       CASE
-        WHEN sqlc.narg('liked') = false THEN a.liked IS NULL OR a.liked = false
-        ELSE a.liked = true
+        WHEN sqlc.narg('liked') = false THEN pa.liked IS NULL OR pa.liked = false
+        ELSE pa.liked = true
       END
     )
-    AND (sqlc.narg('camera_model') IS NULL OR json_extract(a.specific_metadata, char(36) || '.camera_model') = sqlc.narg('camera_model'))
-    AND (sqlc.narg('lens_model') IS NULL OR json_extract(a.specific_metadata, char(36) || '.lens_model') = sqlc.narg('lens_model'))
+    AND (sqlc.narg('camera_model') IS NULL OR json_extract(pa.specific_metadata, char(36) || '.camera_model') = sqlc.narg('camera_model'))
+    AND (sqlc.narg('lens_model') IS NULL OR json_extract(pa.specific_metadata, char(36) || '.lens_model') = sqlc.narg('lens_model'))
     AND (
       sqlc.narg('location_north') IS NULL
       OR sqlc.narg('location_south') IS NULL
       OR sqlc.narg('location_east') IS NULL
       OR sqlc.narg('location_west') IS NULL
       OR (
-        a.gps_latitude IS NOT NULL
-        AND a.gps_longitude IS NOT NULL
-        AND a.gps_latitude
+        pa.gps_latitude IS NOT NULL
+        AND pa.gps_longitude IS NOT NULL
+        AND pa.gps_latitude
           BETWEEN min(sqlc.narg('location_south'), sqlc.narg('location_north'))
           AND max(sqlc.narg('location_south'), sqlc.narg('location_north'))
         AND (
           CASE
             WHEN sqlc.narg('location_west') <= sqlc.narg('location_east') THEN
-              a.gps_longitude BETWEEN sqlc.narg('location_west') AND sqlc.narg('location_east')
+              pa.gps_longitude BETWEEN sqlc.narg('location_west') AND sqlc.narg('location_east')
             ELSE
-              a.gps_longitude >= sqlc.narg('location_west')
-              OR a.gps_longitude <= sqlc.narg('location_east')
+              pa.gps_longitude >= sqlc.narg('location_west')
+              OR pa.gps_longitude <= sqlc.narg('location_east')
           END
         )
       )
@@ -138,7 +179,7 @@ filtered AS (
 )
 SELECT COUNT(*)
 FROM (
-  SELECT CASE WHEN stack_id IS NULL THEN asset_id ELSE stack_id END AS browse_id
-  FROM filtered
+  SELECT CASE WHEN stack_id IS NULL THEN media_item_id ELSE stack_id END AS browse_id
+  FROM eligible
   GROUP BY 1
-) browse_items;
+) browse_rows;

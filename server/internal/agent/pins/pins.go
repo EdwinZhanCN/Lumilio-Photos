@@ -280,7 +280,9 @@ type filterReplayPayload struct {
 	DateTo               string   `json:"date_to,omitempty"`
 	Type                 string   `json:"type,omitempty"`
 	Filename             string   `json:"filename,omitempty"`
-	Raw                  *bool    `json:"raw,omitempty"`
+	Composition          string   `json:"composition,omitempty"`
+	StackMembership      string   `json:"stack_membership,omitempty"`
+	StackKinds           []string `json:"stack_kinds,omitempty"`
 	Rating               *int     `json:"rating,omitempty"`
 	Liked                *bool    `json:"liked,omitempty"`
 	Place                string   `json:"place,omitempty"`
@@ -342,7 +344,7 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, errors.New("invalid filter replay payload")
 	}
-	q := repo.GetAssetIDsUnifiedParams{Limit: ref.MaxSnapshotSize}
+	q := repo.GetMediaItemRefsUnifiedParams{Limit: ref.MaxSnapshotSize}
 	if v := payload.DateFrom; v != "" {
 		if t, err := time.Parse("2006-01-02", v); err == nil {
 			q.DateFrom = dbtypes.NewTimestamp(t)
@@ -362,8 +364,22 @@ func (s *Service) replayFilter(ctx context.Context, library *core.AuthorizedLibr
 		q.FilenameVal = &v
 		q.FilenameOperator = &operator
 	}
-	if payload.Raw != nil {
-		q.IsRaw = payload.Raw
+	if v := strings.ToLower(strings.TrimSpace(payload.Composition)); v != "" {
+		q.Composition = v
+	}
+	if v := strings.ToLower(strings.TrimSpace(payload.StackMembership)); v != "" {
+		q.StackMembership = v
+	}
+	if len(payload.StackKinds) > 0 {
+		kinds := make([]string, 0, len(payload.StackKinds))
+		for _, raw := range payload.StackKinds {
+			if kind := strings.ToLower(strings.TrimSpace(raw)); kind != "" {
+				kinds = append(kinds, kind)
+			}
+		}
+		if len(kinds) > 0 {
+			q.StackKinds = dbtypes.StringsJSONParam(kinds)
+		}
 	}
 	if payload.Rating != nil {
 		rating := int32(*payload.Rating)

@@ -4,15 +4,16 @@ import { GalleryPage } from "../pages/gallery.page";
 import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
 import { t } from "../support/i18n";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
 type Asset = {
   asset_id: string;
   original_filename: string;
 };
 
-type BrowseResponse = {
-  items?: Array<{ asset?: Asset }>;
-};
+// Derived from the generated OpenAPI types rather than hand-written, so a
+// browse-contract change breaks the build instead of failing at runtime.
+type BrowseResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
 
 type Album = {
   album_id: number;
@@ -35,9 +36,12 @@ async function findAsset(
       stack_mode: "expanded",
     }),
   });
+  // Browse rows are logical media items; the file lives on the primary asset.
   return response.items
-    ?.map((item) => item.asset)
-    .find((asset): asset is Asset => asset?.original_filename === filename);
+    ?.map((item) => item.media_item?.primary_asset)
+    .find(
+      (asset): asset is Asset => Boolean(asset?.asset_id) && asset?.original_filename === filename,
+    );
 }
 
 test("@smoke user completes the compact upload, album, viewer, Trash, and restore journey", async ({
@@ -85,11 +89,7 @@ test("@smoke user completes the compact upload, album, viewer, Trash, and restor
     });
   }).toPass({ timeout: 60_000 });
 
-  const asset = await findAsset(
-    workspace.token,
-    workspace.repositoryId,
-    workspace.uploadFilename,
-  );
+  const asset = await findAsset(workspace.token, workspace.repositoryId, workspace.uploadFilename);
   if (!asset) throw new Error("uploaded asset did not appear through the public browse API");
 
   // Reuse the same real upload for the rest of the compact product journey;

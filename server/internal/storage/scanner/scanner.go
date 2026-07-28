@@ -279,16 +279,8 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		zap.Int64("skipped", counters.skipped),
 	)
 
-	// Merge structural media components and detect bursts after scan completion.
-	if _, insertErr := s.queue.Insert(ctx, jobs.DetectStacksArgs{
-		RepositoryID: args.RepositoryID,
-	}, &river.InsertOpts{Queue: "detect_stacks"}); insertErr != nil {
-		s.logger.Warn("failed to enqueue detect stacks job",
-			zap.String("repository_id", args.RepositoryID),
-			zap.Error(insertErr),
-		)
-	}
-
+	// Stack detection is enqueued per asset when metadata extraction completes;
+	// there is nothing to schedule at scan end.
 	return nil
 }
 

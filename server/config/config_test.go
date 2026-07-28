@@ -566,15 +566,16 @@ func TestNormalizeOriginCanonicalizesIDNAAndDefaultPorts(t *testing.T) {
 func TestGenerateDockerProductionProfiles(t *testing.T) {
 	tests := []struct {
 		name    string
-		options InitOptions
+		profile ProfileName
+		inputs  ProfileInputs
 		check   func(*testing.T, AppConfig)
 	}{
 		{
-			name: "ACME",
-			options: InitOptions{
-				Profile: InitProfileDockerACME,
-				Origin:  "https://photos.example.com",
-				Email:   "admin@example.com",
+			name:    "ACME",
+			profile: ProfileDockerACME,
+			inputs: ProfileInputs{
+				Origin: "https://photos.example.com",
+				Email:  "admin@example.com",
 			},
 			check: func(t *testing.T, cfg AppConfig) {
 				if cfg.ServerConfig.TLS.Mode != TLSModeACME ||
@@ -591,9 +592,9 @@ func TestGenerateDockerProductionProfiles(t *testing.T) {
 			},
 		},
 		{
-			name: "external proxy",
-			options: InitOptions{
-				Profile:           InitProfileDockerExternalProxy,
+			name:    "external proxy",
+			profile: ProfileDockerExternalProxy,
+			inputs: ProfileInputs{
 				Origin:            "https://photos.example.com",
 				TrustedProxyCIDRs: []string{"172.30.0.0/24"},
 			},
@@ -608,7 +609,7 @@ func TestGenerateDockerProductionProfiles(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			data, err := GenerateManifest(test.options)
+			data, err := GenerateManifest(test.profile, test.inputs)
 			if err != nil {
 				t.Fatal(err)
 			}

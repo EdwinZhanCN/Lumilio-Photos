@@ -12,7 +12,12 @@ import AssetsPageHeader from "./AssetsPageHeader";
 // subject is the header's bulk-action orchestration (context resolution and the
 // confirmation gate), so no child components are mocked.
 const browseItems: BrowseItem[] = [
-  { type: "asset", id: "asset:asset-1", asset: { asset_id: "asset-1" } as Asset },
+  {
+    type: "media_item",
+    id: "media:media-1",
+    mediaItemId: "media-1",
+    asset: { asset_id: "asset-1" } as Asset,
+  },
 ];
 
 function serveHeaderBootstrap() {
@@ -39,7 +44,7 @@ function renderHeader(node: React.ReactNode) {
   return renderWithProviders(
     <AssetBrowserScope
       scopeId="header-spec"
-      initialSelection={{ enabled: true, selectedIds: ["asset:asset-1"] }}
+      initialSelection={{ enabled: true, selectedIds: ["media:media-1"] }}
     >
       {node}
     </AssetBrowserScope>,

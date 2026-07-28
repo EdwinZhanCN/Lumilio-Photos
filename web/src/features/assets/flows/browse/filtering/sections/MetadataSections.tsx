@@ -7,13 +7,8 @@ import { SectionShell } from "./SectionShell";
 
 type TagOption = components["schemas"]["dto.TagDTO"];
 
-interface ToggleSectionProps {
-  filterDisabled: boolean;
-  enabled: boolean;
-  onEnabledChange: (value: boolean) => void;
-}
-
-interface SelectSectionProps extends ToggleSectionProps {
+interface SelectSectionProps {
+  locked: boolean;
   value: string;
   onValueChange: (value: string) => void;
   items: string[];
@@ -21,9 +16,7 @@ interface SelectSectionProps extends ToggleSectionProps {
 }
 
 export const CameraMakeSection = memo(function CameraMakeSection({
-  filterDisabled,
-  enabled,
-  onEnabledChange,
+  locked,
   value,
   onValueChange,
   items,
@@ -34,13 +27,13 @@ export const CameraMakeSection = memo(function CameraMakeSection({
   return (
     <SectionShell
       title={t("assets.filterTool.cameraMakeSection.title")}
-      enabled={enabled}
-      onToggle={onEnabledChange}
-      disabled={filterDisabled}
+      active={value !== ""}
+      onClear={() => onValueChange("")}
+      locked={locked}
     >
       <select
         className="select select-bordered select-xs w-full"
-        disabled={filterDisabled || !enabled || loading}
+        disabled={locked || loading}
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
       >
@@ -61,9 +54,7 @@ export const CameraMakeSection = memo(function CameraMakeSection({
 });
 
 export const LensSection = memo(function LensSection({
-  filterDisabled,
-  enabled,
-  onEnabledChange,
+  locked,
   value,
   onValueChange,
   items,
@@ -74,13 +65,13 @@ export const LensSection = memo(function LensSection({
   return (
     <SectionShell
       title={t("assets.filterTool.lensSection.title")}
-      enabled={enabled}
-      onToggle={onEnabledChange}
-      disabled={filterDisabled}
+      active={value !== ""}
+      onClear={() => onValueChange("")}
+      locked={locked}
     >
       <select
         className="select select-bordered select-xs w-full"
-        disabled={filterDisabled || !enabled || loading}
+        disabled={locked || loading}
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
       >
@@ -100,27 +91,25 @@ export const LensSection = memo(function LensSection({
   );
 });
 
-interface TagSectionProps extends ToggleSectionProps {
+interface TagSectionProps {
+  locked: boolean;
   value: string[];
   onValueChange: (value: string[]) => void;
 }
 
 export const TagSection = memo(function TagSection({
-  filterDisabled,
-  enabled,
-  onEnabledChange,
+  locked,
   value,
   onValueChange,
 }: TagSectionProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
-  const active = enabled && !filterDisabled;
 
   const tagsQuery = $api.useQuery(
     "get",
     "/api/v1/assets/tags",
     { params: { query: { q: query, limit: 20 } } },
-    { enabled: active, staleTime: 30_000 },
+    { enabled: !locked, staleTime: 30_000 },
   );
   const options: TagOption[] = tagsQuery.data?.tags ?? [];
   const selected = new Set(value);
@@ -132,9 +121,9 @@ export const TagSection = memo(function TagSection({
   return (
     <SectionShell
       title={t("assets.filterTool.tagSection.title")}
-      enabled={enabled}
-      onToggle={onEnabledChange}
-      disabled={filterDisabled}
+      active={value.length > 0}
+      onClear={() => onValueChange([])}
+      locked={locked}
     >
       <TagPickerMenu
         query={query}
@@ -144,8 +133,8 @@ export const TagSection = memo(function TagSection({
         loadingText={t("assets.filterTool.tagSection.loading")}
         noResultsText={t("assets.filterTool.tagSection.no_results")}
         checked={checked}
-        suggestions={active ? suggestions : []}
-        disabled={!active}
+        suggestions={locked ? [] : suggestions}
+        disabled={locked}
         onToggleChecked={(item) => onValueChange(value.filter((name) => name !== item.name))}
         onSelectSuggestion={(item) => onValueChange([...value, item.name])}
         className="max-h-52"

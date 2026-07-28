@@ -1,5 +1,12 @@
 import type { SortByType } from "../types";
-import { normalizeAssetUserFilter, type AssetLocationBBox, type AssetUserFilter } from "./filter";
+import {
+  isMediaComposition,
+  isStackKind,
+  isStackMembership,
+  normalizeAssetUserFilter,
+  type AssetLocationBBox,
+  type AssetUserFilter,
+} from "./filter";
 
 export type AssetBrowseRouteState = {
   query: string;
@@ -13,7 +20,9 @@ const BROWSE_PARAM_KEYS = [
   "q",
   "sort",
   "type",
-  "raw",
+  "composition",
+  "stack_membership",
+  "stack_kind",
   "rating",
   "liked",
   "filename",
@@ -90,9 +99,18 @@ export function parseAssetBrowseParams(
   const from = parseDate(params.get("from"));
   const to = parseDate(params.get("to"));
 
+  const composition = params.get("composition");
+  const membership = params.get("stack_membership");
+  const stackKinds = params.getAll("stack_kind").filter(isStackKind);
+
   const filter = normalizeAssetUserFilter({
     type,
-    raw: parseBoolean(params.get("raw")),
+    media_item: isMediaComposition(composition) ? { composition } : undefined,
+    stack: isStackMembership(membership)
+      ? { membership, kinds: stackKinds }
+      : stackKinds.length > 0
+        ? { kinds: stackKinds }
+        : undefined,
     rating: parseRating(params.get("rating")),
     liked: parseBoolean(params.get("liked")),
     filename: filename ? { operator, value: filename } : undefined,
@@ -124,7 +142,9 @@ export function serializeAssetBrowseParams(
 
   const filter = normalizeAssetUserFilter(state.filter);
   if (filter.type) params.set("type", filter.type.toLocaleLowerCase());
-  if (typeof filter.raw === "boolean") params.set("raw", String(filter.raw));
+  if (filter.media_item?.composition) params.set("composition", filter.media_item.composition);
+  if (filter.stack?.membership) params.set("stack_membership", filter.stack.membership);
+  filter.stack?.kinds?.forEach((kind) => params.append("stack_kind", kind));
   if (typeof filter.rating === "number") params.set("rating", String(filter.rating));
   if (typeof filter.liked === "boolean") params.set("liked", String(filter.liked));
   if (filter.filename) {

@@ -853,24 +853,24 @@ type AssetListResponseDTO struct {
 }
 
 type QueryAssetsResponseDTO struct {
-	Items        []BrowseItemDTO `json:"items,omitempty"`
-	TotalVisible *int            `json:"total_visible,omitempty" example:"120"`
-	TotalAssets  *int            `json:"total_assets,omitempty" example:"150"`
-	StackMode    string          `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
-	Limit        int             `json:"limit" example:"20"`
-	Offset       int             `json:"offset" example:"0"`
+	Items           []BrowseItemDTO `json:"items,omitempty"`
+	TotalVisible    *int            `json:"total_visible,omitempty" example:"120"`
+	TotalMediaItems *int            `json:"total_media_items,omitempty" example:"150"`
+	TotalFiles      *int            `json:"total_files,omitempty" example:"213"`
+	StackMode       string          `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
+	Limit           int             `json:"limit" example:"20"`
+	Offset          int             `json:"offset" example:"0"`
 }
 
 // SearchAssetsResponseDTO represents the response structure for searching assets
 type SearchAssetsResponseDTO struct {
-	TopItems            []BrowseItemDTO         `json:"top_items,omitempty"`
-	TopResultsMeta      SearchTopResultsMetaDTO `json:"top_results_meta"`
-	ResultItems         []BrowseItemDTO         `json:"result_items,omitempty"`
-	ResultsTotalVisible *int                    `json:"results_total_visible,omitempty" example:"120"`
-	ResultsTotalAssets  *int                    `json:"results_total_assets,omitempty" example:"150"`
-	StackMode           string                  `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
-	Limit               int                     `json:"limit" example:"20"`
-	Offset              int                     `json:"offset" example:"0"`
+	TopItems               []BrowseItemDTO         `json:"top_items,omitempty"`
+	TopResultsMeta         SearchTopResultsMetaDTO `json:"top_results_meta"`
+	ResultItems            []BrowseItemDTO         `json:"result_items,omitempty"`
+	ResultsTotalVisible    *int                    `json:"results_total_visible,omitempty" example:"120"`
+	ResultsTotalMediaItems *int                    `json:"results_total_media_items,omitempty" example:"150"`
+	Limit                  int                     `json:"limit" example:"20"`
+	Offset                 int                     `json:"offset" example:"0"`
 }
 
 // DownloadAssetsRequestDTO represents a bulk original-file download request.
@@ -1024,27 +1024,60 @@ type LocationBBoxDTO struct {
 	West  float64 `json:"west" example:"-122.5"`
 }
 
+// MediaComposition filters media items by their component-file makeup
+// (derived from the media_item_browse_facts view, never from single files).
+type MediaComposition string
+
+const (
+	MediaCompositionContainsRAW MediaComposition = "contains_raw"
+	MediaCompositionJPEGRAW     MediaComposition = "jpeg_raw"
+	MediaCompositionRAWUnpaired MediaComposition = "raw_unpaired"
+	MediaCompositionNoRAW       MediaComposition = "no_raw"
+	MediaCompositionLivePhoto   MediaComposition = "live_photo"
+)
+
+// StackMembership filters media items by presentation-stack membership.
+type StackMembership string
+
+const (
+	StackMembershipStacked   StackMembership = "stacked"
+	StackMembershipUnstacked StackMembership = "unstacked"
+)
+
+// MediaItemFilterDTO filters on logical media-item facts.
+type MediaItemFilterDTO struct {
+	Composition *MediaComposition `json:"composition,omitempty" example:"jpeg_raw" enums:"contains_raw,jpeg_raw,raw_unpaired,no_raw,live_photo"`
+}
+
+// StackFilterDTO filters on presentation-stack membership. Non-empty Kinds
+// implies stacked; membership=unstacked with non-empty Kinds is rejected.
+type StackFilterDTO struct {
+	Membership *StackMembership `json:"membership,omitempty" example:"stacked" enums:"stacked,unstacked"`
+	Kinds      []string         `json:"kinds,omitempty" enums:"burst,manual"`
+}
+
 // AssetFilterDTO represents comprehensive filtering options
 type AssetFilterDTO struct {
-	RepositoryID *string            `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	AlbumID      *int               `json:"album_id,omitempty" example:"123"`
-	Type         *string            `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
-	Types        []string           `json:"types,omitempty" example:"PHOTO,VIDEO"` // Multiple asset types
-	OwnerID      *int32             `json:"owner_id,omitempty" example:"123"`
-	RAW          *bool              `json:"raw,omitempty" example:"true"`
-	Rating       *int               `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
-	Liked        *bool              `json:"liked,omitempty" example:"true"`
-	Filename     *FilenameFilterDTO `json:"filename,omitempty"`
-	Date         *DateRangeDTO      `json:"date,omitempty"`
-	IsDeleted    *bool              `json:"is_deleted,omitempty" example:"false"`
-	CameraModel  *string            `json:"camera_model,omitempty" example:"Canon EOS R5"`
-	Lens         *string            `json:"lens,omitempty" example:"EF 50mm f/1.8"`
-	Location     *LocationBBoxDTO   `json:"location,omitempty"`
-	TagName      *string            `json:"tag_name,omitempty" example:"document"`
-	TagSource    *string            `json:"tag_source,omitempty" example:"zeroshot"`
-	TagNames     []string           `json:"tag_names,omitempty"`
-	PersonID     *int32             `json:"person_id,omitempty" example:"42"`
-	FolderPath   *string            `json:"folder_path,omitempty" example:"inbox/2026/05"`
+	RepositoryID *string             `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AlbumID      *int                `json:"album_id,omitempty" example:"123"`
+	Type         *string             `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
+	Types        []string            `json:"types,omitempty" example:"PHOTO,VIDEO"` // Multiple asset types
+	OwnerID      *int32              `json:"owner_id,omitempty" example:"123"`
+	MediaItem    *MediaItemFilterDTO `json:"media_item,omitempty"`
+	Stack        *StackFilterDTO     `json:"stack,omitempty"`
+	Rating       *int                `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
+	Liked        *bool               `json:"liked,omitempty" example:"true"`
+	Filename     *FilenameFilterDTO  `json:"filename,omitempty"`
+	Date         *DateRangeDTO       `json:"date,omitempty"`
+	IsDeleted    *bool               `json:"is_deleted,omitempty" example:"false"`
+	CameraModel  *string             `json:"camera_model,omitempty" example:"Canon EOS R5"`
+	Lens         *string             `json:"lens,omitempty" example:"EF 50mm f/1.8"`
+	Location     *LocationBBoxDTO    `json:"location,omitempty"`
+	TagName      *string             `json:"tag_name,omitempty" example:"document"`
+	TagSource    *string             `json:"tag_source,omitempty" example:"zeroshot"`
+	TagNames     []string            `json:"tag_names,omitempty"`
+	PersonID     *int32              `json:"person_id,omitempty" example:"42"`
+	FolderPath   *string             `json:"folder_path,omitempty" example:"inbox/2026/05"`
 	// FolderRecursive controls whether FolderPath matches descendants (default true) or direct contents only.
 	FolderRecursive *bool `json:"folder_recursive,omitempty" example:"true"`
 }
@@ -1065,8 +1098,11 @@ type SearchAssetsRequestDTO struct {
 	Pagination      PaginationDTO  `json:"pagination"`
 	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
 	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"200" minimum:"1" maximum:"200"`
-	StackMode       string         `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
-	Debug           bool           `json:"debug,omitempty"`
+	// StackMode is no longer part of the search contract: search results are
+	// always flat by media item. The field only remains bindable so handlers
+	// can reject requests that still send it.
+	StackMode string `json:"stack_mode,omitempty" swaggerignore:"true"`
+	Debug     bool   `json:"debug,omitempty"`
 }
 
 type SearchTopResultsMetaDTO struct {
@@ -1157,20 +1193,50 @@ type AssetQueryRequestDTO struct {
 	Pagination     PaginationDTO  `json:"pagination"` // limit, offset
 }
 
-type BrowseStackDTO struct {
-	StackID          string   `json:"stack_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	StackKind        string   `json:"stack_kind,omitempty" example:"burst" enums:"burst,manual"`
-	CoverAssetID     string   `json:"cover_asset_id" example:"550e8400-e29b-41d4-a716-446655440001"`
-	CoverAsset       AssetDTO `json:"cover_asset"`
-	StackSize        int      `json:"stack_size" example:"3"`
-	MemberAssetIDs   []string `json:"member_asset_ids"`
-	MatchedMemberIDs []string `json:"matched_member_ids,omitempty"`
+// MediaCompositionDTO summarizes a media item's component files for badges.
+type MediaCompositionDTO struct {
+	ComponentCount int  `json:"component_count" example:"2"`
+	HasRAW         bool `json:"has_raw" example:"true"`
+	HasJPEG        bool `json:"has_jpeg" example:"true"`
+	HasEdited      bool `json:"has_edited" example:"false"`
+	HasLiveMotion  bool `json:"has_live_motion" example:"false"`
 }
 
+// BrowseMediaItemDTO is one logical media item in a browse response: the
+// primary asset carries the render payload, Composition describes the
+// component files, Stack locates the item's presentation stack (nil when
+// unstacked).
+type BrowseMediaItemDTO struct {
+	MediaItemID  string              `json:"media_item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	MediaKind    string              `json:"media_kind" example:"photo" enums:"photo,video,audio"`
+	PrimaryAsset AssetDTO            `json:"primary_asset"`
+	Composition  MediaCompositionDTO `json:"composition"`
+	Stack        *StackPreviewDTO    `json:"stack,omitempty"`
+}
+
+// BrowseStackMemberDTO references one stack member at media-item granularity.
+type BrowseStackMemberDTO struct {
+	MediaItemID    string `json:"media_item_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	PrimaryAssetID string `json:"primary_asset_id" example:"550e8400-e29b-41d4-a716-446655440001"`
+}
+
+// BrowseStackDTO is a collapsed presentation-stack row. Members is the full
+// visible membership in stack order; MatchedMembers lists members matching
+// the current query.
+type BrowseStackDTO struct {
+	StackID        string                 `json:"stack_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	StackKind      string                 `json:"stack_kind" example:"burst" enums:"burst,manual"`
+	Cover          BrowseMediaItemDTO     `json:"cover"`
+	Members        []BrowseStackMemberDTO `json:"members"`
+	MatchedMembers []BrowseStackMemberDTO `json:"matched_members,omitempty"`
+}
+
+// BrowseItemDTO is one gallery row. Exactly one of MediaItem and Stack is
+// set, matching Type. ID is "media:<media_item_id>" or "stack:<stack_id>".
 type BrowseItemDTO struct {
-	Type     string          `json:"type" example:"stack" enums:"asset,stack"`
-	ID       string          `json:"id" example:"stack:550e8400-e29b-41d4-a716-446655440000"`
-	Asset    *AssetDTO       `json:"asset,omitempty"`
-	Stack    *BrowseStackDTO `json:"stack,omitempty"`
-	BestTsMs *int32          `json:"best_ts_ms,omitempty" example:"12500"`
+	Type      string              `json:"type" example:"media_item" enums:"media_item,stack"`
+	ID        string              `json:"id" example:"media:550e8400-e29b-41d4-a716-446655440000"`
+	MediaItem *BrowseMediaItemDTO `json:"media_item,omitempty"`
+	Stack     *BrowseStackDTO     `json:"stack,omitempty"`
+	BestTsMs  *int32              `json:"best_ts_ms,omitempty" example:"12500"`
 }

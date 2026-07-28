@@ -3,13 +3,8 @@ import { useI18n } from "@/lib/i18n";
 import type { FilenameOperator } from "../types";
 import { SectionShell } from "./SectionShell";
 
-interface ToggleSectionProps {
-  filterDisabled: boolean;
-  enabled: boolean;
-  onEnabledChange: (value: boolean) => void;
-}
-
-interface FilenameSectionProps extends ToggleSectionProps {
+interface FilenameSectionProps {
+  locked: boolean;
   operator: FilenameOperator;
   onOperatorChange: (operator: FilenameOperator) => void;
   value: string;
@@ -17,9 +12,7 @@ interface FilenameSectionProps extends ToggleSectionProps {
 }
 
 export const FilenameSection = memo(function FilenameSection({
-  filterDisabled,
-  enabled,
-  onEnabledChange,
+  locked,
   operator,
   onOperatorChange,
   value,
@@ -30,14 +23,14 @@ export const FilenameSection = memo(function FilenameSection({
   return (
     <SectionShell
       title={t("assets.filterTool.filenameSection.title")}
-      enabled={enabled}
-      onToggle={onEnabledChange}
-      disabled={filterDisabled}
+      active={value.trim() !== ""}
+      onClear={() => onValueChange("")}
+      locked={locked}
     >
       <div className="flex flex-col gap-2">
         <select
           className="select select-bordered select-xs w-full"
-          disabled={filterDisabled || !enabled}
+          disabled={locked}
           value={operator}
           onChange={(event) => onOperatorChange(event.target.value as FilenameOperator)}
         >
@@ -50,7 +43,7 @@ export const FilenameSection = memo(function FilenameSection({
           type="text"
           className="input input-bordered input-xs w-full"
           placeholder={t("assets.filterTool.filenameSection.placeholder")}
-          disabled={filterDisabled || !enabled}
+          disabled={locked}
           value={value}
           onChange={(event) => onValueChange(event.target.value)}
         />
@@ -59,7 +52,8 @@ export const FilenameSection = memo(function FilenameSection({
   );
 });
 
-interface DateSectionProps extends ToggleSectionProps {
+interface DateSectionProps {
+  locked: boolean;
   from: string;
   onFromChange: (value: string) => void;
   to: string;
@@ -67,9 +61,7 @@ interface DateSectionProps extends ToggleSectionProps {
 }
 
 export const DateSection = memo(function DateSection({
-  filterDisabled,
-  enabled,
-  onEnabledChange,
+  locked,
   from,
   onFromChange,
   to,
@@ -80,9 +72,12 @@ export const DateSection = memo(function DateSection({
   return (
     <SectionShell
       title={t("assets.filterTool.dateSection.title")}
-      enabled={enabled}
-      onToggle={onEnabledChange}
-      disabled={filterDisabled}
+      active={Boolean(from || to)}
+      onClear={() => {
+        onFromChange("");
+        onToChange("");
+      }}
+      locked={locked}
     >
       <div className="flex flex-col gap-2">
         <label className="input input-bordered input-xs w-full flex items-center gap-2">
@@ -91,7 +86,7 @@ export const DateSection = memo(function DateSection({
             type="date"
             className="grow text-xs"
             value={from}
-            disabled={filterDisabled || !enabled}
+            disabled={locked}
             onChange={(event) => onFromChange(event.target.value)}
           />
         </label>
@@ -101,7 +96,7 @@ export const DateSection = memo(function DateSection({
             type="date"
             className="grow text-xs"
             value={to}
-            disabled={filterDisabled || !enabled}
+            disabled={locked}
             onChange={(event) => onToChange(event.target.value)}
           />
         </label>

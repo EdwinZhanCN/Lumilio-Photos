@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import FilterTool from "../filtering/FilterTool";
 import type { AssetUserFilter } from "../../../model/filter";
+import ActiveFilterChips from "./ActiveFilterChips";
 import BulkActionMenuItems from "./BulkActionMenuItems";
 import { closeActiveDropdown } from "./dropdown";
 import type { AssetsPageHeaderProps } from "./types";
@@ -28,6 +29,8 @@ interface AssetsPageHeaderActionsProps {
   activeSortByLabel: string;
   inboundDTO: AssetUserFilter;
   handleFiltersChange: (filters: AssetUserFilter) => void;
+  userFilter: AssetUserFilter;
+  onRemoveFilter: (key: AssetUserFilterKey) => void;
   lockedFilterFields: readonly AssetUserFilterKey[];
   scopeControlHidden: AssetsPageHeaderProps["scopeControlHidden"];
   showScan: boolean;
@@ -48,6 +51,8 @@ export default function AssetsPageHeaderActions({
   activeSortByLabel,
   inboundDTO,
   handleFiltersChange,
+  userFilter,
+  onRemoveFilter,
   lockedFilterFields,
   scopeControlHidden,
   showScan,
@@ -335,6 +340,8 @@ export default function AssetsPageHeaderActions({
           <BrowseScopeSelect className="w-full" />
         </div>
       )}
+
+      <ActiveFilterChips filter={userFilter} onRemove={onRemoveFilter} />
     </PageHeader>
   );
 }

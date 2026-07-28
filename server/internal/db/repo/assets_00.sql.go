@@ -54,7 +54,7 @@ func (q *Queries) AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) er
 	return err
 }
 
-const attachOriginalAssetToMediaItem = `-- name: AttachOriginalAssetToMediaItem :exec
+const attachAssetToMediaItem = `-- name: AttachAssetToMediaItem :exec
 INSERT INTO media_item_assets (
     asset_id,
     media_item_id,
@@ -64,20 +64,26 @@ INSERT INTO media_item_assets (
 ) VALUES (
     ?1,
     ?2,
-    'original',
+    ?3,
     0,
-    ?3
+    ?4
 )
 `
 
-type AttachOriginalAssetToMediaItemParams struct {
+type AttachAssetToMediaItemParams struct {
 	AssetID     uuid.UUID         `db:"asset_id" json:"asset_id"`
 	MediaItemID uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	Relation    string            `db:"relation" json:"relation"`
 	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
-func (q *Queries) AttachOriginalAssetToMediaItem(ctx context.Context, arg AttachOriginalAssetToMediaItemParams) error {
-	_, err := q.db.ExecContext(ctx, attachOriginalAssetToMediaItem, arg.AssetID, arg.MediaItemID, arg.CreatedAt)
+func (q *Queries) AttachAssetToMediaItem(ctx context.Context, arg AttachAssetToMediaItemParams) error {
+	_, err := q.db.ExecContext(ctx, attachAssetToMediaItem,
+		arg.AssetID,
+		arg.MediaItemID,
+		arg.Relation,
+		arg.CreatedAt,
+	)
 	return err
 }
 
@@ -2752,6 +2758,28 @@ func (q *Queries) MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWi
 		&i.ExifRaw,
 	)
 	return i, err
+}
+
+const reconcileMediaItemComponentRelation = `-- name: ReconcileMediaItemComponentRelation :exec
+UPDATE media_item_assets
+SET relation = ?1
+WHERE asset_id = ?2
+  AND relation NOT IN ('live_photo_still', 'live_photo_video', 'edited_version')
+  AND relation <> ?1
+`
+
+type ReconcileMediaItemComponentRelationParams struct {
+	Relation string    `db:"relation" json:"relation"`
+	AssetID  uuid.UUID `db:"asset_id" json:"asset_id"`
+}
+
+// Reconcile the component relation from metadata-confirmed facts. Relations
+// assigned by stack/live-photo matching are never overwritten, and the update
+// is a no-op when the stored relation already matches, so retries stay
+// idempotent.
+func (q *Queries) ReconcileMediaItemComponentRelation(ctx context.Context, arg ReconcileMediaItemComponentRelationParams) error {
+	_, err := q.db.ExecContext(ctx, reconcileMediaItemComponentRelation, arg.Relation, arg.AssetID)
+	return err
 }
 
 const removeAssetFromAlbum = `-- name: RemoveAssetFromAlbum :exec

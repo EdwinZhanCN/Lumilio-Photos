@@ -13,10 +13,14 @@ This is the compact system map for agents. Keep details here stable and useful; 
   test suites plus a native CGo build.
 - Runtime state has three non-overlapping owners: frontend preferences in browser localStorage; runtime-mutable settings in the SQLite catalog through Settings/Setup APIs; and runtime-immutable process configuration in a complete schema-versioned TOML manifest.
 - First-run bootstrap (`fresh → catalog_ready → admin_created → ready`) is an orthogonal state machine. It observes owner and primary-repository gates; it is not a fourth configuration source.
-- `server/config/server.example.toml` is the complete local template;
-  production container manifests are generated into app-state by `server config
-  init`; `server/config/server.container.toml` is development-only; and
-  `desktop/supervisor/server.template.toml` is the versioned desktop compiler input.
+- `server/config/examples/` holds one complete manifest per deployment scenario
+  (`dev/`, `desktop/`, `docker/`), generated from `server/config/profiles.go`.
+  Because TOML comments cannot express conditional legality, a valid manifest
+  per scenario is what documents the matrix; `dev/vite.toml` seeds the local
+  file and `docker/dev-http.toml` ships in the image as a development manifest.
+  Production container manifests are generated into app-state by `server config
+  init`, and `desktop/supervisor/server.template.toml` is the versioned desktop
+  compiler input.
 - Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
 
 ## Backend

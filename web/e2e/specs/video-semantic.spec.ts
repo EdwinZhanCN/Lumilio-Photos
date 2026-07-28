@@ -4,16 +4,12 @@ import { GalleryPage } from "../pages/gallery.page";
 import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
 import { t } from "../support/i18n";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
-type BrowseItem = {
-  asset?: { asset_id?: string; original_filename?: string };
-  best_ts_ms?: number;
-};
-
-type SearchResponse = {
-  top_items?: BrowseItem[];
-  result_items?: BrowseItem[];
-};
+// Derived from the generated OpenAPI types rather than hand-written, so a
+// browse-contract change breaks the build instead of failing at runtime.
+type SearchResponse = components["schemas"]["dto.SearchAssetsResponseDTO"];
+type BrowseItem = components["schemas"]["dto.BrowseItemDTO"];
 
 test("@video-regression video semantic search opens the best matching frame", async ({
   page,
@@ -59,11 +55,12 @@ test("@video-regression video semantic search opens the best matching frame", as
             pagination: { limit: 20, offset: 0 },
             enhancement_mode: "auto",
             top_results_limit: 20,
-            stack_mode: "collapsed",
+            // No stack_mode: search results are always flat by media item, and
+            // the endpoint rejects the field outright.
           }),
         });
         matchedItem = [...(response.top_items ?? []), ...(response.result_items ?? [])].find(
-          (item) => item.asset?.original_filename === workspace.videoFilename,
+          (item) => item.media_item?.primary_asset?.original_filename === workspace.videoFilename,
         );
         return matchedItem?.best_ts_ms ?? 0;
       },
@@ -76,7 +73,7 @@ test("@video-regression video semantic search opens the best matching frame", as
     .toBeGreaterThan(0);
 
   const bestTsMs = matchedItem?.best_ts_ms;
-  const assetId = matchedItem?.asset?.asset_id;
+  const assetId = matchedItem?.media_item?.primary_asset?.asset_id;
   expect(bestTsMs).toBeTruthy();
   expect(assetId).toBeTruthy();
 
@@ -96,9 +93,7 @@ test("@video-regression video semantic search opens the best matching frame", as
   });
   await page.getByLabel(new RegExp(workspace.videoFilename, "i")).click();
 
-  await expect
-    .poll(() => new URL(page.url()).searchParams.get("t_ms"))
-    .toBe(String(bestTsMs));
+  await expect.poll(() => new URL(page.url()).searchParams.get("t_ms")).toBe(String(bestTsMs));
   await expect(page).toHaveURL(new RegExp(`/assets/${assetId}`));
 
   const video = page.locator("video");

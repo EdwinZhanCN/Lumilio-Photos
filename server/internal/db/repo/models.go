@@ -419,6 +419,22 @@ type MediaItemAsset struct {
 	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
+type MediaItemBrowseFact struct {
+	MediaItemID    uuid.UUID   `db:"media_item_id" json:"media_item_id"`
+	OwnerID        int32       `db:"owner_id" json:"owner_id"`
+	RepositoryID   uuid.UUID   `db:"repository_id" json:"repository_id"`
+	MediaKind      string      `db:"media_kind" json:"media_kind"`
+	PrimaryAssetID uuid.UUID   `db:"primary_asset_id" json:"primary_asset_id"`
+	ComponentCount int64       `db:"component_count" json:"component_count"`
+	HasRaw         interface{} `db:"has_raw" json:"has_raw"`
+	HasJpeg        interface{} `db:"has_jpeg" json:"has_jpeg"`
+	HasEdited      interface{} `db:"has_edited" json:"has_edited"`
+	HasLiveMotion  interface{} `db:"has_live_motion" json:"has_live_motion"`
+	StackID        uuid.UUID   `db:"stack_id" json:"stack_id"`
+	StackPosition  *int64      `db:"stack_position" json:"stack_position"`
+	StackKind      *string     `db:"stack_kind" json:"stack_kind"`
+}
+
 type OcrIndexMetadatum struct {
 	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
 	Revision  int64             `db:"revision" json:"revision"`

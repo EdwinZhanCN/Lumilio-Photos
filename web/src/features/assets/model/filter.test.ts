@@ -11,11 +11,45 @@ describe("asset filter model", () => {
   it("preserves meaningful false and zero values", () => {
     expect(
       normalizeAssetUserFilter({
-        raw: false,
         liked: false,
         rating: 0,
       }),
-    ).toEqual({ raw: false, liked: false, rating: 0 });
+    ).toEqual({ liked: false, rating: 0 });
+  });
+
+  it("keeps whitelisted composition and stack values", () => {
+    expect(
+      normalizeAssetUserFilter({
+        media_item: { composition: "jpeg_raw" },
+        stack: { membership: "stacked", kinds: ["manual", "burst", "manual"] },
+      }),
+    ).toEqual({
+      media_item: { composition: "jpeg_raw" },
+      stack: { membership: "stacked", kinds: ["burst", "manual"] },
+    });
+  });
+
+  it("accepts the live photo composition", () => {
+    expect(normalizeAssetUserFilter({ media_item: { composition: "live_photo" } })).toEqual({
+      media_item: { composition: "live_photo" },
+    });
+  });
+
+  it("drops unknown composition and stack values", () => {
+    expect(
+      normalizeAssetUserFilter({
+        media_item: { composition: "sidecar" as never },
+        stack: { membership: "grouped" as never, kinds: ["panorama" as never] },
+      }),
+    ).toEqual({});
+  });
+
+  it("drops stack kinds when membership is unstacked", () => {
+    expect(
+      normalizeAssetUserFilter({
+        stack: { membership: "unstacked", kinds: ["burst"] },
+      }),
+    ).toEqual({ stack: { membership: "unstacked" } });
   });
 
   it("normalizes text and tag values", () => {
@@ -43,19 +77,22 @@ describe("asset filter model", () => {
     expect(
       getConstrainedFilterKeys({
         liked: false,
+        media_item: { composition: "no_raw" },
+        stack: { kinds: ["burst"] },
         location: { north: 40, south: 30, east: 20, west: 10 },
         album_id: 42,
       }),
-    ).toEqual(new Set(["liked", "location"]));
+    ).toEqual(new Set(["media_item", "stack", "liked", "location"]));
   });
 
   it("counts canonical active filters", () => {
     expect(
       countActiveAssetUserFilters({
-        raw: false,
+        media_item: { composition: "contains_raw" },
+        stack: { membership: "stacked" },
         rating: 0,
         tag_names: ["travel"],
       }),
-    ).toBe(3);
+    ).toBe(4);
   });
 });
