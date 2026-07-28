@@ -9,6 +9,7 @@ const (
 type StackRelation string
 
 const (
+	StackRelationOriginal       StackRelation = "original"
 	StackRelationRawOriginal    StackRelation = "raw_original"
 	StackRelationJpegOriginal   StackRelation = "jpeg_original"
 	StackRelationEditedVersion  StackRelation = "edited_version"

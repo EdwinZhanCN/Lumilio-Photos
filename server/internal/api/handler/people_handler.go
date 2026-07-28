@@ -267,12 +267,20 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 		return
 	}
 
-	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	params, err := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid filter parameters")
+		return
+	}
 	params.PersonID = &personID
 	params = applyAssetOwnershipScope(c, params)
 
 	result, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidBrowseFilter) {
+			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			return
+		}
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
 			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
 			return

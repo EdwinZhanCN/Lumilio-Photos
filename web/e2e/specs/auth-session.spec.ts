@@ -3,6 +3,7 @@ import type { APIRequestContext, APIResponse } from "playwright/test";
 import { expect, test, type Workspace } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { t } from "../support/i18n";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
 type AuthResponse = {
   token: string;
@@ -13,13 +14,9 @@ type AuthResponse = {
   };
 };
 
-type QueryResponse = {
-  items?: Array<{
-    asset?: {
-      original_filename?: string;
-    };
-  }>;
-};
+// Derived from the generated OpenAPI types rather than hand-written, so a
+// browse-contract change breaks the build instead of failing at runtime.
+type QueryResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
 
 type UploadResponse = {
   task_id: number;
@@ -170,7 +167,10 @@ async function userCanSeeAsset(
   });
   expect(response.ok(), await response.text()).toBe(true);
   const result = (await response.json()) as QueryResponse;
-  return result.items?.some((item) => item.asset?.original_filename === filename) ?? false;
+  return (
+    result.items?.some((item) => item.media_item?.primary_asset?.original_filename === filename) ??
+    false
+  );
 }
 
 async function expectSubjectLockout(

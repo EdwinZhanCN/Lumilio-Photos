@@ -112,6 +112,7 @@ function VirtualizedJustifiedGroup({
         const assetId = asset.asset_id;
         const stackInfo = asset.stack;
         const hasStackOverlay = Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
+        const composition = item.type === "media_item" ? item.composition : undefined;
         const thumbnailUrl = assetId
           ? assetUrls.getThumbnailUrl(assetId, getThumbnailSize(width))
           : undefined;
@@ -132,6 +133,7 @@ function VirtualizedJustifiedGroup({
                 thumbnailUrl={thumbnailUrl}
                 stackInfo={stackInfo}
                 browseStack={item.type === "stack" ? item : undefined}
+                composition={composition}
                 onClick={(event) => onItemClick(item, asset, event)}
                 isSelected={selection.isSelected(item.id)}
                 isSelectionMode={selection.enabled}
@@ -141,6 +143,7 @@ function VirtualizedJustifiedGroup({
               <MediaThumbnail
                 asset={asset}
                 thumbnailUrl={thumbnailUrl}
+                composition={composition}
                 onClick={(event) => onItemClick(item, asset, event)}
                 isSelected={selection.isSelected(item.id)}
                 isSelectionMode={selection.enabled}

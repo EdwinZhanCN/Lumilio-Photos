@@ -104,6 +104,9 @@ type AssetService interface {
 	// Unified query API
 	QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
 	QueryBrowseItems(ctx context.Context, params QueryAssetsParams) (BrowseQueryResult, error)
+	QueryMediaItems(ctx context.Context, params QueryAssetsParams) ([]BrowseMediaItem, int64, error)
+	CountMediaItems(ctx context.Context, params QueryAssetsParams) (int64, error)
+	CountMediaItemFiles(ctx context.Context, params QueryAssetsParams) (int64, error)
 	SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error)
 	SearchBrowseItems(ctx context.Context, params SearchAssetsParams) (SearchBrowseResult, error)
 	QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error)
@@ -124,6 +127,25 @@ type AssetService interface {
 	ListTagSummaries(ctx context.Context, ownerID *int32, repositoryID *string, source *string, query *string, limit, offset int) ([]TagSummary, error)
 }
 
+// MediaComposition filters logical media items by their component makeup.
+type MediaComposition string
+
+const (
+	MediaCompositionContainsRAW MediaComposition = "contains_raw"
+	MediaCompositionJPEGRAW     MediaComposition = "jpeg_raw"
+	MediaCompositionRAWUnpaired MediaComposition = "raw_unpaired"
+	MediaCompositionNoRAW       MediaComposition = "no_raw"
+	MediaCompositionLivePhoto   MediaComposition = "live_photo"
+)
+
+// StackMembership filters media items by presentation-stack membership.
+type StackMembership string
+
+const (
+	StackMembershipStacked   StackMembership = "stacked"
+	StackMembershipUnstacked StackMembership = "unstacked"
+)
+
 // QueryAssetsParams contains all parameters for the unified asset query
 type QueryAssetsParams struct {
 	Query            string // Filename search query (empty for list-only)
@@ -139,7 +161,9 @@ type QueryAssetsParams struct {
 	FilenameOperator *string
 	DateFrom         *time.Time
 	DateTo           *time.Time
-	IsRaw            *bool
+	MediaComposition MediaComposition // media-item component makeup filter (empty = all)
+	StackMembership  StackMembership  // presentation-stack membership filter (empty = all)
+	StackKinds       []string         // presentation-stack kind filter (non-empty implies stacked)
 	IsDeleted        *bool
 	Rating           *int
 	Liked            *bool
@@ -545,6 +569,15 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	if err := queries.DeleteAsset(ctx, id); err != nil {
 		return err
 	}
+	// The trashed component can no longer serve as the browsing component of
+	// its logical media item; re-pick the primary from what remains.
+	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil {
+		if err := NormalizeMediaItemPrimaryAsset(ctx, queries, item.MediaItemID); err != nil {
+			return fmt.Errorf("normalize media item after Trash: %w", err)
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
 	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
 		return err
 	}
@@ -563,6 +596,15 @@ func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
 	defer tx.Rollback()
 	queries := s.queries.WithTx(tx)
 	if err := queries.RestoreAsset(ctx, id); err != nil {
+		return err
+	}
+	// A restored component may reclaim the canonical primary slot (for example
+	// a JPEG that outranks the RAW that served while it was trashed).
+	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil {
+		if err := NormalizeMediaItemPrimaryAsset(ctx, queries, item.MediaItemID); err != nil {
+			return fmt.Errorf("normalize media item after restore: %w", err)
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
@@ -1364,7 +1406,6 @@ func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filte
 		FilenameOperator: params.FilenameOperator,
 		DateFrom:         params.DateFrom,
 		DateTo:           params.DateTo,
-		IsRaw:            params.IsRaw,
 		IsDeleted:        params.IsDeleted,
 		Rating:           params.Rating,
 		Liked:            params.Liked,
@@ -1391,118 +1432,209 @@ func aggregateCandidatePoolSize(limit, offset int) int {
 	return topK
 }
 
-func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
-	var repoUUID uuid.NullUUID
+// unifiedQueryInputs carries QueryAssetsParams values converted to the shapes
+// the unified media-item SQL queries expect (JSON-encoded lists, SQLite
+// timestamps, nullable enums).
+type unifiedQueryInputs struct {
+	assetIDs        *string
+	assetTypes      *string
+	tagNames        *string
+	stackKinds      *string
+	repoUUID        uuid.NullUUID
+	rating          *int32
+	dateFrom        dbtypes.Timestamp
+	dateTo          dbtypes.Timestamp
+	query           *string
+	sortBy          *string
+	composition     *string
+	stackMembership *string
+	isDeleted       bool
+}
+
+func mediaCompositionParam(value MediaComposition) *string {
+	if value == "" {
+		return nil
+	}
+	s := string(value)
+	return &s
+}
+
+func stackMembershipParam(value StackMembership) *string {
+	if value == "" {
+		return nil
+	}
+	s := string(value)
+	return &s
+}
+
+func newUnifiedQueryInputs(params QueryAssetsParams) (unifiedQueryInputs, error) {
+	in := unifiedQueryInputs{
+		assetIDs:        assetSetSourceSQLiteUUIDs(params.Source),
+		assetTypes:      sqliteStrings(params.AssetTypes),
+		tagNames:        sqliteStrings(params.TagNames),
+		stackKinds:      sqliteStrings(params.StackKinds),
+		composition:     mediaCompositionParam(params.MediaComposition),
+		stackMembership: stackMembershipParam(params.StackMembership),
+		isDeleted:       params.IsDeleted != nil && *params.IsDeleted,
+	}
+
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
 		parsedUUID, err := uuid.Parse(*params.RepositoryID)
 		if err != nil {
-			return nil, 0, fmt.Errorf("invalid repository ID: %w", err)
+			return unifiedQueryInputs{}, fmt.Errorf("invalid repository ID: %w", err)
 		}
-		repoUUID = uuid.NullUUID{UUID: parsedUUID, Valid: true}
+		in.repoUUID = uuid.NullUUID{UUID: parsedUUID, Valid: true}
 	}
-
-	var ratingPtr *int32
 	if params.Rating != nil {
 		r := int32(*params.Rating)
-		ratingPtr = &r
+		in.rating = &r
 	}
-
-	var fromTime, toTime dbtypes.Timestamp
 	if params.DateFrom != nil {
-		fromTime = dbtypes.NewTimestamp(*params.DateFrom)
+		in.dateFrom = dbtypes.NewTimestamp(*params.DateFrom)
 	}
 	if params.DateTo != nil {
-		toTime = dbtypes.NewTimestamp(*params.DateTo)
+		in.dateTo = dbtypes.NewTimestamp(*params.DateTo)
 	}
-
-	var queryPtr *string
 	if params.Query != "" {
-		queryPtr = &params.Query
+		query := params.Query
+		in.query = &query
 	}
-
-	var sortByPtr *string
 	switch params.SortBy {
-	case "recently_added":
-		s := "recently_added"
-		sortByPtr = &s
-	case "date_captured":
-		s := "date_captured"
-		sortByPtr = &s
+	case "recently_added", "date_captured":
+		sortBy := params.SortBy
+		in.sortBy = &sortBy
 	}
-	sourceAssetIDs := assetSetSourceSQLiteUUIDs(params.Source)
+	return in, nil
+}
 
-	// Get total count
-	countResult, err := s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
-		AssetIds:         sourceAssetIDs,
+func countMediaItemsUnifiedParams(params QueryAssetsParams, in unifiedQueryInputs) repo.CountMediaItemsUnifiedParams {
+	return repo.CountMediaItemsUnifiedParams{
+		AssetIds:         in.assetIDs,
+		AssetTypes:       in.assetTypes,
+		TagNames:         in.tagNames,
+		StackKinds:       in.stackKinds,
+		IsDeleted:        in.isDeleted,
+		Query:            in.query,
 		AssetType:        params.AssetType,
-		AssetTypes:       sqliteStrings(params.AssetTypes),
-		RepositoryID:     repoUUID,
-		PersonID:         params.PersonID,
 		OwnerID:          params.OwnerID,
+		RepositoryID:     in.repoUUID,
+		FolderPath:       params.FolderPath,
+		FolderRecursive:  params.FolderRecursive,
+		PersonID:         params.PersonID,
 		AlbumID:          params.AlbumID,
-		Query:            queryPtr,
+		TagName:          params.TagName,
+		TagSource:        params.TagSource,
 		FilenameVal:      params.FilenameValue,
 		FilenameOperator: params.FilenameOperator,
-		IsRaw:            params.IsRaw,
-		Rating:           ratingPtr,
+		DateFrom:         in.dateFrom,
+		DateTo:           in.dateTo,
+		Composition:      in.composition,
+		StackMembership:  in.stackMembership,
+		Rating:           in.rating,
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
 		LensModel:        params.LensModel,
-		TagName:          params.TagName,
-		TagSource:        params.TagSource,
-		TagNames:         sqliteStrings(params.TagNames),
-		FolderPath:       params.FolderPath,
-		FolderRecursive:  params.FolderRecursive,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
 		LocationWest:     params.LocationWest,
-		DateFrom:         fromTime,
-		DateTo:           toTime,
-		IsDeleted:        params.IsDeleted != nil && *params.IsDeleted,
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to count assets: %w", err)
 	}
+}
 
-	// Get assets
-	assets, err := s.queries.GetAssetsUnified(ctx, repo.GetAssetsUnifiedParams{
-		AssetIds:         sourceAssetIDs,
+func countMediaItemFilesUnifiedParams(params QueryAssetsParams, in unifiedQueryInputs) repo.CountMediaItemFilesUnifiedParams {
+	return repo.CountMediaItemFilesUnifiedParams{
+		AssetIds:         in.assetIDs,
+		AssetTypes:       in.assetTypes,
+		TagNames:         in.tagNames,
+		StackKinds:       in.stackKinds,
+		IsDeleted:        in.isDeleted,
+		Query:            in.query,
 		AssetType:        params.AssetType,
-		AssetTypes:       sqliteStrings(params.AssetTypes),
-		RepositoryID:     repoUUID,
-		PersonID:         params.PersonID,
 		OwnerID:          params.OwnerID,
+		RepositoryID:     in.repoUUID,
+		FolderPath:       params.FolderPath,
+		FolderRecursive:  params.FolderRecursive,
+		PersonID:         params.PersonID,
 		AlbumID:          params.AlbumID,
-		Query:            queryPtr,
+		TagName:          params.TagName,
+		TagSource:        params.TagSource,
 		FilenameVal:      params.FilenameValue,
 		FilenameOperator: params.FilenameOperator,
-		IsRaw:            params.IsRaw,
-		Rating:           ratingPtr,
+		DateFrom:         in.dateFrom,
+		DateTo:           in.dateTo,
+		Composition:      in.composition,
+		StackMembership:  in.stackMembership,
+		Rating:           in.rating,
 		Liked:            params.Liked,
 		CameraModel:      params.CameraModel,
 		LensModel:        params.LensModel,
-		TagName:          params.TagName,
-		TagSource:        params.TagSource,
-		TagNames:         sqliteStrings(params.TagNames),
-		FolderPath:       params.FolderPath,
-		FolderRecursive:  params.FolderRecursive,
 		LocationNorth:    params.LocationNorth,
 		LocationSouth:    params.LocationSouth,
 		LocationEast:     params.LocationEast,
 		LocationWest:     params.LocationWest,
-		SortBy:           sortByPtr,
-		DateFrom:         fromTime,
-		DateTo:           toTime,
-		IsDeleted:        params.IsDeleted != nil && *params.IsDeleted,
-		Limit:            int64(params.Limit),
+	}
+}
+
+func getMediaItemsUnifiedParams(params QueryAssetsParams, in unifiedQueryInputs) repo.GetMediaItemsUnifiedParams {
+	return repo.GetMediaItemsUnifiedParams{
+		AssetIds:         in.assetIDs,
+		AssetTypes:       in.assetTypes,
+		TagNames:         in.tagNames,
+		StackKinds:       in.stackKinds,
+		SortBy:           in.sortBy,
+		IsDeleted:        in.isDeleted,
+		Query:            in.query,
+		AssetType:        params.AssetType,
+		OwnerID:          params.OwnerID,
+		RepositoryID:     in.repoUUID,
+		FolderPath:       params.FolderPath,
+		FolderRecursive:  params.FolderRecursive,
+		PersonID:         params.PersonID,
+		AlbumID:          params.AlbumID,
+		TagName:          params.TagName,
+		TagSource:        params.TagSource,
+		FilenameVal:      params.FilenameValue,
+		FilenameOperator: params.FilenameOperator,
+		DateFrom:         in.dateFrom,
+		DateTo:           in.dateTo,
+		Composition:      in.composition,
+		StackMembership:  in.stackMembership,
+		Rating:           in.rating,
+		Liked:            params.Liked,
+		CameraModel:      params.CameraModel,
+		LensModel:        params.LensModel,
+		LocationNorth:    params.LocationNorth,
+		LocationSouth:    params.LocationSouth,
+		LocationEast:     params.LocationEast,
+		LocationWest:     params.LocationWest,
 		Offset:           int64(params.Offset),
-	})
+		Limit:            int64(params.Limit),
+	}
+}
+
+// queryAssetsUnified lists one primary asset per matching logical media item.
+// The returned total counts media items, not component files.
+func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	in, err := newUnifiedQueryInputs(params)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return assets, countResult, nil
+	total, err := s.queries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count media items: %w", err)
+	}
+
+	rows, err := s.queries.GetMediaItemsUnified(ctx, getMediaItemsUnifiedParams(params, in))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	assets := make([]repo.Asset, 0, len(rows))
+	for _, row := range rows {
+		assets = append(assets, row.Asset)
+	}
+	return assets, total, nil
 }
 
 func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
@@ -1708,9 +1840,10 @@ func (s *assetService) SearchAssetIDsOCRForOwner(ctx context.Context, ownerID in
 }
 
 // filenameMembershipParams mirrors the query's filter for the filename
-// channel of the Results tier.
-func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedParams {
-	out := repo.GetAssetIDsUnifiedParams{Limit: fusedSetCap}
+// channel of the Results tier. Rows are (media_item_id, primary_asset_id)
+// pairs at media-item granularity.
+func filenameMembershipParams(params QueryAssetsParams) repo.GetMediaItemRefsUnifiedParams {
+	out := repo.GetMediaItemRefsUnifiedParams{Limit: fusedSetCap}
 	out.AssetIds = assetSetSourceSQLiteUUIDs(params.Source)
 	if params.Query != "" {
 		operator := "contains"
@@ -1739,7 +1872,9 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetAssetIDsUnifiedP
 	if params.DateTo != nil {
 		out.DateTo = dbtypes.NewTimestamp(*params.DateTo)
 	}
-	out.IsRaw = params.IsRaw
+	out.Composition = mediaCompositionParam(params.MediaComposition)
+	out.StackMembership = stackMembershipParam(params.StackMembership)
+	out.StackKinds = sqliteStrings(params.StackKinds)
 	out.IsDeleted = params.IsDeleted != nil && *params.IsDeleted
 	if params.Rating != nil {
 		rating := int32(*params.Rating)

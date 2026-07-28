@@ -9,7 +9,8 @@ describe("asset browse route state", () => {
       sort: "recently_added",
       filter: {
         type: "PHOTO",
-        raw: false,
+        media_item: { composition: "jpeg_raw" },
+        stack: { membership: "stacked", kinds: ["burst", "manual"] },
         rating: 0,
         liked: true,
         filename: { operator: "starts_with", value: "IMG_" },
@@ -26,7 +27,8 @@ describe("asset browse route state", () => {
       sort: "recently_added",
       filter: {
         type: "PHOTO",
-        raw: false,
+        media_item: { composition: "jpeg_raw" },
+        stack: { membership: "stacked", kinds: ["burst", "manual"] },
         rating: 0,
         liked: true,
         filename: { operator: "starts_with", value: "IMG_" },
@@ -55,9 +57,21 @@ describe("asset browse route state", () => {
   it("ignores invalid values", () => {
     expect(
       parseAssetBrowseParams(
-        new URLSearchParams("type=audio&raw=maybe&rating=8&from=nope&bbox=200,95,-200,-95"),
+        new URLSearchParams(
+          "type=audio&composition=sidecar&stack_membership=grouped&stack_kind=panorama&rating=8&from=nope&bbox=200,95,-200,-95",
+        ),
       ),
     ).toEqual({ query: "", sort: "date_captured", filter: {} });
+  });
+
+  it("does not read the retired raw parameter", () => {
+    expect(parseAssetBrowseParams(new URLSearchParams("raw=false")).filter).toEqual({});
+  });
+
+  it("keeps a lone stack kind without a membership", () => {
+    expect(parseAssetBrowseParams(new URLSearchParams("stack_kind=burst")).filter).toEqual({
+      stack: { kinds: ["burst"] },
+    });
   });
 
   it("omits defaults from serialized URLs", () => {

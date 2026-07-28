@@ -1,6 +1,7 @@
 package pins
 
 import (
+	"encoding/json"
 	"testing"
 
 	"server/internal/agent/ref"
@@ -47,5 +48,44 @@ func TestLiveReplayRequiresExactVersionAndAuthorizationScope(t *testing.T) {
 	}
 	if isReplayable(plan, 8) {
 		t.Fatal("cross-user plan unexpectedly replayable")
+	}
+}
+
+// The filter replay payload carries the media-item vocabulary. There is no
+// migration for pins written before this change: an old payload simply decodes
+// without the new fields, so its composition/stack filters do not apply.
+func TestFilterReplayPayloadCarriesCompositionAndStackFilters(t *testing.T) {
+	var payload filterReplayPayload
+	raw := []byte(`{
+		"composition": "jpeg_raw",
+		"stack_membership": "stacked",
+		"stack_kinds": ["burst", "manual"]
+	}`)
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("decode filter replay payload: %v", err)
+	}
+
+	if payload.Composition != "jpeg_raw" {
+		t.Fatalf("composition = %q, want jpeg_raw", payload.Composition)
+	}
+	if payload.StackMembership != "stacked" {
+		t.Fatalf("stack_membership = %q, want stacked", payload.StackMembership)
+	}
+	if len(payload.StackKinds) != 2 {
+		t.Fatalf("stack_kinds = %v, want two kinds", payload.StackKinds)
+	}
+}
+
+func TestFilterReplayPayloadIgnoresRetiredRawKey(t *testing.T) {
+	var payload filterReplayPayload
+	if err := json.Unmarshal([]byte(`{"raw": true, "type": "PHOTO"}`), &payload); err != nil {
+		t.Fatalf("decode legacy filter replay payload: %v", err)
+	}
+
+	if payload.Type != "PHOTO" {
+		t.Fatalf("type = %q, want PHOTO", payload.Type)
+	}
+	if payload.Composition != "" || payload.StackMembership != "" || len(payload.StackKinds) != 0 {
+		t.Fatalf("legacy payload produced browse filters: %+v", payload)
 	}
 }

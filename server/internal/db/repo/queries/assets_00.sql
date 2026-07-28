@@ -30,7 +30,7 @@ INSERT INTO media_items (
     sqlc.arg('created_at')
 );
 
--- name: AttachOriginalAssetToMediaItem :exec
+-- name: AttachAssetToMediaItem :exec
 INSERT INTO media_item_assets (
     asset_id,
     media_item_id,
@@ -40,10 +40,21 @@ INSERT INTO media_item_assets (
 ) VALUES (
     sqlc.arg('asset_id'),
     sqlc.arg('media_item_id'),
-    'original',
+    sqlc.arg('relation'),
     0,
     sqlc.arg('created_at')
 );
+
+-- Reconcile the component relation from metadata-confirmed facts. Relations
+-- assigned by stack/live-photo matching are never overwritten, and the update
+-- is a no-op when the stored relation already matches, so retries stay
+-- idempotent.
+-- name: ReconcileMediaItemComponentRelation :exec
+UPDATE media_item_assets
+SET relation = sqlc.arg('relation')
+WHERE asset_id = sqlc.arg('asset_id')
+  AND relation NOT IN ('live_photo_still', 'live_photo_video', 'edited_version')
+  AND relation <> sqlc.arg('relation');
 
 -- name: GetAssetByID :one
 SELECT * FROM assets

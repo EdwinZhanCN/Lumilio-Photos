@@ -123,13 +123,37 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 		return fmt.Errorf("update asset metadata: %w", err)
 	}
 
+	ap.reconcileComponentRelation(ctx, asset, meta.IsRAW, asset.MimeType)
+
 	if hasValidLocationGPS(meta.GPSLatitude, meta.GPSLongitude) {
 		ap.enqueueLocationClusterRebuild(ctx, asset)
 	}
-	ap.enqueueDetectStacks(ctx, asset)
 	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
+	ap.enqueueDetectStacks(ctx, asset)
 
 	return nil
+}
+
+// reconcileComponentRelation re-derives the media item component relation from
+// metadata-confirmed facts after extraction. Relations assigned by stack or
+// live-photo matching (live_photo_*, edited_version) are never overwritten,
+// and the SQL is a no-op when the stored relation already matches, so metadata
+// retries stay idempotent.
+func (ap *AssetProcessor) reconcileComponentRelation(ctx context.Context, asset *repo.Asset, isRAW bool, mimeType string) {
+	if ap == nil || ap.queries == nil || asset == nil {
+		return
+	}
+	relation := repo.InitialMediaRelation(&file.ValidationResult{IsRAW: isRAW, MimeType: mimeType}, asset.OriginalFilename)
+	if err := ap.queries.ReconcileMediaItemComponentRelation(ctx, repo.ReconcileMediaItemComponentRelationParams{
+		AssetID:  asset.AssetID,
+		Relation: string(relation),
+	}); err != nil && ap.logger != nil {
+		ap.logger.Warn("failed to reconcile media item component relation",
+			zap.String("asset_id", asset.AssetID.String()),
+			zap.String("relation", string(relation)),
+			zap.Error(err),
+		)
+	}
 }
 
 func (ap *AssetProcessor) enqueueLocationClusterRebuild(ctx context.Context, asset *repo.Asset) {

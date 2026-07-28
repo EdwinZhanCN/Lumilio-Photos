@@ -20,6 +20,24 @@ FROM media_item_assets mia
 JOIN media_items mi ON mi.media_item_id = mia.media_item_id
 WHERE mia.asset_id IN (sqlc.slice('asset_ids'));
 
+-- Composition/stack facts for a set of logical media items, used to hydrate
+-- browse items outside the unified query path (aggregate search, fused search).
+-- name: GetMediaItemBrowseFactsByIDs :many
+SELECT
+  f.media_item_id,
+  f.primary_asset_id,
+  f.media_kind,
+  CAST(f.component_count AS INTEGER) AS component_count,
+  CAST(f.has_raw AS INTEGER) AS has_raw,
+  CAST(f.has_jpeg AS INTEGER) AS has_jpeg,
+  CAST(f.has_edited AS INTEGER) AS has_edited,
+  CAST(f.has_live_motion AS INTEGER) AS has_live_motion,
+  f.stack_id,
+  f.stack_position,
+  f.stack_kind
+FROM media_item_browse_facts f
+WHERE f.media_item_id IN (sqlc.slice('media_item_ids'));
+
 -- name: MoveMediaItemComponent :exec
 UPDATE media_item_assets
 SET media_item_id = sqlc.arg('target_media_item_id'),
@@ -34,6 +52,34 @@ WHERE media_item_id = sqlc.arg('source_media_item_id');
 
 -- name: DeleteMediaItem :exec
 DELETE FROM media_items WHERE media_item_id = ?1;
+
+-- Canonical browsing component of a logical media item: jpeg_original first,
+-- then live_photo_still, edited_version, raw_original, and finally the
+-- component with the smallest position. Soft-deleted components never serve.
+-- name: SelectMediaItemPrimaryAsset :one
+SELECT mia.asset_id
+FROM media_item_assets mia
+JOIN assets a ON a.asset_id = mia.asset_id
+WHERE mia.media_item_id = sqlc.arg('media_item_id')
+  AND a.is_deleted = false
+ORDER BY
+  CASE mia.relation
+    WHEN 'jpeg_original' THEN 0
+    WHEN 'live_photo_still' THEN 1
+    WHEN 'edited_version' THEN 2
+    WHEN 'raw_original' THEN 3
+    ELSE 4
+  END,
+  mia.position ASC,
+  mia.created_at ASC
+LIMIT 1;
+
+-- name: UpdateMediaItemPrimaryAsset :exec
+UPDATE media_items
+SET primary_asset_id = sqlc.arg('primary_asset_id'),
+    updated_at = sqlc.arg('updated_at')
+WHERE media_item_id = sqlc.arg('media_item_id')
+  AND (primary_asset_id IS NULL OR primary_asset_id <> sqlc.arg('primary_asset_id'));
 
 -- Presentation stacks ------------------------------------------------------
 
@@ -104,11 +150,49 @@ JOIN media_items mi ON mi.media_item_id = asm.media_item_id
 WHERE asm.stack_id = sqlc.arg('stack_id')
   AND (sqlc.narg('owner_id') IS NULL OR mi.owner_id = sqlc.narg('owner_id'));
 
+-- name: GetStackScope :one
+SELECT owner_id, repository_id, cover_media_item_id
+FROM asset_stacks
+WHERE stack_id = sqlc.arg('stack_id');
+
+-- All memberships of a stack with the member scope needed to enforce the
+-- presentation-stack invariants (no soft-delete filtering: trash restores must
+-- keep their memberships).
+-- name: GetStackNormalizationState :many
+SELECT asm.media_item_id,
+       asm.position,
+       mi.owner_id,
+       mi.repository_id
+FROM asset_stack_members asm
+JOIN media_items mi ON mi.media_item_id = asm.media_item_id
+WHERE asm.stack_id = sqlc.arg('stack_id')
+ORDER BY asm.position ASC, asm.created_at ASC, asm.media_item_id ASC;
+
+-- name: UpdateStackMemberPosition :exec
+UPDATE asset_stack_members
+SET position = sqlc.arg('position')
+WHERE stack_id = sqlc.arg('stack_id')
+  AND media_item_id = sqlc.arg('media_item_id')
+  AND position <> sqlc.arg('position');
+
+-- name: RemoveStackMembership :exec
+DELETE FROM asset_stack_members
+WHERE stack_id = sqlc.arg('stack_id')
+  AND media_item_id = sqlc.arg('media_item_id');
+
+-- name: UpdateStackCover :exec
+UPDATE asset_stacks
+SET cover_media_item_id = sqlc.arg('cover_media_item_id'),
+    updated_at = sqlc.arg('updated_at')
+WHERE stack_id = sqlc.arg('stack_id')
+  AND (cover_media_item_id IS NULL OR cover_media_item_id <> sqlc.arg('cover_media_item_id'));
+
 -- Structural and burst detection ------------------------------------------
 
 -- name: FindCandidatesForStackingByName :many
 SELECT a.asset_id,
        mia.media_item_id,
+       mia.relation,
        a.owner_id,
        a.original_filename,
        a.mime_type,
@@ -223,6 +307,44 @@ ORDER BY type, asset_id;
 SELECT COUNT(DISTINCT media_item_id)
 FROM asset_stack_members
 WHERE media_item_id IN (sqlc.slice('media_item_ids'));
+
+-- Live Photo post-consistency: still/motion components in this repository
+-- that share a content identifier but whose media items never joined (for
+-- example because matching ran before the pair finished metadata extraction).
+-- Items already carrying live_photo_* components are excluded.
+-- name: FindUnmatchedLivePhotoPairs :many
+WITH identified AS (
+  SELECT a.owner_id AS owner_id,
+         a.asset_id AS asset_id,
+         a.type AS asset_type,
+         mia.media_item_id AS media_item_id,
+         CAST(json_extract(a.specific_metadata, '$.content_identifier') AS TEXT) AS content_identifier
+  FROM assets a
+  JOIN media_item_assets mia ON mia.asset_id = a.asset_id
+  WHERE a.repository_id = sqlc.arg('repository_id')
+    AND a.owner_id IS NOT NULL
+    AND a.is_deleted = false
+    AND a.type IN ('PHOTO', 'VIDEO')
+    AND NULLIF(json_extract(a.specific_metadata, '$.content_identifier'), '') IS NOT NULL
+),
+paired AS (
+  SELECT owner_id, content_identifier
+  FROM identified
+  GROUP BY owner_id, content_identifier
+  HAVING COUNT(DISTINCT asset_type) = 2
+)
+SELECT i.owner_id, i.asset_id, i.asset_type, i.media_item_id, i.content_identifier
+FROM identified i
+JOIN paired p
+  ON p.owner_id = i.owner_id
+ AND p.content_identifier = i.content_identifier
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM media_item_assets existing
+  WHERE existing.media_item_id = i.media_item_id
+    AND existing.relation IN ('live_photo_still', 'live_photo_video')
+)
+ORDER BY i.content_identifier, i.asset_type, i.asset_id;
 
 -- name: UpdateMediaItemAsLivePhoto :exec
 UPDATE media_items

@@ -121,7 +121,7 @@ RUN groupadd --gid ${APP_GID} app \
 # App artifacts
 COPY --from=builder /out/server /usr/local/bin/server
 COPY --from=web-builder /web/dist /app/web
-COPY server/config/server.container.toml ./config/server.dev.toml
+COPY server/config/examples/docker/dev-http.toml ./config/server.dev.toml
 COPY server/docker-entrypoint.sh /usr/local/bin/lumilio-entrypoint
 
 # Prepare storage path

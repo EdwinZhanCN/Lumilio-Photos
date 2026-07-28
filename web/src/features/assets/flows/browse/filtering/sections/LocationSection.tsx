@@ -3,24 +3,23 @@ import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import { MapComponent } from "../../../../map";
 import type { AssetLocationBBox } from "../../../../model/filter";
-import { centerToBBox, isZeroBBox } from "../filterState";
+import { centerToBBox, EMPTY_LOCATION_BBOX, isZeroBBox } from "../filterState";
 import { SectionShell } from "./SectionShell";
 
 interface LocationSectionProps {
-  filterDisabled: boolean;
-  enabled: boolean;
-  onEnabledChange: (value: boolean) => void;
-  bbox: AssetLocationBBox;
-  onBBoxChange: (bbox: AssetLocationBBox) => void;
+  locked: boolean;
+  /** `undefined` means "anywhere" — the inputs then show the empty bbox. */
+  value: AssetLocationBBox | undefined;
+  onValueChange: (bbox: AssetLocationBBox | undefined) => void;
 }
 
 export const LocationSection = memo(function LocationSection({
-  filterDisabled,
-  enabled,
-  onEnabledChange,
-  bbox,
-  onBBoxChange,
+  locked,
+  value,
+  onValueChange,
 }: LocationSectionProps) {
+  const bbox = value ?? EMPTY_LOCATION_BBOX;
+  const onBBoxChange = onValueChange;
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [locationRadiusKm, setLocationRadiusKm] = useState(5);
   const [locationCenterLat, setLocationCenterLat] = useState(0);
@@ -54,9 +53,9 @@ export const LocationSection = memo(function LocationSection({
     <>
       <SectionShell
         title={t("assets.filterTool.locationSection.title")}
-        enabled={enabled}
-        onToggle={onEnabledChange}
-        disabled={filterDisabled}
+        active={Boolean(value) && !isZeroBBox(bbox)}
+        onClear={() => onValueChange(undefined)}
+        locked={locked}
       >
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
@@ -65,7 +64,7 @@ export const LocationSection = memo(function LocationSection({
               className="input input-bordered input-xs w-1/2"
               placeholder={t("assets.filterTool.locationSection.north_placeholder")}
               step="0.000001"
-              disabled={filterDisabled || !enabled}
+              disabled={locked}
               value={bbox.north}
               onChange={(event) => onBBoxChange({ ...bbox, north: Number(event.target.value) })}
             />
@@ -74,7 +73,7 @@ export const LocationSection = memo(function LocationSection({
               className="input input-bordered input-xs w-1/2"
               placeholder={t("assets.filterTool.locationSection.south_placeholder")}
               step="0.000001"
-              disabled={filterDisabled || !enabled}
+              disabled={locked}
               value={bbox.south}
               onChange={(event) => onBBoxChange({ ...bbox, south: Number(event.target.value) })}
             />
@@ -85,7 +84,7 @@ export const LocationSection = memo(function LocationSection({
               className="input input-bordered input-xs w-1/2"
               placeholder={t("assets.filterTool.locationSection.east_placeholder")}
               step="0.000001"
-              disabled={filterDisabled || !enabled}
+              disabled={locked}
               value={bbox.east}
               onChange={(event) => onBBoxChange({ ...bbox, east: Number(event.target.value) })}
             />
@@ -94,7 +93,7 @@ export const LocationSection = memo(function LocationSection({
               className="input input-bordered input-xs w-1/2"
               placeholder={t("assets.filterTool.locationSection.west_placeholder")}
               step="0.000001"
-              disabled={filterDisabled || !enabled}
+              disabled={locked}
               value={bbox.west}
               onChange={(event) => onBBoxChange({ ...bbox, west: Number(event.target.value) })}
             />
@@ -104,7 +103,7 @@ export const LocationSection = memo(function LocationSection({
             <button
               type="button"
               className="btn btn-xs btn-outline flex-1"
-              disabled={filterDisabled || !enabled}
+              disabled={locked}
               onClick={() => setMapModalOpen(true)}
             >
               {t("assets.filterTool.locationSection.pick_on_map")}
@@ -112,7 +111,7 @@ export const LocationSection = memo(function LocationSection({
             <button
               type="button"
               className="btn btn-xs btn-ghost flex-1"
-              disabled={filterDisabled || !enabled}
+              disabled={locked}
               onClick={setCurrentLocationAsCenter}
             >
               {t("assets.filterTool.locationSection.use_current_location")}

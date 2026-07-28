@@ -1,17 +1,21 @@
 import { ListFilterIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import type { AssetUserFilterKey } from "../../../model/filter";
+import { countActiveAssetUserFilters, type AssetUserFilterKey } from "../../../model/filter";
 import {
   buildAssetUserFilter,
   buildLockedInitialFilter,
-  countEnabledFilters,
   createFilterDraft,
   createLockedFieldSet,
   filterDraftReducer,
-  hasActiveLockedFields,
 } from "./filterState";
-import { LikeSection, RatingSection, RawSection, TypeSection } from "./sections/ChoiceSections";
+import {
+  CompositionSection,
+  LikeSection,
+  RatingSection,
+  StackSection,
+  TypeSection,
+} from "./sections/ChoiceSections";
 import { LocationSection } from "./sections/LocationSection";
 import { CameraMakeSection, LensSection, TagSection } from "./sections/MetadataSections";
 import { DateSection, FilenameSection } from "./sections/ValueSections";
@@ -47,13 +51,9 @@ export default function FilterTool({
     (field: AssetUserFilterKey) => lockedFieldSet.has(field),
     [lockedFieldSet],
   );
-  const hasLockedInitialFilters = useMemo(
-    () => hasActiveLockedFields(initialFilter, lockedFieldSet),
-    [initialFilter, initialHash, lockedFieldSet, lockedFieldsHash],
-  );
   const [filterDraft, dispatchFilterDraft] = useReducer(
     filterDraftReducer,
-    createFilterDraft(initialFilter, hasLockedInitialFilters),
+    createFilterDraft(initialFilter),
   );
   const setDraftField = useCallback(
     <Key extends keyof FilterDraft>(key: Key, value: FilterDraft[Key]) => {
@@ -68,9 +68,9 @@ export default function FilterTool({
 
     dispatchFilterDraft({
       type: "replace",
-      draft: createFilterDraft(initialFilter, hasLockedInitialFilters),
+      draft: createFilterDraft(initialFilter),
     });
-  }, [hasLockedInitialFilters, initialFilter, initialHash]);
+  }, [initialFilter, initialHash]);
 
   const { cameraModelItems, lensItems, loadingOptions } = useFilterOptions({
     open,
@@ -80,21 +80,11 @@ export default function FilterTool({
     fetchLenses,
   });
 
-  const enabledCount = useMemo(
-    () => countEnabledFilters(filterDraft, hasLockedInitialFilters),
-    [filterDraft, hasLockedInitialFilters],
-  );
   const appliedFilter = useMemo(
-    () => buildAssetUserFilter(filterDraft, initialFilter, lockedFieldSet, hasLockedInitialFilters),
-    [
-      filterDraft,
-      hasLockedInitialFilters,
-      initialFilter,
-      initialHash,
-      lockedFieldSet,
-      lockedFieldsHash,
-    ],
+    () => buildAssetUserFilter(filterDraft, initialFilter, lockedFieldSet),
+    [filterDraft, initialFilter, initialHash, lockedFieldSet, lockedFieldsHash],
   );
+  const enabledCount = useMemo(() => countActiveAssetUserFilters(appliedFilter), [appliedFilter]);
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -122,27 +112,25 @@ export default function FilterTool({
     const lockedFilter = buildLockedInitialFilter(initialFilter, lockedFieldSet);
     dispatchFilterDraft({
       type: "replace",
-      draft: createFilterDraft(lockedFilter, hasLockedInitialFilters),
+      draft: createFilterDraft(lockedFilter),
     });
     if (!autoApply) onChange?.(lockedFilter);
-  }, [
-    autoApply,
-    hasLockedInitialFilters,
-    initialFilter,
-    initialHash,
-    lockedFieldSet,
-    lockedFieldsHash,
-    onChange,
-  ]);
+  }, [autoApply, initialFilter, initialHash, lockedFieldSet, lockedFieldsHash, onChange]);
 
   const applyNow = useCallback(() => {
     onChangeRef.current?.(appliedFilter);
     setOpen(false);
   }, [appliedFilter]);
 
-  const filtersEnabled = filterDraft.filterEnabled || hasLockedInitialFilters;
+  const stackSelection = useMemo(
+    () => ({ membership: filterDraft.stackMembership, kinds: filterDraft.stackKinds }),
+    [filterDraft.stackMembership, filterDraft.stackKinds],
+  );
+
+  const filtersEnabled = enabledCount > 0;
   const typeLocked = isFieldLocked("type");
-  const rawLocked = isFieldLocked("raw");
+  const compositionLocked = isFieldLocked("media_item");
+  const stackLocked = isFieldLocked("stack");
   const ratingLocked = isFieldLocked("rating");
   const likedLocked = isFieldLocked("liked");
   const filenameLocked = isFieldLocked("filename");
@@ -183,101 +171,78 @@ export default function FilterTool({
                   </span>
                 )}
               </div>
-              <label className="label cursor-pointer p-0 gap-2">
-                <span className="label-text text-xs opacity-70">
-                  {t("assets.filterTool.main.enable_toggle")}
-                </span>
-                <input
-                  type="checkbox"
-                  className="toggle toggle-primary toggle-sm"
-                  checked={filtersEnabled}
-                  disabled={hasLockedInitialFilters}
-                  onChange={(event) => {
-                    if (!hasLockedInitialFilters) {
-                      setDraftField("filterEnabled", event.target.checked);
-                    }
-                  }}
-                />
-              </label>
             </div>
           </div>
 
+          {/*
+            Sections are ordered by control type, not by topic: the three pill
+            rows first, then the two selects, then the free-form inputs. Mixing
+            control shapes makes the panel read as a pile of unrelated widgets.
+          */}
           <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
             <TypeSection
-              filterDisabled={!filtersEnabled || typeLocked}
-              enabled={filterDraft.typeEnabled}
-              onEnabledChange={(value) => setDraftField("typeEnabled", value)}
-              value={filterDraft.typeValue}
-              onValueChange={(value) => setDraftField("typeValue", value)}
-            />
-            <RawSection
-              filterDisabled={!filtersEnabled || rawLocked}
-              enabled={filterDraft.rawEnabled}
-              onEnabledChange={(value) => setDraftField("rawEnabled", value)}
-              mode={filterDraft.rawMode}
-              onModeChange={(value) => setDraftField("rawMode", value)}
-            />
-            <RatingSection
-              filterDisabled={!filtersEnabled || ratingLocked}
-              enabled={filterDraft.ratingEnabled}
-              onEnabledChange={(value) => setDraftField("ratingEnabled", value)}
-              value={filterDraft.ratingValue}
-              onValueChange={(value) => setDraftField("ratingValue", value)}
+              locked={typeLocked}
+              value={filterDraft.type}
+              onValueChange={(value) => setDraftField("type", value)}
             />
             <LikeSection
-              filterDisabled={!filtersEnabled || likedLocked}
-              enabled={filterDraft.likedEnabled}
-              onEnabledChange={(value) => setDraftField("likedEnabled", value)}
-              value={filterDraft.likedValue}
-              onValueChange={(value) => setDraftField("likedValue", value)}
+              locked={likedLocked}
+              value={filterDraft.liked}
+              onValueChange={(value) => setDraftField("liked", value)}
+            />
+            <RatingSection
+              locked={ratingLocked}
+              value={filterDraft.rating}
+              onValueChange={(value) => setDraftField("rating", value)}
+            />
+            <CompositionSection
+              locked={compositionLocked}
+              value={filterDraft.composition}
+              onValueChange={(value) => setDraftField("composition", value)}
+            />
+            <StackSection
+              locked={stackLocked}
+              value={stackSelection}
+              onValueChange={(value) => {
+                setDraftField("stackMembership", value.membership);
+                setDraftField("stackKinds", value.kinds);
+              }}
             />
             <FilenameSection
-              filterDisabled={!filtersEnabled || filenameLocked}
-              enabled={filterDraft.filenameEnabled}
-              onEnabledChange={(value) => setDraftField("filenameEnabled", value)}
+              locked={filenameLocked}
               operator={filterDraft.filenameOperator}
               onOperatorChange={(value) => setDraftField("filenameOperator", value)}
               value={filterDraft.filenameValue}
               onValueChange={(value) => setDraftField("filenameValue", value)}
             />
             <DateSection
-              filterDisabled={!filtersEnabled || dateLocked}
-              enabled={filterDraft.dateEnabled}
-              onEnabledChange={(value) => setDraftField("dateEnabled", value)}
+              locked={dateLocked}
               from={filterDraft.dateFrom}
               onFromChange={(value) => setDraftField("dateFrom", value)}
               to={filterDraft.dateTo}
               onToChange={(value) => setDraftField("dateTo", value)}
             />
             <LocationSection
-              filterDisabled={!filtersEnabled || locationLocked}
-              enabled={filterDraft.locationEnabled}
-              onEnabledChange={(value) => setDraftField("locationEnabled", value)}
-              bbox={filterDraft.location}
-              onBBoxChange={(value) => setDraftField("location", value)}
+              locked={locationLocked}
+              value={filterDraft.location}
+              onValueChange={(value) => setDraftField("location", value)}
             />
             <CameraMakeSection
-              filterDisabled={!filtersEnabled || cameraModelLocked}
-              enabled={filterDraft.cameraModelEnabled}
-              onEnabledChange={(value) => setDraftField("cameraModelEnabled", value)}
+              locked={cameraModelLocked}
               value={filterDraft.cameraModel}
               onValueChange={(value) => setDraftField("cameraModel", value)}
               items={cameraModelItems}
               loading={loadingOptions}
             />
             <LensSection
-              filterDisabled={!filtersEnabled || lensLocked}
-              enabled={filterDraft.lensEnabled}
-              onEnabledChange={(value) => setDraftField("lensEnabled", value)}
+              locked={lensLocked}
               value={filterDraft.lens}
               onValueChange={(value) => setDraftField("lens", value)}
               items={lensItems}
               loading={loadingOptions}
             />
             <TagSection
-              filterDisabled={!filtersEnabled || tagLocked}
-              enabled={filterDraft.tagEnabled}
-              onEnabledChange={(value) => setDraftField("tagEnabled", value)}
+              locked={tagLocked}
               value={filterDraft.tagNames}
               onValueChange={(value) => setDraftField("tagNames", value)}
             />
@@ -288,7 +253,7 @@ export default function FilterTool({
               type="button"
               className="btn btn-xs btn-ghost text-error"
               onClick={resetAll}
-              disabled={!filtersEnabled && enabledCount === 0}
+              disabled={enabledCount === 0}
             >
               {t("assets.filterTool.main.reset_button")}
             </button>

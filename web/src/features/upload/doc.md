@@ -51,9 +51,12 @@ editor queue, while failed `File` objects remain available for retry.
 
 A successful HTTP response means transport was accepted, not that an asset
 exists yet. [waitForUploadJobs](@/lib/upload/uploadLifecycle.ts) follows the returned ingest task ids
-through `/api/v1/assets/batch/jobs`; [FileUploadProgress](./modules/process/useUploadProcess.tsx) remains in
+through `/api/v1/assets/batch/jobs` (chunked to the backend's 100-id limit,
+SSE first with poll fallback); [FileUploadProgress](./modules/process/useUploadProcess.tsx) remains in
 `processing` until every task reaches a backend terminal state. Asset
 list/search queries are invalidated only after successful materialization.
+Status-wait failures only mark unsettled tasks failed — already-terminal
+successes are preserved.
 
 ## Instant upload
 

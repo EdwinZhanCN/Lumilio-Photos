@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite-plus";
+import { defineConfig, loadEnv, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { docts } from "@edwinzhancn/docts/vite";
@@ -7,6 +7,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Development is a single-origin deployment: the browser only ever talks to the
+// Vite dev server, which proxies /api to the Go API. That is what lets `--host`
+// actually work — a phone on the LAN reaches one origin instead of needing to
+// find a loopback API. API_URL comes from .env.development, written by
+// `make setup`, so overriding it there moves the proxy target.
+const apiProxyTarget = loadEnv("development", __dirname, "").API_URL || "http://127.0.0.1:6680";
 
 const entryChunkBudget = 1300 * 1024;
 const lazyChunkBudget = 650 * 1024;
@@ -139,6 +146,17 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    proxy: {
+      // changeOrigin stays false (the Vite default) on purpose. The API
+      // compares the browser's Origin header against the target origin it
+      // derives from Host, so rewriting Host to the proxy target would make
+      // every session request look cross-origin and get a 403 from
+      // trustedSessionOriginMiddleware. Passing Host through also means the
+      // server sees the address the browser actually used, which is how a LAN
+      // device gets correct passkey-availability answers instead of a
+      // loopback-flavoured one.
+      "/api": { target: apiProxyTarget, ws: true },
+    },
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "credentialless",

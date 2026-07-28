@@ -210,7 +210,7 @@ func (m *SourceMaterializer) materializeFromStaging(
 			RepositoryID:            uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 			Status:                  preparedStatus,
 		}
-		created, createErr := m.createAssetWithMediaItem(ctx, params)
+		created, createErr := m.createAssetWithMediaItem(ctx, params, repo.InitialMediaRelation(validation, source.OriginalFilename))
 		if createErr != nil {
 			if !isUniqueConstraintViolation(createErr) {
 				return nil, fmt.Errorf("create prepared asset: %w", createErr)
@@ -405,7 +405,7 @@ func (m *SourceMaterializer) materializeInPlace(
 			Rating:                  int64Ptr(0),
 			RepositoryID:            uuid.NullUUID{UUID: repoID, Valid: true},
 			Status:                  statusJSON,
-		})
+		}, repo.InitialMediaRelation(validation, source.OriginalFilename))
 		if err != nil {
 			return err
 		}
@@ -472,17 +472,17 @@ func (m *SourceMaterializer) findExistingContent(ctx context.Context, repository
 	return nil, nil
 }
 
-func (m *SourceMaterializer) createAssetWithMediaItem(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error) {
+func (m *SourceMaterializer) createAssetWithMediaItem(ctx context.Context, params repo.CreateAssetParams, relation repo.StackRelation) (*repo.Asset, error) {
 	var created *repo.Asset
 	err := m.database.WithTx(ctx, func(_ *sql.Tx, queries *repo.Queries) error {
 		var err error
-		created, err = createAssetWithMediaItem(ctx, queries, params)
+		created, err = createAssetWithMediaItem(ctx, queries, params, relation)
 		return err
 	})
 	return created, err
 }
 
-func createAssetWithMediaItem(ctx context.Context, queries *repo.Queries, params repo.CreateAssetParams) (*repo.Asset, error) {
+func createAssetWithMediaItem(ctx context.Context, queries *repo.Queries, params repo.CreateAssetParams, relation repo.StackRelation) (*repo.Asset, error) {
 	if params.AssetID == uuid.Nil {
 		params.AssetID = uuid.New()
 	}
@@ -503,12 +503,13 @@ func createAssetWithMediaItem(ctx context.Context, queries *repo.Queries, params
 	}); err != nil {
 		return nil, fmt.Errorf("create logical media item: %w", err)
 	}
-	if err := queries.AttachOriginalAssetToMediaItem(ctx, repo.AttachOriginalAssetToMediaItemParams{
+	if err := queries.AttachAssetToMediaItem(ctx, repo.AttachAssetToMediaItemParams{
 		AssetID:     asset.AssetID,
 		MediaItemID: mediaItemID,
+		Relation:    string(relation),
 		CreatedAt:   createdAt,
 	}); err != nil {
-		return nil, fmt.Errorf("attach original asset to logical media item: %w", err)
+		return nil, fmt.Errorf("attach asset to logical media item: %w", err)
 	}
 	return &asset, nil
 }

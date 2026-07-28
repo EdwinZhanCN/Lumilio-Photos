@@ -131,14 +131,16 @@ func (s *assetService) searchAssetsFusedSet(ctx context.Context, params SearchAs
 	}
 
 	// Filename membership, ranked by capture time (the query's natural order).
+	// Candidates are media-item primary assets: one contribution per logical
+	// media item.
 	if s.queries != nil {
-		if rows, err := s.queries.GetAssetIDsUnified(ctx, filenameMembershipParams(params.QueryAssetsParams)); err == nil {
+		if rows, err := s.queries.GetMediaItemRefsUnified(ctx, filenameMembershipParams(params.QueryAssetsParams)); err == nil {
 			ran++
 			set.Sources = append(set.Sources, SourceFilename)
 			rank := 1
 			for _, row := range rows {
 				all = append(all, aggregatesearch.Candidate{
-					AssetID: row,
+					AssetID: row.PrimaryAssetID,
 					Source:  SourceFilename,
 					Rank:    rank,
 				})

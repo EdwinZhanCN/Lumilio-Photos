@@ -84,14 +84,24 @@ func (l *AuthorizedLibrary) AuthorizeAssetIDs(ctx context.Context, userID int32,
 	return out, nil
 }
 
-func (l *AuthorizedLibrary) FilterAssetIDs(ctx context.Context, params repo.GetAssetIDsUnifiedParams) ([]uuid.UUID, error) {
+// FilterAssetIDs materializes the media-item refs matching the filter and
+// returns one primary asset ID per logical media item (capture time desc).
+func (l *AuthorizedLibrary) FilterAssetIDs(ctx context.Context, params repo.GetMediaItemRefsUnifiedParams) ([]uuid.UUID, error) {
 	params.OwnerID = &l.userID
 	if albumID, ok := int32Value(params.AlbumID); ok {
 		if _, err := l.Album(ctx, albumID); err != nil {
 			return nil, sql.ErrNoRows
 		}
 	}
-	return l.queries.GetAssetIDsUnified(ctx, params)
+	rows, err := l.queries.GetMediaItemRefsUnified(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = row.PrimaryAssetID
+	}
+	return ids, nil
 }
 
 func (l *AuthorizedLibrary) SearchSemantic(ctx context.Context, query string, strictness search.SetStrictness, maxResults int) ([]uuid.UUID, search.SetMeta, error) {

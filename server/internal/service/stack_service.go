@@ -15,8 +15,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/logging"
-	"server/internal/utils/file"
-	"server/internal/utils/raw"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -54,8 +52,10 @@ type MediaItemComponentInfo struct {
 }
 
 type StackService interface {
-	// AutoDetectStacks first merges structural components (RAW/JPEG and edited
-	// iterations) into logical media items, then creates burst presentation stacks.
+	// AutoDetectStacks reconciles component relations, merges structural
+	// components (RAW/JPEG and edited iterations) into logical media items,
+	// re-checks live photo consistency, and creates burst presentation stacks,
+	// normalizing primaries and stacks at every step.
 	AutoDetectStacks(ctx context.Context, repositoryID uuid.UUID) (int, error)
 	CreateManualStack(ctx context.Context, assetIDs []uuid.UUID) (*StackInfo, error)
 	GetStackByAssetAny(ctx context.Context, assetID uuid.UUID, ownerID *int32) (*StackInfo, error)
@@ -76,8 +76,6 @@ func NewStackService(queries *repo.Queries, pool *sql.DB, logger *zap.Logger, au
 	return &stackService{queries: queries, pool: pool, logger: logger, auditProvider: auditProvider}
 }
 
-var fileValidator = file.NewValidator()
-
 const stackMaxTimeGap = 5 * time.Second
 const burstMaxTimeGap = time.Second
 
@@ -96,12 +94,15 @@ func iterationBaseName(filename string) (string, bool) {
 	return strings.ToLower(matches[1]), true
 }
 
+// classifyRelation assigns the structural-merge relation for a component.
+// RAW/JPEG determination is delegated to repo.InitialMediaRelation so extension
+// rules live in exactly one place; this function only adds the merge-specific
+// edited-version fallback.
 func classifyRelation(filename string) repo.StackRelation {
-	ext := strings.ToLower(filepath.Ext(filename))
-	if _, isRaw := raw.RAWExtensions[ext]; isRaw || fileValidator.IsRAWFile(filename) {
+	switch repo.InitialMediaRelation(nil, filename) {
+	case repo.StackRelationRawOriginal:
 		return repo.StackRelationRawOriginal
-	}
-	if ext == ".jpg" || ext == ".jpeg" {
+	case repo.StackRelationJpegOriginal:
 		return repo.StackRelationJpegOriginal
 	}
 	if isIteration(filename) {
@@ -188,11 +189,23 @@ func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []structu
 	return result
 }
 
+// AutoDetectStacks runs the canonical detection pipeline for a repository:
+//  1. reconcile stored component relations with the shared classifier
+//  2. merge JPEG/RAW structural components and edited versions
+//  3. run the live photo post-consistency sweep
+//  4. detect exact EXIF bursts, then conservative timestamp/filename bursts
+//  5. normalize presentation stacks and media item primaries (done at every
+//     mutation point; items reconciled in step 1 are normalized at the end)
 func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.UUID) (int, error) {
 	repositoryUUID := uuid.NullUUID{UUID: repositoryID, Valid: true}
 	candidates, err := s.queries.FindCandidatesForStackingByName(ctx, repositoryUUID)
 	if err != nil {
 		return 0, fmt.Errorf("find structural media candidates: %w", err)
+	}
+
+	reconciledItems, err := s.reconcileComponentRelations(ctx, candidates)
+	if err != nil {
+		return 0, err
 	}
 
 	for _, cluster := range timeCluster(candidates) {
@@ -210,6 +223,10 @@ func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.U
 		}
 	}
 
+	if err := s.runLivePhotoConsistency(ctx, repositoryUUID); err != nil {
+		return 0, fmt.Errorf("live photo consistency: %w", err)
+	}
+
 	burstCandidates, err := s.queries.FindMediaItemsForBurstDetection(ctx, repositoryUUID)
 	if err != nil {
 		return 0, fmt.Errorf("find burst candidates: %w", err)
@@ -225,7 +242,200 @@ func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.U
 			created++
 		}
 	}
+
+	for mediaItemID := range reconciledItems {
+		if err := NormalizeMediaItemPrimaryAsset(ctx, s.queries, mediaItemID); err != nil {
+			return created, fmt.Errorf("normalize reconciled media item %s: %w", mediaItemID, err)
+		}
+	}
 	return created, nil
+}
+
+// reconcileComponentRelations rewrites stored component relations that disagree
+// with the shared classifier. The SQL guard leaves live-photo and
+// edited-version relations untouched. It returns the media items that were
+// candidates for a write so their primary component can be re-picked.
+func (s *stackService) reconcileComponentRelations(ctx context.Context, candidates []repo.FindCandidatesForStackingByNameRow) (map[uuid.UUID]struct{}, error) {
+	affected := make(map[uuid.UUID]struct{})
+	for _, candidate := range candidates {
+		expected := repo.InitialMediaRelation(nil, candidate.OriginalFilename)
+		if candidate.Relation == string(expected) {
+			continue
+		}
+		if err := s.queries.ReconcileMediaItemComponentRelation(ctx, repo.ReconcileMediaItemComponentRelationParams{
+			AssetID:  candidate.AssetID,
+			Relation: string(expected),
+		}); err != nil {
+			return nil, fmt.Errorf("reconcile component relation for asset %s: %w", candidate.AssetID, err)
+		}
+		affected[candidate.MediaItemID] = struct{}{}
+	}
+	return affected, nil
+}
+
+// runLivePhotoConsistency joins still/motion pairs that share a content
+// identifier but were never matched, for example because the per-asset matcher
+// ran before the pair finished metadata extraction. Pairs with more than one
+// still or motion candidate stay untouched, matching MatchLivePhotoStack.
+func (s *stackService) runLivePhotoConsistency(ctx context.Context, repositoryID uuid.NullUUID) error {
+	rows, err := s.queries.FindUnmatchedLivePhotoPairs(ctx, repositoryID)
+	if err != nil {
+		return err
+	}
+	type livePhotoPair struct {
+		identifier string
+		photoID    uuid.UUID
+		videoID    uuid.UUID
+		ambiguous  bool
+	}
+	pairs := make(map[string]*livePhotoPair)
+	var order []string
+	for _, row := range rows {
+		key := fmt.Sprintf("%d:%s", row.OwnerID, row.ContentIdentifier)
+		pair, ok := pairs[key]
+		if !ok {
+			pair = &livePhotoPair{identifier: normalizeLivePhotoContentIdentifier(row.ContentIdentifier)}
+			pairs[key] = pair
+			order = append(order, key)
+		}
+		switch row.AssetType {
+		case string(dbtypes.AssetTypePhoto):
+			if pair.photoID != uuid.Nil {
+				pair.ambiguous = true
+				continue
+			}
+			pair.photoID = row.AssetID
+		case string(dbtypes.AssetTypeVideo):
+			if pair.videoID != uuid.Nil {
+				pair.ambiguous = true
+				continue
+			}
+			pair.videoID = row.AssetID
+		}
+	}
+	for _, key := range order {
+		pair := pairs[key]
+		if pair.ambiguous || pair.photoID == uuid.Nil || pair.videoID == uuid.Nil {
+			continue
+		}
+		if err := s.matchLivePhotoPair(ctx, pair.photoID, pair.videoID, pair.identifier); err != nil {
+			return fmt.Errorf("match live photo pair %q: %w", pair.identifier, err)
+		}
+	}
+	return nil
+}
+
+// NormalizeMediaItemPrimaryAsset enforces the canonical browsing component of
+// a logical media item: jpeg_original, then live_photo_still, edited_version,
+// raw_original, and finally the component with the smallest position.
+// Soft-deleted components never serve. It runs after every component
+// add/remove or relation change so the choice never depends on arrival order.
+func NormalizeMediaItemPrimaryAsset(ctx context.Context, queries *repo.Queries, mediaItemID uuid.UUID) error {
+	assetID, err := queries.SelectMediaItemPrimaryAsset(ctx, mediaItemID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("select primary component: %w", err)
+	}
+	if err := queries.UpdateMediaItemPrimaryAsset(ctx, repo.UpdateMediaItemPrimaryAssetParams{
+		PrimaryAssetID: uuid.NullUUID{UUID: assetID, Valid: true},
+		MediaItemID:    mediaItemID,
+		UpdatedAt:      dbtypes.NewTimestamp(time.Now()),
+	}); err != nil {
+		return fmt.Errorf("update primary component: %w", err)
+	}
+	return nil
+}
+
+// NormalizePresentationStack enforces the presentation-stack invariants:
+//   - members whose owner/repository disagree with the stack are detached
+//   - an empty stack is deleted; a single-member stack is dissolved
+//   - member positions are compacted to 0..n-1 preserving order
+//   - a missing cover is replaced by the lowest-position member
+//
+// It runs after structural merges, membership changes, and media item or asset
+// deletion so the database never holds a degenerate presentation stack.
+func NormalizePresentationStack(ctx context.Context, queries *repo.Queries, stackID uuid.UUID) error {
+	stack, err := queries.GetStackScope(ctx, stackID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load stack scope: %w", err)
+	}
+	members, err := queries.GetStackNormalizationState(ctx, stackID)
+	if err != nil {
+		return fmt.Errorf("load stack members: %w", err)
+	}
+	kept := make([]repo.GetStackNormalizationStateRow, 0, len(members))
+	for _, member := range members {
+		if !sameStackOwner(member.OwnerID, stack.OwnerID) || !sameStackRepository(member.RepositoryID, stack.RepositoryID) {
+			if err := queries.RemoveStackMembership(ctx, repo.RemoveStackMembershipParams{
+				StackID:     stackID,
+				MediaItemID: member.MediaItemID,
+			}); err != nil {
+				return fmt.Errorf("detach out-of-scope member: %w", err)
+			}
+			continue
+		}
+		kept = append(kept, member)
+	}
+	switch len(kept) {
+	case 0:
+		return queries.DeleteStack(ctx, stackID)
+	case 1:
+		if err := queries.RemoveStackMembership(ctx, repo.RemoveStackMembershipParams{
+			StackID:     stackID,
+			MediaItemID: kept[0].MediaItemID,
+		}); err != nil {
+			return fmt.Errorf("dissolve single-member stack: %w", err)
+		}
+		return queries.DeleteStack(ctx, stackID)
+	}
+	for index, member := range kept {
+		if member.Position == int64(index) {
+			continue
+		}
+		if err := queries.UpdateStackMemberPosition(ctx, repo.UpdateStackMemberPositionParams{
+			StackID:     stackID,
+			MediaItemID: member.MediaItemID,
+			Position:    int64(index),
+		}); err != nil {
+			return fmt.Errorf("compact member positions: %w", err)
+		}
+	}
+	coverValid := false
+	for _, member := range kept {
+		if stack.CoverMediaItemID.Valid && stack.CoverMediaItemID.UUID == member.MediaItemID {
+			coverValid = true
+			break
+		}
+	}
+	if !coverValid {
+		if err := queries.UpdateStackCover(ctx, repo.UpdateStackCoverParams{
+			StackID:          stackID,
+			CoverMediaItemID: uuid.NullUUID{UUID: kept[0].MediaItemID, Valid: true},
+			UpdatedAt:        dbtypes.NewTimestamp(time.Now()),
+		}); err != nil {
+			return fmt.Errorf("repair stack cover: %w", err)
+		}
+	}
+	return nil
+}
+
+func sameStackOwner(memberOwner, stackOwner *int32) bool {
+	if memberOwner == nil || stackOwner == nil {
+		return memberOwner == stackOwner
+	}
+	return *memberOwner == *stackOwner
+}
+
+func sameStackRepository(memberRepo, stackRepo uuid.NullUUID) bool {
+	if memberRepo.Valid != stackRepo.Valid {
+		return false
+	}
+	return !memberRepo.Valid || memberRepo.UUID == stackRepo.UUID
 }
 
 func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey string, members []repo.FindCandidatesForStackingByNameRow) error {
@@ -239,7 +449,9 @@ func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey st
 	defer func() { _ = tx.Rollback() }()
 	qtx := s.queries.WithTx(tx)
 
-	// Prefer JPEG for browsing, then the first member in capture order.
+	// The merge target keeps its media item record, so prefer the JPEG
+	// component's item for determinism. The canonical primary asset is
+	// re-picked by NormalizeMediaItemPrimaryAsset once every component moved.
 	primary := members[0]
 	for _, member := range members {
 		if classifyRelation(member.OriginalFilename) == repo.StackRelationJpegOriginal {
@@ -314,6 +526,14 @@ func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey st
 	}
 	for sourceID := range seenSourceItems {
 		if err := qtx.DeleteMediaItem(ctx, sourceID); err != nil {
+			return err
+		}
+	}
+	if err := NormalizeMediaItemPrimaryAsset(ctx, qtx, targetItemID); err != nil {
+		return err
+	}
+	if len(memberships) == 1 {
+		if err := NormalizePresentationStack(ctx, qtx, memberships[0].StackID); err != nil {
 			return err
 		}
 	}
@@ -439,6 +659,9 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 				return false, err
 			}
 		}
+		if err := NormalizePresentationStack(ctx, qtx, existing.StackID); err != nil {
+			return false, err
+		}
 		return false, tx.Commit()
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -474,6 +697,9 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 		}); err != nil {
 			return false, err
 		}
+	}
+	if err := NormalizePresentationStack(ctx, qtx, stackID); err != nil {
+		return false, err
 	}
 	return true, tx.Commit()
 }
@@ -533,6 +759,9 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 			return nil, err
 		}
 	}
+	if err := NormalizePresentationStack(ctx, qtx, stackID); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -576,7 +805,26 @@ func (s *stackService) GetMediaItemByAsset(ctx context.Context, assetID uuid.UUI
 }
 
 func (s *stackService) RemoveFromStack(ctx context.Context, assetID uuid.UUID) error {
-	return s.queries.RemoveStackMemberByAssetID(ctx, assetID)
+	membership, err := s.queries.GetStackByAssetID(ctx, assetID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.queries.WithTx(tx)
+	if err := qtx.RemoveStackMemberByAssetID(ctx, assetID); err != nil {
+		return err
+	}
+	if err := NormalizePresentationStack(ctx, qtx, membership.StackID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *stackService) DeleteStack(ctx context.Context, stackID uuid.UUID) error {
@@ -596,14 +844,7 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 		return nil
 	}
 
-	tx, err := s.pool.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	qtx := s.queries.WithTx(tx)
-
-	rows, err := qtx.FindLivePhotoPair(ctx, repo.FindLivePhotoPairParams{
+	rows, err := s.queries.FindLivePhotoPair(ctx, repo.FindLivePhotoPairParams{
 		OwnerID:           asset.OwnerID,
 		ContentIdentifier: identifier,
 	})
@@ -615,19 +856,32 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 		switch row.Type {
 		case string(dbtypes.AssetTypePhoto):
 			if photoID != uuid.Nil {
-				return tx.Commit()
+				return nil
 			}
 			photoID = row.AssetID
 		case string(dbtypes.AssetTypeVideo):
 			if videoID != uuid.Nil {
-				return tx.Commit()
+				return nil
 			}
 			videoID = row.AssetID
 		}
 	}
 	if photoID == uuid.Nil || videoID == uuid.Nil {
-		return tx.Commit()
+		return nil
 	}
+	return s.matchLivePhotoPair(ctx, photoID, videoID, identifier)
+}
+
+// matchLivePhotoPair joins a still/motion pair into the still's media item and
+// normalizes the affected primary component and presentation stacks. It is
+// shared by the per-asset matcher and the repository-wide consistency sweep.
+func (s *stackService) matchLivePhotoPair(ctx context.Context, photoID, videoID uuid.UUID, identifier string) error {
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.queries.WithTx(tx)
 
 	photoItem, err := qtx.GetMediaItemByAssetID(ctx, photoID)
 	if err != nil {
@@ -650,6 +904,10 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 	}
 	if stackedItems > 1 {
 		return tx.Commit()
+	}
+	memberships, err := qtx.GetStackMembershipsByMediaItemIDs(ctx, []uuid.UUID{photoItemID, videoItemID})
+	if err != nil {
+		return err
 	}
 	if err := qtx.MoveMediaItemComponent(ctx, repo.MoveMediaItemComponentParams{
 		TargetMediaItemID: photoItemID,
@@ -677,6 +935,14 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 	}
 	if err := qtx.DeleteMediaItem(ctx, videoItemID); err != nil {
 		return err
+	}
+	if err := NormalizeMediaItemPrimaryAsset(ctx, qtx, photoItemID); err != nil {
+		return err
+	}
+	for _, membership := range memberships {
+		if err := NormalizePresentationStack(ctx, qtx, membership.StackID); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

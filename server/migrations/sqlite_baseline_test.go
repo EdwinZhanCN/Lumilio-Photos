@@ -36,6 +36,24 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 		assertStrictTable(t, database, table)
 	}
 
+	var userVersion int
+	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&userVersion); err != nil {
+		t.Fatalf("read user_version: %v", err)
+	}
+	if userVersion != 3 {
+		t.Fatalf("baseline user_version = %d, want 3", userVersion)
+	}
+
+	var browseFactColumns int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM pragma_table_info('media_item_browse_facts')
+	`).Scan(&browseFactColumns); err != nil {
+		t.Fatalf("inspect media_item_browse_facts: %v", err)
+	}
+	if browseFactColumns == 0 {
+		t.Fatal("media_item_browse_facts view missing")
+	}
+
 	var seededClassifiers int
 	if err := database.QueryRowContext(ctx, "SELECT count(*) FROM classifier_definitions").Scan(&seededClassifiers); err != nil {
 		t.Fatalf("count classifier seeds: %v", err)

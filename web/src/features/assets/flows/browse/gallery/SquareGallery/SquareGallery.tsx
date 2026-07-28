@@ -55,6 +55,7 @@ const SquareGalleryItem = memo(
   }: SquareGalleryItemProps) => {
     const assetId = asset.asset_id;
     const stackInfo = asset.stack;
+    const composition = item.type === "media_item" ? item.composition : undefined;
 
     return (
       <div
@@ -70,6 +71,7 @@ const SquareGalleryItem = memo(
                 thumbnailUrl={thumbnailUrl}
                 stackInfo={stackInfo}
                 browseStack={item.type === "stack" ? item : undefined}
+                composition={composition}
                 onClick={(event) => onItemClick(item, asset, event)}
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}
@@ -79,6 +81,7 @@ const SquareGalleryItem = memo(
               <MediaThumbnail
                 asset={asset}
                 thumbnailUrl={thumbnailUrl}
+                composition={composition}
                 onClick={(event) => onItemClick(item, asset, event)}
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}

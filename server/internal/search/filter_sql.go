@@ -121,13 +121,6 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 	if filter.DateTo != nil {
 		conditions = append(conditions, fmt.Sprintf("COALESCE(%s.taken_time, %s.upload_time) <= %s", a, a, builder.addArg(filter.DateTo.UTC().UnixMicro())))
 	}
-	if filter.IsRaw != nil {
-		if *filter.IsRaw {
-			conditions = append(conditions, fmt.Sprintf("json_extract(%s.specific_metadata, char(36) || '.is_raw') = 1", a))
-		} else {
-			conditions = append(conditions, fmt.Sprintf("COALESCE(json_extract(%s.specific_metadata, char(36) || '.is_raw'), 0) = 0", a))
-		}
-	}
 	if filter.Rating != nil {
 		if *filter.Rating == 0 {
 			conditions = append(conditions, fmt.Sprintf("(%s.rating IS NULL OR %s.rating = 0)", a, a))

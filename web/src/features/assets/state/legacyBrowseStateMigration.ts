@@ -29,7 +29,6 @@ function legacyFilter(candidate: unknown): AssetUserFilter {
 
   return normalizeAssetUserFilter({
     type: candidate.type === "PHOTO" || candidate.type === "VIDEO" ? candidate.type : undefined,
-    raw: typeof candidate.raw === "boolean" ? candidate.raw : undefined,
     rating: typeof candidate.rating === "number" ? candidate.rating : undefined,
     liked: typeof candidate.liked === "boolean" ? candidate.liked : undefined,
     filename:

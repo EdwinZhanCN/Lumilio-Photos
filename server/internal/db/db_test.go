@@ -162,6 +162,38 @@ func TestMigrationLedgerRejectsHistoricalChecksumChanges(t *testing.T) {
 	}
 }
 
+func TestMigrationRejectsIncompatibleSchemaGeneration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "schema-generation.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	var generation int
+	if err := database.SQL.QueryRowContext(ctx, "PRAGMA user_version").Scan(&generation); err != nil {
+		t.Fatal(err)
+	}
+	if generation != schemaGeneration {
+		t.Fatalf("migrated catalog user_version = %d, want %d", generation, schemaGeneration)
+	}
+
+	if _, err := database.SQL.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
+	err = database.Migrate(ctx)
+	if err == nil || !strings.Contains(err.Error(), "incompatible experimental schema generation") {
+		t.Fatalf("stale-generation catalog error = %v", err)
+	}
+}
+
 func TestBioAlbumSchemaAndQueryLiteralsShareDomainValue(t *testing.T) {
 	baseline, err := migrations.FS.ReadFile("000001_sqlite_baseline.up.sql")
 	if err != nil {
@@ -321,7 +353,7 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		t.Fatalf("tag asset: %v", err)
 	}
 
-	count, err := database.Queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
+	count, err := database.Queries.CountMediaItemsUnified(ctx, repo.CountMediaItemsUnifiedParams{
 		IsDeleted:    false,
 		RepositoryID: uuid.NullUUID{UUID: repositoryID, Valid: true},
 		AssetIds:     dbtypes.UUIDsJSONParam([]uuid.UUID{assetID}),
@@ -329,10 +361,10 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		TagNames:     dbtypes.StringsJSONParam([]string{"favorite"}),
 	})
 	if err != nil {
-		t.Fatalf("count assets with JSON filters: %v", err)
+		t.Fatalf("count media items with JSON filters: %v", err)
 	}
 	if count != 1 {
-		t.Fatalf("filtered asset count = %d, want 1", count)
+		t.Fatalf("filtered media item count = %d, want 1", count)
 	}
 
 	candidates, err := database.Queries.FindCandidatesForStackingByName(

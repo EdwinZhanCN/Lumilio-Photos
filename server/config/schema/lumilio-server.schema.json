@@ -1,0 +1,487 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumilio.org/schema/lumilio-server-v3.schema.json",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "description": "Manifest format version. The loader accepts exactly this version and\nnever migrates an older file in place."
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "development",
+        "production",
+        "test"
+      ],
+      "description": "Deployment environment. Selects test-only affordances; it does not relax\nany origin, TLS, or proxy rule."
+    },
+    "database": {
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "SQLite catalog file. Relative paths resolve from the manifest directory.\n\":memory:\" is rejected because the catalog must survive a restart."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path"
+      ]
+    },
+    "server": {
+      "properties": {
+        "listen": {
+          "type": "string",
+          "description": "Local socket the application listener binds, as host:port or :port.\nNever a URL, and never given a port implicitly. 127.0.0.1 is loopback\nonly; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface."
+        },
+        "primary_origin": {
+          "type": "string",
+          "description": "The one canonical browser origin. It fixes the cookie and CSRF baseline,\nthe WebAuthn origin, and the RP ID derived from its hostname. Scheme plus\nhost plus optional port only: no userinfo, path, query, or fragment."
+        },
+        "cors_allowed_origins": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Extra browser origins allowed to make credentialed cross-origin calls,\nsuch as a local Vite dev server. This does not widen the WebAuthn allowed\norigins and does not define the canonical identity. Empty for a\nsame-origin SPA deployment."
+        },
+        "web_root": {
+          "type": "string",
+          "description": "Directory of built SPA assets. Empty serves the API alone, which is what\nthe Vite development profile wants."
+        },
+        "tls": {
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "acme",
+                "external"
+              ],
+              "description": "Who terminates HTTPS. \"off\" is plaintext and requires an http\nprimary_origin; \"acme\" makes this server obtain its own certificate and\nrequires an https primary_origin with a real hostname; \"external\" puts a\nreverse proxy in front and requires proxy.mode = required."
+            },
+            "http_listen": {
+              "type": "string",
+              "description": "Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to\nprimary_origin. Non-empty if and only if mode = \"acme\"."
+            },
+            "email": {
+              "type": "string",
+              "description": "ACME account contact address. Non-empty if and only if mode = \"acme\"."
+            },
+            "storage_path": {
+              "type": "string",
+              "description": "Persistent directory for certificates and ACME account state. Must be\nmachine-local state outside storage.path. Non-empty iff mode = \"acme\"."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "mode",
+            "http_listen",
+            "email",
+            "storage_path"
+          ]
+        },
+        "proxy": {
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "disabled",
+                "required"
+              ],
+              "description": "Whether a trusted reverse proxy is mandatory. \"disabled\" ignores every\nForwarded and X-Forwarded-* header. \"required\" rejects application\ntraffic whose immediate peer is outside trusted_cidrs, which is what\nstops a direct client from forging X-Forwarded-Proto: https."
+            },
+            "trusted_cidrs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "description": "CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to\nthe immediate peer, not to any address inside a forwarded chain. Must be\nempty when mode = \"disabled\" and hold at least one entry when required."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "mode",
+            "trusted_cidrs"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "listen",
+        "primary_origin",
+        "cors_allowed_origins",
+        "web_root",
+        "tls",
+        "proxy"
+      ]
+    },
+    "logging": {
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "description": "Minimum level emitted to both sinks."
+        },
+        "dir": {
+          "type": "string",
+          "description": "Directory for rotated log files. Relative paths are manifest-relative."
+        },
+        "console_format": {
+          "type": "string",
+          "enum": [
+            "console",
+            "json"
+          ],
+          "description": "Encoding for the stdout stream."
+        },
+        "file_format": {
+          "type": "string",
+          "enum": [
+            "console",
+            "json"
+          ],
+          "description": "Encoding for the on-disk log files."
+        },
+        "repository_audit_verbose": {
+          "type": "boolean",
+          "description": "Log every repository scan decision. Useful when diagnosing ingestion, far\ntoo noisy for normal operation."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "level",
+        "dir",
+        "console_format",
+        "file_format",
+        "repository_audit_verbose"
+      ]
+    },
+    "storage": {
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Portable media root holding the .lumilioroot marker and repository\ndirectories. This is the mount users back up and migrate."
+        },
+        "cloud_state_path": {
+          "type": "string",
+          "description": "Cloud provider sessions and credential artifacts. Machine-bound private\nstate, so it must resolve outside storage.path."
+        },
+        "backups_path": {
+          "type": "string",
+          "description": "Database backup destination. Also machine-bound, also outside\nstorage.path, so that backing up media does not capture secrets."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "cloud_state_path",
+        "backups_path"
+      ]
+    },
+    "repository_scan": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to periodically reconcile repositories against the catalog."
+        },
+        "interval_seconds": {
+          "type": "integer",
+          "description": "Seconds between scan sweeps."
+        },
+        "settle_seconds": {
+          "type": "integer",
+          "description": "Seconds a file must stay unmodified before it is considered complete."
+        },
+        "max_concurrent_repos": {
+          "type": "integer",
+          "description": "Repositories scanned concurrently."
+        },
+        "batch_size": {
+          "type": "integer",
+          "description": "Files per scan batch."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "interval_seconds",
+        "settle_seconds",
+        "max_concurrent_repos",
+        "batch_size"
+      ]
+    },
+    "geocoding": {
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "nominatim"
+          ],
+          "description": "Reverse-geocoding backend. \"disabled\" keeps coordinates local and makes\nno network calls."
+        },
+        "nominatim_endpoint": {
+          "type": "string",
+          "description": "Nominatim reverse endpoint. Read only when provider = \"nominatim\"."
+        },
+        "language": {
+          "type": "string",
+          "description": "Preferred language for returned place names."
+        },
+        "user_agent": {
+          "type": "string",
+          "description": "User-Agent presented to the provider. Public Nominatim requires a real\ncontact string in its usage policy."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "provider",
+        "nominatim_endpoint",
+        "language",
+        "user_agent"
+      ]
+    },
+    "auth": {
+      "properties": {
+        "secret_key_file": {
+          "type": "string",
+          "description": "Path to the token-signing key. This is a path, never the secret itself;\nsecret values must not appear in this manifest or in the environment. The\nserver creates the file with mode 0600 on first boot if it is absent."
+        },
+        "access_token_ttl": {
+          "type": "string",
+          "description": "Access token lifetime as a Go duration, for example \"15m\"."
+        },
+        "refresh_token_ttl": {
+          "type": "string",
+          "description": "Refresh token lifetime, and therefore the session cookie lifetime."
+        },
+        "media_token_ttl": {
+          "type": "string",
+          "description": "Lifetime of short-lived media URLs."
+        },
+        "passkey": {
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether WebAuthn is offered. When true, primary_origin must be https or\nexactly http://localhost; an http LAN address or bare IP is rejected\nbecause browsers will not treat it as a secure context."
+            },
+            "name": {
+              "type": "string",
+              "description": "Relying-party display name shown in the browser prompt. Cosmetic: the RP\nID itself always comes from the primary_origin hostname."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "enabled",
+            "name"
+          ]
+        },
+        "rate_limit": {
+          "properties": {
+            "ip_attempts": {
+              "type": "integer",
+              "description": "Failed attempts allowed per client IP inside one window."
+            },
+            "subject_attempts": {
+              "type": "integer",
+              "description": "Failed attempts allowed per account inside one window."
+            },
+            "window": {
+              "type": "string",
+              "description": "Rolling window over which attempts accumulate."
+            },
+            "lockout": {
+              "type": "string",
+              "description": "How long a subject stays locked after exhausting its budget."
+            },
+            "max_entries": {
+              "type": "integer",
+              "description": "Tracked entries held in memory, bounding the limiter's footprint."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ip_attempts",
+            "subject_attempts",
+            "window",
+            "lockout",
+            "max_entries"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "secret_key_file",
+        "access_token_ttl",
+        "refresh_token_ttl",
+        "media_token_ttl",
+        "passkey",
+        "rate_limit"
+      ]
+    },
+    "transcode": {
+      "properties": {
+        "hardware_accel": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "vaapi",
+            "nvenc",
+            "qsv",
+            "videotoolbox",
+            "none"
+          ],
+          "description": "Hardware video acceleration backend. \"auto\" probes what the host offers\nand falls back to software; \"none\" forces software transcoding."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "hardware_accel"
+      ]
+    },
+    "lumen": {
+      "properties": {
+        "discovery_enabled": {
+          "type": "boolean",
+          "description": "Whether to look for external Lumen ML nodes at all. ML stays optional;\nfalse keeps the deployment entirely local."
+        },
+        "discovery_mdns_enabled": {
+          "type": "boolean",
+          "description": "Discover nodes over mDNS on the local link. Containers usually cannot,\nso Docker deployments prefer a hub URL or static nodes."
+        },
+        "discovery_hub_url": {
+          "type": "string",
+          "description": "Absolute http(s) URL of a Lumen hub. May be empty when mDNS or static\nnodes already supply the node list."
+        },
+        "discovery_static_nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Explicit host:port Lumen nodes, tried regardless of discovery results."
+        },
+        "discovery_service_type": {
+          "type": "string",
+          "description": "mDNS service type to browse."
+        },
+        "discovery_domain": {
+          "type": "string",
+          "description": "mDNS domain to browse."
+        },
+        "deployment_id": {
+          "type": "string",
+          "description": "Label identifying this deployment in Lumen logs and node affinity."
+        },
+        "resolve_timeout": {
+          "type": "string",
+          "description": "Timeout for resolving a discovered node's address."
+        },
+        "connect_timeout": {
+          "type": "string",
+          "description": "Timeout for opening a connection to a resolved node."
+        },
+        "rediscovery_backoff_min": {
+          "type": "string",
+          "description": "Shortest wait before retrying discovery after a failure."
+        },
+        "rediscovery_backoff_max": {
+          "type": "string",
+          "description": "Longest wait between discovery retries. Must be \u003e= the minimum."
+        },
+        "scan_interval": {
+          "type": "string",
+          "description": "Interval between periodic node health sweeps."
+        },
+        "chunk_auto": {
+          "type": "boolean",
+          "description": "Let the client choose chunked upload automatically by payload size."
+        },
+        "chunk_threshold_bytes": {
+          "type": "integer",
+          "description": "Payload size in bytes above which chunking kicks in."
+        },
+        "chunk_max_bytes": {
+          "type": "integer",
+          "description": "Bytes per chunk. Must be \u003c= chunk_threshold_bytes."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "discovery_enabled",
+        "discovery_mdns_enabled",
+        "discovery_hub_url",
+        "discovery_static_nodes",
+        "discovery_service_type",
+        "discovery_domain",
+        "deployment_id",
+        "resolve_timeout",
+        "connect_timeout",
+        "rediscovery_backoff_min",
+        "rediscovery_backoff_max",
+        "scan_interval",
+        "chunk_auto",
+        "chunk_threshold_bytes",
+        "chunk_max_bytes"
+      ]
+    },
+    "tools": {
+      "properties": {
+        "exiftool_path": {
+          "type": "string",
+          "description": "exiftool binary. A bare command is looked up on PATH; anything holding a\npath separator is resolved relative to the manifest."
+        },
+        "ffmpeg_path": {
+          "type": "string",
+          "description": "ffmpeg binary, resolved by the same rule."
+        },
+        "ffprobe_path": {
+          "type": "string",
+          "description": "ffprobe binary, resolved by the same rule."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "exiftool_path",
+        "ffmpeg_path",
+        "ffprobe_path"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schema_version",
+    "environment",
+    "database",
+    "server",
+    "logging",
+    "storage",
+    "repository_scan",
+    "geocoding",
+    "auth",
+    "transcode",
+    "lumen",
+    "tools"
+  ],
+  "title": "Lumilio Photos runtime manifest (schema v3)",
+  "description": "Complete runtime configuration. There are no code defaults, no configuration file search, and no environment-variable overrides: every key below must be present in the file."
+}

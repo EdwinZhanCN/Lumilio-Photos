@@ -58,7 +58,10 @@ export function StudioEditMvp(): React.JSX.Element {
   }, []);
 
   const resume = useCallback((id: string) => openEditor(id, "develop"), [openEditor]);
-  const handlePicked = useCallback((id: string) => openEditor(id, focusTab), [openEditor, focusTab]);
+  const handlePicked = useCallback(
+    (id: string) => openEditor(id, focusTab),
+    [openEditor, focusTab],
+  );
 
   const handleActivity = useCallback((activity: StudioEditorActivity) => {
     setRecent(
@@ -109,8 +112,11 @@ export function StudioEditMvp(): React.JSX.Element {
             title={t("studio.pickPhoto", {
               defaultValue: "Pick a photo to edit",
             })}
-            initialFilters={{ raw: false }}
-            lockedFields={["type", "raw"]}
+            // No composition filter: the editor's working source comes from the
+            // server export endpoint, which decodes RAW via its embedded preview,
+            // so every photo is editable regardless of component makeup.
+            initialFilters={{ type: "PHOTO" }}
+            lockedFields={["type"]}
             onSelect={handlePicked}
           />
         </div>

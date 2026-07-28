@@ -11801,16 +11801,16 @@ export interface components {
             /** @example true */
             liked?: boolean;
             location?: components["schemas"]["dto.LocationBBoxDTO"];
+            media_item?: components["schemas"]["dto.MediaItemFilterDTO"];
             /** @example 123 */
             owner_id?: number;
             /** @example 42 */
             person_id?: number;
             /** @example 5 */
             rating?: number;
-            /** @example true */
-            raw?: boolean;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
+            stack?: components["schemas"]["dto.StackFilterDTO"];
             /** @example document */
             tag_name?: string;
             tag_names?: string[];
@@ -12012,24 +12012,34 @@ export interface components {
             task_id?: number;
         };
         "dto.BrowseItemDTO": {
-            asset?: components["schemas"]["dto.AssetDTO"];
             /** @example 12500 */
             best_ts_ms?: number;
-            /** @example stack:550e8400-e29b-41d4-a716-446655440000 */
+            /** @example media:550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
+            media_item?: components["schemas"]["dto.BrowseMediaItemDTO"];
             stack?: components["schemas"]["dto.BrowseStackDTO"];
             /**
-             * @example stack
+             * @example media_item
              * @enum {string}
              */
-            type?: "asset" | "stack";
+            type?: "media_item" | "stack";
+        };
+        "dto.BrowseMediaItemDTO": {
+            composition?: components["schemas"]["dto.MediaCompositionDTO"];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            media_item_id?: string;
+            /**
+             * @example photo
+             * @enum {string}
+             */
+            media_kind?: "photo" | "video" | "audio";
+            primary_asset?: components["schemas"]["dto.AssetDTO"];
+            stack?: components["schemas"]["dto.StackPreviewDTO"];
         };
         "dto.BrowseStackDTO": {
-            cover_asset?: components["schemas"]["dto.AssetDTO"];
-            /** @example 550e8400-e29b-41d4-a716-446655440001 */
-            cover_asset_id?: string;
-            matched_member_ids?: string[];
-            member_asset_ids?: string[];
+            cover?: components["schemas"]["dto.BrowseMediaItemDTO"];
+            matched_members?: components["schemas"]["dto.BrowseStackMemberDTO"][];
+            members?: components["schemas"]["dto.BrowseStackMemberDTO"][];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             stack_id?: string;
             /**
@@ -12037,8 +12047,12 @@ export interface components {
              * @enum {string}
              */
             stack_kind?: "burst" | "manual";
-            /** @example 3 */
-            stack_size?: number;
+        };
+        "dto.BrowseStackMemberDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            media_item_id?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440001 */
+            primary_asset_id?: string;
         };
         "dto.BrowserCapabilitiesDTO": {
             /** @example http://192.168.1.20:6680 */
@@ -12716,6 +12730,23 @@ export interface components {
             user_id?: number;
             username?: string;
         };
+        /**
+         * @example jpeg_raw
+         * @enum {string}
+         */
+        "dto.MediaComposition": "contains_raw" | "jpeg_raw" | "raw_unpaired" | "no_raw" | "live_photo" | "contains_raw" | "jpeg_raw" | "raw_unpaired" | "no_raw" | "live_photo";
+        "dto.MediaCompositionDTO": {
+            /** @example 2 */
+            component_count?: number;
+            /** @example false */
+            has_edited?: boolean;
+            /** @example true */
+            has_jpeg?: boolean;
+            /** @example false */
+            has_live_motion?: boolean;
+            /** @example true */
+            has_raw?: boolean;
+        };
         "dto.MediaItemByAssetResponseDTO": {
             asset_id?: string;
             media_item?: components["schemas"]["dto.MediaItemDTO"];
@@ -12732,6 +12763,9 @@ export interface components {
             /** @enum {string} */
             media_kind?: "photo" | "video" | "audio" | "live_photo";
             primary_asset_id?: string;
+        };
+        "dto.MediaItemFilterDTO": {
+            composition?: components["schemas"]["dto.MediaComposition"];
         };
         "dto.MediaTokenDTO": {
             expires_at?: string;
@@ -12925,8 +12959,10 @@ export interface components {
              * @enum {string}
              */
             stack_mode?: "collapsed" | "expanded";
+            /** @example 213 */
+            total_files?: number;
             /** @example 150 */
-            total_assets?: number;
+            total_media_items?: number;
             /** @example 120 */
             total_visible?: number;
         };
@@ -13217,11 +13253,6 @@ export interface components {
              * @enum {string}
              */
             sort_by?: "recently_added" | "date_captured";
-            /**
-             * @example collapsed
-             * @enum {string}
-             */
-            stack_mode?: "collapsed" | "expanded";
             /** @example 200 */
             top_results_limit?: number;
             /** @example America/New_York */
@@ -13234,14 +13265,9 @@ export interface components {
             offset?: number;
             result_items?: components["schemas"]["dto.BrowseItemDTO"][];
             /** @example 150 */
-            results_total_assets?: number;
+            results_total_media_items?: number;
             /** @example 120 */
             results_total_visible?: number;
-            /**
-             * @example collapsed
-             * @enum {string}
-             */
-            stack_mode?: "collapsed" | "expanded";
             top_items?: components["schemas"]["dto.BrowseItemDTO"][];
             top_results_meta?: components["schemas"]["dto.SearchTopResultsMetaDTO"];
         };
@@ -13375,6 +13401,10 @@ export interface components {
              */
             stack_kind?: "burst" | "manual";
         };
+        "dto.StackFilterDTO": {
+            kinds?: ("burst" | "manual")[];
+            membership?: components["schemas"]["dto.StackMembership"];
+        };
         "dto.StackMemberDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440001 */
             media_item_id?: string;
@@ -13383,6 +13413,11 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440002 */
             primary_asset_id?: string;
         };
+        /**
+         * @example stacked
+         * @enum {string}
+         */
+        "dto.StackMembership": "stacked" | "unstacked" | "stacked" | "unstacked";
         /** @description Stack fields (populated when stack mode is enabled) */
         "dto.StackPreviewDTO": {
             /**

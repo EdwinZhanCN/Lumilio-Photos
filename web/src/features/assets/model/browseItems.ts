@@ -1,16 +1,22 @@
-import type { Asset } from "@/lib/assets/types";
+import type { Asset, StackPreview } from "@/lib/assets/types";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import type {
   AssetGroup,
   BrowseGroup,
   BrowseItem,
+  BrowseMediaItem,
   BrowseStackItem,
+  BrowseStackKind,
+  BrowseStackMemberRef,
   BrowseItemId,
+  MediaCompositionFacts,
   SortByType,
 } from "../types";
-import { groupAssetsBySort } from "./assetGroups";
+import { getAssetGroupKey } from "./assetGroups";
 
 export type BrowseItemDTO = components["schemas"]["dto.BrowseItemDTO"];
+type BrowseStackMemberDTO = components["schemas"]["dto.BrowseStackMemberDTO"];
+type MediaCompositionDTO = components["schemas"]["dto.MediaCompositionDTO"];
 
 const isStackAsset = (asset: Asset): boolean =>
   Boolean(
@@ -32,18 +38,21 @@ export const resolveStackFocusAssetId = (
   asset: Asset,
   stack?: BrowseStackItem,
 ): string | undefined => {
-  const matchedMemberId = stack?.matchedMemberIds?.find((id) => Boolean(id));
+  const matchedMemberId = stack?.matchedMembers.find((member) =>
+    Boolean(member.primaryAssetId),
+  )?.primaryAssetId;
 
   return matchedMemberId ?? asset.asset_id;
 };
 
-const toAssetItem = (asset: Asset): BrowseItem | null => {
+const toMediaItemFromAsset = (asset: Asset): BrowseMediaItem | null => {
   const assetId = asset.asset_id;
   if (!assetId) return null;
 
   return {
-    type: "asset",
-    id: `asset:${assetId}`,
+    type: "media_item",
+    id: `media:${assetId}`,
+    mediaItemId: assetId,
     asset,
   };
 };
@@ -80,7 +89,7 @@ export const findBrowseItemById = (items: BrowseItem[], itemId: string): BrowseI
 
 export const findBrowseItemIndexByAssetId = (items: BrowseItem[], assetId: string): number =>
   items.findIndex((item) => {
-    if (item.type === "asset") {
+    if (item.type === "media_item") {
       return item.asset.asset_id === assetId;
     }
 
@@ -90,7 +99,7 @@ export const findBrowseItemIndexByAssetId = (items: BrowseItem[], assetId: strin
 
     return (
       item.assets.some((a) => a.asset_id === assetId) ||
-      item.memberAssetIds?.includes(assetId) === true
+      item.members.some((member) => member.primaryAssetId === assetId)
     );
   });
 
@@ -133,7 +142,7 @@ export const resolveBrowseSelectedAssetIds = (
 
   resolveSelectedBrowseItems(selectedIds, items).forEach((item) => {
     if (item.type === "stack" && stackMode === "whole-stack") {
-      const memberAssetIds = item.memberAssetIds?.filter(Boolean) ?? [];
+      const memberAssetIds = item.members.map((member) => member.primaryAssetId).filter(Boolean);
       if (memberAssetIds.length > 0) {
         memberAssetIds.forEach(addAssetId);
         return;
@@ -145,6 +154,12 @@ export const resolveBrowseSelectedAssetIds = (
 
   return resolved;
 };
+
+const stackKindFromPreview = (stack?: StackPreview | null): BrowseStackKind =>
+  stack?.stack_kind === "burst" ? "burst" : "manual";
+
+const memberRefFromAsset = (asset: Asset): BrowseStackMemberRef[] =>
+  asset.asset_id ? [{ mediaItemId: asset.asset_id, primaryAssetId: asset.asset_id }] : [];
 
 export const createBrowseGroupsFromAssetGroups = (groups?: AssetGroup[]): BrowseGroup[] => {
   if (!groups || groups.length === 0) return [];
@@ -160,8 +175,8 @@ export const createBrowseGroupsFromAssetGroups = (groups?: AssetGroup[]): Browse
       if (!asset.asset_id) return;
 
       if (!isStackAsset(asset)) {
-        const assetItem = toAssetItem(asset);
-        if (assetItem) items.push(assetItem);
+        const mediaItem = toMediaItemFromAsset(asset);
+        if (mediaItem) items.push(mediaItem);
         return;
       }
 
@@ -174,10 +189,11 @@ export const createBrowseGroupsFromAssetGroups = (groups?: AssetGroup[]): Browse
           type: "stack",
           id: `stack:${stackId}`,
           stackId,
+          stackKind: stackKindFromPreview(asset.stack),
           representative: asset,
           assets: [asset],
-          memberAssetIds: asset.asset_id ? [asset.asset_id] : [],
-          matchedMemberIds: asset.asset_id ? [asset.asset_id] : [],
+          members: memberRefFromAsset(asset),
+          matchedMembers: memberRefFromAsset(asset),
         };
         stackItemsById.set(stackId, stackItem);
         stackGroupIndexById.set(stackId, browseGroups.length);
@@ -187,8 +203,11 @@ export const createBrowseGroupsFromAssetGroups = (groups?: AssetGroup[]): Browse
 
       existingItem.assets = [...existingItem.assets, asset];
       if (asset.asset_id) {
-        existingItem.memberAssetIds = [...(existingItem.memberAssetIds ?? []), asset.asset_id];
-        existingItem.matchedMemberIds = [...(existingItem.matchedMemberIds ?? []), asset.asset_id];
+        existingItem.members = [...existingItem.members, ...memberRefFromAsset(asset)];
+        existingItem.matchedMembers = [
+          ...existingItem.matchedMembers,
+          ...memberRefFromAsset(asset),
+        ];
       }
       const nextRepresentative = preferRepresentative(existingItem.representative, asset);
       if (nextRepresentative === existingItem.representative) {
@@ -217,6 +236,26 @@ export const createBrowseGroupsFromAssetGroups = (groups?: AssetGroup[]): Browse
 export const createBrowseGroupsFromAssets = (assets?: Asset[], key = "flat:all"): BrowseGroup[] =>
   createBrowseGroupsFromAssetGroups(assets && assets.length > 0 ? [{ key, assets }] : []);
 
+const toStackMemberRefs = (members?: BrowseStackMemberDTO[] | null): BrowseStackMemberRef[] =>
+  (members ?? []).flatMap((member) =>
+    member.media_item_id && member.primary_asset_id
+      ? [{ mediaItemId: member.media_item_id, primaryAssetId: member.primary_asset_id }]
+      : [],
+  );
+
+const toCompositionFacts = (
+  composition?: MediaCompositionDTO | null,
+): MediaCompositionFacts | undefined =>
+  composition
+    ? {
+        componentCount: composition.component_count ?? 1,
+        hasRaw: composition.has_raw ?? false,
+        hasJpeg: composition.has_jpeg ?? false,
+        hasEdited: composition.has_edited ?? false,
+        hasLiveMotion: composition.has_live_motion ?? false,
+      }
+    : undefined;
+
 export const createBrowseItemsFromBrowseItemDTOs = (
   dtoItems?: BrowseItemDTO[] | null,
 ): BrowseItem[] => {
@@ -225,29 +264,42 @@ export const createBrowseItemsFromBrowseItemDTOs = (
   const items: BrowseItem[] = [];
 
   dtoItems.forEach((item) => {
-    if (item.type === "stack" && item.stack?.cover_asset) {
-      const representative = item.stack.cover_asset as Asset;
+    if (item.type === "stack" && item.stack) {
       const stackId = item.stack.stack_id;
-      if (!representative.asset_id || !stackId) return;
+      const cover = item.stack.cover;
+      const primaryAsset = cover?.primary_asset as Asset | undefined;
+      if (!stackId || !primaryAsset?.asset_id) return;
+
+      // Graft the cover's stack preview onto the asset so thumbnail overlays
+      // (stack size badge) keep working off `asset.stack`.
+      const representative: Asset = { ...primaryAsset, stack: cover?.stack ?? primaryAsset.stack };
 
       items.push({
         type: "stack",
         id: `stack:${stackId}`,
         stackId,
+        stackKind: item.stack.stack_kind === "burst" ? "burst" : "manual",
         representative,
         assets: [representative],
-        memberAssetIds: item.stack.member_asset_ids ?? [],
-        matchedMemberIds: item.stack.matched_member_ids ?? [],
+        members: toStackMemberRefs(item.stack.members),
+        matchedMembers: toStackMemberRefs(item.stack.matched_members),
         bestTsMs: item.best_ts_ms ?? undefined,
       });
       return;
     }
 
-    if (item.type === "asset" && item.asset?.asset_id) {
+    if (item.type === "media_item" && item.media_item?.primary_asset?.asset_id) {
+      const media = item.media_item;
+      const primaryAsset = media.primary_asset as Asset;
+      const mediaItemId = media.media_item_id ?? primaryAsset.asset_id ?? "";
+      if (!mediaItemId) return;
+
       items.push({
-        type: "asset",
-        id: `asset:${item.asset.asset_id}`,
-        asset: item.asset as Asset,
+        type: "media_item",
+        id: `media:${mediaItemId}`,
+        mediaItemId,
+        asset: { ...primaryAsset, stack: media.stack ?? primaryAsset.stack },
+        composition: toCompositionFacts(media.composition),
         bestTsMs: item.best_ts_ms ?? undefined,
       });
     }
@@ -264,27 +316,32 @@ export const createBrowseGroupsFromBrowseItemDTOs = (
   return items.length > 0 ? [{ key, items }] : [];
 };
 
-export const groupBrowseItemsBySort = (items: BrowseItem[], sortBy: SortByType): BrowseGroup[] => {
+/**
+ * Date grouping runs on browse items, not on physical assets: two rows can share
+ * a representative asset (a media item and the stack it covers), so a round-trip
+ * through `asset_id` would drop or duplicate rows. Grouping keys come from the
+ * representative's date, but row identity stays `BrowseItem.id`.
+ */
+export const groupBrowseItemsBySort = (
+  items: BrowseItem[],
+  sortBy: SortByType,
+  now: Date = new Date(),
+): BrowseGroup[] => {
   if (items.length === 0) return [];
 
-  const itemByRepresentativeId = new Map<string, BrowseItem>();
+  const groups: BrowseGroup[] = [];
   items.forEach((item) => {
-    const assetId = getBrowseItemAsset(item).asset_id;
-    if (!assetId) return;
-    itemByRepresentativeId.set(assetId, item);
+    const key = getAssetGroupKey(getBrowseItemAsset(item), sortBy, now);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.items = [...last.items, item];
+      return;
+    }
+
+    groups.push({ key, items: [item] });
   });
 
-  return groupAssetsBySort(items.map(getBrowseItemAsset), sortBy)
-    .map((group) => ({
-      key: group.key,
-      items: group.assets.flatMap((asset) => {
-        const assetId = asset.asset_id;
-        if (!assetId) return [];
-        const mapped = itemByRepresentativeId.get(assetId);
-        return mapped ? [mapped] : [];
-      }),
-    }))
-    .filter((group) => group.items.length > 0);
+  return groups;
 };
 
 export const mergeAdjacentBrowseGroups = (...groupCollections: BrowseGroup[][]): BrowseGroup[] => {

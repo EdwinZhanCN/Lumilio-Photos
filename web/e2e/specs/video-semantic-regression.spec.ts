@@ -3,6 +3,7 @@ import process from "node:process";
 import { expect, test } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { api, baseURL } from "../support/api";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 import {
   profileAsset,
   VIDEO_REGRESSION_ASSETS,
@@ -16,19 +17,18 @@ type Asset = {
   type: "PHOTO" | "VIDEO";
 };
 
-type BrowseItem = {
-  asset?: Asset;
-  best_ts_ms?: number;
-};
+// Derived from the generated OpenAPI types rather than hand-written, so a
+// browse-contract change breaks the build instead of failing at runtime.
+type QueryResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
+type SearchResponse = components["schemas"]["dto.SearchAssetsResponseDTO"];
+type BrowseItem = components["schemas"]["dto.BrowseItemDTO"];
 
-type QueryResponse = {
-  items?: BrowseItem[];
-};
-
-type SearchResponse = {
-  top_items?: BrowseItem[];
-  result_items?: BrowseItem[];
-};
+/** Browse rows are logical media items; the file lives on the primary asset. */
+function primaryAssets(items: BrowseItem[]): Asset[] {
+  return items
+    .map((item) => item.media_item?.primary_asset)
+    .filter((asset): asset is Asset => Boolean(asset?.asset_id));
+}
 
 type Repository = {
   id: string;
@@ -149,9 +149,7 @@ async function findAsset(
       stack_mode: "expanded",
     }),
   });
-  return response.items
-    ?.map((item) => item.asset)
-    .find((asset): asset is Asset => asset?.original_filename === filename);
+  return primaryAssets(response.items ?? []).find((asset) => asset.original_filename === filename);
 }
 
 async function waitForAsset(token: string, repositoryID: string, filename: string): Promise<Asset> {
@@ -370,12 +368,14 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
           pagination: { limit: 50, offset: 0 },
           enhancement_mode: "auto",
           top_results_limit: 50,
-          stack_mode: "expanded",
+          // No stack_mode: search results are always flat by media item, and
+          // the endpoint rejects the field outright.
         }),
       });
-      const assets = [...(response.top_items ?? []), ...(response.result_items ?? [])]
-        .map((item) => item.asset)
-        .filter((asset): asset is Asset => Boolean(asset));
+      const assets = primaryAssets([
+        ...(response.top_items ?? []),
+        ...(response.result_items ?? []),
+      ]);
       expect(
         assets.some((asset) => asset.original_filename === photoFilename && asset.type === "PHOTO"),
       ).toBe(true);

@@ -58,7 +58,7 @@ type Querier interface {
 	// has no description (or the field is empty).
 	ApplyMergedKeeperPreferences(ctx context.Context, arg ApplyMergedKeeperPreferencesParams) error
 	AssignFaceClusterMemberExclusive(ctx context.Context, arg AssignFaceClusterMemberExclusiveParams) (FaceClusterMember, error)
-	AttachOriginalAssetToMediaItem(ctx context.Context, arg AttachOriginalAssetToMediaItemParams) error
+	AttachAssetToMediaItem(ctx context.Context, arg AttachAssetToMediaItemParams) error
 	BindPendingAgentEffectExecutingRun(ctx context.Context, arg BindPendingAgentEffectExecutingRunParams) (uuid.UUID, error)
 	BulkToggleAssetLiked(ctx context.Context, assetIds []uuid.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
@@ -79,12 +79,12 @@ type Querier interface {
 	CountAssetsByStatus(ctx context.Context, status dbtypes.JSON) (int64, error)
 	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
 	CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error)
-	// Count query matching GetAssetsUnified WHERE clause
-	// Returns total count of assets matching the filters (for pagination)
-	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
 	CountAssetsWithSearchEmbedding(ctx context.Context) (int64, error)
 	CountBioAlbumPhotoAssets(ctx context.Context, repositoryID interface{}) (int64, error)
 	CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID interface{}) (int64, error)
+	// Count of visible collapsed browse rows (total_visible in collapsed mode):
+	// one per presentation stack with any matched member plus one per unstacked
+	// matching media item. Predicates mirror GetCollapsedBrowseItemsUnified.
 	CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error)
 	CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
@@ -93,6 +93,13 @@ type Querier interface {
 	CountIncrementalFaceNeighbors(ctx context.Context, arg CountIncrementalFaceNeighborsParams) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID interface{}) (int64, error)
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
+	// Count of component files belonging to the media items matched by
+	// CountMediaItemsUnified (total_files). Components share the browse
+	// is_deleted state so list/count predicates stay identical.
+	CountMediaItemFilesUnified(ctx context.Context, arg CountMediaItemFilesUnifiedParams) (int64, error)
+	// Count query matching GetMediaItemsUnified WHERE clause.
+	// Returns the number of matching logical media items (total_media_items).
+	CountMediaItemsUnified(ctx context.Context, arg CountMediaItemsUnifiedParams) (int64, error)
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPersonFacesScoped(ctx context.Context, arg CountPersonFacesScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error)
@@ -192,6 +199,11 @@ type Querier interface {
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID uuid.NullUUID) ([]FindCandidatesForStackingByNameRow, error)
 	FindLivePhotoPair(ctx context.Context, arg FindLivePhotoPairParams) ([]FindLivePhotoPairRow, error)
 	FindMediaItemsForBurstDetection(ctx context.Context, repositoryID uuid.NullUUID) ([]FindMediaItemsForBurstDetectionRow, error)
+	// Live Photo post-consistency: still/motion components in this repository
+	// that share a content identifier but whose media items never joined (for
+	// example because matching ran before the pair finished metadata extraction).
+	// Items already carrying live_photo_* components are excluded.
+	FindUnmatchedLivePhotoPairs(ctx context.Context, repositoryID uuid.NullUUID) ([]FindUnmatchedLivePhotoPairsRow, error)
 	FinishAgentRun(ctx context.Context, arg FinishAgentRunParams) error
 	FinishAgentThread(ctx context.Context, arg FinishAgentThreadParams) error
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
@@ -223,10 +235,6 @@ type Querier interface {
 	// search_people producer: assets containing at least one of the given people
 	// (union semantics; the agent intersects refs for "both people" requests).
 	GetAssetIDsByPersonIDs(ctx context.Context, arg GetAssetIDsByPersonIDsParams) ([]uuid.UUID, error)
-	// Agent ref materialization: same filter semantics as GetAssetsUnified but
-	// returns ordered asset ids only (capture time desc). The limit is the ref
-	// snapshot cap; callers detect truncation by requesting cap+1.
-	GetAssetIDsUnified(ctx context.Context, arg GetAssetIDsUnifiedParams) ([]uuid.UUID, error)
 	GetAssetQualityScore(ctx context.Context, assetID uuid.UUID) (AssetQualityScore, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID *int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) (GetAssetWithRelationsRow, error)
@@ -250,9 +258,6 @@ type Querier interface {
 	GetAssetsByStatusAndRepository(ctx context.Context, arg GetAssetsByStatusAndRepositoryParams) ([]Asset, error)
 	GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error)
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
-	// Handles: listing, filename search, and all filtering
-	// Use this for most queries unless semantic search is needed
-	GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error)
 	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
 	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
 	GetAuthorizedAssetIDs(ctx context.Context, arg GetAuthorizedAssetIDsParams) ([]uuid.UUID, error)
@@ -268,6 +273,10 @@ type Querier interface {
 	// Merge suggestions never pair clusters of different owners; owner_id
 	// optionally restricts candidates to one owner's clusters (nil = admin).
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
+	// Collapsed presentation browse: one row per presentation stack (any member
+	// matched) and one row per unstacked matching media item. The cover row is
+	// the stack's designated cover media item when visible, otherwise the
+	// lowest-position visible member.
 	GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)
@@ -330,10 +339,21 @@ type Querier interface {
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
 	GetManualFaceClusterMembershipsForScope(ctx context.Context, arg GetManualFaceClusterMembershipsForScopeParams) ([]GetManualFaceClusterMembershipsForScopeRow, error)
+	// Composition/stack facts for a set of logical media items, used to hydrate
+	// browse items outside the unified query path (aggregate search, fused search).
+	GetMediaItemBrowseFactsByIDs(ctx context.Context, mediaItemIds []uuid.UUID) ([]GetMediaItemBrowseFactsByIDsRow, error)
 	// Logical media items -------------------------------------------------------
 	GetMediaItemByAssetID(ctx context.Context, assetID uuid.UUID) (MediaItem, error)
 	GetMediaItemComponents(ctx context.Context, arg GetMediaItemComponentsParams) ([]MediaItemAsset, error)
+	// Agent ref materialization: same filter semantics as GetMediaItemsUnified but
+	// returns one ordered (media_item_id, primary_asset_id) pair per logical media
+	// item (capture time desc). The limit is the ref snapshot cap; callers detect
+	// truncation by requesting cap+1.
+	GetMediaItemRefsUnified(ctx context.Context, arg GetMediaItemRefsUnifiedParams) ([]GetMediaItemRefsUnifiedRow, error)
 	GetMediaItemsByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetMediaItemsByAssetIDsRow, error)
+	// Expanded media-item browse: one row per matching logical media item with
+	// composition facts, stack metadata, and the embedded primary asset.
+	GetMediaItemsUnified(ctx context.Context, arg GetMediaItemsUnifiedParams) ([]GetMediaItemsUnifiedRow, error)
 	// Cluster attachment is owner-scoped only: a face may join a cluster whose
 	// members live in a different repository, same owner.
 	GetNearestAssignedFaceCluster(ctx context.Context, arg GetNearestAssignedFaceClusterParams) (GetNearestAssignedFaceClusterRow, error)
@@ -391,6 +411,11 @@ type Querier interface {
 	// Live Photo components and within intentional burst/manual stacks.
 	GetStackMembershipForRepository(ctx context.Context, repositoryID uuid.NullUUID) ([]GetStackMembershipForRepositoryRow, error)
 	GetStackMembershipsByMediaItemIDs(ctx context.Context, mediaItemIds []uuid.UUID) ([]GetStackMembershipsByMediaItemIDsRow, error)
+	// All memberships of a stack with the member scope needed to enforce the
+	// presentation-stack invariants (no soft-delete filtering: trash restores must
+	// keep their memberships).
+	GetStackNormalizationState(ctx context.Context, stackID uuid.UUID) ([]GetStackNormalizationStateRow, error)
+	GetStackScope(ctx context.Context, stackID uuid.UUID) (GetStackScopeRow, error)
 	GetStacksByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetStacksByAssetIDsRow, error)
 	GetSystemState(ctx context.Context) (SystemState, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
@@ -500,10 +525,16 @@ type Querier interface {
 	// "recently added" presentation order, ascending; callers reverse for newest first.
 	RankAssetIDsByUploadTime(ctx context.Context, assetIds []uuid.UUID) ([]uuid.UUID, error)
 	ReclaimInterruptedRepositoryScanRuns(ctx context.Context) (int64, error)
+	// Reconcile the component relation from metadata-confirmed facts. Relations
+	// assigned by stack/live-photo matching are never overwritten, and the update
+	// is a no-op when the stored relation already matches, so retries stay
+	// idempotent.
+	ReconcileMediaItemComponentRelation(ctx context.Context, arg ReconcileMediaItemComponentRelationParams) error
 	ReleaseAgentThreadRefs(ctx context.Context, arg ReleaseAgentThreadRefsParams) error
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
 	RemoveStackMemberByAssetID(ctx context.Context, assetID uuid.UUID) error
+	RemoveStackMembership(ctx context.Context, arg RemoveStackMembershipParams) error
 	RemoveStackMembershipsByMediaItemIDs(ctx context.Context, mediaItemIds []uuid.UUID) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
@@ -520,6 +551,10 @@ type Querier interface {
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SearchTagsByName(ctx context.Context, arg SearchTagsByNameParams) ([]Tag, error)
+	// Canonical browsing component of a logical media item: jpeg_original first,
+	// then live_photo_still, edited_version, raw_original, and finally the
+	// component with the smallest position. Soft-deleted components never serve.
+	SelectMediaItemPrimaryAsset(ctx context.Context, mediaItemID uuid.UUID) (uuid.UUID, error)
 	SetAgentThreadActiveRun(ctx context.Context, arg SetAgentThreadActiveRunParams) error
 	SetBootstrapPhase(ctx context.Context, bootstrapPhase string) (SystemState, error)
 	SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error)
@@ -559,6 +594,7 @@ type Querier interface {
 	UpdateLocationClusterGeocode(ctx context.Context, arg UpdateLocationClusterGeocodeParams) error
 	UpdateMediaItemAfterStructuralMerge(ctx context.Context, arg UpdateMediaItemAfterStructuralMergeParams) error
 	UpdateMediaItemAsLivePhoto(ctx context.Context, arg UpdateMediaItemAsLivePhotoParams) error
+	UpdateMediaItemPrimaryAsset(ctx context.Context, arg UpdateMediaItemPrimaryAssetParams) error
 	UpdateOCRResultStats(ctx context.Context, assetID uuid.UUID) error
 	UpdatePendingAgentEffect(ctx context.Context, arg UpdatePendingAgentEffectParams) error
 	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
@@ -572,6 +608,8 @@ type Querier interface {
 	UpdateRepositoryRootFromDisk(ctx context.Context, arg UpdateRepositoryRootFromDiskParams) (RepositoryRoot, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error)
+	UpdateStackCover(ctx context.Context, arg UpdateStackCoverParams) error
+	UpdateStackMemberPosition(ctx context.Context, arg UpdateStackMemberPositionParams) error
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error

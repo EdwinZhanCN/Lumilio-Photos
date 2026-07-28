@@ -181,109 +181,206 @@ func (c LumenConfig) Enabled() bool { return c.DiscoveryEnabled }
 // manifest uses pointers for every value so an omitted field is distinct from
 // a deliberately configured false, zero, empty string, or empty array.
 type manifest struct {
-	SchemaVersion  *int                    `toml:"schema_version"`
-	Environment    *string                 `toml:"environment"`
-	Database       *databaseManifest       `toml:"database"`
-	Server         *serverManifest         `toml:"server"`
-	Logging        *loggingManifest        `toml:"logging"`
-	Storage        *storageManifest        `toml:"storage"`
-	RepositoryScan *repositoryScanManifest `toml:"repository_scan"`
-	Geocoding      *geocodingManifest      `toml:"geocoding"`
-	Auth           *authManifest           `toml:"auth"`
-	Transcode      *transcodeManifest      `toml:"transcode"`
-	Lumen          *lumenManifest          `toml:"lumen"`
-	Tools          *toolsManifest          `toml:"tools"`
+	// Manifest format version. The loader accepts exactly this version and
+	// never migrates an older file in place.
+	SchemaVersion *int `toml:"schema_version" json:"schema_version"`
+	// Deployment environment. Selects test-only affordances; it does not relax
+	// any origin, TLS, or proxy rule.
+	Environment    *string                 `toml:"environment" json:"environment" jsonschema:"enum=development,enum=production,enum=test"`
+	Database       *databaseManifest       `toml:"database" json:"database"`
+	Server         *serverManifest         `toml:"server" json:"server"`
+	Logging        *loggingManifest        `toml:"logging" json:"logging"`
+	Storage        *storageManifest        `toml:"storage" json:"storage"`
+	RepositoryScan *repositoryScanManifest `toml:"repository_scan" json:"repository_scan"`
+	Geocoding      *geocodingManifest      `toml:"geocoding" json:"geocoding"`
+	Auth           *authManifest           `toml:"auth" json:"auth"`
+	Transcode      *transcodeManifest      `toml:"transcode" json:"transcode"`
+	Lumen          *lumenManifest          `toml:"lumen" json:"lumen"`
+	Tools          *toolsManifest          `toml:"tools" json:"tools"`
 }
 
 type databaseManifest struct {
-	Path *string `toml:"path"`
+	// SQLite catalog file. Relative paths resolve from the manifest directory.
+	// ":memory:" is rejected because the catalog must survive a restart.
+	Path *string `toml:"path" json:"path"`
 }
 type serverManifest struct {
-	Listen             *string        `toml:"listen"`
-	PrimaryOrigin      *string        `toml:"primary_origin"`
-	CORSAllowedOrigins *[]string      `toml:"cors_allowed_origins"`
-	WebRoot            *string        `toml:"web_root"`
-	TLS                *tlsManifest   `toml:"tls"`
-	Proxy              *proxyManifest `toml:"proxy"`
+	// Local socket the application listener binds, as host:port or :port.
+	// Never a URL, and never given a port implicitly. 127.0.0.1 is loopback
+	// only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
+	Listen *string `toml:"listen" json:"listen"`
+	// The one canonical browser origin. It fixes the cookie and CSRF baseline,
+	// the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
+	// host plus optional port only: no userinfo, path, query, or fragment.
+	PrimaryOrigin *string `toml:"primary_origin" json:"primary_origin"`
+	// Extra browser origins allowed to make credentialed cross-origin calls,
+	// such as a local Vite dev server. This does not widen the WebAuthn allowed
+	// origins and does not define the canonical identity. Empty for a
+	// same-origin SPA deployment.
+	CORSAllowedOrigins *[]string `toml:"cors_allowed_origins" json:"cors_allowed_origins"`
+	// Directory of built SPA assets. Empty serves the API alone, which is what
+	// the Vite development profile wants.
+	WebRoot *string        `toml:"web_root" json:"web_root"`
+	TLS     *tlsManifest   `toml:"tls" json:"tls"`
+	Proxy   *proxyManifest `toml:"proxy" json:"proxy"`
 }
 type tlsManifest struct {
-	Mode        *string `toml:"mode"`
-	HTTPListen  *string `toml:"http_listen"`
-	Email       *string `toml:"email"`
-	StoragePath *string `toml:"storage_path"`
+	// Who terminates HTTPS. "off" is plaintext and requires an http
+	// primary_origin; "acme" makes this server obtain its own certificate and
+	// requires an https primary_origin with a real hostname; "external" puts a
+	// reverse proxy in front and requires proxy.mode = required.
+	Mode *string `toml:"mode" json:"mode" jsonschema:"enum=off,enum=acme,enum=external"`
+	// Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
+	// primary_origin. Non-empty if and only if mode = "acme".
+	HTTPListen *string `toml:"http_listen" json:"http_listen"`
+	// ACME account contact address. Non-empty if and only if mode = "acme".
+	Email *string `toml:"email" json:"email"`
+	// Persistent directory for certificates and ACME account state. Must be
+	// machine-local state outside storage.path. Non-empty iff mode = "acme".
+	StoragePath *string `toml:"storage_path" json:"storage_path"`
 }
 type proxyManifest struct {
-	Mode         *string   `toml:"mode"`
-	TrustedCIDRs *[]string `toml:"trusted_cidrs"`
+	// Whether a trusted reverse proxy is mandatory. "disabled" ignores every
+	// Forwarded and X-Forwarded-* header. "required" rejects application
+	// traffic whose immediate peer is outside trusted_cidrs, which is what
+	// stops a direct client from forging X-Forwarded-Proto: https.
+	Mode *string `toml:"mode" json:"mode" jsonschema:"enum=disabled,enum=required"`
+	// CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
+	// the immediate peer, not to any address inside a forwarded chain. Must be
+	// empty when mode = "disabled" and hold at least one entry when required.
+	TrustedCIDRs *[]string `toml:"trusted_cidrs" json:"trusted_cidrs"`
 }
 type loggingManifest struct {
-	Level                  *string `toml:"level"`
-	Dir                    *string `toml:"dir"`
-	ConsoleFormat          *string `toml:"console_format"`
-	FileFormat             *string `toml:"file_format"`
-	RepositoryAuditVerbose *bool   `toml:"repository_audit_verbose"`
+	// Minimum level emitted to both sinks.
+	Level *string `toml:"level" json:"level" jsonschema:"enum=debug,enum=info,enum=warn,enum=error"`
+	// Directory for rotated log files. Relative paths are manifest-relative.
+	Dir *string `toml:"dir" json:"dir"`
+	// Encoding for the stdout stream.
+	ConsoleFormat *string `toml:"console_format" json:"console_format" jsonschema:"enum=console,enum=json"`
+	// Encoding for the on-disk log files.
+	FileFormat *string `toml:"file_format" json:"file_format" jsonschema:"enum=console,enum=json"`
+	// Log every repository scan decision. Useful when diagnosing ingestion, far
+	// too noisy for normal operation.
+	RepositoryAuditVerbose *bool `toml:"repository_audit_verbose" json:"repository_audit_verbose"`
 }
 type storageManifest struct {
-	Path           *string `toml:"path"`
-	CloudStatePath *string `toml:"cloud_state_path"`
-	BackupsPath    *string `toml:"backups_path"`
+	// Portable media root holding the .lumilioroot marker and repository
+	// directories. This is the mount users back up and migrate.
+	Path *string `toml:"path" json:"path"`
+	// Cloud provider sessions and credential artifacts. Machine-bound private
+	// state, so it must resolve outside storage.path.
+	CloudStatePath *string `toml:"cloud_state_path" json:"cloud_state_path"`
+	// Database backup destination. Also machine-bound, also outside
+	// storage.path, so that backing up media does not capture secrets.
+	BackupsPath *string `toml:"backups_path" json:"backups_path"`
 }
 type repositoryScanManifest struct {
-	Enabled            *bool `toml:"enabled"`
-	IntervalSeconds    *int  `toml:"interval_seconds"`
-	SettleSeconds      *int  `toml:"settle_seconds"`
-	MaxConcurrentRepos *int  `toml:"max_concurrent_repos"`
-	BatchSize          *int  `toml:"batch_size"`
+	// Whether to periodically reconcile repositories against the catalog.
+	Enabled *bool `toml:"enabled" json:"enabled"`
+	// Seconds between scan sweeps.
+	IntervalSeconds *int `toml:"interval_seconds" json:"interval_seconds"`
+	// Seconds a file must stay unmodified before it is considered complete.
+	SettleSeconds *int `toml:"settle_seconds" json:"settle_seconds"`
+	// Repositories scanned concurrently.
+	MaxConcurrentRepos *int `toml:"max_concurrent_repos" json:"max_concurrent_repos"`
+	// Files per scan batch.
+	BatchSize *int `toml:"batch_size" json:"batch_size"`
 }
 type geocodingManifest struct {
-	Provider          *string `toml:"provider"`
-	NominatimEndpoint *string `toml:"nominatim_endpoint"`
-	Language          *string `toml:"language"`
-	UserAgent         *string `toml:"user_agent"`
+	// Reverse-geocoding backend. "disabled" keeps coordinates local and makes
+	// no network calls.
+	Provider *string `toml:"provider" json:"provider" jsonschema:"enum=disabled,enum=nominatim"`
+	// Nominatim reverse endpoint. Read only when provider = "nominatim".
+	NominatimEndpoint *string `toml:"nominatim_endpoint" json:"nominatim_endpoint"`
+	// Preferred language for returned place names.
+	Language *string `toml:"language" json:"language"`
+	// User-Agent presented to the provider. Public Nominatim requires a real
+	// contact string in its usage policy.
+	UserAgent *string `toml:"user_agent" json:"user_agent"`
 }
 type authManifest struct {
-	SecretKeyFile   *string                `toml:"secret_key_file"`
-	AccessTokenTTL  *string                `toml:"access_token_ttl"`
-	RefreshTokenTTL *string                `toml:"refresh_token_ttl"`
-	MediaTokenTTL   *string                `toml:"media_token_ttl"`
-	Passkey         *passkeyManifest       `toml:"passkey"`
-	RateLimit       *authRateLimitManifest `toml:"rate_limit"`
+	// Path to the token-signing key. This is a path, never the secret itself;
+	// secret values must not appear in this manifest or in the environment. The
+	// server creates the file with mode 0600 on first boot if it is absent.
+	SecretKeyFile *string `toml:"secret_key_file" json:"secret_key_file"`
+	// Access token lifetime as a Go duration, for example "15m".
+	AccessTokenTTL *string `toml:"access_token_ttl" json:"access_token_ttl"`
+	// Refresh token lifetime, and therefore the session cookie lifetime.
+	RefreshTokenTTL *string `toml:"refresh_token_ttl" json:"refresh_token_ttl"`
+	// Lifetime of short-lived media URLs.
+	MediaTokenTTL *string                `toml:"media_token_ttl" json:"media_token_ttl"`
+	Passkey       *passkeyManifest       `toml:"passkey" json:"passkey"`
+	RateLimit     *authRateLimitManifest `toml:"rate_limit" json:"rate_limit"`
 }
 type passkeyManifest struct {
-	Enabled *bool   `toml:"enabled"`
-	Name    *string `toml:"name"`
+	// Whether WebAuthn is offered. When true, primary_origin must be https or
+	// exactly http://localhost; an http LAN address or bare IP is rejected
+	// because browsers will not treat it as a secure context.
+	Enabled *bool `toml:"enabled" json:"enabled"`
+	// Relying-party display name shown in the browser prompt. Cosmetic: the RP
+	// ID itself always comes from the primary_origin hostname.
+	Name *string `toml:"name" json:"name"`
 }
 type authRateLimitManifest struct {
-	IPAttempts      *int    `toml:"ip_attempts"`
-	SubjectAttempts *int    `toml:"subject_attempts"`
-	Window          *string `toml:"window"`
-	Lockout         *string `toml:"lockout"`
-	MaxEntries      *int    `toml:"max_entries"`
+	// Failed attempts allowed per client IP inside one window.
+	IPAttempts *int `toml:"ip_attempts" json:"ip_attempts"`
+	// Failed attempts allowed per account inside one window.
+	SubjectAttempts *int `toml:"subject_attempts" json:"subject_attempts"`
+	// Rolling window over which attempts accumulate.
+	Window *string `toml:"window" json:"window"`
+	// How long a subject stays locked after exhausting its budget.
+	Lockout *string `toml:"lockout" json:"lockout"`
+	// Tracked entries held in memory, bounding the limiter's footprint.
+	MaxEntries *int `toml:"max_entries" json:"max_entries"`
 }
 type transcodeManifest struct {
-	HardwareAccel *string `toml:"hardware_accel"`
+	// Hardware video acceleration backend. "auto" probes what the host offers
+	// and falls back to software; "none" forces software transcoding.
+	HardwareAccel *string `toml:"hardware_accel" json:"hardware_accel" jsonschema:"enum=auto,enum=vaapi,enum=nvenc,enum=qsv,enum=videotoolbox,enum=none"`
 }
 type lumenManifest struct {
-	DiscoveryEnabled      *bool     `toml:"discovery_enabled"`
-	DiscoveryMDNSEnabled  *bool     `toml:"discovery_mdns_enabled"`
-	DiscoveryHubURL       *string   `toml:"discovery_hub_url"`
-	DiscoveryStaticNodes  *[]string `toml:"discovery_static_nodes"`
-	DiscoveryServiceType  *string   `toml:"discovery_service_type"`
-	DiscoveryDomain       *string   `toml:"discovery_domain"`
-	DeploymentID          *string   `toml:"deployment_id"`
-	ResolveTimeout        *string   `toml:"resolve_timeout"`
-	ConnectTimeout        *string   `toml:"connect_timeout"`
-	RediscoveryBackoffMin *string   `toml:"rediscovery_backoff_min"`
-	RediscoveryBackoffMax *string   `toml:"rediscovery_backoff_max"`
-	ScanInterval          *string   `toml:"scan_interval"`
-	ChunkAuto             *bool     `toml:"chunk_auto"`
-	ChunkThresholdBytes   *int      `toml:"chunk_threshold_bytes"`
-	ChunkMaxBytes         *int      `toml:"chunk_max_bytes"`
+	// Whether to look for external Lumen ML nodes at all. ML stays optional;
+	// false keeps the deployment entirely local.
+	DiscoveryEnabled *bool `toml:"discovery_enabled" json:"discovery_enabled"`
+	// Discover nodes over mDNS on the local link. Containers usually cannot,
+	// so Docker deployments prefer a hub URL or static nodes.
+	DiscoveryMDNSEnabled *bool `toml:"discovery_mdns_enabled" json:"discovery_mdns_enabled"`
+	// Absolute http(s) URL of a Lumen hub. May be empty when mDNS or static
+	// nodes already supply the node list.
+	DiscoveryHubURL *string `toml:"discovery_hub_url" json:"discovery_hub_url"`
+	// Explicit host:port Lumen nodes, tried regardless of discovery results.
+	DiscoveryStaticNodes *[]string `toml:"discovery_static_nodes" json:"discovery_static_nodes"`
+	// mDNS service type to browse.
+	DiscoveryServiceType *string `toml:"discovery_service_type" json:"discovery_service_type"`
+	// mDNS domain to browse.
+	DiscoveryDomain *string `toml:"discovery_domain" json:"discovery_domain"`
+	// Label identifying this deployment in Lumen logs and node affinity.
+	DeploymentID *string `toml:"deployment_id" json:"deployment_id"`
+	// Timeout for resolving a discovered node's address.
+	ResolveTimeout *string `toml:"resolve_timeout" json:"resolve_timeout"`
+	// Timeout for opening a connection to a resolved node.
+	ConnectTimeout *string `toml:"connect_timeout" json:"connect_timeout"`
+	// Shortest wait before retrying discovery after a failure.
+	RediscoveryBackoffMin *string `toml:"rediscovery_backoff_min" json:"rediscovery_backoff_min"`
+	// Longest wait between discovery retries. Must be >= the minimum.
+	RediscoveryBackoffMax *string `toml:"rediscovery_backoff_max" json:"rediscovery_backoff_max"`
+	// Interval between periodic node health sweeps.
+	ScanInterval *string `toml:"scan_interval" json:"scan_interval"`
+	// Let the client choose chunked upload automatically by payload size.
+	ChunkAuto *bool `toml:"chunk_auto" json:"chunk_auto"`
+	// Payload size in bytes above which chunking kicks in.
+	ChunkThresholdBytes *int `toml:"chunk_threshold_bytes" json:"chunk_threshold_bytes"`
+	// Bytes per chunk. Must be <= chunk_threshold_bytes.
+	ChunkMaxBytes *int `toml:"chunk_max_bytes" json:"chunk_max_bytes"`
 }
 type toolsManifest struct {
-	ExifToolPath *string `toml:"exiftool_path"`
-	FFmpegPath   *string `toml:"ffmpeg_path"`
-	FFprobePath  *string `toml:"ffprobe_path"`
+	// exiftool binary. A bare command is looked up on PATH; anything holding a
+	// path separator is resolved relative to the manifest.
+	ExifToolPath *string `toml:"exiftool_path" json:"exiftool_path"`
+	// ffmpeg binary, resolved by the same rule.
+	FFmpegPath *string `toml:"ffmpeg_path" json:"ffmpeg_path"`
+	// ffprobe binary, resolved by the same rule.
+	FFprobePath *string `toml:"ffprobe_path" json:"ffprobe_path"`
 }
 
 // LoadAppConfig strictly loads one complete runtime manifest. It never searches
@@ -463,9 +560,7 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 		p = append(p, fmt.Sprintf("schema_version must be %d", SchemaVersion))
 	}
 	environment := normalizedRequired(&p, "environment", *m.Environment)
-	if environment != "development" && environment != "production" && environment != "test" {
-		p = append(p, "environment must be one of development, production, test")
-	}
+	requireOneOf(&p, "environment", environment, environmentValues...)
 
 	rawDatabasePath := strings.TrimSpace(*m.Database.Path)
 	db := DatabaseConfig{Path: resolvePath(base, rawDatabasePath)}
@@ -502,16 +597,16 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 		"server.cors_allowed_origins",
 		*m.Server.CORSAllowedOrigins,
 	)
-	requireOneOf(&p, "server.tls.mode", string(server.TLS.Mode), string(TLSModeOff), string(TLSModeACME), string(TLSModeExternal))
-	requireOneOf(&p, "server.proxy.mode", string(server.Proxy.Mode), string(ProxyModeDisabled), string(ProxyModeRequired))
+	requireOneOf(&p, "server.tls.mode", string(server.TLS.Mode), tlsModeValues...)
+	requireOneOf(&p, "server.proxy.mode", string(server.Proxy.Mode), proxyModeValues...)
 	server.Proxy.TrustedCIDRs = parseTrustedCIDRs(&p, *m.Server.Proxy.TrustedCIDRs)
 	validateNetworkTopology(&p, server, primaryURL)
 
 	logging := LoggingConfig{Level: strings.ToLower(strings.TrimSpace(*m.Logging.Level)), LogDir: resolvePath(base, *m.Logging.Dir), ConsoleFormat: strings.ToLower(strings.TrimSpace(*m.Logging.ConsoleFormat)), FileFormat: strings.ToLower(strings.TrimSpace(*m.Logging.FileFormat)), RepositoryAuditVerbose: *m.Logging.RepositoryAuditVerbose}
-	requireOneOf(&p, "logging.level", logging.Level, "debug", "info", "warn", "error")
+	requireOneOf(&p, "logging.level", logging.Level, logLevelValues...)
 	requireNonEmpty(&p, "logging.dir", strings.TrimSpace(*m.Logging.Dir))
-	requireOneOf(&p, "logging.console_format", logging.ConsoleFormat, "console", "json")
-	requireOneOf(&p, "logging.file_format", logging.FileFormat, "console", "json")
+	requireOneOf(&p, "logging.console_format", logging.ConsoleFormat, logFormatValues...)
+	requireOneOf(&p, "logging.file_format", logging.FileFormat, logFormatValues...)
 
 	storage := StorageConfig{
 		Path:           resolvePath(base, *m.Storage.Path),
@@ -536,7 +631,7 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requirePositive(&p, "repository_scan.batch_size", scan.BatchSize)
 
 	geocoding := GeocodingConfig{Provider: strings.ToLower(strings.TrimSpace(*m.Geocoding.Provider)), NominatimEndpoint: strings.TrimSpace(*m.Geocoding.NominatimEndpoint), Language: strings.TrimSpace(*m.Geocoding.Language), UserAgent: strings.TrimSpace(*m.Geocoding.UserAgent)}
-	requireOneOf(&p, "geocoding.provider", geocoding.Provider, "disabled", "nominatim")
+	requireOneOf(&p, "geocoding.provider", geocoding.Provider, geocodingProviders...)
 	requireNonEmpty(&p, "geocoding.nominatim_endpoint", geocoding.NominatimEndpoint)
 	requireHTTPURL(&p, "geocoding.nominatim_endpoint", geocoding.NominatimEndpoint)
 	requireNonEmpty(&p, "geocoding.language", geocoding.Language)
@@ -576,7 +671,7 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	}
 
 	transcode := TranscodeConfig{HardwareAccel: strings.ToLower(strings.TrimSpace(*m.Transcode.HardwareAccel))}
-	requireOneOf(&p, "transcode.hardware_accel", transcode.HardwareAccel, "auto", "vaapi", "nvenc", "qsv", "videotoolbox", "none")
+	requireOneOf(&p, "transcode.hardware_accel", transcode.HardwareAccel, hardwareAccelValues...)
 
 	lumen := LumenConfig{DiscoveryEnabled: *m.Lumen.DiscoveryEnabled, DiscoveryMDNSEnabled: *m.Lumen.DiscoveryMDNSEnabled, DiscoveryHubURL: strings.TrimSpace(*m.Lumen.DiscoveryHubURL), DiscoveryStaticNodes: cleanStrings(*m.Lumen.DiscoveryStaticNodes), DiscoveryServiceType: strings.TrimSpace(*m.Lumen.DiscoveryServiceType), DiscoveryDomain: strings.TrimSpace(*m.Lumen.DiscoveryDomain), DeploymentID: strings.TrimSpace(*m.Lumen.DeploymentID), ChunkAuto: *m.Lumen.ChunkAuto, ChunkThresholdBytes: *m.Lumen.ChunkThresholdBytes, ChunkMaxBytes: *m.Lumen.ChunkMaxBytes}
 	requireNonEmpty(&p, "lumen.discovery_service_type", lumen.DiscoveryServiceType)

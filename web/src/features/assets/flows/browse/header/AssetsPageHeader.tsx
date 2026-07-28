@@ -10,6 +10,7 @@ import {
   getConstraintUserFilter,
   normalizeAssetUserFilter,
   stripConstrainedAssetUserFilter,
+  type AssetUserFilterKey,
 } from "../../../model/filter";
 
 export default function AssetsPageHeader({
@@ -51,6 +52,10 @@ export default function AssetsPageHeader({
   const handleFiltersChange = (nextFilter: typeof inboundDTO) => {
     onFiltersChange(stripConstrainedAssetUserFilter(nextFilter, constraint));
   };
+  const handleRemoveFilter = (key: AssetUserFilterKey) => {
+    const { [key]: _removed, ...rest } = filter;
+    onFiltersChange(rest);
+  };
   const bulk = useAssetsPageHeaderBulkActions({
     browseItems,
     bulkActions,
@@ -70,6 +75,8 @@ export default function AssetsPageHeader({
         activeSortByLabel={activeSortByLabel}
         inboundDTO={inboundDTO}
         handleFiltersChange={handleFiltersChange}
+        userFilter={filter}
+        onRemoveFilter={handleRemoveFilter}
         lockedFilterFields={lockedFilterFields}
         scopeControlHidden={scopeControlHidden}
         showScan={capabilities?.showScan ?? true}

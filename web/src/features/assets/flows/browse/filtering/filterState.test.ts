@@ -3,10 +3,9 @@ import {
   buildAssetUserFilter,
   buildLockedInitialFilter,
   centerToBBox,
-  countEnabledFilters,
+  createFilterDraft,
   createLockedFieldSet,
   EMPTY_LOCATION_BBOX,
-  hasActiveLockedFields,
   isZeroBBox,
   toDateInput,
 } from "./filterState";
@@ -14,39 +13,34 @@ import { isAssetUserFilterFieldActive, type AssetUserFilter } from "../../../mod
 import type { FilterDraft } from "./types";
 
 const createDraft = (overrides: Partial<FilterDraft> = {}): FilterDraft => ({
-  filterEnabled: true,
-  typeEnabled: false,
-  typeValue: "PHOTO",
-  rawEnabled: false,
-  rawMode: "include",
-  ratingEnabled: false,
-  ratingValue: 5,
-  likedEnabled: false,
-  likedValue: true,
-  filenameEnabled: false,
+  stackKinds: [],
   filenameOperator: "contains",
   filenameValue: "",
-  dateEnabled: false,
   dateFrom: "",
   dateTo: "",
-  locationEnabled: false,
-  location: EMPTY_LOCATION_BBOX,
-  cameraModelEnabled: false,
   cameraModel: "",
-  lensEnabled: false,
   lens: "",
-  tagEnabled: false,
   tagNames: [],
   ...overrides,
 });
 
 describe("FilterTool filter state", () => {
   it("treats boolean false and rating zero as active filter values", () => {
-    const dto: AssetUserFilter = { raw: false, liked: false, rating: 0 };
+    const dto: AssetUserFilter = { liked: false, rating: 0 };
 
-    expect(isAssetUserFilterFieldActive(dto, "raw")).toBe(true);
     expect(isAssetUserFilterFieldActive(dto, "liked")).toBe(true);
     expect(isAssetUserFilterFieldActive(dto, "rating")).toBe(true);
+  });
+
+  it("treats composition and stack selections as active filter values", () => {
+    expect(
+      isAssetUserFilterFieldActive({ media_item: { composition: "no_raw" } }, "media_item"),
+    ).toBe(true);
+    expect(isAssetUserFilterFieldActive({ stack: { membership: "unstacked" } }, "stack")).toBe(
+      true,
+    );
+    expect(isAssetUserFilterFieldActive({ stack: { kinds: ["burst"] } }, "stack")).toBe(true);
+    expect(isAssetUserFilterFieldActive({ stack: { kinds: [] } }, "stack")).toBe(false);
   });
 
   it("rejects empty text, empty tags, and the zero location box", () => {
@@ -79,51 +73,75 @@ describe("FilterTool filter state", () => {
       camera_model: "Leica M11",
       tag_names: ["travel"],
     });
-    expect(hasActiveLockedFields(initial, lockedFields)).toBe(true);
+  });
+
+  it("seeds a flat draft from an existing filter", () => {
+    expect(
+      createFilterDraft({
+        type: "VIDEO",
+        media_item: { composition: "jpeg_raw" },
+        stack: { membership: "stacked", kinds: ["burst"] },
+        rating: 0,
+        liked: false,
+        date: { from: "2026-07-16T13:14:15Z" },
+      }),
+    ).toEqual(
+      createDraft({
+        type: "VIDEO",
+        composition: "jpeg_raw",
+        stackMembership: "stacked",
+        stackKinds: ["burst"],
+        rating: 0,
+        liked: false,
+        dateFrom: "2026-07-16",
+      }),
+    );
   });
 
   it("lets locked initial values override the editable draft", () => {
     const initial: AssetUserFilter = { type: "PHOTO", liked: true };
     const lockedFields = createLockedFieldSet(["type"]);
-    const draft = createDraft({
-      typeEnabled: true,
-      typeValue: "VIDEO",
-      likedEnabled: true,
-      likedValue: false,
-    });
+    const draft = createDraft({ type: "VIDEO", liked: false });
 
-    expect(buildAssetUserFilter(draft, initial, lockedFields, true)).toEqual({
+    expect(buildAssetUserFilter(draft, initial, lockedFields)).toEqual({
       type: "PHOTO",
       liked: false,
     });
   });
 
-  it("keeps locked filters when the global editable filter switch is off", () => {
-    const initial: AssetUserFilter = { raw: false };
-    const lockedFields = createLockedFieldSet(["raw"]);
-    const draft = createDraft({ filterEnabled: false });
+  it("keeps locked filters that the draft never carries", () => {
+    const initial: AssetUserFilter = { media_item: { composition: "no_raw" } };
+    const lockedFields = createLockedFieldSet(["media_item"]);
 
-    expect(buildAssetUserFilter(draft, initial, lockedFields, true)).toEqual({ raw: false });
-    expect(countEnabledFilters(draft, true)).toBe(0);
+    expect(buildAssetUserFilter(createDraft(), initial, lockedFields)).toEqual({
+      media_item: { composition: "no_raw" },
+    });
   });
 
-  it("trims filename filters and omits incomplete enabled values", () => {
+  it("builds composition and stack filters from the draft", () => {
+    expect(
+      buildAssetUserFilter(
+        createDraft({ composition: "raw_unpaired", stackKinds: ["manual"] }),
+        {},
+        new Set(),
+      ),
+    ).toEqual({
+      media_item: { composition: "raw_unpaired" },
+      stack: { kinds: ["manual"] },
+    });
+  });
+
+  it("trims filename filters and omits values left empty", () => {
     const draft = createDraft({
-      filenameEnabled: true,
       filenameValue: "  beach  ",
-      dateEnabled: true,
       dateTo: "2026-07-16",
-      locationEnabled: true,
-      cameraModelEnabled: true,
-      lensEnabled: true,
-      tagEnabled: true,
+      location: EMPTY_LOCATION_BBOX,
     });
 
-    expect(buildAssetUserFilter(draft, {}, new Set(), false)).toEqual({
+    expect(buildAssetUserFilter(draft, {}, new Set())).toEqual({
       filename: { operator: "contains", value: "beach" },
       date: { from: undefined, to: "2026-07-16" },
     });
-    expect(countEnabledFilters(draft, false)).toBe(2);
   });
 
   it("normalizes ISO dates and computes the same center-radius bounding box", () => {

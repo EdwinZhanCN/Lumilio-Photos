@@ -25,7 +25,9 @@ type AssetFilterInput struct {
 	DateTo               string   `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
 	Type                 string   `json:"type,omitempty" jsonschema:"enum=PHOTO,enum=VIDEO,enum=AUDIO,description=Asset type"`
 	Filename             string   `json:"filename,omitempty" jsonschema:"description=Filename substring to search for"`
-	Raw                  *bool    `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
+	Composition          string   `json:"composition,omitempty" jsonschema:"enum=contains_raw,enum=jpeg_raw,enum=raw_unpaired,enum=no_raw,enum=live_photo,description=Filter media items by component composition (e.g. jpeg_raw for JPEG+RAW pairs)"`
+	StackMembership      string   `json:"stack_membership,omitempty" jsonschema:"enum=stacked,enum=unstacked,description=Filter media items by presentation-stack membership"`
+	StackKinds           []string `json:"stack_kinds,omitempty" jsonschema:"description=Stack kinds to filter by (burst, manual); implies stacked membership"`
 	Rating               *int     `json:"rating,omitempty" jsonschema:"description=Filter by exact rating (0-5)"`
 	Liked                *bool    `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
 	Place                string   `json:"place,omitempty" jsonschema:"description=Place name to match against the library's location clusters (e.g. Kyoto, Tokyo Tower)"`
@@ -37,13 +39,15 @@ type AssetFilterInput struct {
 }
 
 // RegisterFilterAssets registers the filter_assets producer: metadata
-// conditions in, ref out. The matching asset ids are materialized eagerly as
-// an ordered snapshot (capture time desc); only the receipt reaches the LLM.
+// conditions in, ref out. The matching media items are materialized eagerly as
+// an ordered snapshot of primary asset ids (capture time desc); only the
+// receipt reaches the LLM.
 func RegisterFilterAssets() {
 	info := &schema.ToolInfo{
 		Name: "filter_assets",
-		Desc: "Find assets by metadata conditions (date range, type, filename, RAW, rating, liked, place, camera, lens, album, tags) " +
+		Desc: "Find media items by metadata conditions (date range, type, filename, composition, stack membership/kinds, rating, liked, place, camera, lens, album, tags) " +
 			"and optionally min_quality_percentile (keep scores at/above that percentile of the matched set; unscored dropped). " +
+			"Each logical media item (e.g. a JPEG+RAW pair) counts once. " +
 			"Returns a ref: a handle for the matching set. Pass the ref to other tools " +
 			"(combine, describe, show, bulk_like_assets, tag_assets, create_album) to work with the set.",
 	}
@@ -138,9 +142,9 @@ func applyMinQualityPercentile(
 	return kept, note, nil
 }
 
-func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams, *ref.Error) {
+func buildFilterParams(input *AssetFilterInput) (*repo.GetMediaItemRefsUnifiedParams, *ref.Error) {
 	// Fetch one row past the cap so truncation is detectable.
-	params := repo.GetAssetIDsUnifiedParams{Limit: ref.MaxSnapshotSize + 1}
+	params := repo.GetMediaItemRefsUnifiedParams{Limit: ref.MaxSnapshotSize + 1}
 
 	if input.DateFrom != "" {
 		t, err := time.Parse("2006-01-02", input.DateFrom)
@@ -172,8 +176,42 @@ func buildFilterParams(input *AssetFilterInput) (*repo.GetAssetIDsUnifiedParams,
 		params.FilenameVal = &input.Filename
 		params.FilenameOperator = &operator
 	}
-	if input.Raw != nil {
-		params.IsRaw = input.Raw
+	if input.Composition != "" {
+		composition := strings.ToLower(strings.TrimSpace(input.Composition))
+		switch composition {
+		case "contains_raw", "jpeg_raw", "raw_unpaired", "no_raw", "live_photo":
+			params.Composition = composition
+		default:
+			return nil, ref.InvalidArgument(fmt.Sprintf("composition %q is not one of contains_raw, jpeg_raw, raw_unpaired, no_raw, live_photo", input.Composition))
+		}
+	}
+	membership := strings.ToLower(strings.TrimSpace(input.StackMembership))
+	if membership != "" {
+		switch membership {
+		case "stacked", "unstacked":
+			params.StackMembership = membership
+		default:
+			return nil, ref.InvalidArgument(fmt.Sprintf("stack_membership %q is not one of stacked, unstacked", input.StackMembership))
+		}
+	}
+	if len(input.StackKinds) > 0 {
+		if membership == "unstacked" {
+			return nil, ref.InvalidArgument("stack_membership=unstacked excludes stack_kinds")
+		}
+		kinds := make([]string, 0, len(input.StackKinds))
+		for _, raw := range input.StackKinds {
+			kind := strings.ToLower(strings.TrimSpace(raw))
+			if kind == "" {
+				continue
+			}
+			if !dbtypes.StackKind(kind).Valid() {
+				return nil, ref.InvalidArgument(fmt.Sprintf("stack kind %q is not one of burst, manual", raw))
+			}
+			kinds = append(kinds, kind)
+		}
+		if len(kinds) > 0 {
+			params.StackKinds = dbtypes.StringsJSONParam(kinds)
+		}
 	}
 	if input.Rating != nil {
 		if *input.Rating < 0 || *input.Rating > 5 {
@@ -220,6 +258,10 @@ func filterHint(input *AssetFilterInput) string {
 		return fmt.Sprintf("album%d", *input.AlbumID)
 	case input.Filename != "":
 		return input.Filename
+	case input.Composition != "":
+		return input.Composition
+	case len(input.StackKinds) > 0:
+		return input.StackKinds[0]
 	case input.DateFrom != "" && len(input.DateFrom) >= 4:
 		return input.DateFrom[:4]
 	case input.Type != "":
@@ -249,8 +291,14 @@ func filterPlanParams(input *AssetFilterInput) map[string]string {
 	if input.Filename != "" {
 		params["filename"] = input.Filename
 	}
-	if input.Raw != nil {
-		params["raw"] = fmt.Sprintf("%t", *input.Raw)
+	if input.Composition != "" {
+		params["composition"] = input.Composition
+	}
+	if input.StackMembership != "" {
+		params["stack_membership"] = input.StackMembership
+	}
+	if len(input.StackKinds) > 0 {
+		params["stack_kinds"] = strings.Join(input.StackKinds, ",")
 	}
 	if input.Rating != nil {
 		params["rating"] = fmt.Sprintf("%d", *input.Rating)
@@ -294,7 +342,7 @@ func filterSummary(input *AssetFilterInput, count int, truncated bool) string {
 	if clause == "" {
 		clause = "no conditions"
 	}
-	summary := fmt.Sprintf("filter(%s) → %d assets", clause, count)
+	summary := fmt.Sprintf("filter(%s) → %d media items", clause, count)
 	if count == 0 {
 		summary += " (empty set)"
 	}

@@ -21,6 +21,12 @@ import (
 
 const migrationTable = "lumilio_schema_migrations"
 
+// schemaGeneration is the destructive experimental schema generation stamped
+// into PRAGMA user_version by the SQLite baseline. Catalogs written by any
+// other generation are rejected outright: experimental catalogs are never
+// upgraded in place.
+const schemaGeneration = 3
+
 type embeddedMigration struct {
 	version  int64
 	name     string
@@ -37,6 +43,9 @@ type appliedMigration struct {
 // Migrate applies Lumilio's embedded transactional migrations followed by
 // River's official SQLite migrations against the same single-writer pool.
 func (d *DB) Migrate(ctx context.Context) error {
+	if err := assertSchemaGeneration(ctx, d.SQL); err != nil {
+		return err
+	}
 	if err := migrateApplication(ctx, d.SQL); err != nil {
 		return fmt.Errorf("migrate Lumilio schema: %w", err)
 	}
@@ -45,6 +54,37 @@ func (d *DB) Migrate(ctx context.Context) error {
 	}
 	if err := d.Check(ctx); err != nil {
 		return fmt.Errorf("post-migration integrity check: %w", err)
+	}
+	return nil
+}
+
+// assertSchemaGeneration refuses to start against a catalog written by an
+// incompatible experimental schema generation. An empty catalog passes so the
+// baseline can claim it; a catalog that already has core application tables
+// must carry the current generation in PRAGMA user_version.
+func assertSchemaGeneration(ctx context.Context, database *sql.DB) error {
+	var coreTables int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM sqlite_schema
+		WHERE type = 'table' AND name IN ('assets', 'media_items', 'asset_stacks')
+	`).Scan(&coreTables); err != nil {
+		return fmt.Errorf("inspect schema generation: %w", err)
+	}
+	if coreTables == 0 {
+		return nil
+	}
+
+	var generation int
+	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&generation); err != nil {
+		return fmt.Errorf("read schema generation: %w", err)
+	}
+	if generation != schemaGeneration {
+		return fmt.Errorf(
+			"catalog schema generation = %d, want %d: this catalog belongs to an incompatible experimental schema generation; delete the SQLite catalog and restart Lumilio Photos (media repositories and original files are not deleted)",
+			generation,
+			schemaGeneration,
+		)
 	}
 	return nil
 }

@@ -1,0 +1,277 @@
+#:schema ../../schema/lumilio-server.schema.json
+# Lumilio Photos runtime manifest, schema v3.
+# Docker behind an external reverse proxy that owns HTTPS.
+#
+# Scenario: deployment-origin-tls-plan.md 5.6 Docker external reverse proxy
+#
+# The proxy terminates HTTPS and this container speaks plain HTTP on an internal
+# network. Do not publish this listener to the host:
+#
+#     services:
+#       lumilio:
+#         expose:
+#           - "6680"
+#         networks:
+#           - lumilio_proxy
+#
+# Network isolation is the first layer of protection and trusted_cidrs is the
+# second. Make the CIDR match that dedicated proxy network exactly: a broad subnet
+# shared with unrelated containers would let any of them forge the forwarded
+# origin and defeat the check.
+#
+# The proxy must overwrite, not pass through, the client's proto and host headers.
+# Conflicting or ambiguous Forwarded and X-Forwarded-* values are rejected.
+#
+# Generate a real one with:
+#
+#     server config init --profile docker-external-proxy \
+#       --origin https://photos.example.com \
+#       --trusted-proxy 172.30.0.0/24 \
+#       --output /data/app-state/server.toml
+#
+# Every key below is required: the loader has no defaults, performs no file
+# search, and accepts no environment overrides. Whether a manifest is legal
+# also depends on combinations across keys, which no per-key comment can
+# state; `server config validate --config <file>` is the authority.
+#
+# Generated from server/config/profiles.go by `make config-examples`.
+# Edit the profile table, not this file.
+
+# Manifest format version. The loader accepts exactly this version and
+# never migrates an older file in place.
+schema_version = 3
+
+# Deployment environment. Selects test-only affordances; it does not relax
+# any origin, TLS, or proxy rule.
+# One of: development, production, test
+environment = "production"
+
+[database]
+# SQLite catalog file. Relative paths resolve from the manifest directory.
+# ":memory:" is rejected because the catalog must survive a restart.
+path = "/data/app-state/library.sqlite3"
+
+[server]
+# Local socket the application listener binds, as host:port or :port.
+# Never a URL, and never given a port implicitly. 127.0.0.1 is loopback
+# only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
+listen = "0.0.0.0:6680"
+
+# The one canonical browser origin. It fixes the cookie and CSRF baseline,
+# the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
+# host plus optional port only: no userinfo, path, query, or fragment.
+primary_origin = "https://photos.example.com"
+
+# Extra browser origins allowed to make credentialed cross-origin calls,
+# such as a local Vite dev server. This does not widen the WebAuthn allowed
+# origins and does not define the canonical identity. Empty for a
+# same-origin SPA deployment.
+cors_allowed_origins = []
+
+# Directory of built SPA assets. Empty serves the API alone, which is what
+# the Vite development profile wants.
+web_root = "/app/web"
+
+[server.tls]
+# Who terminates HTTPS. "off" is plaintext and requires an http
+# primary_origin; "acme" makes this server obtain its own certificate and
+# requires an https primary_origin with a real hostname; "external" puts a
+# reverse proxy in front and requires proxy.mode = required.
+# One of: off, acme, external
+mode = "external"
+
+# Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
+# primary_origin. Non-empty if and only if mode = "acme".
+http_listen = ""
+
+# ACME account contact address. Non-empty if and only if mode = "acme".
+email = ""
+
+# Persistent directory for certificates and ACME account state. Must be
+# machine-local state outside storage.path. Non-empty iff mode = "acme".
+storage_path = ""
+
+[server.proxy]
+# Whether a trusted reverse proxy is mandatory. "disabled" ignores every
+# Forwarded and X-Forwarded-* header. "required" rejects application
+# traffic whose immediate peer is outside trusted_cidrs, which is what
+# stops a direct client from forging X-Forwarded-Proto: https.
+# One of: disabled, required
+mode = "required"
+
+# CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
+# the immediate peer, not to any address inside a forwarded chain. Must be
+# empty when mode = "disabled" and hold at least one entry when required.
+trusted_cidrs = ["172.30.0.0/24"]
+
+[logging]
+# Minimum level emitted to both sinks.
+# One of: debug, info, warn, error
+level = "info"
+
+# Directory for rotated log files. Relative paths are manifest-relative.
+dir = "/data/app-state/logs"
+
+# Encoding for the stdout stream.
+# One of: console, json
+console_format = "console"
+
+# Encoding for the on-disk log files.
+# One of: console, json
+file_format = "json"
+
+# Log every repository scan decision. Useful when diagnosing ingestion, far
+# too noisy for normal operation.
+repository_audit_verbose = false
+
+[storage]
+# Portable media root holding the .lumilioroot marker and repository
+# directories. This is the mount users back up and migrate.
+path = "/data/storage"
+
+# Cloud provider sessions and credential artifacts. Machine-bound private
+# state, so it must resolve outside storage.path.
+cloud_state_path = "/data/app-state/cloud"
+
+# Database backup destination. Also machine-bound, also outside
+# storage.path, so that backing up media does not capture secrets.
+backups_path = "/data/app-state/backups"
+
+[repository_scan]
+# Whether to periodically reconcile repositories against the catalog.
+enabled = true
+
+# Seconds between scan sweeps.
+interval_seconds = 300
+
+# Seconds a file must stay unmodified before it is considered complete.
+settle_seconds = 5
+
+# Repositories scanned concurrently.
+max_concurrent_repos = 1
+
+# Files per scan batch.
+batch_size = 500
+
+[geocoding]
+# Reverse-geocoding backend. "disabled" keeps coordinates local and makes
+# no network calls.
+# One of: disabled, nominatim
+provider = "disabled"
+
+# Nominatim reverse endpoint. Read only when provider = "nominatim".
+nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
+
+# Preferred language for returned place names.
+language = "en"
+
+# User-Agent presented to the provider. Public Nominatim requires a real
+# contact string in its usage policy.
+user_agent = "Lumilio-Photos/1.0"
+
+[auth]
+# Path to the token-signing key. This is a path, never the secret itself;
+# secret values must not appear in this manifest or in the environment. The
+# server creates the file with mode 0600 on first boot if it is absent.
+secret_key_file = "/data/app-state/secrets/lumilio_secret_key"
+
+# Access token lifetime as a Go duration, for example "15m".
+access_token_ttl = "15m"
+
+# Refresh token lifetime, and therefore the session cookie lifetime.
+refresh_token_ttl = "168h"
+
+# Lifetime of short-lived media URLs.
+media_token_ttl = "10m"
+
+[auth.passkey]
+# Whether WebAuthn is offered. When true, primary_origin must be https or
+# exactly http://localhost; an http LAN address or bare IP is rejected
+# because browsers will not treat it as a secure context.
+enabled = true
+
+# Relying-party display name shown in the browser prompt. Cosmetic: the RP
+# ID itself always comes from the primary_origin hostname.
+name = "Lumilio Photos"
+
+[auth.rate_limit]
+# Failed attempts allowed per client IP inside one window.
+ip_attempts = 60
+
+# Failed attempts allowed per account inside one window.
+subject_attempts = 8
+
+# Rolling window over which attempts accumulate.
+window = "1m"
+
+# How long a subject stays locked after exhausting its budget.
+lockout = "5m"
+
+# Tracked entries held in memory, bounding the limiter's footprint.
+max_entries = 10000
+
+[transcode]
+# Hardware video acceleration backend. "auto" probes what the host offers
+# and falls back to software; "none" forces software transcoding.
+# One of: auto, vaapi, nvenc, qsv, videotoolbox, none
+hardware_accel = "auto"
+
+[lumen]
+# Whether to look for external Lumen ML nodes at all. ML stays optional;
+# false keeps the deployment entirely local.
+discovery_enabled = true
+
+# Discover nodes over mDNS on the local link. Containers usually cannot,
+# so Docker deployments prefer a hub URL or static nodes.
+discovery_mdns_enabled = true
+
+# Absolute http(s) URL of a Lumen hub. May be empty when mDNS or static
+# nodes already supply the node list.
+discovery_hub_url = ""
+
+# Explicit host:port Lumen nodes, tried regardless of discovery results.
+discovery_static_nodes = []
+
+# mDNS service type to browse.
+discovery_service_type = "_lumen._tcp"
+
+# mDNS domain to browse.
+discovery_domain = "local"
+
+# Label identifying this deployment in Lumen logs and node affinity.
+deployment_id = "container"
+
+# Timeout for resolving a discovered node's address.
+resolve_timeout = "3s"
+
+# Timeout for opening a connection to a resolved node.
+connect_timeout = "3s"
+
+# Shortest wait before retrying discovery after a failure.
+rediscovery_backoff_min = "10s"
+
+# Longest wait between discovery retries. Must be >= the minimum.
+rediscovery_backoff_max = "2m"
+
+# Interval between periodic node health sweeps.
+scan_interval = "30s"
+
+# Let the client choose chunked upload automatically by payload size.
+chunk_auto = true
+
+# Payload size in bytes above which chunking kicks in.
+chunk_threshold_bytes = 1048576
+
+# Bytes per chunk. Must be <= chunk_threshold_bytes.
+chunk_max_bytes = 262144
+
+[tools]
+# exiftool binary. A bare command is looked up on PATH; anything holding a
+# path separator is resolved relative to the manifest.
+exiftool_path = "exiftool"
+
+# ffmpeg binary, resolved by the same rule.
+ffmpeg_path = "ffmpeg"
+
+# ffprobe binary, resolved by the same rule.
+ffprobe_path = "ffprobe"

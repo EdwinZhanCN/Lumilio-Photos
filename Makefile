@@ -4,10 +4,16 @@ WEB_DIR := web
 SITE_DIR := site
 SERVER_DIR := server
 DESKTOP_DIR := desktop
-SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/server.example.toml
+SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/examples/dev/vite.toml
 SERVER_CONFIG_LOCAL := $(SERVER_DIR)/config/server.local.toml
 DEV_DATABASE := $(SERVER_DIR)/.local/lumilio/library.sqlite3
 DEV_DERIVED := $(SERVER_DIR)/.local/lumilio/derived
+# Every root the development manifest owns. These mirror the dev-vite profile
+# layout in server/config/profiles.go: .local holds the catalog and derived
+# indexes, data holds storage plus machine-bound app-state (secrets, backups,
+# cloud), and logs holds the rotated log files. Change the profile layout and
+# this list has to follow.
+DEV_STATE_DIRS := $(SERVER_DIR)/.local $(SERVER_DIR)/data $(SERVER_DIR)/logs
 
 GO := go
 VP := vp
@@ -22,10 +28,11 @@ GO_TAG_FLAGS := $(if $(strip $(GO_BUILD_TAGS)),-tags=$(strip $(GO_BUILD_TAGS)))
 export CGO_LDFLAGS_ALLOW := -Xpreprocessor
 export CGO_CFLAGS_ALLOW := -Xpreprocessor
 
-API_URL ?= http://localhost:6680
-VITE_API_URL ?= $(API_URL)
+# Where the Vite dev server proxies /api. The browser never sees this address:
+# it talks only to the Vite origin, so the SPA uses relative URLs.
+API_URL ?= http://127.0.0.1:6680
 
-.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto db-reset dev-reset sqlite-architecture-check \
+.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto db-reset dev-reset sqlite-architecture-check config-examples \
 	desktop-dev desktop-build desktop-test desktop-panel \
 	.server-config .web-env
 
@@ -110,12 +117,27 @@ dto:
 	cd $(WEB_DIR) && $(VP) node scripts/generate-openapi-types.mjs
 	cd $(SITE_DIR) && ./node_modules/.bin/redocly build-docs ../server/docs/swagger.yaml --output docs/public/redoc-static.html
 
+# Narrow reset: the catalog only. Media, secrets and backups survive, so the
+# next boot re-indexes the existing storage instead of starting from nothing.
 db-reset:
 	@echo "==> Removing the known development SQLite catalog and derived indexes"
 	rm -f "$(DEV_DATABASE)" "$(DEV_DATABASE)-wal" "$(DEV_DATABASE)-shm"
 	rm -rf "$(DEV_DERIVED)"
 
-dev-reset: db-reset
+# Full reset: every root the development manifest owns, plus the generated
+# config. Resetting only the catalog left the old secret key, backups and
+# storage repositories behind, which is an inconsistent state the server has no
+# way to reconcile — so this removes all of it and lets `make dev` rebuild.
+#
+# This deletes the development media library. Use db-reset to keep it.
+dev-reset:
+	@echo "==> Removing development state:"
+	@for dir in $(DEV_STATE_DIRS); do \
+		if [ -e "$$dir" ]; then \
+			printf '      %s (%s)\n' "$$dir" "$$(du -sh "$$dir" 2>/dev/null | cut -f1)"; \
+		fi; \
+	done
+	rm -rf $(DEV_STATE_DIRS)
 	@echo "==> Recreating local development config"
 	rm -f $(WEB_DIR)/.env.development
 	rm -f $(SERVER_CONFIG_LOCAL)
@@ -124,11 +146,20 @@ dev-reset: db-reset
 .server-config:
 	@if [ ! -f "$(SERVER_CONFIG_LOCAL)" ]; then \
 		echo "==> Creating $(SERVER_CONFIG_LOCAL) from $(SERVER_CONFIG_EXAMPLE)"; \
-		cp "$(SERVER_CONFIG_EXAMPLE)" "$(SERVER_CONFIG_LOCAL)"; \
+		sed 's|^#:schema \.\./\.\./schema/|#:schema schema/|' \
+			"$(SERVER_CONFIG_EXAMPLE)" > "$(SERVER_CONFIG_LOCAL)"; \
 	fi
+
+# Regenerate the manifest JSON Schema and every example from the profile table
+# in server/config/profiles.go. The schema is embedded, so a change to the doc
+# comments needs the second pass to reach the generated TOML.
+config-examples:
+	@echo "==> Regenerating config schema and examples"
+	cd $(SERVER_DIR) && $(GO) run ./tools/configgen >/dev/null && $(GO) run ./tools/configgen
 
 .web-env:
 	@printf '%s\n' \
-	"VITE_API_URL=$(API_URL)" \
+	"# Proxy target for /api in the Vite dev server. Not exposed to the browser:" \
+	"# the SPA uses relative URLs so dev is single-origin like production." \
 	"API_URL=$(API_URL)" \
 	> $(WEB_DIR)/.env.development
