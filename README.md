@@ -78,7 +78,6 @@ Docker 交付面向安装了 Docker Engine 与 Compose 2.23.1+ 的 Linux 主机�
 - [用户安装指南](site/docs/zh-cn/user-manual/introduction/installation.md)
 - [用户手册](site/docs/zh-cn/user-manual/features/index.md)
 - [贡献指南](CONTRIBUTING.md)
-- [桌面端开发与打包](desktop/README.md)
 - [工程协作指南](AGENTS.md)
 
 ## 开源许可

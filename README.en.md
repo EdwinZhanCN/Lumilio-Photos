@@ -80,7 +80,6 @@ opt-in and are not required for importing, browsing, or organizing media.
 - [User installation guide](site/docs/en/user-manual/introduction/installation.md)
 - [User manual](site/docs/en/user-manual/features/index.md)
 - [Contributing](CONTRIBUTING.md)
-- [Desktop development and packaging](desktop/README.md)
 - [Engineering guide](AGENTS.md)
 
 ## License
