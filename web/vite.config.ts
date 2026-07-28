@@ -11,9 +11,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Development is a single-origin deployment: the browser only ever talks to the
 // Vite dev server, which proxies /api to the Go API. That is what lets `--host`
 // actually work — a phone on the LAN reaches one origin instead of needing to
-// find a loopback API. API_URL comes from .env.development, written by
-// `make setup`, so overriding it there moves the proxy target.
-const apiProxyTarget = loadEnv("development", __dirname, "").API_URL || "http://127.0.0.1:6680";
+// find a loopback API. `make web-dev` passes API_URL as process-local toolchain
+// configuration, so development no longer writes an env file into web/.
+const apiProxyTarget =
+  process.env.API_URL || loadEnv("development", __dirname, "").API_URL || "http://127.0.0.1:6680";
 
 const entryChunkBudget = 1300 * 1024;
 const lazyChunkBudget = 650 * 1024;

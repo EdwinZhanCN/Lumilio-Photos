@@ -30,16 +30,13 @@ lerna-debug.log*
 !*.env.example
 !*.env.*.example
 !/web/.env.production
-/server/config/server.local.toml
 /server/config/.secrets/
 
 # Local runtime and test state
+/.local/
 /.cache/lumilio-assets/
 /.cache/e2e/
 /.cache/lumilio-tool-stubs/
-/server/.cache/
-/server/.local/
-/server/data/
 /server/benchruns/
 
 # Documentation build and media staging

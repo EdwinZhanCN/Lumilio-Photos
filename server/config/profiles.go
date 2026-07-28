@@ -49,8 +49,8 @@ type Profile struct {
 	// Notes are the header comment lines: invariants, warnings, and the
 	// operational preconditions that are not visible in any single key.
 	Notes []string
-	// Operator marks profiles `server config init` will generate. The rest are
-	// documentation of shapes produced by Desktop or by the dev toolchain.
+	// Operator marks profiles `server config init` will generate. The rest
+	// document shapes compiled by the Desktop host.
 	Operator bool
 	// Defaults supply placeholder inputs when generating the example file.
 	Defaults ProfileInputs
@@ -156,6 +156,12 @@ func containerLayout(stateDir, storageDir string) layout {
 		secretKey:  stateDir + "/secrets/lumilio_secret_key",
 		webRoot:    "/app/web",
 	}
+}
+
+func developmentLayout(stateDir, storageDir string) layout {
+	l := containerLayout(stateDir, storageDir)
+	l.webRoot = ""
+	return l
 }
 
 func desktopLayout() layout {
@@ -289,6 +295,7 @@ var profileTable = []Profile{
 		Path:     "dev/vite.toml",
 		Summary:  "Local development: single origin on the Vite dev server, LAN reachable.",
 		Scenario: "deployment-origin-tls-plan.md 5.7 Development",
+		Operator: true,
 		Notes: []string{
 			"`make dev` runs Vite on 0.0.0.0:6657 and this server on 127.0.0.1:6680. Vite",
 			"proxies /api to the API, so the browser only ever talks to the Vite origin.",
@@ -309,18 +316,24 @@ var profileTable = []Profile{
 			"passkeys work on this machine at http://localhost:6657 and are unavailable from",
 			"a LAN address, which is plain HTTP and not a secure context. Remote devices get",
 			"password plus TOTP, exactly as in the Desktop LAN profile.",
+			"",
+			"The development toolchain writes this complete manifest to",
+			"`.local/dev/config/server.toml`. Its app-private state and portable media",
+			"storage are sibling roots under `.local/dev`, so reset operations never need",
+			"to discover or delete paths from an arbitrary manifest.",
 		},
-		Defaults: ProfileInputs{Origin: "http://localhost:6657"},
+		Defaults: ProfileInputs{
+			Origin:     "http://localhost:6657",
+			StateDir:   "../state",
+			StorageDir: "../storage",
+		},
 		build: func(inputs ProfileInputs) manifest {
-			m := baseManifest("development", "local", "debug", layout{
-				database:   "../.local/lumilio/library.sqlite3",
-				logs:       "../logs",
-				storage:    "../data/storage",
-				cloudState: "../data/app-state/cloud",
-				backups:    "../data/app-state/backups",
-				secretKey:  "../data/app-state/secrets/lumilio_secret_key",
-				webRoot:    "",
-			})
+			m := baseManifest(
+				"development",
+				"local",
+				"debug",
+				developmentLayout(inputs.StateDir, inputs.StorageDir),
+			)
 			m.Geocoding.Language = ptr("zh")
 			m.Server.PrimaryOrigin = ptr(inputs.Origin)
 			return m
@@ -536,6 +549,16 @@ var profileTable = []Profile{
 // profile has no place to put, which is friendlier than silently ignoring it.
 func validateOperatorInputs(name ProfileName, inputs ProfileInputs) error {
 	switch name {
+	case ProfileDevVite:
+		if strings.TrimSpace(inputs.Email) != "" {
+			return errors.New("dev-vite does not accept --email")
+		}
+		if strings.TrimSpace(inputs.Listen) != "" {
+			return errors.New("dev-vite owns its loopback listener and does not accept --listen")
+		}
+		if len(inputs.TrustedProxyCIDRs) != 0 {
+			return errors.New("dev-vite does not accept trusted proxies")
+		}
 	case ProfileDockerACME:
 		if strings.TrimSpace(inputs.Email) == "" {
 			return errors.New("docker-acme requires --email")

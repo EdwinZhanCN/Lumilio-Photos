@@ -4,16 +4,9 @@ WEB_DIR := web
 SITE_DIR := site
 SERVER_DIR := server
 DESKTOP_DIR := desktop
-SERVER_CONFIG_EXAMPLE := $(SERVER_DIR)/config/examples/dev/vite.toml
-SERVER_CONFIG_LOCAL := $(SERVER_DIR)/config/server.local.toml
-DEV_DATABASE := $(SERVER_DIR)/.local/lumilio/library.sqlite3
-DEV_DERIVED := $(SERVER_DIR)/.local/lumilio/derived
-# Every root the development manifest owns. These mirror the dev-vite profile
-# layout in server/config/profiles.go: .local holds the catalog and derived
-# indexes, data holds storage plus machine-bound app-state (secrets, backups,
-# cloud), and logs holds the rotated log files. Change the profile layout and
-# this list has to follow.
-DEV_STATE_DIRS := $(SERVER_DIR)/.local $(SERVER_DIR)/data $(SERVER_DIR)/logs
+DEV_ROOT := $(CURDIR)/.local/dev
+DEV_CONFIG := $(DEV_ROOT)/config/server.toml
+DEV_STATE_SCRIPT := scripts/dev-state.sh
 
 GO := go
 VP := vp
@@ -31,14 +24,16 @@ export CGO_CFLAGS_ALLOW := -Xpreprocessor
 # Where the Vite dev server proxies /api. The browser never sees this address:
 # it talks only to the Vite origin, so the SPA uses relative URLs.
 API_URL ?= http://127.0.0.1:6680
+WEB_DEV_PORT ?= 6657
+DEV_ORIGIN ?= http://localhost:$(WEB_DEV_PORT)
 
-.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto db-reset dev-reset architecture-check compose-test config-examples \
-	desktop-dev desktop-build desktop-test desktop-panel \
-	.server-config .web-env
+.PHONY: setup dev dev-config dev-clean dev-reset dev-purge server-dev .server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto architecture-check compose-test config-examples \
+	desktop-dev desktop-build desktop-test desktop-panel
 
-setup: .server-config
+setup:
 	@echo "==> Installing Go dependencies"
 	cd $(SERVER_DIR) && $(GO) mod download
+	$(MAKE) dev-config
 	@echo "==> Installing web dependencies"
 	cd $(WEB_DIR) && CI=1 VITE_GIT_HOOKS=0 $(VP) install
 	@echo "==> Installing documentation site dependencies"
@@ -53,17 +48,20 @@ setup: .server-config
 	fi
 	@echo "==> Setup complete"
 
-dev:
+dev: dev-config
 	@echo "==> Starting server and web"
-	$(MAKE) -j2 server-dev web-dev
+	$(MAKE) -j2 .server-dev web-dev
 
-server-dev: .server-config
+server-dev: dev-config
+	$(MAKE) .server-dev
+
+.server-dev:
 	@echo "==> Starting server"
-	cd $(SERVER_DIR) && $(GO) run $(GO_TAG_FLAGS) ./cmd --config config/server.local.toml
+	cd $(SERVER_DIR) && $(GO) run $(GO_TAG_FLAGS) ./cmd --config "$(DEV_CONFIG)"
 
-web-dev: .web-env
+web-dev:
 	@echo "==> Starting web"
-	cd $(WEB_DIR) && $(VP) dev --host --port 6657
+	cd $(WEB_DIR) && API_URL="$(API_URL)" $(VP) dev --host --port $(WEB_DEV_PORT)
 
 test: server-test web-test
 
@@ -123,38 +121,25 @@ dto:
 	cd $(WEB_DIR) && $(VP) node scripts/generate-openapi-types.mjs
 	cd $(SITE_DIR) && ./node_modules/.bin/redocly build-docs ../server/docs/swagger.yaml --output docs/public/redoc-static.html
 
-# Narrow reset: the catalog only. Media, secrets and backups survive, so the
-# next boot re-indexes the existing storage instead of starting from nothing.
-db-reset:
-	@echo "==> Removing the known development SQLite catalog and derived indexes"
-	rm -f "$(DEV_DATABASE)" "$(DEV_DATABASE)-wal" "$(DEV_DATABASE)-shm"
-	rm -rf "$(DEV_DERIVED)"
+dev-config:
+	@sh $(DEV_STATE_SCRIPT) init "$(CURDIR)"
+	@echo "==> Generating $(DEV_CONFIG)"
+	cd $(SERVER_DIR) && $(GO) run $(GO_TAG_FLAGS) ./cmd config init \
+		--profile dev-vite \
+		--origin "$(DEV_ORIGIN)" \
+		--state-dir ../state \
+		--storage-dir ../storage \
+		--output "$(DEV_CONFIG)" \
+		--force
 
-# Full reset: every root the development manifest owns, plus the generated
-# config. Resetting only the catalog left the old secret key, backups and
-# storage repositories behind, which is an inconsistent state the server has no
-# way to reconcile — so this removes all of it and lets `make dev` rebuild.
-#
-# This deletes the development media library. Use db-reset to keep it.
+dev-clean:
+	@sh $(DEV_STATE_SCRIPT) clean "$(CURDIR)"
+
 dev-reset:
-	@echo "==> Removing development state:"
-	@for dir in $(DEV_STATE_DIRS); do \
-		if [ -e "$$dir" ]; then \
-			printf '      %s (%s)\n' "$$dir" "$$(du -sh "$$dir" 2>/dev/null | cut -f1)"; \
-		fi; \
-	done
-	rm -rf $(DEV_STATE_DIRS)
-	@echo "==> Recreating local development config"
-	rm -f $(WEB_DIR)/.env.development
-	rm -f $(SERVER_CONFIG_LOCAL)
-	$(MAKE) .server-config .web-env
+	@sh $(DEV_STATE_SCRIPT) reset "$(CURDIR)"
 
-.server-config:
-	@if [ ! -f "$(SERVER_CONFIG_LOCAL)" ]; then \
-		echo "==> Creating $(SERVER_CONFIG_LOCAL) from $(SERVER_CONFIG_EXAMPLE)"; \
-		sed 's|^#:schema \.\./\.\./schema/|#:schema schema/|' \
-			"$(SERVER_CONFIG_EXAMPLE)" > "$(SERVER_CONFIG_LOCAL)"; \
-	fi
+dev-purge:
+	@CONFIRM_DEV_PURGE="$(CONFIRM)" sh $(DEV_STATE_SCRIPT) purge "$(CURDIR)"
 
 # Regenerate the manifest JSON Schema and every example from the profile table
 # in server/config/profiles.go. The schema is embedded, so a change to the doc
@@ -162,10 +147,3 @@ dev-reset:
 config-examples:
 	@echo "==> Regenerating config schema and examples"
 	cd $(SERVER_DIR) && $(GO) run ./tools/configgen >/dev/null && $(GO) run ./tools/configgen
-
-.web-env:
-	@printf '%s\n' \
-	"# Proxy target for /api in the Vite dev server. Not exposed to the browser:" \
-	"# the SPA uses relative URLs so dev is single-origin like production." \
-	"API_URL=$(API_URL)" \
-	> $(WEB_DIR)/.env.development

@@ -24,6 +24,11 @@
 # a LAN address, which is plain HTTP and not a secure context. Remote devices get
 # password plus TOTP, exactly as in the Desktop LAN profile.
 #
+# The development toolchain writes this complete manifest to
+# `.local/dev/config/server.toml`. Its app-private state and portable media
+# storage are sibling roots under `.local/dev`, so reset operations never need
+# to discover or delete paths from an arbitrary manifest.
+#
 # Every key below is required: the loader has no defaults, performs no file
 # search, and accepts no environment overrides. Whether a manifest is legal
 # also depends on combinations across keys, which no per-key comment can
@@ -44,7 +49,7 @@ environment = "development"
 [database]
 # SQLite catalog file. Relative paths resolve from the manifest directory.
 # ":memory:" is rejected because the catalog must survive a restart.
-path = "../.local/lumilio/library.sqlite3"
+path = "../state/library.sqlite3"
 
 [server]
 # Local socket the application listener binds, as host:port or :port.
@@ -105,7 +110,7 @@ trusted_cidrs = []
 level = "debug"
 
 # Directory for rotated log files. Relative paths are manifest-relative.
-dir = "../logs"
+dir = "../state/logs"
 
 # Encoding for the stdout stream.
 # One of: console, json
@@ -122,15 +127,15 @@ repository_audit_verbose = false
 [storage]
 # Portable media root holding the .lumilioroot marker and repository
 # directories. This is the mount users back up and migrate.
-path = "../data/storage"
+path = "../storage"
 
 # Cloud provider sessions and credential artifacts. Machine-bound private
 # state, so it must resolve outside storage.path.
-cloud_state_path = "../data/app-state/cloud"
+cloud_state_path = "../state/cloud"
 
 # Database backup destination. Also machine-bound, also outside
 # storage.path, so that backing up media does not capture secrets.
-backups_path = "../data/app-state/backups"
+backups_path = "../state/backups"
 
 [repository_scan]
 # Whether to periodically reconcile repositories against the catalog.
@@ -168,7 +173,7 @@ user_agent = "Lumilio-Photos/1.0"
 # Path to the token-signing key. This is a path, never the secret itself;
 # secret values must not appear in this manifest or in the environment. The
 # server creates the file with mode 0600 on first boot if it is absent.
-secret_key_file = "../data/app-state/secrets/lumilio_secret_key"
+secret_key_file = "../state/secrets/lumilio_secret_key"
 
 # Access token lifetime as a Go duration, for example "15m".
 access_token_ttl = "15m"

@@ -19,8 +19,9 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/config/examples/` holds one complete manifest per deployment scenario
   (`dev/`, `desktop/`, `docker/`), generated from `server/config/profiles.go`.
   Because TOML comments cannot express conditional legality, a valid manifest
-  per scenario is what documents the matrix; `dev/vite.toml` seeds the local
-  file. Container images ship no bootable default manifest. Production
+  per scenario is what documents the matrix; `make dev` renders `dev-vite`
+  into `.local/dev/config/server.toml`. Container images ship no bootable
+  default manifest. Production
   manifests are generated into app-state by `server config init`, and
   `desktop/supervisor/server.template.toml` is the versioned desktop compiler
   input.
