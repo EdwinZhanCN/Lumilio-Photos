@@ -65,7 +65,8 @@ FROM debian:trixie-slim AS runtime
 ARG TARGETARCH
 
 # Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime,
-# curl for health checks, and gosu for dropping privileges after validating
+# curl for health checks, libcap for granting the non-root Server binary only
+# privileged-port binding, and gosu for dropping privileges after validating
 # writable bind mounts.
 #
 # On trixie, libheif uses a plugin architecture: each codec ships as a separate
@@ -89,6 +90,7 @@ RUN set -eux; \
         libheif-plugin-aomdec \
         libheif-plugin-libde265 \
         libraw23 \
+        libcap2-bin \
         gosu; \
     if [ "${TARGETARCH}" = "amd64" ]; then \
         apt-get install -y --no-install-recommends \
@@ -121,15 +123,16 @@ RUN groupadd --gid ${APP_GID} app \
 # App artifacts
 COPY --from=builder /out/server /usr/local/bin/server
 COPY --from=web-builder /web/dist /app/web
-COPY server/config/examples/docker/dev-http.toml ./config/server.dev.toml
 COPY server/docker-entrypoint.sh /usr/local/bin/lumilio-entrypoint
 
 # Prepare storage path
 RUN chmod +x /usr/local/bin/lumilio-entrypoint \
+    && setcap cap_net_bind_service=+ep /usr/local/bin/server \
+    && getcap /usr/local/bin/server | grep -q 'cap_net_bind_service=ep' \
     && mkdir -p /data/storage /data/app-state \
     && chown -R app:app /data /app
 
-EXPOSE 6680 8080 8443
+EXPOSE 80 443 6680
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=20s CMD \
     server config healthcheck --config /data/app-state/server.toml

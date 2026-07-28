@@ -29,14 +29,14 @@ Lumen 与基础媒体管理相互独立。未启用或节点暂时不可达时�
 
 ## Docker 与其他自托管节点
 
-Docker 部署可在安装页的 Compose 配置器中选择：
+Docker 交付只支持 Linux；Caddy、内置 ACME 和已有代理三份生产 Compose
+都使用 Host network。因此容器可以直接参与宿主机的局域网 mDNS，无需再选择
+bridge/host Compose 变体。是否启用 Lumen、使用 mDNS、Host Broker 或静态节点
+地址，仍由完整 schema-v3 manifest 显式决定，而不是由 Compose 环境变量覆盖。
 
-- **暂不启用**：只运行基础媒体管理。
-- **Linux Host network + mDNS**：容器直接参与宿主机网络发现，适合受信任的 Linux 局域网。
-- **Lumen Host Broker**：由宿主机发现节点，再把节点列表提供给容器；Broker 不代理媒体或推理请求。
-- **静态节点地址**：直接填写一个或多个可达的 `host:port`。
-
-macOS 与 Windows 的 Docker Desktop 通常无法让容器直接参与宿主机局域网 mDNS，优先评估 Host Broker 或静态地址。静态地址可以指向任意网络可达的节点，但当前连接安全边界不适合穿越互联网或不可信网络。
+静态地址可以指向任意网络可达的节点，但当前连接安全边界不适合穿越互联网或
+不可信网络。macOS 与 Windows 用户应使用 Desktop 交付，而不是 Docker
+Desktop 部署 Server。
 
 ## 验证与故障排查
 

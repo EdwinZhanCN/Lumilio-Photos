@@ -1,0 +1,22 @@
+# Linux host-network deployment with HTTPS terminated by Lumilio.
+#
+# Generate /data/app-state/server.toml with the docker-acme profile before
+# starting. The non-root Server binary carries only CAP_NET_BIND_SERVICE so it
+# can bind the host's TCP 80 and 443 directly.
+name: lumilio-photos-acme
+
+services:
+    lumilio:
+        image: ${LUMILIO_IMAGE:-ghcr.io/edwinzhancn/lumilio-server:latest}
+        restart: unless-stopped
+        network_mode: host
+        command: ["server", "--config", "/data/app-state/server.toml"]
+        volumes:
+            - ${LUMILIO_STORAGE:?set LUMILIO_STORAGE to the media root}:/data/storage
+            - ${LUMILIO_STATE:?set LUMILIO_STATE to the machine-local app-state root}:/data/app-state
+        healthcheck:
+            test: ["CMD", "server", "config", "healthcheck", "--config", "/data/app-state/server.toml"]
+            interval: 10s
+            timeout: 6s
+            retries: 12
+            start_period: 30s

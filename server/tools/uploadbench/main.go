@@ -8,7 +8,7 @@
 // upload acceptance is never treated as completion.
 //
 // The tool is a host-side client: it drives a running server (native or the
-// docker-compose.release.yml stack) over HTTP. It can optionally read the
+// deploy/compose/compose.caddy.yml production stack) over HTTP. It can optionally read the
 // SQLite library catalog for exact River completion timestamps. See README.md
 // for the full runbook and the push/pull flow for the Docker release
 // environment.

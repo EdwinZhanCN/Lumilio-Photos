@@ -8,14 +8,16 @@
 # owns TLS end to end. The certificate hostname is derived from primary_origin;
 # there is no separate domain key that could drift away from it.
 #
-# Two listeners are required. Publish them from unprivileged container ports:
+# The container uses Linux host networking and binds the host ports directly:
 #
-#     ports:
-#       - "80:8080"     # http_listen: ACME HTTP-01 challenge, then 308 to HTTPS
-#       - "443:8443"    # listen: the application over HTTPS
+#     network_mode: host
+#     server.listen: :443
+#     server.tls.http_listen: :80
 #
 # Preconditions: you control the domain, its A/AAAA records point at this
-# deployment, and a public CA can reach port 80 or 443.
+# deployment, a public CA can reach TCP 80/443, and no host process already owns
+# those ports. The image grants only CAP_NET_BIND_SERVICE to the non-root Server
+# binary; the application still runs as UID 10001.
 #
 # storage_path must be a persistent volume. Losing it re-requests certificates on
 # every restart and will hit CA rate limits. Certificate acquisition failure is
@@ -54,7 +56,7 @@ path = "/data/app-state/library.sqlite3"
 # Local socket the application listener binds, as host:port or :port.
 # Never a URL, and never given a port implicitly. 127.0.0.1 is loopback
 # only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
-listen = "0.0.0.0:8443"
+listen = ":443"
 
 # The one canonical browser origin. It fixes the cookie and CSRF baseline,
 # the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
@@ -81,7 +83,7 @@ mode = "acme"
 
 # Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
 # primary_origin. Non-empty if and only if mode = "acme".
-http_listen = "0.0.0.0:8080"
+http_listen = ":80"
 
 # ACME account contact address. Non-empty if and only if mode = "acme".
 email = "admin@example.com"

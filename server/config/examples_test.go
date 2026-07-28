@@ -208,28 +208,28 @@ func TestProfileScenarioInvariants(t *testing.T) {
 				if server.Listen == server.TLS.HTTPListen {
 					t.Error("the two ACME listeners must differ")
 				}
+				if server.Listen != ":443" || server.TLS.HTTPListen != ":80" {
+					t.Errorf("host-network ACME listeners = %q and %q", server.Listen, server.TLS.HTTPListen)
+				}
 			},
 		},
 		{
 			profile: ProfileDockerExternalProxy,
 			check: func(t *testing.T, cfg AppConfig) {
 				assertExternalProxy(t, cfg)
+				if cfg.ServerConfig.Listen != "127.0.0.1:6680" {
+					t.Errorf("same-host proxy listener = %q", cfg.ServerConfig.Listen)
+				}
+				for _, cidr := range cfg.ServerConfig.Proxy.TrustedCIDRs {
+					if !cidr.Addr().IsLoopback() {
+						t.Errorf("same-host proxy profile trusts non-loopback %s", cidr)
+					}
+				}
 				if cfg.ServerConfig.WebRoot == "" {
 					t.Error("the container image serves the SPA itself")
 				}
 				if len(cfg.ServerConfig.CORSAllowedOrigins) != 0 {
 					t.Error("SPA and API share one origin here; CORS must be empty")
-				}
-			},
-		},
-		{
-			profile: ProfileDockerDevHTTP,
-			check: func(t *testing.T, cfg AppConfig) {
-				if cfg.ServerConfig.TLS.Mode != TLSModeOff {
-					t.Errorf("tls mode = %q", cfg.ServerConfig.TLS.Mode)
-				}
-				if cfg.ServerConfig.Proxy.Mode != ProxyModeDisabled {
-					t.Error("plaintext HTTP cannot require a proxy")
 				}
 			},
 		},

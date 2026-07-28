@@ -19,7 +19,6 @@ const (
 	ProfileDesktopExternalHTTPSRemote   ProfileName = "desktop-external-https-remote"
 	ProfileDockerACME                   ProfileName = "docker-acme"
 	ProfileDockerExternalProxy          ProfileName = "docker-external-proxy"
-	ProfileDockerDevHTTP                ProfileName = "docker-dev-http"
 )
 
 // ProfileInputs are the values an operator supplies for a profile that cannot
@@ -28,6 +27,7 @@ const (
 type ProfileInputs struct {
 	Origin            string
 	Email             string
+	Listen            string
 	TrustedProxyCIDRs []string
 	StateDir          string
 	StorageDir        string
@@ -92,6 +92,9 @@ func (p Profile) Build(inputs ProfileInputs) (manifest, error) {
 	}
 	if inputs.Email == "" {
 		inputs.Email = p.Defaults.Email
+	}
+	if strings.TrimSpace(inputs.Listen) == "" {
+		inputs.Listen = p.Defaults.Listen
 	}
 	if len(inputs.TrustedProxyCIDRs) == 0 {
 		inputs.TrustedProxyCIDRs = p.Defaults.TrustedProxyCIDRs
@@ -444,14 +447,16 @@ var profileTable = []Profile{
 			"owns TLS end to end. The certificate hostname is derived from primary_origin;",
 			"there is no separate domain key that could drift away from it.",
 			"",
-			"Two listeners are required. Publish them from unprivileged container ports:",
+			"The container uses Linux host networking and binds the host ports directly:",
 			"",
-			"    ports:",
-			"      - \"80:8080\"     # http_listen: ACME HTTP-01 challenge, then 308 to HTTPS",
-			"      - \"443:8443\"    # listen: the application over HTTPS",
+			"    network_mode: host",
+			"    server.listen: :443",
+			"    server.tls.http_listen: :80",
 			"",
 			"Preconditions: you control the domain, its A/AAAA records point at this",
-			"deployment, and a public CA can reach port 80 or 443.",
+			"deployment, a public CA can reach TCP 80/443, and no host process already owns",
+			"those ports. The image grants only CAP_NET_BIND_SERVICE to the non-root Server",
+			"binary; the application still runs as UID 10001.",
 			"",
 			"storage_path must be a persistent volume. Losing it re-requests certificates on",
 			"every restart and will hit CA rate limits. Certificate acquisition failure is",
@@ -474,10 +479,10 @@ var profileTable = []Profile{
 			if stateDir == "" {
 				stateDir = "/data/app-state"
 			}
-			m.Server.Listen = ptr("0.0.0.0:8443")
+			m.Server.Listen = ptr(":443")
 			m.Server.PrimaryOrigin = ptr(inputs.Origin)
 			m.Server.TLS.Mode = ptr(string(TLSModeACME))
-			m.Server.TLS.HTTPListen = ptr("0.0.0.0:8080")
+			m.Server.TLS.HTTPListen = ptr(":80")
 			m.Server.TLS.Email = ptr(inputs.Email)
 			m.Server.TLS.StoragePath = ptr(stateDir + "/tls")
 			return m
@@ -491,19 +496,18 @@ var profileTable = []Profile{
 		Operator: true,
 		Notes: []string{
 			"The proxy terminates HTTPS and this container speaks plain HTTP on an internal",
-			"network. Do not publish this listener to the host:",
+			"host listener. Docker uses Linux host networking; there is no bridge network,",
+			"container address, service DNS, or published-port layer.",
 			"",
-			"    services:",
-			"      lumilio:",
-			"        expose:",
-			"          - \"6680\"",
-			"        networks:",
-			"          - lumilio_proxy",
+			"Same-host proxies should keep the default 127.0.0.1:6680 listener and trust only",
+			"127.0.0.1/32. A remote proxy must name the exact host interface explicitly:",
 			"",
-			"Network isolation is the first layer of protection and trusted_cidrs is the",
-			"second. Make the CIDR match that dedicated proxy network exactly: a broad subnet",
-			"shared with unrelated containers would let any of them forge the forwarded",
-			"origin and defeat the check.",
+			"    server config init --profile docker-external-proxy \\",
+			"      --listen 192.168.1.20:6680 \\",
+			"      --trusted-proxy 192.168.1.10/32 ...",
+			"",
+			"Firewall a remote listener to that proxy as defense in depth. proxy.mode=required",
+			"still rejects every ordinary request whose immediate peer is not trusted.",
 			"",
 			"The proxy must overwrite, not pass through, the client's proto and host headers.",
 			"Conflicting or ambiguous Forwarded and X-Forwarded-* values are rejected.",
@@ -512,40 +516,17 @@ var profileTable = []Profile{
 			"",
 			"    server config init --profile docker-external-proxy \\",
 			"      --origin https://photos.example.com \\",
-			"      --trusted-proxy 172.30.0.0/24 \\",
+			"      --trusted-proxy 127.0.0.1/32 \\",
 			"      --output /data/app-state/server.toml",
 		},
 		Defaults: ProfileInputs{
 			Origin:            "https://photos.example.com",
-			TrustedProxyCIDRs: []string{"172.30.0.0/24"},
+			Listen:            "127.0.0.1:6680",
+			TrustedProxyCIDRs: []string{"127.0.0.1/32"},
 		},
 		build: func(inputs ProfileInputs) manifest {
 			m := dockerBase(inputs)
-			externalProxy(&m, inputs.Origin, "0.0.0.0:6680", inputs.TrustedProxyCIDRs)
-			return m
-		},
-	},
-	{
-		Name:     ProfileDockerDevHTTP,
-		Path:     "docker/dev-http.toml",
-		Summary:  "Container over plaintext HTTP, for development and tests only.",
-		Scenario: "deployment-origin-tls-plan.md 12.2 docker-compose.dev.yml",
-		Notes: []string{
-			"Used by docker-compose.dev.yml. The image serves the SPA and the API on one",
-			"origin, so cors_allowed_origins is empty.",
-			"",
-			"This is not a production shape and must not be treated as a default. Production",
-			"operators pick docker/acme.toml or docker/external-proxy.toml, which is why the",
-			"release image ships no bootable HTTP manifest.",
-			"",
-			"primary_origin is http://localhost:6680, so this only behaves correctly when the",
-			"browser reaches it at exactly that address on the container host.",
-		},
-		Defaults: ProfileInputs{Origin: "http://localhost:6680"},
-		build: func(inputs ProfileInputs) manifest {
-			m := dockerBase(inputs)
-			m.Server.Listen = ptr("0.0.0.0:6680")
-			m.Server.PrimaryOrigin = ptr(inputs.Origin)
+			externalProxy(&m, inputs.Origin, inputs.Listen, inputs.TrustedProxyCIDRs)
 			return m
 		},
 	},
@@ -558,6 +539,9 @@ func validateOperatorInputs(name ProfileName, inputs ProfileInputs) error {
 	case ProfileDockerACME:
 		if strings.TrimSpace(inputs.Email) == "" {
 			return errors.New("docker-acme requires --email")
+		}
+		if strings.TrimSpace(inputs.Listen) != "" {
+			return errors.New("docker-acme owns fixed host listeners and does not accept --listen")
 		}
 		if len(inputs.TrustedProxyCIDRs) != 0 {
 			return errors.New("docker-acme does not accept trusted proxies")

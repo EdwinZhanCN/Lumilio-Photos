@@ -3,8 +3,7 @@
 A host-side benchmark for the Lumilio Photos upload pipeline with ML/AI
 excluded. It drives a running server over HTTP and can optionally open its
 SQLite library read-only for exact River timing, so it works against native
-dev, `docker-compose.yml`, or the release stack
-(`docker-compose.release.yml`).
+development or the production Compose stacks under `deploy/compose/`.
 
 A photo is **photo-ready** only when its `metadata_asset` *and* `thumbnail_asset`
 task states are both `complete`. HTTP upload acceptance is never treated as
@@ -48,16 +47,16 @@ numbers — machine controls (AC power, no sleep/backup/Spotlight on the repo).
 ```bash
 cd server
 
-# Smoke test (20 files) against local dev or the release stack on :6680.
+# Smoke test (20 files) against local dev or the public production origin.
 go run ./tools/uploadbench \
-  -base http://localhost:6680 \
+  -base https://photos.example.com \
   -dataset "/Volumes/CodeBase/Photography/Sep 28 2025" \
   -user admin -pass 'YOUR_PASSWORD' \
   -concurrency 8 -profile core -limit 20
 
-# Full run with resource sampling of the release stack.
+# Full run with resource sampling of the production stack.
 go run ./tools/uploadbench \
-  -base http://localhost:6680 \
+  -base https://photos.example.com \
   -dataset "/Volumes/CodeBase/Photography/Sep 28 2025" \
   -user admin -pass 'YOUR_PASSWORD' \
   -concurrency 8 -profile core \
@@ -104,15 +103,18 @@ been checkpointed.
 
 `report.md`/`summary.json` record whether exact timing was used.
 
-### Clean-room reset (release stack)
+### Clean-room reset (production stack)
 
 The tool aborts preflight if any River job is pending. Reset between runs:
 
 ```bash
-# Wipe app-state + storage volumes so each run starts from an empty repository/queue.
-docker compose -f docker-compose.release.yml down -v
-# Point LUMILIO_STORAGE at a fresh, empty directory for each run.
-docker compose -f docker-compose.release.yml up -d
+# Stop the selected stack. App-state and media are bind mounts, so down -v is
+# intentionally not treated as a data reset.
+export COMPOSE_FILE=deploy/compose/compose.caddy.yml
+docker compose down
+# Point LUMILIO_STATE and LUMILIO_STORAGE at fresh, empty directories, generate
+# a new complete manifest, then start the selected stack.
+docker compose up -d
 # Re-run first-time setup to recreate the admin user + primary repository.
 ```
 
@@ -132,7 +134,7 @@ Aggregate `summary.json` files across runs for median / p25-p75 / bootstrap CI.
 
 ---
 
-## Testing the *latest code* via the Docker release stack
+## Testing the *latest code* via a production Compose stack
 
 The benchmark tool itself runs on the host and does **not** ship in any image —
 you only need to rebuild images when you want to benchmark **server** changes.
@@ -162,18 +164,19 @@ gh run watch "$(gh run list --workflow 'Release Docker' -L1 --json databaseId -q
 
 # 3. Pull + start the stack on the benchmark host.
 export LUMILIO_STORAGE=/srv/lumilio-bench       # fresh media root
-export LUMILIO_VERSION=edge                      # or latest / v1.2.3
-docker compose -f docker-compose.release.yml pull
-docker compose -f docker-compose.release.yml up -d
+export LUMILIO_STATE=/srv/lumilio-bench-state   # fresh app-state root
+export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:edge
+export COMPOSE_FILE=deploy/compose/compose.caddy.yml
+docker compose pull
+docker compose up -d
 
 # 4. Wait for health, complete first-time setup (creates admin + primary repo),
-#    then run the benchmark against http://localhost:6680.
-docker compose -f docker-compose.release.yml ps
+#    then run the benchmark against its public HTTPS origin.
+docker compose ps
 ```
 
 Notes:
-- The server API is on `:6680`; the web UI is on `:6657`. The benchmark talks to
-  the server directly (`-base http://localhost:6680`).
+- The production image serves API and Web from one public HTTPS origin.
 - `sample.sh` records container resource usage with `docker stats`. Exact
   per-job timing (`-sqlite`) reads the host-visible app-state catalog directly.
 - The release image installs `libraw23`, so NEF thumbnails resolve through the

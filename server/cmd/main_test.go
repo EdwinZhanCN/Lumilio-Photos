@@ -55,7 +55,8 @@ func TestConfigInitAndValidate(t *testing.T) {
 		"init",
 		"--profile", "docker-external-proxy",
 		"--origin", "https://photos.example.com",
-		"--trusted-proxy", "172.30.0.0/24",
+		"--listen", "192.168.1.20:6680",
+		"--trusted-proxy", "192.168.1.10/32",
 		"--output", path,
 	}, &stdout, &stderr)
 	if err != nil {
@@ -73,7 +74,7 @@ func TestConfigInitAndValidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "configuration valid") ||
-		!strings.Contains(stdout.String(), "do not publish the application listener") {
+		!strings.Contains(stdout.String(), "keep the application listener loopback-only or firewalled") {
 		t.Fatalf("validate report = %q", stdout.String())
 	}
 	if err := runConfigCLI([]string{

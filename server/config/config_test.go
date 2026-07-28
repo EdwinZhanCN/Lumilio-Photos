@@ -579,8 +579,8 @@ func TestGenerateDockerProductionProfiles(t *testing.T) {
 			},
 			check: func(t *testing.T, cfg AppConfig) {
 				if cfg.ServerConfig.TLS.Mode != TLSModeACME ||
-					cfg.ServerConfig.Listen != "0.0.0.0:8443" ||
-					cfg.ServerConfig.TLS.HTTPListen != "0.0.0.0:8080" {
+					cfg.ServerConfig.Listen != ":443" ||
+					cfg.ServerConfig.TLS.HTTPListen != ":80" {
 					t.Fatalf("ACME config = %+v", cfg.ServerConfig)
 				}
 				// Docker profiles emit Linux container paths. On Windows hosts
@@ -596,11 +596,13 @@ func TestGenerateDockerProductionProfiles(t *testing.T) {
 			profile: ProfileDockerExternalProxy,
 			inputs: ProfileInputs{
 				Origin:            "https://photos.example.com",
+				Listen:            "192.168.1.20:6680",
 				TrustedProxyCIDRs: []string{"172.30.0.0/24"},
 			},
 			check: func(t *testing.T, cfg AppConfig) {
 				if cfg.ServerConfig.TLS.Mode != TLSModeExternal ||
 					cfg.ServerConfig.Proxy.Mode != ProxyModeRequired ||
+					cfg.ServerConfig.Listen != "192.168.1.20:6680" ||
 					len(cfg.ServerConfig.Proxy.TrustedCIDRs) != 1 {
 					t.Fatalf("external proxy config = %+v", cfg.ServerConfig)
 				}

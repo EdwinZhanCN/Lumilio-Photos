@@ -15,6 +15,10 @@ This document describes the current Go backend as implemented in `server/`.
   conditional legality stays in `resolveManifest`.
 - Ignored local config file: `server/config/server.local.toml`.
 - Docker image: `server/Dockerfile`.
+- Linux production Compose files:
+  `deploy/compose/compose.{caddy,acme,proxy}.yml`; all use host networking.
+- Browser E2E Compose files: `web/e2e/compose.yml` plus the CI cache overlay
+  `web/e2e/compose.ci.yml`.
 
 Startup ownership is split between the thin CLI host and the shared app runtime:
 

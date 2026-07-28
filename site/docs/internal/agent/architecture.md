@@ -4,9 +4,11 @@ This is the compact system map for agents. Keep details here stable and useful; 
 
 ## Runtime Shape
 
-- Docker production explicitly selects `docker-compose.acme.yml` or
-  `docker-compose.proxy.yml`; plain HTTP is development-only. The Go process
-  owns the embedded SQLite catalog and serves both the API and built React SPA.
+- Docker production on Linux explicitly selects
+  `deploy/compose/compose.caddy.yml`, `deploy/compose/compose.acme.yml`, or
+  `deploy/compose/compose.proxy.yml`. All three use host networking; there is no
+  Docker plaintext-development stack. The Go process owns the embedded SQLite
+  catalog and serves both the API and built React SPA.
 - Linux is the standalone Server/Docker delivery target. macOS and Windows are
   Desktop App delivery targets; the App hosts the same complete `server/app`
   runtime in-process, so both Desktop CI jobs run the full Server and Desktop
@@ -17,10 +19,10 @@ This is the compact system map for agents. Keep details here stable and useful; 
   (`dev/`, `desktop/`, `docker/`), generated from `server/config/profiles.go`.
   Because TOML comments cannot express conditional legality, a valid manifest
   per scenario is what documents the matrix; `dev/vite.toml` seeds the local
-  file and `docker/dev-http.toml` ships in the image as a development manifest.
-  Production container manifests are generated into app-state by `server config
-  init`, and `desktop/supervisor/server.template.toml` is the versioned desktop
-  compiler input.
+  file. Container images ship no bootable default manifest. Production
+  manifests are generated into app-state by `server config init`, and
+  `desktop/supervisor/server.template.toml` is the versioned desktop compiler
+  input.
 - Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
 
 ## Backend
