@@ -21,6 +21,7 @@ require (
 	github.com/go-webauthn/webauthn v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
+	github.com/invopop/jsonschema v0.14.0
 	github.com/mattn/go-sqlite3 v1.14.48
 	github.com/riverqueue/river v0.41.0
 	github.com/riverqueue/river/riverdriver/riversqlite v0.41.0
@@ -64,7 +65,6 @@ require (
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/mdns v1.0.7 // indirect
-	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.10.0 // indirect
