@@ -1277,7 +1277,7 @@ Hardening backlog包括：MFA/passkey浏览器E2E、cloud import、duplicate rac
 
 - `make setup` 现在用 `CI=1 VITE_GIT_HOOKS=0 vp install` 确定性安装前端依赖，并安装从仓库 root 正确进入 `web/` 执行 `vp staged` 的 hook。`make dev` 只启动本地 Server 与 Vite，不再依赖 Docker 数据库；`make db-reset` 只删除经过精确解析的 catalog、WAL、SHM 与 derived state。
 - devcontainer、CI、release workflows、Make targets、ignore rules 和文档均删除旧数据库 service、password secret、secret initializer、旧 web image/Caddy 与 PostgreSQL 工具链。release workflow 只构建一个 multi-arch `lumilio-server` image。
-- `scripts/check-sqlite-architecture.sh` 扫描活动源码、完整 Go compiled dependency graph、sqlc 残留宏、危险的动态 slice/fixed placeholder 组合、数据库侧随机 UUID 和旧 PostgreSQL package/binary。CI 无条件执行该 guard；UUID 与随机数据只能在 Go 中生成，所有 required-column insert contract 由 schema test 覆盖。
+- `scripts/check-architecture.sh` 扫描活动源码、完整 Go compiled dependency graph、sqlc 残留宏、危险的动态 slice/fixed placeholder 组合、数据库侧随机 UUID 和旧 PostgreSQL package/binary。CI 无条件执行该 guard；UUID 与随机数据只能在 Go 中生成，所有 required-column insert contract 由 schema test 覆盖。
 - 首次 setup UI/API 中已经没有数据库准备或密码轮换阶段；状态只表达 admin/repository bootstrap，backup UI 与双语文档只描述 SQLite snapshot。OpenAPI、前端 DTO、Redoc、i18n extraction 与 feature docs 已重新生成或同步。
 - sqlc 宏迁移后的真实测试暴露并修复 typed CTE/JSON collection、NULL bool、timestamp、UUID、queue timestamp scan、location cluster transaction、sqlite-vec `k <= 4096`、snapshot sidecar、forced backup、video semantic seek、恢复 fixture 权限等边界。生成命令为 `cd server && sqlc generate`、`make dto`、`cd web && vp exec i18next-cli extract`；生成文件未被手工修补。
 

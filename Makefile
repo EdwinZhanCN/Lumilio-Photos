@@ -32,7 +32,7 @@ export CGO_CFLAGS_ALLOW := -Xpreprocessor
 # it talks only to the Vite origin, so the SPA uses relative URLs.
 API_URL ?= http://127.0.0.1:6680
 
-.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto db-reset dev-reset sqlite-architecture-check compose-test config-examples \
+.PHONY: setup dev server-dev web-dev test server-test web-test web-browser-test web-auth-hardening-test web-video-semantic-test web-backup-recovery-test dto db-reset dev-reset architecture-check compose-test config-examples \
 	desktop-dev desktop-build desktop-test desktop-panel \
 	.server-config .web-env
 
@@ -67,8 +67,8 @@ web-dev: .web-env
 
 test: server-test web-test
 
-sqlite-architecture-check:
-	./scripts/check-sqlite-architecture.sh
+architecture-check:
+	./scripts/check-architecture.sh
 
 compose-test:
 	LUMILIO_STORAGE=/srv/lumilio/media LUMILIO_STATE=/srv/lumilio/state LUMILIO_DOMAIN=photos.example.com docker compose -f deploy/compose/compose.caddy.yml config --quiet
@@ -76,7 +76,7 @@ compose-test:
 	LUMILIO_STORAGE=/srv/lumilio/media LUMILIO_STATE=/srv/lumilio/state docker compose -f deploy/compose/compose.proxy.yml config --quiet
 	docker compose -f web/e2e/compose.yml -f web/e2e/compose.ci.yml config --quiet
 
-server-test: sqlite-architecture-check
+server-test: architecture-check
 	cd $(SERVER_DIR) && $(GO) test $(GO_TAG_FLAGS) ./...
 
 web-test:
@@ -109,7 +109,7 @@ desktop-dev: desktop-panel
 		LUMILIO_WEB_ROOT=$(CURDIR)/$(WEB_DIR)/dist \
 		$(GO) run $(GO_TAG_FLAGS) .
 
-desktop-test: sqlite-architecture-check desktop-panel
+desktop-test: architecture-check desktop-panel
 	@echo "==> Testing desktop module (including SQLite first/second launch)"
 	cd $(DESKTOP_DIR) && $(GO) test $(GO_TAG_FLAGS) ./...
 
