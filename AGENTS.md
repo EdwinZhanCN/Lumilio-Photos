@@ -44,7 +44,6 @@ Then read only the references relevant to the change:
 - Frontend tooling or architecture docs:
   [vite-plus.md](site/docs/internal/vite-plus.md) and
   [docts.md](site/docs/internal/docts.md).
-- Desktop: [desktop/README.md](desktop/README.md).
 - Known debt: [tech-debt-tracker.md](site/docs/internal/exec-plans/tech-debt-tracker.md).
 
 Completed plans under `site/docs/internal/exec-plans/completed/` are

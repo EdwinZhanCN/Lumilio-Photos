@@ -75,8 +75,7 @@ useful; implementation plans belong in `exec-plans/`.
   Recovery reads invalid active intent as raw, fingerprinted control-plane data
   while every replacement candidate still passes the strict Server loader. The
   private Wails Control Panel consumes the supervisor's typed runtime snapshot
-  and remains available after recoverable startup failures. See
-  `desktop/README.md`.
+  and remains available after recoverable startup failures.
 
 ## Contracts
 

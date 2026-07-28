@@ -1,124 +1,66 @@
-# Dependencies
+# Dependencies and package-manager state
 node_modules/
 .pnpm-store/
-/vendor/
+vendor/
 package-lock.json
 yarn.lock
-__pycache__/
-*.py[cod]
-*$py.class
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-/pml/lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-*.npz
-*.onnx
-
-# Build outputs
-/build/
-/dist/
-/server/data/
+# Build, test, and log outputs
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Testing
-/coverage/
+*.test
+*.out
+coverage/
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 /web/playwright-report/
 /web/test-results/
-*.test
+
+# Local configuration and secrets
+*.env
+*.env.*
+!*.env.example
+!*.env.*.example
+!/web/.env.production
+/server/config/server.local.toml
+/server/config/.secrets/
+
+# Local runtime and test state
 /.cache/lumilio-assets/
 /.cache/e2e/
 /.cache/lumilio-tool-stubs/
+/server/.cache/
+/server/.local/
+/server/data/
+/server/benchruns/
 
-# Production
-*.env
+# Documentation build and media staging
+/site/docs/.vitepress/cache/
+/site/docs/.vitepress/dist/
+/site/media/
+.wrangler/
 
-# Development
-*.development
-server/config/server.local.toml
-server/config/.secrets/
+# Local Go workspace files
+go.work
+go.work.sum
 
-# IDE specific files
+# Editors and operating systems
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 .DS_Store
-
-# Debug files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-debug
-
-# Go specific
-*.out
-go.work
-server/.cache/
-/server/.local/
-
-# Misc
-*.DS_Store
-*.log
-*.gz
-.vercel
-.wrangler/
-
-# Go specific
-/pml/pt
-
-web/docs/
-/site/docs/.vitepress/dist/
-/site/docs/.vitepress/cache/
-/site/media/
-
-/share/
-/pml/build
-/pml/.venv
-/pml/uv.lock
-
-# Binaries
-/server/api
-/server/worker
-pml/data/bioclip/txt_emb_species.json
-/data
-server/main
-/ml/lumen-clip/data
-
-# agent
-.claude/
-.codex/
-.antigravitycli/
-
-notes/
-
-# Local third-party source references
-3rd-party/
-.zread/
-
-# Benchmark run artifacts (uploadbench/immichbench default -out)
-server/benchruns/
-demo/
-
-# Keep a nested module marker so Go tooling skips generated Desktop bundles.
-!/desktop/build/
-/desktop/build/*
-!/desktop/build/go.mod
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
