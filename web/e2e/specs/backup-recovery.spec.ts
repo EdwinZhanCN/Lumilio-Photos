@@ -27,7 +27,13 @@ type RepositoryList = {
 };
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const compose = ["compose", "-f", "docker-compose.e2e.yml", "-p", "lumilio-photos-e2e"];
+const compose = [
+  "compose",
+  "-f",
+  path.join(repositoryRoot, "web/e2e/compose.yml"),
+  "-p",
+  "lumilio-photos-e2e",
+];
 
 function backupRow(page: Page, name: string): Locator {
   return page.getByRole("listitem").filter({ hasText: name });

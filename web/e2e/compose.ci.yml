@@ -1,0 +1,14 @@
+# CI-only overlay: cache both image builds in the GitHub Actions cache backend.
+services:
+  lumen-fixture:
+    build:
+      cache_from:
+        - type=gha,scope=e2e-lumen-fixture
+      cache_to:
+        - type=gha,scope=e2e-lumen-fixture,mode=max
+  lumilio:
+    build:
+      cache_from:
+        - type=gha,scope=e2e-lumilio
+      cache_to:
+        - type=gha,scope=e2e-lumilio,mode=max
