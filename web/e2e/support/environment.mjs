@@ -9,11 +9,17 @@ const cache = path.join(root, ".cache/e2e");
 // CI layers a build-cache override on top through this env var; local runs leave
 // it unset and build without a cache backend.
 const extraFile = process.env.LUMILIO_E2E_COMPOSE_EXTRA;
+const composeFile = path.join(root, "web/e2e/compose.yml");
+const extraPath = extraFile
+  ? path.isAbsolute(extraFile)
+    ? extraFile
+    : path.resolve(root, extraFile)
+  : undefined;
 const compose = [
   "compose",
   "-f",
-  "docker-compose.e2e.yml",
-  ...(extraFile ? ["-f", extraFile] : []),
+  composeFile,
+  ...(extraPath ? ["-f", extraPath] : []),
   "-p",
   "lumilio-photos-e2e",
 ];

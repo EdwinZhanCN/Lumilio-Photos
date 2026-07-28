@@ -349,7 +349,7 @@ services may be replaced. Run `e2e:up` first and `e2e:down` afterwards. Install
 the project-pinned browser revision with `vp exec playwright install chromium` locally, or
 `vp exec playwright install --with-deps chromium` on Linux CI.
 
-Rebuild the `lumilio` service (`docker compose -f docker-compose.e2e.yml -p
+Rebuild the `lumilio` service (`docker compose -f web/e2e/compose.yml -p
 lumilio-photos-e2e up -d --build lumilio`) after changing frontend source; the
 container serves a built image, so edits are otherwise invisible to the suite.
 

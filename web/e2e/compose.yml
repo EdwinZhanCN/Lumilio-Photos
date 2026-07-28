@@ -1,0 +1,44 @@
+name: lumilio-photos-e2e
+
+services:
+  lumen-fixture:
+    build:
+      context: ../..
+      dockerfile: web/e2e/support/fakelumen.Dockerfile
+    ports:
+      - "127.0.0.1:${LUMILIO_E2E_LUMEN_METRICS_PORT:-16658}:50052"
+    healthcheck:
+      test: ["CMD", "/fakelumen", "-health-check", "127.0.0.1:50051"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+  lumilio:
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile
+      secrets:
+        - npmrc
+    depends_on:
+      lumen-fixture:
+        condition: service_healthy
+    volumes:
+      - storage_data:/data/storage
+      - app_state_data:/data/app-state
+      - ./support/server.e2e.toml:/data/app-state/server.toml:ro
+    ports:
+      - "${LUMILIO_E2E_PORT:-16657}:6680"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health/ready >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+
+volumes:
+  storage_data:
+  app_state_data:
+
+secrets:
+  npmrc:
+    file: ../../.cache/e2e/npmrc

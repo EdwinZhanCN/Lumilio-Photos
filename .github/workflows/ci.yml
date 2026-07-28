@@ -52,7 +52,7 @@ jobs:
                       browser_smoke:
                           - '.github/workflows/ci.yml'
                           - 'Makefile'
-                          - 'docker-compose.e2e*.yml'
+                          - 'web/e2e/compose*.yml'
                           - 'server/Dockerfile'
                           - 'server/go.mod'
                           - 'server/go.sum'
@@ -98,7 +98,7 @@ jobs:
                       auth_e2e:
                           - '.github/workflows/ci.yml'
                           - 'Makefile'
-                          - 'docker-compose.e2e*.yml'
+                          - 'web/e2e/compose*.yml'
                           - 'server/config/**'
                           - 'server/internal/api/handler/auth*.go'
                           - 'server/internal/api/ratelimit/**'
@@ -113,7 +113,7 @@ jobs:
                       video_e2e:
                           - '.github/workflows/ci.yml'
                           - 'Makefile'
-                          - 'docker-compose.e2e*.yml'
+                          - 'web/e2e/compose*.yml'
                           - 'server/internal/processors/video*.go'
                           - 'server/internal/processors/*transcode*.go'
                           - 'server/internal/search/**'
@@ -129,7 +129,7 @@ jobs:
                       recovery_e2e:
                           - '.github/workflows/ci.yml'
                           - 'Makefile'
-                          - 'docker-compose.e2e*.yml'
+                          - 'web/e2e/compose*.yml'
                           - 'server/Dockerfile'
                           - 'server/internal/db/backup/**'
                           - 'server/internal/queue/db_backup_worker.go'
@@ -168,6 +168,7 @@ jobs:
                   sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev
 
             - run: make sqlite-architecture-check
+            - run: make compose-test
 
     # Linux is the standalone Server deployment target. macOS and Windows run
     # the same complete Server suite below as part of their Desktop App gates,
@@ -243,7 +244,7 @@ jobs:
 
             # A docker-container builder plus the ACTIONS_* runtime env let the
             # E2E image builds read and write the GitHub Actions layer cache;
-            # docker-compose.e2e.ci.yml wires the cache in per service.
+            # web/e2e/compose.ci.yml wires the cache in per service.
             - uses: docker/setup-buildx-action@v3
               if: needs.changes.outputs.e2e == 'true'
             - uses: crazy-max/ghaction-github-runtime@v3
@@ -253,7 +254,7 @@ jobs:
               if: needs.changes.outputs.e2e == 'true'
               run: cd web && vp run e2e:up
               env:
-                  LUMILIO_E2E_COMPOSE_EXTRA: docker-compose.e2e.ci.yml
+                  LUMILIO_E2E_COMPOSE_EXTRA: web/e2e/compose.ci.yml
 
             - name: Run Chromium smoke
               if: needs.changes.outputs.browser_smoke == 'true'

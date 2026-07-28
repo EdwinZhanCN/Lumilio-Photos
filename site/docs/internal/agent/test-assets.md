@@ -36,7 +36,7 @@ do not touch the catalog directly.
   (`LUMILIO_DEMO_BASE_URL`), then waits for ingestion. Flags: `--concurrency`
   (1–8), `--timeout` (seconds).
 - **`vp run e2e:seed`** — `assets:sync` (smoke) + `e2e/support/seed.mjs` into the
-  e2e stack (base `:16657`, admin `e2e-admin`). The `docker-compose.e2e.yml`
+  e2e stack (base `:16657`, admin `e2e-admin`). The `web/e2e/compose.yml`
   stack is managed by `vp run e2e:up | e2e:down | e2e:logs`.
 
 ## Gotchas
