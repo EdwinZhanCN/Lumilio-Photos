@@ -1,27 +1,41 @@
 /**
  * # Notifications
  *
- * Notifications is the narrow feature facade for the application's global
- * notification runtime. Durable in-session notification records remain owned
- * by `GlobalContext`; this feature does not mirror them in a feature store.
+ * Notifications is the narrow feature facade for application-wide
+ * notifications. It exposes product commands and navigation surfaces while
+ * the cross-cutting notification runtime remains owned by `GlobalContext`.
  *
- * ## Surfaces
+ * ## State
  *
- * {@link useMessage} is the public command used by product workflows. A call
- * adds one record to the global message center and presents the same event as
- * a Sonner toast. Dismissing the toast marks the matching record as read.
+ * Notification history is in-memory session state in `GlobalContext`. This
+ * feature has no Query data, feature store, URL state, or browser persistence.
+ * {@link Notifications} mounts presentation only; it does not own records.
  *
- * {@link MessageCenter} renders the recent notification history in the app
- * navigation and delegates read/clear commands to `GlobalContext`.
- * {@link Notifications} mounts the process-wide {@link Toaster}; it contains
- * no notification data and only selects theme-aware toast presentation.
+ * ## Flows
  *
- * ## Decisions
+ * ```mermaid
+ * flowchart TD
+ *     FEATURE["product feature"] --> MESSAGE["useMessage"]
+ *     MESSAGE --> GLOBAL["GlobalContext history"]
+ *     MESSAGE --> TOAST["Sonner toast"]
+ *     TOAST --> READ["mark record read"]
+ *     NAV["app navigation"] --> CENTER["MessageCenter"]
+ *     CENTER --> GLOBAL
+ * ```
  *
- * The feature intentionally keeps `components/` and `hooks/` rather than
- * inventing a workflow or state directory. Its UI is reused by app
- * composition, while notification state is a genuinely cross-cutting runtime
- * concern already owned by `GlobalContext`.
+ * Product workflows call {@link useMessage}. The same event is appended to the
+ * global history and shown as a toast; dismissing the toast marks its matching
+ * record read. {@link MessageCenter} renders recent history and read/clear
+ * commands in navigation. {@link Notifications} mounts the process-wide
+ * {@link Toaster}.
+ *
+ * ## Data
+ *
+ * There is no backend contract. Notification type, message, duration, read
+ * state, and clearing are runtime values supplied through `GlobalContext`.
+ * The root `index.ts` exports {@link useMessage}, {@link MessageCenter}, and
+ * {@link Notifications}; the toaster implementation remains private to app
+ * composition.
  *
  * @module
  */

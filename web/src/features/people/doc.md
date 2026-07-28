@@ -1,52 +1,51 @@
 # People
 
-Recognized people — face clusters surfaced as named, browsable identities —
-and the correction tools that keep them honest. The `collections` feature
-owns the people *rail/grid* entry point; this feature owns person **detail**
-and every identity correction. AI grouping is assistive; the user is the
-authority for who is who.
+People owns recognized identities, person detail, and the correction tools
+for face clusters. Collections owns the people rail/grid entry; Assets owns
+photo presentation. AI clustering is assistive, while user corrections are
+durable authority.
 
-## Ownership
+## State
 
-A person is owner-scoped but **not** repository-scoped: clusters span
-repositories, so only the list read follows the browse scope.
-[usePeople](./api/usePeople.ts) lists people under the current browse scope (with an
-`includeHidden` toggle that switches the grid from visible-only to all
-people); [usePersonDetails](./api/usePeople.ts) loads one person plus its rename, with no
-repository filter — as do the face list and every mutation below.
-[PersonDetails](./flows/detail/PersonDetailsFlow.tsx) is the detail route: a [CollectionHero](@/components/collection) with an
-edit action that opens [PersonRenameModal](./flows/detail/PersonRenameModal.tsx), and the person's asset
-gallery rendered through [AssetBrowser](@/features/assets).
+People lists, details, faces, and mutations remain TanStack Query server
+state. The list read follows [usePeople](./api/usePeople.ts)'s browse scope, but person
+detail and mutations are owner-scoped rather than repository-scoped because
+one identity can span repositories.
 
-## Corrections
+Rename-modal tabs, face selection, and merge target are flow-local
+interaction. No person or face collection is mirrored into Context,
+Zustand, URL state, or browser persistence.
 
-Two distinct surfaces sit on the same person:
+## Flows
 
-- **Asset gallery** — the person's *photos*, scoped by `{ person_id }`. This
-  is the browsing surface and does not render face crops as gallery content.
-- **Edit modal** — [PersonRenameModal](./flows/detail/PersonRenameModal.tsx) owns tabbed identity management:
-  info/name/hidden state, face corrections through [PersonFacesPanel](./flows/detail/PersonFacesPanel.tsx)
-  over [usePersonFaces](./api/usePeople.ts), and merge via [PersonPicker](./flows/detail/PersonPicker.tsx).
+```mermaid
+flowchart TD
+    COLLECTIONS["Collections people entry"] --> DETAIL["PersonDetails"]
+    DETAIL --> HERO["identity hero"]
+    DETAIL --> PHOTOS["AssetBrowser"]
+    HERO --> MODAL["PersonRenameModal"]
+    MODAL --> FACES["PersonFacesPanel"]
+    MODAL --> PICKER["PersonPicker"]
+    FACES --> CORRECT["cover / move / remove"]
+    PICKER --> MERGE["merge people"]
+```
 
-The face-level operations:
+[PersonDetails](./flows/detail/PersonDetailsFlow.tsx) renders a collection hero and a person-constrained
+[AssetBrowser](../assets/index.ts). The gallery contains photos, not face crops.
+[PersonRenameModal](./flows/detail/PersonRenameModal.tsx) owns identity info, hidden state, face correction,
+and merge tabs. [PersonFacesPanel](./flows/detail/PersonFacesPanel.tsx) works on face crops and
+[PersonPicker](./flows/detail/PersonPicker.tsx) selects move/merge targets.
 
-- [useSetPersonCover](./api/usePeople.ts) — promote one face to the representative cover
-  from that face's non-selection-mode menu.
-- [useMoveFace](./api/usePeople.ts) — reassign selected faces to another person
-  ([PersonPicker](./flows/detail/PersonPicker.tsx) picks the target). Each reassignment becomes a manual
-  correction. Photos and other faces in the same asset are unchanged.
-- [useRemoveFaceFromPerson](./api/usePeople.ts) — detach selected faces, leaving them
-  unclustered for a later rebuild. The original assets are never modified.
-- [useMergePeople](./api/usePeople.ts) — fold source people into the target from the merge
-  tab. Source clusters are emptied and removed; the target
-  name/confirmation/hidden state survive.
-- [useSetPersonHidden](./api/usePeople.ts) — hide a person from the default grid via a
-  normal switch in the info tab. Faces, assets and names are preserved.
+## Data
 
-## Decisions
+[usePeople](./api/usePeople.ts) lists summaries and exposes the optional hidden-person
+view. [usePersonDetails](./api/usePeople.ts) and [usePersonFaces](./api/usePeople.ts) load one identity
+and its face memberships. [useSetPersonCover](./api/usePeople.ts),
+[useMoveFace](./api/usePeople.ts), [useRemoveFaceFromPerson](./api/usePeople.ts),
+[useMergePeople](./api/usePeople.ts), and [useSetPersonHidden](./api/usePeople.ts) own correction
+mutations and invalidation.
 
-Corrections are durable: moves and merges mark membership `is_manual`, and a
-full cluster rebuild replays manual assignments so user corrections are not
-discarded. Editing is modal-only, matching the collections mental model and
-keeping the gallery focused on photos. Face crops are served per-face (not
-full thumbnails) so the correction grid shows exactly what the model grouped.
+Moves and merges preserve manual assignments so a later clustering rebuild
+cannot discard user corrections. Removing a face detaches its membership;
+original media is never modified. The root `index.ts` exports only list,
+rebuild, and summary contracts needed by Collections and Manage.

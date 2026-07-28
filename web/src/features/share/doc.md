@@ -1,52 +1,52 @@
 # Share
 
-Apple-iCloud-Link-style public sharing: pick a set of assets, an album, or
-a person, and get a revocable, time-limited link that a recipient can open
-without an account and without ever touching the authenticated app.
+Share owns revocable, time-limited public links for asset snapshots, albums,
+and people. Owner-facing creation and management stay inside the
+authenticated app, while the public viewer is deliberately outside the
+gated route tree.
 
-## Two audiences, two surfaces
+## State
 
-- **Owner-facing**: [CreateShareLinkModal](./flows/create/CreateShareLinkModal.tsx) (create) and
-  [SharedLinks](./flows/manage/SharedLinksFlow.tsx) (manage: revoke/extend/delete) run inside the
-  authenticated app shell and use [useShareLinks](./api/useShareLinks.ts) against
-  `/api/v1/share-links`.
-- **Public**: [PublicShare](./flows/public/PublicShareFlow.tsx) is mounted at `/s/:token` (and
-  `/s/:token/:assetId` for the lightbox) as a sibling of the gated route
-  tree in `app/router/AppRouter.tsx` — not inside it — so a recipient is
-  never redirected through first-run setup or forced to authenticate. It uses
-  [usePublicShareView](./api/usePublicShareView.ts) against `/api/v1/public/shares/{token}` and
-  never calls an authenticated endpoint.
+Share state is server-owned and read through [useShareLinks](./api/useShareLinks.ts) or
+[usePublicShareView](./api/usePublicShareView.ts); the feature has no Context, Zustand store, or
+browser persistence. The public token and optional asset id live in the URL,
+making direct links and browser navigation authoritative.
 
-## Why the public viewer doesn't reuse the normal gallery
+The raw share token exists only in [CreateShareLinkModal](./flows/create/CreateShareLinkModal.tsx)'s local
+success state. The server stores an HMAC, so an existing link cannot reveal
+its URL again; a lost link must be revoked and recreated.
 
-The public API deliberately returns a minimal, de-sensitized asset shape
-(id, type, dimensions, duration, taken_time — no owner_id, storage_path, or
-filename) and has no filter/search/sort in v1. Reusing the app's
-`BrowseGroup`/`BrowseItem`/`Asset` types and `JustifiedGallery` would mean
-either widening those types to something a public page could safely see, or
-faking fields just to satisfy them. [PublicShareGrid](./flows/public/PublicShareGrid.tsx) and
-[PublicShareLightbox](./flows/public/PublicShareLightbox.tsx) are small, purpose-built components instead;
-[shareUrls](./model/shareUrls.ts) builds token-scoped media URLs (no media-token query
-param, unlike `assetUrls`).
+## Flows
 
-## Creation entry points
+```mermaid
+flowchart LR
+    GALLERY["Authenticated galleries"] --> CREATE["CreateShareLinkModal"]
+    CREATE --> API["Share API"]
+    OWNER["SharedLinks"] --> API
+    API --> TOKEN["One-time raw token"]
+    ROUTE["/s/:token/:assetId?"] --> PUBLIC["PublicShare"]
+    PUBLIC --> GRID["PublicShareGrid"]
+    GRID --> LIGHTBOX["PublicShareLightbox"]
+```
 
-[createShareSelectedBulkAction](./flows/create/shareBulkAction.tsx) is a reusable "Share selected" bulk
-action wired into every gallery that supports multi-select (Assets, Liked,
-Album, Person, Utility classifier) — it opens [CreateShareLinkModal](./flows/create/CreateShareLinkModal.tsx)
-with `sourceKind: "asset_snapshot"`. Album and Person detail pages also get
-a whole-collection "Share" button in their `CollectionHero` `actions` slot,
-using `sourceKind: "album"` / `"person"` with `sourceRef` — the backend
-resolves the snapshot server-side, so the frontend never materializes a
-large asset ID array for those. The backend also supports `utility_query`
-and `pin` source kinds, but v1 has no dedicated button for them (reachable
-today via select-all + "Share selected").
+[createShareSelectedBulkAction](./flows/create/shareBulkAction.tsx) supplies the reusable “Share selected”
+action for multi-select galleries. Album and person pages can instead ask the
+server to resolve a collection snapshot, avoiding a large client-side asset
+id list. [SharedLinks](./flows/manage/SharedLinksFlow.tsx) owns revoke, extend, and delete operations.
 
-## Tokens are hash-only
+[PublicShare](./flows/public/PublicShareFlow.tsx) uses only token-scoped public endpoints. It renders
+[PublicShareGrid](./flows/public/PublicShareGrid.tsx) and [PublicShareLightbox](./flows/public/PublicShareLightbox.tsx) without passing
+recipients through authentication or first-run setup.
 
-The server stores only an HMAC of the share token, never the raw value —
-so a share's URL can only ever be copied once, in
-[CreateShareLinkModal](./flows/create/CreateShareLinkModal.tsx)'s success state, right after creation.
-[SharedLinks](./flows/manage/SharedLinksFlow.tsx) intentionally has no "copy" action on existing rows;
-the only recovery path for a lost link is revoking it and creating a new
-one.
+## Data
+
+The public API returns a minimal asset shape without owner, storage-path, or
+filename fields. The public viewer therefore has purpose-built components
+instead of widening authenticated gallery types or fabricating private
+fields. [shareUrls](./model/shareUrls.ts) builds token-scoped media URLs without the
+authenticated media-token query parameter.
+
+Creation and management use `/api/v1/share-links`; public reads use
+`/api/v1/public/shares/{token}`. The feature's narrow public entry exposes
+creation helpers to authenticated galleries while keeping public-viewer
+internals private.

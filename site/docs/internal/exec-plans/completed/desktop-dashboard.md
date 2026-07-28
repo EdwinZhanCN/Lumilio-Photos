@@ -1,6 +1,6 @@
 # Lumilio Photos Desktop Dashboard UI/UX Implementation Plan
 
-> - 路径：`site/docs/internal/agent/exec-plans/completed/desktop-dashboard.md`
+> - 路径：`site/docs/internal/exec-plans/completed/desktop-dashboard.md`
 > - 唯一基线：`88a0836b64dafa5527b3bc0024a329800cfa62c7`
 > - 基线提交：`feat(network): converge origin TLS and proxy deployment`
 > - 工作分支：从该提交创建或继续当前实现分支

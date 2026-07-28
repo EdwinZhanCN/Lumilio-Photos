@@ -1,6 +1,7 @@
 # Architecture
 
-This is the compact system map for agents. Keep details here stable and useful; implementation plans belong in `exec-plans/`.
+This is the compact system map for contributors. Keep details here stable and
+useful; implementation plans belong in `exec-plans/`.
 
 ## Runtime Shape
 

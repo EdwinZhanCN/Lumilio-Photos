@@ -1,58 +1,85 @@
 # Agent Guide
 
-This file is the short entry point for humans and coding agents working in Lumilio Photos. Keep it compact; longer notes live under `site/docs/internal/` (built by VitePress but kept out of nav/sidebar and the search index, so internal-only).
+This is the compact entry point for coding agents working in Lumilio Photos.
+Human setup, commands, and commit conventions live in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Overview
+## Principles
 
-- `server/`: Go API service. Entrypoint is `server/cmd/main.go` (thin); the bootstrap lives in `server/app` (`app.Run(ctx)`); application config is `server/config`; business logic lives in `server/internal/*`; migrations live in `server/migrations`.
-- `web/`: React 19 + TypeScript frontend on Vite+. Feature code lives under `web/src/features/*`; shared pieces live in `web/src/lib`, `web/src/components`, and `web/src/contexts`. `web/ARCHITECTURE.md` is authoritative; `web/src/features/README.md` is the short placement checklist.
-- `desktop/`: Wails v3 macOS app (separate Go module, `replace server => ../server`). Runs `server/app` and its embedded SQLite catalog in-process; the React UI is served over HTTP at `localhost:6680`. See `desktop/README.md`.
-- `wasm/`: Rust WebAssembly crates for browser-side hashing/export/studio/thumbnail flows; checked-in JS/WASM bundles live under `web/src/wasm`.
-- `site/docs/`: VitePress docs site. Public product/user docs under `en/` and `zh-cn/`; internal engineering/harness docs live under `site/docs/internal/` (`internal/agent/` = harness notes, `internal/frontend/` = frontend architecture) — built but excluded from nav/sidebar/search.
+Lumilio Photos is local-first: preserve original media, keep repository and
+application-state ownership explicit, make ML/AI optional, and prefer boring
+configuration that boots and diagnoses cleanly.
 
-The system is local-first: preserve original media, keep repository/storage semantics explicit, make ML/AI optional, and prefer boring configuration that boots cleanly in Docker and local dev.
+## Repository Map
 
-## Documentation
+- `server/`: Go API and embedded SQLite runtime. `server/cmd/main.go` is the thin
+  entry point; bootstrap lives in `server/app`, configuration in
+  `server/config`, business logic in `server/internal`, and migrations in
+  `server/migrations`.
+- `web/`: React 19 and TypeScript on Vite+. Feature code lives in
+  `web/src/features`; shared runtime code belongs in `web/src/lib`,
+  `web/src/components`, or `web/src/contexts`.
+- `desktop/`: Wails v3 desktop app for macOS and Windows. It is a separate Go
+  module that runs `server/app` and SQLite in-process.
+- `wasm/`: Rust WebAssembly crates; checked-in browser bundles live in
+  `web/src/wasm`.
+- `deploy/`: Linux production Compose files and reverse-proxy examples.
+- `site/docs/`: VitePress user documentation under `en/` and `zh-cn/`.
+  Engineering notes under `site/docs/internal/` are excluded from the
+  VitePress build.
 
-### MUST READ BEFORE ANY CHANGES
+## Documentation Routing
 
-- `site/docs/internal/agent/architecture.md`: system map, backend/frontend boundaries, config/runtime notes.
-- `site/docs/internal/agent/BACKEND.md`: backend runtime, package map, config, queues, storage, API contracts.
-- `site/docs/internal/agent/FRONTEND.md`: frontend runtime, toolchain, routes, state boundaries, API usage, and the test-layer taxonomy (which file name / runner for a given test, incl. GPU/WebGL capability tests).
-- `site/docs/internal/agent/test-assets.md`: test/demo media toolchain — the git-LFS `Lumilio-Assets` pin (`assets.lock.json`), `vp run assets:sync`, and the `demo:seed` / `e2e:seed` seeders.
-- `web/ARCHITECTURE.md`: enforceable frontend directory ownership, public-entry rules, dependency direction, and boundary gates.
-- `site/docs/internal/agent/DESIGN.md`: product and interface guidance for app work.
-- `site/docs/internal/agent/core-beliefs.md`: decision principles for product and engineering tradeoffs.
-- `site/docs/internal/agent/exec-plans/tech-debt-tracker.md`: small known debt that should not be forgotten.
-- `site/docs/internal/agent/vite-plus.md`: frontend Vite+ setup and command mapping.
-- `site/docs/internal/agent/docts.md`: the `doc.ts` architecture-doc convention (`@module` + `{@link}` backed by `import type`) and the `docts/link-needs-import` lint rule.
+Before substantive changes, read the
+[system map](site/docs/internal/architecture.md) and check
+[active execution plans](site/docs/internal/exec-plans/active/).
+Then read only the references relevant to the change:
 
-### TRACK THE CHANGES
+- Backend: [BACKEND.md](site/docs/internal/BACKEND.md).
+- Frontend: [FRONTEND.md](site/docs/internal/FRONTEND.md) and
+  [web/ARCHITECTURE.md](web/ARCHITECTURE.md).
+- UI or product behavior: [DESIGN.md](site/docs/internal/DESIGN.md) and
+  [core beliefs](site/docs/internal/core-beliefs.md).
+- Test or demo media: [test-assets.md](site/docs/internal/test-assets.md).
+- Frontend tooling or architecture docs:
+  [vite-plus.md](site/docs/internal/vite-plus.md) and
+  [docts.md](site/docs/internal/docts.md).
+- Desktop: [desktop/README.md](desktop/README.md).
+- Known debt: [tech-debt-tracker.md](site/docs/internal/exec-plans/tech-debt-tracker.md).
 
-- `site/docs/internal/agent/exec-plans/active/`: current execution plans.
-- `site/docs/internal/agent/exec-plans/completed/`: completed execution records.
+Completed plans under `site/docs/internal/exec-plans/completed/` are
+historical records, not required reading.
 
-### READ BEFORE YOU MAKE ANY PLANS
+## Non-Negotiable Rules
 
-- `site/docs/internal/agent/PLAN-MODE.md`: plan mode description
+- Prefer root Make targets. Use `make server-test` for backend changes,
+  `make web-test` for frontend changes, `make desktop-test` for desktop changes,
+  and `make compose-test` for deployment changes. `make test` runs the Server
+  and Web gates.
+- Follow the frontend “Test layers” taxonomy in
+  [FRONTEND.md](site/docs/internal/FRONTEND.md); do not invent test-file
+  conventions.
+- API contracts are OpenAPI-first. Never hand-edit
+  `web/src/lib/http-commons/schema.d.ts` or cast around a stale response type.
+  Fix the backend DTO or annotation and run `make dto`.
+- The Server requires a complete schema-versioned TOML manifest. Do not add
+  code defaults, consumer fallbacks, automatic config search, or ordinary
+  environment overrides for runtime-immutable fields.
+- Never commit secrets. TOML contains explicit secret-file paths only; secret
+  values and secret-path overrides do not belong in environment variables.
+- Keep generated files generated and record the command used. Format Go with
+  `gofmt`; follow Vite+ fmt/lint for TypeScript.
+- Frontend i18n is extract-then-fill: write `t("key", "default")`, run
+  `vp exec i18next-cli extract`, then fill the generated Chinese value. Never
+  hand-edit translation keys.
+- Follow `web/ARCHITECTURE.md` for state ownership, thin routes, workflow
+  placement, public entries, and dependency direction.
+- Feature documentation uses a root `doc.ts`; every `{@link X}` must have a
+  matching `import type`, and the generated sibling `doc.md` is never edited by
+  hand.
 
+## Execution Plans
 
-## Usage Rules
-
-- Use root `make` targets for daily work and validation: `make setup`, `make dev`, `make server-dev`, `make web-dev`, `make test`, `make dto`.
-- Desktop-specific targets: `make desktop-dev`, `make desktop-test`, `make desktop-build`.
-- If you are in a sandbox without host environment, like cloud/container, use `make setup` to set up the local dev environment. Do not use your own cli tooling if possible.
-- Backend quality gate: prefer `make server-test`. Do not bypass it with `cd server && go test ./...` unless there is a concrete reason and you preserve the Makefile environment (notably `CGO_LDFLAGS_ALLOW` / `CGO_CFLAGS_ALLOW` for local media dependencies).
-- Frontend quality gate: prefer `make web-test`. Direct `cd web && vp check --no-fmt --no-lint && vp lint && vp test` is acceptable when you are intentionally running only the web gate.
-- Choosing which test to write (file name → runner, from unit through browser-capability to E2E, including GPU/WebGL capability tests) follows the test-layer taxonomy in [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) "Test layers". Do not invent test-file conventions outside it.
-- API contracts are OpenAPI-first. Do not hand-edit `web/src/lib/http-commons/schema.d.ts`; change backend annotations and run `make dto`. An `as`-cast on an API response (`query.data?.data as {...}`) is a red flag: the DTO/`@Success` annotation is missing or `make dto` is stale — fix the contract, never cast around it. If generated `data` is `Record<string, never>` or `unknown` for an endpoint that returns payload data, that is a contract failure and must be fixed in backend DTO/annotation/codegen before frontend work proceeds; do not add compatibility shims for stale DTOs. See [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) "API Contract".
-- A complete schema-versioned TOML manifest is required runtime input. Runtime-immutable fields have no code defaults, consumer fallbacks, automatic config search, or ordinary environment overrides.
-- Do not commit secrets. TOML contains only explicit secret-file paths; secret values and secret-path overrides do not belong in environment variables.
-- Go code must be formatted with `gofmt`. TypeScript should follow Vite+ lint/fmt rules and prefer `@/...` imports.
-- `vp fmt` writes files by default. Generated/vendored frontend artifacts must stay excluded through `web/vite.config.ts` `fmt.ignorePatterns` (notably `src/wasm/**`, `src/features/*/doc.md`, and generated OpenAPI/client code).
-- i18n keys are **extract-then-fill, never hand-written**: write `t("key", "default")` in code → run `vp exec i18next-cli extract` → fill zh values in the generated JSON. Do NOT manually add/restructure/delete keys in `translation.json`. See [FRONTEND.md](site/docs/internal/agent/FRONTEND.md) for details.
-- Choose frontend state by source and lifecycle: TanStack Query for server facts, Context for cross-cutting runtime capabilities, flow-local Zustand/`useReducer` for shared interaction, URL state for shareable/restorable pages, and persisted storage only for explicitly refresh-safe preferences. See `web/ARCHITECTURE.md`.
-- Frontend feature routes stay thin, workflow orchestration belongs in `flows/<workflow>/`, and cross-feature runtime imports must use the target feature's narrow public entry.
-- Keep generated files generated. If a generated artifact changes, include the command that produced it in your notes.
-- Document a feature with a `doc.ts` at its root (`@module` comment, markdown prose, `{@link}` to real symbols). Every `{@link X}` MUST be `import type`-d in the same file — tsc plus the `docts/link-needs-import` rule enforce it. The sibling `doc.md` is generated; never hand-edit it. See [docts.md](site/docs/internal/agent/docts.md).
-- Commit messages convention, use this pattern: feat: …, fix: …., chore: …, refactor: …. and docs: … etc.If something domain specific and worth noting, then use pattern like: feat(assets): …
+Keep unfinished plans in `site/docs/internal/exec-plans/active/`. Move
+completed records to `site/docs/internal/exec-plans/completed/`, retaining
+only the goal, final contracts, validation boundaries, and useful decisions.
