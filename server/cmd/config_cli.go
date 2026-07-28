@@ -47,13 +47,13 @@ func runConfigInit(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("server config init", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	profile := flags.String("profile", "", strings.Join(config.ProfileNames(true), " or "))
-	origin := flags.String("origin", "", "canonical public https origin")
+	origin := flags.String("origin", "", "canonical browser origin")
 	email := flags.String("email", "", "ACME account email (docker-acme)")
 	listen := flags.String("listen", "", "application listener (docker-external-proxy; defaults to 127.0.0.1:6680)")
 	output := flags.String("output", "", "destination server.toml")
 	force := flags.Bool("force", false, "replace an existing output file")
-	stateDir := flags.String("state-dir", "/data/app-state", "container application state path")
-	storageDir := flags.String("storage-dir", "/data/storage", "container media storage path")
+	stateDir := flags.String("state-dir", "", "application state path (uses the profile default when empty)")
+	storageDir := flags.String("storage-dir", "", "media storage path (uses the profile default when empty)")
 	var trustedProxies repeatedStrings
 	flags.Var(&trustedProxies, "trusted-proxy", "trusted proxy CIDR (repeatable)")
 	if err := flags.Parse(args); err != nil {

@@ -4,6 +4,7 @@
 .codex
 .devcontainer
 .github
+.local
 desktop
 site
 
@@ -12,6 +13,5 @@ site
 **/dist
 **/.cache
 
-server/.local
 web/.env
 web/.env.*

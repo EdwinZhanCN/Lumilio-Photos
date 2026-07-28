@@ -42,8 +42,8 @@ make dev
 
 `make setup` installs the Go, Web, and documentation dependencies, ensures
 `wasm-pack` and the Swag CLI are available, and installs the repository commit
-hook. It also creates the ignored `server/config/server.local.toml` from the
-versioned development example.
+hook. It also generates the complete development manifest under
+`.local/dev/config/server.toml`.
 
 `make dev` starts:
 
@@ -52,9 +52,11 @@ versioned development example.
 
 The browser talks only to the Vite origin; the development server proxies
 `/api` to the Go API. SQLite runs inside the Go process and requires no database
-container. The default catalog is
-`server/.local/lumilio/library.sqlite3`, and development media is stored under
-`server/data/storage/`.
+container. All runtime artifacts owned by `make dev` live under `.local/dev/`:
+app-private state, including the catalog, indexes, logs, secrets, cloud state,
+and backups, lives under `state/`; portable development media lives under
+`storage/`. Dependency and test-asset caches remain outside this tree and are
+not reset with the development instance.
 
 ## Common Commands
 
@@ -70,11 +72,13 @@ container. The default catalog is
 | `make compose-test` | Validate production and E2E Compose files |
 | `make dto` | Regenerate OpenAPI, frontend API types, and API documentation |
 | `make config-examples` | Regenerate the configuration schema and TOML examples |
-| `make db-reset` | Delete the development catalog and derived indexes while preserving other state |
-| `make dev-reset` | Delete all development state, including development media, and recreate local configuration |
+| `make dev-clean` | Delete rebuildable development indexes and logs |
+| `make dev-reset` | Delete development application state while preserving media and caches |
+| `make dev-purge CONFIRM=dev-purge` | Delete the complete development instance, including media |
 
-Both reset targets delete data. Confirm that they resolve only to local
-development paths before running them.
+Reset and purge refuse to run while the development Server is listening. They
+also require the fixed `.local/dev/.lumilio-dev-root` marker and reject symlink
+roots; purge additionally requires the exact confirmation value shown above.
 
 ## Testing
 

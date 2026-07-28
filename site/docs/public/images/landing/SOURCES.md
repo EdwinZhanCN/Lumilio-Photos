@@ -1,6 +1,6 @@
 # Chinese landing-page visual sources
 
-The product screenshots in this directory were captured from a locally running Lumilio Photos instance after importing the demo dataset under `server/data/storage/primary/landing-demo`.
+The product screenshots in this directory were captured from a locally running Lumilio Photos instance after importing the demo dataset under `.local/dev/storage/primary/landing-demo`.
 
 The scene images are local WebP derivatives of Unsplash photographs used in that demo dataset:
 

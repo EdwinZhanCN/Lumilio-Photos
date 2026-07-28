@@ -13,7 +13,10 @@ This document describes the current Go backend as implemented in `server/`.
   reflected from the manifest struct and referenced by each example's
   `#:schema` directive. It covers presence, types, and closed value sets only —
   conditional legality stays in `resolveManifest`.
-- Ignored local config file: `server/config/server.local.toml`.
+- Generated development config:
+  `.local/dev/config/server.toml`. `make dev` keeps the catalog, indexes, logs,
+  secrets, cloud state, backups, and media under the same `.local/dev/`
+  instance root while preserving the state/storage boundary.
 - Docker image: `server/Dockerfile`.
 - Linux production Compose files:
   `deploy/compose/compose.{caddy,acme,proxy}.yml`; all use host networking.

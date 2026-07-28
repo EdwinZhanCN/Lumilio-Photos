@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"server/config"
 )
 
 func TestParseCLIRequiresConfig(t *testing.T) {
@@ -85,5 +87,46 @@ func TestConfigInitAndValidate(t *testing.T) {
 		"--output", path,
 	}, &stdout, &stderr); err == nil || !strings.Contains(err.Error(), "refusing to overwrite") {
 		t.Fatalf("existing output error = %v", err)
+	}
+}
+
+func TestConfigInitDevProfileUsesRequestedLocalRoots(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config", "server.toml")
+	var stdout, stderr bytes.Buffer
+	err := runConfigCLI([]string{
+		"init",
+		"--profile", "dev-vite",
+		"--origin", "http://localhost:6657",
+		"--state-dir", "../state",
+		"--storage-dir", "../storage",
+		"--output", configPath,
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("config init dev-vite: %v\n%s", err, stderr.String())
+	}
+
+	cfg, err := config.LoadAppConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateRoot := filepath.Join(root, "state")
+	if cfg.DatabaseConfig.Path != filepath.Join(stateRoot, "library.sqlite3") {
+		t.Errorf("database path = %q", cfg.DatabaseConfig.Path)
+	}
+	if cfg.LoggingConfig.LogDir != filepath.Join(stateRoot, "logs") {
+		t.Errorf("log path = %q", cfg.LoggingConfig.LogDir)
+	}
+	if cfg.StorageConfig.CloudStatePath != filepath.Join(stateRoot, "cloud") {
+		t.Errorf("cloud path = %q", cfg.StorageConfig.CloudStatePath)
+	}
+	if cfg.StorageConfig.BackupsPath != filepath.Join(stateRoot, "backups") {
+		t.Errorf("backup path = %q", cfg.StorageConfig.BackupsPath)
+	}
+	if cfg.Auth.SecretKeyFile != filepath.Join(stateRoot, "secrets", "lumilio_secret_key") {
+		t.Errorf("secret path = %q", cfg.Auth.SecretKeyFile)
+	}
+	if cfg.StorageConfig.Path != filepath.Join(root, "storage") {
+		t.Errorf("storage path = %q", cfg.StorageConfig.Path)
 	}
 }
