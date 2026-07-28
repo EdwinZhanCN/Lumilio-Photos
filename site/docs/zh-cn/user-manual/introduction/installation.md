@@ -56,45 +56,76 @@ Desktop 控制面板提供三个明确的网络模式：
 主 Origin 同时也是 WebAuthn Origin，其 hostname 就是 RP ID。因此修改
 hostname 后需要重新注册 Passkey；迁移期间请保留密码与 TOTP 恢复路径。
 
-## Docker
+## Docker（Linux 服务器 / NAS）
 
-Docker 生产部署不再提供隐式明文模式。必须明确选择“内置 ACME”或“外部 HTTPS 反向代理”。单个 `lumilio-server` 镜像仍同时提供 Web 界面和 API。
+需要在 Linux 上安装 Docker Engine 与 Compose 2.23.1 或更高版本。所有受支持的生产
+Compose 都使用 host network，不再发布或转换端口；进程直接绑定完整 manifest
+指定的宿主机监听地址。生产环境没有隐式明文模式。
 
-### 内置 ACME HTTPS
-
-先将域名 A/AAAA 记录指向部署主机，并开放公网 TCP 80/443：
+先设置两个持久化宿主机目录：
 
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.acme.yml
 export LUMILIO_STORAGE=/srv/lumilio/media
 export LUMILIO_STATE=/srv/lumilio/state
 export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
 mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
+```
+
+### 同机 Caddy（推荐）
+
+将域名 A/AAAA 记录指向主机，并开放公网 TCP 80/443：
+
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.caddy.yml
+export LUMILIO_DOMAIN=photos.example.com
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-external-proxy \
+  --origin "https://${LUMILIO_DOMAIN}" \
+  --trusted-proxy 127.0.0.1/32 \
+  --output /data/app-state/server.toml
+docker compose -f compose.caddy.yml up -d
+```
+
+Lumilio 只监听 `127.0.0.1:6680`。Caddy 直接绑定宿主机 TCP 80/443，通过
+loopback 转发请求；证书状态保存在命名卷 `caddy_data` 和 `caddy_config` 中。
+
+### 内置 ACME HTTPS
+
+需要由 Lumilio 自己申请并终止证书时：
+
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.acme.yml
 docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
   server config init --profile docker-acme \
   --origin https://photos.example.com --email admin@example.com \
   --output /data/app-state/server.toml
-docker compose -f docker-compose.acme.yml up -d
+docker compose -f compose.acme.yml up -d
 ```
 
-CertMagic 的账户与证书保存在 `/data/app-state/tls`；保留状态挂载即可跨重启续期。证书申请失败会阻止启动，绝不会降级到 HTTP。
+host-network 容器直接绑定 TCP 80/443。镜像只给非 root Server binary 授予
+绑定低端口所需的 capability；如果端口已被宿主机进程占用，启动会失败。
+CertMagic 的账户与证书保存在 `/data/app-state/tls`。证书申请失败会阻止启动，
+绝不会降级到 HTTP。
 
-### 外部反向代理
+### 已有反向代理
 
-已有 Caddy、Traefik 或 Nginx 时，使用专用代理网络：
+同一主机上已经直接运行 Caddy、Nginx 或 Traefik 时：
 
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.proxy.yml
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.proxy.yml
 docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
   server config init --profile docker-external-proxy \
   --origin https://photos.example.com \
-  --trusted-proxy 172.30.0.0/24 \
+  --trusted-proxy 127.0.0.1/32 \
   --output /data/app-state/server.toml
-export LUMILIO_DOMAIN=photos.example.com
-docker compose -f docker-compose.proxy.yml up -d
+docker compose -f compose.proxy.yml up -d
 ```
 
-代理 profile 默认不发布 Lumilio 的 6680 端口，因此直接请求不能绕过可信代理。代理必须覆盖 `Forwarded`，或 `X-Forwarded-Proto`、`X-Forwarded-Host` 与客户端 IP；只信任精确代理地址或专用子网，不要信任包含无关容器的共享网络。仓库的 `deploy/reverse-proxy/` 提供 Caddy、Nginx 与 Traefik 最小示例。
+代理 upstream 指向 `127.0.0.1:6680`。若代理位于另一台主机，生成 manifest
+时使用 `--listen <lumilio-host-ip>:6680`，并且只信任该代理的 `/32` 或
+`/128`；宿主机防火墙也应只允许同一地址访问。代理必须覆盖而不是追加转发的
+scheme、host 与客户端地址。`deploy/reverse-proxy/` 中保留了最小 Nginx 和
+Traefik 示例。
 
 媒体与应用状态必须使用两个独立持久化挂载。状态目录保存 schema v3 manifest、`library.sqlite3`、快照、凭据、日志和 ACME 状态，并应位于可靠本机磁盘。两个目录都必须允许容器 UID 10001 写入。修改配置后先运行：
 

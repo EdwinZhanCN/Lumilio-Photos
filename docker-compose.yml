@@ -1,8 +1,0 @@
-# Lumilio has no implicit production network mode. Choose exactly one:
-#
-#   docker compose -f docker-compose.acme.yml up -d
-#   docker compose -f docker-compose.proxy.yml up -d
-#
-# Plain HTTP exists only in docker-compose.dev.yml.
-name: lumilio-photos
-services: {}

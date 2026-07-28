@@ -1,5 +1,6 @@
 {$LUMILIO_DOMAIN} {
-	reverse_proxy lumilio:6680 {
+	reverse_proxy 127.0.0.1:6680 {
+		header_up -Forwarded
 		header_up X-Forwarded-Proto https
 		header_up X-Forwarded-Host {host}
 		header_up X-Forwarded-For {remote_host}

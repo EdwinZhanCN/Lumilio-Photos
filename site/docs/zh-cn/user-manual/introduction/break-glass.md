@@ -10,18 +10,22 @@ BreakGlass 会替换管理员密码，删除通行密钥、TOTP 和恢复码，�
 
 ## Docker Compose
 
-在包含 Lumilio Photos Compose 文件的目录中执行以下命令。
+选择部署时使用的同一份生产 Compose：
+
+```bash
+export COMPOSE_FILE=/path/to/compose.caddy.yml # 或 compose.acme.yml / compose.proxy.yml
+```
 
 1. 停止正常 Server，避免同时运行两个队列和 API 实例：
 
    ```bash
-   docker compose stop lumilio
+   docker compose stop
    ```
 
 2. 启动一次性恢复容器。不指定用户名时，将恢复最早创建的已启用管理员：
 
    ```bash
-   docker compose run -d --name lumilio-breakglass \
+   docker compose run --no-deps -d --name lumilio-breakglass \
      -e LUMILIO_BREAK_GLASS=true \
      -e LUMILIO_BREAK_GLASS_USERNAME=admin \
      lumilio
@@ -37,7 +41,7 @@ BreakGlass 会替换管理员密码，删除通行密钥、TOTP 和恢复码，�
 
    ```bash
    docker rm -f lumilio-breakglass
-   docker compose up -d lumilio
+   docker compose up -d
    ```
 
 5. 使用临时密码登录，并在提示时设置永久密码。

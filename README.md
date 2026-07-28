@@ -45,29 +45,33 @@ Desktop packages include the embedded SQLite catalog and required media tools. T
 
 ### Docker Compose
 
-Docker with the Compose plugin is required. The single application image serves both the web interface and API. Set `LUMILIO_STORAGE` to the host media directory and `LUMILIO_STATE` to a separate machine-local directory for the SQLite catalog, snapshots, credentials, and logs.
+Docker Engine with Compose 2.23.1+ on Linux is required. Every supported
+production stack uses host networking so Lumen discovery and host services have
+one explicit network boundary. The single application image serves both the web
+interface and API.
 
-Choose either built-in ACME or an external reverse proxy. This ACME example
-requires a public DNS name pointing at the host and inbound TCP 80/443:
+The recommended stack runs Caddy on the same host:
 
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.acme.yml
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.caddy.yml
 export LUMILIO_STORAGE=/srv/lumilio/media
 export LUMILIO_STATE=/srv/lumilio/state
 export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
+export LUMILIO_DOMAIN=photos.example.com
 mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
 docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config init --profile docker-acme \
-  --origin https://photos.example.com --email admin@example.com \
+  server config init --profile docker-external-proxy \
+  --origin "https://${LUMILIO_DOMAIN}" --trusted-proxy 127.0.0.1/32 \
   --output /data/app-state/server.toml
-docker compose -f docker-compose.acme.yml up -d
+docker compose -f compose.caddy.yml up -d
 ```
 
-Open the exact HTTPS origin you generated. If TLS already terminates at Caddy,
-Traefik, Nginx, or another proxy, use `docker-compose.proxy.yml` and generate
-`--profile docker-external-proxy --trusted-proxy <narrow-cidr>` instead. That
-profile does not publish Lumilio's internal port. Plain HTTP is available only
-through `docker-compose.dev.yml`.
+Open the exact HTTPS origin you generated. `deploy/compose/compose.acme.yml`
+lets Lumilio own public TCP 80/443 directly;
+`deploy/compose/compose.proxy.yml` is for an existing same-host or explicitly
+configured remote HTTPS proxy. There is no Docker plaintext-development stack;
+contributors use `make dev`, while the isolated browser harness owns
+`web/e2e/compose.yml`.
 
 > [!IMPORTANT]
 > Production reads the complete schema-v3 manifest from `/data/app-state/server.toml`; CLI flags generate or validate that file but never override runtime policy. While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or `-shm` with a host SQLite tool. Create consistent snapshots under **Settings → Server**, and back up the media directory separately.
@@ -116,8 +120,6 @@ From `web/`, run `vp run assets:sync` for the profile pinned in
 `assets.lock.json`, or `vp run assets:sync -- --profile=e2e` for another profile
 at the same locked revision. Files are hash-verified and stored only in the
 ignored `.cache/lumilio-assets/` directory.
-
-The repository also includes a Dev Container configuration under `.devcontainer/`. Open the project in the container, run `make setup`, and then use the same `make dev` workflow.
 
 ## Optional AI with Lumen
 

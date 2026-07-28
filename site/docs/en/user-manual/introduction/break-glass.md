@@ -10,18 +10,22 @@ The temporary password is written only to `security.log`. Do not upload this fil
 
 ## Docker Compose
 
-Run these commands from the directory containing the Lumilio Photos Compose file.
+Select the same production file used for the deployment:
+
+```bash
+export COMPOSE_FILE=/path/to/compose.caddy.yml # or compose.acme.yml / compose.proxy.yml
+```
 
 1. Stop the normal server so two queue and API instances cannot run together:
 
    ```bash
-   docker compose stop lumilio
+   docker compose stop
    ```
 
 2. Start a one-time recovery container. Omit the username option to recover the oldest active administrator:
 
    ```bash
-   docker compose run -d --name lumilio-breakglass \
+   docker compose run --no-deps -d --name lumilio-breakglass \
      -e LUMILIO_BREAK_GLASS=true \
      -e LUMILIO_BREAK_GLASS_USERNAME=admin \
      lumilio
@@ -37,7 +41,7 @@ Run these commands from the directory containing the Lumilio Photos Compose file
 
    ```bash
    docker rm -f lumilio-breakglass
-   docker compose up -d lumilio
+   docker compose up -d
    ```
 
 5. Sign in with the temporary password and choose a permanent password when prompted.

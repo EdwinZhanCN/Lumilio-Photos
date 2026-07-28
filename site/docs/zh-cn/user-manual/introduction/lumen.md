@@ -50,15 +50,12 @@ mDNS 通常不会跨越不同子网或 VLAN。以下情况也可能导致无法�
 
 ## Docker 环境
 
-Docker 是否能直接使用 mDNS，取决于宿主平台和容器网络模式。
+Docker Server 交付只支持 Linux。三份生产 Compose 全部使用 **Host
+network**，因此流明集可以直接参与宿主机的局域网 mDNS 发现，不再提供
+bridge-network 变体。macOS 与 Windows 用户应使用 Desktop 交付。
 
-### Linux 宿主机
-
-当流明集容器使用 **Host network** 时，它可以直接参与宿主机的局域网 mDNS 发现。如果使用默认 bridge 网络，mDNS 广播通常不会自动进入容器，应改用 Host Broker 或静态节点。
-
-### macOS 与 Windows Docker Desktop
-
-Docker Desktop 的容器运行在独立的虚拟化网络中，通常不能直接使用宿主机的局域网 mDNS。这种情况下，可在宿主机运行 **Lumen Host Broker**，再让容器中的流明集通过 `host.docker.internal` 连接 Broker。
+如果局域网、VLAN 或防火墙仍然阻止 mDNS，可在完整 schema-v3 manifest 中
+配置 Host Broker 或静态节点地址；这不会改变 Compose 网络模式。
 
 各平台的适用边界与计划补充的操作内容，请参阅 [Lumen AI](../features/lumen-ai.md)。该功能页目前仍在完善，不应被视为完整的部署或故障排查指南。
 

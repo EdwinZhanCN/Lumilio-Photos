@@ -5,19 +5,18 @@
 # Scenario: deployment-origin-tls-plan.md 5.6 Docker external reverse proxy
 #
 # The proxy terminates HTTPS and this container speaks plain HTTP on an internal
-# network. Do not publish this listener to the host:
+# host listener. Docker uses Linux host networking; there is no bridge network,
+# container address, service DNS, or published-port layer.
 #
-#     services:
-#       lumilio:
-#         expose:
-#           - "6680"
-#         networks:
-#           - lumilio_proxy
+# Same-host proxies should keep the default 127.0.0.1:6680 listener and trust only
+# 127.0.0.1/32. A remote proxy must name the exact host interface explicitly:
 #
-# Network isolation is the first layer of protection and trusted_cidrs is the
-# second. Make the CIDR match that dedicated proxy network exactly: a broad subnet
-# shared with unrelated containers would let any of them forge the forwarded
-# origin and defeat the check.
+#     server config init --profile docker-external-proxy \
+#       --listen 192.168.1.20:6680 \
+#       --trusted-proxy 192.168.1.10/32 ...
+#
+# Firewall a remote listener to that proxy as defense in depth. proxy.mode=required
+# still rejects every ordinary request whose immediate peer is not trusted.
 #
 # The proxy must overwrite, not pass through, the client's proto and host headers.
 # Conflicting or ambiguous Forwarded and X-Forwarded-* values are rejected.
@@ -26,7 +25,7 @@
 #
 #     server config init --profile docker-external-proxy \
 #       --origin https://photos.example.com \
-#       --trusted-proxy 172.30.0.0/24 \
+#       --trusted-proxy 127.0.0.1/32 \
 #       --output /data/app-state/server.toml
 #
 # Every key below is required: the loader has no defaults, performs no file
@@ -55,7 +54,7 @@ path = "/data/app-state/library.sqlite3"
 # Local socket the application listener binds, as host:port or :port.
 # Never a URL, and never given a port implicitly. 127.0.0.1 is loopback
 # only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
-listen = "0.0.0.0:6680"
+listen = "127.0.0.1:6680"
 
 # The one canonical browser origin. It fixes the cookie and CSRF baseline,
 # the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
@@ -102,7 +101,7 @@ mode = "required"
 # CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
 # the immediate peer, not to any address inside a forwarded chain. Must be
 # empty when mode = "disabled" and hold at least one entry when required.
-trusted_cidrs = ["172.30.0.0/24"]
+trusted_cidrs = ["127.0.0.1/32"]
 
 [logging]
 # Minimum level emitted to both sinks.

@@ -1,0 +1,25 @@
+# Replace the hostname before use. Traefik and Lumilio run on the same Linux
+# host; the Lumilio external-proxy manifest listens on loopback only.
+http:
+    routers:
+        lumilio:
+            rule: Host(`photos.example.com`)
+            entryPoints:
+                - websecure
+            service: lumilio
+            middlewares:
+                - lumilio-forwarded
+            tls:
+                certResolver: letsencrypt
+
+    middlewares:
+        lumilio-forwarded:
+            headers:
+                customRequestHeaders:
+                    Forwarded: ""
+
+    services:
+        lumilio:
+            loadBalancer:
+                servers:
+                    - url: http://127.0.0.1:6680

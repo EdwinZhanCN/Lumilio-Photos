@@ -297,4 +297,4 @@ jobs:
 
                       On first launch, allow the Windows Firewall prompt if you want LAN Lumen ML discovery (optional).
 
-                      Linux/Docker image: `ghcr.io/edwinzhancn/lumilio-server` — see `docker-compose.release.yml`.
+                      Linux/Docker image: `ghcr.io/edwinzhancn/lumilio-server` — see `deploy/compose/compose.caddy.yml`.

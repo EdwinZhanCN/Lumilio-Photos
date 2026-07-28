@@ -94,52 +94,78 @@ keep password and TOTP recovery available during the move.
 
 ## Docker (Linux server / NAS)
 
-Requires Docker with the Compose plugin.
+Requires Docker Engine with Compose 2.23.1 or newer on Linux. All supported
+production Compose files use host networking. They do not publish or translate
+ports: each process binds the host listener from the complete manifest.
+Production has no implicit plaintext mode.
 
-Production has no implicit plaintext mode. Choose built-in ACME when this host
-owns public TCP 80/443, or the external-proxy profile when another service owns
-TLS.
-
-### Built-in ACME HTTPS
-
-Point the DNS A/AAAA record at the host and allow inbound TCP 80 and 443:
+Set the two persistent host paths before choosing a TLS owner:
 
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.acme.yml
-mkdir -p /srv/lumilio/media /srv/lumilio/state
 export LUMILIO_STORAGE=/srv/lumilio/media
 export LUMILIO_STATE=/srv/lumilio/state
 export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
+mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
+```
+
+### Caddy on the same host (recommended)
+
+Point the DNS A/AAAA record at the host and allow inbound TCP 80/443:
+
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.caddy.yml
+export LUMILIO_DOMAIN=photos.example.com
+docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
+  server config init --profile docker-external-proxy \
+  --origin "https://${LUMILIO_DOMAIN}" \
+  --trusted-proxy 127.0.0.1/32 \
+  --output /data/app-state/server.toml
+docker compose -f compose.caddy.yml up -d
+```
+
+Lumilio listens only on `127.0.0.1:6680`. Caddy binds host TCP 80/443, obtains
+the certificate, and forwards over loopback. Its certificate state is retained
+in named `caddy_data` and `caddy_config` volumes.
+
+### Built-in ACME HTTPS
+
+Use this when Lumilio itself should obtain and terminate the certificate:
+
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.acme.yml
 docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
   server config init --profile docker-acme \
   --origin https://photos.example.com --email admin@example.com \
   --output /data/app-state/server.toml
-docker compose -f docker-compose.acme.yml up -d
+docker compose -f compose.acme.yml up -d
 ```
 
-Open `https://photos.example.com`. CertMagic stores its account and certificate
-under `/data/app-state/tls`, so retaining the state mount also retains renewals.
-Certificate acquisition failure stops startup; it never falls back to HTTP.
+The host-network container binds TCP 80 and 443 directly. The image grants its
+non-root Server binary only the capability needed for those privileged ports;
+startup fails if another host process already owns either port. CertMagic keeps
+its account and certificate under `/data/app-state/tls`. Certificate acquisition
+failure stops startup and never falls back to HTTP.
 
 ### Existing reverse proxy
 
-Generate the external profile with the dedicated Docker network CIDR:
+For Caddy, Nginx, or Traefik already running directly on the same host:
 
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/docker-compose.proxy.yml
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.proxy.yml
 docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
   server config init --profile docker-external-proxy \
   --origin https://photos.example.com \
-  --trusted-proxy 172.30.0.0/24 \
+  --trusted-proxy 127.0.0.1/32 \
   --output /data/app-state/server.toml
-export LUMILIO_DOMAIN=photos.example.com
-docker compose -f docker-compose.proxy.yml up -d
+docker compose -f compose.proxy.yml up -d
 ```
 
-The included Caddy example publishes 80/443. Lumilio itself has only `expose:
-6680`, so direct host access cannot bypass the proxy. Nginx and Traefik examples
-are under `deploy/reverse-proxy/`. Trust the narrowest proxy address or
-dedicated subnet; never trust a network shared with unrelated containers.
+Configure the proxy upstream as `127.0.0.1:6680`. For a proxy on another
+machine, generate the manifest with `--listen <lumilio-host-ip>:6680` and trust
+only that proxy's `/32` or `/128`; firewall the listener to the same address.
+The proxy must overwrite, rather than append, the forwarded scheme, host, and
+client address. Minimal Nginx and Traefik examples live under
+`deploy/reverse-proxy/`.
 
 The single image serves both web and API. `LUMILIO_STORAGE` holds media;
 `LUMILIO_STATE` separately holds the schema-v3 manifest, SQLite catalog,

@@ -49,6 +49,7 @@ func runConfigInit(args []string, stdout, stderr io.Writer) error {
 	profile := flags.String("profile", "", strings.Join(config.ProfileNames(true), " or "))
 	origin := flags.String("origin", "", "canonical public https origin")
 	email := flags.String("email", "", "ACME account email (docker-acme)")
+	listen := flags.String("listen", "", "application listener (docker-external-proxy; defaults to 127.0.0.1:6680)")
 	output := flags.String("output", "", "destination server.toml")
 	force := flags.Bool("force", false, "replace an existing output file")
 	stateDir := flags.String("state-dir", "/data/app-state", "container application state path")
@@ -70,6 +71,7 @@ func runConfigInit(args []string, stdout, stderr io.Writer) error {
 		config.ProfileInputs{
 			Origin:            strings.TrimSpace(*origin),
 			Email:             strings.TrimSpace(*email),
+			Listen:            strings.TrimSpace(*listen),
 			TrustedProxyCIDRs: trustedProxies,
 			StateDir:          strings.TrimSpace(*stateDir),
 			StorageDir:        strings.TrimSpace(*storageDir),
@@ -159,11 +161,11 @@ func writeConfigReport(output io.Writer, cfg config.AppConfig) {
 	fmt.Fprintf(output, "proxy mode: %s\n", cfg.ServerConfig.Proxy.Mode)
 	if cfg.ServerConfig.TLS.Mode == config.TLSModeACME {
 		fmt.Fprintf(output, "ACME HTTP listener: %s\n", cfg.ServerConfig.TLS.HTTPListen)
-		fmt.Fprintln(output, "required host ports: TCP 80 -> ACME HTTP listener; TCP 443 -> application listener")
+		fmt.Fprintln(output, "required host ports: the host-network container binds TCP 80 and 443 directly")
 	}
 	if cfg.ServerConfig.TLS.Mode == config.TLSModeExternal {
 		fmt.Fprintf(output, "trusted proxy CIDRs: %s\n", prefixesString(cfg.ServerConfig.Proxy.TrustedCIDRs))
-		fmt.Fprintln(output, "required host ports: publish HTTPS on the reverse proxy; do not publish the application listener")
+		fmt.Fprintln(output, "network boundary: publish HTTPS on the reverse proxy; keep the application listener loopback-only or firewalled to the remote proxy")
 	}
 	if cfg.ServerConfig.TLS.Mode == config.TLSModeOff {
 		fmt.Fprintln(output, "security warning: plaintext HTTP; use only for local development or an explicitly accepted LAN profile")

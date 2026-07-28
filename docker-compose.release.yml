@@ -1,4 +1,0 @@
-# Deprecated compatibility entry point. Production no longer defaults to
-# plaintext HTTP; choose docker-compose.acme.yml or docker-compose.proxy.yml.
-name: lumilio-photos-release-choose-profile
-services: {}
