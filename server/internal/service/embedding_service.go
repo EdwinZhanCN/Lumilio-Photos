@@ -10,6 +10,7 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/db/vectorindex"
 
 	"github.com/google/uuid"
 )
@@ -101,9 +102,8 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID uuid.UUID,
 
 	if embeddingType == EmbeddingTypeSemantic {
 		// Semantic vectors live in the dedicated fixed-dimension search_embeddings
-		// table (cosine HNSW). The default space records the active model for query
-		// routing and model-change detection; the vector index itself is static
-		// (migration 000012), so no per-space index creation is needed here.
+		// table. The default space records the active model for query routing and
+		// model-change detection; Vec1 is maintained as a derived flat/ANN index.
 		space, err = e.ensureDefaultSpace(ctx, queries, embeddingType, space)
 		if err != nil {
 			return err
@@ -127,7 +127,7 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID uuid.UUID,
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit embedding transaction: %w", err)
 		}
-		return nil
+		return e.maintainSemanticIndex(ctx)
 	}
 
 	// Non-search vectors (e.g. pHash) stay in the generic exact-scan table.
@@ -217,6 +217,13 @@ func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit video frame embedding transaction: %w", err)
+	}
+	return e.maintainSemanticIndex(ctx)
+}
+
+func (e *embeddingService) maintainSemanticIndex(ctx context.Context) error {
+	if err := vectorindex.Maintain(ctx, e.pool); err != nil {
+		return fmt.Errorf("maintain semantic Vec1 index: %w", err)
 	}
 	return nil
 }

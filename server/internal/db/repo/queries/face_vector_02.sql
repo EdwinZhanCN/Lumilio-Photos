@@ -11,5 +11,5 @@ WHERE fi.id != sqlc.arg('id')
   AND fi.embedding IS NOT NULL
   AND fi.confidence >= sqlc.arg('min_confidence')
   AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
-  AND 1.0 - vec_distance_cosine(fi.embedding, sqlc.arg('embedding_query'))
+  AND 1.0 - vec1_cos_distance(fi.embedding, sqlc.arg('embedding_query'))
       >= CAST(sqlc.arg('min_similarity') AS REAL);

@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"sync"
 
+	"server/internal/db/vec1ext"
 	"server/platform/sqliteuri"
 
-	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var registerVectorExtension sync.Once
+var registerVec1Extension sync.Once
 
 // Open opens a single-connection SQLite pool with the fixed runtime pragmas.
 // Phase 2 will move this behavior into the production db boundary.
@@ -25,7 +25,7 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("resolve SQLite path: %w", err)
 	}
 
-	registerVectorExtension.Do(sqlitevec.Auto)
+	registerVec1Extension.Do(vec1ext.Auto)
 
 	dsn := sqliteuri.DSN(absolutePath, nil)
 	database, err := sql.Open("sqlite3", dsn)

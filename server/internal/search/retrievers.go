@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"strings"
 
 	"server/internal/db/dbtypes"
@@ -14,12 +15,12 @@ import (
 )
 
 const (
-	// sqlite-vec rejects vec0 KNN queries whose k exceeds 4096. The asset
-	// candidate request is expanded because videos can contribute multiple
-	// frame vectors to the nearest-neighbor pool.
-	sqliteVecKNNMax         = 4096
+	// Vec1 has no sqlite-vec-style 4096 hard limit. Keep a generous explicit
+	// work bound so a single request cannot allocate an unbounded result heap.
+	// The asset request is expanded because videos may contribute many frames.
+	maxVec1KNNVectors       = 65_536
 	embeddingKNNExpansion   = 8
-	maxANNAssetCandidateSet = sqliteVecKNNMax / embeddingKNNExpansion
+	maxANNAssetCandidateSet = maxVec1KNNVectors / embeddingKNNExpansion
 )
 
 type EmbeddingRetriever struct {
@@ -50,7 +51,11 @@ func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candi
 	queryVector := dbtypes.NewVector(embedding.Vector)
 	vectorPlaceholder := builder.addArg(queryVector)
 	knnLimit := expandedEmbeddingKNNLimit(req.TopK)
-	knnLimitPlaceholder := builder.addArg(knnLimit)
+	vec1ParamsPlaceholder := builder.addArg(fmt.Sprintf(`{"k":%d,"nprobe":0.15}`, knnLimit))
+	vec1Conditions, err := buildVec1FilterConditions(builder, req.Filter, space.ID)
+	if err != nil {
+		return nil, err
+	}
 	spacePlaceholder := builder.addArg(space.ID)
 	conditions, err := buildAssetFilterConditions(builder, req.Filter, "a")
 	if err != nil {
@@ -63,10 +68,12 @@ func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candi
 
 	query := fmt.Sprintf(`
 WITH nearest AS (
-  SELECT rowid, distance
-  FROM search_embeddings_vec
-  WHERE embedding MATCH %s
-    AND k = %s
+  SELECT
+    e.id AS rowid,
+    vec1_l2_distance(e.vector, %s) AS distance
+  FROM search_embeddings_vec(%s, %s) AS v
+  JOIN search_embeddings e ON e.id = v.rowid
+  WHERE %s
 ),
 ranked AS (
   SELECT
@@ -90,7 +97,14 @@ FROM ranked
 GROUP BY asset_id
 ORDER BY raw_score, asset_id DESC
 LIMIT %s
-`, vectorPlaceholder, knnLimitPlaceholder, joinConditions(conditions), limitPlaceholder)
+`,
+		vectorPlaceholder,
+		vectorPlaceholder,
+		vec1ParamsPlaceholder,
+		joinConditions(vec1Conditions),
+		joinConditions(conditions),
+		limitPlaceholder,
+	)
 
 	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
 	if err != nil {
@@ -98,17 +112,56 @@ LIMIT %s
 	}
 	defer rows.Close()
 
-	return collectCandidates(rows, SourceEmbedding)
+	candidates, err := collectCandidates(rows, SourceEmbedding)
+	if err != nil {
+		return nil, err
+	}
+	squareRootCandidateDistances(candidates)
+	return candidates, nil
 }
 
 func expandedEmbeddingKNNLimit(topK int) int {
 	if topK <= 0 {
 		return 1
 	}
-	if topK > sqliteVecKNNMax/embeddingKNNExpansion {
-		return sqliteVecKNNMax
+	if topK > maxVec1KNNVectors/embeddingKNNExpansion {
+		return maxVec1KNNVectors
 	}
 	return topK * embeddingKNNExpansion
+}
+
+// buildVec1FilterConditions pushes the high-value authorization and media
+// predicates into Vec1. More relational filters are still checked against the
+// authoritative tables after candidate selection.
+func buildVec1FilterConditions(builder *sqlBuilder, filter Filter, spaceID int64) ([]string, error) {
+	isDeleted := false
+	if filter.IsDeleted != nil {
+		isDeleted = *filter.IsDeleted
+	}
+	conditions := []string{
+		fmt.Sprintf("v.space_id = %s", builder.addArg(spaceID)),
+		fmt.Sprintf("v.is_deleted = %s", builder.addArg(isDeleted)),
+	}
+	if filter.OwnerID != nil {
+		conditions = append(conditions, fmt.Sprintf("v.owner_id = %s", builder.addArg(*filter.OwnerID)))
+	}
+	if filter.AssetType != nil {
+		conditions = append(conditions, fmt.Sprintf("v.asset_type = %s", builder.addArg(*filter.AssetType)))
+	}
+	if len(filter.AssetTypes) > 0 {
+		placeholder, err := builder.addJSONArg(filter.AssetTypes)
+		if err != nil {
+			return nil, err
+		}
+		conditions = append(conditions, fmt.Sprintf("v.asset_type IN (SELECT value FROM json_each(%s))", placeholder))
+	}
+	return conditions, nil
+}
+
+func squareRootCandidateDistances(candidates []Candidate) {
+	for index := range candidates {
+		candidates[index].RawScore = math.Sqrt(candidates[index].RawScore)
+	}
 }
 
 func (r *EmbeddingRetriever) resolveQuerySpace(ctx context.Context, req Request) (QueryEmbedding, repo.EmbeddingSpace, error) {

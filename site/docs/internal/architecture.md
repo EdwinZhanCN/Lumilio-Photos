@@ -45,8 +45,8 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/storage`: repository layout, staging, scanner, repository config.
 - `server/internal/sourcing`: unified ingest materialization for upload, scan, and cloud flows.
 - `server/internal/db` and `server/migrations`: the single-writer SQLite runtime,
-  application/River migrations, Online Backup snapshots, FTS5, and sqlite-vec
-  derived indexes.
+  application/River migrations, Online Backup snapshots, FTS5, and the
+  statically linked SQLite Vec1 derived semantic index.
 - `server/internal/search/bleveocr`: rebuildable OCR search sidecar. SQLite OCR
   rows remain authoritative; a revision outbox feeds
   `<sqlite-directory>/indexes/bleve/ocr-v1/`.

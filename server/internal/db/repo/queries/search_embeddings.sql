@@ -1,4 +1,4 @@
--- Dedicated fixed-dimension semantic search vectors (see migration 000012).
+-- Dedicated fixed-dimension authoritative semantic search vectors.
 -- Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 
 -- name: InsertSearchEmbedding :exec

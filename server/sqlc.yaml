@@ -2,7 +2,9 @@ version: "2"
 sql:
     - engine: "sqlite"
       queries: "internal/db/repo/queries"
-      schema: "migrations/*.up.sql"
+      # Destructive experimental generations keep historical baselines
+      # embedded for auditability. sqlc must parse only the active baseline.
+      schema: "migrations/000003_vec1_baseline.up.sql"
       gen:
           go:
               package: "repo"

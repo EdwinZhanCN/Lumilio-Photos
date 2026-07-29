@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the Lumilio Photos Windows portable app directory. Must run inside an
-# MSYS2 MINGW64 shell with go, gcc, pkgconf, libvips, libraw and ntldd
+# MSYS2 MINGW64 shell with go, gcc, pkgconf, sqlite3, libvips, libraw and ntldd
 # installed (see the desktop-windows CI job / release workflow).
 #
 # Prerequisites (staged before running):

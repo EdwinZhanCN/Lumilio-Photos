@@ -116,13 +116,13 @@ function installCorruptBackupFixture(): string {
     `${base}/${manifestName}`,
     `${JSON.stringify(
       {
-        format_version: 1,
+        format_version: 2,
         app_version: "e2e-corrupt",
         config_schema_version: 3,
-        application_migration_version: 1,
+        application_migration_version: 3,
         river_migration_version: 1,
         sqlite_version: "invalid-fixture",
-        sqlite_vec_version: "invalid-fixture",
+        vec1_version: "invalid-fixture",
         created_at: "2099-12-31T23:59:59Z",
         database_size: corruptDatabase.length,
         sha256: "0".repeat(64),

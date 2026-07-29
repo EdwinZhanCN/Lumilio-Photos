@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"server/internal/db/dbtypes"
+	"server/internal/db/vectorindex"
 
 	"github.com/google/uuid"
 )
@@ -137,10 +138,9 @@ type SetMeta struct {
 	LanguageVersion string
 }
 
-// A vec0 KNN query can return at most sqliteVecKNNMax vectors. Keep the ANN
-// asset pool within that bound after video-frame expansion; if every ANN
-// candidate passes the cutoff, RetrieveSet falls back to an exact scan rather
-// than exceeding sqlite-vec's k limit or claiming a truncated pool is complete.
+// Keep the ANN asset pool within the explicit Vec1 request work bound after
+// video-frame expansion. If every candidate passes the cutoff at that bound,
+// RetrieveSet falls back to the authoritative exact scan.
 const setInitialPoolSize = maxANNAssetCandidateSet
 
 // RetrieveSet returns every candidate within the calibrated relevance
@@ -159,7 +159,11 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 	}
 	queryVector := dbtypes.NewVector(embedding.Vector)
 
-	indexVersion := fmt.Sprintf("embedding-space/%d", space.ID)
+	indexMode, err := vectorindex.CurrentMode(ctx, r.pool)
+	if err != nil {
+		return nil, SetMeta{}, err
+	}
+	indexVersion := fmt.Sprintf("vec1-%s/embedding-space/%d", indexMode, space.ID)
 	modelVersion := space.ModelID
 	if modelVersion == "" {
 		modelVersion = embedding.Model
@@ -173,6 +177,17 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 		Calibrated: true, CosFloor: cosFloor, Cutoff: cutoff,
 		ProfileVersion: profile.ProfileVersion, ModelVersion: profile.ModelVersion,
 		IndexVersion: profile.IndexVersion, LanguageVersion: profile.LanguageVersion,
+	}
+
+	if strictness == StrictnessStrict {
+		candidates, truncated, err := r.retrieveExactWithinCutoff(ctx, req, queryVector, space.ID, space.Dimensions, cutoff, maxResults)
+		if err != nil {
+			return nil, meta, err
+		}
+		meta.Scanned = len(candidates)
+		meta.Exact = true
+		meta.Complete = !truncated
+		return candidates, meta, nil
 	}
 
 	// First pool fetch anchors the set in nearest-distance order.
@@ -189,35 +204,27 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 	meta.Scanned = len(pool)
 
 	if len(pool) == 0 {
-		meta.Complete = true
+		meta.Complete = indexMode == vectorindex.ModeFlat
 		return pool, meta, nil
 	}
 
-	if strictness == StrictnessStrict {
-		candidates, truncated, err := r.retrieveExactWithinCutoff(ctx, req, queryVector, space.ID, space.Dimensions, cutoff, maxResults)
-		if err != nil {
-			return nil, meta, err
-		}
-		meta.Exact = true
-		meta.Complete = !truncated
-		return candidates, meta, nil
-	}
-
-	// ANN path with iterative widening: grow the KNN pool until the cutoff
-	// provably bites inside it (the set is then complete) or the pool hits
-	// the cap.
+	// Grow the KNN pool until the cutoff bites or the pool hits the cap. A flat
+	// index can prove completeness; ANN returns the exact-reranked observed set
+	// and leaves Complete=false so callers may request the strict path.
 	for {
 		kept := filterWithinCutoff(pool, cutoff)
 
 		switch {
 		case len(pool) < k:
-			// Library exhausted inside the pool — the set is complete.
-			meta.Complete = true
+			// A flat index exhausted the filtered library. ANN only exhausted
+			// the probed buckets, so its completeness remains intentionally
+			// unclaimed.
+			meta.Complete = indexMode == vectorindex.ModeFlat
 			return kept, meta, nil
 		case len(kept) < len(pool):
-			// The cutoff bit inside the pool: everything beyond the pool is
-			// farther than the worst pool member, hence beyond the cutoff.
-			meta.Complete = true
+			// That proof is exact for flat KNN. ANN candidates are exact-
+			// reranked, but unprobed buckets may still contain omitted matches.
+			meta.Complete = indexMode == vectorindex.ModeFlat
 			return kept, meta, nil
 		case k >= maxResults:
 			// Cap reached and the cutoff never bit: truncated set.
@@ -227,8 +234,9 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 			}
 			return kept, meta, nil
 		case k >= maxANNAssetCandidateSet:
-			// sqlite-vec cannot widen the ANN vector pool further. Preserve
-			// set completeness with the authoritative scalar-distance path.
+			// Do not widen the Vec1 request heap beyond its explicit work
+			// bound. Preserve set completeness with the authoritative scalar
+			// distance path.
 			candidates, truncated, err := r.retrieveExactWithinCutoff(ctx, req, queryVector, space.ID, space.Dimensions, cutoff, maxResults)
 			if err != nil {
 				return nil, meta, err
@@ -252,7 +260,7 @@ func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, stric
 }
 
 // retrieveExactWithinCutoff runs the strict path over authoritative vector
-// BLOBs with sqlite-vec's exact scalar distance function.
+// BLOBs with Vec1's exact scalar distance function.
 func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req Request, queryVector dbtypes.Vector, spaceID int64, dimensions int64, cutoff float64, maxResults int) ([]Candidate, bool, error) {
 	if int64(len(queryVector.Slice())) != dimensions {
 		return nil, false, fmt.Errorf("query vector dimension mismatch")
@@ -264,13 +272,13 @@ func (r *EmbeddingRetriever) retrieveExactWithinCutoff(ctx context.Context, req 
 	if err != nil {
 		return nil, false, err
 	}
-	distanceExpr := fmt.Sprintf("vec_distance_L2(e.vector, %s)", vectorPlaceholder)
+	distanceSquaredExpr := fmt.Sprintf("vec1_l2_distance(e.vector, %s)", vectorPlaceholder)
 	// The cutoff is a per-frame predicate: an asset qualifies if any of its frames
 	// falls within the cutoff, then it is ranked by its best (nearest) frame.
 	conditions = append(conditions,
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
 	)
-	cutoffPlaceholder := builder.addArg(cutoff)
+	cutoffSquaredPlaceholder := builder.addArg(cutoff * cutoff)
 	limitPlaceholder := builder.addArg(maxResults + 1)
 
 	query := fmt.Sprintf(`
@@ -278,7 +286,7 @@ WITH scored AS (
   SELECT
     a.asset_id,
     e.frame_ts_ms,
-    %s AS distance
+    %s AS distance_squared
   FROM search_embeddings e
   JOIN assets a ON a.asset_id = e.asset_id
   WHERE %s
@@ -288,20 +296,20 @@ ranked AS (
     scored.*,
     ROW_NUMBER() OVER (
       PARTITION BY asset_id
-      ORDER BY distance, frame_ts_ms IS NULL, frame_ts_ms
+      ORDER BY distance_squared, frame_ts_ms IS NULL, frame_ts_ms
     ) AS distance_rank
   FROM scored
-  WHERE distance <= %s
+  WHERE distance_squared <= %s
 )
 SELECT
   asset_id,
-  MIN(distance) AS raw_score,
+  MIN(distance_squared) AS raw_score,
   MAX(CASE WHEN distance_rank = 1 THEN frame_ts_ms END) AS best_ts
 FROM ranked
 GROUP BY asset_id
 ORDER BY raw_score, asset_id DESC
 LIMIT %s
-`, distanceExpr, joinConditions(conditions), cutoffPlaceholder, limitPlaceholder)
+`, distanceSquaredExpr, joinConditions(conditions), cutoffSquaredPlaceholder, limitPlaceholder)
 
 	rows, err := r.pool.QueryContext(ctx, query, builder.args...)
 	if err != nil {
@@ -313,6 +321,7 @@ LIMIT %s
 	if err != nil {
 		return nil, false, err
 	}
+	squareRootCandidateDistances(candidates)
 	truncated := len(candidates) > maxResults
 	if truncated {
 		candidates = candidates[:maxResults]
@@ -322,7 +331,7 @@ LIMIT %s
 
 // filterWithinCutoff keeps candidates whose distance passes the cutoff,
 // preserving relevance order. RawScore for the embedding channel is the
-// sqlite-vec L2 distance (smaller = closer).
+// exact L2 distance (smaller = closer).
 func filterWithinCutoff(candidates []Candidate, cutoff float64) []Candidate {
 	kept := make([]Candidate, 0, len(candidates))
 	for _, candidate := range candidates {

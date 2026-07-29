@@ -26,8 +26,8 @@ directory must remain beside the script so its modules can be resolved.
 
 The supervisor resolves these tools relative to the packaged resources
 directory. In local development, an absent bundled tool falls back to `PATH`.
-SQLite and sqlite-vec are linked into the Go application; there is no separate
-database runtime to stage.
+SQLite and SQLite Vec1 are linked into the Go application; there is no
+separate database runtime or vector extension to stage.
 
 ## Provenance
 

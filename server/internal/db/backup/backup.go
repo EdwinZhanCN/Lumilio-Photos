@@ -22,7 +22,7 @@ import (
 	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
-const manifestFormatVersion = 1
+const manifestFormatVersion = 2
 
 // Logf matches the supervisor-style logging callback used across the app.
 type Logf func(format string, args ...any)
@@ -43,7 +43,7 @@ type Manifest struct {
 	ApplicationMigration int64     `json:"application_migration_version"`
 	RiverMigration       int64     `json:"river_migration_version"`
 	SQLiteVersion        string    `json:"sqlite_version"`
-	VectorVersion        string    `json:"sqlite_vec_version"`
+	Vec1Version          string    `json:"vec1_version"`
 	CreatedAt            time.Time `json:"created_at"`
 	DatabaseSize         int64     `json:"database_size"`
 	SHA256               string    `json:"sha256"`
@@ -140,7 +140,7 @@ func CreateSnapshot(
 		ApplicationMigration: info.ApplicationMigration,
 		RiverMigration:       info.RiverMigration,
 		SQLiteVersion:        info.SQLiteVersion,
-		VectorVersion:        info.VectorVersion,
+		Vec1Version:          info.Vec1Version,
 		CreatedAt:            createdAt,
 		DatabaseSize:         info.SizeBytes,
 		SHA256:               checksum,
@@ -295,6 +295,7 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 	if info.LibraryID != manifest.LibraryID ||
 		info.ApplicationMigration != manifest.ApplicationMigration ||
 		info.RiverMigration != manifest.RiverMigration ||
+		info.Vec1Version != manifest.Vec1Version ||
 		info.SizeBytes != manifest.DatabaseSize {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("SQLite snapshot does not match its manifest")
 	}

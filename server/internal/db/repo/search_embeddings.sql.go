@@ -82,7 +82,7 @@ type InsertSearchEmbeddingParams struct {
 	ModelID   string         `db:"model_id" json:"model_id"`
 }
 
-// Dedicated fixed-dimension semantic search vectors (see migration 000012).
+// Dedicated fixed-dimension authoritative semantic search vectors.
 // Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 func (q *Queries) InsertSearchEmbedding(ctx context.Context, arg InsertSearchEmbeddingParams) error {
 	_, err := q.db.ExecContext(ctx, insertSearchEmbedding,

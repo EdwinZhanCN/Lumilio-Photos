@@ -13,7 +13,7 @@ const getNearestAssignedFaceCluster = `-- name: GetNearestAssignedFaceCluster :o
 SELECT
     fcm.cluster_id,
     fi.id AS face_id,
-    CAST(1.0 - vec_distance_cosine(fi.embedding, ?1) AS REAL) AS similarity
+    CAST(1.0 - vec1_cos_distance(fi.embedding, ?1) AS REAL) AS similarity
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 JOIN face_cluster_members fcm ON fcm.face_id = fi.id
@@ -24,7 +24,7 @@ WHERE fi.id != ?2
   AND fi.embedding IS NOT NULL
   AND fi.confidence >= ?5
   AND COALESCE(fi.face_size, 0) >= ?6
-  AND 1.0 - vec_distance_cosine(fi.embedding, ?1)
+  AND 1.0 - vec1_cos_distance(fi.embedding, ?1)
       >= CAST(?7 AS REAL)
 ORDER BY similarity DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
 LIMIT 1

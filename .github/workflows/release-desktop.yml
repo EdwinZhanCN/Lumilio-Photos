@@ -4,7 +4,7 @@ name: Release Desktop
 # GitHub Release:
 #   - macOS (Apple Silicon): ad-hoc-signed DMG via build-macos.sh
 #   - Windows (amd64): portable zip via build-windows.sh (MSYS2/mingw64 CGo)
-# One shared web SPA artifact feeds both bundles. SQLite, FTS5, and sqlite-vec
+# One shared web SPA artifact feeds both bundles. SQLite, FTS5, and SQLite Vec1
 # are linked into the desktop executable.
 #
 # macOS amd64 is deferred until fetch-resources.sh gains Intel ffmpeg pins
@@ -184,6 +184,7 @@ jobs:
                       mingw-w64-x86_64-go
                       mingw-w64-x86_64-gcc
                       mingw-w64-x86_64-pkgconf
+                      mingw-w64-x86_64-sqlite3
                       mingw-w64-x86_64-libvips
                       mingw-w64-x86_64-libraw
                       mingw-w64-x86_64-ntldd

@@ -38,6 +38,17 @@ for (const moduleDir of [join(root, "desktop"), join(root, "server")]) {
   }
 }
 
+add(
+  "vendored:sqlite-vec1@0.7",
+  "SQLite Vec1 0.7",
+  "https://sqlite.org/vec1",
+  [{
+    name: "PUBLIC-DOMAIN",
+    text: "The author disclaims copyright to this source code. The source is dedicated to the public domain.",
+  }],
+  "Public Domain",
+);
+
 const nodeModules = join(root, "web/node_modules");
 if (!existsSync(nodeModules)) throw new Error("web/node_modules is missing; run `cd web && vp install`");
 function visit(dir) {

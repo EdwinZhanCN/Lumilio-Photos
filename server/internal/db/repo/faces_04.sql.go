@@ -43,7 +43,7 @@ WITH pair_scores AS (
         fc1.cluster_name AS name1,
         fc2.cluster_id AS other_cluster_id,
         fc2.cluster_name AS name2,
-        AVG(1 - vec_distance_cosine(fi1.embedding, fi2.embedding)) AS avg_similarity
+        AVG(1 - vec1_cos_distance(fi1.embedding, fi2.embedding)) AS avg_similarity
     FROM face_clusters fc1
     JOIN face_cluster_members fcm1 ON fcm1.cluster_id = fc1.cluster_id
     JOIN face_items fi1 ON fi1.id = fcm1.face_id
@@ -60,7 +60,7 @@ WITH pair_scores AS (
       AND COALESCE(fc2.is_confirmed, false) = true
       AND (?2 IS NULL OR fc1.owner_id = ?2)
     GROUP BY fc1.cluster_id, fc1.cluster_name, fc2.cluster_id, fc2.cluster_name
-    HAVING AVG(1 - vec_distance_cosine(fi1.embedding, fi2.embedding)) >= ?3
+    HAVING AVG(1 - vec1_cos_distance(fi1.embedding, fi2.embedding)) >= ?3
 )
 SELECT cluster_id, name1, other_cluster_id, name2, avg_similarity
 FROM pair_scores

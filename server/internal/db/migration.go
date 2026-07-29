@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/vectorindex"
 	migrations "server/migrations"
 
 	"github.com/riverqueue/river/riverdriver/riversqlite"
@@ -25,7 +26,10 @@ const migrationTable = "lumilio_schema_migrations"
 // into PRAGMA user_version by the SQLite baseline. Catalogs written by any
 // other generation are rejected outright: experimental catalogs are never
 // upgraded in place.
-const schemaGeneration = 3
+const (
+	schemaGeneration                 = 4
+	currentGenerationBaselineVersion = 3
+)
 
 type embeddedMigration struct {
 	version  int64
@@ -48,6 +52,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 	}
 	if err := migrateApplication(ctx, d.SQL); err != nil {
 		return fmt.Errorf("migrate Lumilio schema: %w", err)
+	}
+	if err := vectorindex.Reconcile(ctx, d.SQL); err != nil {
+		return fmt.Errorf("reconcile semantic Vec1 index: %w", err)
 	}
 	if err := migrateRiver(ctx, d.SQL); err != nil {
 		return fmt.Errorf("migrate River schema: %w", err)
@@ -90,7 +97,11 @@ func assertSchemaGeneration(ctx context.Context, database *sql.DB) error {
 }
 
 func migrateApplication(ctx context.Context, database *sql.DB) error {
-	available, err := loadEmbeddedMigrations()
+	all, err := loadEmbeddedMigrations()
+	if err != nil {
+		return err
+	}
+	available, err := currentGenerationMigrations(all)
 	if err != nil {
 		return err
 	}
@@ -153,6 +164,27 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 		)
 	}
 	return nil
+}
+
+// currentGenerationMigrations excludes destructive baselines from older
+// experimental generations. Those files remain embedded and immutable for
+// auditability, but a fresh generation-4 catalog starts directly at migration
+// 000003 and therefore never needs the sqlite-vec module referenced by 000001.
+func currentGenerationMigrations(all []embeddedMigration) ([]embeddedMigration, error) {
+	var current []embeddedMigration
+	for _, migration := range all {
+		if migration.version >= currentGenerationBaselineVersion {
+			current = append(current, migration)
+		}
+	}
+	if len(current) == 0 || current[0].version != currentGenerationBaselineVersion {
+		return nil, fmt.Errorf(
+			"schema generation %d baseline migration %06d is missing",
+			schemaGeneration,
+			currentGenerationBaselineVersion,
+		)
+	}
+	return current, nil
 }
 
 func loadEmbeddedMigrations() ([]embeddedMigration, error) {

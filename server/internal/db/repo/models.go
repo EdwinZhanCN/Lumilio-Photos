@@ -569,6 +569,16 @@ type SearchEmbedding struct {
 	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
+type SemanticVectorIndexState struct {
+	ID              int64             `db:"id" json:"id"`
+	Mode            string            `db:"mode" json:"mode"`
+	RowCount        int64             `db:"row_count" json:"row_count"`
+	TrainedRowCount int64             `db:"trained_row_count" json:"trained_row_count"`
+	RebuildPending  int64             `db:"rebuild_pending" json:"rebuild_pending"`
+	Config          string            `db:"config" json:"config"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type Setting struct {
 	ID                          int64             `db:"id" json:"id"`
 	LlmAgentEnabled             bool              `db:"llm_agent_enabled" json:"llm_agent_enabled"`

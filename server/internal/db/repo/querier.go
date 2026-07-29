@@ -447,7 +447,7 @@ type Querier interface {
 	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
 	InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error
-	// Dedicated fixed-dimension semantic search vectors (see migration 000012).
+	// Dedicated fixed-dimension authoritative semantic search vectors.
 	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 	InsertSearchEmbedding(ctx context.Context, arg InsertSearchEmbeddingParams) error
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)

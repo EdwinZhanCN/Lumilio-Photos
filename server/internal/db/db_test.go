@@ -85,8 +85,24 @@ func TestOpenMigrateAndReopenSQLiteCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inspect reopened catalog: %v", err)
 	}
-	if info.ApplicationMigration != 2 || info.RiverMigration == 0 || info.LibraryID == "" {
+	if info.ApplicationMigration != 3 || info.RiverMigration == 0 || info.LibraryID == "" {
 		t.Fatalf("unexpected catalog identity: %+v", info)
+	}
+}
+
+func TestParseVec1VersionIsPortableAcrossCPUBuilds(t *testing.T) {
+	for _, info := range []string{
+		"version 0.7 (NEON, multi-threaded)",
+		"version 0.7 (AVX2, multi-threaded)",
+		"version 0.7 (scalar, single-threaded)",
+	} {
+		version, err := parseVec1Version(info)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != "0.7" {
+			t.Fatalf("parseVec1Version(%q) = %q, want 0.7", info, version)
+		}
 	}
 }
 
@@ -152,7 +168,7 @@ func TestMigrationLedgerRejectsHistoricalChecksumChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
-		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 1
+		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 3
 	`, strings.Repeat("0", 64)); err != nil {
 		t.Fatal(err)
 	}
@@ -194,8 +210,34 @@ func TestMigrationRejectsIncompatibleSchemaGeneration(t *testing.T) {
 	}
 }
 
+func TestOpenRejectsOldGenerationBeforeDerivedModuleChecks(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(secureTempDir(t), "old-generation.sqlite3")
+	catalog, err := Open(ctx, config.DatabaseConfig{Path: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		CREATE TABLE assets (id INTEGER);
+		CREATE TABLE media_items (id INTEGER);
+		CREATE TABLE asset_stacks (id INTEGER);
+		PRAGMA user_version = 3;
+	`); err != nil {
+		_ = catalog.Close(ctx)
+		t.Fatal(err)
+	}
+	if err := catalog.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = Open(ctx, config.DatabaseConfig{Path: path})
+	if err == nil || !strings.Contains(err.Error(), "incompatible experimental schema generation") {
+		t.Fatalf("old-generation open error = %v", err)
+	}
+}
+
 func TestBioAlbumSchemaAndQueryLiteralsShareDomainValue(t *testing.T) {
-	baseline, err := migrations.FS.ReadFile("000001_sqlite_baseline.up.sql")
+	baseline, err := migrations.FS.ReadFile("000003_vec1_baseline.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

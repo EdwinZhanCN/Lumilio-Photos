@@ -10,15 +10,16 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	"server/config"
 	"server/internal/db/repo"
+	"server/internal/db/vec1ext"
 	"server/platform/fsprivacy"
 	"server/platform/sqliteuri"
 
-	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/mattn/go-sqlite3"
 )
 
@@ -30,8 +31,8 @@ const (
 )
 
 var (
-	registerVectorExtension sync.Once
-	registerSQLiteDriver    sync.Once
+	registerVec1Extension sync.Once
+	registerSQLiteDriver  sync.Once
 )
 
 // DB is the single SQLite runtime boundary used by application queries, River,
@@ -48,7 +49,7 @@ type CatalogInfo struct {
 	Path                     string
 	LibraryID                string
 	SQLiteVersion            string
-	VectorVersion            string
+	Vec1Version              string
 	ApplicationMigration     int64
 	RiverMigration           int64
 	SizeBytes                int64
@@ -68,7 +69,7 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 		return nil, err
 	}
 
-	registerVectorExtension.Do(sqlitevec.Auto)
+	registerVec1Extension.Do(vec1ext.Auto)
 	registerSQLiteDriver.Do(func() {
 		sql.Register(sqliteDriverName, &sqlite3.SQLiteDriver{
 			ConnectHook: configureSQLiteConnection,
@@ -104,6 +105,9 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	if err := claimOrVerifyCatalog(ctx, database); err != nil {
 		return closeOnError("verify identity of", err)
 	}
+	if err := assertSchemaGeneration(ctx, database); err != nil {
+		return closeOnError("verify schema generation of", err)
+	}
 	if err := validateIntegrity(ctx, database); err != nil {
 		return closeOnError("validate", err)
 	}
@@ -111,15 +115,18 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 		return closeOnError("secure", err)
 	}
 
-	var sqliteVersion, vectorVersion string
-	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec_version()").Scan(&sqliteVersion, &vectorVersion); err != nil {
+	var sqliteVersion, vec1Info string
+	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec1_info()").Scan(&sqliteVersion, &vec1Info); err != nil {
 		return closeOnError("probe versions for", err)
 	}
+	if _, err := parseVec1Version(vec1Info); err != nil {
+		return closeOnError("probe Vec1 version for", err)
+	}
 	log.Printf(
-		"SQLite catalog opened: location=%s sqlite=%s vector=%s writer_connections=1",
+		"SQLite catalog opened: location=%s sqlite=%s vec1=%s writer_connections=1",
 		safeLocation(path),
 		sqliteVersion,
-		vectorVersion,
+		vec1Info,
 	)
 
 	return &DB{
@@ -180,7 +187,7 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	}
 	cleanPath = filepath.Clean(cleanPath)
 
-	registerVectorExtension.Do(sqlitevec.Auto)
+	registerVec1Extension.Do(vec1ext.Auto)
 	query := make(url.Values)
 	query.Set("mode", "ro")
 	if immutable {
@@ -228,8 +235,13 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 		return CatalogInfo{}, fmt.Errorf("SQLite foreign_key_check found %d violations", info.ForeignKeyViolationCount)
 	}
 
-	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec_version()").Scan(&info.SQLiteVersion, &info.VectorVersion); err != nil {
+	var vec1Info string
+	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec1_info()").Scan(&info.SQLiteVersion, &vec1Info); err != nil {
 		return CatalogInfo{}, fmt.Errorf("probe SQLite snapshot versions: %w", err)
+	}
+	info.Vec1Version, err = parseVec1Version(vec1Info)
+	if err != nil {
+		return CatalogInfo{}, fmt.Errorf("probe SQLite snapshot Vec1 version: %w", err)
 	}
 	if err := database.QueryRowContext(ctx, "SELECT library_id FROM system_state WHERE id = 1").Scan(&info.LibraryID); err != nil {
 		return CatalogInfo{}, fmt.Errorf("read SQLite library identity: %w", err)
@@ -246,6 +258,18 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	}
 	info.SizeBytes = fileInfo.Size()
 	return info, nil
+}
+
+func parseVec1Version(info string) (string, error) {
+	const prefix = "version "
+	if !strings.HasPrefix(info, prefix) {
+		return "", fmt.Errorf("unexpected vec1_info() value %q", info)
+	}
+	version, _, _ := strings.Cut(strings.TrimPrefix(info, prefix), " ")
+	if version == "" {
+		return "", fmt.Errorf("unexpected vec1_info() value %q", info)
+	}
+	return version, nil
 }
 
 // Close performs bounded maintenance after HTTP and River have drained, then
