@@ -1059,6 +1059,7 @@ type StackFilterDTO struct {
 // AssetFilterDTO represents comprehensive filtering options
 type AssetFilterDTO struct {
 	RepositoryID *string             `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	EventID      *string             `json:"event_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 	AlbumID      *int                `json:"album_id,omitempty" example:"123"`
 	Type         *string             `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
 	Types        []string            `json:"types,omitempty" example:"PHOTO,VIDEO"` // Multiple asset types

@@ -104,6 +104,41 @@ func (l *AuthorizedLibrary) FilterAssetIDs(ctx context.Context, params repo.GetM
 	return ids, nil
 }
 
+func (l *AuthorizedLibrary) EventAssetIDs(ctx context.Context, eventID string, limit int64) ([]uuid.UUID, error) {
+	rows, err := l.queries.GetEventAssetIDsForAgent(ctx, repo.GetEventAssetIDsForAgentParams{
+		EventID: eventID, OwnerID: l.userID, Limit: limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, value := range rows {
+		var raw string
+		switch id := value.(type) {
+		case string:
+			raw = id
+		case []byte:
+			raw = string(id)
+		case nil:
+			continue
+		default:
+			return nil, fmt.Errorf("unexpected Event asset ID type %T", value)
+		}
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+func (l *AuthorizedLibrary) LookupEvents(ctx context.Context, query *string, limit int64) ([]repo.AgentLookupEventsRow, error) {
+	return l.queries.AgentLookupEvents(ctx, repo.AgentLookupEventsParams{
+		OwnerID: l.userID, TitleQuery: query, Limit: limit,
+	})
+}
+
 func (l *AuthorizedLibrary) SearchSemantic(ctx context.Context, query string, strictness search.SetStrictness, maxResults int) ([]uuid.UUID, search.SetMeta, error) {
 	if l.search == nil {
 		return nil, search.SetMeta{}, errors.New("search unavailable")

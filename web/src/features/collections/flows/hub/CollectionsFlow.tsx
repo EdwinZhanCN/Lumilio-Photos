@@ -1,6 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
-import { Album, ArrowRight, FolderTree, LibraryBig, MapPin, Users, Wrench } from "lucide-react";
+import {
+  Album,
+  ArrowRight,
+  CalendarRange,
+  FolderTree,
+  LibraryBig,
+  MapPin,
+  Users,
+  Wrench,
+} from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import PageHeader from "@/components/ui/PageHeader";
 import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
@@ -58,6 +67,29 @@ function CollectionsContent() {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">
         <div className="space-y-6">
+          <section className="card card-border bg-base-100">
+            <div className="card-body flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-box bg-base-200 p-3">
+                  <CalendarRange className="size-5" />
+                </div>
+                <div>
+                  <h2 className="card-title">{t("events.title", "Events")}</h2>
+                  <p className="text-sm text-base-content/60">
+                    {t("events.hubDescription", "Media organized by time and place")}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => navigate("/collections/events")}
+              >
+                {t("common.viewAll")}
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+          </section>
           {isAlbumsError && (
             <CollectionErrorAlert
               message={t("collections.messages.loadAlbumsError", {

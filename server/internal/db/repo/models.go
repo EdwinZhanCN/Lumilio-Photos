@@ -312,6 +312,75 @@ type EmbeddingSpace struct {
 	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type Event struct {
+	EventID                   string            `db:"event_id" json:"event_id"`
+	OwnerID                   int32             `db:"owner_id" json:"owner_id"`
+	Status                    string            `db:"status" json:"status"`
+	StartAt                   int64             `db:"start_at" json:"start_at"`
+	EndAt                     int64             `db:"end_at" json:"end_at"`
+	Timezone                  *string           `db:"timezone" json:"timezone"`
+	GeneratedTitle            *string           `db:"generated_title" json:"generated_title"`
+	TitleOverride             *string           `db:"title_override" json:"title_override"`
+	GeneratedCoverMediaItemID *string           `db:"generated_cover_media_item_id" json:"generated_cover_media_item_id"`
+	CoverOverrideMediaItemID  *string           `db:"cover_override_media_item_id" json:"cover_override_media_item_id"`
+	IsHidden                  bool              `db:"is_hidden" json:"is_hidden"`
+	AlgorithmVersion          string            `db:"algorithm_version" json:"algorithm_version"`
+	CreatedAt                 dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt                 dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type EventConstraint struct {
+	ConstraintID     string            `db:"constraint_id" json:"constraint_id"`
+	OwnerID          int32             `db:"owner_id" json:"owner_id"`
+	Kind             string            `db:"kind" json:"kind"`
+	EventID          *string           `db:"event_id" json:"event_id"`
+	LeftMediaItemID  string            `db:"left_media_item_id" json:"left_media_item_id"`
+	RightMediaItemID *string           `db:"right_media_item_id" json:"right_media_item_id"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type EventDirtyRange struct {
+	DirtyRangeID string            `db:"dirty_range_id" json:"dirty_range_id"`
+	OwnerID      int32             `db:"owner_id" json:"owner_id"`
+	RangeStart   int64             `db:"range_start" json:"range_start"`
+	RangeEnd     int64             `db:"range_end" json:"range_end"`
+	Reason       string            `db:"reason" json:"reason"`
+	ClaimedAt    *int64            `db:"claimed_at" json:"claimed_at"`
+	ClaimToken   *string           `db:"claim_token" json:"claim_token"`
+	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
+}
+
+type EventMediaItem struct {
+	EventID         string            `db:"event_id" json:"event_id"`
+	OwnerID         int32             `db:"owner_id" json:"owner_id"`
+	MediaItemID     uuid.UUID         `db:"media_item_id" json:"media_item_id"`
+	Position        int64             `db:"position" json:"position"`
+	Source          string            `db:"source" json:"source"`
+	Confidence      *float64          `db:"confidence" json:"confidence"`
+	Evidence        string            `db:"evidence" json:"evidence"`
+	DerivationRunID *string           `db:"derivation_run_id" json:"derivation_run_id"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+}
+
+type EventOwnerState struct {
+	OwnerID                int32             `db:"owner_id" json:"owner_id"`
+	ActiveAlgorithmVersion string            `db:"active_algorithm_version" json:"active_algorithm_version"`
+	InitializedAt          int64             `db:"initialized_at" json:"initialized_at"`
+	LastFullRebuildAt      *int64            `db:"last_full_rebuild_at" json:"last_full_rebuild_at"`
+	AutomaticRebuildPaused int64             `db:"automatic_rebuild_paused" json:"automatic_rebuild_paused"`
+	Revision               int64             `db:"revision" json:"revision"`
+	UpdatedAt              dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type EventRedirect struct {
+	OldEventID string            `db:"old_event_id" json:"old_event_id"`
+	OwnerID    int32             `db:"owner_id" json:"owner_id"`
+	NewEventID string            `db:"new_event_id" json:"new_event_id"`
+	Reason     string            `db:"reason" json:"reason"`
+	CreatedAt  dbtypes.Timestamp `db:"created_at" json:"created_at"`
+}
+
 type FaceCluster struct {
 	ClusterID            int32             `db:"cluster_id" json:"cluster_id"`
 	OwnerID              *int32            `db:"owner_id" json:"owner_id"`

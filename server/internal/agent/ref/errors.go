@@ -15,6 +15,7 @@ const (
 	CodeFeatureUnavailable Code = "FeatureUnavailable"
 	CodeResourceExhausted  Code = "resource_exhausted"
 	CodeInternal           Code = "Internal"
+	CodeEventRefTooLarge   Code = "event_ref_too_large"
 )
 
 // Error is the typed, agent-readable error envelope. Message states what

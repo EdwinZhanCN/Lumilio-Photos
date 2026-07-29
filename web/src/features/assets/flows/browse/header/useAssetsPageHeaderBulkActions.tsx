@@ -20,6 +20,7 @@ import {
   resolveBrowseSelectedAssetIds,
   resolveSelectedBrowseItems,
 } from "../../../model/browseItems";
+import { toSelectedLogicalMedia } from "../../../model/selectedLogicalMedia";
 import type { TagPickerItem } from "../../../components/TagPickerMenu";
 import type { AssetsPageHeaderProps, ConfirmableBulkAction } from "./types";
 
@@ -89,6 +90,10 @@ export function useAssetsPageHeaderBulkActions({
       item.type === "stack" ? item.assets : [getBrowseItemAsset(item)],
     );
   }, [selection.enabled, selection.selectedCount, selectedBrowseItems]);
+  const selectedLogicalMedia = useMemo(
+    () => selectedBrowseItems.map(toSelectedLogicalMedia),
+    [selectedBrowseItems],
+  );
 
   const bulkActionContext = useMemo<AssetsBulkActionContext>(
     () => ({
@@ -96,12 +101,14 @@ export function useAssetsPageHeaderBulkActions({
       affectedAssetCount,
       selectedAssetIds: resolvedSelectedAssetIds,
       selectedAssets,
+      selectedLogicalMedia,
       clearSelection: selection.clear,
     }),
     [
       affectedAssetCount,
       resolvedSelectedAssetIds,
       selectedAssets,
+      selectedLogicalMedia,
       selectedItemCount,
       selection.clear,
     ],

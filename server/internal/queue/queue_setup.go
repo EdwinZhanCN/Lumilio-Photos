@@ -53,6 +53,7 @@ func New(dbpool *sql.DB, workers *river.Workers, logger *slog.Logger) (*river.Cl
 		"retry_asset":               {MaxWorkers: 2},
 		"reindex_assets":            {MaxWorkers: 1},
 		"rebuild_location_clusters": {MaxWorkers: 1},
+		"rebuild_events":            {MaxWorkers: 1},
 		"scan_repository":           {MaxWorkers: 1},
 		"db_backup":                 {MaxWorkers: 1},
 		"detect_stacks":             {MaxWorkers: 1},

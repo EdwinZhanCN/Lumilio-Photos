@@ -474,10 +474,27 @@ func (m *SourceMaterializer) findExistingContent(ctx context.Context, repository
 
 func (m *SourceMaterializer) createAssetWithMediaItem(ctx context.Context, params repo.CreateAssetParams, relation repo.StackRelation) (*repo.Asset, error) {
 	var created *repo.Asset
-	err := m.database.WithTx(ctx, func(_ *sql.Tx, queries *repo.Queries) error {
+	err := m.database.WithTx(ctx, func(tx *sql.Tx, queries *repo.Queries) error {
 		var err error
 		created, err = createAssetWithMediaItem(ctx, queries, params, relation)
-		return err
+		if err != nil || created.OwnerID == nil {
+			return err
+		}
+		capturedAt := created.UploadTime.Time.UTC().UnixMicro()
+		now := time.Now().UTC().UnixMicro()
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO event_dirty_ranges(
+ dirty_range_id,owner_id,range_start,range_end,reason,created_at
+) VALUES(?,?,?,?,?,?)`,
+			uuid.NewString(), *created.OwnerID, capturedAt, capturedAt, "media_item_created", now); err != nil {
+			return fmt.Errorf("mark Event range dirty: %w", err)
+		}
+		args := jobs.EventRebuildArgs{OwnerID: *created.OwnerID}
+		opts := args.InsertOpts()
+		if _, err := m.queueClient.InsertTx(ctx, tx, args, &opts); err != nil {
+			return fmt.Errorf("enqueue Event rebuild: %w", err)
+		}
+		return nil
 	})
 	return created, err
 }
