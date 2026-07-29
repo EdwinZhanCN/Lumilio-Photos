@@ -113,29 +113,31 @@ func TestRequiredPasswordChangeTokenRejectsWrongPurposeAndSigningMethod(t *testi
 	require.ErrorIs(t, err, ErrInvalidPasswordChangeToken)
 }
 
-func TestPasskeyIdentityIsStaticAndExact(t *testing.T) {
+func TestPasskeyIdentityFollowsCurrentRequestOrigin(t *testing.T) {
 	svc, err := NewAuthService(nil, nil, config.AuthConfig{
 		SecretKeyFile: filepath.Join(t.TempDir(), "secret"),
 		Passkey: config.PasskeyConfig{
 			Enabled: true,
 			Name:    "Lumilio Photos",
 		},
-		PasskeyIdentity: config.PasskeyIdentity{
-			Origin: "https://photos.example.com",
-			RPID:   "photos.example.com",
-		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, "photos.example.com", svc.webauthn.Config.RPID)
-	require.Equal(t, []string{"https://photos.example.com"}, svc.webauthn.Config.RPOrigins)
 
 	wa, origin, err := svc.newWebAuthnForOrigin("https://PHOTOS.example.com:443")
 	require.NoError(t, err)
-	require.Same(t, svc.webauthn, wa)
 	require.Equal(t, "https://photos.example.com", origin)
+	require.Equal(t, "photos.example.com", wa.Config.RPID)
+	require.Equal(t, []string{"https://photos.example.com"}, wa.Config.RPOrigins)
 
-	_, _, err = svc.newWebAuthnForOrigin("https://evil.example.com")
-	require.Error(t, err)
+	second, secondOrigin, err := svc.newWebAuthnForOrigin("https://family.example.net")
+	require.NoError(t, err)
+	require.Equal(t, "https://family.example.net", secondOrigin)
+	require.Equal(t, "family.example.net", second.Config.RPID)
+
+	_, _, err = svc.newWebAuthnForOrigin("http://192.168.1.20:6680")
+	require.ErrorIs(t, err, ErrPasskeyNotConfigured)
+	_, _, err = svc.newWebAuthnForOrigin("https://203.0.113.10")
+	require.ErrorIs(t, err, ErrPasskeyNotConfigured)
 
 	valid := &passkeyChallengeClaims{
 		Origin: "https://photos.example.com",
@@ -143,16 +145,14 @@ func TestPasskeyIdentityIsStaticAndExact(t *testing.T) {
 			RelyingPartyID: "photos.example.com",
 		},
 	}
-	_, err = svc.newWebAuthnForChallenge(valid)
+	_, err = svc.newWebAuthnForChallenge(valid, "https://photos.example.com")
 	require.NoError(t, err)
 
-	wrongOrigin := *valid
-	wrongOrigin.Origin = "https://evil.example.com"
-	_, err = svc.newWebAuthnForChallenge(&wrongOrigin)
+	_, err = svc.newWebAuthnForChallenge(valid, "https://family.example.net")
 	require.True(t, errors.Is(err, ErrInvalidPasskeyChallenge))
 
 	wrongRPID := *valid
 	wrongRPID.SessionData.RelyingPartyID = "example.com"
-	_, err = svc.newWebAuthnForChallenge(&wrongRPID)
+	_, err = svc.newWebAuthnForChallenge(&wrongRPID, "https://photos.example.com")
 	require.True(t, errors.Is(err, ErrInvalidPasskeyChallenge))
 }

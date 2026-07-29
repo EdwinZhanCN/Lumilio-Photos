@@ -1,0 +1,12 @@
+# Default Linux deployment. Host networking preserves Lumen mDNS discovery and
+# makes Lumilio available at http://<host-ip>:6680 without a domain or proxy.
+name: lumilio-photos
+
+services:
+    lumilio:
+        image: ${LUMILIO_IMAGE:-ghcr.io/edwinzhancn/lumilio-server:latest}
+        restart: unless-stopped
+        network_mode: host
+        volumes:
+            - ${LUMILIO_STORAGE:-./lumilio/media}:/data/storage
+            - ${LUMILIO_STATE:-./lumilio/app-state}:/data/app-state

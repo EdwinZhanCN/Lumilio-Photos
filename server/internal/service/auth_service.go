@@ -19,8 +19,6 @@ import (
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 
-	"github.com/go-webauthn/webauthn/protocol"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -113,9 +111,7 @@ type AuthService struct {
 	refreshTokenTTL           time.Duration
 	mediaTokenTTL             time.Duration
 	passkeyEnabled            bool
-	passkeyOrigin             string
-	passkeyRPID               string
-	webauthn                  *webauthn.WebAuthn
+	passkeyName               string
 	logger                    *zap.Logger
 	securityLogger            *zap.Logger
 }
@@ -166,26 +162,10 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 	csrfTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "csrf.refresh.binding.v1")
 	mfaEncryptKey := secretbox.DeriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
-	var webAuthnInstance *webauthn.WebAuthn
+	passkeyName := strings.TrimSpace(cfg.Passkey.Name)
 	if cfg.Passkey.Enabled {
-		if cfg.PasskeyIdentity.Origin == "" || cfg.PasskeyIdentity.RPID == "" {
-			return nil, errors.New("passkey identity must be derived from server.primary_origin")
-		}
-		displayName := strings.TrimSpace(cfg.Passkey.Name)
-		if displayName == "" {
+		if passkeyName == "" {
 			return nil, errors.New("passkey display name is required")
-		}
-		webAuthnInstance, err = webauthn.New(&webauthn.Config{
-			RPID:          cfg.PasskeyIdentity.RPID,
-			RPDisplayName: displayName,
-			RPOrigins:     []string{cfg.PasskeyIdentity.Origin},
-			AuthenticatorSelection: protocol.AuthenticatorSelection{
-				ResidentKey:      protocol.ResidentKeyRequirementRequired,
-				UserVerification: protocol.VerificationRequired,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("initialize passkey identity: %w", err)
 		}
 	}
 
@@ -203,9 +183,7 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 		refreshTokenTTL:           cfg.RefreshTokenTTL,
 		mediaTokenTTL:             cfg.MediaTokenTTL,
 		passkeyEnabled:            cfg.Passkey.Enabled,
-		passkeyOrigin:             cfg.PasskeyIdentity.Origin,
-		passkeyRPID:               cfg.PasskeyIdentity.RPID,
-		webauthn:                  webAuthnInstance,
+		passkeyName:               passkeyName,
 		logger:                    logger,
 		securityLogger:            securityLogger,
 	}, nil

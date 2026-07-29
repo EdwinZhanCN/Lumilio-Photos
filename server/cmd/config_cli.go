@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,29 +46,29 @@ func runConfigInit(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("server config init", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	profile := flags.String("profile", "", strings.Join(config.ProfileNames(true), " or "))
-	origin := flags.String("origin", "", "canonical browser origin")
+	hostname := flags.String("hostname", "", "ACME certificate hostname (docker-acme)")
 	email := flags.String("email", "", "ACME account email (docker-acme)")
-	listen := flags.String("listen", "", "application listener (docker-external-proxy; defaults to 127.0.0.1:6680)")
+	listen := flags.String("listen", "", "application listener (docker-http; defaults to :6680)")
 	output := flags.String("output", "", "destination server.toml")
 	force := flags.Bool("force", false, "replace an existing output file")
 	stateDir := flags.String("state-dir", "", "application state path (uses the profile default when empty)")
 	storageDir := flags.String("storage-dir", "", "media storage path (uses the profile default when empty)")
 	var trustedProxies repeatedStrings
-	flags.Var(&trustedProxies, "trusted-proxy", "trusted proxy CIDR (repeatable)")
+	flags.Var(&trustedProxies, "trusted-proxy", "proxy CIDR trusted for client-IP recovery (repeatable)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return errors.New("config init does not accept positional arguments")
 	}
-	if strings.TrimSpace(*profile) == "" || strings.TrimSpace(*origin) == "" || strings.TrimSpace(*output) == "" {
-		return errors.New("config init requires --profile, --origin, and --output")
+	if strings.TrimSpace(*profile) == "" || strings.TrimSpace(*output) == "" {
+		return errors.New("config init requires --profile and --output")
 	}
 
 	data, err := config.GenerateManifest(
 		config.ProfileName(strings.TrimSpace(*profile)),
 		config.ProfileInputs{
-			Origin:            strings.TrimSpace(*origin),
+			Hostname:          strings.TrimSpace(*hostname),
 			Email:             strings.TrimSpace(*email),
 			Listen:            strings.TrimSpace(*listen),
 			TrustedProxyCIDRs: trustedProxies,
@@ -154,18 +153,17 @@ func runConfigValidate(args []string, stdout, stderr io.Writer) error {
 }
 
 func writeConfigReport(output io.Writer, cfg config.AppConfig) {
-	fmt.Fprintf(output, "primary origin: %s\n", cfg.ServerConfig.PrimaryOrigin)
-	fmt.Fprintf(output, "passkey RP ID: %s\n", cfg.Auth.PasskeyIdentity.RPID)
+	fmt.Fprintln(output, "browser origin: derived from each request")
+	fmt.Fprintln(output, "passkey RP ID: derived from each secure browser origin")
 	fmt.Fprintf(output, "application listener: %s\n", cfg.ServerConfig.Listen)
 	fmt.Fprintf(output, "TLS owner: %s\n", cfg.ServerConfig.TLS.Mode)
-	fmt.Fprintf(output, "proxy mode: %s\n", cfg.ServerConfig.Proxy.Mode)
 	if cfg.ServerConfig.TLS.Mode == config.TLSModeACME {
+		fmt.Fprintf(output, "ACME hostname: %s\n", cfg.ServerConfig.TLS.Hostname)
 		fmt.Fprintf(output, "ACME HTTP listener: %s\n", cfg.ServerConfig.TLS.HTTPListen)
 		fmt.Fprintln(output, "required host ports: the host-network container binds TCP 80 and 443 directly")
 	}
-	if cfg.ServerConfig.TLS.Mode == config.TLSModeExternal {
-		fmt.Fprintf(output, "trusted proxy CIDRs: %s\n", prefixesString(cfg.ServerConfig.Proxy.TrustedCIDRs))
-		fmt.Fprintln(output, "network boundary: publish HTTPS on the reverse proxy; keep the application listener loopback-only or firewalled to the remote proxy")
+	if len(cfg.ServerConfig.Proxy.TrustedCIDRs) != 0 {
+		fmt.Fprintf(output, "trusted client-IP proxy CIDRs: %s\n", prefixesString(cfg.ServerConfig.Proxy.TrustedCIDRs))
 	}
 	if cfg.ServerConfig.TLS.Mode == config.TLSModeOff {
 		fmt.Fprintln(output, "security warning: plaintext HTTP; use only for local development or an explicitly accepted LAN profile")
@@ -211,11 +209,10 @@ func checkRuntimeHealth(ctx context.Context, server config.ServerConfig) error {
 	requestURL := "http://" + dialAddress + "/api/v1/health/ready"
 	transport := &http.Transport{}
 	if server.TLS.Mode == config.TLSModeACME {
-		requestURL = server.PrimaryOrigin + "/api/v1/health/ready"
-		primary, _ := url.Parse(server.PrimaryOrigin)
+		requestURL = "https://" + server.TLS.Hostname + "/api/v1/health/ready"
 		transport.TLSClientConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
-			ServerName: primary.Hostname(),
+			ServerName: server.TLS.Hostname,
 		}
 		transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, dialAddress)

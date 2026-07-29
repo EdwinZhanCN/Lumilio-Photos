@@ -15,7 +15,6 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -601,8 +600,7 @@ func run(
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
 	docs.SwaggerInfo.Description = "Photo management system API with asset upload, processing, and organization features"
 	docs.SwaggerInfo.Version = "1.0"
-	primaryURL, _ := url.Parse(appConfig.ServerConfig.PrimaryOrigin)
-	docs.SwaggerInfo.Host = primaryURL.Host
+	docs.SwaggerInfo.Host = ""
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
 	// Set up router with new asset, album, auth, stats and agent endpoints
@@ -692,14 +690,11 @@ func run(
 	appLogger.Info("server starting",
 		zap.String("operation", "server.listen"),
 		zap.String("listen", appConfig.ServerConfig.Listen),
-		zap.String("primary_origin", appConfig.ServerConfig.PrimaryOrigin),
-		zap.String("passkey_rp_id", appConfig.Auth.PasskeyIdentity.RPID),
+		zap.String("origin_policy", "request-derived"),
 		zap.String("tls_mode", string(appConfig.ServerConfig.TLS.Mode)),
-		zap.String("proxy_mode", string(appConfig.ServerConfig.Proxy.Mode)),
 		zap.Int("trusted_proxy_cidr_count", len(appConfig.ServerConfig.Proxy.TrustedCIDRs)),
+		zap.String("acme_hostname", appConfig.ServerConfig.TLS.Hostname),
 		zap.String("acme_storage_path", appConfig.ServerConfig.TLS.StoragePath),
-		zap.String("swagger_url", appConfig.ServerConfig.PrimaryOrigin+"/swagger/index.html"),
-		zap.String("health_url", appConfig.ServerConfig.PrimaryOrigin+"/api/v1/health"),
 	)
 
 	// Serve in a goroutine so this function can block on ctx and drive a

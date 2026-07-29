@@ -6,18 +6,17 @@ path = "/data/app-state/library.sqlite3"
 
 [server]
 listen = "0.0.0.0:6680"
-primary_origin = "http://localhost:16657"
 cors_allowed_origins = []
 web_root = "/app/web"
 
 [server.tls]
 mode = "off"
+hostname = ""
 http_listen = ""
 email = ""
 storage_path = ""
 
 [server.proxy]
-mode = "disabled"
 trusted_cidrs = []
 
 [logging]

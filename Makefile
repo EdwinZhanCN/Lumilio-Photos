@@ -69,9 +69,9 @@ architecture-check:
 	./scripts/check-architecture.sh
 
 compose-test:
+	docker compose -f deploy/compose/compose.yml config --quiet
 	LUMILIO_STORAGE=/srv/lumilio/media LUMILIO_STATE=/srv/lumilio/state LUMILIO_DOMAIN=photos.example.com docker compose -f deploy/compose/compose.caddy.yml config --quiet
 	LUMILIO_STORAGE=/srv/lumilio/media LUMILIO_STATE=/srv/lumilio/state docker compose -f deploy/compose/compose.acme.yml config --quiet
-	LUMILIO_STORAGE=/srv/lumilio/media LUMILIO_STATE=/srv/lumilio/state docker compose -f deploy/compose/compose.proxy.yml config --quiet
 	docker compose -f web/e2e/compose.yml -f web/e2e/compose.ci.yml config --quiet
 
 server-test: architecture-check
@@ -126,7 +126,6 @@ dev-config:
 	@echo "==> Generating $(DEV_CONFIG)"
 	cd $(SERVER_DIR) && $(GO) run $(GO_TAG_FLAGS) ./cmd config init \
 		--profile dev-vite \
-		--origin "$(DEV_ORIGIN)" \
 		--state-dir ../state \
 		--storage-dir ../storage \
 		--output "$(DEV_CONFIG)" \

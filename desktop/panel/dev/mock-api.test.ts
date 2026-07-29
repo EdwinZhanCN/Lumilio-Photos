@@ -5,19 +5,11 @@ describe("control-panel development scenarios", () => {
   it("models all network deployment summaries from resolved facts", () => {
     expect(networkPayload("local")).toMatchObject({
       mode: "local",
-      tlsMode: "off",
-      trustedProxyCIDRs: [],
+      listen: "127.0.0.1:6680",
     });
     expect(networkPayload("lan")).toMatchObject({
       mode: "lan_http",
       listen: "0.0.0.0:6680",
-      remotePasskeyAvailable: false,
-    });
-    expect(networkPayload("external")).toMatchObject({
-      mode: "external_https",
-      tlsMode: "external",
-      proxyMode: "required",
-      rpID: "photos.example.com",
     });
   });
 
@@ -37,7 +29,7 @@ describe("control-panel development scenarios", () => {
   });
 
   it("exposes only the typed runtime contract and host-only network facts", () => {
-    const payload = statePayload("failed", "dashboard", "external", "failed");
+    const payload = statePayload("failed", "dashboard", "lan", "failed");
     expect(payload).not.toHaveProperty("ready");
     expect(payload).not.toHaveProperty("serverURL");
     expect(payload).not.toHaveProperty("stage");
@@ -45,7 +37,7 @@ describe("control-panel development scenarios", () => {
     expect(payload.runtime).toMatchObject({
       phase: "failed",
       errorCode: "startup_failed",
-      network: { mode: "external_https", trustedProxyCIDRs: ["127.0.0.1/32", "::1/128"] },
+      network: { mode: "lan_http", listen: "0.0.0.0:6680" },
     });
     expect(payload.networkHost).toEqual({
       lanWarningAcceptedVersion: 0,
@@ -58,11 +50,11 @@ describe("control-panel development scenarios", () => {
       valid: false,
       issues: [{ field: "server.tls.mode", code: "unsupported_desktop_tls" }],
     });
-    expect(validationPayload('[logging]\nlevel = "debug"', "external")).toMatchObject({
+    expect(validationPayload('[logging]\nlevel = "debug"', "lan")).toMatchObject({
       valid: true,
       requiresRestart: true,
       semanticChanges: [{ field: "logging.level", before: "info", after: "debug" }],
-      network: { mode: "external_https" },
+      network: { mode: "lan_http" },
     });
   });
 });

@@ -9,8 +9,7 @@ package config
 // rejects a config the server accepts.
 var (
 	environmentValues   = []string{"development", "production", "test"}
-	tlsModeValues       = []string{string(TLSModeOff), string(TLSModeACME), string(TLSModeExternal)}
-	proxyModeValues     = []string{string(ProxyModeDisabled), string(ProxyModeRequired)}
+	tlsModeValues       = []string{string(TLSModeOff), string(TLSModeACME)}
 	logLevelValues      = []string{"debug", "info", "warn", "error"}
 	logFormatValues     = []string{"console", "json"}
 	geocodingProviders  = []string{"disabled", "nominatim"}

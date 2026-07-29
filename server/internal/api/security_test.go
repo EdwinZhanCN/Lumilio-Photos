@@ -19,7 +19,7 @@ func TestCORSMiddlewareSeparatesCredentialedAndOpenAPIRequests(t *testing.T) {
 	newRouter := func(t *testing.T, reached *bool) *gin.Engine {
 		t.Helper()
 		router := gin.New()
-		policy := testOriginPolicy(t, "http://api.example.test", []string{trustedOrigin})
+		policy := testOriginPolicy(t, []string{trustedOrigin})
 		router.Use(originPolicyMiddleware(policy))
 		router.Use(corsMiddleware(policy))
 		router.Any("/probe", func(c *gin.Context) {
@@ -99,7 +99,7 @@ func TestTrustedSessionOriginMiddleware(t *testing.T) {
 
 	testRequest := func(origin, referer, fetchSite string) int {
 		router := gin.New()
-		policy := testOriginPolicy(t, "http://photos.example.test", []string{trustedOrigin})
+		policy := testOriginPolicy(t, []string{trustedOrigin})
 		router.Use(originPolicyMiddleware(policy))
 		router.Use(trustedSessionOriginMiddleware(policy))
 		router.POST("/session", func(c *gin.Context) {
@@ -133,13 +133,11 @@ func TestTrustedSessionOriginMiddleware(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, testRequest("", "not a URL", ""))
 }
 
-func testOriginPolicy(t *testing.T, primaryOrigin string, cors []string) *httporigin.Policy {
+func testOriginPolicy(t *testing.T, cors []string) *httporigin.Policy {
 	t.Helper()
 	policy, err := httporigin.New(config.ServerConfig{
-		PrimaryOrigin:      primaryOrigin,
 		CORSAllowedOrigins: cors,
 		TLS:                config.TLSConfig{Mode: config.TLSModeOff},
-		Proxy:              config.ProxyConfig{Mode: config.ProxyModeDisabled},
 	}, config.PasskeyConfig{Enabled: true, Name: "Lumilio Photos"})
 	require.NoError(t, err)
 	return policy

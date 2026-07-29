@@ -13,7 +13,7 @@
         "production",
         "test"
       ],
-      "description": "Deployment environment. Selects test-only affordances; it does not relax\nany origin, TLS, or proxy rule."
+      "description": "Deployment environment. Selects test-only affordances; it does not relax\nruntime manifest validation."
     },
     "database": {
       "properties": {
@@ -34,16 +34,12 @@
           "type": "string",
           "description": "Local socket the application listener binds, as host:port or :port.\nNever a URL, and never given a port implicitly. 127.0.0.1 is loopback\nonly; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface."
         },
-        "primary_origin": {
-          "type": "string",
-          "description": "The one canonical browser origin. It fixes the cookie and CSRF baseline,\nthe WebAuthn origin, and the RP ID derived from its hostname. Scheme plus\nhost plus optional port only: no userinfo, path, query, or fragment."
-        },
         "cors_allowed_origins": {
           "items": {
             "type": "string"
           },
           "type": "array",
-          "description": "Extra browser origins allowed to make credentialed cross-origin calls,\nsuch as a local Vite dev server. This does not widen the WebAuthn allowed\norigins and does not define the canonical identity. Empty for a\nsame-origin SPA deployment."
+          "description": "Extra browser origins allowed to make credentialed cross-origin calls,\nsuch as a local Vite dev server. Empty for a same-origin SPA deployment."
         },
         "web_root": {
           "type": "string",
@@ -55,14 +51,17 @@
               "type": "string",
               "enum": [
                 "off",
-                "acme",
-                "external"
+                "acme"
               ],
-              "description": "Who terminates HTTPS. \"off\" is plaintext and requires an http\nprimary_origin; \"acme\" makes this server obtain its own certificate and\nrequires an https primary_origin with a real hostname; \"external\" puts a\nreverse proxy in front and requires proxy.mode = required."
+              "description": "Whether this process serves plaintext HTTP or obtains its own ACME\ncertificate. External proxies use mode = \"off\" for the upstream."
+            },
+            "hostname": {
+              "type": "string",
+              "description": "Public certificate hostname. Non-empty if and only if mode = \"acme\"."
             },
             "http_listen": {
               "type": "string",
-              "description": "Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to\nprimary_origin. Non-empty if and only if mode = \"acme\"."
+              "description": "Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to\nthe ACME hostname. Non-empty if and only if mode = \"acme\"."
             },
             "email": {
               "type": "string",
@@ -77,6 +76,7 @@
           "type": "object",
           "required": [
             "mode",
+            "hostname",
             "http_listen",
             "email",
             "storage_path"
@@ -84,26 +84,17 @@
         },
         "proxy": {
           "properties": {
-            "mode": {
-              "type": "string",
-              "enum": [
-                "disabled",
-                "required"
-              ],
-              "description": "Whether a trusted reverse proxy is mandatory. \"disabled\" ignores every\nForwarded and X-Forwarded-* header. \"required\" rejects application\ntraffic whose immediate peer is outside trusted_cidrs, which is what\nstops a direct client from forging X-Forwarded-Proto: https."
-            },
             "trusted_cidrs": {
               "items": {
                 "type": "string"
               },
               "type": "array",
-              "description": "CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to\nthe immediate peer, not to any address inside a forwarded chain. Must be\nempty when mode = \"disabled\" and hold at least one entry when required."
+              "description": "CIDRs whose immediate TCP peer may supply X-Forwarded-For. This controls\nclient-IP recovery only; reverse-proxy access never depends on this list."
             }
           },
           "additionalProperties": false,
           "type": "object",
           "required": [
-            "mode",
             "trusted_cidrs"
           ]
         }
@@ -112,7 +103,6 @@
       "type": "object",
       "required": [
         "listen",
-        "primary_origin",
         "cors_allowed_origins",
         "web_root",
         "tls",
@@ -276,11 +266,11 @@
           "properties": {
             "enabled": {
               "type": "boolean",
-              "description": "Whether WebAuthn is offered. When true, primary_origin must be https or\nexactly http://localhost; an http LAN address or bare IP is rejected\nbecause browsers will not treat it as a secure context."
+              "description": "Whether WebAuthn is offered on secure request origins. HTTP LAN addresses\nremain usable with password and TOTP but cannot use passkeys."
             },
             "name": {
               "type": "string",
-              "description": "Relying-party display name shown in the browser prompt. Cosmetic: the RP\nID itself always comes from the primary_origin hostname."
+              "description": "Relying-party display name shown in the browser prompt."
             }
           },
           "additionalProperties": false,

@@ -73,12 +73,8 @@ type RuntimeConfigValidation struct {
 }
 
 type NetworkCandidatePatch struct {
-	Mode              NetworkMode `json:"mode"`
-	PrimaryOrigin     string      `json:"primaryOrigin"`
-	Listen            string      `json:"listen"`
-	ProxyLocation     string      `json:"proxyLocation"`
-	TrustedProxyCIDRs []string    `json:"trustedProxyCIDRs"`
-	AcceptLANWarning  bool        `json:"acceptLANWarning"`
+	Mode             NetworkMode `json:"mode"`
+	AcceptLANWarning bool        `json:"acceptLANWarning"`
 }
 
 type hostProjection struct {
@@ -118,29 +114,19 @@ func (s *Supervisor) hostProjection() (hostProjection, error) {
 }
 
 func (p hostProjection) initialBindings(network DesktopSettings) serverManifestBindings {
-	tlsMode := "off"
-	proxyMode := "disabled"
-	if network.NetworkMode == NetworkExternalHTTPS {
-		tlsMode = "external"
-		proxyMode = "required"
-	}
 	return serverManifestBindings{
-		Listen:            network.Listen,
-		PrimaryOrigin:     network.PrimaryOrigin,
-		TLSMode:           tlsMode,
-		ProxyMode:         proxyMode,
-		TrustedProxyCIDRs: network.TrustedProxyCIDRs,
-		WebRoot:           p.WebRoot,
-		LogDir:            p.LogDir,
-		StoragePath:       p.StoragePath,
-		CloudStatePath:    p.CloudStatePath,
-		BackupsPath:       p.BackupsPath,
-		DatabasePath:      p.DatabasePath,
-		SecretKeyFile:     p.SecretKeyFile,
-		ExifToolPath:      p.ExifToolPath,
-		FFmpegPath:        p.FFmpegPath,
-		FFprobePath:       p.FFprobePath,
-		LumenStaticNode:   p.LumenStaticNode,
+		Listen:          network.Listen,
+		WebRoot:         p.WebRoot,
+		LogDir:          p.LogDir,
+		StoragePath:     p.StoragePath,
+		CloudStatePath:  p.CloudStatePath,
+		BackupsPath:     p.BackupsPath,
+		DatabasePath:    p.DatabasePath,
+		SecretKeyFile:   p.SecretKeyFile,
+		ExifToolPath:    p.ExifToolPath,
+		FFmpegPath:      p.FFmpegPath,
+		FFprobePath:     p.FFprobePath,
+		LumenStaticNode: p.LumenStaticNode,
 	}
 }
 
@@ -149,7 +135,6 @@ func (s *Supervisor) ensureRuntimeIntent(settings DesktopSettings) error {
 	if err != nil {
 		return err
 	}
-	migratingSettings := settings.Version != desktopSettingsVersion || settings.legacyNetwork
 	path := s.paths.RuntimeConfigFile()
 	data, readErr := os.ReadFile(path)
 	if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
@@ -157,13 +142,10 @@ func (s *Supervisor) ensureRuntimeIntent(settings DesktopSettings) error {
 	}
 	creatingIntent := errors.Is(readErr, fs.ErrNotExist)
 	if creatingIntent {
-		network := settings
-		if !settings.legacyNetwork {
-			network = DesktopSettings{}
-		}
+		network := DesktopSettings{}
 		network, err = normalizeNetworkSettings(network)
 		if err != nil {
-			return fmt.Errorf("migrate desktop network settings: %w", err)
+			return fmt.Errorf("initialize desktop network settings: %w", err)
 		}
 		data, err = renderServerManifest(projection.initialBindings(network))
 		if err != nil {
@@ -179,21 +161,14 @@ func (s *Supervisor) ensureRuntimeIntent(settings DesktopSettings) error {
 	if _, _, err := s.materializeRuntimeBytes(data); err != nil {
 		return fmt.Errorf("validate runtime intent: %w", err)
 	}
-	// A new intent and an interrupted v1 migration both need the same initial
-	// recovery point. Write it only after the real materialized manifest passes
-	// strict validation, and before replacing desktop-settings.json with v2.
-	if creatingIntent || migratingSettings {
+	// A new intent needs an initial recovery point after strict validation.
+	if creatingIntent {
 		if _, err := os.Stat(s.paths.RuntimeLastKnownGoodFile()); errors.Is(err, fs.ErrNotExist) {
 			if err := writeAtomicPrivate(s.paths.RuntimeLastKnownGoodFile(), data); err != nil {
 				return fmt.Errorf("write initial last-known-good runtime: %w", err)
 			}
 		} else if err != nil {
 			return fmt.Errorf("inspect initial last-known-good runtime: %w", err)
-		}
-	}
-	if migratingSettings {
-		if err := SaveSettings(s.paths.DesktopSettingsFile(), settings); err != nil {
-			return fmt.Errorf("migrate desktop settings to v2: %w", err)
 		}
 	}
 	return nil
@@ -227,6 +202,7 @@ func projectRuntimeHostFields(document map[string]any, p hostProjection) {
 	setRuntimePath(document, "server.web_root", p.WebRoot)
 	setRuntimePath(document, "server.cors_allowed_origins", []string{})
 	setRuntimePath(document, "server.tls.http_listen", "")
+	setRuntimePath(document, "server.tls.hostname", "")
 	setRuntimePath(document, "server.tls.email", "")
 	setRuntimePath(document, "server.tls.storage_path", "")
 	setRuntimePath(document, "logging.dir", p.LogDir)
@@ -426,10 +402,10 @@ func (s *Supervisor) ValidateRuntimeConfig(baseFingerprint, candidate string) (R
 			})
 		}
 	}
-	if mode, _ := runtimePathValue(candidateDocument, "server.tls.mode"); mode == "acme" {
+	if mode, _ := runtimePathValue(candidateDocument, "server.tls.mode"); mode != "off" {
 		result.Issues = append(result.Issues, ConfigIssue{
 			Field: "server.tls.mode", Code: "unsupported_desktop_tls",
-			Message: "Desktop supports TLS modes off and external; ACME is not available",
+			Message: "Desktop supports plaintext local and LAN access; TLS is not available",
 		})
 	}
 	canonical, err := toml.Marshal(candidateDocument)
@@ -463,32 +439,10 @@ func (s *Supervisor) PatchRuntimeNetwork(
 		return RuntimeConfigValidation{}, err
 	}
 	network := DesktopSettings{
-		NetworkMode: patch.Mode, PrimaryOrigin: strings.TrimSpace(patch.PrimaryOrigin),
-		Listen: strings.TrimSpace(patch.Listen), TrustedProxyCIDRs: patch.TrustedProxyCIDRs,
+		NetworkMode: patch.Mode,
 	}
 	if patch.AcceptLANWarning {
 		network.LANHTTPWarningAcceptedVersion = lanHTTPWarningCurrentVersion
-	}
-	if patch.Mode == NetworkExternalHTTPS {
-		switch patch.ProxyLocation {
-		case "same_host":
-			if network.Listen == "" {
-				network.Listen = "127.0.0.1:6680"
-			}
-			network.TrustedProxyCIDRs = []string{"127.0.0.1/32", "::1/128"}
-		case "remote":
-			if network.Listen == "" {
-				network.Listen = "0.0.0.0:6680"
-			}
-		default:
-			return RuntimeConfigValidation{
-				BaseFingerprint: baseFingerprint,
-				Issues: []ConfigIssue{{
-					Field: "server.proxy", Code: "invalid_proxy_location",
-					Message: "external HTTPS requires a same-host or remote proxy location",
-				}},
-			}, nil
-		}
 	}
 	normalized, err := normalizeNetworkSettings(network)
 	if err != nil {
@@ -506,15 +460,9 @@ func (s *Supervisor) PatchRuntimeNetwork(
 			Issues:          []ConfigIssue{{Code: "invalid_toml", Message: err.Error()}},
 		}, nil
 	}
-	tlsMode, proxyMode := "off", "disabled"
-	if normalized.NetworkMode == NetworkExternalHTTPS {
-		tlsMode, proxyMode = "external", "required"
-	}
 	setRuntimePath(document, "server.listen", normalized.Listen)
-	setRuntimePath(document, "server.primary_origin", normalized.PrimaryOrigin)
-	setRuntimePath(document, "server.tls.mode", tlsMode)
-	setRuntimePath(document, "server.proxy.mode", proxyMode)
-	setRuntimePath(document, "server.proxy.trusted_cidrs", normalized.TrustedProxyCIDRs)
+	setRuntimePath(document, "server.tls.mode", "off")
+	setRuntimePath(document, "server.proxy.trusted_cidrs", []string{})
 	updated, err := toml.Marshal(document)
 	if err != nil {
 		return RuntimeConfigValidation{}, err
@@ -529,8 +477,6 @@ func runtimeSemanticChanges(before, after serverconfig.AppConfig) []SemanticChan
 	}{
 		{"network.mode", string(networkSummaryFromConfig(before).Mode), string(networkSummaryFromConfig(after).Mode)},
 		{"server.listen", before.ServerConfig.Listen, after.ServerConfig.Listen},
-		{"server.primary_origin", before.ServerConfig.PrimaryOrigin, after.ServerConfig.PrimaryOrigin},
-		{"auth.passkey.rp_id", before.Auth.PasskeyIdentity.RPID, after.Auth.PasskeyIdentity.RPID},
 		{"auth.passkey.enabled", fmt.Sprint(before.Auth.Passkey.Enabled), fmt.Sprint(after.Auth.Passkey.Enabled)},
 		{"logging.level", before.LoggingConfig.Level, after.LoggingConfig.Level},
 		{"repository_scan", fmt.Sprint(before.RepositoryScan), fmt.Sprint(after.RepositoryScan)},

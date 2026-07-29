@@ -473,7 +473,7 @@
       }
     },
     "browserSecurity": {
-      "insecureBody": "Passwords, authenticator codes, session cookies, and media can be read on this network. Passkeys work only at the configured localhost address; remote devices must use password and TOTP.",
+      "insecureBody": "Passwords, authenticator codes, session cookies, and media can be read on this network. Passkeys work on localhost or over HTTPS; remote HTTP devices must use password and TOTP.",
       "insecureTitle": "This network connection is not encrypted."
     },
     "changePassword": {
@@ -547,10 +547,9 @@
     },
     "passkeyEnvironment": {
       "disabled": "Passkeys are disabled for this Lumilio deployment.",
+      "domainRequired": "Passkeys over HTTPS require a domain name instead of an IP address.",
       "invalidOrigin": "This browser origin cannot use passkeys.",
-      "nonPrimaryOrigin": "Open Lumilio at its configured primary address to use a passkey.",
-      "secureOriginRequired": "Passkeys require HTTPS or the configured localhost address.",
-      "trustedProxyRequired": "Passkeys require access through the configured trusted proxy."
+      "secureOriginRequired": "Passkeys require HTTPS or a localhost address."
     },
     "passwordField": {
       "hidePassword": "Hide password",
@@ -1334,7 +1333,7 @@
           "name": "Classifier matching"
         },
         "default": {
-          "description": "Background work for the photo library."
+          "description": "Background work for the media library."
         },
         "detect_stacks": {
           "description": "Looks for RAW+JPEG and related media stacks.",
@@ -1410,7 +1409,7 @@
         "settled": "Quiet",
         "working": "Working"
       },
-      "subtitle": "Grouped by the part of the photo library pipeline doing the work.",
+      "subtitle": "Grouped by the part of the media library pipeline doing the work.",
       "time": {
         "daysAgo_one": "{{count}} day ago",
         "daysAgo_other": "{{count}} days ago",

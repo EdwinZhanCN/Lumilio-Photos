@@ -58,16 +58,13 @@
       {
         local: t("networkLocal"),
         lan_http: t("networkLAN"),
-        external_https: t("networkExternal"),
       } as const
     )[network.mode] ?? "—";
   }
 
   function passkeySummary(): string {
-    if (!network.primaryOrigin) return "—";
     if (!network.passkeyEnabled) return t("passkeyDisabled");
     if (network.mode === "lan_http") return t("passkeyLocalOnly");
-    if (network.remotePasskeyAvailable) return t("passkeyCanonicalOrigin");
     return t("passkeyAvailable");
   }
 
@@ -192,21 +189,13 @@
         </dd>
       </div>
       <div class="col-span-2 min-w-0">
-        <dt class="text-[10.5px] tracking-wide text-muted uppercase">{t("primaryOrigin")}</dt>
+        <dt class="text-[10.5px] tracking-wide text-muted uppercase">{t("serverAddress")}</dt>
         <dd
           class="m-0 mt-0.5 truncate font-mono text-[11.5px]"
-          title={runtime.browserURL || network.primaryOrigin}
+          title={runtime.browserURL}
         >
-          {runtime.browserURL || network.primaryOrigin || "—"}
+          {runtime.browserURL || "—"}
         </dd>
-      </div>
-      <div class="min-w-0">
-        <dt class="text-[10.5px] tracking-wide text-muted uppercase">{t("transport")}</dt>
-        <dd class="m-0 mt-0.5 text-xs">{network.tlsMode || "—"}</dd>
-      </div>
-      <div class="min-w-0">
-        <dt class="text-[10.5px] tracking-wide text-muted uppercase">{t("proxy")}</dt>
-        <dd class="m-0 mt-0.5 text-xs">{network.proxyMode || "—"}</dd>
       </div>
       <div class="col-span-2 min-w-0">
         <dt class="text-[10.5px] tracking-wide text-muted uppercase">{t("passkeys")}</dt>

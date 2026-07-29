@@ -23,38 +23,34 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestOffAndExternalServeInternalHTTP(t *testing.T) {
-	for _, mode := range []config.TLSMode{config.TLSModeOff, config.TLSModeExternal} {
-		t.Run(string(mode), func(t *testing.T) {
-			runtime, err := Start(context.Background(), config.ServerConfig{
-				Listen: "127.0.0.1:0",
-				TLS:    config.TLSConfig{Mode: mode},
-			}, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusNoContent)
-			}), zap.NewNop())
-			if err != nil {
-				t.Fatalf("start transport: %v", err)
-			}
-			t.Cleanup(func() { shutdownRuntime(t, runtime) })
+func TestOffServesHTTP(t *testing.T) {
+	runtime, err := Start(context.Background(), config.ServerConfig{
+		Listen: "127.0.0.1:0",
+		TLS:    config.TLSConfig{Mode: config.TLSModeOff},
+	}, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), zap.NewNop())
+	if err != nil {
+		t.Fatalf("start transport: %v", err)
+	}
+	t.Cleanup(func() { shutdownRuntime(t, runtime) })
 
-			response, err := http.Get("http://" + runtime.listeners[0].Addr().String())
-			if err != nil {
-				t.Fatalf("GET internal HTTP: %v", err)
-			}
-			defer response.Body.Close()
-			if response.StatusCode != http.StatusNoContent {
-				t.Fatalf("status = %d", response.StatusCode)
-			}
-		})
+	response, err := http.Get("http://" + runtime.listeners[0].Addr().String())
+	if err != nil {
+		t.Fatalf("GET HTTP: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d", response.StatusCode)
 	}
 }
 
 func TestACMEServesHTTPSChallengeAndRedirect(t *testing.T) {
 	manager := newFakeCertificateManager(t)
 	cfg := config.ServerConfig{
-		Listen:        "127.0.0.1:0",
-		PrimaryOrigin: "https://photos.example.com",
+		Listen: "127.0.0.1:0",
 		TLS: config.TLSConfig{
+			Hostname:   "photos.example.com",
 			Mode:       config.TLSModeACME,
 			HTTPListen: "127.0.0.1:0",
 		},
@@ -133,9 +129,9 @@ func TestACMEAcquisitionFailureClosesBothListeners(t *testing.T) {
 	runtime, err := start(
 		context.Background(),
 		config.ServerConfig{
-			Listen:        httpsAddr,
-			PrimaryOrigin: "https://photos.example.com",
+			Listen: httpsAddr,
 			TLS: config.TLSConfig{
+				Hostname:   "photos.example.com",
 				Mode:       config.TLSModeACME,
 				HTTPListen: httpAddr,
 			},
@@ -166,9 +162,9 @@ func TestACMEShutdownReleasesBothPorts(t *testing.T) {
 	runtime, err := start(
 		context.Background(),
 		config.ServerConfig{
-			Listen:        httpsAddr,
-			PrimaryOrigin: "https://photos.example.com",
+			Listen: httpsAddr,
 			TLS: config.TLSConfig{
+				Hostname:   "photos.example.com",
 				Mode:       config.TLSModeACME,
 				HTTPListen: httpAddr,
 			},
@@ -197,8 +193,8 @@ func TestCertMagicStoragePathErrorIsDiagnostic(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := newCertMagicManager(config.ServerConfig{
-		PrimaryOrigin: "https://photos.example.com",
 		TLS: config.TLSConfig{
+			Hostname:    "photos.example.com",
 			Email:       "admin@example.com",
 			StoragePath: notDirectory,
 		},

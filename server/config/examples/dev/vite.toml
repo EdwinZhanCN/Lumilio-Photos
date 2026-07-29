@@ -1,33 +1,11 @@
 #:schema ../../schema/lumilio-server.schema.json
 # Lumilio Photos runtime manifest, schema v3.
-# Local development: single origin on the Vite dev server, LAN reachable.
+# Local development behind the Vite development proxy.
 #
-# Scenario: deployment-origin-tls-plan.md 5.7 Development
+# Scenario: dynamic request origin development
 #
-# `make dev` runs Vite on 0.0.0.0:6657 and this server on 127.0.0.1:6680. Vite
-# proxies /api to the API, so the browser only ever talks to the Vite origin.
-# Development is therefore single-origin like production, and
-# cors_allowed_origins is empty: there is no cross-origin request to allow.
-#
-# Only Vite is published to the network. The API stays on loopback because the
-# proxy runs on this machine, so a phone at http://<lan-ip>:6657 reaches the whole
-# app without the API listener ever being exposed.
-#
-# The Vite proxy must not rewrite the Host header (changeOrigin stays false). The
-# server derives its target origin from Host and compares the browser's Origin
-# against it, so a rewritten Host would make every session request look
-# cross-origin and be rejected.
-#
-# primary_origin is the Vite origin, not the API listener: WebAuthn signs the
-# origin the browser is actually on, so the RP ID here is localhost. That means
-# passkeys work on this machine at http://localhost:6657 and are unavailable from
-# a LAN address, which is plain HTTP and not a secure context. Remote devices get
-# password plus TOTP, exactly as in the Desktop LAN profile.
-#
-# The development toolchain writes this complete manifest to
-# `.local/dev/config/server.toml`. Its app-private state and portable media
-# storage are sibling roots under `.local/dev`, so reset operations never need
-# to discover or delete paths from an arbitrary manifest.
+# `make dev` publishes Vite on 0.0.0.0:6657 and keeps the API on
+# 127.0.0.1:6680. Browser origin and passkey identity come from each request.
 #
 # Every key below is required: the loader has no defaults, performs no file
 # search, and accepts no environment overrides. Whether a manifest is legal
@@ -42,7 +20,7 @@
 schema_version = 3
 
 # Deployment environment. Selects test-only affordances; it does not relax
-# any origin, TLS, or proxy rule.
+# runtime manifest validation.
 # One of: development, production, test
 environment = "development"
 
@@ -57,15 +35,8 @@ path = "../state/library.sqlite3"
 # only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
 listen = "127.0.0.1:6680"
 
-# The one canonical browser origin. It fixes the cookie and CSRF baseline,
-# the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
-# host plus optional port only: no userinfo, path, query, or fragment.
-primary_origin = "http://localhost:6657"
-
 # Extra browser origins allowed to make credentialed cross-origin calls,
-# such as a local Vite dev server. This does not widen the WebAuthn allowed
-# origins and does not define the canonical identity. Empty for a
-# same-origin SPA deployment.
+# such as a local Vite dev server. Empty for a same-origin SPA deployment.
 cors_allowed_origins = []
 
 # Directory of built SPA assets. Empty serves the API alone, which is what
@@ -73,15 +44,16 @@ cors_allowed_origins = []
 web_root = ""
 
 [server.tls]
-# Who terminates HTTPS. "off" is plaintext and requires an http
-# primary_origin; "acme" makes this server obtain its own certificate and
-# requires an https primary_origin with a real hostname; "external" puts a
-# reverse proxy in front and requires proxy.mode = required.
-# One of: off, acme, external
+# Whether this process serves plaintext HTTP or obtains its own ACME
+# certificate. External proxies use mode = "off" for the upstream.
+# One of: off, acme
 mode = "off"
 
+# Public certificate hostname. Non-empty if and only if mode = "acme".
+hostname = ""
+
 # Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
-# primary_origin. Non-empty if and only if mode = "acme".
+# the ACME hostname. Non-empty if and only if mode = "acme".
 http_listen = ""
 
 # ACME account contact address. Non-empty if and only if mode = "acme".
@@ -92,17 +64,9 @@ email = ""
 storage_path = ""
 
 [server.proxy]
-# Whether a trusted reverse proxy is mandatory. "disabled" ignores every
-# Forwarded and X-Forwarded-* header. "required" rejects application
-# traffic whose immediate peer is outside trusted_cidrs, which is what
-# stops a direct client from forging X-Forwarded-Proto: https.
-# One of: disabled, required
-mode = "disabled"
-
-# CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
-# the immediate peer, not to any address inside a forwarded chain. Must be
-# empty when mode = "disabled" and hold at least one entry when required.
-trusted_cidrs = []
+# CIDRs whose immediate TCP peer may supply X-Forwarded-For. This controls
+# client-IP recovery only; reverse-proxy access never depends on this list.
+trusted_cidrs = ["127.0.0.1/32", "::1/128"]
 
 [logging]
 # Minimum level emitted to both sinks.
@@ -185,13 +149,11 @@ refresh_token_ttl = "168h"
 media_token_ttl = "10m"
 
 [auth.passkey]
-# Whether WebAuthn is offered. When true, primary_origin must be https or
-# exactly http://localhost; an http LAN address or bare IP is rejected
-# because browsers will not treat it as a secure context.
+# Whether WebAuthn is offered on secure request origins. HTTP LAN addresses
+# remain usable with password and TOTP but cannot use passkeys.
 enabled = true
 
-# Relying-party display name shown in the browser prompt. Cosmetic: the RP
-# ID itself always comes from the primary_origin hostname.
+# Relying-party display name shown in the browser prompt.
 name = "Lumilio Photos"
 
 [auth.rate_limit]

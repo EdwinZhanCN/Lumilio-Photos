@@ -87,13 +87,8 @@ type ValidateLLMSettingsResponseDTO struct {
 type RuntimeInfoDTO struct {
 	Environment                  string     `json:"environment" example:"production"`
 	ServerListen                 string     `json:"server_listen" example:"0.0.0.0:6680"`
-	PrimaryOrigin                string     `json:"primary_origin" example:"https://photos.example.com"`
-	TLSMode                      string     `json:"tls_mode" example:"external"`
-	ProxyMode                    string     `json:"proxy_mode" example:"required"`
-	TrustedProxyCIDRs            []string   `json:"trusted_proxy_cidrs"`
+	TLSMode                      string     `json:"tls_mode" example:"off"`
 	PasskeyEnabled               bool       `json:"passkey_enabled" example:"true"`
-	PasskeyOrigin                string     `json:"passkey_origin" example:"https://photos.example.com"`
-	PasskeyRPID                  string     `json:"passkey_rp_id" example:"photos.example.com"`
 	ACMECertificateHostname      string     `json:"acme_certificate_hostname,omitempty" example:"photos.example.com"`
 	ACMECertificateStatus        string     `json:"acme_certificate_status" example:"active"`
 	ACMECertificateExpiresAt     *time.Time `json:"acme_certificate_expires_at,omitempty"`
@@ -117,20 +112,11 @@ type CertificateRuntimeInfo struct {
 // NewRuntimeInfoDTO builds the read-only runtime info snapshot from the immutable
 // application configuration.
 func NewRuntimeInfoDTO(cfg config.AppConfig) RuntimeInfoDTO {
-	trustedCIDRs := make([]string, 0, len(cfg.ServerConfig.Proxy.TrustedCIDRs))
-	for _, prefix := range cfg.ServerConfig.Proxy.TrustedCIDRs {
-		trustedCIDRs = append(trustedCIDRs, prefix.String())
-	}
 	return RuntimeInfoDTO{
 		Environment:                  cfg.Environment,
 		ServerListen:                 cfg.ServerConfig.Listen,
-		PrimaryOrigin:                cfg.ServerConfig.PrimaryOrigin,
 		TLSMode:                      string(cfg.ServerConfig.TLS.Mode),
-		ProxyMode:                    string(cfg.ServerConfig.Proxy.Mode),
-		TrustedProxyCIDRs:            trustedCIDRs,
 		PasskeyEnabled:               cfg.Auth.Passkey.Enabled,
-		PasskeyOrigin:                cfg.Auth.PasskeyIdentity.Origin,
-		PasskeyRPID:                  cfg.Auth.PasskeyIdentity.RPID,
 		ACMECertificateStatus:        map[bool]string{true: "initializing", false: "not_applicable"}[cfg.ServerConfig.TLS.Mode == config.TLSModeACME],
 		LogLevel:                     cfg.LoggingConfig.Level,
 		StorageRoot:                  cfg.StorageConfig.Path,

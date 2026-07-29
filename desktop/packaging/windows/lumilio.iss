@@ -155,7 +155,7 @@ begin
 end;
 
 { Read the user's chosen media-library location from desktop-settings.json so the
-  uninstaller can warn when "remove data" would also delete the photo library
+  uninstaller can warn when "remove data" would also delete the media library
   (the default library lives inside the data directory). }
 function GetStoragePath(DataDir: String): String;
 var
@@ -217,7 +217,7 @@ begin
     or (Pos(Lowercase(DataDir), Lowercase(StoragePath)) = 1);
 
   if LibraryInsideData then
-    if MsgBox('WARNING: your photo library is stored inside this folder.' + #13#10
+    if MsgBox('WARNING: your media library is stored inside this folder.' + #13#10
       + 'Deleting it will PERMANENTLY delete your original photos and videos.' + #13#10#13#10
       + 'Delete everything, including your photos?', mbError, MB_YESNO or MB_DEFBUTTON2) <> IDYES then
       Exit;

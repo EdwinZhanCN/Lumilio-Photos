@@ -59,8 +59,7 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	secretKeyFile := filepath.Join(dir, "secrets", "lumilio_secret_key")
 
 	cfg, err := compileAndLoadServerManifest(path, serverManifestBindings{
-		Listen: "127.0.0.1:6680", PrimaryOrigin: "http://localhost:6680", WebRoot: webRoot,
-		TLSMode: "off", ProxyMode: "disabled", TrustedProxyCIDRs: []string{},
+		Listen: "127.0.0.1:6680", WebRoot: webRoot,
 		LogDir: logDir, StoragePath: storagePath,
 		CloudStatePath: filepath.Join(dir, "appdata", "cloud"), BackupsPath: filepath.Join(dir, "appdata", "backups"),
 		DatabasePath: databasePath, SecretKeyFile: secretKeyFile,
@@ -69,12 +68,6 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("compileAndLoadServerManifest: %v", err)
-	}
-	if cfg.Auth.PasskeyIdentity.RPID != "localhost" {
-		t.Fatalf("webauthn rp id = %q, want localhost", cfg.Auth.PasskeyIdentity.RPID)
-	}
-	if got, want := cfg.Auth.PasskeyIdentity.Origin, "http://localhost:6680"; got != want {
-		t.Fatalf("webauthn origin = %q, want %q", got, want)
 	}
 	if len(cfg.ServerConfig.CORSAllowedOrigins) != 0 {
 		t.Fatalf(
@@ -110,16 +103,12 @@ func TestDesktopServerConfigInvariants(t *testing.T) {
 	if !cfg.LoadedFromManifest() || cfg.ManifestPath != path || cfg.ServerConfig.Listen != "127.0.0.1:6680" {
 		t.Fatalf("manifest was not strict-loaded: %+v", cfg)
 	}
-	if cfg.Auth.PasskeyIdentity.RPID != "localhost" || cfg.Auth.PasskeyIdentity.Origin != "http://localhost:6680" {
-		t.Fatalf("unexpected auth config: %+v", cfg.Auth)
-	}
 	if cfg.ServerConfig.WebRoot != webRoot || cfg.DatabaseConfig.Path != databasePath || cfg.Tools.FFmpegPath != ffmpegPath {
 		t.Fatalf("unexpected generated config: db=%+v tools=%+v", cfg.DatabaseConfig, cfg.Tools)
 	}
 	network := networkSummaryFromConfig(cfg)
-	if network.Mode != NetworkLocal || network.PrimaryOrigin != "http://localhost:6680" ||
-		network.RPID != "localhost" || network.TLSMode != "off" ||
-		network.ProxyMode != "disabled" || !network.PasskeyEnabled {
+	if network.Mode != NetworkLocal || network.Listen != "127.0.0.1:6680" ||
+		!network.PasskeyEnabled {
 		t.Fatalf("runtime network summary was not derived from strict config: %+v", network)
 	}
 }
@@ -188,59 +177,29 @@ func TestDesktopNetworkProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if local.Version != 1 || local.NetworkMode != NetworkLocal ||
-		local.Listen != "127.0.0.1:6680" || local.PrimaryOrigin != "http://localhost:6680" {
+	if local.Version != desktopSettingsVersion || local.NetworkMode != NetworkLocal ||
+		local.Listen != "127.0.0.1:6680" {
 		t.Fatalf("local defaults = %+v", local)
 	}
 
 	lan, err := normalizeNetworkSettings(DesktopSettings{
 		NetworkMode:                   NetworkLANHTTP,
-		PrimaryOrigin:                 local.PrimaryOrigin,
 		LANHTTPWarningAcceptedVersion: lanHTTPWarningCurrentVersion,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lan.Listen != "0.0.0.0:6680" || lan.PrimaryOrigin != local.PrimaryOrigin {
-		t.Fatalf("LAN profile changed more than listen: %+v", lan)
-	}
-
-	external, err := normalizeNetworkSettings(DesktopSettings{
-		NetworkMode:       NetworkExternalHTTPS,
-		PrimaryOrigin:     "https://PHOTOS.example.com:443",
-		Listen:            "127.0.0.1:6680",
-		TrustedProxyCIDRs: []string{"127.0.0.1/32", "::1/128"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if external.PrimaryOrigin != "https://photos.example.com" ||
-		!reflect.DeepEqual(external.TrustedProxyCIDRs, []string{"127.0.0.1/32", "::1/128"}) {
-		t.Fatalf("same-host external profile = %+v", external)
-	}
-
-	remote, err := normalizeNetworkSettings(DesktopSettings{
-		NetworkMode:       NetworkExternalHTTPS,
-		PrimaryOrigin:     "https://photos.example.com",
-		Listen:            "0.0.0.0:6680",
-		TrustedProxyCIDRs: []string{"192.168.1.10/32"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := remote.TrustedProxyCIDRs; !reflect.DeepEqual(got, []string{"192.168.1.10/32"}) {
-		t.Fatalf("remote trusted CIDRs = %v", got)
+	if lan.Listen != "0.0.0.0:6680" {
+		t.Fatalf("LAN profile = %+v", lan)
 	}
 }
 
 func TestDesktopSettingsV2DoesNotPersistRuntimeNetworkFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "desktop-settings.json")
 	if err := SaveSettings(path, DesktopSettings{
-		NetworkMode:       NetworkExternalHTTPS,
-		PrimaryOrigin:     "https://photos.example.com",
-		Listen:            "0.0.0.0:6680",
-		TrustedProxyCIDRs: []string{"192.168.1.10/32"},
-		Language:          "zh",
+		NetworkMode: NetworkLANHTTP,
+		Listen:      "0.0.0.0:6680",
+		Language:    "zh",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -259,86 +218,13 @@ func TestDesktopSettingsV2DoesNotPersistRuntimeNetworkFields(t *testing.T) {
 	}
 }
 
-func TestDesktopSettingsV1MigratesExternalNetworkToRuntimeIntent(t *testing.T) {
-	appData := filepath.Join(t.TempDir(), "appdata")
-	t.Setenv("LUMILIO_APP_DATA", appData)
-	configDir := filepath.Join(appData, "config")
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
+func TestDesktopSettingsRejectsLegacySchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "desktop-settings.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"network_mode":"external_https"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	legacy := `{
-  "version": 1,
-  "network_mode": "external_https",
-  "primary_origin": "https://photos.example.com",
-  "listen": "127.0.0.1:6680",
-  "trusted_proxy_cidrs": ["127.0.0.1/32", "::1/128"],
-  "language": "zh",
-  "onboarding_completed": true
-}`
-	settingsPath := filepath.Join(configDir, "desktop-settings.json")
-	if err := os.WriteFile(settingsPath, []byte(legacy), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	s := New(Options{Logf: func(string, ...any) {}})
-	settings, err := s.Settings()
-	if err != nil {
-		t.Fatalf("migrate v1 settings: %v", err)
-	}
-	if settings.Version != desktopSettingsVersion ||
-		settings.NetworkMode != "" ||
-		settings.PrimaryOrigin != "" ||
-		settings.Language != "zh" {
-		t.Fatalf("migrated settings = %+v", settings)
-	}
-	disk, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(disk), "network_mode") || !strings.Contains(string(disk), `"version": 2`) {
-		t.Fatalf("v2 settings did not remove runtime source fields:\n%s", disk)
-	}
-	view, err := s.ReadRuntimeConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if view.Network.Mode != NetworkExternalHTTPS ||
-		view.Network.PrimaryOrigin != "https://photos.example.com" ||
-		!view.LastKnownGoodAvailable {
-		t.Fatalf("migrated runtime view = %+v", view)
-	}
-
-	// Simulate a process exit after runtime.toml was created but before LKG and
-	// desktop-settings.json v2 were durably written. The next launch must finish
-	// the migration without losing the equivalent external HTTPS profile.
-	if err := os.Remove(s.paths.RuntimeLastKnownGoodFile()); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(settingsPath, []byte(legacy), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	resumed := New(Options{Logf: func(string, ...any) {}})
-	if _, err := resumed.Settings(); err != nil {
-		t.Fatalf("resume interrupted v1 migration: %v", err)
-	}
-	active, err := os.ReadFile(resumed.paths.RuntimeConfigFile())
-	if err != nil {
-		t.Fatal(err)
-	}
-	lkg, err := os.ReadFile(resumed.paths.RuntimeLastKnownGoodFile())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(active) != string(lkg) {
-		t.Fatal("resumed migration did not restore the active intent as initial LKG")
-	}
-	resumedView, err := resumed.ReadRuntimeConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resumedView.Network.Mode != NetworkExternalHTTPS ||
-		resumedView.Network.PrimaryOrigin != "https://photos.example.com" {
-		t.Fatalf("resumed migration runtime view = %+v", resumedView)
+	if _, err := LoadSettings(path); err == nil || !strings.Contains(err.Error(), "unsupported desktop settings version 1") {
+		t.Fatalf("legacy settings error = %v", err)
 	}
 }
 
@@ -354,13 +240,12 @@ func TestRuntimeCandidateFingerprintHostProjectionAndSemantics(t *testing.T) {
 	}
 
 	patched, err := s.PatchRuntimeNetwork(view.BaseFingerprint, view.CandidateTOML, NetworkCandidatePatch{
-		Mode: NetworkExternalHTTPS, PrimaryOrigin: "https://photos.example.com",
-		Listen: "127.0.0.1:6680", ProxyLocation: "same_host",
+		Mode: NetworkLANHTTP, AcceptLANWarning: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !patched.Valid || patched.Network.Mode != NetworkExternalHTTPS ||
+	if !patched.Valid || patched.Network.Mode != NetworkLANHTTP ||
 		len(patched.SemanticChanges) == 0 {
 		t.Fatalf("network candidate = %+v", patched)
 	}
@@ -370,7 +255,7 @@ func TestRuntimeCandidateFingerprintHostProjectionAndSemantics(t *testing.T) {
 	if _, err := s.PatchRuntimeNetwork(
 		"sha256:stale",
 		view.CandidateTOML,
-		NetworkCandidatePatch{Mode: NetworkExternalHTTPS, ProxyLocation: "invalid"},
+		NetworkCandidatePatch{Mode: NetworkLocal},
 	); !errors.Is(err, ErrStaleRuntimeConfig) {
 		t.Fatalf("stale structured patch error = %v", err)
 	}
@@ -687,7 +572,7 @@ func hasConfigIssue(issues []ConfigIssue, code string) bool {
 	return false
 }
 
-func TestInternalHealthURLIsIndependentFromPrimaryOrigin(t *testing.T) {
+func TestInternalHealthURLUsesLoopbackDialAddress(t *testing.T) {
 	if got, want := internalHealthURL("0.0.0.0:6680"), "http://127.0.0.1:6680/api/v1/health/ready"; got != want {
 		t.Fatalf("health URL = %q, want %q", got, want)
 	}
@@ -698,33 +583,28 @@ func TestInternalHealthURLIsIndependentFromPrimaryOrigin(t *testing.T) {
 
 func TestNetworkSummaryFromConfigClassifiesListenExposure(t *testing.T) {
 	for _, test := range []struct {
-		name    string
-		listen  string
-		tlsMode serverconfig.TLSMode
-		want    NetworkMode
+		name   string
+		listen string
+		want   NetworkMode
 	}{
-		{name: "loopback ipv4", listen: "127.0.0.1:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
-		{name: "loopback ipv4 subnet", listen: "127.0.0.42:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
-		{name: "loopback ipv6", listen: "[::1]:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
-		{name: "localhost hostname", listen: "localhost:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLocal},
-		{name: "unspecified ipv4", listen: "0.0.0.0:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "unspecified empty host", listen: ":6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "unspecified ipv6", listen: "[::]:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "concrete lan ipv4", listen: "192.168.1.20:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "rfc1918 10/8", listen: "10.0.0.5:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "rfc1918 172.16", listen: "172.16.4.8:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "public ipv4", listen: "203.0.113.10:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "non-loopback ipv6", listen: "[2001:db8::1]:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "unproven hostname", listen: "photos.local:6680", tlsMode: serverconfig.TLSModeOff, want: NetworkLANHTTP},
-		{name: "external tls wins", listen: "192.168.1.20:6680", tlsMode: serverconfig.TLSModeExternal, want: NetworkExternalHTTPS},
+		{name: "loopback ipv4", listen: "127.0.0.1:6680", want: NetworkLocal},
+		{name: "loopback ipv4 subnet", listen: "127.0.0.42:6680", want: NetworkLocal},
+		{name: "loopback ipv6", listen: "[::1]:6680", want: NetworkLocal},
+		{name: "localhost hostname", listen: "localhost:6680", want: NetworkLocal},
+		{name: "unspecified ipv4", listen: "0.0.0.0:6680", want: NetworkLANHTTP},
+		{name: "unspecified empty host", listen: ":6680", want: NetworkLANHTTP},
+		{name: "unspecified ipv6", listen: "[::]:6680", want: NetworkLANHTTP},
+		{name: "concrete lan ipv4", listen: "192.168.1.20:6680", want: NetworkLANHTTP},
+		{name: "public ipv4", listen: "203.0.113.10:6680", want: NetworkLANHTTP},
+		{name: "non-loopback ipv6", listen: "[2001:db8::1]:6680", want: NetworkLANHTTP},
+		{name: "unproven hostname", listen: "photos.local:6680", want: NetworkLANHTTP},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := serverconfig.AppConfig{}
 			cfg.ServerConfig.Listen = test.listen
-			cfg.ServerConfig.TLS.Mode = test.tlsMode
 			got := networkSummaryFromConfig(cfg)
 			if got.Mode != test.want {
-				t.Fatalf("mode = %q, want %q for listen %q tls %q", got.Mode, test.want, test.listen, test.tlsMode)
+				t.Fatalf("mode = %q, want %q for listen %q", got.Mode, test.want, test.listen)
 			}
 		})
 	}

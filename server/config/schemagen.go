@@ -25,9 +25,9 @@ const SchemaID = "https://lumilio.org/schema/lumilio-server-v3.schema.json"
 // The schema is a derived, deliberately lossy artifact. It carries presence,
 // types, and the closed value sets, which is what an editor can act on while
 // you type. It cannot carry the conditional rules that decide whether a
-// manifest is actually legal — that http_listen is non-empty only under
-// tls.mode = acme, that trusted_cidrs must be empty when the proxy is
-// disabled, that backups_path must fall outside storage.path. Those live in
+// manifest is actually legal — that http_listen and hostname are non-empty
+// only under tls.mode = acme, that ACME listeners must not collide, and that
+// backups_path must fall outside storage.path. Those live in
 // resolveManifest, which stays the sole authority, and are documented by the
 // per-scenario example manifests rather than by any single key.
 //

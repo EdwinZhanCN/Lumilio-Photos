@@ -24,16 +24,9 @@ const (
 // NetworkSummary is derived from a manifest accepted by the real Server config
 // loader. The panel must not infer deployment security from URLs.
 type NetworkSummary struct {
-	Mode                   NetworkMode `json:"mode"`
-	Listen                 string      `json:"listen"`
-	PrimaryOrigin          string      `json:"primaryOrigin"`
-	TLSMode                string      `json:"tlsMode"`
-	ProxyMode              string      `json:"proxyMode"`
-	TrustedProxyCIDRs      []string    `json:"trustedProxyCIDRs"`
-	PasskeyOrigin          string      `json:"passkeyOrigin"`
-	RPID                   string      `json:"rpID"`
-	PasskeyEnabled         bool        `json:"passkeyEnabled"`
-	RemotePasskeyAvailable bool        `json:"remotePasskeyAvailable"`
+	Mode           NetworkMode `json:"mode"`
+	Listen         string      `json:"listen"`
+	PasskeyEnabled bool        `json:"passkeyEnabled"`
 }
 
 // RuntimeSnapshot is the single source read by the panel, tray, and Server
@@ -103,34 +96,17 @@ func (s *Supervisor) updateSnapshot(update func(*RuntimeSnapshot)) {
 
 func networkSummaryFromConfig(cfg serverconfig.AppConfig) NetworkSummary {
 	mode := NetworkLocal
-	switch cfg.ServerConfig.TLS.Mode {
-	case serverconfig.TLSModeExternal:
-		mode = NetworkExternalHTTPS
-	default:
-		// Only proven loopback listeners are "local". Unspecified binds
-		// (0.0.0.0/::), concrete LAN/public IPs, and unproven hostnames are
-		// plaintext network exposure and must surface as lan_http so Apply
-		// requires the LAN warning acknowledgement.
-		if !isLoopbackListen(cfg.ServerConfig.Listen) {
-			mode = NetworkLANHTTP
-		}
+	// Only proven loopback listeners are "local". Unspecified binds
+	// (0.0.0.0/::), concrete LAN/public IPs, and unproven hostnames are
+	// plaintext network exposure and must surface as lan_http.
+	if !isLoopbackListen(cfg.ServerConfig.Listen) {
+		mode = NetworkLANHTTP
 	}
-	summary := NetworkSummary{
-		Mode:                   mode,
-		Listen:                 cfg.ServerConfig.Listen,
-		PrimaryOrigin:          cfg.ServerConfig.PrimaryOrigin,
-		TLSMode:                string(cfg.ServerConfig.TLS.Mode),
-		ProxyMode:              string(cfg.ServerConfig.Proxy.Mode),
-		TrustedProxyCIDRs:      []string{},
-		PasskeyOrigin:          cfg.Auth.PasskeyIdentity.Origin,
-		RPID:                   cfg.Auth.PasskeyIdentity.RPID,
-		PasskeyEnabled:         cfg.Auth.Passkey.Enabled,
-		RemotePasskeyAvailable: cfg.Auth.Passkey.Enabled && cfg.ServerConfig.TLS.Mode == serverconfig.TLSModeExternal,
+	return NetworkSummary{
+		Mode:           mode,
+		Listen:         cfg.ServerConfig.Listen,
+		PasskeyEnabled: cfg.Auth.Passkey.Enabled,
 	}
-	for _, prefix := range cfg.ServerConfig.Proxy.TrustedCIDRs {
-		summary.TrustedProxyCIDRs = append(summary.TrustedProxyCIDRs, prefix.String())
-	}
-	return summary
 }
 
 // isLoopbackListen reports whether listen is proven loopback-only.

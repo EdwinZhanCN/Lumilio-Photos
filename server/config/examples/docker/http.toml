@@ -1,19 +1,11 @@
 #:schema ../../schema/lumilio-server.schema.json
 # Lumilio Photos runtime manifest, schema v3.
-# Desktop behind a reverse proxy running on another host.
+# Docker default: host-network HTTP on port 6680.
 #
-# Scenario: deployment-origin-tls-plan.md 5.4 Desktop external HTTPS (remote proxy)
+# Scenario: zero-configuration Docker HTTP
 #
-# The proxy lives on a different machine, so the listener has to be reachable on a
-# LAN interface rather than loopback. Bind the specific interface address, not
-# 0.0.0.0, so the exposure is deliberate and visible.
-#
-# trusted_cidrs pins the proxy's exact address with a host mask. Any other LAN
-# client that reaches the listener directly is rejected with 403 before any auth
-# handler runs, because proxy.mode = required trusts the immediate TCP peer only.
-#
-# Loopback health endpoints keep a narrow exception so readiness probes work
-# without going through the proxy.
+# This complete manifest is embedded in the image. No domain, public URL,
+# certificate, or reverse proxy is required before first use.
 #
 # Every key below is required: the loader has no defaults, performs no file
 # search, and accepts no environment overrides. Whether a manifest is legal
@@ -28,46 +20,40 @@
 schema_version = 3
 
 # Deployment environment. Selects test-only affordances; it does not relax
-# any origin, TLS, or proxy rule.
+# runtime manifest validation.
 # One of: development, production, test
 environment = "production"
 
 [database]
 # SQLite catalog file. Relative paths resolve from the manifest directory.
 # ":memory:" is rejected because the catalog must survive a restart.
-path = "/Users/example/Library/Application Support/Lumilio/app-state/library.sqlite3"
+path = "/data/app-state/library.sqlite3"
 
 [server]
 # Local socket the application listener binds, as host:port or :port.
 # Never a URL, and never given a port implicitly. 127.0.0.1 is loopback
 # only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
-listen = "192.168.1.20:6680"
-
-# The one canonical browser origin. It fixes the cookie and CSRF baseline,
-# the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
-# host plus optional port only: no userinfo, path, query, or fragment.
-primary_origin = "https://photos.example.com"
+listen = ":6680"
 
 # Extra browser origins allowed to make credentialed cross-origin calls,
-# such as a local Vite dev server. This does not widen the WebAuthn allowed
-# origins and does not define the canonical identity. Empty for a
-# same-origin SPA deployment.
+# such as a local Vite dev server. Empty for a same-origin SPA deployment.
 cors_allowed_origins = []
 
 # Directory of built SPA assets. Empty serves the API alone, which is what
 # the Vite development profile wants.
-web_root = "/Applications/Lumilio.app/Contents/Resources/web"
+web_root = "/app/web"
 
 [server.tls]
-# Who terminates HTTPS. "off" is plaintext and requires an http
-# primary_origin; "acme" makes this server obtain its own certificate and
-# requires an https primary_origin with a real hostname; "external" puts a
-# reverse proxy in front and requires proxy.mode = required.
-# One of: off, acme, external
-mode = "external"
+# Whether this process serves plaintext HTTP or obtains its own ACME
+# certificate. External proxies use mode = "off" for the upstream.
+# One of: off, acme
+mode = "off"
+
+# Public certificate hostname. Non-empty if and only if mode = "acme".
+hostname = ""
 
 # Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
-# primary_origin. Non-empty if and only if mode = "acme".
+# the ACME hostname. Non-empty if and only if mode = "acme".
 http_listen = ""
 
 # ACME account contact address. Non-empty if and only if mode = "acme".
@@ -78,17 +64,9 @@ email = ""
 storage_path = ""
 
 [server.proxy]
-# Whether a trusted reverse proxy is mandatory. "disabled" ignores every
-# Forwarded and X-Forwarded-* header. "required" rejects application
-# traffic whose immediate peer is outside trusted_cidrs, which is what
-# stops a direct client from forging X-Forwarded-Proto: https.
-# One of: disabled, required
-mode = "required"
-
-# CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
-# the immediate peer, not to any address inside a forwarded chain. Must be
-# empty when mode = "disabled" and hold at least one entry when required.
-trusted_cidrs = ["192.168.1.10/32"]
+# CIDRs whose immediate TCP peer may supply X-Forwarded-For. This controls
+# client-IP recovery only; reverse-proxy access never depends on this list.
+trusted_cidrs = []
 
 [logging]
 # Minimum level emitted to both sinks.
@@ -96,7 +74,7 @@ trusted_cidrs = ["192.168.1.10/32"]
 level = "info"
 
 # Directory for rotated log files. Relative paths are manifest-relative.
-dir = "/Users/example/Library/Application Support/Lumilio/app-state/logs"
+dir = "/data/app-state/logs"
 
 # Encoding for the stdout stream.
 # One of: console, json
@@ -113,15 +91,15 @@ repository_audit_verbose = false
 [storage]
 # Portable media root holding the .lumilioroot marker and repository
 # directories. This is the mount users back up and migrate.
-path = "/Users/example/Pictures/Lumilio"
+path = "/data/storage"
 
 # Cloud provider sessions and credential artifacts. Machine-bound private
 # state, so it must resolve outside storage.path.
-cloud_state_path = "/Users/example/Library/Application Support/Lumilio/app-state/cloud"
+cloud_state_path = "/data/app-state/cloud"
 
 # Database backup destination. Also machine-bound, also outside
 # storage.path, so that backing up media does not capture secrets.
-backups_path = "/Users/example/Library/Application Support/Lumilio/app-state/backups"
+backups_path = "/data/app-state/backups"
 
 [repository_scan]
 # Whether to periodically reconcile repositories against the catalog.
@@ -159,7 +137,7 @@ user_agent = "Lumilio-Photos/1.0"
 # Path to the token-signing key. This is a path, never the secret itself;
 # secret values must not appear in this manifest or in the environment. The
 # server creates the file with mode 0600 on first boot if it is absent.
-secret_key_file = "/Users/example/Library/Application Support/Lumilio/app-state/secrets/lumilio_secret_key"
+secret_key_file = "/data/app-state/secrets/lumilio_secret_key"
 
 # Access token lifetime as a Go duration, for example "15m".
 access_token_ttl = "15m"
@@ -171,13 +149,11 @@ refresh_token_ttl = "168h"
 media_token_ttl = "10m"
 
 [auth.passkey]
-# Whether WebAuthn is offered. When true, primary_origin must be https or
-# exactly http://localhost; an http LAN address or bare IP is rejected
-# because browsers will not treat it as a secure context.
+# Whether WebAuthn is offered on secure request origins. HTTP LAN addresses
+# remain usable with password and TOTP but cannot use passkeys.
 enabled = true
 
-# Relying-party display name shown in the browser prompt. Cosmetic: the RP
-# ID itself always comes from the primary_origin hostname.
+# Relying-party display name shown in the browser prompt.
 name = "Lumilio Photos"
 
 [auth.rate_limit]
@@ -225,7 +201,7 @@ discovery_service_type = "_lumen._tcp"
 discovery_domain = "local"
 
 # Label identifying this deployment in Lumen logs and node affinity.
-deployment_id = "desktop"
+deployment_id = "container"
 
 # Timeout for resolving a discovered node's address.
 resolve_timeout = "3s"

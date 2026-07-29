@@ -52,12 +52,6 @@ func RequestOriginContext(c *gin.Context) (httporigin.RequestContext, bool) {
 
 func writeOriginPolicyError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, httporigin.ErrTrustedProxyRequired):
-		GinError(c, http.StatusForbidden, err, http.StatusForbidden, "trusted_proxy_required")
-	case errors.Is(err, httporigin.ErrMisdirectedRequest):
-		GinError(c, http.StatusMisdirectedRequest, err, http.StatusMisdirectedRequest, "misdirected_request")
-	case errors.Is(err, httporigin.ErrInvalidForwarded):
-		GinError(c, http.StatusBadRequest, err, http.StatusBadRequest, "invalid_forwarded_target")
 	case errors.Is(err, httporigin.ErrInvalidPeerAddress),
 		errors.Is(err, httporigin.ErrInvalidTargetOrigin),
 		errors.Is(err, httporigin.ErrInvalidBrowserOrigin):

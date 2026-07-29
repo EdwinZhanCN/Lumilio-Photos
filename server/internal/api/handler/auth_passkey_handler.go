@@ -78,7 +78,8 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/verify [post]
 func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
-	if _, ok := requirePasskeyRequest(c); !ok {
+	origin, ok := requirePasskeyRequest(c)
+	if !ok {
 		return
 	}
 	if !h.allowAuthNetwork(c, authRateScopePasskeyVerify) {
@@ -100,7 +101,7 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 		return
 	}
 
-	response, err := h.authService.VerifyPasskeyLogin(c.Request.Context(), req.ChallengeToken, credentialJSON)
+	response, err := h.authService.VerifyPasskeyLogin(c.Request.Context(), req.ChallengeToken, credentialJSON, origin)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidPasskeyChallenge),
@@ -193,7 +194,8 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/verify [post]
 func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
-	if _, ok := requirePasskeyRequest(c); !ok {
+	origin, ok := requirePasskeyRequest(c)
+	if !ok {
 		return
 	}
 	user, ok := requireCurrentUser(c)
@@ -213,7 +215,7 @@ func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 		return
 	}
 
-	response, err := h.authService.VerifyPasskeyEnrollment(c.Request.Context(), user.UserID, req.ChallengeToken, credentialJSON)
+	response, err := h.authService.VerifyPasskeyEnrollment(c.Request.Context(), user.UserID, req.ChallengeToken, credentialJSON, origin)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidPasskeyChallenge),

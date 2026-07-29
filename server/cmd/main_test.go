@@ -55,16 +55,13 @@ func TestConfigInitAndValidate(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	err := runConfigCLI([]string{
 		"init",
-		"--profile", "docker-external-proxy",
-		"--origin", "https://photos.example.com",
-		"--listen", "192.168.1.20:6680",
-		"--trusted-proxy", "192.168.1.10/32",
+		"--profile", "docker-http",
 		"--output", path,
 	}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("config init: %v\n%s", err, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "passkey RP ID: photos.example.com") {
+	if !strings.Contains(stdout.String(), "passkey RP ID: derived from each secure browser origin") {
 		t.Fatalf("init report = %q", stdout.String())
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -76,13 +73,13 @@ func TestConfigInitAndValidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), "configuration valid") ||
-		!strings.Contains(stdout.String(), "keep the application listener loopback-only or firewalled") {
+		!strings.Contains(stdout.String(), "security warning: plaintext HTTP") {
 		t.Fatalf("validate report = %q", stdout.String())
 	}
 	if err := runConfigCLI([]string{
 		"init",
 		"--profile", "docker-acme",
-		"--origin", "https://photos.example.com",
+		"--hostname", "photos.example.com",
 		"--email", "admin@example.com",
 		"--output", path,
 	}, &stdout, &stderr); err == nil || !strings.Contains(err.Error(), "refusing to overwrite") {
@@ -97,7 +94,6 @@ func TestConfigInitDevProfileUsesRequestedLocalRoots(t *testing.T) {
 	err := runConfigCLI([]string{
 		"init",
 		"--profile", "dev-vite",
-		"--origin", "http://localhost:6657",
 		"--state-dir", "../state",
 		"--storage-dir", "../storage",
 		"--output", configPath,

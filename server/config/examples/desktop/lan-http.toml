@@ -2,21 +2,10 @@
 # Lumilio Photos runtime manifest, schema v3.
 # Desktop LAN sharing over plaintext HTTP.
 #
-# Scenario: deployment-origin-tls-plan.md 5.2 Desktop LAN HTTP
+# Scenario: dynamic request origin desktop LAN
 #
-# Turning LAN sharing on changes exactly one key: listen moves from loopback to
-# 0.0.0.0. primary_origin deliberately stays on localhost so the derived RP ID
-# does not change and passkeys already registered on this machine keep working.
-#
-# LAN traffic is unencrypted. Passwords, TOTP codes, session cookies and media all
-# cross the network in the clear; a home network is not a trusted transport.
-#
-# Passkey is therefore available on this machine through http://localhost only.
-# A remote device at http://<lan-ip>:6680 is not on primary_origin, so the server
-# reports passkey unavailable and the browser is offered password plus TOTP with a
-# persistent unencrypted-connection warning.
-#
-# 0.0.0.0 covers IPv4 interfaces only; it does not imply IPv6.
+# The listener accepts LAN connections. HTTP remains available for password and
+# TOTP, while passkeys become available automatically on a valid HTTPS hostname.
 #
 # Every key below is required: the loader has no defaults, performs no file
 # search, and accepts no environment overrides. Whether a manifest is legal
@@ -31,7 +20,7 @@
 schema_version = 3
 
 # Deployment environment. Selects test-only affordances; it does not relax
-# any origin, TLS, or proxy rule.
+# runtime manifest validation.
 # One of: development, production, test
 environment = "production"
 
@@ -46,15 +35,8 @@ path = "/Users/example/Library/Application Support/Lumilio/app-state/library.sql
 # only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
 listen = "0.0.0.0:6680"
 
-# The one canonical browser origin. It fixes the cookie and CSRF baseline,
-# the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
-# host plus optional port only: no userinfo, path, query, or fragment.
-primary_origin = "http://localhost:6680"
-
 # Extra browser origins allowed to make credentialed cross-origin calls,
-# such as a local Vite dev server. This does not widen the WebAuthn allowed
-# origins and does not define the canonical identity. Empty for a
-# same-origin SPA deployment.
+# such as a local Vite dev server. Empty for a same-origin SPA deployment.
 cors_allowed_origins = []
 
 # Directory of built SPA assets. Empty serves the API alone, which is what
@@ -62,15 +44,16 @@ cors_allowed_origins = []
 web_root = "/Applications/Lumilio.app/Contents/Resources/web"
 
 [server.tls]
-# Who terminates HTTPS. "off" is plaintext and requires an http
-# primary_origin; "acme" makes this server obtain its own certificate and
-# requires an https primary_origin with a real hostname; "external" puts a
-# reverse proxy in front and requires proxy.mode = required.
-# One of: off, acme, external
+# Whether this process serves plaintext HTTP or obtains its own ACME
+# certificate. External proxies use mode = "off" for the upstream.
+# One of: off, acme
 mode = "off"
 
+# Public certificate hostname. Non-empty if and only if mode = "acme".
+hostname = ""
+
 # Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
-# primary_origin. Non-empty if and only if mode = "acme".
+# the ACME hostname. Non-empty if and only if mode = "acme".
 http_listen = ""
 
 # ACME account contact address. Non-empty if and only if mode = "acme".
@@ -81,16 +64,8 @@ email = ""
 storage_path = ""
 
 [server.proxy]
-# Whether a trusted reverse proxy is mandatory. "disabled" ignores every
-# Forwarded and X-Forwarded-* header. "required" rejects application
-# traffic whose immediate peer is outside trusted_cidrs, which is what
-# stops a direct client from forging X-Forwarded-Proto: https.
-# One of: disabled, required
-mode = "disabled"
-
-# CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
-# the immediate peer, not to any address inside a forwarded chain. Must be
-# empty when mode = "disabled" and hold at least one entry when required.
+# CIDRs whose immediate TCP peer may supply X-Forwarded-For. This controls
+# client-IP recovery only; reverse-proxy access never depends on this list.
 trusted_cidrs = []
 
 [logging]
@@ -174,13 +149,11 @@ refresh_token_ttl = "168h"
 media_token_ttl = "10m"
 
 [auth.passkey]
-# Whether WebAuthn is offered. When true, primary_origin must be https or
-# exactly http://localhost; an http LAN address or bare IP is rejected
-# because browsers will not treat it as a secure context.
+# Whether WebAuthn is offered on secure request origins. HTTP LAN addresses
+# remain usable with password and TOTP but cannot use passkeys.
 enabled = true
 
-# Relying-party display name shown in the browser prompt. Cosmetic: the RP
-# ID itself always comes from the primary_origin hostname.
+# Relying-party display name shown in the browser prompt.
 name = "Lumilio Photos"
 
 [auth.rate_limit]
