@@ -13,7 +13,7 @@ The temporary password is written only to `security.log`. Do not upload this fil
 Select the same production file used for the deployment:
 
 ```bash
-export COMPOSE_FILE=/path/to/compose.caddy.yml # or compose.acme.yml / compose.proxy.yml
+export COMPOSE_FILE=/path/to/compose.yml # or compose.caddy.yml / compose.acme.yml
 ```
 
 1. Stop the normal server so two queue and API instances cannot run together:

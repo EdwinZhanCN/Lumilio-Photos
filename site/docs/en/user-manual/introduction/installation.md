@@ -45,7 +45,7 @@ region settings.
 App data (database, secrets, logs) lives under
 `~/Library/Application Support/Lumilio Photos/`. To uninstall, quit from the
 menu bar, delete the app, and delete that folder if you also want the data gone
-(your photo library location is separate and is never deleted).
+(your media library location is separate and is never deleted).
 
 ## Windows
 
@@ -73,113 +73,42 @@ from in-app map region settings.
 
 ## Desktop network access
 
-The Desktop Control Panel offers three explicit network modes:
+The Desktop Control Panel offers two network modes:
 
 - **Local only** is the default. Lumilio listens on loopback and opens
   `http://localhost:6680`. Use this unless another device needs access.
-- **LAN HTTP** listens on the local network but keeps
-  `http://localhost:6680` as the canonical origin. It is intended only for a
-  trusted home LAN and requires acknowledging that traffic from other devices
-  is unencrypted. Passkeys remain available only from the Desktop machine's
-  localhost URL. Your firewall may also require an inbound rule.
-- **External HTTPS** is for an existing HTTPS reverse proxy. Enter the exact
-  public HTTPS origin and the narrow CIDR of each trusted proxy; Desktop never
-  obtains ACME certificates itself. The proxy must forward the original
-  scheme, host, and client address. Saving performs a restart and readiness
-  check, and restores the previous working settings if the candidate fails.
+- **LAN HTTP** listens on the local network. It is intended only for a trusted
+  home LAN and requires acknowledging that traffic from other devices is
+  unencrypted. Passkeys remain available from localhost but not a remote HTTP
+  address. Your firewall may also require an inbound rule.
 
-The configured primary origin is also the WebAuthn Origin, and its hostname is
-the RP ID. Changing the hostname therefore requires registering new passkeys;
-keep password and TOTP recovery available during the move.
+Domain, certificate, and reverse-proxy configuration remains outside the
+Desktop Control Panel. Lumilio derives the browser and passkey identity from
+the address currently used.
 
 ## Docker (Linux server / NAS)
 
-Requires Docker Engine with Compose 2.23.1 or newer on Linux. All supported
-production Compose files use host networking. They do not publish or translate
-ports: each process binds the host listener from the complete manifest.
-Production has no implicit plaintext mode.
-
-Set the two persistent host paths before choosing a TLS owner:
+Requires Docker Engine with Compose 2.23.1 or newer on Linux. Download and
+start the default host-network deployment:
 
 ```bash
-export LUMILIO_STORAGE=/srv/lumilio/media
-export LUMILIO_STATE=/srv/lumilio/state
-export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
-mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
+mkdir lumilio-server && cd lumilio-server
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+docker compose up -d
 ```
 
-### Caddy on the same host (recommended)
+Open `http://<Linux-host-IP>:6680`. No domain, HTTPS URL, or hand-written TOML
+is required. Media and application state default to `./lumilio/media` and
+`./lumilio/app-state`; set `LUMILIO_STORAGE` and `LUMILIO_STATE` before startup
+to use other paths.
 
-Point the DNS A/AAAA record at the host and allow inbound TCP 80/443:
+The default Compose uses host networking so Lumen mDNS discovery works on the
+LAN. It does not need a `ports` mapping.
 
-```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.caddy.yml
-export LUMILIO_DOMAIN=photos.example.com
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config init --profile docker-external-proxy \
-  --origin "https://${LUMILIO_DOMAIN}" \
-  --trusted-proxy 127.0.0.1/32 \
-  --output /data/app-state/server.toml
-docker compose -f compose.caddy.yml up -d
-```
-
-Lumilio listens only on `127.0.0.1:6680`. Caddy binds host TCP 80/443, obtains
-the certificate, and forwards over loopback. Its certificate state is retained
-in named `caddy_data` and `caddy_config` volumes.
-
-### Built-in ACME HTTPS
-
-Use this when Lumilio itself should obtain and terminate the certificate:
-
-```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.acme.yml
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config init --profile docker-acme \
-  --origin https://photos.example.com --email admin@example.com \
-  --output /data/app-state/server.toml
-docker compose -f compose.acme.yml up -d
-```
-
-The host-network container binds TCP 80 and 443 directly. The image grants its
-non-root Server binary only the capability needed for those privileged ports;
-startup fails if another host process already owns either port. CertMagic keeps
-its account and certificate under `/data/app-state/tls`. Certificate acquisition
-failure stops startup and never falls back to HTTP.
-
-### Existing reverse proxy
-
-For Caddy, Nginx, or Traefik already running directly on the same host:
-
-```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.proxy.yml
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config init --profile docker-external-proxy \
-  --origin https://photos.example.com \
-  --trusted-proxy 127.0.0.1/32 \
-  --output /data/app-state/server.toml
-docker compose -f compose.proxy.yml up -d
-```
-
-Configure the proxy upstream as `127.0.0.1:6680`. For a proxy on another
-machine, generate the manifest with `--listen <lumilio-host-ip>:6680` and trust
-only that proxy's `/32` or `/128`; firewall the listener to the same address.
-The proxy must overwrite, rather than append, the forwarded scheme, host, and
-client address. Minimal Nginx and Traefik examples live under
-`deploy/reverse-proxy/`.
-
-The single image serves both web and API. `LUMILIO_STORAGE` holds media;
-`LUMILIO_STATE` separately holds the schema-v3 manifest, SQLite catalog,
-snapshots, credentials, logs, and ACME state. Both mounts must be writable by
-container UID 10001. Validate edits before restart:
-
-```bash
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config validate --config /data/app-state/server.toml
-```
-
-Passkey Origin is exactly `server.primary_origin`, and RP ID is exactly its
-hostname. Changing that hostname means existing passkeys cannot sign in at the
-new RP ID; keep password + TOTP recovery available and register new passkeys.
+Remote HTTP is unencrypted and cannot use passkeys. Existing reverse proxies
+may forward to port 6680 without configuring a public URL in Lumilio. Optional
+same-host Caddy and built-in ACME files remain available as
+`compose.caddy.yml` and `compose.acme.yml`.
 
 ::: warning Back up through Lumilio
 While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or

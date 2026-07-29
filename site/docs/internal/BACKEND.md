@@ -58,16 +58,18 @@ generation exited, durably records promotion intent before the atomic file
 replacement, and updates last-known-good only after readiness. `Prepare`
 reconciles an interrupted journal before starting, including either side of the
 promotion boundary. The host-level single-instance lock is acquired before
-settings migration or Wails UI, spans all generations, and is released only by
+runtime setup or Wails UI, spans all generations, and is released only by
 Desktop shutdown. Control-plane reads deliberately expose an invalid active
 intent plus structured issues for recovery; candidate acceptance still uses
 `LoadAppConfigBytes`.
 
-`server.primary_origin` is the sole canonical browser and WebAuthn Origin.
-`internal/httporigin` resolves direct/proxied request context, and
-`internal/servertransport` owns off/external/ACME listeners. Proxy-required
-deployments reject direct application requests before auth handlers; only
-loopback live/ready probes bypass the proxy requirement.
+Browser and WebAuthn identity are derived from each request.
+`internal/httporigin` normalizes `Forwarded`/`X-Forwarded-*` target metadata
+and the browser `Origin`; `server.proxy.trusted_cidrs` is used only to recover
+the client IP from `X-Forwarded-For`. `internal/servertransport` owns plaintext
+and ACME listeners. Passkey challenges bind the normalized request Origin and
+its hostname RP ID, then verification checks the current request against that
+same pair.
 
 The standalone Server/Docker distribution is supported on Linux. macOS and
 Windows ship the Desktop App rather than a separately operated Server, but that
@@ -260,8 +262,8 @@ server CORS, or this CSRF protocol. The React product Web runs in the user's
 default browser and is served by `server/app` on the same localhost origin as
 the API. The Control Panel receives the typed Supervisor runtime snapshot and
 can validate/apply/restore runtime intent even when ordinary Server startup
-fails. Desktop's `server.primary_origin` binding remains the WebAuthn RP Origin
-for the product Web; it is not a CORS entry.
+fails. Desktop opens the product Web on `http://localhost:6680`; its local and
+LAN profiles use the same request-derived Origin behavior as standalone Server.
 
 ## Queues And Processing
 

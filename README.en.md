@@ -47,18 +47,19 @@ Desktop packages include the embedded SQLite catalog and required media tools. T
 ### Docker Compose
 
 The Docker delivery targets Linux with Docker Engine and Compose 2.23.1 or
-newer. All production variants use host networking:
+newer. The default host-network deployment requires no domain or generated
+configuration:
 
-- [`compose.caddy.yml`](deploy/compose/compose.caddy.yml) — recommended; Caddy
-  owns public HTTPS on the same host.
-- [`compose.acme.yml`](deploy/compose/compose.acme.yml) — Lumilio obtains and
-  terminates the certificate directly.
-- [`compose.proxy.yml`](deploy/compose/compose.proxy.yml) — use an existing
-  same-host or explicitly configured remote HTTPS proxy.
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+docker compose up -d
+```
 
-Read the [installation guide](site/docs/en/user-manual/introduction/installation.md)
-before deploying. Production requires an explicit schema-versioned manifest and
-separate persistent paths for media and application state.
+Open `http://<Linux-host-IP>:6680`. Optional
+[`compose.caddy.yml`](deploy/compose/compose.caddy.yml) and
+[`compose.acme.yml`](deploy/compose/compose.acme.yml) add HTTPS. Read the
+[installation guide](site/docs/en/user-manual/introduction/installation.md)
+for persistent paths and advanced deployment options.
 
 ## Contributing
 

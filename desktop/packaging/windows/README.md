@@ -22,14 +22,14 @@
   - removes the program files,
   - offers to also delete the app data in `%LocalAppData%\Lumilio Photos`
     (default **No**),
-  - if the photo library lives inside the data dir (the default location),
+  - if the media library lives inside the data dir (the default location),
     requires a second explicit confirmation before deleting, because that is the
     user's original photos. An **external** library (e.g. `D:\Photos`) is never
     touched — the uninstaller only ever deletes the data dir.
 - **In-place upgrades** — the same `setup.exe` for a newer version reuses the
   stable `AppId` and install dir. Before copying the new payload it deletes
   everything under `{app}` (`[InstallDelete]`), so removed DLLs/tools from older
-  builds do not linger. App data and the photo library are never touched.
+  builds do not linger. App data and the media library are never touched.
 
 Storage-path selection is deliberately **not** in the installer: it belongs to
 the app's first-run onboarding window (per-user, with live writability

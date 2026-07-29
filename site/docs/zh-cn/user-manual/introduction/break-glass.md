@@ -1,56 +1,43 @@
-# 恢复管理员访问权限
+---
+title: 恢复管理员访问
+---
 
-仅当一个**已启用的管理员**丢失全部登录因子，并且没有其他管理员可以使用“重置访问权限”时，才使用 BreakGlass。它不能修复配置、数据库或启动失败。
+# 恢复管理员访问
 
-BreakGlass 会替换管理员密码，删除通行密钥、TOTP 和恢复码，并使已有会话失效。使用临时密码登录后，必须立即设置永久密码。
+只有当一个**仍处于启用状态的管理员**丢失全部登录因素，且没有其他管理员可以重置其访问权限时，才使用 BreakGlass。它会重置管理员密码，移除通行密钥、TOTP 与恢复代码，并使现有会话失效。
 
-::: danger 敏感日志
-临时密码只写入 `security.log`。不要上传该文件、粘贴到 Issue，或将它发送到日志收集服务。
+开始前先确认正在操作正确的实例，并创建一份最新的 SQLite 数据库快照。BreakGlass 不能修复配置、数据库或启动故障。
+
+::: danger 临时密码属于敏感信息
+临时密码只写入 `security.log`。不要上传这个文件、粘贴到 Issue，或发送给日志收集服务。
 :::
 
 ## Docker Compose
 
-选择部署时使用的同一份生产 Compose：
+以下命令必须在部署目录执行，并使用生产环境实际选择的同一个 Compose 文件。
 
 ```bash
-export COMPOSE_FILE=/path/to/compose.caddy.yml # 或 compose.acme.yml / compose.proxy.yml
+export COMPOSE_FILE=/path/to/compose.yml
+docker compose stop
+docker compose run --no-deps -d --name lumilio-breakglass \
+  -e LUMILIO_BREAK_GLASS=true \
+  -e LUMILIO_BREAK_GLASS_USERNAME=admin \
+  lumilio
+docker exec lumilio-breakglass cat /data/app-state/logs/security.log
 ```
 
-1. 停止正常 Server，避免同时运行两个队列和 API 实例：
+复制成功的 `auth.break_glass` 事件中的 `temporary_password` 后：
 
-   ```bash
-   docker compose stop
-   ```
+```bash
+docker rm -f lumilio-breakglass
+docker compose up -d
+```
 
-2. 启动一次性恢复容器。不指定用户名时，将恢复最早创建的已启用管理员：
+如果实际使用 `compose.caddy.yml` 或 `compose.acme.yml`，相应替换 `COMPOSE_FILE`。省略 `LUMILIO_BREAK_GLASS_USERNAME` 会恢复最早创建的启用中管理员。
 
-   ```bash
-   docker compose run --no-deps -d --name lumilio-breakglass \
-     -e LUMILIO_BREAK_GLASS=true \
-     -e LUMILIO_BREAK_GLASS_USERNAME=admin \
-     lumilio
-   ```
+## Desktop：macOS
 
-3. 读取成功的 `auth.break_glass` 事件，并复制其中的 `temporary_password`：
-
-   ```bash
-   docker exec lumilio-breakglass cat /data/app-state/logs/security.log
-   ```
-
-4. 删除一次性容器，并在不启用 BreakGlass 的情况下重新启动正常 Server：
-
-   ```bash
-   docker rm -f lumilio-breakglass
-   docker compose up -d
-   ```
-
-5. 使用临时密码登录，并在提示时设置永久密码。
-
-## Desktop
-
-首先从菜单栏或系统托盘中完全退出 Lumilio Photos。已有实例仍在运行时，恢复启动会被拒绝。
-
-### macOS
+先从菜单栏完全退出 Lumilio Photos，再运行：
 
 ```bash
 open -n -a "Lumilio Photos" --args \
@@ -58,13 +45,15 @@ open -n -a "Lumilio Photos" --args \
   --break-glass-username admin
 ```
 
-安全日志位置：
+临时密码位于：
 
 ```text
 ~/Library/Application Support/Lumilio Photos/logs/security.log
 ```
 
-### Windows PowerShell
+## Desktop：Windows PowerShell
+
+先从托盘完全退出 Lumilio Photos，再运行：
 
 ```powershell
 & "$env:LOCALAPPDATA\Programs\Lumilio Photos\lumilio-photos.exe" `
@@ -72,17 +61,16 @@ open -n -a "Lumilio Photos" --args \
   --break-glass-username admin
 ```
 
-安全日志位置：
+临时密码位于：
 
 ```text
-%LOCALAPPDATA%\Lumilio Photos\logs\security.log
+$env:LOCALAPPDATA\Lumilio Photos\logs\security.log
 ```
 
-删除 `--break-glass-username admin` 即可恢复最早创建的已启用管理员。复制临时密码后，退出本次恢复启动，再正常打开 Lumilio Photos。随后使用临时密码登录并完成强制改密。
+省略 `--break-glass-username admin` 会恢复最早创建的启用中管理员。
 
-## 恢复失败时
+## 完成恢复
 
-- 指定的账户必须存在、具有管理员角色并处于启用状态。
-- Desktop 用户应确认原有托盘应用已经完全退出。
-- Docker 用户可通过 `docker logs lumilio-breakglass` 检查启动错误，并等待 `security.log` 创建完成。
-- 如果配置加载、SQLite 完整性或迁移、安全日志初始化失败，应先修复该启动问题；BreakGlass 只会在这些依赖就绪后运行。
+退出这次恢复启动，正常启动 Lumilio Photos，用临时密码登录并立即设置永久密码，然后重新登记 TOTP 或通行密钥并生成新恢复代码。
+
+如果恢复失败，确认目标账户存在、角色为管理员且仍启用；Desktop 必须已完全退出。Docker 可运行 `docker logs lumilio-breakglass` 检查启动失败。配置、SQLite 迁移或安全日志初始化失败时，必须先修复该启动问题。
