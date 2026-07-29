@@ -3,12 +3,13 @@ package sqlitespike
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
+	"strings"
 	"testing"
-
-	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )
 
 func TestSQLiteDriverPragmasStrictJSONAndVector(t *testing.T) {
@@ -30,14 +31,14 @@ func TestSQLiteDriverPragmasStrictJSONAndVector(t *testing.T) {
 
 	var sqliteVersion string
 	var vectorVersion string
-	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec_version()").Scan(&sqliteVersion, &vectorVersion); err != nil {
+	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec1_info()").Scan(&sqliteVersion, &vectorVersion); err != nil {
 		t.Fatalf("query SQLite/vector versions: %v", err)
 	}
 	if sqliteVersion == "" {
 		t.Fatal("sqlite_version() returned an empty version")
 	}
-	if vectorVersion != "v0.1.6" {
-		t.Fatalf("vec_version() = %q, want v0.1.6", vectorVersion)
+	if !strings.Contains(vectorVersion, "version 0.7") {
+		t.Fatalf("vec1_info() = %q, want version 0.7", vectorVersion)
 	}
 
 	if _, err := database.ExecContext(ctx, `
@@ -110,11 +111,10 @@ func testVectorDimensions(t *testing.T, ctx context.Context, database *sql.DB, d
 
 	table := fmt.Sprintf("vectors_%d", dimensions)
 	if _, err := database.ExecContext(ctx, fmt.Sprintf(
-		"CREATE VIRTUAL TABLE %s USING vec0(embedding float[%d])",
+		"CREATE VIRTUAL TABLE %s USING vec1(embedding)",
 		table,
-		dimensions,
 	)); err != nil {
-		t.Fatalf("create %dD vec0 table: %v", dimensions, err)
+		t.Fatalf("create %dD Vec1 table: %v", dimensions, err)
 	}
 
 	vectors := map[int][]float32{
@@ -123,10 +123,7 @@ func testVectorDimensions(t *testing.T, ctx context.Context, database *sql.DB, d
 		3: constantVector(dimensions, 1),
 	}
 	for rowID, vector := range vectors {
-		serialized, err := sqlitevec.SerializeFloat32(vector)
-		if err != nil {
-			t.Fatalf("serialize %dD vector: %v", dimensions, err)
-		}
+		serialized := serializeFloat32(vector)
 		if _, err := database.ExecContext(
 			ctx,
 			fmt.Sprintf("INSERT INTO %s (rowid, embedding) VALUES (?, ?)", table),
@@ -136,11 +133,14 @@ func testVectorDimensions(t *testing.T, ctx context.Context, database *sql.DB, d
 			t.Fatalf("insert %dD vector row %d: %v", dimensions, rowID, err)
 		}
 	}
-
-	query, err := sqlitevec.SerializeFloat32(constantVector(dimensions, 0.2))
-	if err != nil {
-		t.Fatalf("serialize %dD query: %v", dimensions, err)
+	if _, err := database.ExecContext(ctx, fmt.Sprintf(
+		"INSERT INTO %s(cmd, arg) VALUES ('rebuild', '{\"index\":\"flat\",\"distance\":\"l2\"}')",
+		table,
+	)); err != nil {
+		t.Fatalf("rebuild %dD Vec1 table: %v", dimensions, err)
 	}
+
+	query := serializeFloat32(constantVector(dimensions, 0.2))
 	got := vectorTopK(t, ctx, database, table, query, 2)
 	want := []int64{2, 1}
 	if encoded, _ := json.Marshal(got); string(encoded) != "[2,1]" {
@@ -164,16 +164,22 @@ func constantVector(dimensions int, value float32) []float32 {
 	return vector
 }
 
+func serializeFloat32(vector []float32) []byte {
+	blob := make([]byte, len(vector)*4)
+	for index, value := range vector {
+		binary.LittleEndian.PutUint32(blob[index*4:], math.Float32bits(value))
+	}
+	return blob
+}
+
 func vectorTopK(t *testing.T, ctx context.Context, database *sql.DB, table string, query []byte, limit int) []int64 {
 	t.Helper()
 
 	rows, err := database.QueryContext(ctx, fmt.Sprintf(`
 		SELECT rowid
-		FROM %s
-		WHERE embedding MATCH ?
+		FROM %s(?, ?)
 		ORDER BY distance
-		LIMIT ?
-	`, table), query, limit)
+	`, table), query, fmt.Sprintf(`{"k":%d}`, limit))
 	if err != nil {
 		t.Fatalf("query %s top-k: %v", table, err)
 	}

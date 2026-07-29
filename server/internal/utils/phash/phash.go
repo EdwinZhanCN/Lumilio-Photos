@@ -28,7 +28,7 @@ func ComputeFromReader(r io.Reader) (*goimagehash.ImageHash, error) {
 }
 
 // ToVector converts a 64-bit perceptual hash into a 64-element float32 vector
-// suitable for sqlite-vec storage and nearest-neighbor search.
+// suitable for SQLite BLOB storage and nearest-neighbor search.
 func ToVector(h *goimagehash.ImageHash) []float32 {
 	hashBits := h.GetHash()
 	vector := make([]float32, 64)

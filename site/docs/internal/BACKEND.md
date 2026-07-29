@@ -153,19 +153,21 @@ Owner identity is instance-local database policy rather than portable
 ## Database And API Contracts
 
 - `github.com/mattn/go-sqlite3` is the only database driver. `internal/db.Open`
-  fixes the writer pool at one connection, registers sqlite-vec statically, and
-  applies fixed pragmas to every physical connection through driver DSN options
-  plus a connection hook. Startup reads the effective values back and fails
-  closed if policy differs.
+  fixes the writer pool at one connection, registers the vendored SQLite Vec1
+  0.7 extension statically, and applies fixed pragmas to every physical
+  connection through driver DSN options plus a connection hook. Startup reads
+  the effective values back and fails closed if policy differs.
 - Application tables and River queues share the same catalog and can commit
   business state plus `InsertTx` jobs in one short `database/sql` transaction.
 - A running catalog must never be opened or copied through a host/container
   mount with another SQLite process. Host and container VFS locking is not a
   supported coordination boundary; use the application Online Backup flow, or
   inspect the catalog only after a graceful application stop.
-- FTS5, sqlite-vec tables, and the OCR Bleve sidecar are derived query
+- FTS5, the Vec1 semantic table, and the OCR Bleve sidecar are derived query
   structures; authoritative text and embedding data remains in ordinary
-  application tables.
+  application tables. Vec1 is exact-flat below 5,000 semantic rows and
+  automatically trains a PQ ANN model at larger sizes; ANN candidates are
+  filtered inside Vec1 and exact-reranked from authoritative BLOBs.
 - OCR search lives at
   `<sqlite-directory>/indexes/bleve/ocr-v1/`. `ocr_results` and
   `ocr_text_items` remain authoritative; a revisioned SQLite outbox drives

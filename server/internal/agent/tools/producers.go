@@ -18,7 +18,7 @@ import (
 )
 
 // SearchSemanticInput finds assets by visual/semantic similarity to a text
-// query (CLIP embeddings + sqlite-vec). Membership is decided by a per-query
+// query (CLIP embeddings + SQLite Vec1). Membership is decided by a per-query
 // calibrated relevance cutoff — the ref is the full relevant set, not a
 // fixed TopK. Use rank/top to trim it.
 type SearchSemanticInput struct {

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"server/internal/db/repo"
+	"server/internal/db/vectorindex"
 	"server/internal/logging"
 	"server/internal/queue/jobs"
 	"server/internal/settings"
@@ -336,6 +337,9 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		}
 		if err := s.queries.ClearDefaultSearchSpaceByType(ctx, string(EmbeddingTypeSemantic)); err != nil {
 			return fmt.Errorf("reset semantic index: clear default space: %w", err)
+		}
+		if err := vectorindex.Maintain(ctx, s.dbpool); err != nil {
+			return fmt.Errorf("reset semantic index: rebuild Vec1 flat index: %w", err)
 		}
 		// Video frame rows were wiped with the table; ensure videos are
 		// re-queued when video semantic indexing is enabled.

@@ -186,11 +186,11 @@ jobs:
                   go-version-file: server/go.mod
                   cache-dependency-path: server/go.sum
 
-            # CGO deps for govips + libraw (server/internal/utils/raw).
-            - name: Install libvips and libraw
+            # CGO headers for govips, libraw, and the vendored Vec1 source.
+            - name: Install libvips, libraw, and SQLite headers
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev
 
             - run: make server-test
 
@@ -323,8 +323,8 @@ jobs:
                   cache: true
 
             # CGO deps: both the complete Server suite and the Desktop module
-            # compile govips/libraw. SQLite, FTS5, and sqlite-vec are linked
-            # into the test binary, so no database service is staged.
+            # compile govips/libraw. SQLite, FTS5, and Vec1 are linked into the
+            # test binary, so no database service is staged.
             # ffmpeg/exiftool are required because Desktop hostProjection writes
             # absolute tools.* paths into the strict runtime manifest; CI has no
             # app bundle, so LookPath must resolve development installs.
@@ -373,6 +373,7 @@ jobs:
                       mingw-w64-x86_64-go
                       mingw-w64-x86_64-gcc
                       mingw-w64-x86_64-pkgconf
+                      mingw-w64-x86_64-sqlite3
                       mingw-w64-x86_64-libvips
                       mingw-w64-x86_64-libraw
                       mingw-w64-x86_64-ffmpeg

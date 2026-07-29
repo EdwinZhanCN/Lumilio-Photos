@@ -20,7 +20,7 @@ WHERE fi.id != ?1
   AND fi.embedding IS NOT NULL
   AND fi.confidence >= ?4
   AND COALESCE(fi.face_size, 0) >= ?5
-  AND 1.0 - vec_distance_cosine(fi.embedding, ?6)
+  AND 1.0 - vec1_cos_distance(fi.embedding, ?6)
       >= CAST(?7 AS REAL)
 `
 

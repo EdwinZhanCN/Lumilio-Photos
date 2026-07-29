@@ -287,8 +287,8 @@ func (s *classifierService) Preview(ctx context.Context, positivePrompts, negati
 		return nil, err
 	}
 
-	// sqlite-vec returns cosine distance, so the contrastive similarity margin
-	// is distance(negative) - distance(positive).
+	// Vec1 returns cosine distance, so the contrastive similarity margin is
+	// distance(negative) - distance(positive).
 	posVec := dbtypes.NewVector(positive)
 	negVec := dbtypes.NewVector(negative)
 	// Assets may carry multiple vectors (video frames); represent each asset by
@@ -297,7 +297,7 @@ func (s *classifierService) Preview(ctx context.Context, positivePrompts, negati
 WITH scored AS (
   SELECT
     a.asset_id,
-    MAX(vec_distance_cosine(e.vector, ?) - vec_distance_cosine(e.vector, ?)) AS score
+    MAX(vec1_cos_distance(e.vector, ?) - vec1_cos_distance(e.vector, ?)) AS score
   FROM search_embeddings e
   JOIN assets a ON a.asset_id = e.asset_id
   WHERE e.space_id = ?

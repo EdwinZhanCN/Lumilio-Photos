@@ -15,11 +15,11 @@ import (
 const getSimilarFaces = `-- name: GetSimilarFaces :many
 SELECT
     fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at,
-    CAST(1.0 - vec_distance_cosine(fi.embedding, ?1) AS REAL) AS similarity
+    CAST(1.0 - vec1_cos_distance(fi.embedding, ?1) AS REAL) AS similarity
 FROM face_items fi
 WHERE fi.id != ?2
 AND fi.embedding IS NOT NULL
-AND 1.0 - vec_distance_cosine(fi.embedding, ?1)
+AND 1.0 - vec1_cos_distance(fi.embedding, ?1)
     >= CAST(?3 AS REAL)
 ORDER BY similarity DESC
 LIMIT ?4

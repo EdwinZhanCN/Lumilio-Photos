@@ -5,13 +5,13 @@ package migrations_test
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
+	"math"
 	"strings"
 	"testing"
 
 	"server/internal/db/sqlitespike"
 	"server/migrations"
-
-	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )
 
 func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
@@ -24,7 +24,7 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 
-	baseline, err := migrations.FS.ReadFile("000001_sqlite_baseline.up.sql")
+	baseline, err := migrations.FS.ReadFile("000003_vec1_baseline.up.sql")
 	if err != nil {
 		t.Fatalf("read SQLite baseline: %v", err)
 	}
@@ -40,8 +40,8 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&userVersion); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if userVersion != 3 {
-		t.Fatalf("baseline user_version = %d, want 3", userVersion)
+	if userVersion != 4 {
+		t.Fatalf("baseline user_version = %d, want 4", userVersion)
 	}
 
 	var browseFactColumns int
@@ -160,10 +160,7 @@ func insertVectorFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 		t.Fatalf("insert vector prerequisites: %v", err)
 	}
 
-	vector, err := sqlitevec.SerializeFloat32(make([]float32, 768))
-	if err != nil {
-		t.Fatalf("serialize vector: %v", err)
-	}
+	vector := serializeVector(make([]float32, 768))
 	if _, err := database.ExecContext(ctx, `
 		INSERT INTO search_embeddings (
 			asset_id, space_id, vector, model_id, created_at
@@ -178,6 +175,48 @@ func insertVectorFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 	if vectorRows != 1 {
 		t.Fatalf("derived vector count = %d, want 1", vectorRows)
 	}
+
+	var nearestRowID int64
+	if err := database.QueryRowContext(ctx, `
+		SELECT rowid
+		FROM search_embeddings_vec(?, '{"k":1}')
+		WHERE space_id = 1
+		  AND owner_id = 1
+		  AND is_deleted = 0
+		  AND asset_type = 'PHOTO'
+	`, vector).Scan(&nearestRowID); err != nil {
+		t.Fatalf("query Vec1 fixture: %v", err)
+	}
+	if nearestRowID <= 0 {
+		t.Fatalf("nearest Vec1 rowid = %d", nearestRowID)
+	}
+
+	if _, err := database.ExecContext(ctx, `
+		UPDATE assets
+		SET is_deleted = 1
+		WHERE asset_id = '00000000-0000-0000-0000-000000000003'
+	`); err != nil {
+		t.Fatalf("update Vec1 metadata source: %v", err)
+	}
+	var visibleRows int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM search_embeddings_vec(?, '{"k":1}')
+		WHERE is_deleted = 0
+	`, vector).Scan(&visibleRows); err != nil {
+		t.Fatalf("query updated Vec1 metadata: %v", err)
+	}
+	if visibleRows != 0 {
+		t.Fatalf("visible Vec1 rows after soft delete = %d, want 0", visibleRows)
+	}
+}
+
+func serializeVector(vector []float32) []byte {
+	blob := make([]byte, len(vector)*4)
+	for index, value := range vector {
+		binary.LittleEndian.PutUint32(blob[index*4:], math.Float32bits(value))
+	}
+	return blob
 }
 
 func insertFTSFixture(t *testing.T, ctx context.Context, database *sql.DB) {
@@ -235,9 +274,12 @@ var applicationTables = []string{
 	"face_cluster_members",
 	"ocr_results",
 	"ocr_text_items",
+	"ocr_index_metadata",
+	"ocr_index_outbox",
 	"species_predictions",
 	"asset_quality_scores",
 	"search_embeddings",
+	"semantic_vector_index_state",
 	"agent_checkpoints",
 	"agent_pins",
 	"cloud_credentials",

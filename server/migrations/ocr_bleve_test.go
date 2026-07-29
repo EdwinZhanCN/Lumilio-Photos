@@ -18,12 +18,50 @@ func TestOCRBleveMigrationDropsOnlyOCRFTSAndSeedsOutbox(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, database.Close()) })
 
-	baseline, err := migrations.FS.ReadFile("000001_sqlite_baseline.up.sql")
-	require.NoError(t, err)
-	_, err = database.ExecContext(ctx, string(baseline))
-	require.NoError(t, err)
-	insertVectorFixtures(t, ctx, database)
 	_, err = database.ExecContext(ctx, `
+CREATE TABLE assets (
+    asset_id TEXT PRIMARY KEY
+) STRICT;
+CREATE TABLE ocr_results (
+    asset_id TEXT PRIMARY KEY REFERENCES assets(asset_id) ON DELETE CASCADE,
+    model_id TEXT NOT NULL,
+    total_count INTEGER NOT NULL DEFAULT 0 CHECK (total_count >= 0),
+    processing_time_ms INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    full_text TEXT NOT NULL DEFAULT ''
+) STRICT;
+CREATE TABLE ocr_text_items (
+    id INTEGER PRIMARY KEY,
+    asset_id TEXT NOT NULL REFERENCES ocr_results(asset_id) ON DELETE CASCADE,
+    text_content TEXT NOT NULL,
+    confidence REAL NOT NULL CHECK (confidence BETWEEN 0 AND 1),
+    bounding_box TEXT NOT NULL CHECK (json_valid(bounding_box)),
+    text_length INTEGER NOT NULL CHECK (text_length >= 0),
+    area_pixels REAL,
+    created_at INTEGER NOT NULL
+) STRICT;
+CREATE VIRTUAL TABLE ocr_search_fts USING fts5(
+    full_text,
+    content = 'ocr_results',
+    content_rowid = 'rowid',
+    tokenize = 'trigram'
+);
+CREATE VIRTUAL TABLE location_search_fts USING fts5(label);
+CREATE TRIGGER ocr_search_fts_insert AFTER INSERT ON ocr_results BEGIN
+    INSERT INTO ocr_search_fts (rowid, full_text) VALUES (new.rowid, new.full_text);
+END;
+CREATE TRIGGER ocr_search_fts_delete AFTER DELETE ON ocr_results BEGIN
+    INSERT INTO ocr_search_fts (ocr_search_fts, rowid, full_text)
+    VALUES ('delete', old.rowid, old.full_text);
+END;
+CREATE TRIGGER ocr_search_fts_update AFTER UPDATE OF full_text ON ocr_results BEGIN
+    INSERT INTO ocr_search_fts (ocr_search_fts, rowid, full_text)
+    VALUES ('delete', old.rowid, old.full_text);
+    INSERT INTO ocr_search_fts (rowid, full_text) VALUES (new.rowid, new.full_text);
+END;
+INSERT INTO assets (asset_id)
+VALUES ('00000000-0000-0000-0000-000000000003');
 INSERT INTO ocr_results (
     asset_id, model_id, total_count, processing_time_ms, created_at, updated_at, full_text
 ) VALUES (
