@@ -75,7 +75,9 @@ vp exec i18next-cli status     # step 3: verify zh coverage (must be 100%)
 - `src/wasm`: checked-in generated/bundled WASM support code.
 - `src/workers`: browser worker entry points and worker tests.
 
-Current feature areas are assets, auth, cloud, collections, home, Lumilio, manage, monitor, notifications, people, repositories, settings, share, studio, upload, and users.
+Current feature areas are assets, auth, cloud, collections, events, home,
+Lumilio, manage, monitor, notifications, people, repositories, settings, share,
+studio, upload, and users.
 
 ### Feature Ownership
 
@@ -149,6 +151,12 @@ Use TanStack Query for server state:
 - cache lifecycle
 - loading/error state
 - pagination and refetch behavior
+
+Events follow this boundary directly: the index uses opaque server cursors,
+detail and mutation state remain in TanStack Query, and the detail gallery
+composes the public Assets entry with an immutable `event_id` constraint.
+Assets exposes feature-neutral logical selection values to Event correction
+actions; Events never imports Assets selection internals.
 
 Use Context for cross-cutting runtime capabilities:
 

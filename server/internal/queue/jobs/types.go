@@ -53,6 +53,45 @@ const (
 	LocalToolMaxAttempts  = 5
 )
 
+type EventRebuildArgs struct {
+	OwnerID int32 `json:"ownerId" river:"unique"`
+}
+
+func (EventRebuildArgs) Kind() string { return "rebuild_events" }
+
+func (EventRebuildArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue: "rebuild_events",
+		UniqueOpts: river.UniqueOpts{
+			ByArgs: true,
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateRunning,
+				rivertype.JobStateScheduled,
+			},
+		},
+	}
+}
+
+type ScheduleEventRebuildsArgs struct{}
+
+func (ScheduleEventRebuildsArgs) Kind() string { return "schedule_event_rebuilds" }
+
+func (ScheduleEventRebuildsArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: "rebuild_events", UniqueOpts: river.UniqueOpts{
+		ByArgs: true,
+		ByState: []rivertype.JobState{
+			rivertype.JobStateAvailable,
+			rivertype.JobStatePending,
+			rivertype.JobStateRetryable,
+			rivertype.JobStateRunning,
+			rivertype.JobStateScheduled,
+		},
+	}}
+}
+
 // ZeroshotClassifyArgs is the River job payload for zero-shot
 // classification. It scores the asset's already-stored semantic image embedding
 // against classifier prototypes; it does not re-run any ML model.

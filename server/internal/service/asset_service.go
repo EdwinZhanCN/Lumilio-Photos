@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/event"
 	aggregatesearch "server/internal/search"
 	"server/internal/search/bleveocr"
 	"server/internal/utils/geohash"
@@ -157,6 +158,7 @@ type QueryAssetsParams struct {
 	AssetTypes       []string // Multiple types filter
 	OwnerID          *int32
 	AlbumID          *int32
+	EventID          *string
 	FilenameValue    *string
 	FilenameOperator *string
 	DateFrom         *time.Time
@@ -192,6 +194,7 @@ const (
 	AssetSetSourcePin       AssetSetSourceKind = "pin"
 	AssetSetSourceRef       AssetSetSourceKind = "ref"
 	AssetSetSourceShareLink AssetSetSourceKind = "share_link"
+	AssetSetSourceEvent     AssetSetSourceKind = "event"
 )
 
 // AssetSetSource scopes a query to an internally resolved asset set.
@@ -1358,6 +1361,26 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 
 // QueryAssets is the unified method for listing, filtering, and searching assets.
 func (s *assetService) QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	if params.EventID != nil {
+		if params.OwnerID == nil {
+			return nil, 0, event.ErrNotFound
+		}
+		resolved, _, err := event.NewResolver(s.pool).OrderedAssets(ctx, *params.OwnerID, *params.EventID, 0)
+		if err != nil {
+			return nil, 0, err
+		}
+		ids := make([]uuid.UUID, 0, len(resolved))
+		for _, item := range resolved {
+			id, err := uuid.Parse(item.AssetID)
+			if err != nil {
+				return nil, 0, fmt.Errorf("parse Event asset ID: %w", err)
+			}
+			ids = append(ids, id)
+		}
+		params.Source = &AssetSetSource{
+			Kind: AssetSetSourceEvent, AssetIDs: ids, PreserveSnapshotOrder: true,
+		}
+	}
 	if params.SearchType == "semantic" && params.Query != "" {
 		return s.queryAssetsAggregate(ctx, params)
 	}

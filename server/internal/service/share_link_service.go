@@ -96,6 +96,46 @@ type ShareLinkService interface {
 	AssetInShare(link repo.ShareLink, assetID uuid.UUID) bool
 }
 
+type ResolvedSnapshotShareService interface {
+	CreateResolvedSnapshot(ctx context.Context, params ShareLinkCreateParams, assetIDs []uuid.UUID, sourceRef string) (repo.ShareLink, string, error)
+	CreateResolvedSnapshotTx(ctx context.Context, tx *sql.Tx, params ShareLinkCreateParams, assetIDs []uuid.UUID, sourceRef string) (repo.ShareLink, string, error)
+}
+
+func (s *shareLinkService) CreateResolvedSnapshot(ctx context.Context, params ShareLinkCreateParams, assetIDs []uuid.UUID, sourceRef string) (repo.ShareLink, string, error) {
+	if len(assetIDs) > ShareLinkMaxAssets {
+		return repo.ShareLink{}, "", ErrShareLinkTooLarge
+	}
+	params.SourceKind = "asset_snapshot"
+	params.SourceRef = &sourceRef
+	params.ExplicitAssetIDs = append([]uuid.UUID(nil), assetIDs...)
+	return s.Create(ctx, params)
+}
+
+func (s *shareLinkService) CreateResolvedSnapshotTx(ctx context.Context, tx *sql.Tx, params ShareLinkCreateParams, assetIDs []uuid.UUID, sourceRef string) (repo.ShareLink, string, error) {
+	if len(assetIDs) > ShareLinkMaxAssets {
+		return repo.ShareLink{}, "", ErrShareLinkTooLarge
+	}
+	if len(assetIDs) == 0 {
+		return repo.ShareLink{}, "", ErrShareLinkSourceEmpty
+	}
+	rawToken, err := s.generateToken()
+	if err != nil {
+		return repo.ShareLink{}, "", err
+	}
+	expiresAt := time.Now().Add(time.Duration(clampExpiryDays(params.ExpiresInDays)) * 24 * time.Hour)
+	link, err := repo.New(tx).CreateShareLink(ctx, repo.CreateShareLinkParams{
+		OwnerID: params.OwnerID, TokenHash: s.hashToken(rawToken), Title: params.Title,
+		Description: params.Description, SourceKind: "asset_snapshot", SourceRef: &sourceRef,
+		AssetIds: dbtypes.UUIDs(append([]uuid.UUID(nil), assetIDs...)), AssetCount: int64(len(assetIDs)),
+		AllowDownload: params.AllowDownload, IncludeOriginals: params.IncludeOriginals,
+		ExpiresAt: dbtypes.NewTimestamp(expiresAt), ShareID: uuid.New(),
+	})
+	if err != nil {
+		return repo.ShareLink{}, "", err
+	}
+	return link, rawToken, nil
+}
+
 type shareLinkService struct {
 	queries      *repo.Queries
 	assetService AssetService

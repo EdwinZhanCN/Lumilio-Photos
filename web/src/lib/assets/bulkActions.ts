@@ -14,11 +14,19 @@ export type AssetsBulkActionId =
 
 export type AssetsBulkActionTone = "default" | "info" | "danger";
 
+export interface SelectedLogicalMedia {
+  browse_item_id: string;
+  media_item_ids: string[];
+  representative_asset_ids: string[];
+  complete: boolean;
+}
+
 export interface AssetsBulkActionContext {
   selectedItemCount: number;
   affectedAssetCount: number;
   selectedAssetIds: string[];
   selectedAssets: Asset[];
+  selectedLogicalMedia: SelectedLogicalMedia[];
   clearSelection: () => void;
 }
 

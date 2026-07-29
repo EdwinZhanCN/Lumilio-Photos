@@ -762,6 +762,29 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 	if err := NormalizePresentationStack(ctx, qtx, stackID); err != nil {
 		return nil, err
 	}
+	if items[0].OwnerID != nil {
+		var rangeStart, rangeEnd sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `
+SELECT min(COALESCE(a.taken_time,a.upload_time,mi.created_at)),
+       max(COALESCE(a.taken_time,a.upload_time,mi.created_at))
+FROM asset_stack_members asm
+JOIN media_items mi ON mi.media_item_id=asm.media_item_id
+LEFT JOIN assets a ON a.asset_id=mi.primary_asset_id
+WHERE asm.stack_id=? AND mi.owner_id=?`, stackID, *items[0].OwnerID).
+			Scan(&rangeStart, &rangeEnd); err != nil {
+			return nil, err
+		}
+		if rangeStart.Valid && rangeEnd.Valid {
+			if _, err := tx.ExecContext(ctx, `
+INSERT INTO event_dirty_ranges(
+ dirty_range_id,owner_id,range_start,range_end,reason,created_at
+) VALUES(?,?,?,?,?,?)`,
+				uuid.NewString(), *items[0].OwnerID, rangeStart.Int64, rangeEnd.Int64,
+				"stack_created", time.Now().UTC().UnixMicro()); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}

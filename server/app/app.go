@@ -33,6 +33,7 @@ import (
 	"server/internal/db"
 	dbbackup "server/internal/db/backup"
 	"server/internal/db/repo"
+	"server/internal/event"
 	"server/internal/httporigin"
 	"server/internal/logging"
 	"server/internal/processors"
@@ -337,6 +338,13 @@ func run(
 	if err != nil {
 		return fmt.Errorf("initialize queue: %w", err)
 	}
+	eventService := event.NewService(sqlDB)
+	river.AddWorker[queue.EventRebuildArgs](workers, &queue.EventRebuildWorker{
+		DB: sqlDB, Service: eventService,
+	})
+	river.AddWorker[queue.ScheduleEventRebuildsArgs](workers, &queue.ScheduleEventRebuildsWorker{
+		DB: sqlDB,
+	})
 	river.AddWorker[queue.ProcessOCROutboxArgs](workers, &queue.ProcessOCROutboxWorker{
 		Writer: ocrIndexWriter,
 	})
@@ -502,6 +510,17 @@ func run(
 		databaseCloseAllowed = true
 	}()
 	appLogger.Info("queues initialized successfully", zap.String("operation", "queue.init"))
+	backfillOwners, err := eventService.InitializeBackfill(ctx)
+	if err != nil {
+		return fmt.Errorf("initialize Event backfill: %w", err)
+	}
+	for _, ownerID := range backfillOwners {
+		args := jobs.EventRebuildArgs{OwnerID: ownerID}
+		opts := args.InsertOpts()
+		if _, err := queueClient.Insert(ctx, args, &opts); err != nil {
+			return fmt.Errorf("enqueue Event backfill for owner %d: %w", ownerID, err)
+		}
+	}
 
 	// --- Periodic Jobs (River PeriodicJobs) ---
 	// Must be registered after Start() — the periodic job enqueuer is
@@ -526,6 +545,15 @@ func run(
 			return jobs.DatabaseBackupArgs{}, nil
 		},
 		&river.PeriodicJobOpts{ID: "database_backup", RunOnStart: true},
+	))
+	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
+		river.PeriodicInterval(time.Minute),
+		func() (river.JobArgs, *river.InsertOpts) {
+			args := jobs.ScheduleEventRebuildsArgs{}
+			opts := args.InsertOpts()
+			return args, &opts
+		},
+		&river.PeriodicJobOpts{ID: "schedule_event_rebuilds", RunOnStart: true},
 	))
 	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
 		river.PeriodicInterval(time.Second),
@@ -566,6 +594,7 @@ func run(
 	cloudController := handler.NewCloudHandler(cloudSyncService)
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, cloudSyncService)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
+	eventController := handler.NewEventHandler(eventService, sqlDB, shareLinkService)
 	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries)
 
 	// Initialize Swagger docs
@@ -594,6 +623,7 @@ func run(
 		userController,
 		repositoryScanController,
 		duplicateController,
+		eventController,
 		cloudController,
 		shareLinkController,
 		handler.RequireLLMAgentEnabled(settingsService),

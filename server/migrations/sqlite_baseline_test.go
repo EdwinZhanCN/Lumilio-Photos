@@ -31,6 +31,13 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	if _, err := database.ExecContext(ctx, string(baseline)); err != nil {
 		t.Fatalf("execute SQLite baseline: %v", err)
 	}
+	eventsMigration, err := migrations.FS.ReadFile("000004_media_semantic_events.up.sql")
+	if err != nil {
+		t.Fatalf("read Event migration: %v", err)
+	}
+	if _, err := database.ExecContext(ctx, string(eventsMigration)); err != nil {
+		t.Fatalf("execute Event migration: %v", err)
+	}
 
 	for _, table := range applicationTables {
 		assertStrictTable(t, database, table)
@@ -257,6 +264,12 @@ var applicationTables = []string{
 	"album_assets",
 	"media_items",
 	"media_item_assets",
+	"events",
+	"event_media_items",
+	"event_constraints",
+	"event_redirects",
+	"event_dirty_ranges",
+	"event_owner_state",
 	"asset_stacks",
 	"asset_stack_members",
 	"duplicate_groups",

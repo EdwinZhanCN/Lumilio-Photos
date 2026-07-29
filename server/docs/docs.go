@@ -1041,6 +1041,10 @@ const docTemplate = `{
                     "date": {
                         "$ref": "#/components/schemas/dto.DateRangeDTO"
                     },
+                    "event_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
                     "filename": {
                         "$ref": "#/components/schemas/dto.FilenameFilterDTO"
                     },
@@ -2625,6 +2629,293 @@ const docTemplate = `{
                     "code",
                     "setup_token"
                 ],
+                "type": "object"
+            },
+            "dto.EventAddMembersRequestDTO": {
+                "properties": {
+                    "asset_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "required": [
+                    "asset_ids"
+                ],
+                "type": "object"
+            },
+            "dto.EventAssetDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "media_item_id": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventAssetsPageDTO": {
+                "properties": {
+                    "assets": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.EventAssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    },
+                    "omitted_members": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventDetailDTO": {
+                "properties": {
+                    "algorithm_version": {
+                        "type": "string"
+                    },
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
+                    "cover_media_item_id": {
+                        "type": "string"
+                    },
+                    "displayable_count": {
+                        "type": "integer"
+                    },
+                    "end_at": {
+                        "type": "integer"
+                    },
+                    "event_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "is_hidden": {
+                        "type": "boolean"
+                    },
+                    "media_count": {
+                        "type": "integer"
+                    },
+                    "pending_rebuild": {
+                        "type": "boolean"
+                    },
+                    "redirected_from": {
+                        "type": "string"
+                    },
+                    "start_at": {
+                        "type": "integer"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "title_override": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventListPageDTO": {
+                "properties": {
+                    "events": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.EventSummaryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventMergeRequestDTO": {
+                "properties": {
+                    "event_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 2,
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "survivor_event_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "event_ids",
+                    "survivor_event_id"
+                ],
+                "type": "object"
+            },
+            "dto.EventMutationResponseDTO": {
+                "properties": {
+                    "event": {
+                        "$ref": "#/components/schemas/dto.EventSummaryDTO"
+                    },
+                    "pending_rebuild": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventPatchRequestDTO": {
+                "properties": {
+                    "clear_cover_override": {
+                        "type": "boolean"
+                    },
+                    "clear_title_override": {
+                        "type": "boolean"
+                    },
+                    "cover_media_item_id": {
+                        "type": "string"
+                    },
+                    "is_hidden": {
+                        "type": "boolean"
+                    },
+                    "title_override": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventRebuildPreviewDTO": {
+                "properties": {
+                    "created": {
+                        "type": "integer"
+                    },
+                    "events": {
+                        "type": "integer"
+                    },
+                    "members": {
+                        "type": "integer"
+                    },
+                    "redirected": {
+                        "type": "integer"
+                    },
+                    "retained": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventRebuildRequestDTO": {
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean"
+                    },
+                    "from": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "to": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventRelationsResponseDTO": {
+                "properties": {
+                    "complete": {
+                        "type": "boolean"
+                    },
+                    "relations": {
+                        "items": {
+                            "$ref": "#/components/schemas/event.ResourceRelation"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "source_version": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventShareRequestDTO": {
+                "properties": {
+                    "allow_download": {
+                        "type": "boolean"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "expires_in_days": {
+                        "type": "integer"
+                    },
+                    "include_originals": {
+                        "type": "boolean"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.EventSplitRequestDTO": {
+                "properties": {
+                    "before_media_item_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "before_media_item_id"
+                ],
+                "type": "object"
+            },
+            "dto.EventSummaryDTO": {
+                "properties": {
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
+                    "cover_media_item_id": {
+                        "type": "string"
+                    },
+                    "displayable_count": {
+                        "type": "integer"
+                    },
+                    "end_at": {
+                        "type": "integer"
+                    },
+                    "event_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "is_hidden": {
+                        "type": "boolean"
+                    },
+                    "media_count": {
+                        "type": "integer"
+                    },
+                    "redirected_from": {
+                        "type": "string"
+                    },
+                    "start_at": {
+                        "type": "integer"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "title_override": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "dto.FaceClusterRebuildResponseDTO": {
@@ -6279,6 +6570,41 @@ const docTemplate = `{
                     "method",
                     "mfa_token"
                 ],
+                "type": "object"
+            },
+            "event.ResourceRef": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "event.ResourceRelation": {
+                "properties": {
+                    "confidence": {
+                        "type": "number"
+                    },
+                    "facts": {
+                        "additionalProperties": {},
+                        "type": "object"
+                    },
+                    "from": {
+                        "$ref": "#/components/schemas/event.ResourceRef"
+                    },
+                    "origin": {
+                        "type": "string"
+                    },
+                    "relation": {
+                        "type": "string"
+                    },
+                    "to": {
+                        "$ref": "#/components/schemas/event.ResourceRef"
+                    }
+                },
                 "type": "object"
             },
             "handler.AgentCancelRequest": {
@@ -14499,6 +14825,467 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/events": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Page size",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Opaque cursor",
+                        "in": "query",
+                        "name": "cursor",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventListPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "List Events",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/merge": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EventMergeRequestDTO",
+                                        "summary": "request",
+                                        "description": "Merge request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Merge request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventMutationResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Merge Events",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/rebuild": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EventRebuildRequestDTO",
+                                        "summary": "request",
+                                        "description": "Rebuild options"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Rebuild options",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventRebuildPreviewDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Rebuild Events",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventDetailDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Event",
+                "tags": [
+                    "events"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EventPatchRequestDTO",
+                                        "summary": "request",
+                                        "description": "Event changes"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Event changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventMutationResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Update Event",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/{id}/assets": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page size",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventAssetsPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Event assets",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/{id}/members": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EventAddMembersRequestDTO",
+                                        "summary": "request",
+                                        "description": "Assets to add"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Assets to add",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventMutationResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Add Event members",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/{id}/members/{mediaItemId}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Media item UUID",
+                        "in": "path",
+                        "name": "mediaItemId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventMutationResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Remove Event member",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/{id}/relations": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventRelationsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Event relations",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/{id}/share": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EventShareRequestDTO",
+                                        "summary": "request",
+                                        "description": "Share options"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Share options",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.CreateShareLinkResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Share Event",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/{id}/split": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Event UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EventSplitRequestDTO",
+                                        "summary": "request",
+                                        "description": "Split request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Split request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventMutationResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Split Event",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "description": "Check if the server is healthy",
@@ -15231,6 +16018,37 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/people/{id}/events": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Person ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventRelationsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get a Person's Events",
+                "tags": [
+                    "people"
+                ]
+            }
+        },
         "/api/v1/people/{id}/faces": {
             "get": {
                 "description": "List the individual face crops assigned to a person for correction workflows.",
@@ -15749,6 +16567,49 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Merge people",
+                "tags": [
+                    "people"
+                ]
+            }
+        },
+        "/api/v1/people/{id}/relations": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Person ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Relation type",
+                        "in": "query",
+                        "name": "relation",
+                        "required": true,
+                        "schema": {
+                            "enum": [
+                                "co_occurs_with"
+                            ],
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventRelationsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Person relations",
                 "tags": [
                     "people"
                 ]

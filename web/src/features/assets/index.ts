@@ -4,3 +4,4 @@ export { useAssetFilterOptions } from "./api/useAssetFilterOptions";
 export type { AssetBrowseConstraint } from "./model/filter";
 export { AssetBrowser } from "./flows/browse/AssetBrowser";
 export { AssetPreviewGrid } from "./flows/browse/AssetPreviewGrid";
+export { default as PhotoPicker } from "./picker";

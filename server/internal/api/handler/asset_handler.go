@@ -2272,6 +2272,7 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		SearchType:       searchType,
 		ViewerTimeZone:   viewerTimeZone,
 		RepositoryID:     filter.RepositoryID,
+		EventID:          filter.EventID,
 		AssetType:        filter.Type,
 		AssetTypes:       filter.Types,
 		OwnerID:          filter.OwnerID,
