@@ -63,13 +63,11 @@ export interface DashboardPaths {
   serverConfig?: string;
 }
 
-export type NetworkMode = "local" | "lan_http" | "external_https";
+export type NetworkMode = "local" | "lan_http";
 
 export interface NetworkInfo {
   mode: NetworkMode;
-  primaryOrigin: string;
   listen: string;
-  trustedProxyCIDRs: string[];
   lanWarningAcceptedVersion: number;
   lanAddresses: string[];
 }
@@ -79,14 +77,7 @@ export type RuntimePhase = "stopped" | "starting" | "running" | "restarting" | "
 export interface RuntimeNetworkSummary {
   mode: NetworkMode;
   listen: string;
-  primaryOrigin: string;
-  tlsMode: "off" | "external";
-  proxyMode: "disabled" | "required";
-  trustedProxyCIDRs: string[];
-  passkeyOrigin: string;
-  rpID: string;
   passkeyEnabled: boolean;
-  remotePasskeyAvailable: boolean;
 }
 
 export interface RuntimeSnapshot {
@@ -217,10 +208,6 @@ export interface LumenSavePayload {
 
 export interface NetworkCandidateInput {
   mode: NetworkMode;
-  primaryOrigin: string;
-  listen: string;
-  proxyLocation: "same_host" | "remote";
-  trustedProxyCIDRs: string[];
   acceptLANWarning: boolean;
 }
 

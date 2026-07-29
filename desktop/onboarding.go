@@ -107,7 +107,7 @@ func (d *desktopApp) onboardingHandler() http.Handler {
 			CanChooseDirectories(true).
 			CanChooseFiles(false).
 			CanCreateDirectories(true).
-			SetTitle("Choose photo library location")
+			SetTitle("Choose media library location")
 		if d.onboardWin != nil {
 			dlg = dlg.AttachToWindow(d.onboardWin)
 		}

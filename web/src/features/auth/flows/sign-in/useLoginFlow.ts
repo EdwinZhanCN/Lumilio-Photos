@@ -80,15 +80,11 @@ export function useLoginFlow() {
         });
       case "secure_origin_required":
         return t("auth.passkeyEnvironment.secureOriginRequired", {
-          defaultValue: "Passkeys require HTTPS or the configured localhost address.",
+          defaultValue: "Passkeys require HTTPS or a localhost address.",
         });
-      case "non_primary_origin":
-        return t("auth.passkeyEnvironment.nonPrimaryOrigin", {
-          defaultValue: "Open Lumilio at its configured primary address to use a passkey.",
-        });
-      case "trusted_proxy_required":
-        return t("auth.passkeyEnvironment.trustedProxyRequired", {
-          defaultValue: "Passkeys require access through the configured trusted proxy.",
+      case "domain_required":
+        return t("auth.passkeyEnvironment.domainRequired", {
+          defaultValue: "Passkeys over HTTPS require a domain name instead of an IP address.",
         });
       case "invalid_request_origin":
         return t("auth.passkeyEnvironment.invalidOrigin", {

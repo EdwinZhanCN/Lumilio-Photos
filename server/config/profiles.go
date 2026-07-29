@@ -12,20 +12,19 @@ import (
 type ProfileName string
 
 const (
-	ProfileDevVite                      ProfileName = "dev-vite"
-	ProfileDesktopLocal                 ProfileName = "desktop-local"
-	ProfileDesktopLANHTTP               ProfileName = "desktop-lan-http"
-	ProfileDesktopExternalHTTPSSameHost ProfileName = "desktop-external-https-samehost"
-	ProfileDesktopExternalHTTPSRemote   ProfileName = "desktop-external-https-remote"
-	ProfileDockerACME                   ProfileName = "docker-acme"
-	ProfileDockerExternalProxy          ProfileName = "docker-external-proxy"
+	ProfileDevVite        ProfileName = "dev-vite"
+	ProfileDesktopLocal   ProfileName = "desktop-local"
+	ProfileDesktopLANHTTP ProfileName = "desktop-lan-http"
+	ProfileDockerHTTP     ProfileName = "docker-http"
+	ProfileDockerCaddy    ProfileName = "docker-caddy"
+	ProfileDockerACME     ProfileName = "docker-acme"
 )
 
 // ProfileInputs are the values an operator supplies for a profile that cannot
 // be fully determined in advance. They are one-shot generation inputs and never
 // runtime overrides: the generated manifest is complete on its own.
 type ProfileInputs struct {
-	Origin            string
+	Hostname          string
 	Email             string
 	Listen            string
 	TrustedProxyCIDRs []string
@@ -87,8 +86,8 @@ func ProfileNames(operatorOnly bool) []string {
 // the same presence check and resolver the runtime loader uses. A profile can
 // therefore never emit a manifest the server would reject.
 func (p Profile) Build(inputs ProfileInputs) (manifest, error) {
-	if inputs.Origin == "" {
-		inputs.Origin = p.Defaults.Origin
+	if inputs.Hostname == "" {
+		inputs.Hostname = p.Defaults.Hostname
 	}
 	if inputs.Email == "" {
 		inputs.Email = p.Defaults.Email
@@ -105,12 +104,11 @@ func (p Profile) Build(inputs ProfileInputs) (manifest, error) {
 	if strings.TrimSpace(inputs.StorageDir) == "" {
 		inputs.StorageDir = p.Defaults.StorageDir
 	}
-	if inputs.Origin != "" {
-		normalized, _, err := NormalizeOrigin(inputs.Origin)
-		if err != nil {
-			return manifest{}, fmt.Errorf("origin must be an exact http(s) origin: %w", err)
+	if inputs.Hostname != "" {
+		inputs.Hostname = normalizeHostname(inputs.Hostname)
+		if !validACMEHostname(inputs.Hostname) {
+			return manifest{}, errors.New("hostname must be a registrable DNS hostname")
 		}
-		inputs.Origin = normalized
 	}
 
 	raw := p.build(inputs)
@@ -188,17 +186,16 @@ func baseManifest(environment string, deploymentID string, logLevel string, l la
 		Database:      &databaseManifest{Path: ptr(l.database)},
 		Server: &serverManifest{
 			Listen:             ptr("127.0.0.1:6680"),
-			PrimaryOrigin:      ptr("http://localhost:6680"),
 			CORSAllowedOrigins: ptr([]string{}),
 			WebRoot:            ptr(l.webRoot),
 			TLS: &tlsManifest{
 				Mode:        ptr(string(TLSModeOff)),
+				Hostname:    ptr(""),
 				HTTPListen:  ptr(""),
 				Email:       ptr(""),
 				StoragePath: ptr(""),
 			},
 			Proxy: &proxyManifest{
-				Mode:         ptr(string(ProxyModeDisabled)),
 				TrustedCIDRs: ptr([]string{}),
 			},
 		},
@@ -278,64 +275,22 @@ func dockerBase(inputs ProfileInputs) manifest {
 	return baseManifest("production", "container", "info", containerLayout(inputs.StateDir, inputs.StorageDir))
 }
 
-// externalProxy applies the shape shared by every reverse-proxy deployment:
-// the proxy owns HTTPS, this server speaks plain HTTP on an internal socket,
-// and only the proxy's own address may present forwarded headers.
-func externalProxy(m *manifest, origin string, listen string, cidrs []string) {
-	m.Server.Listen = ptr(listen)
-	m.Server.PrimaryOrigin = ptr(origin)
-	m.Server.TLS.Mode = ptr(string(TLSModeExternal))
-	m.Server.Proxy.Mode = ptr(string(ProxyModeRequired))
-	m.Server.Proxy.TrustedCIDRs = ptr(append([]string(nil), cidrs...))
-}
-
 var profileTable = []Profile{
 	{
 		Name:     ProfileDevVite,
 		Path:     "dev/vite.toml",
-		Summary:  "Local development: single origin on the Vite dev server, LAN reachable.",
-		Scenario: "deployment-origin-tls-plan.md 5.7 Development",
+		Summary:  "Local development behind the Vite development proxy.",
+		Scenario: "dynamic request origin development",
 		Operator: true,
 		Notes: []string{
-			"`make dev` runs Vite on 0.0.0.0:6657 and this server on 127.0.0.1:6680. Vite",
-			"proxies /api to the API, so the browser only ever talks to the Vite origin.",
-			"Development is therefore single-origin like production, and",
-			"cors_allowed_origins is empty: there is no cross-origin request to allow.",
-			"",
-			"Only Vite is published to the network. The API stays on loopback because the",
-			"proxy runs on this machine, so a phone at http://<lan-ip>:6657 reaches the whole",
-			"app without the API listener ever being exposed.",
-			"",
-			"The Vite proxy must not rewrite the Host header (changeOrigin stays false). The",
-			"server derives its target origin from Host and compares the browser's Origin",
-			"against it, so a rewritten Host would make every session request look",
-			"cross-origin and be rejected.",
-			"",
-			"primary_origin is the Vite origin, not the API listener: WebAuthn signs the",
-			"origin the browser is actually on, so the RP ID here is localhost. That means",
-			"passkeys work on this machine at http://localhost:6657 and are unavailable from",
-			"a LAN address, which is plain HTTP and not a secure context. Remote devices get",
-			"password plus TOTP, exactly as in the Desktop LAN profile.",
-			"",
-			"The development toolchain writes this complete manifest to",
-			"`.local/dev/config/server.toml`. Its app-private state and portable media",
-			"storage are sibling roots under `.local/dev`, so reset operations never need",
-			"to discover or delete paths from an arbitrary manifest.",
+			"`make dev` publishes Vite on 0.0.0.0:6657 and keeps the API on",
+			"127.0.0.1:6680. Browser origin and passkey identity come from each request.",
 		},
-		Defaults: ProfileInputs{
-			Origin:     "http://localhost:6657",
-			StateDir:   "../state",
-			StorageDir: "../storage",
-		},
+		Defaults: ProfileInputs{StateDir: "../state", StorageDir: "../storage"},
 		build: func(inputs ProfileInputs) manifest {
-			m := baseManifest(
-				"development",
-				"local",
-				"debug",
-				developmentLayout(inputs.StateDir, inputs.StorageDir),
-			)
+			m := baseManifest("development", "local", "debug", developmentLayout(inputs.StateDir, inputs.StorageDir))
 			m.Geocoding.Language = ptr("zh")
-			m.Server.PrimaryOrigin = ptr(inputs.Origin)
+			m.Server.Proxy.TrustedCIDRs = ptr([]string{"127.0.0.1/32", "::1/128"})
 			return m
 		},
 	},
@@ -343,22 +298,15 @@ var profileTable = []Profile{
 		Name:     ProfileDesktopLocal,
 		Path:     "desktop/local.toml",
 		Summary:  "Desktop default: reachable only from this machine.",
-		Scenario: "deployment-origin-tls-plan.md 5.1 Desktop local",
+		Scenario: "dynamic request origin desktop local",
 		Notes: []string{
-			"The zero-configuration Desktop shape. The listener is bound to loopback, so no",
-			"other device on the network can open a connection at all.",
-			"",
-			"Passkey works because browsers treat http://localhost as a secure context. This",
-			"is the only way plain HTTP and WebAuthn coexist legitimately.",
-			"",
-			"Desktop generates this file itself from its network settings; the paths below",
-			"are illustrative of a macOS install. Desktop never uses tls.mode = acme.",
+			"The listener is loopback-only. A same-host reverse proxy may forward to it",
+			"without changing the Desktop runtime manifest.",
 		},
-		Defaults: ProfileInputs{Origin: "http://localhost:6680"},
 		build: func(inputs ProfileInputs) manifest {
 			m := desktopBase()
 			m.Server.Listen = ptr("127.0.0.1:6680")
-			m.Server.PrimaryOrigin = ptr(inputs.Origin)
+			m.Server.Proxy.TrustedCIDRs = ptr([]string{"127.0.0.1/32", "::1/128"})
 			return m
 		},
 	},
@@ -366,126 +314,69 @@ var profileTable = []Profile{
 		Name:     ProfileDesktopLANHTTP,
 		Path:     "desktop/lan-http.toml",
 		Summary:  "Desktop LAN sharing over plaintext HTTP.",
-		Scenario: "deployment-origin-tls-plan.md 5.2 Desktop LAN HTTP",
+		Scenario: "dynamic request origin desktop LAN",
 		Notes: []string{
-			"Turning LAN sharing on changes exactly one key: listen moves from loopback to",
-			"0.0.0.0. primary_origin deliberately stays on localhost so the derived RP ID",
-			"does not change and passkeys already registered on this machine keep working.",
-			"",
-			"LAN traffic is unencrypted. Passwords, TOTP codes, session cookies and media all",
-			"cross the network in the clear; a home network is not a trusted transport.",
-			"",
-			"Passkey is therefore available on this machine through http://localhost only.",
-			"A remote device at http://<lan-ip>:6680 is not on primary_origin, so the server",
-			"reports passkey unavailable and the browser is offered password plus TOTP with a",
-			"persistent unencrypted-connection warning.",
-			"",
-			"0.0.0.0 covers IPv4 interfaces only; it does not imply IPv6.",
+			"The listener accepts LAN connections. HTTP remains available for password and",
+			"TOTP, while passkeys become available automatically on a valid HTTPS hostname.",
 		},
-		Defaults: ProfileInputs{Origin: "http://localhost:6680"},
 		build: func(inputs ProfileInputs) manifest {
 			m := desktopBase()
 			m.Server.Listen = ptr("0.0.0.0:6680")
-			m.Server.PrimaryOrigin = ptr(inputs.Origin)
 			return m
 		},
 	},
 	{
-		Name:     ProfileDesktopExternalHTTPSSameHost,
-		Path:     "desktop/external-https-samehost.toml",
-		Summary:  "Desktop behind a reverse proxy running on the same machine.",
-		Scenario: "deployment-origin-tls-plan.md 5.3 Desktop external HTTPS (same host)",
+		Name:     ProfileDockerHTTP,
+		Path:     "docker/http.toml",
+		Summary:  "Docker default: host-network HTTP on port 6680.",
+		Scenario: "zero-configuration Docker HTTP",
+		Operator: true,
 		Notes: []string{
-			"A proxy such as Caddy terminates HTTPS on this machine and forwards to the",
-			"loopback listener:",
-			"",
-			"    photos.example.com {",
-			"        reverse_proxy 127.0.0.1:6680",
-			"    }",
-			"",
-			"Because the proxy is local, trusted_cidrs is loopback only: nothing off this",
-			"machine can present forwarded headers, and the listener is not reachable from",
-			"the network in the first place.",
-			"",
-			"Every device now uses one canonical HTTPS address, so passkeys work everywhere.",
-			"The RP ID becomes photos.example.com; passkeys previously registered against",
-			"localhost survive but cannot be used here and must be re-registered after a",
-			"password plus TOTP login.",
+			"This complete manifest is embedded in the image. No domain, public URL,",
+			"certificate, or reverse proxy is required before first use.",
 		},
-		Defaults: ProfileInputs{
-			Origin:            "https://photos.example.com",
-			TrustedProxyCIDRs: []string{"127.0.0.1/32", "::1/128"},
-		},
+		Defaults: ProfileInputs{Listen: ":6680"},
 		build: func(inputs ProfileInputs) manifest {
-			m := desktopBase()
-			externalProxy(&m, inputs.Origin, "127.0.0.1:6680", inputs.TrustedProxyCIDRs)
+			m := dockerBase(inputs)
+			m.Server.Listen = ptr(inputs.Listen)
+			m.Server.Proxy.TrustedCIDRs = ptr(append([]string(nil), inputs.TrustedProxyCIDRs...))
 			return m
 		},
 	},
 	{
-		Name:     ProfileDesktopExternalHTTPSRemote,
-		Path:     "desktop/external-https-remote.toml",
-		Summary:  "Desktop behind a reverse proxy running on another host.",
-		Scenario: "deployment-origin-tls-plan.md 5.4 Desktop external HTTPS (remote proxy)",
+		Name:     ProfileDockerCaddy,
+		Path:     "docker/caddy.toml",
+		Summary:  "Docker behind the bundled same-host Caddy proxy.",
+		Scenario: "optional Caddy HTTPS",
 		Notes: []string{
-			"The proxy lives on a different machine, so the listener has to be reachable on a",
-			"LAN interface rather than loopback. Bind the specific interface address, not",
-			"0.0.0.0, so the exposure is deliberate and visible.",
-			"",
-			"trusted_cidrs pins the proxy's exact address with a host mask. Any other LAN",
-			"client that reaches the listener directly is rejected with 403 before any auth",
-			"handler runs, because proxy.mode = required trusts the immediate TCP peer only.",
-			"",
-			"Loopback health endpoints keep a narrow exception so readiness probes work",
-			"without going through the proxy.",
-		},
-		Defaults: ProfileInputs{
-			Origin:            "https://photos.example.com",
-			TrustedProxyCIDRs: []string{"192.168.1.10/32"},
+			"Lumilio listens only on loopback so public HTTP cannot bypass Caddy.",
+			"Caddy supplies the request-facing host and scheme through standard headers.",
 		},
 		build: func(inputs ProfileInputs) manifest {
-			m := desktopBase()
-			externalProxy(&m, inputs.Origin, "192.168.1.20:6680", inputs.TrustedProxyCIDRs)
+			m := dockerBase(inputs)
+			m.Server.Listen = ptr("127.0.0.1:6680")
+			m.Server.Proxy.TrustedCIDRs = ptr([]string{"127.0.0.1/32", "::1/128"})
 			return m
 		},
 	},
 	{
 		Name:     ProfileDockerACME,
 		Path:     "docker/acme.toml",
-		Summary:  "Docker with built-in ACME: this server obtains and renews its own certificate.",
-		Scenario: "deployment-origin-tls-plan.md 5.5 Docker built-in ACME HTTPS",
+		Summary:  "Docker with built-in ACME HTTPS.",
+		Scenario: "optional built-in ACME HTTPS",
 		Operator: true,
 		Notes: []string{
-			"There is no reverse proxy here, so proxy.mode stays disabled and the server",
-			"owns TLS end to end. The certificate hostname is derived from primary_origin;",
-			"there is no separate domain key that could drift away from it.",
-			"",
-			"The container uses Linux host networking and binds the host ports directly:",
-			"",
-			"    network_mode: host",
-			"    server.listen: :443",
-			"    server.tls.http_listen: :80",
-			"",
-			"Preconditions: you control the domain, its A/AAAA records point at this",
-			"deployment, a public CA can reach TCP 80/443, and no host process already owns",
-			"those ports. The image grants only CAP_NET_BIND_SERVICE to the non-root Server",
-			"binary; the application still runs as UID 10001.",
-			"",
-			"storage_path must be a persistent volume. Losing it re-requests certificates on",
-			"every restart and will hit CA rate limits. Certificate acquisition failure is",
-			"fatal by design: the server refuses to start rather than fall back to plaintext.",
+			"The server owns public TCP 80/443 and obtains a certificate for tls.hostname.",
+			"Certificate acquisition failure remains fatal and never falls back to HTTP.",
 			"",
 			"Generate a real one with:",
 			"",
 			"    server config init --profile docker-acme \\",
-			"      --origin https://photos.example.com \\",
+			"      --hostname photos.example.com \\",
 			"      --email admin@example.com \\",
 			"      --output /data/app-state/server.toml",
 		},
-		Defaults: ProfileInputs{
-			Origin: "https://photos.example.com",
-			Email:  "admin@example.com",
-		},
+		Defaults: ProfileInputs{Hostname: "photos.example.com", Email: "admin@example.com"},
 		build: func(inputs ProfileInputs) manifest {
 			m := dockerBase(inputs)
 			stateDir := strings.TrimRight(strings.TrimSpace(inputs.StateDir), "/")
@@ -493,53 +384,11 @@ var profileTable = []Profile{
 				stateDir = "/data/app-state"
 			}
 			m.Server.Listen = ptr(":443")
-			m.Server.PrimaryOrigin = ptr(inputs.Origin)
 			m.Server.TLS.Mode = ptr(string(TLSModeACME))
+			m.Server.TLS.Hostname = ptr(inputs.Hostname)
 			m.Server.TLS.HTTPListen = ptr(":80")
 			m.Server.TLS.Email = ptr(inputs.Email)
 			m.Server.TLS.StoragePath = ptr(stateDir + "/tls")
-			return m
-		},
-	},
-	{
-		Name:     ProfileDockerExternalProxy,
-		Path:     "docker/external-proxy.toml",
-		Summary:  "Docker behind an external reverse proxy that owns HTTPS.",
-		Scenario: "deployment-origin-tls-plan.md 5.6 Docker external reverse proxy",
-		Operator: true,
-		Notes: []string{
-			"The proxy terminates HTTPS and this container speaks plain HTTP on an internal",
-			"host listener. Docker uses Linux host networking; there is no bridge network,",
-			"container address, service DNS, or published-port layer.",
-			"",
-			"Same-host proxies should keep the default 127.0.0.1:6680 listener and trust only",
-			"127.0.0.1/32. A remote proxy must name the exact host interface explicitly:",
-			"",
-			"    server config init --profile docker-external-proxy \\",
-			"      --listen 192.168.1.20:6680 \\",
-			"      --trusted-proxy 192.168.1.10/32 ...",
-			"",
-			"Firewall a remote listener to that proxy as defense in depth. proxy.mode=required",
-			"still rejects every ordinary request whose immediate peer is not trusted.",
-			"",
-			"The proxy must overwrite, not pass through, the client's proto and host headers.",
-			"Conflicting or ambiguous Forwarded and X-Forwarded-* values are rejected.",
-			"",
-			"Generate a real one with:",
-			"",
-			"    server config init --profile docker-external-proxy \\",
-			"      --origin https://photos.example.com \\",
-			"      --trusted-proxy 127.0.0.1/32 \\",
-			"      --output /data/app-state/server.toml",
-		},
-		Defaults: ProfileInputs{
-			Origin:            "https://photos.example.com",
-			Listen:            "127.0.0.1:6680",
-			TrustedProxyCIDRs: []string{"127.0.0.1/32"},
-		},
-		build: func(inputs ProfileInputs) manifest {
-			m := dockerBase(inputs)
-			externalProxy(&m, inputs.Origin, inputs.Listen, inputs.TrustedProxyCIDRs)
 			return m
 		},
 	},
@@ -550,16 +399,16 @@ var profileTable = []Profile{
 func validateOperatorInputs(name ProfileName, inputs ProfileInputs) error {
 	switch name {
 	case ProfileDevVite:
-		if strings.TrimSpace(inputs.Email) != "" {
-			return errors.New("dev-vite does not accept --email")
+		if strings.TrimSpace(inputs.Hostname) != "" || strings.TrimSpace(inputs.Email) != "" {
+			return errors.New("dev-vite does not accept ACME inputs")
 		}
 		if strings.TrimSpace(inputs.Listen) != "" {
 			return errors.New("dev-vite owns its loopback listener and does not accept --listen")
 		}
-		if len(inputs.TrustedProxyCIDRs) != 0 {
-			return errors.New("dev-vite does not accept trusted proxies")
-		}
 	case ProfileDockerACME:
+		if strings.TrimSpace(inputs.Hostname) == "" {
+			return errors.New("docker-acme requires --hostname")
+		}
 		if strings.TrimSpace(inputs.Email) == "" {
 			return errors.New("docker-acme requires --email")
 		}
@@ -569,12 +418,9 @@ func validateOperatorInputs(name ProfileName, inputs ProfileInputs) error {
 		if len(inputs.TrustedProxyCIDRs) != 0 {
 			return errors.New("docker-acme does not accept trusted proxies")
 		}
-	case ProfileDockerExternalProxy:
-		if strings.TrimSpace(inputs.Email) != "" {
-			return errors.New("docker-external-proxy does not accept --email")
-		}
-		if len(inputs.TrustedProxyCIDRs) == 0 {
-			return errors.New("docker-external-proxy requires at least one --trusted-proxy")
+	case ProfileDockerHTTP:
+		if strings.TrimSpace(inputs.Hostname) != "" || strings.TrimSpace(inputs.Email) != "" {
+			return errors.New("docker-http does not accept ACME inputs")
 		}
 	}
 	return nil

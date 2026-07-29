@@ -8,13 +8,10 @@ import type { BrowserCapabilities, LoginOptionsResponse } from "../../types";
 describe("LoginFlow deployment capabilities", () => {
   it("shows the LAN HTTP warning and does not offer a passkey", async () => {
     const capabilities = {
-      primary_origin: "http://localhost:6680",
       current_origin: "http://192.168.1.20:6680",
       passkey_available: false,
       passkey_unavailable_reason: "secure_origin_required",
       insecure_transport: true,
-      proxy_required: false,
-      via_trusted_proxy: false,
     } satisfies BrowserCapabilities;
     const loginOptions = {
       password: true,
@@ -43,12 +40,9 @@ describe("LoginFlow deployment capabilities", () => {
 
   it("offers a passkey only when both browser and server policy allow it", async () => {
     const capabilities = {
-      primary_origin: "http://localhost:6680",
       current_origin: "http://localhost:6680",
       passkey_available: true,
       insecure_transport: false,
-      proxy_required: false,
-      via_trusted_proxy: false,
     } satisfies BrowserCapabilities;
     const loginOptions = {
       password: true,

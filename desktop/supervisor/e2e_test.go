@@ -87,13 +87,18 @@ func TestDesktopRuntimeConfigRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	candidate, err := supervisor.PatchRuntimeNetwork(view.BaseFingerprint, view.CandidateTOML, NetworkCandidatePatch{
-		Mode: NetworkExternalHTTPS, PrimaryOrigin: "https://photos.example.com",
-		Listen: blocker.Addr().String(), ProxyLocation: "remote",
-		TrustedProxyCIDRs: []string{"127.0.0.1/32", "::1/128"},
-	})
+	document, err := parseRuntimeDocument([]byte(view.CandidateTOML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	setRuntimePath(document, "server.listen", blocker.Addr().String())
+	candidateTOML, err := toml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := supervisor.ValidateRuntimeConfig(view.BaseFingerprint, string(candidateTOML))
 	if err != nil || !candidate.Valid {
-		t.Fatalf("patch candidate = %+v, %v", candidate, err)
+		t.Fatalf("validate candidate = %+v, %v", candidate, err)
 	}
 	if _, err := supervisor.ApplyRuntimeConfigAsync(
 		ctx,

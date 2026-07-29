@@ -405,7 +405,7 @@
     "bootstrap": {
       "admin": {
         "submit": "创建管理员并继续",
-        "subtitle": "此账户可管理服务器、资料库和成员。",
+        "subtitle": "此账户可管理服务器、资源库和成员。",
         "title": "创建管理员"
       },
       "firstRun": "首次运行设置",
@@ -473,7 +473,7 @@
       }
     },
     "browserSecurity": {
-      "insecureBody": "此网络上的其他人可能读取密码、身份验证器代码、会话 Cookie 和媒体内容。Passkey 仅可在配置的 localhost 地址使用；远程设备必须使用密码和 TOTP。",
+      "insecureBody": "此网络上的其他人可能读取密码、身份验证器代码、会话 Cookie 和媒体内容。Passkey 可在 localhost 或 HTTPS 地址使用；通过 HTTP 远程访问时必须使用密码和 TOTP。",
       "insecureTitle": "此网络连接未加密。"
     },
     "changePassword": {
@@ -547,10 +547,9 @@
     },
     "passkeyEnvironment": {
       "disabled": "此 Lumilio 部署已停用 Passkey。",
+      "domainRequired": "通过 HTTPS 使用 Passkey 时需要域名，不能直接使用 IP 地址。",
       "invalidOrigin": "当前浏览器 Origin 无法使用 Passkey。",
-      "nonPrimaryOrigin": "请通过 Lumilio 配置的正式地址打开应用以使用 Passkey。",
-      "secureOriginRequired": "Passkey 需要 HTTPS 或配置的 localhost 地址。",
-      "trustedProxyRequired": "Passkey 需要通过配置的可信反向代理访问。"
+      "secureOriginRequired": "Passkey 需要 HTTPS 或 localhost 地址。"
     },
     "passwordField": {
       "hidePassword": "隐藏密码",
@@ -731,8 +730,8 @@
     "deleteModal": {
       "confirm": "删除合集",
       "deleting": "删除中...",
-      "description_one": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
-      "description_other": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
+      "description_one": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资源库中的照片。",
+      "description_other": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资源库中的照片。",
       "title": "删除相册"
     },
     "emptyAlbums": "还没有相册。",
@@ -861,7 +860,7 @@
     "thisAsset": "这张照片"
   },
   "duplicates": {
-    "emptyDescription": "看起来你的资料库里每张照片都是独一无二的。",
+    "emptyDescription": "看起来你的资源库里每张照片都是独一无二的。",
     "emptyTitle": "没有需要处理的重复项",
     "filters": {
       "dismissed": "已忽略",
@@ -893,7 +892,7 @@
       "mixed": "混合（精确 + 相似）",
       "phash": "视觉相似"
     },
-    "noScanYet": "运行一次扫描以查找资料库中的重复照片。",
+    "noScanYet": "运行一次扫描以查找资源库中的重复照片。",
     "pageTitle": "重复照片",
     "scanError": "扫描失败：{{message}}",
     "scanSuccess": "共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
@@ -934,7 +933,7 @@
     "noCover": "无可显示的封面",
     "pendingRebuild": "更改正在等待事件重新构建。",
     "rebuild": "重新构建",
-    "removeConfirmMessage": "媒体仍保留在资料库中，并将从此事件中排除。",
+    "removeConfirmMessage": "媒体仍保留在资源库中，并将从此事件中排除。",
     "removeConfirmTitle": "移除所选媒体？",
     "removeSelected": "从事件中移除",
     "renamePrompt": "事件名称",
@@ -1328,7 +1327,7 @@
           "name": "零样本分类"
         },
         "default": {
-          "description": "照片图库的后台处理。"
+          "description": "媒体库的后台处理。"
         },
         "detect_stacks": {
           "description": "查找 RAW+JPEG 以及相关媒体堆叠。",
@@ -1404,7 +1403,7 @@
         "settled": "安静",
         "working": "处理中"
       },
-      "subtitle": "按照片图库后台处理模块聚合。",
+      "subtitle": "按媒体库后台处理模块聚合。",
       "time": {
         "daysAgo_one": "{{count}} 天前",
         "daysAgo_other": "{{count}} 天前",

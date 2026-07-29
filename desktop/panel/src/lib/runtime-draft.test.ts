@@ -9,26 +9,13 @@ import type { RuntimeConfigValidation, RuntimeConfigView, RuntimeNetworkSummary 
 const currentNetwork: RuntimeNetworkSummary = {
   mode: "local",
   listen: "127.0.0.1:6680",
-  primaryOrigin: "http://localhost:6680",
-  tlsMode: "off",
-  proxyMode: "disabled",
-  trustedProxyCIDRs: [],
-  passkeyOrigin: "http://localhost:6680",
-  rpID: "localhost",
   passkeyEnabled: true,
-  remotePasskeyAvailable: false,
 };
 
 const candidateNetwork: RuntimeNetworkSummary = {
   ...currentNetwork,
-  mode: "external_https",
-  primaryOrigin: "https://photos.example.com",
-  tlsMode: "external",
-  proxyMode: "required",
-  trustedProxyCIDRs: ["127.0.0.1/32", "::1/128"],
-  passkeyOrigin: "https://photos.example.com",
-  rpID: "photos.example.com",
-  remotePasskeyAvailable: true,
+  mode: "lan_http",
+  listen: "0.0.0.0:6680",
 };
 
 const view: RuntimeConfigView = {

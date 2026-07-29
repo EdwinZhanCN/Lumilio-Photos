@@ -30,13 +30,8 @@ export default function ServerTab() {
     ? [
         ["environment", runtime.environment],
         ["server_listen", runtime.server_listen],
-        ["primary_origin", runtime.primary_origin],
         ["tls_mode", runtime.tls_mode],
-        ["proxy_mode", runtime.proxy_mode],
-        ["trusted_proxy_cidrs", runtime.trusted_proxy_cidrs?.join(", ")],
         ["passkey_enabled", formatBoolean(runtime.passkey_enabled, t)],
-        ["passkey_origin", runtime.passkey_origin],
-        ["passkey_rp_id", runtime.passkey_rp_id],
         ["acme_certificate_hostname", runtime.acme_certificate_hostname],
         ["acme_certificate_status", runtime.acme_certificate_status],
         ["acme_certificate_expires_at", runtime.acme_certificate_expires_at],

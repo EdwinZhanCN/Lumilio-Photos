@@ -22,7 +22,7 @@ export function BrowserSecurityNotice({ className = "" }: { className?: string }
         <p className="mt-1">
           {t("auth.browserSecurity.insecureBody", {
             defaultValue:
-              "Passwords, authenticator codes, session cookies, and media can be read on this network. Passkeys work only at the configured localhost address; remote devices must use password and TOTP.",
+              "Passwords, authenticator codes, session cookies, and media can be read on this network. Passkeys work on localhost or over HTTPS; remote HTTP devices must use password and TOTP.",
           })}
         </p>
       </div>

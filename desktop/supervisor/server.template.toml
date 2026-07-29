@@ -8,21 +8,20 @@ path = {{toml .DatabasePath}}
 
 [server]
 listen = {{toml .Listen}}
-primary_origin = {{toml .PrimaryOrigin}}
 # The private Wails control panel uses its own /__onb host boundary. The React
-# product Web and API are served together at BrowserOrigin, so they are same-origin.
+# product Web and API are served together, so browser requests are same-origin.
 cors_allowed_origins = []
 web_root = {{toml .WebRoot}}
 
 [server.tls]
-mode = {{toml .TLSMode}}
+mode = "off"
+hostname = ""
 http_listen = ""
 email = ""
 storage_path = ""
 
 [server.proxy]
-mode = {{toml .ProxyMode}}
-trusted_cidrs = {{toml .TrustedProxyCIDRs}}
+trusted_cidrs = []
 
 [logging]
 level = "info"

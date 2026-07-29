@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	serverconfig "server/config"
 )
 
 const (
@@ -19,27 +17,22 @@ const (
 	lanHTTPWarningCurrentVersion = 1
 )
 
-// NetworkMode selects how the embedded server is reachable. Desktop never
-// owns public certificates: external HTTPS always means a trusted reverse
-// proxy terminates TLS.
+// NetworkMode selects whether the embedded server is local-only or reachable
+// over the LAN. Public HTTPS deployment belongs to the Server distribution.
 type NetworkMode string
 
 const (
-	NetworkLocal         NetworkMode = "local"
-	NetworkLANHTTP       NetworkMode = "lan_http"
-	NetworkExternalHTTPS NetworkMode = "external_https"
+	NetworkLocal   NetworkMode = "local"
+	NetworkLANHTTP NetworkMode = "lan_http"
 )
 
 // DesktopSettings are host/control-plane choices that persist across launches.
-// Runtime policy lives in runtime.toml; the network fields below are working
-// values used only by explicit v1 migration and candidate patch normalization.
-// Settings never populates them from v2 and the v2 disk schema never writes them.
+// Runtime network policy lives in runtime.toml; NetworkMode and Listen are
+// transient values used while applying a structured runtime patch.
 type DesktopSettings struct {
 	Version                       int         `json:"version"`
 	NetworkMode                   NetworkMode `json:"network_mode"`
-	PrimaryOrigin                 string      `json:"primary_origin"`
 	Listen                        string      `json:"listen"`
-	TrustedProxyCIDRs             []string    `json:"trusted_proxy_cidrs,omitempty"`
 	LANHTTPWarningAcceptedVersion int         `json:"lan_http_warning_accepted_version,omitempty"`
 
 	// StoragePath is the onboarding/legacy location choice. New runtimes always
@@ -80,8 +73,6 @@ type DesktopSettings struct {
 	LumenPreviousCacheDir string `json:"lumen_previous_cache_dir,omitempty"`
 	LumenInstalledVersion string `json:"lumen_installed_version,omitempty"`
 	LumenInstalledProfile string `json:"lumen_installed_profile,omitempty"`
-
-	legacyNetwork bool
 }
 
 type desktopSettingsV2 struct {
@@ -102,7 +93,7 @@ type desktopSettingsV2 struct {
 	LumenInstalledProfile         string `json:"lumen_installed_profile,omitempty"`
 }
 
-// LoadSettings reads desktop-settings.json using explicit v1/v2 disk schemas.
+// LoadSettings reads desktop-settings.json using the current disk schema.
 // A missing file yields an empty v2 host configuration.
 func LoadSettings(path string) (DesktopSettings, error) {
 	data, err := os.ReadFile(path)
@@ -119,17 +110,6 @@ func LoadSettings(path string) (DesktopSettings, error) {
 		return DesktopSettings{}, fmt.Errorf("parse desktop settings: %w", err)
 	}
 	switch header.Version {
-	case 0, 1:
-		var legacy DesktopSettings
-		if err := decodeSettingsJSON(data, &legacy); err != nil {
-			return DesktopSettings{}, err
-		}
-		normalized, err := normalizeNetworkSettings(legacy)
-		if err != nil {
-			return DesktopSettings{}, err
-		}
-		normalized.legacyNetwork = true
-		return normalized, nil
 	case desktopSettingsVersion:
 		var disk desktopSettingsV2
 		if err := decodeSettingsJSON(data, &disk); err != nil {
@@ -217,13 +197,9 @@ func desktopSettingsFromV2(d desktopSettingsV2) DesktopSettings {
 	}
 }
 
-// normalizeNetworkSettings migrates old settings and validates the complete
-// network profile before it can be persisted or compiled into server.toml.
+// normalizeNetworkSettings validates the complete Desktop network profile.
 func normalizeNetworkSettings(s DesktopSettings) (DesktopSettings, error) {
-	if s.Version != 0 && s.Version != 1 && s.Version != desktopSettingsVersion {
-		return DesktopSettings{}, fmt.Errorf("unsupported desktop settings version %d", s.Version)
-	}
-	s.Version = 1
+	s.Version = desktopSettingsVersion
 	if s.NetworkMode == "" {
 		s.NetworkMode = NetworkLocal
 	}
@@ -231,8 +207,6 @@ func normalizeNetworkSettings(s DesktopSettings) (DesktopSettings, error) {
 	switch s.NetworkMode {
 	case NetworkLocal:
 		s.Listen = "127.0.0.1:6680"
-		s.PrimaryOrigin = "http://localhost:6680"
-		s.TrustedProxyCIDRs = nil
 	case NetworkLANHTTP:
 		if s.LANHTTPWarningAcceptedVersion < lanHTTPWarningCurrentVersion {
 			return DesktopSettings{}, fmt.Errorf(
@@ -241,35 +215,6 @@ func normalizeNetworkSettings(s DesktopSettings) (DesktopSettings, error) {
 			)
 		}
 		s.Listen = "0.0.0.0:6680"
-		s.PrimaryOrigin = "http://localhost:6680"
-		s.TrustedProxyCIDRs = nil
-	case NetworkExternalHTTPS:
-		origin, parsed, err := serverconfig.NormalizeOrigin(s.PrimaryOrigin)
-		if err != nil || parsed.Scheme != "https" {
-			return DesktopSettings{}, errors.New("external HTTPS requires an exact https primary origin")
-		}
-		s.PrimaryOrigin = origin
-		if err := validateDesktopListen(s.Listen); err != nil {
-			return DesktopSettings{}, err
-		}
-		if len(s.TrustedProxyCIDRs) == 0 {
-			return DesktopSettings{}, errors.New("external HTTPS requires at least one trusted proxy CIDR")
-		}
-		normalizedCIDRs := make([]string, 0, len(s.TrustedProxyCIDRs))
-		seen := make(map[netip.Prefix]struct{}, len(s.TrustedProxyCIDRs))
-		for _, raw := range s.TrustedProxyCIDRs {
-			prefix, err := netip.ParsePrefix(strings.TrimSpace(raw))
-			if err != nil || prefix.Bits() == 0 {
-				return DesktopSettings{}, fmt.Errorf("invalid trusted proxy CIDR %q", raw)
-			}
-			prefix = prefix.Masked()
-			if _, exists := seen[prefix]; exists {
-				continue
-			}
-			seen[prefix] = struct{}{}
-			normalizedCIDRs = append(normalizedCIDRs, prefix.String())
-		}
-		s.TrustedProxyCIDRs = normalizedCIDRs
 	default:
 		return DesktopSettings{}, fmt.Errorf("unsupported desktop network mode %q", s.NetworkMode)
 	}

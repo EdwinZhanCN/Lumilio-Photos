@@ -17,6 +17,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/net/idna"
+	"golang.org/x/net/publicsuffix"
 )
 
 const SchemaVersion = 3
@@ -50,7 +51,6 @@ type DatabaseConfig struct {
 
 type ServerConfig struct {
 	Listen             string
-	PrimaryOrigin      string
 	CORSAllowedOrigins []string
 	WebRoot            string
 	TLS                TLSConfig
@@ -60,27 +60,19 @@ type ServerConfig struct {
 type TLSMode string
 
 const (
-	TLSModeOff      TLSMode = "off"
-	TLSModeACME     TLSMode = "acme"
-	TLSModeExternal TLSMode = "external"
+	TLSModeOff  TLSMode = "off"
+	TLSModeACME TLSMode = "acme"
 )
 
 type TLSConfig struct {
 	Mode        TLSMode
+	Hostname    string
 	HTTPListen  string
 	Email       string
 	StoragePath string
 }
 
-type ProxyMode string
-
-const (
-	ProxyModeDisabled ProxyMode = "disabled"
-	ProxyModeRequired ProxyMode = "required"
-)
-
 type ProxyConfig struct {
-	Mode         ProxyMode
 	TrustedCIDRs []netip.Prefix
 }
 
@@ -128,20 +120,12 @@ type AuthConfig struct {
 	RefreshTokenTTL time.Duration
 	MediaTokenTTL   time.Duration
 	Passkey         PasskeyConfig
-	// PasskeyIdentity is derived exclusively from server.primary_origin.
-	// It is resolved by the strict loader and is never a manifest input.
-	PasskeyIdentity PasskeyIdentity
 	RateLimit       AuthRateLimitConfig
 }
 
 type PasskeyConfig struct {
 	Enabled bool
 	Name    string
-}
-
-type PasskeyIdentity struct {
-	Origin string
-	RPID   string
 }
 
 type AuthRateLimitConfig struct {
@@ -185,7 +169,7 @@ type manifest struct {
 	// never migrates an older file in place.
 	SchemaVersion *int `toml:"schema_version" json:"schema_version"`
 	// Deployment environment. Selects test-only affordances; it does not relax
-	// any origin, TLS, or proxy rule.
+	// runtime manifest validation.
 	Environment    *string                 `toml:"environment" json:"environment" jsonschema:"enum=development,enum=production,enum=test"`
 	Database       *databaseManifest       `toml:"database" json:"database"`
 	Server         *serverManifest         `toml:"server" json:"server"`
@@ -209,14 +193,8 @@ type serverManifest struct {
 	// Never a URL, and never given a port implicitly. 127.0.0.1 is loopback
 	// only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
 	Listen *string `toml:"listen" json:"listen"`
-	// The one canonical browser origin. It fixes the cookie and CSRF baseline,
-	// the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
-	// host plus optional port only: no userinfo, path, query, or fragment.
-	PrimaryOrigin *string `toml:"primary_origin" json:"primary_origin"`
 	// Extra browser origins allowed to make credentialed cross-origin calls,
-	// such as a local Vite dev server. This does not widen the WebAuthn allowed
-	// origins and does not define the canonical identity. Empty for a
-	// same-origin SPA deployment.
+	// such as a local Vite dev server. Empty for a same-origin SPA deployment.
 	CORSAllowedOrigins *[]string `toml:"cors_allowed_origins" json:"cors_allowed_origins"`
 	// Directory of built SPA assets. Empty serves the API alone, which is what
 	// the Vite development profile wants.
@@ -225,13 +203,13 @@ type serverManifest struct {
 	Proxy   *proxyManifest `toml:"proxy" json:"proxy"`
 }
 type tlsManifest struct {
-	// Who terminates HTTPS. "off" is plaintext and requires an http
-	// primary_origin; "acme" makes this server obtain its own certificate and
-	// requires an https primary_origin with a real hostname; "external" puts a
-	// reverse proxy in front and requires proxy.mode = required.
-	Mode *string `toml:"mode" json:"mode" jsonschema:"enum=off,enum=acme,enum=external"`
+	// Whether this process serves plaintext HTTP or obtains its own ACME
+	// certificate. External proxies use mode = "off" for the upstream.
+	Mode *string `toml:"mode" json:"mode" jsonschema:"enum=off,enum=acme"`
+	// Public certificate hostname. Non-empty if and only if mode = "acme".
+	Hostname *string `toml:"hostname" json:"hostname"`
 	// Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
-	// primary_origin. Non-empty if and only if mode = "acme".
+	// the ACME hostname. Non-empty if and only if mode = "acme".
 	HTTPListen *string `toml:"http_listen" json:"http_listen"`
 	// ACME account contact address. Non-empty if and only if mode = "acme".
 	Email *string `toml:"email" json:"email"`
@@ -240,14 +218,8 @@ type tlsManifest struct {
 	StoragePath *string `toml:"storage_path" json:"storage_path"`
 }
 type proxyManifest struct {
-	// Whether a trusted reverse proxy is mandatory. "disabled" ignores every
-	// Forwarded and X-Forwarded-* header. "required" rejects application
-	// traffic whose immediate peer is outside trusted_cidrs, which is what
-	// stops a direct client from forging X-Forwarded-Proto: https.
-	Mode *string `toml:"mode" json:"mode" jsonschema:"enum=disabled,enum=required"`
-	// CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
-	// the immediate peer, not to any address inside a forwarded chain. Must be
-	// empty when mode = "disabled" and hold at least one entry when required.
+	// CIDRs whose immediate TCP peer may supply X-Forwarded-For. This controls
+	// client-IP recovery only; reverse-proxy access never depends on this list.
 	TrustedCIDRs *[]string `toml:"trusted_cidrs" json:"trusted_cidrs"`
 }
 type loggingManifest struct {
@@ -313,12 +285,10 @@ type authManifest struct {
 	RateLimit     *authRateLimitManifest `toml:"rate_limit" json:"rate_limit"`
 }
 type passkeyManifest struct {
-	// Whether WebAuthn is offered. When true, primary_origin must be https or
-	// exactly http://localhost; an http LAN address or bare IP is rejected
-	// because browsers will not treat it as a secure context.
+	// Whether WebAuthn is offered on secure request origins. HTTP LAN addresses
+	// remain usable with password and TOTP but cannot use passkeys.
 	Enabled *bool `toml:"enabled" json:"enabled"`
-	// Relying-party display name shown in the browser prompt. Cosmetic: the RP
-	// ID itself always comes from the primary_origin hostname.
+	// Relying-party display name shown in the browser prompt.
 	Name *string `toml:"name" json:"name"`
 }
 type authRateLimitManifest struct {
@@ -455,19 +425,18 @@ func validateManifestPresence(m manifest) []string {
 	}
 	if m.Server != nil {
 		required(&p, "server.listen", m.Server.Listen)
-		required(&p, "server.primary_origin", m.Server.PrimaryOrigin)
 		required(&p, "server.cors_allowed_origins", m.Server.CORSAllowedOrigins)
 		required(&p, "server.web_root", m.Server.WebRoot)
 		requiredSection(&p, "server.tls", m.Server.TLS)
 		if m.Server.TLS != nil {
 			required(&p, "server.tls.mode", m.Server.TLS.Mode)
+			required(&p, "server.tls.hostname", m.Server.TLS.Hostname)
 			required(&p, "server.tls.http_listen", m.Server.TLS.HTTPListen)
 			required(&p, "server.tls.email", m.Server.TLS.Email)
 			required(&p, "server.tls.storage_path", m.Server.TLS.StoragePath)
 		}
 		requiredSection(&p, "server.proxy", m.Server.Proxy)
 		if m.Server.Proxy != nil {
-			required(&p, "server.proxy.mode", m.Server.Proxy.Mode)
 			required(&p, "server.proxy.trusted_cidrs", m.Server.Proxy.TrustedCIDRs)
 		}
 	}
@@ -570,27 +539,17 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	}
 
 	server := ServerConfig{
-		Listen:        strings.TrimSpace(*m.Server.Listen),
-		PrimaryOrigin: strings.TrimSpace(*m.Server.PrimaryOrigin),
-		WebRoot:       resolveOptionalPath(base, *m.Server.WebRoot),
+		Listen:  strings.TrimSpace(*m.Server.Listen),
+		WebRoot: resolveOptionalPath(base, *m.Server.WebRoot),
 		TLS: TLSConfig{
 			Mode:        TLSMode(strings.ToLower(strings.TrimSpace(*m.Server.TLS.Mode))),
+			Hostname:    normalizeHostname(strings.TrimSpace(*m.Server.TLS.Hostname)),
 			HTTPListen:  strings.TrimSpace(*m.Server.TLS.HTTPListen),
 			Email:       strings.TrimSpace(*m.Server.TLS.Email),
 			StoragePath: resolveOptionalPath(base, *m.Server.TLS.StoragePath),
 		},
-		Proxy: ProxyConfig{
-			Mode: ProxyMode(strings.ToLower(strings.TrimSpace(*m.Server.Proxy.Mode))),
-		},
 	}
 	validateListenAddress(&p, "server.listen", server.Listen)
-
-	normalizedPrimary, primaryURL, originErr := NormalizeOrigin(server.PrimaryOrigin)
-	if originErr != nil {
-		p = append(p, "server.primary_origin must be an exact http(s) origin: "+originErr.Error())
-	} else {
-		server.PrimaryOrigin = normalizedPrimary
-	}
 
 	server.CORSAllowedOrigins = normalizeOriginList(
 		&p,
@@ -598,9 +557,8 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 		*m.Server.CORSAllowedOrigins,
 	)
 	requireOneOf(&p, "server.tls.mode", string(server.TLS.Mode), tlsModeValues...)
-	requireOneOf(&p, "server.proxy.mode", string(server.Proxy.Mode), proxyModeValues...)
 	server.Proxy.TrustedCIDRs = parseTrustedCIDRs(&p, *m.Server.Proxy.TrustedCIDRs)
-	validateNetworkTopology(&p, server, primaryURL)
+	validateNetworkTopology(&p, server)
 
 	logging := LoggingConfig{Level: strings.ToLower(strings.TrimSpace(*m.Logging.Level)), LogDir: resolvePath(base, *m.Logging.Dir), ConsoleFormat: strings.ToLower(strings.TrimSpace(*m.Logging.ConsoleFormat)), FileFormat: strings.ToLower(strings.TrimSpace(*m.Logging.FileFormat)), RepositoryAuditVerbose: *m.Logging.RepositoryAuditVerbose}
 	requireOneOf(&p, "logging.level", logging.Level, logLevelValues...)
@@ -660,16 +618,6 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requirePositive(&p, "auth.rate_limit.max_entries", auth.RateLimit.MaxEntries)
 	auth.RateLimit.Window = parsePositiveDuration(&p, "auth.rate_limit.window", *m.Auth.RateLimit.Window)
 	auth.RateLimit.Lockout = parsePositiveDuration(&p, "auth.rate_limit.lockout", *m.Auth.RateLimit.Lockout)
-	if primaryURL != nil {
-		auth.PasskeyIdentity = PasskeyIdentity{
-			Origin: server.PrimaryOrigin,
-			RPID:   primaryURL.Hostname(),
-		}
-		if auth.Passkey.Enabled {
-			validatePasskeyOrigin(&p, primaryURL)
-		}
-	}
-
 	transcode := TranscodeConfig{HardwareAccel: strings.ToLower(strings.TrimSpace(*m.Transcode.HardwareAccel))}
 	requireOneOf(&p, "transcode.hardware_accel", transcode.HardwareAccel, hardwareAccelValues...)
 
@@ -870,43 +818,13 @@ func parseTrustedCIDRs(p *[]string, values []string) []netip.Prefix {
 	return out
 }
 
-func validateNetworkTopology(p *[]string, server ServerConfig, primary *url.URL) {
-	if server.Proxy.Mode == ProxyModeDisabled && len(server.Proxy.TrustedCIDRs) != 0 {
-		*p = append(*p, "server.proxy.trusted_cidrs must be empty when proxy mode is disabled")
-	}
-	if server.Proxy.Mode == ProxyModeRequired && len(server.Proxy.TrustedCIDRs) == 0 {
-		*p = append(*p, "server.proxy.trusted_cidrs must contain at least one CIDR when proxy mode is required")
-	}
-	if primary == nil {
-		return
-	}
-
+func validateNetworkTopology(p *[]string, server ServerConfig) {
 	switch server.TLS.Mode {
 	case TLSModeOff:
-		if primary.Scheme != "http" {
-			*p = append(*p, "server.tls.mode off requires an http primary origin")
-		}
 		requireEmptyTLSFields(p, server.TLS)
-		if server.Proxy.Mode != ProxyModeDisabled {
-			*p = append(*p, "server.tls.mode off requires proxy mode disabled")
-		}
-	case TLSModeExternal:
-		if primary.Scheme != "https" {
-			*p = append(*p, "server.tls.mode external requires an https primary origin")
-		}
-		requireEmptyTLSFields(p, server.TLS)
-		if server.Proxy.Mode != ProxyModeRequired {
-			*p = append(*p, "server.tls.mode external requires proxy mode required")
-		}
 	case TLSModeACME:
-		if primary.Scheme != "https" {
-			*p = append(*p, "server.tls.mode acme requires an https primary origin")
-		}
-		if primary.Hostname() == "localhost" || net.ParseIP(primary.Hostname()) != nil {
-			*p = append(*p, "server.tls.mode acme requires a public DNS hostname")
-		}
-		if server.Proxy.Mode != ProxyModeDisabled {
-			*p = append(*p, "server.tls.mode acme requires proxy mode disabled")
+		if !validACMEHostname(server.TLS.Hostname) {
+			*p = append(*p, "server.tls.hostname must be a registrable DNS hostname without a wildcard, port, or trailing dot")
 		}
 		validateListenAddress(p, "server.tls.http_listen", server.TLS.HTTPListen)
 		if listenAddressesConflict(server.Listen, server.TLS.HTTPListen) {
@@ -920,6 +838,9 @@ func validateNetworkTopology(p *[]string, server ServerConfig, primary *url.URL)
 }
 
 func requireEmptyTLSFields(p *[]string, tls TLSConfig) {
+	if tls.Hostname != "" {
+		*p = append(*p, "server.tls.hostname must be empty unless TLS mode is acme")
+	}
 	if tls.HTTPListen != "" {
 		*p = append(*p, "server.tls.http_listen must be empty unless TLS mode is acme")
 	}
@@ -929,6 +850,27 @@ func requireEmptyTLSFields(p *[]string, tls TLSConfig) {
 	if tls.StoragePath != "" {
 		*p = append(*p, "server.tls.storage_path must be empty unless TLS mode is acme")
 	}
+}
+
+func normalizeHostname(value string) string {
+	value = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(value)), ".")
+	ascii, err := idna.Lookup.ToASCII(value)
+	if err != nil {
+		return value
+	}
+	return strings.ToLower(ascii)
+}
+
+func validACMEHostname(host string) bool {
+	if host == "" ||
+		host == "localhost" ||
+		strings.ContainsAny(host, "*:/") ||
+		net.ParseIP(host) != nil ||
+		!validDomainName(host) {
+		return false
+	}
+	registrable, err := publicsuffix.EffectiveTLDPlusOne(host)
+	return err == nil && registrable == host || err == nil && strings.HasSuffix(host, "."+registrable)
 }
 
 func listenAddressesConflict(left, right string) bool {
@@ -952,18 +894,6 @@ func listenAddressesConflict(left, right string) bool {
 		(rightIP.IsUnspecified() && rightIP.Is4() == leftIP.Is4())
 }
 
-func validatePasskeyOrigin(p *[]string, origin *url.URL) {
-	host := origin.Hostname()
-	if origin.Scheme == "http" && host != "localhost" {
-		*p = append(*p, "auth.passkey.enabled requires https or exact http://localhost[:port] primary origin")
-		return
-	}
-	if origin.Scheme == "https" {
-		if net.ParseIP(host) != nil || !validDomainName(host) {
-			*p = append(*p, "auth.passkey.enabled requires an https domain name or exact http://localhost[:port]")
-		}
-	}
-}
 func requireOutsidePath(p *[]string, name, candidate, root string) {
 	if strings.TrimSpace(candidate) == "" || strings.TrimSpace(root) == "" {
 		return

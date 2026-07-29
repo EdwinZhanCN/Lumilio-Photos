@@ -1,32 +1,16 @@
 #:schema ../../schema/lumilio-server.schema.json
 # Lumilio Photos runtime manifest, schema v3.
-# Docker with built-in ACME: this server obtains and renews its own certificate.
+# Docker with built-in ACME HTTPS.
 #
-# Scenario: deployment-origin-tls-plan.md 5.5 Docker built-in ACME HTTPS
+# Scenario: optional built-in ACME HTTPS
 #
-# There is no reverse proxy here, so proxy.mode stays disabled and the server
-# owns TLS end to end. The certificate hostname is derived from primary_origin;
-# there is no separate domain key that could drift away from it.
-#
-# The container uses Linux host networking and binds the host ports directly:
-#
-#     network_mode: host
-#     server.listen: :443
-#     server.tls.http_listen: :80
-#
-# Preconditions: you control the domain, its A/AAAA records point at this
-# deployment, a public CA can reach TCP 80/443, and no host process already owns
-# those ports. The image grants only CAP_NET_BIND_SERVICE to the non-root Server
-# binary; the application still runs as UID 10001.
-#
-# storage_path must be a persistent volume. Losing it re-requests certificates on
-# every restart and will hit CA rate limits. Certificate acquisition failure is
-# fatal by design: the server refuses to start rather than fall back to plaintext.
+# The server owns public TCP 80/443 and obtains a certificate for tls.hostname.
+# Certificate acquisition failure remains fatal and never falls back to HTTP.
 #
 # Generate a real one with:
 #
 #     server config init --profile docker-acme \
-#       --origin https://photos.example.com \
+#       --hostname photos.example.com \
 #       --email admin@example.com \
 #       --output /data/app-state/server.toml
 #
@@ -43,7 +27,7 @@
 schema_version = 3
 
 # Deployment environment. Selects test-only affordances; it does not relax
-# any origin, TLS, or proxy rule.
+# runtime manifest validation.
 # One of: development, production, test
 environment = "production"
 
@@ -58,15 +42,8 @@ path = "/data/app-state/library.sqlite3"
 # only; 0.0.0.0 is every IPv4 interface; [::] is every IPv6 interface.
 listen = ":443"
 
-# The one canonical browser origin. It fixes the cookie and CSRF baseline,
-# the WebAuthn origin, and the RP ID derived from its hostname. Scheme plus
-# host plus optional port only: no userinfo, path, query, or fragment.
-primary_origin = "https://photos.example.com"
-
 # Extra browser origins allowed to make credentialed cross-origin calls,
-# such as a local Vite dev server. This does not widen the WebAuthn allowed
-# origins and does not define the canonical identity. Empty for a
-# same-origin SPA deployment.
+# such as a local Vite dev server. Empty for a same-origin SPA deployment.
 cors_allowed_origins = []
 
 # Directory of built SPA assets. Empty serves the API alone, which is what
@@ -74,15 +51,16 @@ cors_allowed_origins = []
 web_root = "/app/web"
 
 [server.tls]
-# Who terminates HTTPS. "off" is plaintext and requires an http
-# primary_origin; "acme" makes this server obtain its own certificate and
-# requires an https primary_origin with a real hostname; "external" puts a
-# reverse proxy in front and requires proxy.mode = required.
-# One of: off, acme, external
+# Whether this process serves plaintext HTTP or obtains its own ACME
+# certificate. External proxies use mode = "off" for the upstream.
+# One of: off, acme
 mode = "acme"
 
+# Public certificate hostname. Non-empty if and only if mode = "acme".
+hostname = "photos.example.com"
+
 # Socket for the ACME HTTP-01 challenge and the plain-HTTP 308 redirect to
-# primary_origin. Non-empty if and only if mode = "acme".
+# the ACME hostname. Non-empty if and only if mode = "acme".
 http_listen = ":80"
 
 # ACME account contact address. Non-empty if and only if mode = "acme".
@@ -93,16 +71,8 @@ email = "admin@example.com"
 storage_path = "/data/app-state/tls"
 
 [server.proxy]
-# Whether a trusted reverse proxy is mandatory. "disabled" ignores every
-# Forwarded and X-Forwarded-* header. "required" rejects application
-# traffic whose immediate peer is outside trusted_cidrs, which is what
-# stops a direct client from forging X-Forwarded-Proto: https.
-# One of: disabled, required
-mode = "disabled"
-
-# CIDRs whose immediate TCP peer may supply proxy headers. Trust applies to
-# the immediate peer, not to any address inside a forwarded chain. Must be
-# empty when mode = "disabled" and hold at least one entry when required.
+# CIDRs whose immediate TCP peer may supply X-Forwarded-For. This controls
+# client-IP recovery only; reverse-proxy access never depends on this list.
 trusted_cidrs = []
 
 [logging]
@@ -186,13 +156,11 @@ refresh_token_ttl = "168h"
 media_token_ttl = "10m"
 
 [auth.passkey]
-# Whether WebAuthn is offered. When true, primary_origin must be https or
-# exactly http://localhost; an http LAN address or bare IP is rejected
-# because browsers will not treat it as a secure context.
+# Whether WebAuthn is offered on secure request origins. HTTP LAN addresses
+# remain usable with password and TOTP but cannot use passkeys.
 enabled = true
 
-# Relying-party display name shown in the browser prompt. Cosmetic: the RP
-# ID itself always comes from the primary_origin hostname.
+# Relying-party display name shown in the browser prompt.
 name = "Lumilio Photos"
 
 [auth.rate_limit]

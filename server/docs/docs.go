@@ -1707,23 +1707,10 @@ const docTemplate = `{
                         "enum": [
                             "disabled",
                             "secure_origin_required",
-                            "non_primary_origin",
-                            "trusted_proxy_required",
+                            "domain_required",
                             "invalid_request_origin"
                         ],
                         "type": "string"
-                    },
-                    "primary_origin": {
-                        "example": "http://localhost:6680",
-                        "type": "string"
-                    },
-                    "proxy_required": {
-                        "example": false,
-                        "type": "boolean"
-                    },
-                    "via_trusted_proxy": {
-                        "example": false,
-                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -4905,22 +4892,6 @@ const docTemplate = `{
                         "example": true,
                         "type": "boolean"
                     },
-                    "passkey_origin": {
-                        "example": "https://photos.example.com",
-                        "type": "string"
-                    },
-                    "passkey_rp_id": {
-                        "example": "photos.example.com",
-                        "type": "string"
-                    },
-                    "primary_origin": {
-                        "example": "https://photos.example.com",
-                        "type": "string"
-                    },
-                    "proxy_mode": {
-                        "example": "required",
-                        "type": "string"
-                    },
                     "repository_scan_enabled": {
                         "example": true,
                         "type": "boolean"
@@ -4938,15 +4909,8 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "tls_mode": {
-                        "example": "external",
+                        "example": "off",
                         "type": "string"
-                    },
-                    "trusted_proxy_cidrs": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
                     }
                 },
                 "type": "object"

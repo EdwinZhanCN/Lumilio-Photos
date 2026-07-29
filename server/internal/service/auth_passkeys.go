@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -204,7 +206,7 @@ func (s *AuthService) BeginPasskeyLogin(ctx context.Context, username string, or
 	}, nil
 }
 
-func (s *AuthService) VerifyPasskeyLogin(ctx context.Context, challengeToken string, credentialJSON []byte) (*AuthResponse, error) {
+func (s *AuthService) VerifyPasskeyLogin(ctx context.Context, challengeToken string, credentialJSON []byte, origin string) (*AuthResponse, error) {
 	challenge, err := s.parsePasskeyChallenge(challengeToken, passkeyTokenPurposeLogin)
 	if err != nil {
 		return nil, err
@@ -223,7 +225,7 @@ func (s *AuthService) VerifyPasskeyLogin(ctx context.Context, challengeToken str
 		return nil, ErrPasskeyNotConfigured
 	}
 
-	wa, err := s.newWebAuthnForChallenge(challenge)
+	wa, err := s.newWebAuthnForChallenge(challenge, origin)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +304,7 @@ func (s *AuthService) BeginPasskeyEnrollment(ctx context.Context, userID int, or
 	}, nil
 }
 
-func (s *AuthService) VerifyPasskeyEnrollment(ctx context.Context, userID int, challengeToken string, credentialJSON []byte) (PasskeyCredentialSummary, error) {
+func (s *AuthService) VerifyPasskeyEnrollment(ctx context.Context, userID int, challengeToken string, credentialJSON []byte, origin string) (PasskeyCredentialSummary, error) {
 	challenge, err := s.parsePasskeyChallenge(challengeToken, passkeyTokenPurposeEnroll)
 	if err != nil {
 		return PasskeyCredentialSummary{}, err
@@ -327,7 +329,7 @@ func (s *AuthService) VerifyPasskeyEnrollment(ctx context.Context, userID int, c
 		return PasskeyCredentialSummary{}, fmt.Errorf("load passkeys: %w", err)
 	}
 
-	wa, err := s.newWebAuthnForChallenge(challenge)
+	wa, err := s.newWebAuthnForChallenge(challenge, origin)
 	if err != nil {
 		return PasskeyCredentialSummary{}, err
 	}
@@ -608,27 +610,56 @@ func (s *AuthService) parsePasskeyChallenge(tokenString string, expectedPurpose 
 }
 
 func (s *AuthService) newWebAuthnForOrigin(origin string) (*webauthn.WebAuthn, string, error) {
-	if !s.passkeyEnabled || s.webauthn == nil {
+	if !s.passkeyEnabled {
 		return nil, "", ErrPasskeyNotConfigured
 	}
 	normalizedOrigin, _, err := config.NormalizeOrigin(origin)
-	if err != nil || normalizedOrigin != s.passkeyOrigin {
-		return nil, "", fmt.Errorf("passkey origin must equal server.primary_origin")
+	if err != nil {
+		return nil, "", ErrPasskeyNotConfigured
 	}
-	return s.webauthn, s.passkeyOrigin, nil
+	parsed, err := url.Parse(normalizedOrigin)
+	if err != nil {
+		return nil, "", ErrPasskeyNotConfigured
+	}
+	host := parsed.Hostname()
+	if parsed.Scheme == "http" && !isPasskeyLoopbackHost(host) {
+		return nil, "", ErrPasskeyNotConfigured
+	}
+	if parsed.Scheme == "https" && net.ParseIP(host) != nil {
+		return nil, "", ErrPasskeyNotConfigured
+	}
+
+	instance, err := webauthn.New(&webauthn.Config{
+		RPID:          host,
+		RPDisplayName: s.passkeyName,
+		RPOrigins:     []string{normalizedOrigin},
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			ResidentKey:      protocol.ResidentKeyRequirementRequired,
+			UserVerification: protocol.VerificationRequired,
+		},
+	})
+	if err != nil {
+		return nil, "", ErrPasskeyNotConfigured
+	}
+	return instance, normalizedOrigin, nil
 }
 
-func (s *AuthService) newWebAuthnForChallenge(challenge *passkeyChallengeClaims) (*webauthn.WebAuthn, error) {
-	if !s.passkeyEnabled || s.webauthn == nil {
-		return nil, ErrPasskeyNotConfigured
-	}
-	normalized, _, err := config.NormalizeOrigin(challenge.Origin)
-	if err != nil ||
-		normalized != s.passkeyOrigin ||
-		challenge.SessionData.RelyingPartyID != s.passkeyRPID {
+func (s *AuthService) newWebAuthnForChallenge(challenge *passkeyChallengeClaims, origin string) (*webauthn.WebAuthn, error) {
+	wa, normalizedOrigin, err := s.newWebAuthnForOrigin(origin)
+	if err != nil {
 		return nil, ErrInvalidPasskeyChallenge
 	}
-	return s.webauthn, nil
+	parsed, err := url.Parse(normalizedOrigin)
+	if err != nil ||
+		challenge.Origin != normalizedOrigin ||
+		challenge.SessionData.RelyingPartyID != parsed.Hostname() {
+		return nil, ErrInvalidPasskeyChallenge
+	}
+	return wa, nil
+}
+
+func isPasskeyLoopbackHost(host string) bool {
+	return strings.EqualFold(host, "localhost")
 }
 
 func cloneByteSlice(value []byte) []byte {

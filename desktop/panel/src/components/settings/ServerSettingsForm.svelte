@@ -10,7 +10,7 @@
   } from "../../lib/runtime-draft.svelte.ts";
   import { refreshState, store } from "../../lib/store.svelte.ts";
   import type { NetworkInfo, NetworkMode } from "../../lib/types.ts";
-  import { networkDraftFromResolvedState, proxyLocationFor } from "./network-draft.ts";
+  import { networkDraftFromResolvedState } from "./network-draft.ts";
 
   let {
     open,
@@ -35,10 +35,6 @@
   const initialNetwork = currentNetwork();
   let initial = $state<NetworkInfo>(initialNetwork);
   let mode = $state<NetworkMode>(initialNetwork.mode);
-  let primaryOrigin = $state(initialNetwork.primaryOrigin);
-  let listen = $state(initialNetwork.listen);
-  let proxyLocation = $state<"same_host" | "remote">("same_host");
-  let trustedCIDRs = $state("");
   let acceptLANWarning = $state(false);
   let message = $state("");
   let error = $state("");
@@ -47,24 +43,14 @@
   function seed(network = currentNetwork()): void {
     initial = structuredClone(network);
     mode = initial.mode;
-    primaryOrigin = initial.primaryOrigin;
-    listen = initial.listen;
-    proxyLocation = proxyLocationFor(initial);
-    trustedCIDRs = initial.trustedProxyCIDRs.join("\n");
     acceptLANWarning = initial.lanWarningAcceptedVersion >= 1;
     message = "";
     error = "";
   }
 
   function fieldsDirty(): boolean {
-    return (
-      mode !== initial.mode ||
-      primaryOrigin !== initial.primaryOrigin ||
-      listen !== initial.listen ||
-      proxyLocation !== proxyLocationFor(initial) ||
-      trustedCIDRs !== initial.trustedProxyCIDRs.join("\n") ||
-      acceptLANWarning !== (initial.lanWarningAcceptedVersion >= 1)
-    );
+    return mode !== initial.mode ||
+      acceptLANWarning !== (initial.lanWarningAcceptedVersion >= 1);
   }
 
   async function syncResolvedCandidateNetwork(): Promise<void> {
@@ -108,20 +94,6 @@
     untrack(() => void syncResolvedCandidateNetwork());
   });
 
-  function hostname(origin: string): string {
-    try {
-      return new URL(origin).hostname;
-    } catch {
-      return "";
-    }
-  }
-
-  const hostnameWillChange = $derived(
-    mode === "external_https" &&
-      hostname(primaryOrigin) !== "" &&
-      hostname(primaryOrigin) !== hostname(initial.primaryOrigin),
-  );
-
   $effect(() => {
     dirty = fieldsDirty();
     canSave = mode !== "lan_http" || acceptLANWarning;
@@ -141,13 +113,6 @@
         toml: runtimeDraft.candidateToml,
         network: {
           mode,
-          primaryOrigin,
-          listen,
-          proxyLocation,
-          trustedProxyCIDRs: trustedCIDRs
-            .split(/\s+/)
-            .map((value) => value.trim())
-            .filter(Boolean),
           acceptLANWarning,
         },
       });
@@ -183,7 +148,6 @@
     <select class="select select-sm w-full" bind:value={mode}>
       <option value="local">{t("networkLocal")}</option>
       <option value="lan_http">{t("networkLAN")}</option>
-      <option value="external_https">{t("networkExternal")}</option>
     </select>
   </label>
 
@@ -207,46 +171,6 @@
       />
       <span>{t("networkAcceptLAN")}</span>
     </label>
-  {:else}
-    <label class="flex flex-col gap-1 text-xs">
-      <span class="font-semibold">{t("networkOrigin")}</span>
-      <input
-        class="input input-sm w-full"
-        type="url"
-        bind:value={primaryOrigin}
-        placeholder="https://photos.example.com"
-      />
-    </label>
-    <label class="flex flex-col gap-1 text-xs">
-      <span class="font-semibold">{t("networkProxyLocation")}</span>
-      <select class="select select-sm w-full" bind:value={proxyLocation}>
-        <option value="same_host">{t("networkProxySameHost")}</option>
-        <option value="remote">{t("networkProxyRemote")}</option>
-      </select>
-    </label>
-    <label class="flex flex-col gap-1 text-xs">
-      <span class="font-semibold">{t("networkListen")}</span>
-      <input
-        class="input input-sm w-full"
-        bind:value={listen}
-        placeholder={proxyLocation === "same_host" ? "127.0.0.1:6680" : "0.0.0.0:6680"}
-      />
-    </label>
-    {#if proxyLocation === "remote"}
-      <label class="flex flex-col gap-1 text-xs">
-        <span class="font-semibold">{t("networkTrustedCIDRs")}</span>
-        <textarea
-          class="textarea textarea-sm w-full"
-          rows="2"
-          bind:value={trustedCIDRs}
-          placeholder="192.168.1.10/32"
-        ></textarea>
-      </label>
-    {/if}
-    <p class="m-0 text-xs text-muted">{t("networkExternalHint")}</p>
-    {#if hostnameWillChange}
-      <div class="alert alert-warning alert-soft text-xs"><span>{t("networkRPWarning")}</span></div>
-    {/if}
   {/if}
 
   {#if error}

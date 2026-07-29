@@ -1,7 +1,7 @@
 // Package servertransport owns the HTTP/TLS listeners for one application
-// runtime generation. It keeps transport lifecycle separate from API policy:
-// external TLS is terminated by a required trusted proxy, while ACME TLS is
-// terminated in-process.
+// runtime generation. It keeps transport lifecycle separate from request
+// origin policy: plaintext upstreams may sit behind any conventional reverse
+// proxy, while ACME TLS is terminated in-process.
 package servertransport
 
 import (
@@ -70,8 +70,6 @@ func start(
 	switch cfg.TLS.Mode {
 	case config.TLSModeOff:
 		return startHTTP(cfg.Listen, handler, nil)
-	case config.TLSModeExternal:
-		return startExternal(cfg.Listen, handler)
 	case config.TLSModeACME:
 		return startACME(ctx, cfg, handler, logger, newManager)
 	default:

@@ -19,9 +19,7 @@ import (
 func TestGetBrowserCapabilitiesUsesResolvedOriginPolicy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	policy, err := httporigin.New(config.ServerConfig{
-		PrimaryOrigin: "http://localhost:6680",
-		TLS:           config.TLSConfig{Mode: config.TLSModeOff},
-		Proxy:         config.ProxyConfig{Mode: config.ProxyModeDisabled},
+		TLS: config.TLSConfig{Mode: config.TLSModeOff},
 	}, config.PasskeyConfig{Enabled: true, Name: "Lumilio Photos"})
 	require.NoError(t, err)
 	handler := NewAuthHandler(nil, nil, time.Hour, policy)
@@ -36,7 +34,6 @@ func TestGetBrowserCapabilitiesUsesResolvedOriginPolicy(t *testing.T) {
 				ClientIP:           netip.MustParseAddr("127.0.0.1"),
 				TargetOrigin:       "http://localhost:6680",
 				BrowserOrigin:      "http://localhost:6680",
-				IsPrimaryOrigin:    true,
 				IsSecureContext:    true,
 				IsSecureForPasskey: true,
 			},
@@ -73,7 +70,6 @@ func TestGetBrowserCapabilitiesUsesResolvedOriginPolicy(t *testing.T) {
 			require.Equal(t, http.StatusOK, recorder.Code)
 			var got dtoBrowserCapabilities
 			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &got))
-			require.Equal(t, "http://localhost:6680", got.PrimaryOrigin)
 			require.Equal(t, test.want.CurrentOrigin, got.CurrentOrigin)
 			require.Equal(t, test.want.PasskeyAvailable, got.PasskeyAvailable)
 			require.Equal(t, test.want.PasskeyUnavailableReason, got.PasskeyUnavailableReason)
@@ -83,7 +79,6 @@ func TestGetBrowserCapabilitiesUsesResolvedOriginPolicy(t *testing.T) {
 }
 
 type dtoBrowserCapabilities struct {
-	PrimaryOrigin            string `json:"primary_origin"`
 	CurrentOrigin            string `json:"current_origin"`
 	PasskeyAvailable         bool   `json:"passkey_available"`
 	PasskeyUnavailableReason string `json:"passkey_unavailable_reason"`

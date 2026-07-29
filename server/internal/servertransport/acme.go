@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -43,10 +42,6 @@ type certMagicManager struct {
 }
 
 func newCertMagicManager(cfg config.ServerConfig, logger *zap.Logger) (certificateManager, error) {
-	primary, err := url.Parse(cfg.PrimaryOrigin)
-	if err != nil {
-		return nil, fmt.Errorf("parse ACME primary origin: %w", err)
-	}
 	if err := os.MkdirAll(cfg.TLS.StoragePath, 0o700); err != nil {
 		return nil, fmt.Errorf("create ACME storage %s: %w", cfg.TLS.StoragePath, err)
 	}
@@ -74,7 +69,7 @@ func newCertMagicManager(cfg config.ServerConfig, logger *zap.Logger) (certifica
 	magicConfig = certmagic.New(cache, certmagic.Config{
 		Storage:           &certmagic.FileStorage{Path: filepath.Clean(cfg.TLS.StoragePath)},
 		Logger:            logger,
-		DefaultServerName: primary.Hostname(),
+		DefaultServerName: cfg.TLS.Hostname,
 	})
 	issuerTemplate := certmagic.DefaultACME
 	issuerTemplate.Email = cfg.TLS.Email
@@ -86,7 +81,7 @@ func newCertMagicManager(cfg config.ServerConfig, logger *zap.Logger) (certifica
 		config:   magicConfig,
 		issuer:   issuer,
 		cache:    cache,
-		hostname: primary.Hostname(),
+		hostname: cfg.TLS.Hostname,
 	}, nil
 }
 
@@ -185,7 +180,7 @@ func startACME(
 		handler.ServeHTTP(w, r)
 	})
 	redirectHandler := manager.HTTPChallengeHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		target := cfg.PrimaryOrigin + r.URL.EscapedPath()
+		target := "https://" + cfg.TLS.Hostname + r.URL.EscapedPath()
 		if r.URL.EscapedPath() == "" {
 			target += "/"
 		}
@@ -203,12 +198,11 @@ func startACME(
 		manager,
 	)
 
-	primary, _ := url.Parse(cfg.PrimaryOrigin)
-	if err := manager.ManageSync(ctx, []string{primary.Hostname()}); err != nil {
+	if err := manager.ManageSync(ctx, []string{cfg.TLS.Hostname}); err != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return nil, errors.Join(
-			fmt.Errorf("obtain ACME certificate for %s: %w", primary.Hostname(), err),
+			fmt.Errorf("obtain ACME certificate for %s: %w", cfg.TLS.Hostname, err),
 			runtime.Shutdown(shutdownCtx),
 		)
 	}

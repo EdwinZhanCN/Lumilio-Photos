@@ -220,11 +220,9 @@ func (s *Supervisor) Settings() (DesktopSettings, error) {
 	if runtimeErr != nil && !needsRuntimeInitialization {
 		return DesktopSettings{}, fmt.Errorf("inspect runtime intent: %w", runtimeErr)
 	}
-	// Host settings remain readable when an established v2 runtime intent is
-	// invalid, so a returning user reaches the recovery Dashboard rather than
-	// being misclassified as first-run onboarding. Runtime creation and the
-	// explicit v1 migration still complete as one ordered operation.
-	if needsRuntimeInitialization || settings.legacyNetwork {
+	// Host settings remain readable when an established runtime intent is
+	// invalid, so a returning user reaches the recovery Dashboard.
+	if needsRuntimeInitialization {
 		if err := s.ensureRuntimeIntent(settings); err != nil {
 			return DesktopSettings{}, err
 		}
@@ -234,7 +232,6 @@ func (s *Supervisor) Settings() (DesktopSettings, error) {
 		}
 	}
 	settings.Version = desktopSettingsVersion
-	settings.legacyNetwork = false
 	return settings, nil
 }
 
@@ -305,15 +302,14 @@ func (s *Supervisor) LumenDir() (string, error) {
 // validation.
 func StorageReachable(path string) bool { return storageReachable(path) }
 
-// ServerURL is the canonical browser origin the desktop host opens. It is
-// independent from the internal readiness address.
+// ServerURL is the local browser address the Desktop host opens.
 func (s *Supervisor) ServerURL() string {
 	if origin := s.RuntimeSnapshot().BrowserURL; origin != "" {
 		return origin
 	}
 	if err := s.ensurePaths(); err == nil {
 		if _, cfg, loadErr := s.runtimeIntent(); loadErr == nil {
-			return cfg.ServerConfig.PrimaryOrigin
+			return browserURLForListen(cfg.ServerConfig.Listen)
 		}
 	}
 	return "http://localhost:" + serverPort
@@ -459,7 +455,7 @@ func (s *Supervisor) startRuntimeLockedWithOperation(
 	}
 	network := networkSummaryFromConfig(appConfig)
 	s.updateSnapshot(func(snapshot *RuntimeSnapshot) {
-		snapshot.BrowserURL = appConfig.ServerConfig.PrimaryOrigin
+		snapshot.BrowserURL = browserURLForListen(appConfig.ServerConfig.Listen)
 		snapshot.Network = network
 		_, lkgErr := os.Stat(s.paths.RuntimeLastKnownGoodFile())
 		snapshot.LastKnownGoodAvailable = lkgErr == nil
@@ -497,6 +493,14 @@ func (s *Supervisor) startRuntimeLockedWithOperation(
 	s.setSnapshot(snapshot)
 	s.logf("desktop runtime ready at %s", snapshot.BrowserURL)
 	return nil
+}
+
+func browserURLForListen(listen string) string {
+	_, port, err := net.SplitHostPort(strings.TrimSpace(listen))
+	if err != nil || port == "" {
+		port = serverPort
+	}
+	return "http://localhost:" + port
 }
 
 // StopRuntime drains only the current Server generation. It never releases the

@@ -140,18 +140,17 @@ path = "/Users/demo/Library/Application Support/Lumilio Photos/library.sqlite3"
 
 [server]
 listen = "127.0.0.1:6680"
-primary_origin = "http://localhost:6680"
 cors_allowed_origins = []
 web_root = "/Applications/Lumilio Photos.app/Contents/Resources/web"
 
 [server.tls]
 mode = "off"
+hostname = ""
 http_listen = ""
 email = ""
 storage_path = ""
 
 [server.proxy]
-mode = "disabled"
 trusted_cidrs = []
 
 [logging]
@@ -174,7 +173,7 @@ hardware_accel = "auto"
 
 const MOCK_FINGERPRINT = `sha256:${"a".repeat(64)}`;
 
-type MockNetwork = "local" | "lan" | "external";
+type MockNetwork = "local" | "lan";
 type MockLumen = "disabled" | "starting" | "running" | "failed";
 type MockApply = "success" | "rollback" | "failure";
 
@@ -187,41 +186,13 @@ export function networkPayload(network: MockNetwork | null) {
     return {
       mode: "lan_http",
       listen: "0.0.0.0:6680",
-      primaryOrigin: "http://localhost:6680",
-      tlsMode: "off",
-      proxyMode: "disabled",
-      trustedProxyCIDRs: [],
-      passkeyOrigin: "http://localhost:6680",
-      rpID: "localhost",
       passkeyEnabled: true,
-      remotePasskeyAvailable: false,
-    };
-  }
-  if (network === "external") {
-    return {
-      mode: "external_https",
-      listen: "127.0.0.1:6680",
-      primaryOrigin: "https://photos.example.com",
-      tlsMode: "external",
-      proxyMode: "required",
-      trustedProxyCIDRs: ["127.0.0.1/32", "::1/128"],
-      passkeyOrigin: "https://photos.example.com",
-      rpID: "photos.example.com",
-      passkeyEnabled: true,
-      remotePasskeyAvailable: true,
     };
   }
   return {
     mode: "local",
     listen: "127.0.0.1:6680",
-    primaryOrigin: "http://localhost:6680",
-    tlsMode: "off",
-    proxyMode: "disabled",
-    trustedProxyCIDRs: [],
-    passkeyOrigin: "http://localhost:6680",
-    rpID: "localhost",
     passkeyEnabled: true,
-    remotePasskeyAvailable: false,
   };
 }
 
@@ -279,8 +250,7 @@ export function statePayload(
   const runtimePhase: MockRuntimePhase = isMockRuntimePhase(runtimeOverride)
     ? runtimeOverride
     : mock.runtimePhase;
-  const network =
-    networkOverride === "lan" || networkOverride === "external" ? networkOverride : "local";
+  const network = networkOverride === "lan" ? networkOverride : "local";
   const runtimeNetwork = networkPayload(network);
   const lumen =
     lumenOverride === "disabled" ||
@@ -309,9 +279,9 @@ export function statePayload(
             : "preparing",
       errorCode: forcedFailure ? "startup_failed" : mock.runtimeErrorCode,
       errorMessage: forcedFailure
-        ? "The runtime manifest is invalid: server.primary_origin must be an exact origin."
+        ? "The runtime manifest is invalid: server.listen must be a complete host:port address."
         : mock.runtimeErrorMessage,
-      browserURL: runtimeNetwork.primaryOrigin,
+      browserURL: "http://localhost:6680",
       canOpen: runtimePhase === "running",
       canRestart: ["stopped", "running", "failed"].includes(runtimePhase),
       lastKnownGoodAvailable: true,
@@ -510,14 +480,12 @@ export function mockPanelApi(): Plugin {
             const network =
               url.pathname.endsWith("/patch-network") && requestedMode === "lan_http"
                 ? "lan"
-                : url.pathname.endsWith("/patch-network") && requestedMode === "external_https"
-                  ? "external"
-                  : mockQuery(req).get("network");
+                : mockQuery(req).get("network");
             return json(
               res,
               validationPayload(
                 candidateToml,
-                network === "lan" || network === "external" ? network : "local",
+                network === "lan" ? network : "local",
               ),
             );
           }

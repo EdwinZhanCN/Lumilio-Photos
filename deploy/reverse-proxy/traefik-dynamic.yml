@@ -1,5 +1,5 @@
-# Replace the hostname before use. Traefik and Lumilio run on the same Linux
-# host; the Lumilio external-proxy manifest listens on loopback only.
+# Replace the hostname before use. This example assumes Traefik and Lumilio run
+# on the same Linux host and Lumilio uses the embedded docker-caddy manifest.
 http:
     routers:
         lumilio:

@@ -12589,13 +12589,7 @@ export interface components {
             /** @example false */
             passkey_available?: boolean;
             /** @enum {string} */
-            passkey_unavailable_reason?: "disabled" | "secure_origin_required" | "non_primary_origin" | "trusted_proxy_required" | "invalid_request_origin";
-            /** @example http://localhost:6680 */
-            primary_origin?: string;
-            /** @example false */
-            proxy_required?: boolean;
-            /** @example false */
-            via_trusted_proxy?: boolean;
+            passkey_unavailable_reason?: "disabled" | "secure_origin_required" | "domain_required" | "invalid_request_origin";
         };
         "dto.CSRFTokenDTO": {
             csrfToken?: string;
@@ -13834,14 +13828,6 @@ export interface components {
             lumen_discovery_enabled?: boolean;
             /** @example true */
             passkey_enabled?: boolean;
-            /** @example https://photos.example.com */
-            passkey_origin?: string;
-            /** @example photos.example.com */
-            passkey_rp_id?: string;
-            /** @example https://photos.example.com */
-            primary_origin?: string;
-            /** @example required */
-            proxy_mode?: string;
             /** @example true */
             repository_scan_enabled?: boolean;
             /** @example 300 */
@@ -13850,9 +13836,8 @@ export interface components {
             server_listen?: string;
             /** @example /data/storage */
             storage_root?: string;
-            /** @example external */
+            /** @example off */
             tls_mode?: string;
-            trusted_proxy_cidrs?: string[];
         };
         "dto.SearchAssetsRequestDTO": {
             debug?: boolean;

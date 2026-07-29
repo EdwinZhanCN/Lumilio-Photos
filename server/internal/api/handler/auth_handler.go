@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"server/config"
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/httporigin"
@@ -134,13 +133,10 @@ func (h *AuthHandler) GetBrowserCapabilities(c *gin.Context) {
 	}
 	available, reason := h.originPolicy.PasskeyAvailability(resolved)
 	api.JSONOK(c, dto.BrowserCapabilitiesDTO{
-		PrimaryOrigin:            h.originPolicy.PrimaryOrigin(),
 		CurrentOrigin:            resolved.BrowserOrigin,
 		PasskeyAvailable:         available,
 		PasskeyUnavailableReason: string(reason),
 		InsecureTransport:        !resolved.IsSecureContext,
-		ProxyRequired:            h.originPolicy.ProxyMode() == config.ProxyModeRequired,
-		ViaTrustedProxy:          resolved.ViaTrustedProxy,
 	})
 }
 
