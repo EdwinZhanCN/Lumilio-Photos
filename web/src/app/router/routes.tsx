@@ -17,6 +17,7 @@ import FolderDetails from "@/features/collections/routes/FolderDetails";
 import Tags from "@/features/collections/routes/Tags";
 import TagDetails from "@/features/collections/routes/TagDetails";
 import PersonDetails from "@/features/people/routes/PersonDetails";
+import { EventDetails, Events } from "@/features/events";
 import PublicShare from "@/features/share/routes/PublicShare.tsx";
 import SharedLinks from "@/features/share/routes/SharedLinks.tsx";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
@@ -104,6 +105,18 @@ export const appRoutes = [
   {
     path: "/collections/albums",
     element: <Albums />,
+  },
+  {
+    path: "/collections/events",
+    element: <Events />,
+  },
+  {
+    path: "/collections/events/:eventId",
+    element: <EventDetails />,
+  },
+  {
+    path: "/collections/events/:eventId/:assetId",
+    element: <EventDetails />,
   },
   {
     path: "/collections/map",

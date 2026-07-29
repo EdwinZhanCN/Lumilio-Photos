@@ -47,6 +47,10 @@ src/features/<feature>/
 - Tests and feature-specific styles stay beside the implementation they characterize.
 - A small feature omits unused directories. Uniformity means identical directory semantics, not identical directory counts.
 - The Assets feature expresses its main journeys as `flows/browse`, `flows/viewer`, and `flows/export`; pure filtering and browse-item rules live in `model`. It keeps `map/` and `picker/` as reviewed public sub-entry exceptions whose entry files remain narrow.
+- The Events feature owns its cursor-backed index, Event detail orchestration,
+  mutations, and presentation fallbacks. Event detail composes
+  `@/features/assets`; neutral bulk-action selection contracts remain in
+  `src/lib/assets` so Assets does not depend on Events.
 - The only handwritten documentation sources under `web/` are this file and
   feature-root `doc.ts` files. Put feature-specific architecture in `doc.ts`;
   do not add feature `README.md` files or supporting `docs/` directories.

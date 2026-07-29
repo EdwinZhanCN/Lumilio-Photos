@@ -42,6 +42,7 @@ type Querier interface {
 	AgentInspectAssets(ctx context.Context, arg AgentInspectAssetsParams) ([]AgentInspectAssetsRow, error)
 	// lookup_albums entity resolver: albums matching a title query.
 	AgentLookupAlbums(ctx context.Context, arg AgentLookupAlbumsParams) ([]AgentLookupAlbumsRow, error)
+	AgentLookupEvents(ctx context.Context, arg AgentLookupEventsParams) ([]AgentLookupEventsRow, error)
 	// lookup_people entity resolver: named face clusters matching a name query.
 	AgentLookupPeople(ctx context.Context, arg AgentLookupPeopleParams) ([]AgentLookupPeopleRow, error)
 	// peek observer: minimal per-asset fields plus place + people; snapshot order
@@ -67,9 +68,13 @@ type Querier interface {
 	BumpOCRIndexRevision(ctx context.Context, assetID uuid.UUID) (int64, error)
 	CancelPendingAgentEffects(ctx context.Context, arg CancelPendingAgentEffectsParams) error
 	CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error)
+	ClaimEventDirtyRanges(ctx context.Context, arg ClaimEventDirtyRangesParams) (int64, error)
 	ClearAwaitingAgentRun(ctx context.Context, arg ClearAwaitingAgentRunParams) error
 	ClearDefaultSearchSpaceByType(ctx context.Context, embeddingType string) error
+	ClearEventCovers(ctx context.Context, arg ClearEventCoversParams) error
 	ClearOCRIndexOutbox(ctx context.Context) error
+	ClearStaleEventDirtyClaims(ctx context.Context, claimedAt *int64) (int64, error)
+	CompareAndAdvanceEventRevision(ctx context.Context, arg CompareAndAdvanceEventRevisionParams) (int64, error)
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
@@ -153,10 +158,13 @@ type Querier interface {
 	DeleteAllSearchEmbeddings(ctx context.Context) error
 	DeleteAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteCheckpoint(ctx context.Context, id string) error
+	DeleteClaimedEventDirtyRanges(ctx context.Context, arg DeleteClaimedEventDirtyRangesParams) (int64, error)
 	DeleteCloudCredential(ctx context.Context, credentialID uuid.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
 	DeleteEmptyFaceClusters(ctx context.Context) error
 	DeleteEmptyUnconfirmedFaceClusters(ctx context.Context) error
+	DeleteEventConstraint(ctx context.Context, arg DeleteEventConstraintParams) error
+	DeleteEventMemberships(ctx context.Context, arg DeleteEventMembershipsParams) error
 	DeleteExpiredAgentRefs(ctx context.Context, now dbtypes.Timestamp) error
 	DeleteExpiredRegistrationSessions(ctx context.Context) error
 	DeleteExternalRepositoryRoot(ctx context.Context, rootID uuid.UUID) (int64, error)
@@ -193,6 +201,7 @@ type Querier interface {
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
 	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) error
+	EventCandidateTimeBounds(ctx context.Context, ownerID *int32) (EventCandidateTimeBoundsRow, error)
 	ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLinkExpiryParams) (ShareLink, error)
 	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
 	// Structural and burst detection ------------------------------------------
@@ -295,6 +304,10 @@ type Querier interface {
 	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (GetEmbeddingByTypeRow, error)
 	GetEmbeddingModels(ctx context.Context, embeddingType string) ([]GetEmbeddingModelsRow, error)
 	GetEmbeddingSpaceByAttributes(ctx context.Context, arg GetEmbeddingSpaceByAttributesParams) (EmbeddingSpace, error)
+	GetEventAssetIDsForAgent(ctx context.Context, arg GetEventAssetIDsForAgentParams) ([]interface{}, error)
+	GetEventForOwner(ctx context.Context, arg GetEventForOwnerParams) (Event, error)
+	GetEventOwnerState(ctx context.Context, ownerID int32) (EventOwnerState, error)
+	GetEventRedirectForOwner(ctx context.Context, arg GetEventRedirectForOwnerParams) (string, error)
 	// Returns assets in a repository that share the exact same (content_hash, file_size)
 	// with at least one other asset of the same owner. Only photos are considered,
 	// and only non-deleted assets. Results are ordered so members of the same
@@ -446,6 +459,11 @@ type Querier interface {
 	InsertDuplicateGroupAsset(ctx context.Context, arg InsertDuplicateGroupAssetParams) error
 	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
+	InsertEvent(ctx context.Context, arg InsertEventParams) error
+	InsertEventConstraint(ctx context.Context, arg InsertEventConstraintParams) error
+	InsertEventDirtyRange(ctx context.Context, arg InsertEventDirtyRangeParams) error
+	InsertEventMembership(ctx context.Context, arg InsertEventMembershipParams) error
+	InsertEventRedirect(ctx context.Context, arg InsertEventRedirectParams) error
 	InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error
 	// Dedicated fixed-dimension authoritative semantic search vectors.
 	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
@@ -456,6 +474,7 @@ type Querier interface {
 	ListAssetEmbeddings(ctx context.Context, assetIds []uuid.UUID) ([]ListAssetEmbeddingsRow, error)
 	ListAssetsByRepositoryAny(ctx context.Context, repositoryID uuid.NullUUID) ([]Asset, error)
 	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
+	ListClaimedEventDirtyRanges(ctx context.Context, arg ListClaimedEventDirtyRangesParams) ([]EventDirtyRange, error)
 	ListCloudCredentials(ctx context.Context) ([]CloudCredential, error)
 	ListCloudCredentialsForOwner(ctx context.Context, ownerID int32) ([]CloudCredential, error)
 	ListCloudImportRunsForRepository(ctx context.Context, arg ListCloudImportRunsForRepositoryParams) ([]CloudImportRun, error)
@@ -464,9 +483,15 @@ type Querier interface {
 	// their own ID and never see NULL-owner or foreign groups.
 	// Pending groups are returned newest-first; resolved groups by resolution time.
 	ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error)
+	ListEventCandidates(ctx context.Context, ownerID *int32) ([]ListEventCandidatesRow, error)
+	ListEventConstraints(ctx context.Context, ownerID int32) ([]EventConstraint, error)
+	ListEventMembership(ctx context.Context, arg ListEventMembershipParams) ([]EventMediaItem, error)
+	ListEventMembershipPage(ctx context.Context, arg ListEventMembershipPageParams) ([]EventMediaItem, error)
+	ListEventsPage(ctx context.Context, arg ListEventsPageParams) ([]Event, error)
 	ListLocationClusterCandidatesForScope(ctx context.Context, arg ListLocationClusterCandidatesForScopeParams) ([]ListLocationClusterCandidatesForScopeRow, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
 	ListOCRIndexOutboxBatch(ctx context.Context, limit int64) ([]ListOCRIndexOutboxBatchRow, error)
+	ListOwnersWithEventDirtyRanges(ctx context.Context, claimedAt *int64) ([]int32, error)
 	// Loads pHash embeddings for every non-deleted photo in a repository so the
 	// service layer can build a similarity graph in-memory. owner_id is included
 	// because duplicate edges never cross owners.
@@ -495,6 +520,7 @@ type Querier interface {
 	MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFileParams) error
 	MarkDuplicateGroupDismissed(ctx context.Context, groupID uuid.UUID) error
 	MarkDuplicateGroupMerged(ctx context.Context, arg MarkDuplicateGroupMergedParams) error
+	MarkEventRedirected(ctx context.Context, arg MarkEventRedirectedParams) error
 	MarkLocationClustersGeocodeDisabled(ctx context.Context, arg MarkLocationClustersGeocodeDisabledParams) error
 	MarkStaleCloudImportRunsInterrupted(ctx context.Context) error
 	// ============================================================================
@@ -538,6 +564,7 @@ type Querier interface {
 	RemoveStackMembershipsByMediaItemIDs(ctx context.Context, mediaItemIds []uuid.UUID) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
+	RenewEventDirtyClaim(ctx context.Context, arg RenewEventDirtyClaimParams) (int64, error)
 	RepositoryExists(ctx context.Context, path string) (int64, error)
 	RequestAgentRunCancel(ctx context.Context, arg RequestAgentRunCancelParams) (AgentRun, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error)
@@ -546,6 +573,7 @@ type Querier interface {
 	RevokeRefreshToken(ctx context.Context, tokenID int64) error
 	RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams) (ShareLink, error)
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
+	RewriteRedirectTargets(ctx context.Context, arg RewriteRedirectTargetsParams) error
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
@@ -557,6 +585,7 @@ type Querier interface {
 	SelectMediaItemPrimaryAsset(ctx context.Context, mediaItemID uuid.UUID) (uuid.UUID, error)
 	SetAgentThreadActiveRun(ctx context.Context, arg SetAgentThreadActiveRunParams) error
 	SetBootstrapPhase(ctx context.Context, bootstrapPhase string) (SystemState, error)
+	SetEventRebuildPaused(ctx context.Context, arg SetEventRebuildPausedParams) (int64, error)
 	SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
@@ -587,6 +616,8 @@ type Querier interface {
 	UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error)
 	// Resets all asset roles in a group, then flags the chosen keeper.
 	UpdateDuplicateGroupKeeperRole(ctx context.Context, arg UpdateDuplicateGroupKeeperRoleParams) error
+	UpdateEventBoundsAndGeneratedCover(ctx context.Context, arg UpdateEventBoundsAndGeneratedCoverParams) error
+	UpdateEventOverrides(ctx context.Context, arg UpdateEventOverridesParams) error
 	UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterParams) (FaceCluster, error)
 	UpdateFaceClusterRepresentative(ctx context.Context, arg UpdateFaceClusterRepresentativeParams) (FaceCluster, error)
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
@@ -627,6 +658,7 @@ type Querier interface {
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
 	// Embedding spaces
 	UpsertEmbeddingSpace(ctx context.Context, arg UpsertEmbeddingSpaceParams) (EmbeddingSpace, error)
+	UpsertEventOwnerState(ctx context.Context, arg UpsertEventOwnerStateParams) error
 	UpsertOCRIndexOutbox(ctx context.Context, arg UpsertOCRIndexOutboxParams) error
 	UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	UpsertRepositoryDefaults(ctx context.Context, arg UpsertRepositoryDefaultsParams) (RepositoryDefault, error)

@@ -34,6 +34,7 @@ type AssetFilterInput struct {
 	Camera               string   `json:"camera,omitempty" jsonschema:"description=Camera model substring (e.g. Nikon Z8)"`
 	Lens                 string   `json:"lens,omitempty" jsonschema:"description=Lens model substring"`
 	AlbumID              *int     `json:"album_id,omitempty" jsonschema:"description=Filter to assets in this album id"`
+	EventID              string   `json:"event_id,omitempty" jsonschema:"description=Stable Event UUID returned by lookup_events"`
 	TagNames             []string `json:"tag_names,omitempty" jsonschema:"description=Tag names to filter by (AND semantics — assets must have all listed tags)"`
 	MinQualityPercentile *float64 `json:"min_quality_percentile,omitempty" jsonschema:"description=Keep only assets whose SigLIP aesthetic score is at/above this percentile (1-99) of the matched set's scored assets — e.g. 75 keeps the top quartile. Unscored assets are dropped."`
 }
@@ -64,7 +65,18 @@ func RegisterFilterAssets() {
 				return errorOutput(refErr), nil
 			}
 
-			rows, err := deps.Library.FilterAssetIDs(ctx, *params)
+			var rows []uuid.UUID
+			var err error
+			if strings.TrimSpace(input.EventID) != "" {
+				if _, parseErr := uuid.Parse(input.EventID); parseErr != nil {
+					refErr := ref.InvalidArgument("event_id is not a UUID")
+					sendError(deps, info.Name, execID, start, refErr)
+					return errorOutput(refErr), nil
+				}
+				rows, err = deps.Library.EventAssetIDs(ctx, input.EventID, ref.MaxSnapshotSize+1)
+			} else {
+				rows, err = deps.Library.FilterAssetIDs(ctx, *params)
+			}
 			if err != nil {
 				refErr := ref.Internal("asset filter query")
 				sendError(deps, info.Name, execID, start, refErr)
@@ -72,6 +84,15 @@ func RegisterFilterAssets() {
 			}
 
 			truncated := len(rows) > ref.MaxSnapshotSize
+			if truncated && strings.TrimSpace(input.EventID) != "" {
+				refErr := &ref.Error{
+					Code:    ref.CodeEventRefTooLarge,
+					Message: fmt.Sprintf("Event contains more than %d displayable assets", ref.MaxSnapshotSize),
+					Hint:    "open the Event in the library or narrow it with ordinary filters",
+				}
+				sendError(deps, info.Name, execID, start, refErr)
+				return errorOutput(refErr), nil
+			}
 			if truncated {
 				rows = rows[:ref.MaxSnapshotSize]
 			}

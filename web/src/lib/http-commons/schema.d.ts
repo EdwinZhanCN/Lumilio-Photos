@@ -7531,6 +7531,450 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Events */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Page size */
+                    limit?: number;
+                    /** @description Opaque cursor */
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventListPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventDetailDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Event */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Event changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventMutationResponseDTO"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/events/{id}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event assets */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Page size */
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventAssetsPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Event members */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Assets to add */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventAddMembersRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventMutationResponseDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/members/{mediaItemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Event member */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                    /** @description Media item UUID */
+                    mediaItemId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventMutationResponseDTO"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event relations */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRelationsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Share Event */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Share options */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventShareRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.CreateShareLinkResponseDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{id}/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Split Event */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Event UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Split request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventSplitRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventMutationResponseDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge Events */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Merge request */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventMergeRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventMutationResponseDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rebuild Events */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Rebuild options */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventRebuildRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRebuildPreviewDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -8124,6 +8568,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/people/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a Person's Events */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Person ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRelationsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/people/{id}/faces": {
         parameters: {
             query?: never;
@@ -8572,6 +9055,48 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/people/{id}/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Person relations */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Relation type */
+                    relation: "co_occurs_with";
+                };
+                header?: never;
+                path: {
+                    /** @description Person ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRelationsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11786,6 +12311,8 @@ export interface components {
             /** @example Canon EOS R5 */
             camera_model?: string;
             date?: components["schemas"]["dto.DateRangeDTO"];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            event_id?: string;
             filename?: components["schemas"]["dto.FilenameFilterDTO"];
             /** @example inbox/2026/05 */
             folder_path?: string;
@@ -12423,6 +12950,96 @@ export interface components {
         "dto.EnableTOTPRequestDTO": {
             code: string;
             setup_token: string;
+        };
+        "dto.EventAddMembersRequestDTO": {
+            asset_ids: string[];
+        };
+        "dto.EventAssetDTO": {
+            asset_id?: string;
+            media_item_id?: string;
+            position?: number;
+        };
+        "dto.EventAssetsPageDTO": {
+            assets?: components["schemas"]["dto.EventAssetDTO"][];
+            next_cursor?: string;
+            omitted_members?: number;
+        };
+        "dto.EventDetailDTO": {
+            algorithm_version?: string;
+            cover_asset_id?: string;
+            cover_media_item_id?: string;
+            displayable_count?: number;
+            end_at?: number;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            event_id?: string;
+            is_hidden?: boolean;
+            media_count?: number;
+            pending_rebuild?: boolean;
+            redirected_from?: string;
+            start_at?: number;
+            timezone?: string;
+            title_override?: string;
+        };
+        "dto.EventListPageDTO": {
+            events?: components["schemas"]["dto.EventSummaryDTO"][];
+            next_cursor?: string;
+        };
+        "dto.EventMergeRequestDTO": {
+            event_ids: string[];
+            survivor_event_id: string;
+        };
+        "dto.EventMutationResponseDTO": {
+            event?: components["schemas"]["dto.EventSummaryDTO"];
+            pending_rebuild?: boolean;
+        };
+        "dto.EventPatchRequestDTO": {
+            clear_cover_override?: boolean;
+            clear_title_override?: boolean;
+            cover_media_item_id?: string;
+            is_hidden?: boolean;
+            title_override?: string;
+        };
+        "dto.EventRebuildPreviewDTO": {
+            created?: number;
+            events?: number;
+            members?: number;
+            redirected?: number;
+            retained?: number;
+        };
+        "dto.EventRebuildRequestDTO": {
+            dry_run?: boolean;
+            from?: string;
+            owner_id?: number;
+            to?: string;
+        };
+        "dto.EventRelationsResponseDTO": {
+            complete?: boolean;
+            relations?: components["schemas"]["event.ResourceRelation"][];
+            source_version?: string;
+        };
+        "dto.EventShareRequestDTO": {
+            allow_download?: boolean;
+            description?: string;
+            expires_in_days?: number;
+            include_originals?: boolean;
+            title: string;
+        };
+        "dto.EventSplitRequestDTO": {
+            before_media_item_id: string;
+        };
+        "dto.EventSummaryDTO": {
+            cover_asset_id?: string;
+            cover_media_item_id?: string;
+            displayable_count?: number;
+            end_at?: number;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            event_id?: string;
+            is_hidden?: boolean;
+            media_count?: number;
+            redirected_from?: string;
+            start_at?: number;
+            timezone?: string;
+            title_override?: string;
         };
         "dto.FaceClusterRebuildResponseDTO": {
             algorithm?: string;
@@ -13890,6 +14507,20 @@ export interface components {
             /** @enum {string} */
             method: "totp" | "recovery_code";
             mfa_token: string;
+        };
+        "event.ResourceRef": {
+            id?: string;
+            kind?: string;
+        };
+        "event.ResourceRelation": {
+            confidence?: number;
+            facts?: {
+                [key: string]: unknown;
+            };
+            from?: components["schemas"]["event.ResourceRef"];
+            origin?: string;
+            relation?: string;
+            to?: components["schemas"]["event.ResourceRef"];
         };
         "handler.AgentCancelRequest": {
             run_id: string;

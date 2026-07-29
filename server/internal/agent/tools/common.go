@@ -90,6 +90,7 @@ func RegisterAll() {
 	// Lookup
 	RegisterLookupPeople()
 	RegisterLookupAlbums()
+	RegisterLookupEvents()
 	// Transformers
 	RegisterCombine()
 	RegisterRank()

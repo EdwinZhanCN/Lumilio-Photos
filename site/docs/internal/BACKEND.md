@@ -109,6 +109,9 @@ and is shut down when the host run exits.
 - `internal/classify`: classifier support code shared by API/service paths.
 - `internal/logging`: zap logger setup, stdlib bridge, and repository audit helpers.
 - `internal/agent`: agent service and tools.
+- `internal/event`: owner-scoped Event candidates, deterministic `events-v1`
+  segmentation/reconciliation, correction transactions, resolution, and direct
+  typed relations. Event membership atoms are always `media_item` rows.
 - `internal/utils`: media, hashing, raw, exif, upload, imaging, and support utilities.
 
 ## Storage Model
@@ -159,6 +162,15 @@ Owner identity is instance-local database policy rather than portable
   the effective values back and fails closed if policy differs.
 - Application tables and River queues share the same catalog and can commit
   business state plus `InsertTx` jobs in one short `database/sql` transaction.
+- Migration `000004_media_semantic_events` adds stable Events, membership,
+  correction constraints, one-hop redirects, factual dirty ranges, and
+  per-owner rebuild state without changing schema generation 4. The
+  `rebuild_events` River queue is single-worker; owner jobs deduplicate only in
+  non-running states so one follower can collect changes made during compute.
+- Event reads, browse filters, shares, relations, and Agent refs resolve through
+  the same owner-scoped Event service. Event shares and Agent refs materialize
+  immutable displayable-asset snapshots; automatic membership uses no ML/AI
+  signal.
 - A running catalog must never be opened or copied through a host/container
   mount with another SQLite process. Host and container VFS locking is not a
   supported coordination boundary; use the application Online Backup flow, or

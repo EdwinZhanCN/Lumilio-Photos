@@ -6486,8 +6486,8 @@ static void vec1MetaFilterScan4ByteArray(
       case VEC1_OP_IN: {
         int ii;
         for(ii=0; ii<rval; ii++){
-          uint32x4_t rhs2 = vdupq_n_s32(aRval[ii]);
-          cmp = vorrq_s32(cmp, vceqq_u32(lhs, rhs2));
+          int32x4_t rhs2 = vdupq_n_s32(aRval[ii]);
+          cmp = vorrq_u32(cmp, vceqq_s32(lhs, rhs2));
         }
         break;
       }
@@ -6497,7 +6497,7 @@ static void vec1MetaFilterScan4ByteArray(
       }
       case VEC1_OP_GT: {
         cmp = vcgtq_s32(lhs, rhs);
-        cmp = vbicq_u32(cmp, vceqq_u32(lhs, null));
+        cmp = vbicq_u32(cmp, vceqq_s32(lhs, null));
         break;
       }
       case VEC1_OP_LT: {
@@ -6506,7 +6506,7 @@ static void vec1MetaFilterScan4ByteArray(
       }
       case VEC1_OP_GE: {
         cmp = vcgeq_s32(lhs, rhs);
-        cmp = vbicq_u32(cmp, vceqq_u32(lhs, null));
+        cmp = vbicq_u32(cmp, vceqq_s32(lhs, null));
         break;
       }
       case VEC1_OP_LE: {
@@ -10721,11 +10721,17 @@ static int initExtension(
     0,                         /* xRelease     */
     0,                         /* xRollbackTo  */
     0,                         /* xShadowName  */
+#if SQLITE_VERSION_NUMBER>=3044000
     0,                         /* xIntegrity   */
+#endif
   };
 
   static sqlite3_module vec1Module = {
+#if SQLITE_VERSION_NUMBER>=3044000
     4,                    /* iVersion */
+#else
+    3,                    /* iVersion */
+#endif
     vec1CreateMethod,     /* xCreate */
     vec1ConnectMethod,    /* xConnect */
     vec1BestIndexMethod,  /* xBestIndex */
@@ -10749,7 +10755,9 @@ static int initExtension(
     vec1ReleaseMethod,    /* xRelease */
     vec1RollbackToMethod, /* xRollbackTo */
     0,                    /* xShadowName */
+#if SQLITE_VERSION_NUMBER>=3044000
     vec1IntegrityMethod   /* xIntegrity */
+#endif
   };
   
   static struct Func {
@@ -10947,5 +10955,3 @@ int sqlite3_vec1_extra_init(const char *z){
 #endif
 
 #endif /* !defined(VEC1SIMD) || VEC1SIMD==SCALAR */
-
-

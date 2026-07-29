@@ -236,6 +236,24 @@ type DuplicateControllerInterface interface {
 	DismissDuplicateGroup(c *gin.Context) // POST   /duplicates/groups/:id/dismiss
 }
 
+type EventControllerInterface interface {
+	ListEvents(c *gin.Context)
+	GetEvent(c *gin.Context)
+	GetEventAssets(c *gin.Context)
+	PatchEvent(c *gin.Context)
+	RebuildEvents(c *gin.Context)
+	GetRebuildStatus(c *gin.Context)
+	SetRebuildState(c *gin.Context)
+	ShareEvent(c *gin.Context)
+	GetEventRelations(c *gin.Context)
+	GetPersonEvents(c *gin.Context)
+	GetPersonRelations(c *gin.Context)
+	MergeEvents(c *gin.Context)
+	SplitEvent(c *gin.Context)
+	RemoveEventMember(c *gin.Context)
+	AddEventMembers(c *gin.Context)
+}
+
 // CloudControllerInterface defines the cloud sync endpoints.
 type CloudControllerInterface interface {
 	ListProviders(c *gin.Context)                 // GET    /cloud/providers
@@ -292,6 +310,7 @@ func NewRouter(
 	userController UserControllerInterface,
 	repositoryScanController RepositoryScanControllerInterface,
 	duplicateController DuplicateControllerInterface,
+	eventController EventControllerInterface,
 	cloudController CloudControllerInterface,
 	shareLinkController ShareLinkControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
@@ -535,6 +554,8 @@ func NewRouter(
 			people.POST("/:id/faces/:faceId/remove", authController.AuthMiddleware(), peopleController.RemoveFace)
 			people.PUT("/:id/cover", authController.AuthMiddleware(), peopleController.SetPersonCover)
 			people.PUT("/:id/hidden", authController.AuthMiddleware(), peopleController.SetPersonHidden)
+			people.GET("/:id/events", authController.AuthMiddleware(), eventController.GetPersonEvents)
+			people.GET("/:id/relations", authController.AuthMiddleware(), eventController.GetPersonRelations)
 		}
 
 		// Duplicate detection routes (Utilities Rail). Reads and per-group
@@ -549,6 +570,24 @@ func NewRouter(
 			duplicates.POST("/detect", authController.RequireAdmin(), duplicateController.DetectDuplicates)
 			duplicates.POST("/groups/:id/merge", duplicateController.MergeDuplicateGroup)
 			duplicates.POST("/groups/:id/dismiss", duplicateController.DismissDuplicateGroup)
+		}
+
+		events := v1.Group("/events")
+		events.Use(authController.AuthMiddleware(), appInitializedMiddleware)
+		{
+			events.GET("", eventController.ListEvents)
+			events.GET("/rebuild/status", eventController.GetRebuildStatus)
+			events.POST("/rebuild", eventController.RebuildEvents)
+			events.PATCH("/rebuild/state", eventController.SetRebuildState)
+			events.POST("/merge", eventController.MergeEvents)
+			events.GET("/:id", eventController.GetEvent)
+			events.GET("/:id/assets", eventController.GetEventAssets)
+			events.GET("/:id/relations", eventController.GetEventRelations)
+			events.PATCH("/:id", eventController.PatchEvent)
+			events.POST("/:id/share", eventController.ShareEvent)
+			events.POST("/:id/split", eventController.SplitEvent)
+			events.POST("/:id/members", eventController.AddEventMembers)
+			events.DELETE("/:id/members/:mediaItemId", eventController.RemoveEventMember)
 		}
 
 		// Cloud account routes are owner-scoped in the handler/service; admins
