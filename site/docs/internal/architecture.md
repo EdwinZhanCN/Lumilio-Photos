@@ -5,11 +5,10 @@ useful; implementation plans belong in `exec-plans/`.
 
 ## Runtime Shape
 
-- Docker production on Linux explicitly selects
-  `deploy/compose/compose.caddy.yml`, `deploy/compose/compose.acme.yml`, or
-  `deploy/compose/compose.proxy.yml`. All three use host networking; there is no
-  Docker plaintext-development stack. The Go process owns the embedded SQLite
-  catalog and serves both the API and built React SPA.
+- Docker production on Linux starts with `deploy/compose/compose.yml`, a
+  zero-input host-network HTTP deployment at port 6680. Optional
+  `compose.caddy.yml` and `compose.acme.yml` add HTTPS. The Go process owns the
+  embedded SQLite catalog and serves both the API and built React SPA.
 - Linux is the standalone Server/Docker delivery target. macOS and Windows are
   Desktop App delivery targets; the App hosts the same complete `server/app`
   runtime in-process, so both Desktop CI jobs run the full Server and Desktop
@@ -20,9 +19,9 @@ useful; implementation plans belong in `exec-plans/`.
   (`dev/`, `desktop/`, `docker/`), generated from `server/config/profiles.go`.
   Because TOML comments cannot express conditional legality, a valid manifest
   per scenario is what documents the matrix; `make dev` renders `dev-vite`
-  into `.local/dev/config/server.toml`. Container images ship no bootable
-  default manifest. Production
-  manifests are generated into app-state by `server config init`, and
+  into `.local/dev/config/server.toml`. Container images ship complete
+  `docker-http` and `docker-caddy` manifests; ACME and custom operator
+  manifests are generated into app-state by `server config init`. The
   `desktop/supervisor/server.template.toml` is the versioned desktop compiler
   input.
 - Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
@@ -35,8 +34,9 @@ useful; implementation plans belong in `exec-plans/`.
   `LoadAppConfig(path)` plus a one-shot complete-manifest generator. It strictly
   decodes schema v3, resolves manifest-relative paths and secret files,
   validates the complete graph, and fingerprints the source bytes.
-- `server/internal/httporigin`: canonical request/proxy/browser Origin policy.
-- `server/internal/servertransport`: off, external, and CertMagic ACME listener lifecycle.
+- `server/internal/httporigin`: request-derived target/browser Origin policy
+  and trusted-proxy client-IP recovery.
+- `server/internal/servertransport`: plaintext and CertMagic ACME listener lifecycle.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS.
 - `server/internal/api/handler`: HTTP request/response layer.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
@@ -72,7 +72,7 @@ useful; implementation plans belong in `exec-plans/`.
   the immutable per-generation `config/server.toml` with mode `0600`.
   Candidate apply is journaled and readiness-gated, with
   `runtime.last-known-good.toml` rollback and launch-time reconciliation. The
-  host lock is acquired before settings migration or Wails UI construction.
+  host lock is acquired before runtime setup or Wails UI construction.
   Recovery reads invalid active intent as raw, fingerprinted control-plane data
   while every replacement candidate still passes the strict Server loader. The
   private Wails Control Panel consumes the supervisor's typed runtime snapshot

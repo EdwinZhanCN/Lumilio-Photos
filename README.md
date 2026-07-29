@@ -46,18 +46,22 @@
 ### Docker Compose
 
 Docker 交付面向安装了 Docker Engine 与 Compose 2.23.1+ 的 Linux 主机。
-三种生产变体都使用 host network：
+默认部署使用 host network，以保留局域网 Lumen 节点发现：
 
-- [`compose.caddy.yml`](deploy/compose/compose.caddy.yml)：推荐方案，由同机
-  Caddy 提供公网 HTTPS。
-- [`compose.acme.yml`](deploy/compose/compose.acme.yml)：由流明集直接申请
-  并终止证书。
-- [`compose.proxy.yml`](deploy/compose/compose.proxy.yml)：接入已有的同机代理，
-  或经过显式配置的远程 HTTPS 代理。
+```bash
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+docker compose up -d
+```
 
-部署前请阅读[安装指南](site/docs/zh-cn/user-manual/introduction/installation.md)。
-生产环境需要显式提供带 schema 版本的完整 manifest，并为媒体和应用状态配置
-彼此独立的持久化目录。
+启动后打开 `http://Linux主机IP:6680`。不需要先购买域名、配置 HTTPS 或生成
+TOML。默认数据目录为 `./lumilio/media` 和 `./lumilio/app-state`，也可以通过
+`LUMILIO_STORAGE` 与 `LUMILIO_STATE` 指定其他位置。
+
+需要 HTTPS 时，可在基础部署完成后使用已有反向代理、
+[`compose.caddy.yml`](deploy/compose/compose.caddy.yml) 或
+[`compose.acme.yml`](deploy/compose/compose.acme.yml)。详细步骤与安全边界见
+[安装指南](site/docs/zh-cn/user-manual/introduction/installation.md)和
+[HTTPS 与通行密钥](site/docs/zh-cn/user-manual/help/https.md)。
 
 ## 参与贡献
 

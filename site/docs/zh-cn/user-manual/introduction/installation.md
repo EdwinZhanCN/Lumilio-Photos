@@ -1,162 +1,197 @@
-# 安装
+---
+title: 安装 Lumilio Photos
+description: 按 macOS、Windows 或 Linux 选择正式支持的安装方式。
+---
 
-如果安装后所有管理员都无法登录，请按照[恢复管理员访问权限](./break-glass.md)操作，不要直接编辑数据库。
+# 安装 Lumilio Photos
 
-::: warning 注意
-流明集当前处于 Beta 阶段。请先使用测试媒体或已有可靠备份的资料库进行试用，不要将本应用作为重要媒体的唯一存储位置。
-:::
+先确认 Lumilio Photos 将运行在哪一台设备上，再选择对应的安装方法。如果你准备用一台电脑访问部署在 Linux 服务器上的 Lumilio Photos，应选择 **Linux**，而不是浏览器所在电脑的系统。
 
-流明集可以作为 Desktop 应用运行，也可以通过 Docker 部署在 NAS 或 Linux 服务器上。如果只想在一台电脑上试用，优先选择 Desktop；如果需要持续运行并从多台设备访问，选择 Docker。
-
-| 方式 | 适合用户 | 当前发布平台 |
+| 运行 Lumilio Photos 的设备 | 安装方式 | 当前支持的平台 |
 | --- | --- | --- |
-| Desktop | 普通用户、单机资料库 | macOS Apple Silicon、Windows x64 |
-| Docker | NAS、Linux 服务器、多设备访问 | Linux amd64、Linux arm64 |
-| 源码运行 | 开发者与贡献者 | 取决于本地开发环境 |
+| Mac | Desktop 应用 | Apple Silicon |
+| Windows 电脑 | Desktop 应用 | Windows 10/11 x64 |
+| Linux 服务器或 NAS | Docker Server | Linux amd64、arm64 |
 
-## Desktop
-
-请前往 [GitHub Releases](https://github.com/EdwinZhanCN/Lumilio-Photos/releases) 选择最新发布，并下载与系统匹配的文件。
-
-### macOS Apple Silicon
-
-下载名称包含 `macos-arm64` 的 DMG，打开后将流明集拖入“应用程序”。当前安装包为 ad-hoc 签名，尚未完成 Apple notarization。首次启动时，macOS 可能要求你在“系统设置 → 隐私与安全性”中确认打开。
-
-macOS Intel 当前尚未进入 Desktop 发布矩阵。
-
-### Windows x64
-
-推荐下载名称包含 `windows-amd64-setup.exe` 的安装程序。如果不希望安装，也可以下载对应的便携 ZIP，解压后运行应用。
-
-当前 Windows 发布文件尚未完成 Authenticode 签名，SmartScreen 可能显示警告。请只从项目的 GitHub Releases 下载，并核对文件名与发布版本。
-
-### 首次启动
-
-Desktop 会引导你选择语言和下载区域，并显示本机默认存储位置。外部目录在启动完成后通过 Desktop 控制面板授权；不要把“挂载资源库”用于初始化空目录。Desktop 会在本机应用数据目录管理嵌入式 SQLite catalog；Lumen Hub 为可选组件，只在你启用本地 AI 时另行下载。
-
-::: tip 本地网络权限
-如需通过 mDNS 发现其他 Lumen 节点，请允许 macOS 的本地网络访问或 Windows 防火墙提示。拒绝该权限不影响基础媒体管理。
+::: warning 仍处于测试阶段
+Lumilio Photos 目前是 Beta 软件。请先使用测试媒体或已有可靠备份的媒体库试用，不要把它作为重要媒体的唯一副本。
 :::
 
-### Desktop 网络访问
+## macOS
 
-Desktop 控制面板提供三个明确的网络模式：
+macOS 版本是常驻菜单栏的 Desktop 应用，适合主要在一台 Mac 上使用。应用已经包含数据库和媒体处理工具，不需要另外安装数据库。
 
-- **仅本机**是默认模式。服务只监听回环地址，并打开
-  `http://localhost:6680`；没有其他设备访问需求时应保持此模式。
-- **局域网 HTTP**会把监听地址扩展到局域网，但规范 Origin 仍是
-  `http://localhost:6680`。它只适合可信家庭网络，并要求确认其他设备的
-  流量没有加密；Passkey 仍只能在 Desktop 本机的 localhost 地址使用。
-  操作系统防火墙可能还需要允许入站连接。
-- **外部 HTTPS**用于已有的 HTTPS 反向代理。填写精确的公网 HTTPS Origin
-  和每个可信代理的最小 CIDR；Desktop 自身绝不申请 ACME 证书。代理必须转发
-  原始 scheme、host 与客户端地址。保存后 Desktop 会重启并检查就绪状态；候选
-  配置启动失败时会自动恢复上一个可用配置。
+### 检查 Mac 是否受支持
 
-主 Origin 同时也是 WebAuthn Origin，其 hostname 就是 RP ID。因此修改
-hostname 后需要重新注册 Passkey；迁移期间请保留密码与 TOTP 恢复路径。
+打开苹果菜单中的 **关于本机**，查看“芯片”一项：
 
-## Docker（Linux 服务器 / NAS）
+- 显示 Apple M 系列芯片时，可以安装当前版本；
+- Intel Mac 暂不在正式发布范围内。
 
-需要在 Linux 上安装 Docker Engine 与 Compose 2.23.1 或更高版本。所有受支持的生产
-Compose 都使用 host network，不再发布或转换端口；进程直接绑定完整 manifest
-指定的宿主机监听地址。生产环境没有隐式明文模式。
+### 下载并安装
 
-先设置两个持久化宿主机目录：
+1. 打开项目的 [GitHub Releases](https://github.com/EdwinZhanCN/Lumilio-Photos/releases) 页面，进入最新版本。
+2. 下载文件名中包含 `macos-arm64` 的 `.dmg` 文件。
+3. 打开下载的 DMG，把 **Lumilio Photos** 拖入“应用程序”文件夹。
+4. 从“应用程序”中启动 Lumilio Photos。
+
+当前 macOS 应用尚未经过 Apple 公证。第一次启动时，系统可能会阻止打开：
+
+1. 先尝试启动一次应用；
+2. 打开 **系统设置 → 隐私与安全性**；
+3. 找到 Lumilio Photos 的提示，选择 **仍要打开**；
+4. 再次确认启动。
+
+请只对从项目 GitHub Releases 下载的安装文件执行这一步。
+
+### 第一次启动后
+
+Lumilio Photos 不会显示在程序坞中，而是常驻菜单栏。应用会先打开 Desktop 控制面板中的首次设置向导；完成设置后，本机服务启动，默认浏览器会打开：
+
+```text
+http://localhost:6680
+```
+
+看到“首次运行设置”欢迎页面，表示 Desktop 已经安装并成功启动。接下来继续[完成首次设置](./first-use)。
+
+::: tip 关闭浏览器不会退出应用
+Web 主界面运行在浏览器中，但后台服务由菜单栏应用管理。需要完全退出时，请使用菜单栏中的退出命令。
+:::
+
+## Windows
+
+Windows 版本是常驻系统托盘的 Desktop 应用，支持 Windows 10 和 Windows 11 x64。应用已经包含数据库和媒体处理工具。
+
+### 选择安装文件
+
+项目发布两个 Windows 文件：
+
+| 文件 | 适合谁 |
+| --- | --- |
+| 文件名包含 `windows-amd64-setup.exe` | 大多数用户，推荐 |
+| 文件名包含 `windows-amd64.zip` | 不希望运行安装程序的用户 |
+
+安装程序会创建开始菜单入口、注册卸载程序，并在系统缺少 Microsoft Edge WebView2 Runtime 时尝试自动安装。便携 ZIP 不会完成这些操作。
+
+### 使用安装程序（推荐）
+
+1. 打开项目的 [GitHub Releases](https://github.com/EdwinZhanCN/Lumilio-Photos/releases) 页面，进入最新版本。
+2. 下载文件名中包含 `windows-amd64-setup.exe` 的文件。
+3. 运行安装程序。它按当前用户安装，不需要管理员权限。
+4. 安装完成后，从开始菜单启动 **Lumilio Photos**。
+
+当前 Windows 安装程序尚未进行 Authenticode 签名。如果 SmartScreen 显示“Windows 已保护你的电脑”，请确认文件来自项目 GitHub Releases，然后选择 **更多信息 → 仍要运行**。
+
+### 使用便携 ZIP
+
+1. 从同一发布页面下载文件名中包含 `windows-amd64.zip` 的文件。
+2. 把 ZIP 完整解压到一个长期保留的文件夹，不要直接在压缩包中运行。
+3. 打开解压后的 `Lumilio Photos` 文件夹，运行 `lumilio-photos.exe`。
+
+便携版需要系统已经安装 Microsoft Edge WebView2 Runtime，否则 Desktop 控制面板无法显示。拿不准时，请使用上面的安装程序。
+
+### 第一次启动后
+
+Lumilio Photos 会常驻系统托盘，并先显示 Desktop 控制面板中的首次设置向导。完成设置后，本机服务启动，默认浏览器会打开：
+
+```text
+http://localhost:6680
+```
+
+看到“首次运行设置”欢迎页面，表示 Desktop 已经安装并成功启动。接下来继续[完成首次设置](./first-use)。
+
+::: tip 关闭浏览器不会退出应用
+需要完全退出 Lumilio Photos 时，请使用系统托盘中的退出命令。
+:::
+
+## Linux
+
+Linux 版本是通过 Docker Compose 运行的 Server，适合需要在服务器或 NAS 上持续运行，并通过浏览器访问的用户。第一次启动不需要域名、HTTPS 或手工编写配置。
+
+### 开始前准备
+
+你需要：
+
+- 一台 amd64 或 arm64 Linux 主机；
+- Docker Engine 和 Docker Compose 2.23.1 或更高版本；
+- 当前用户能够运行 Docker；
+- 局域网中的其他设备能够访问这台主机的 TCP 6680。
+
+先确认 Docker Compose 版本：
+
+```bash
+docker compose version
+```
+
+### 启动 Server
+
+新建一个部署目录，在其中下载默认 Compose 文件并启动：
+
+```bash
+mkdir lumilio-server
+cd lumilio-server
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+docker compose up -d
+```
+
+默认会在当前目录创建两个持久化目录：
+
+- `./lumilio/media` 保存原始媒体和资源库；
+- `./lumilio/app-state` 保存 SQLite 数据库、凭据、日志和数据库快照。
+
+删除容器不会删除这两个目录。升级或迁移前，仍应分别备份媒体目录和应用状态。
+
+### 检查 Server 是否启动
+
+```bash
+docker compose ps
+```
+
+当 `lumilio` 服务显示为健康状态后，在同一局域网的浏览器中打开：
+
+```text
+http://Linux主机的IP地址:6680
+```
+
+例如主机地址是 `192.168.1.20`，就打开 `http://192.168.1.20:6680`。看到“首次运行设置”欢迎页面，表示 Server 已经安装并成功启动。
+
+如果服务没有就绪，先查看日志：
+
+```bash
+docker compose logs lumilio
+```
+
+::: warning 局域网 HTTP 不会加密
+默认部署便于先完成安装，但 HTTP 流量可能被同一网络中的其他设备读取。密码和 TOTP 可以使用，远程浏览器不能使用通行密钥。需要长期远程访问或使用通行密钥时，再配置[HTTPS 与通行密钥](../help/https)。
+:::
+
+### 使用其他目录
+
+如果不希望把数据放在部署目录中，可以在启动前指定两个路径：
 
 ```bash
 export LUMILIO_STORAGE=/srv/lumilio/media
-export LUMILIO_STATE=/srv/lumilio/state
-export LUMILIO_IMAGE=ghcr.io/edwinzhancn/lumilio-server:latest
+export LUMILIO_STATE=/srv/lumilio/app-state
 mkdir -p "$LUMILIO_STORAGE" "$LUMILIO_STATE"
+docker compose up -d
 ```
 
-### 同机 Caddy（推荐）
+`LUMILIO_STORAGE` 是媒体目录，`LUMILIO_STATE` 是应用状态目录。不要让二者相互包含。
 
-将域名 A/AAAA 记录指向主机，并开放公网 TCP 80/443：
-
-```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.caddy.yml
-export LUMILIO_DOMAIN=photos.example.com
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config init --profile docker-external-proxy \
-  --origin "https://${LUMILIO_DOMAIN}" \
-  --trusted-proxy 127.0.0.1/32 \
-  --output /data/app-state/server.toml
-docker compose -f compose.caddy.yml up -d
-```
-
-Lumilio 只监听 `127.0.0.1:6680`。Caddy 直接绑定宿主机 TCP 80/443，通过
-loopback 转发请求；证书状态保存在命名卷 `caddy_data` 和 `caddy_config` 中。
-
-### 内置 ACME HTTPS
-
-需要由 Lumilio 自己申请并终止证书时：
-
-```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.acme.yml
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config init --profile docker-acme \
-  --origin https://photos.example.com --email admin@example.com \
-  --output /data/app-state/server.toml
-docker compose -f compose.acme.yml up -d
-```
-
-host-network 容器直接绑定 TCP 80/443。镜像只给非 root Server binary 授予
-绑定低端口所需的 capability；如果端口已被宿主机进程占用，启动会失败。
-CertMagic 的账户与证书保存在 `/data/app-state/tls`。证书申请失败会阻止启动，
-绝不会降级到 HTTP。
-
-### 已有反向代理
-
-同一主机上已经直接运行 Caddy、Nginx 或 Traefik 时：
-
-```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.proxy.yml
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config init --profile docker-external-proxy \
-  --origin https://photos.example.com \
-  --trusted-proxy 127.0.0.1/32 \
-  --output /data/app-state/server.toml
-docker compose -f compose.proxy.yml up -d
-```
-
-代理 upstream 指向 `127.0.0.1:6680`。若代理位于另一台主机，生成 manifest
-时使用 `--listen <lumilio-host-ip>:6680`，并且只信任该代理的 `/32` 或
-`/128`；宿主机防火墙也应只允许同一地址访问。代理必须覆盖而不是追加转发的
-scheme、host 与客户端地址。`deploy/reverse-proxy/` 中保留了最小 Nginx 和
-Traefik 示例。
-
-媒体与应用状态必须使用两个独立持久化挂载。状态目录保存 schema v3 manifest、`library.sqlite3`、快照、凭据、日志和 ACME 状态，并应位于可靠本机磁盘。两个目录都必须允许容器 UID 10001 写入。修改配置后先运行：
-
-```bash
-docker run --rm -v "$LUMILIO_STATE:/data/app-state" "$LUMILIO_IMAGE" \
-  server config validate --config /data/app-state/server.toml
-```
-
-Passkey Origin 始终精确等于 `server.primary_origin`，RP ID 始终是其 hostname。修改 hostname 后，已有 Passkey 仍会保留，但不能在新的 RP ID 登录；请保留密码 + TOTP 恢复路径并重新注册 Passkey。
-
-::: warning 通过流明集创建备份
-流明集运行时，不要直接复制 `library.sqlite3`、`-wal` 或 `-shm`，也不要用宿主机 SQLite 工具打开它们；跨容器挂载边界会破坏 WAL 锁协调。请在“设置 → 服务器”中创建并下载一致性快照，并单独备份媒体目录。
+::: tip 为什么使用 host network
+默认 Compose 使用 Linux host network，让 Server 可以发现局域网中的 Lumen 节点。无需添加 `ports`。如果 NAS 平台把容器隔离在自己的网络中，请阅读[可选的 Lumen 与 Lumilio Agent](../features/lumen-ai)了解连接限制。
 :::
 
-Docker 中的 Lumen 网络模式边界请参阅 [Lumen AI](../features/lumen-ai.md)。不可变运行策略需要通过完整 schema v3 manifest 配置；普通环境变量不会覆盖这些字段。
+::: danger 不要直接复制运行中的数据库
+Lumilio 运行时，不要使用主机上的 SQLite 工具打开或复制 `library.sqlite3`、`-wal` 或 `-shm`。请通过 Lumilio 创建一致的数据库快照，并单独备份媒体目录。具体方法见[备份与数据完整性](./integrity)。
+:::
 
-## 从源码运行
+## 安装完成后
 
-源码运行面向开发者与贡献者，不是普通用户的推荐安装方式。开发环境需要 Go、Node.js/Vite+、Make、libvips、libraw、FFmpeg、ExifTool，以及重建浏览器 WASM 时使用的 Rust。SQLite 嵌入在 Go 进程中；只有容器交付和 E2E 工作流需要 Docker。
+无论使用哪一种系统，下一步都是[完成首次设置](./first-use)：创建管理员账户、设置登录保护并创建主资源库。
 
-```bash
-make setup
-make dev
-```
+完成基本设置后，如有需要再阅读：
 
-具体版本、平台依赖和开发命令以当前仓库中的开发文档与 CI 配置为准。
-
-## 安装后检查
-
-1. 确认流明集界面可以打开，且首次设置页没有报告服务失联。
-2. 确认默认存储位置指向预期的本机目录或 Docker 持久化挂载。
-3. 使用少量已有备份的照片完成首次试用。
-
-继续阅读[首次使用](./first-use.md)和[存储位置与仓库](./repositories.md)。
+- [HTTPS 与通行密钥](../help/https)：让其他设备安全访问，或配置更复杂的反向代理；
+- [理解资源库与原始文件](./repositories)：确认媒体、数据库和备份分别存放在哪里；
+- [可选的 Lumen 与 Lumilio Agent](../features/lumen-ai)：按需启用本地 AI 能力。
