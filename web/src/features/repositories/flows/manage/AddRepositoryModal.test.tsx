@@ -41,7 +41,7 @@ function repositoryResponse(name: string) {
     repository: {
       id: crypto.randomUUID(),
       name,
-      path: `/storage/${name.toLowerCase().replaceAll(" ", "-")}`,
+      path: `/storage/${name}`,
       role: "regular",
       is_primary: false,
       storage_strategy: "date",
@@ -165,5 +165,29 @@ describe("AddRepositoryModal", () => {
     await vi.waitFor(() => {
       expect(body).toMatchObject({ root_id: "24162749-4136-4c24-96db-b5056d9cdf20" });
     });
+  });
+
+  it("rejects unsupported directory-name characters before submitting", async () => {
+    serveCloudCredentials();
+    const createRepository = vi.fn();
+    worker.use(
+      http.post("*/api/v1/repositories", () => {
+        createRepository();
+        return HttpResponse.json(repositoryResponse("Invalid"));
+      }),
+    );
+
+    const screen = await renderWithProviders(<AddRepositoryModal isOpen onClose={vi.fn()} />);
+
+    await screen
+      .getByLabelText(t("manage.repositories.createNameLabel"), { exact: true })
+      .fill("Family/Media");
+
+    const submit = screen.getByRole("button", {
+      name: t("manage.repositories.createSubmit"),
+      exact: true,
+    });
+    await expect.element(submit).toBeDisabled();
+    expect(createRepository).not.toHaveBeenCalled();
   });
 });

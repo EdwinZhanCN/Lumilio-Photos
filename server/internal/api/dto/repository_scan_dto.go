@@ -3,6 +3,9 @@ package dto
 import "time"
 
 type CreateRepositoryRequestDTO struct {
+	// Name is preserved verbatim as the directory name for regular
+	// repositories. It accepts Unicode letters/digits, ASCII spaces, hyphens,
+	// and underscores; leading/trailing spaces are rejected.
 	Name string `json:"name" binding:"required" example:"Family Photos"`
 	// RootID identifies a registered Storage Location. Empty selects the
 	// configured default location. Clients never submit an arbitrary root path.
@@ -16,7 +19,7 @@ type CreateRepositoryRequestDTO struct {
 type RepositoryDTO struct {
 	ID              string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Name            string                  `json:"name" example:"Family Photos"`
-	Path            string                  `json:"path" example:"/data/storage/family-photos"`
+	Path            string                  `json:"path" example:"/data/storage/Family Photos"`
 	Role            string                  `json:"role" example:"regular"`
 	IsPrimary       bool                    `json:"is_primary" example:"false"`
 	RootID          *string                 `json:"root_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`

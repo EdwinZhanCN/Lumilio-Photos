@@ -5,9 +5,11 @@ import {
   isDuplicateHandling,
   isStorageStrategy,
   useCreateRepository,
+  validateRepositoryName,
 } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
+import { repositoryNameErrorMessage } from "../../model/repositoryNameValidation.ts";
 
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -41,9 +43,10 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
     );
   }, [defaults]);
 
+  const nameError = validateRepositoryName(name);
   const canSubmit = useMemo(
-    () => name.trim() !== "" && root.trim() !== "" && !createMutation.isPending,
-    [createMutation.isPending, name, root],
+    () => nameError === null && root.trim() !== "" && !createMutation.isPending,
+    [createMutation.isPending, nameError, root],
   );
 
   if (setupQuery.isLoading) {
@@ -69,7 +72,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
     event.preventDefault();
     if (!canSubmit) return;
     await createMutation.createRepository({
-      name: name.trim(),
+      name,
       role: "primary",
       storageStrategy: strategy,
       duplicateHandling,
@@ -122,18 +125,36 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
         {error && <div className="alert alert-error mb-4 text-sm">{error}</div>}
 
         <form onSubmit={submit} className="space-y-4">
-          <label className="form-control">
-            <span className="label-text mb-1 font-medium">
+          <div className="fieldset gap-1">
+            <label className="fieldset-legend p-0 font-medium" htmlFor="primary-repository-name">
               {t("auth.primaryRepository.name", { defaultValue: "Name" })}
-            </span>
+            </label>
             <input
-              className="input input-bordered w-full"
+              id="primary-repository-name"
+              className={`input input-bordered w-full ${
+                name.length > 0 && nameError ? "input-error" : ""
+              }`}
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={createMutation.isPending}
+              aria-invalid={name.length > 0 && nameError !== null}
+              aria-describedby="primary-repository-name-hint"
               required
             />
-          </label>
+            <span
+              id="primary-repository-name-hint"
+              className={`label text-xs leading-snug ${
+                name.length > 0 && nameError ? "text-error" : "text-base-content/55"
+              }`}
+            >
+              {name.length > 0 && nameError
+                ? repositoryNameErrorMessage(nameError, t)
+                : t(
+                    "auth.primaryRepository.nameHint",
+                    "Use 1–80 letters, numbers, spaces, hyphens, or underscores. The primary directory remains <root>/primary.",
+                  )}
+            </span>
+          </div>
 
           <label className="form-control">
             <span className="label-text mb-1 font-medium">

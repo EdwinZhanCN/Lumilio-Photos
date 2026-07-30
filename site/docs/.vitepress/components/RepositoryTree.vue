@@ -3,7 +3,7 @@ import FileTree, { type TreeNode } from "./FileTree.vue";
 
 const tree: TreeNode[] = [
   {
-    name: "照片硬盘/",
+    name: "媒体硬盘/",
     kind: "folder",
     annotation: "存储位置",
     expanded: true,
@@ -123,7 +123,7 @@ const tree: TreeNode[] = [
         ],
       },
       {
-        name: "家庭照片/",
+        name: "家庭媒体/",
         kind: "folder",
         annotation: "另一个独立资源库",
         children: [

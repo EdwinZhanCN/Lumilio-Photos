@@ -2162,6 +2162,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "name": {
+                        "description": "Name is preserved verbatim as the directory name for regular\nrepositories. It accepts Unicode letters/digits, ASCII spaces, hyphens,\nand underscores; leading/trailing spaces are rejected.",
                         "example": "Family Photos",
                         "type": "string"
                     },
@@ -4613,7 +4614,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "path": {
-                        "example": "/data/storage/family-photos",
+                        "example": "/data/storage/Family Photos",
                         "type": "string"
                     },
                     "role": {
@@ -17113,51 +17114,6 @@ const docTemplate = `{
             }
         },
         "/api/v1/repositories/{id}": {
-            "delete": {
-                "description": "Remove a repository from the registry. Does not delete files on disk.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository deleted successfully"
-                    },
-                    "404": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository not found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Delete repository",
-                "tags": [
-                    "repositories"
-                ]
-            },
             "get": {
                 "description": "Return a single repository.",
                 "parameters": [
@@ -17199,81 +17155,6 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Get repository",
-                "tags": [
-                    "repositories"
-                ]
-            },
-            "patch": {
-                "description": "Update mutable repository fields (name, storage_strategy, local_settings). Repository ownership is fixed to the Host Owner.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.UpdateRepositoryRequestDTO",
-                                        "summary": "request",
-                                        "description": "Fields to update"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Fields to update",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository updated successfully"
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid request"
-                    },
-                    "404": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository not found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Update repository",
                 "tags": [
                     "repositories"
                 ]

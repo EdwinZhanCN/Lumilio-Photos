@@ -40,6 +40,7 @@ import {
   TotpSetupPanel,
   type StepperStep,
 } from "../../components/ui";
+import { repositoryNameErrorMessage } from "../../model/repositoryNameValidation.ts";
 import { useBootstrapFlow } from "./useBootstrapFlow.ts";
 
 const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
@@ -82,6 +83,7 @@ const BootstrapFlow: React.FC = () => {
     setRegion,
     repoName,
     setRepoName,
+    repoNameError,
     repoRoot,
     strategy,
     setStrategy,
@@ -455,7 +457,7 @@ const BootstrapFlow: React.FC = () => {
                   })}
                   sub={t("auth.bootstrap.repository.subtitle", {
                     defaultValue:
-                      "Choose where Lumilio stores photos. This becomes the default for future repositories.",
+                      "Choose where Lumilio stores media. This becomes the default for future repositories.",
                   })}
                 />
 
@@ -466,13 +468,25 @@ const BootstrapFlow: React.FC = () => {
                 )}
 
                 <form className="mt-5 flex flex-col gap-4" onSubmit={(e) => void submitRepo(e)}>
-                  <Field label={t("auth.primaryRepository.name", { defaultValue: "Name" })}>
+                  <Field
+                    label={t("auth.primaryRepository.name", { defaultValue: "Name" })}
+                    hint={t(
+                      "auth.primaryRepository.nameHint",
+                      "Use 1–80 letters, numbers, spaces, hyphens, or underscores. The primary directory remains <root>/primary.",
+                    )}
+                    error={
+                      repoName.length > 0 && repoNameError
+                        ? repositoryNameErrorMessage(repoNameError, t)
+                        : undefined
+                    }
+                  >
                     <TextInput
                       icon={FolderPlus}
                       type="text"
                       value={repoName}
                       onChange={(e) => setRepoName(e.target.value)}
                       disabled={isCreatingRepository}
+                      invalid={repoName.length > 0 && repoNameError !== null}
                       required
                     />
                   </Field>

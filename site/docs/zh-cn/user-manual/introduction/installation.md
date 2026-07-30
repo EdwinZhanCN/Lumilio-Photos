@@ -178,8 +178,10 @@ docker compose up -d
 
 `LUMILIO_STORAGE` 是媒体目录，`LUMILIO_STATE` 是应用状态目录。不要让二者相互包含。
 
+如果需要让不同资源库分别位于多块磁盘，不要增加第二个 `/data/storage`。完成首次设置后，按照[Server 挂载资源库](./repositories#server)把每块磁盘挂载到 `/data/storage/<资源库名称>`。
+
 ::: tip 为什么使用 host network
-默认 Compose 使用 Linux host network，让 Server 可以发现局域网中的 Lumen 节点。无需添加 `ports`。如果 NAS 平台把容器隔离在自己的网络中，请阅读[可选的 Lumen 与 Lumilio Agent](../features/lumen-ai)了解连接限制。
+默认 Compose 使用 Linux host network，让 Server 可以发现局域网中的 Lumen 节点。无需添加 `ports`。如果 NAS 平台把容器隔离在自己的网络中，请阅读 [Lumen AI](../features/lumen-ai) 了解连接限制。
 :::
 
 ::: danger 不要直接复制运行中的数据库
@@ -194,4 +196,5 @@ Lumilio 运行时，不要使用主机上的 SQLite 工具打开或复制 `libra
 
 - [HTTPS 与通行密钥](../help/https)：让其他设备安全访问，或配置更复杂的反向代理；
 - [理解资源库与原始文件](./repositories)：确认媒体、数据库和备份分别存放在哪里；
-- [可选的 Lumen 与 Lumilio Agent](../features/lumen-ai)：按需启用本地 AI 能力。
+- [Lumen AI](../features/lumen-ai)：按需启用本地或局域网 ML 能力；
+- [Lumilio Agent](../features/agent)：按需启用对话式整理助手。

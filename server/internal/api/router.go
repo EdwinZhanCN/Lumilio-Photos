@@ -421,8 +421,11 @@ func NewRouter(
 			repositories.GET("", appInitializedMiddleware, repositoryScanController.ListRepositories)
 			repositories.POST("", repositoryScanController.CreateRepository)
 			repositories.GET("/:id", appInitializedMiddleware, repositoryScanController.GetRepository)
-			repositories.PATCH("/:id", appInitializedMiddleware, repositoryScanController.UpdateRepository)
-			repositories.DELETE("/:id", appInitializedMiddleware, repositoryScanController.DeleteRepository)
+			// Repository mutation is intentionally disabled in the public API.
+			// Keep the handlers available until the future lifecycle design can
+			// define safe rename/detach semantics for Desktop and Server.
+			// repositories.PATCH("/:id", appInitializedMiddleware, repositoryScanController.UpdateRepository)
+			// repositories.DELETE("/:id", appInitializedMiddleware, repositoryScanController.DeleteRepository)
 			repositories.GET("/:id/cloud", appInitializedMiddleware, cloudController.GetRepositoryCloudStatus)
 			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
 			repositories.POST("/:id/scan", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)

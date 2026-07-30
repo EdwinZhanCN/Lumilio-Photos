@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateRepository } from "@/features/repositories";
+import { useCreateRepository, validateRepositoryName } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
@@ -59,10 +59,10 @@ export function useBootstrapFlow() {
 
   const registration = useRegistrationFlow({ onComplete: () => setMfaComplete(true) });
   const current = mfaComplete ? 5 : welcomed ? (FLOW_INDEX[registration.step] ?? 1) : 0;
+  const repoNameError = validateRepositoryName(repoName);
   const canSubmitRepo = useMemo(
-    () =>
-      repoName.trim() !== "" && repoRoot.trim() !== "" && !createRepositoryMutation.isPending,
-    [createRepositoryMutation.isPending, repoName, repoRoot],
+    () => repoNameError === null && repoRoot.trim() !== "" && !createRepositoryMutation.isPending,
+    [createRepositoryMutation.isPending, repoNameError, repoRoot],
   );
 
   const submitRepo = async (event: FormEvent<HTMLFormElement>) => {
@@ -70,7 +70,7 @@ export function useBootstrapFlow() {
     if (!canSubmitRepo) return;
 
     await createRepositoryMutation.createRepository({
-      name: repoName.trim(),
+      name: repoName,
       role: "primary",
       storageStrategy: strategy,
       duplicateHandling,
@@ -98,6 +98,7 @@ export function useBootstrapFlow() {
     setRegion,
     repoName,
     setRepoName,
+    repoNameError,
     repoRoot,
     strategy,
     setStrategy,

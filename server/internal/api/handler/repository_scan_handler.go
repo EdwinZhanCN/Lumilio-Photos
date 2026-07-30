@@ -68,9 +68,9 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		return
 	}
 
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		api.GinBadRequest(c, errors.New("repository name is required"), "Repository name is required")
+	name := req.Name
+	if err := storage.ValidateRepositoryName(name); err != nil {
+		api.GinBadRequest(c, err, "Invalid repository name")
 		return
 	}
 
@@ -113,6 +113,14 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 			writeRepositoryConflict(c, "storage_location_invalid", "Storage Location needs attention")
 		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
 			api.GinBadRequest(c, err, "Repository already exists")
+		case errors.Is(err, storage.ErrInvalidRepositoryName):
+			api.GinBadRequest(c, err, "Invalid repository name")
+		case errors.Is(err, storage.ErrRepositoryNameConflict):
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository name conflicts with an existing directory")
+		case errors.Is(err, storage.ErrRepositoryTargetNotEmpty):
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository target directory is not empty")
+		case errors.Is(err, storage.ErrRepositoryStorageNotWritable):
+			api.GinBadRequest(c, err, "Repository storage is not writable")
 		case errors.Is(err, storage.ErrPathNotAllowed):
 			api.GinBadRequest(c, err, "Repository path is not allowed")
 		case errors.As(err, &conflict):
@@ -362,7 +370,7 @@ func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
 // @Success 200 {object} dto.RepositoryDTO "Repository updated successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 404 {object} api.ErrorResponse "Repository not found"
-// @Router /api/v1/repositories/{id} [patch]
+// Disabled public route (formerly PATCH /api/v1/repositories/{id}).
 func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 
@@ -408,7 +416,7 @@ func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
 // @Param id path string true "Repository UUID"
 // @Success 200 {object} api.SuccessResponse "Repository deleted successfully"
 // @Failure 404 {object} api.ErrorResponse "Repository not found"
-// @Router /api/v1/repositories/{id} [delete]
+// Disabled public route (formerly DELETE /api/v1/repositories/{id}).
 func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 

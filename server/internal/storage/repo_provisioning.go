@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -17,9 +19,18 @@ import (
 
 // Provisioning errors. Callers (HTTP handlers) map these to status codes.
 var (
-	ErrPrimaryRepositoryExists   = errors.New("primary repository already exists")
-	ErrPrimaryRepositoryRequired = errors.New("primary repository must be created first")
-	ErrRepositoryExistsAtPath    = errors.New("repository already exists at path")
+	ErrPrimaryRepositoryExists      = errors.New("primary repository already exists")
+	ErrPrimaryRepositoryRequired    = errors.New("primary repository must be created first")
+	ErrRepositoryExistsAtPath       = errors.New("repository already exists at path")
+	ErrInvalidRepositoryName        = errors.New("invalid repository name")
+	ErrRepositoryNameConflict       = errors.New("repository name conflicts with an existing directory")
+	ErrRepositoryTargetNotEmpty     = errors.New("repository target directory is not empty")
+	ErrRepositoryStorageNotWritable = errors.New("repository storage is not writable")
+)
+
+const (
+	maxRepositoryNameRunes = 80
+	maxRepositoryNameBytes = 240
 )
 
 // CreateRepositorySpec describes a repository to create. StorageStrategy and
@@ -47,6 +58,10 @@ type CreateRepositoryResult struct {
 // path inside Root, applies repository defaults, and either registers an
 // existing on-disk repository or initializes a new one.
 func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*CreateRepositoryResult, error) {
+	if err := ValidateRepositoryName(spec.Name); err != nil {
+		return nil, err
+	}
+
 	role := normalizeRepoRole(spec.Role)
 
 	primaryExists, err := rm.primaryRepositoryExists(ctx)
@@ -133,8 +148,10 @@ func (rm *DefaultRepositoryManager) primaryRepositoryExists(ctx context.Context)
 }
 
 // resolveRepositoryCreatePath resolves the on-disk path for a new repository
-// under root. Primary repositories always live at <root>/primary; others use a
-// slugified folder name. The result is guaranteed to stay inside root.
+// under root. Primary repositories always live at <root>/primary; a regular
+// repository uses its validated name verbatim so a Server bind-mount target and
+// the name submitted in Web always refer to the same directory. The result is
+// guaranteed to stay inside root.
 func resolveRepositoryCreatePath(root, name string, role dbtypes.RepoRole) (string, error) {
 	trimmed := strings.TrimSpace(root)
 	if trimmed == "" {
@@ -145,12 +162,13 @@ func resolveRepositoryCreatePath(root, name string, role dbtypes.RepoRole) (stri
 		return "", fmt.Errorf("invalid storage root: %w", err)
 	}
 
-	folderName := repositoryFolderNameFromName(name)
+	if err := ValidateRepositoryName(name); err != nil {
+		return "", err
+	}
+
+	folderName := name
 	if role == dbtypes.RepoRolePrimary {
 		folderName = "primary"
-	}
-	if folderName == "" {
-		return "", errors.New("repository name must contain letters or numbers")
 	}
 
 	repoPath, err := filepath.Abs(filepath.Join(cleanRoot, folderName))
@@ -164,35 +182,53 @@ func resolveRepositoryCreatePath(root, name string, role dbtypes.RepoRole) (stri
 	if rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
 		return "", errors.New("repository path must be inside storage root")
 	}
+	if err := rejectCaseInsensitiveRepositoryNameConflict(cleanRoot, folderName); err != nil {
+		return "", err
+	}
 	return repoPath, nil
 }
 
-func repositoryFolderNameFromName(name string) string {
-	var builder strings.Builder
-	lastDash := false
-	for _, r := range strings.TrimSpace(name) {
-		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r):
-			builder.WriteRune(unicode.ToLower(r))
-			lastDash = false
-		case r == '-' || r == '_':
-			if builder.Len() > 0 {
-				builder.WriteRune(r)
-				lastDash = r == '-'
-			}
-		case unicode.IsSpace(r):
-			if builder.Len() > 0 && !lastDash {
-				builder.WriteRune('-')
-				lastDash = true
-			}
-		default:
-			if builder.Len() > 0 && !lastDash {
-				builder.WriteRune('-')
-				lastDash = true
-			}
+// ValidateRepositoryName applies the portable directory-name contract used by
+// every deployment. It is intentionally a whitelist: names are never
+// lowercased, trimmed, slugified, or repaired behind the user's back.
+func ValidateRepositoryName(name string) error {
+	if !utf8.ValidString(name) {
+		return fmt.Errorf("%w: name must be valid UTF-8", ErrInvalidRepositoryName)
+	}
+	if name == "" {
+		return fmt.Errorf("%w: name is required", ErrInvalidRepositoryName)
+	}
+	if len(name) > maxRepositoryNameBytes {
+		return fmt.Errorf("%w: name must not exceed %d UTF-8 bytes", ErrInvalidRepositoryName, maxRepositoryNameBytes)
+	}
+	runeCount := utf8.RuneCountInString(name)
+	if runeCount > maxRepositoryNameRunes {
+		return fmt.Errorf("%w: name must not exceed %d characters", ErrInvalidRepositoryName, maxRepositoryNameRunes)
+	}
+	if strings.HasPrefix(name, " ") || strings.HasSuffix(name, " ") {
+		return fmt.Errorf("%w: name cannot start or end with a space", ErrInvalidRepositoryName)
+	}
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == ' ' || r == '-' || r == '_' {
+			continue
+		}
+		return fmt.Errorf("%w: character %q is not allowed", ErrInvalidRepositoryName, r)
+	}
+	return nil
+}
+
+func rejectCaseInsensitiveRepositoryNameConflict(root, requestedName string) error {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return fmt.Errorf("list storage root: %w", err)
+	}
+	for _, entry := range entries {
+		existingName := entry.Name()
+		if existingName != requestedName && strings.EqualFold(existingName, requestedName) {
+			return fmt.Errorf("%w: %q already exists as %q", ErrRepositoryNameConflict, requestedName, existingName)
 		}
 	}
-	return strings.Trim(strings.TrimSpace(builder.String()), "-_")
+	return nil
 }
 
 func firstNonEmpty(values ...string) string {
