@@ -9,7 +9,9 @@ import { useRepositoryRoots } from "../../api/useRepositoryRoots";
 import {
   isDuplicateHandling,
   isStorageStrategy,
+  validateRepositoryName,
   type DuplicateHandling,
+  type RepositoryNameError,
   type StorageStrategy,
 } from "../../model/repositorySetup";
 
@@ -32,6 +34,8 @@ export default function AddRepositoryModal({
   const [rootId, setRootId] = useState("");
   const [storageStrategy, setStorageStrategy] = useState<StorageStrategy>("date");
   const [duplicateHandling, setDuplicateHandling] = useState<DuplicateHandling>("rename");
+  const nameError = validateRepositoryName(name);
+  const nameErrorMessage = repositoryNameErrorMessage(nameError, t);
 
   const credentials = useMemo(
     () => (credentialsQuery.data?.credentials ?? []).filter((item) => item.status === "connected"),
@@ -62,14 +66,13 @@ export default function AddRepositoryModal({
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const trimmedName = name.trim();
-      if (!trimmedName || createRepositoryMutation.isPending) return;
+      if (validateRepositoryName(name) || createRepositoryMutation.isPending) return;
       if (!rootId) return;
       if (source === "cloud" && !credentialId) return;
 
       try {
         const response = await createRepositoryMutation.createRepository({
-          name: trimmedName,
+          name,
           rootId,
           cloudCredentialId: source === "cloud" ? credentialId : undefined,
           storageStrategy,
@@ -83,9 +86,9 @@ export default function AddRepositoryModal({
               })
             : source === "cloud"
               ? t("manage.repositories.cloudImportCreateSuccess", {
-                  name: trimmedName,
+                  name,
                 })
-              : t("manage.repositories.createSuccess", { name: trimmedName }),
+              : t("manage.repositories.createSuccess", { name }),
         );
         // The repository was created; these describe risks of where it landed,
         // such as a cloud-sync folder that may evict originals.
@@ -146,23 +149,39 @@ export default function AddRepositoryModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <label className="form-control w-full">
-            <span className="label pb-1">
-              <span className="label-text font-medium">
-                {t("manage.repositories.createNameLabel")}
-              </span>
-            </span>
+          <div className="fieldset w-full gap-1">
+            <label className="fieldset-legend p-0 text-sm font-medium" htmlFor="repository-name">
+              {t("manage.repositories.createNameLabel")}
+            </label>
             <input
+              id="repository-name"
               type="text"
-              className="input input-bordered w-full"
+              className={`input input-bordered w-full ${
+                name.length > 0 && nameError ? "input-error" : ""
+              }`}
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("manage.repositories.createNamePlaceholder")}
               disabled={createRepositoryMutation.isPending}
+              aria-invalid={name.length > 0 && nameError !== null}
+              aria-describedby="repository-name-hint"
               autoFocus
               required
             />
-          </label>
+            <span
+              id="repository-name-hint"
+              className={`label text-xs leading-snug ${
+                name.length > 0 && nameError ? "text-error" : "text-base-content/55"
+              }`}
+            >
+              {name.length > 0 && nameError
+                ? nameErrorMessage
+                : t(
+                    "manage.repositories.createNameHint",
+                    "Use 1–80 letters, numbers, spaces, hyphens, or underscores. The name is also the directory name.",
+                  )}
+            </span>
+          </div>
 
           <div className="fieldset gap-1">
             <label
@@ -370,7 +389,7 @@ export default function AddRepositoryModal({
               type="submit"
               className="btn btn-primary gap-2"
               disabled={
-                !name.trim() ||
+                nameError !== null ||
                 !rootId ||
                 createRepositoryMutation.isPending ||
                 (source === "cloud" && !credentialId)
@@ -394,4 +413,36 @@ export default function AddRepositoryModal({
       />
     </div>
   );
+}
+
+function repositoryNameErrorMessage(
+  error: RepositoryNameError | null,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  switch (error) {
+    case "required":
+      return t("manage.repositories.createNameRequired", "Enter a repository name.");
+    case "leadingOrTrailingSpace":
+      return t(
+        "manage.repositories.createNameEdgeSpace",
+        "The name cannot start or end with a space.",
+      );
+    case "tooManyCharacters":
+      return t(
+        "manage.repositories.createNameTooManyCharacters",
+        "The name cannot exceed 80 characters.",
+      );
+    case "tooManyBytes":
+      return t(
+        "manage.repositories.createNameTooManyBytes",
+        "The name is too long when encoded for the filesystem.",
+      );
+    case "unsupportedCharacter":
+      return t(
+        "manage.repositories.createNameUnsupportedCharacter",
+        "Use only letters, numbers, spaces, hyphens, and underscores.",
+      );
+    default:
+      return "";
+  }
 }

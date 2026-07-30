@@ -1,7 +1,7 @@
 ---
-title: Lumilio Agent 指南已整合
+title: Lumilio Agent 入口已移动
 ---
 
-# Lumilio Agent 指南已整合
+# Lumilio Agent 入口已移动
 
-Agent 的入口、上下文引用方式与安全边界已移至[可选的 Lumen 与 Lumilio Agent](./lumen-ai)。
+Agent 的入口、上下文引用、看板和确认边界已经统一写在 [Lumilio Agent](./agent)。本页保留为旧链接兼容入口。

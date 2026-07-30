@@ -19,8 +19,9 @@ import (
 
 type createRepositoryManagerStub struct {
 	storage.RepositoryManager
-	hostOwnerID *int32
-	createdSpec storage.CreateRepositorySpec
+	hostOwnerID  *int32
+	createdSpec  storage.CreateRepositorySpec
+	createCalled bool
 }
 
 func (s *createRepositoryManagerStub) HostOwnerID(context.Context) (*int32, error) {
@@ -28,6 +29,7 @@ func (s *createRepositoryManagerStub) HostOwnerID(context.Context) (*int32, erro
 }
 
 func (s *createRepositoryManagerStub) CreateRepository(_ context.Context, spec storage.CreateRepositorySpec) (*storage.CreateRepositoryResult, error) {
+	s.createCalled = true
 	s.createdSpec = spec
 	return &storage.CreateRepositoryResult{
 		Repository: &repo.Repository{
@@ -57,7 +59,7 @@ func TestCreateRepositoryUsesHostOwnerNotActingAdmin(t *testing.T) {
 	handler := NewRepositoryScanHandler(nil, manager, nil)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Archive"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -68,6 +70,30 @@ func TestCreateRepositoryUsesHostOwnerNotActingAdmin(t *testing.T) {
 	}
 	if manager.createdSpec.OwnerID == nil || *manager.createdSpec.OwnerID != hostOwnerID {
 		t.Fatalf("repository owner = %v, want Host Owner %d", manager.createdSpec.OwnerID, hostOwnerID)
+	}
+	if manager.createdSpec.Name != "Family Media" {
+		t.Fatalf("repository name = %q, want exact input", manager.createdSpec.Name)
+	}
+}
+
+func TestCreateRepositoryRejectsInvalidNameBeforeManagerCall(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	hostOwnerID := int32(1)
+	manager := &createRepositoryManagerStub{hostOwnerID: &hostOwnerID}
+	handler := NewRepositoryScanHandler(nil, manager, nil)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family/Media"}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
+
+	handler.CreateRepository(ctx)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if manager.createCalled {
+		t.Fatal("repository manager was called for an invalid name")
 	}
 }
 

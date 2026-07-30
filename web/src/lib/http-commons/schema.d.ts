@@ -9734,94 +9734,10 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        /**
-         * Delete repository
-         * @description Remove a repository from the registry. Does not delete files on disk.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-            };
-        };
+        delete?: never;
         options?: never;
         head?: never;
-        /**
-         * Update repository
-         * @description Update mutable repository fields (name, storage_strategy, local_settings). Repository ownership is fixed to the Host Owner.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Fields to update */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.UpdateRepositoryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-            };
-        };
+        patch?: never;
         trace?: never;
     };
     "/api/v1/repositories/{id}/cloud": {
@@ -12760,7 +12676,12 @@ export interface components {
              * @enum {string}
              */
             duplicate_handling?: "rename" | "uuid" | "overwrite";
-            /** @example Family Photos */
+            /**
+             * @description Name is preserved verbatim as the directory name for regular
+             *     repositories. It accepts Unicode letters/digits, ASCII spaces, hyphens,
+             *     and underscores; leading/trailing spaces are rejected.
+             * @example Family Photos
+             */
             name: string;
             /**
              * @example regular
@@ -13695,7 +13616,7 @@ export interface components {
             local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
             /** @example Family Photos */
             name?: string;
-            /** @example /data/storage/family-photos */
+            /** @example /data/storage/Family Photos */
             path?: string;
             /** @example regular */
             role?: string;

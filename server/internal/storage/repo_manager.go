@@ -442,26 +442,39 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
+	// A Server operator may bind-mount an empty host directory directly at this
+	// path before creating the repository. Prove the exact target is empty and
+	// writable, while remembering whether Lumilio owns the directory itself so
+	// rollback never recursively removes a pre-existing mount.
+	targetCreated, err := prepareRepositoryInitializationTarget(cleanPath)
+	if err != nil {
+		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
+		return nil, err
+	}
+	rollback := func(cause error) error {
+		cleanupErr := cleanupRepositoryInitializationTarget(cleanPath, targetCreated)
+		if cleanupErr == nil {
+			return cause
+		}
+		return errors.Join(cause, fmt.Errorf("rollback repository initialization: %w", cleanupErr))
+	}
+
 	// Create directory structure using directory manager
 	if err := rm.dirManager.CreateStructure(cleanPath); err != nil {
 		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
-		return nil, fmt.Errorf("failed to create repository structure: %w", err)
+		return nil, rollback(fmt.Errorf("failed to create repository structure: %w", err))
 	}
 
 	// Save configuration file
 	if err := config.SaveConfigToFile(cleanPath); err != nil {
-		// Clean up on failure
-		os.RemoveAll(cleanPath)
 		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
-		return nil, fmt.Errorf("failed to save configuration: %w", err)
+		return nil, rollback(fmt.Errorf("failed to save configuration: %w", err))
 	}
 
 	repoUUID, err := uuid.Parse(config.ID)
 	if err != nil {
-		// Clean up on failure
-		os.RemoveAll(cleanPath)
 		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
-		return nil, fmt.Errorf("invalid repository ID: %w", err)
+		return nil, rollback(fmt.Errorf("invalid repository ID: %w", err))
 	}
 
 	now := time.Now()
@@ -478,10 +491,8 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 		RootID:         firstRootID(rootID),
 	})
 	if err != nil {
-		// Clean up on failure
-		os.RemoveAll(cleanPath)
 		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_id", config.ID), zap.String("repository_name", config.Name))
-		return nil, fmt.Errorf("failed to create database record: %w", err)
+		return nil, rollback(fmt.Errorf("failed to create database record: %w", err))
 	}
 
 	rm.repoAudit(cleanPath).Operation("repository.initialize",
@@ -495,6 +506,71 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	)
 
 	return &dbRepo, nil
+}
+
+func prepareRepositoryInitializationTarget(path string) (created bool, err error) {
+	info, err := os.Stat(path)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		if err := os.Mkdir(path, 0o755); err != nil {
+			return false, fmt.Errorf("%w: create target directory: %v", ErrRepositoryStorageNotWritable, err)
+		}
+		created = true
+	case err != nil:
+		return false, fmt.Errorf("%w: inspect target directory: %v", ErrRepositoryStorageNotWritable, err)
+	case !info.IsDir():
+		return false, fmt.Errorf("%w: target path is not a directory", ErrRepositoryTargetNotEmpty)
+	default:
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return false, fmt.Errorf("%w: read target directory: %v", ErrRepositoryStorageNotWritable, err)
+		}
+		if len(entries) != 0 {
+			return false, fmt.Errorf("%w: %s", ErrRepositoryTargetNotEmpty, path)
+		}
+	}
+
+	probe, err := os.CreateTemp(path, ".lumilio-write-test-*")
+	if err != nil {
+		if created {
+			_ = os.RemoveAll(path)
+		}
+		return false, fmt.Errorf("%w: create probe file: %v", ErrRepositoryStorageNotWritable, err)
+	}
+	probePath := probe.Name()
+	if closeErr := probe.Close(); closeErr != nil {
+		_ = os.Remove(probePath)
+		if created {
+			_ = os.RemoveAll(path)
+		}
+		return false, fmt.Errorf("%w: close probe file: %v", ErrRepositoryStorageNotWritable, closeErr)
+	}
+	if removeErr := os.Remove(probePath); removeErr != nil {
+		if created {
+			_ = os.RemoveAll(path)
+		}
+		return false, fmt.Errorf("%w: remove probe file: %v", ErrRepositoryStorageNotWritable, removeErr)
+	}
+	return created, nil
+}
+
+func cleanupRepositoryInitializationTarget(path string, targetCreated bool) error {
+	if targetCreated {
+		return os.RemoveAll(path)
+	}
+
+	var cleanupErrors []error
+	for _, name := range []string{
+		DefaultStructure.ConfigFile,
+		DefaultStructure.SystemDir,
+		DefaultStructure.InboxDir,
+	} {
+		target := filepath.Join(path, name)
+		if err := os.RemoveAll(target); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("remove %s: %w", target, err))
+		}
+	}
+	return errors.Join(cleanupErrors...)
 }
 
 func firstRootID(ids []uuid.UUID) uuid.NullUUID {

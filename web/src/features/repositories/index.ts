@@ -9,5 +9,10 @@ export { useRepositoryScan } from "./api/useRepositoryScan";
 export type { RepositoryOption, RepositoryStatus } from "./types";
 export { getRepositoryDisplayName } from "./model/repositoryDisplayName";
 export { isRepositoryUnavailable } from "./model/repositoryOptions";
-export { isDuplicateHandling, isStorageStrategy } from "./model/repositorySetup";
+export {
+  isDuplicateHandling,
+  isStorageStrategy,
+  validateRepositoryName,
+  type RepositoryNameError,
+} from "./model/repositorySetup";
 export { waitForRepositoryScan } from "./api/waitForRepositoryScan";
