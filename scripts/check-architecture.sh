@@ -139,3 +139,20 @@ fi
 
 printf '%s\n' "SQLite SQL checks passed"
 printf '%s\n' "Browse architecture checks passed"
+
+# Desktop is a separate Go module. Keep the new host boundary explicit: the
+# server may not depend on Desktop, and only the runtime adapter may import the
+# server application package. This is intentionally a small static guard so it
+# works in local checkouts without a generated dependency graph.
+desktop_server_imports="$({ rg -n '"server/' desktop --glob '*.go' || true; } | grep -vE '^desktop/internal/runtime/' || true)"
+if [ -n "$desktop_server_imports" ]; then
+    printf '%s\n' "Desktop architecture check found a server import outside internal/runtime:" "$desktop_server_imports" >&2
+    exit 1
+fi
+
+if rg -n '^[[:space:]]*"desktop/' server --glob '*.go' >/dev/null 2>&1; then
+    printf '%s\n' "Desktop architecture check found a server -> desktop import." >&2
+    exit 1
+fi
+
+printf '%s\n' "Desktop architecture checks passed"

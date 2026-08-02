@@ -8,13 +8,13 @@ This document describes the current Go backend as implemented in `server/`.
 - Config package: `server/config`.
 - Tracked config templates: `server/config/examples/{dev,desktop,docker}/*.toml`,
   generated from the profile table in `server/config/profiles.go` by
-  `make config-examples`. Never hand-edit them; a golden test enforces it.
+  `task config:examples`. Never hand-edit them; a golden test enforces it.
 - Manifest JSON Schema: `server/config/schema/lumilio-server.schema.json`,
   reflected from the manifest struct and referenced by each example's
   `#:schema` directive. It covers presence, types, and closed value sets only —
   conditional legality stays in `resolveManifest`.
 - Generated development config:
-  `.local/dev/config/server.toml`. `make dev` keeps the catalog, indexes, logs,
+  `.local/dev/config/server.toml`. `task dev` keeps the catalog, indexes, logs,
   secrets, cloud state, backups, and media under the same `.local/dev/`
   instance root while preserving the state/storage boundary.
 - Docker image: `server/Dockerfile`.
@@ -44,24 +44,22 @@ or override layer. Missing, unknown, legacy, contradictory, or invalid fields
 fail startup. Relative paths use the manifest directory. Startup logs the
 absolute path, schema version, and source SHA-256 without logging secret content.
 
-Desktop is a host wrapper, not a second server bootstrap: the supervisor prepares
-app-data paths, bundled media tools, and the SPA root. Persistent
-`config/runtime.toml` is strict-loaded, copied, and projected with host-owned
-paths before Desktop atomically writes app-data `config/server.toml` with mode
-`0600` and calls `app.Run`. A write or reload error blocks startup.
+Desktop is a host wrapper, not a second server bootstrap: the Wails Host prepares
+private app-data paths and calls `server/app.Run` in-process only after the
+complete runtime intent has passed `LoadAppConfigBytes`. The RuntimeController
+owns one generation and receives typed `RuntimeReady` and
+`RepositoryManagerReady` handoffs; it does not use a loopback health probe as an
+ownership proof. A write, journal, or strict reload error leaves Tray and
+Settings available for recovery.
 
-DesktopSettings v2 contains host/control-plane choices, not Server network
-policy. Structured network edits and raw TOML edits both patch one fingerprinted
-runtime candidate. Apply is serialized across restart/shutdown, journals
-`candidate_staged → candidate_promoted → rolling_back`, proves the previous
-generation exited, durably records promotion intent before the atomic file
-replacement, and updates last-known-good only after readiness. `Prepare`
-reconciles an interrupted journal before starting, including either side of the
-promotion boundary. The host-level single-instance lock is acquired before
-runtime setup or Wails UI, spans all generations, and is released only by
-Desktop shutdown. Control-plane reads deliberately expose an invalid active
-intent plus structured issues for recovery; candidate acceptance still uses
-`LoadAppConfigBytes`.
+Desktop settings are host choices only; runtime intent remains a complete,
+schema-versioned TOML document. Candidate edits are fingerprinted and guarded
+by aggregate/version and base-fingerprint checks. Apply journals prepared,
+stopping, candidate-selection, rollback, and committing phases, proves the old
+generation has released ownership, and promotes last-known-good only after the
+new generation is ready. Shortcut cache corruption is quarantined and does not
+block the Host. The Wails single-instance boundary protects the Host, while the
+RuntimeController generation guard protects SQLite/listener ownership.
 
 Browser and WebAuthn identity are derived from each request.
 `internal/httporigin` normalizes `Forwarded`/`X-Forwarded-*` target metadata
@@ -94,7 +92,9 @@ contracts, not server configuration.
 
 The optional pprof listener belongs to the outer `app.Run` host lifecycle. It
 is started once, remains stable across in-process database restore generations,
-and is shut down when the host run exits.
+and is shut down when the host run exits. Desktop lifecycle state is projected
+through typed Wails bindings and `desktop:snapshot-changed` revision notices;
+the Settings WebView never calls the Server HTTP API.
 
 ## Important Packages
 
@@ -202,7 +202,7 @@ Owner identity is instance-local database policy rather than portable
 After API changes, run:
 
 ```bash
-make dto
+task dto
 ```
 
 After SQL schema or SQL queries change, run:
@@ -222,12 +222,12 @@ tags still define the contract.
 > **If the frontend is casting (`as { ... }`) around a response, the contract is
 > the bug — not the frontend.** Either the handler's `@Success ... {data=dto.X}`
 > annotation is missing/points at the wrong DTO, or the DTO is correct and the
-> generated artifacts are stale (`make dto` was not re-run). Fix the annotation /
+> generated artifacts are stale (`task dto` was not re-run). Fix the annotation /
 > DTO and regenerate; never let the frontend cast around a typed endpoint. If
 > generated `schema.d.ts` exposes `data?: Record<string, never>` or
 > `data?: unknown` for an endpoint that returns payload data, that is a contract
 > failure: fix backend DTO/annotation/codegen before frontend work proceeds. Do
-> not add frontend compatibility shims for stale DTOs. A stale `make dto` once
+> not add frontend compatibility shims for stale DTOs. A stale `task dto` once
 > let `dto.OptionsResponseDTO.camera_models` surface to the SPA as an untyped
 > `Record<string, never>`, so a frontend cast guessed `cameras` and silently
 > broke a feature.
@@ -312,10 +312,10 @@ The app should remain useful when ML/LLM features are disabled.
 Backend gate:
 
 ```bash
-make server-test
+task server:test
 ```
 
-Use the Makefile target by default. It exports the local cgo flag allowlist
+Use the Taskfile target by default. It exports the local cgo flag allowlist
 needed by media dependencies on macOS. Only run the direct command when you have
 a concrete reason and preserve the same environment:
 

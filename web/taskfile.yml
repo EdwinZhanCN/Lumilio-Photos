@@ -1,0 +1,147 @@
+# Web (React 19 + Vite+) tasks. Runs in the web/ directory. The leaf commands
+# stay in package.json scripts; this file only orchestrates them.
+#
+# API_URL / WEB_DEV_PORT are injected by the root Taskfile include; the
+# `default` fallbacks at each use site keep standalone runs (`cd web && task
+# test`) working without shadowing the injected values.
+version: "3"
+
+tasks:
+  install:
+    desc: Install frontend dependencies
+    env:
+      # CI mode forces prebuilt binaries (e.g. sharp) and skips vite-plus git
+      # hooks; the repository installs its own hooks via `task setup`.
+      CI: "1"
+      VITE_GIT_HOOKS: "0"
+    cmds:
+      - vp install
+
+  install:ci:
+    desc: Install frontend dependencies in CI mode with a frozen lockfile
+    env:
+      CI: "1"
+      VITE_GIT_HOOKS: "0"
+    cmds:
+      - vp install --frozen-lockfile
+
+  dev:
+    desc: Start only the Vite development server
+    env:
+      API_URL: '{{.API_URL | default "http://127.0.0.1:6680"}}'
+    cmds:
+      - vp dev --host --port {{.WEB_DEV_PORT | default "6657"}}
+
+  build:
+    desc: Build the production bundle
+    cmds:
+      - vp build
+
+  lint:
+    desc: Run the frontend linter
+    cmds:
+      - vp lint
+
+  type-check:
+    desc: Run TypeScript checks without formatting or lint
+    cmds:
+      - vp check --no-fmt --no-lint
+
+  check:boundaries:
+    desc: Enforce frontend source boundaries
+    cmds:
+      - vp node scripts/check-source-boundaries.mjs
+
+  test:
+    desc: Run frontend type, lint, boundary, and unit checks
+    cmds:
+      - vp check --no-fmt --no-lint
+      - vp lint
+      - vp node scripts/check-source-boundaries.mjs
+      - vp test
+
+  test:coverage:
+    desc: Run unit tests with coverage
+    cmds:
+      - vp test run --coverage
+
+  test:watch:
+    desc: Run unit tests in watch mode
+    cmds:
+      - vp test watch
+
+  e2e:
+    up:
+      desc: Start the isolated E2E Compose environment
+      cmds:
+        - vp run e2e:up
+    down:
+      desc: Stop the isolated E2E Compose environment
+      cmds:
+        - vp run e2e:down
+    logs:
+      desc: Show E2E service logs
+      cmds:
+        - vp run e2e:logs
+    seed:
+      desc: Sync assets and seed the E2E environment
+      cmds:
+        - vp run e2e:seed
+    seed:video-semantic:
+      desc: Sync E2E-profile assets and seed for the video semantic regression
+      cmds:
+        - vp run e2e:seed:video-semantic
+
+  test:browser:
+    desc: Run the Playwright smoke regression
+    cmds:
+      - task: e2e:seed
+      - vp run e2e:test --grep @smoke --workers=1
+
+  test:auth-hardening:
+    desc: Run the authentication hardening regression
+    cmds:
+      - task: e2e:seed
+      - vp run e2e:test --grep @auth-hardening --workers=1
+
+  test:video-semantic:
+    desc: Run the video semantic regression
+    cmds:
+      - task: e2e:seed:video-semantic
+      - vp run e2e:test --grep @video-regression --workers=1
+
+  test:backup-recovery:
+    desc: Run the database backup and recovery regression
+    cmds:
+      - task: e2e:seed
+      - vp run e2e:test --grep @backup-recovery --workers=1
+
+  openapi-types:
+    desc: Regenerate frontend OpenAPI types from the server spec
+    cmds:
+      - vp node scripts/generate-openapi-types.mjs
+
+  playwright:install:
+    desc: Install the Playwright Chromium browser with system dependencies
+    cmds:
+      - vp exec playwright install --with-deps chromium
+
+  playwright:install:deps:
+    desc: Install only the Playwright browser system dependencies
+    cmds:
+      - vp exec playwright install-deps chromium
+
+  assets:sync:
+    desc: Sync versioned demo and E2E media assets
+    cmds:
+      - vp run assets:sync
+
+  i18n:extract:
+    desc: Extract frontend translation keys
+    cmds:
+      - vp exec i18next-cli extract
+
+  demo:seed:
+    desc: Seed the demo database
+    cmds:
+      - vp run demo:seed

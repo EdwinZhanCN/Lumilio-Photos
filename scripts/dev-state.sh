@@ -38,7 +38,7 @@ reject_symlink() {
 }
 
 assert_repository() {
-	[ -f "$repository_root/Makefile" ] ||
+	[ -f "$repository_root/taskfile.yml" ] ||
 		fail "not a Lumilio Photos repository: $repository_root"
 	[ -d "$repository_root/server/config" ] ||
 		fail "missing server/config under $repository_root"
@@ -148,7 +148,7 @@ purge_environment() {
 	verify_marker
 	assert_server_stopped
 	[ "${CONFIRM_DEV_PURGE:-}" = "dev-purge" ] ||
-		fail "set CONFIRM=dev-purge when invoking make dev-purge"
+		fail "set CONFIRM_DEV_PURGE=dev-purge when invoking task dev-purge"
 	printf 'Removing the complete development environment, including media:\n'
 	describe_target "$dev_root"
 	reject_symlink "$state_root"

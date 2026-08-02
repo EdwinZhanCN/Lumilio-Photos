@@ -109,3 +109,18 @@ func TestRunRejectsStructLiteralConfig(t *testing.T) {
 		t.Fatalf("expected unvalidated config rejection, got %v", err)
 	}
 }
+
+func TestProductURLUsesLoopbackForDesktopListeners(t *testing.T) {
+	for _, test := range []struct {
+		listen string
+		want   string
+	}{
+		{listen: ":6680", want: "http://127.0.0.1:6680"},
+		{listen: "0.0.0.0:6680", want: "http://127.0.0.1:6680"},
+		{listen: "127.0.0.1:6680", want: "http://127.0.0.1:6680"},
+	} {
+		if got := productURL(test.listen); got != test.want {
+			t.Fatalf("productURL(%q) = %q, want %q", test.listen, got, test.want)
+		}
+	}
+}

@@ -32,6 +32,9 @@ lerna-debug.log*
 !/web/.env.production
 /server/config/.secrets/
 
+# Task runner fingerprint state
+/.task/
+
 # Local runtime and test state
 /.local/
 /.cache/lumilio-assets/

@@ -51,16 +51,16 @@ historical records, not required reading.
 
 ## Non-Negotiable Rules
 
-- Prefer root Make targets. Use `make server-test` for backend changes,
-  `make web-test` for frontend changes, `make desktop-test` for desktop changes,
-  and `make compose-test` for deployment changes. `make test` runs the Server
-  and Web gates.
+- Prefer root Task targets. Use `task server:test` for backend changes,
+  `task web:test` for frontend changes, `task desktop:test` for desktop changes,
+  and `task compose:test` for deployment changes. `task test` runs the
+  architecture, Server, and Web gates.
 - Follow the frontend “Test layers” taxonomy in
   [FRONTEND.md](site/docs/internal/FRONTEND.md); do not invent test-file
   conventions.
 - API contracts are OpenAPI-first. Never hand-edit
   `web/src/lib/http-commons/schema.d.ts` or cast around a stale response type.
-  Fix the backend DTO or annotation and run `make dto`.
+  Fix the backend DTO or annotation and run `task dto`.
 - The Server requires a complete schema-versioned TOML manifest. Do not add
   code defaults, consumer fallbacks, automatic config search, or ordinary
   environment overrides for runtime-immutable fields.

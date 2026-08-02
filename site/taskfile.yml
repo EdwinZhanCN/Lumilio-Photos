@@ -1,0 +1,53 @@
+# Documentation site (VitePress) tasks. Runs in the site/ directory.
+version: '3'
+
+tasks:
+  install:
+    desc: Install documentation site dependencies
+    env:
+      CI: '1'
+      VITE_GIT_HOOKS: '0'
+    cmds:
+      - vp install
+
+  install:ci:
+    desc: Install documentation site dependencies in CI mode with a frozen lockfile
+    env:
+      CI: '1'
+      VITE_GIT_HOOKS: '0'
+    cmds:
+      - vp install --frozen-lockfile
+
+  dev:
+    desc: Start the VitePress development server
+    cmds:
+      - vp run dev
+
+  build:
+    desc: Build the documentation site
+    cmds:
+      - vp run build
+
+  preview:
+    desc: Preview the built documentation site
+    cmds:
+      - vp run preview
+
+  openapi-docs:
+    desc: Regenerate the Redoc API documentation from the server spec
+    cmds:
+      - ./node_modules/.bin/redocly build-docs ../server/docs/swagger.yaml --output docs/public/redoc-static.html
+
+  media:
+    manifest:
+      desc: Generate the media manifest
+      cmds:
+        - node scripts/media.mjs manifest
+    sync:
+      desc: Sync versioned site media
+      cmds:
+        - node scripts/media.mjs sync
+    verify:
+      desc: Verify site media integrity
+      cmds:
+        - node scripts/media.mjs verify

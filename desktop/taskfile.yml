@@ -1,0 +1,158 @@
+# Desktop (Wails v3) tasks.
+#
+# This file is part of the repository Taskfile system (root taskfile.yml
+# includes it as the `desktop:` namespace). Structure:
+#   - top section: Wails3-generated tasks (build/package/run/dev + platform
+#     includes). Do not rename these; the wails3 CLI dispatches through them.
+#   - bottom section: Lumilio additions (test/compile/frontend/devtool
+#     wrappers). If `wails3 update` regenerates the top section, re-apply the
+#     additions below.
+version: '3'
+
+# Consistent with the root taskfile: prefixed output keeps parallel
+# dependencies attributable and strict shell options match repository scripts.
+output: prefixed
+set: [errexit, nounset, pipefail]
+
+vars:
+  APP_NAME: "desktop"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "vp"}}'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  GOOS: '{{.GOOS | default OS}}'
+
+includes:
+  common: ./build/taskfile.yml
+  windows: ./build/windows/taskfile.yml
+  darwin: ./build/darwin/taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{.GOOS}}:build"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{.GOOS}}:package"
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  test:
+    summary: Runs the complete Desktop Go tests with the race detector
+    desc: Runs the complete Desktop Go tests with the race detector
+    vars:
+      GO_TAGS: '{{.GO_BUILD_TAGS | default "sqlite_fts5"}}'
+    env:
+      CGO_LDFLAGS_ALLOW: '-Xpreprocessor'
+      CGO_CFLAGS_ALLOW: '-Xpreprocessor'
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    cmds:
+      - go test -tags={{.GO_TAGS}} -race ./...
+
+  test:ci:
+    summary: Runs the complete Desktop Go tests in CI mode (no race detector)
+    desc: Runs the complete Desktop Go tests in CI mode (no race detector)
+    env:
+      CGO_LDFLAGS_ALLOW: '-Xpreprocessor'
+      CGO_CFLAGS_ALLOW: '-Xpreprocessor'
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    cmds:
+      # Cached cgo objects can bake in Homebrew Cellar paths that no longer
+      # exist after a runner-image brew bump; rebuild from a clean cache.
+      - go clean -cache
+      - go test -tags={{.GO_TAGS | default "sqlite_fts5"}} ./...
+
+  compile:
+    summary: Compiles the Desktop app binaries
+    desc: Compiles the Desktop app binaries
+    env:
+      CGO_LDFLAGS_ALLOW: '-Xpreprocessor'
+      CGO_CFLAGS_ALLOW: '-Xpreprocessor'
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    cmds:
+      - go build -tags={{.GO_TAGS | default "sqlite_fts5"}} ./...
+
+  frontend:install:ci:
+    summary: Installs the control panel frontend dependencies in CI mode
+    desc: Installs the control panel frontend dependencies in CI mode
+    dir: frontend
+    env:
+      CI: '1'
+      VITE_GIT_HOOKS: '0'
+    cmds:
+      - vp install
+
+  frontend:build:
+    summary: Builds the control panel frontend for production
+    desc: Builds the control panel frontend for production
+    dir: frontend
+    cmds:
+      - vp run build
+
+  resources-manifest:
+    summary: Regenerates the signed-resource manifest from the payload directory
+    desc: Regenerates the signed-resource manifest from the payload directory
+    cmds:
+      - go run ./internal/resources/cmd/manifest -root ./resources/payload -output ./resources/manifest.json
+
+  generate:icons:
+    summary: Regenerates platform icons from build/appicon.png
+    desc: Regenerates platform icons from build/appicon.png
+    cmds:
+      - task: common:generate:icons
+
+  licenses:
+    summary: Generates desktop/licenses/THIRD_PARTY_NOTICES.txt
+    desc: Generates desktop/licenses/THIRD_PARTY_NOTICES.txt
+    cmds:
+      - go run ./cmd/devtool notices
+
+  resources:
+    summary: Fetches pinned media tools for the current platform
+    desc: Fetches pinned media tools for the current platform
+    cmds:
+      - go run ./cmd/devtool fetch-resources
+
+  build:windows:
+    summary: Builds the Windows portable application directory
+    desc: Builds the Windows portable application directory
+    platforms: [windows]
+    deps:
+      - task: common:generate:icons
+    cmds:
+      - go run ./cmd/devtool build-windows
+
+  build:macos:
+    summary: Builds the macOS app bundle
+    desc: Builds the macOS app bundle
+    platforms: [darwin]
+    vars:
+      ARCH: '{{.ARCH | default "arm64"}}'
+    deps:
+      - task: common:generate:icons
+    cmds:
+      - go run ./cmd/devtool build-macos {{.ARCH}}
+
+  build:macos:dmg:
+    summary: Builds the macOS app bundle and DMG
+    desc: Builds the macOS app bundle and DMG
+    platforms: [darwin]
+    vars:
+      ARCH: '{{.ARCH | default "arm64"}}'
+    deps:
+      - task: common:generate:icons
+    cmds:
+      - go run ./cmd/devtool build-macos {{.ARCH}} --dmg
