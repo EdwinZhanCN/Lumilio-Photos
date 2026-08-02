@@ -1,0 +1,153 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard", ":prHourlyLimit2"],
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "Group: desktop frontend (npm) — keep before desktop gomod so paths never overlap",
+      "matchFileNames": ["desktop/frontend/**"],
+      "matchManagers": ["npm"],
+      "groupName": "desktop frontend (React)",
+      "labels": ["frontend"]
+    },
+    {
+      "description": "Group: desktop Go module",
+      "matchFileNames": ["desktop/**"],
+      "matchManagers": ["gomod"],
+      "groupName": "desktop (Go)",
+      "labels": ["go"]
+    },
+    {
+      "description": "Group: web (React)",
+      "matchFileNames": ["web/**"],
+      "matchManagers": ["npm"],
+      "groupName": "web (React)",
+      "labels": ["frontend"]
+    },
+    {
+      "description": "Group: docs site",
+      "matchFileNames": ["site/**"],
+      "matchManagers": ["npm"],
+      "groupName": "docs site",
+      "labels": ["docs"]
+    },
+    {
+      "description": "Group: server Go module",
+      "matchFileNames": ["server/**"],
+      "matchManagers": ["gomod"],
+      "groupName": "server (Go)",
+      "labels": ["go"]
+    },
+    {
+      "description": "Group: wasm Rust crates",
+      "matchFileNames": ["wasm/**"],
+      "matchManagers": ["cargo"],
+      "groupName": "wasm crates",
+      "labels": ["rust"]
+    },
+    {
+      "description": "Group: deploy Docker images",
+      "matchFileNames": ["deploy/**"],
+      "matchManagers": ["docker-compose", "dockerfile"],
+      "groupName": "deploy images",
+      "labels": ["docker"]
+    },
+    {
+      "description": "Group: eino AI framework ecosystem (cloudwego/eino + eino-contrib)",
+      "matchPackagePatterns": ["^github\\.com/cloudwego/eino", "^github\\.com/eino-contrib/"],
+      "groupName": "cloudwego/eino",
+      "automerge": false,
+      "labels": ["ai", "manual-review"]
+    },
+    {
+      "description": "Group: riverqueue (river + riverdriver + rivertype + rivershared)",
+      "matchPackagePatterns": ["^github\\.com/riverqueue/river"],
+      "groupName": "riverqueue",
+      "automerge": false,
+      "labels": ["manual-review"]
+    },
+    {
+      "description": "Group: lumen-sdk (self-maintained SDK, tag-driven releases)",
+      "matchPackageNames": ["github.com/edwinzhancn/lumen-sdk"],
+      "groupName": "lumen-sdk",
+      "automerge": false,
+      "labels": ["sdk", "manual-review"]
+    },
+    {
+      "description": "Safe automerge: patch+minor on dependencies",
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "branch",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Major updates always need a human",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Tier 2 manual-review: govips binds to system libvips version",
+      "matchPackageNames": ["github.com/davidbyttow/govips/v2"],
+      "automerge": false,
+      "labels": ["libvips", "manual-review"]
+    },
+    {
+      "description": "Tier 2 manual-review: sqlite3 is the storage core (CGO + FTS5)",
+      "matchPackageNames": ["github.com/mattn/go-sqlite3"],
+      "automerge": false,
+      "labels": ["manual-review"]
+    },
+    {
+      "description": "Tier 2 manual-review: Go toolchain version bumps",
+      "matchManagers": ["gomod"],
+      "matchDatasources": ["golang-version"],
+      "automerge": false,
+      "labels": ["manual-review"]
+    },
+    {
+      "description": "Tier 2 manual-review: ML inference + test runner ecosystem (vitest must stay compatible with the vite-plus fork)",
+      "matchPackageNames": ["@huggingface/transformers", "vitest"],
+      "matchPackagePatterns": ["^@vitest/"],
+      "automerge": false,
+      "labels": ["manual-review"]
+    },
+    {
+      "description": "Tier 2 manual-review: Playwright e2e is pinned and version-coupled with @vitest/browser-playwright",
+      "matchPackageNames": ["playwright", "@playwright/test"],
+      "automerge": false,
+      "labels": ["e2e", "manual-review"]
+    },
+    {
+      "description": "Tier 2 manual-review: swag/v2 is still RC and drives task dto generation",
+      "matchPackageNames": ["github.com/swaggo/swag/v2"],
+      "automerge": false,
+      "labels": ["dto", "manual-review"]
+    },
+    {
+      "description": "Tier 1 frozen: Wails3 alpha — Go lib + @wailsio/runtime + CLI must be bumped together by hand",
+      "matchPackageNames": ["github.com/wailsapp/wails/v3", "@wailsio/runtime"],
+      "enabled": false
+    },
+    {
+      "description": "Tier 1 frozen: Vite+ toolchain — vp CLI + vite-plus-core fork (vite is catalog-overridden to npm:@voidzero-dev/vite-plus-core)",
+      "matchPackageNames": ["vite-plus", "@voidzero-dev/vite-plus-core"],
+      "matchPackagePatterns": ["^@voidzero-dev/"],
+      "enabled": false
+    },
+    {
+      "description": "Tier 1 frozen: self-maintained DTO generator",
+      "matchPackageNames": ["@edwinzhancn/docts"],
+      "enabled": false
+    },
+    {
+      "description": "Tier 1 frozen: vitepress is pinned to 2.0.0-alpha.17 deliberately",
+      "matchPackageNames": ["vitepress"],
+      "enabled": false
+    },
+    {
+      "description": "Tier 1 frozen: wasm-bindgen family must stay aligned with wasm-pack CLI across all 4 crates",
+      "matchPackageNames": ["wasm-bindgen", "wasm-bindgen-rayon", "js-sys", "web-sys"],
+      "enabled": false
+    }
+  ]
+}

@@ -33,11 +33,11 @@ Core stack:
 Daily commands:
 
 ```bash
-make web-dev
-make web-test
+task web:dev
+task web:test
 ```
 
-Use the Makefile targets by default. Direct commands are acceptable when you are
+Use the Taskfile targets by default. Direct commands are acceptable when you are
 intentionally running only the web workspace:
 
 ```bash
@@ -117,7 +117,7 @@ OpenAPI is the source of truth for HTTP contracts.
 >    does the referenced DTO actually declare the fields you need?
 > 2. If the DTO is correct but `schema.d.ts` shows `Record<string, never>`,
 >    `unknown`, or stale/missing fields, the **generated contract is broken** →
->    fix the backend annotation/DTO/codegen and run `make dto`.
+>    fix the backend annotation/DTO/codegen and run `task dto`.
 > 3. Only then read the now-typed field.
 >
 > Do not add frontend compatibility shims, endpoint-local response casts, or
@@ -128,16 +128,16 @@ OpenAPI is the source of truth for HTTP contracts.
 > Real bug this caught: `/assets/filter-options` returns `camera_models`, but a
 > cast had guessed `cameras`, silently breaking the camera `@`-mention. The DTO
 > (`dto.OptionsResponseDTO`) and its `@Success` annotation were both correct —
-> `make dto` simply had not been re-run, so the cast masked the stale type.
+> `task dto` simply had not been re-run, so the cast masked the stale type.
 
 For API changes:
 
 1. Update backend annotations and handler behavior.
-2. Run `make dto`.
+2. Run `task dto`.
 3. Update frontend hooks/components against generated types.
 
 The checked-in fetch/query runtime comes from the official `openapi-fetch`,
-`openapi-react-query`, and `openapi-typescript-helpers` packages. `make dto`
+`openapi-react-query`, and `openapi-typescript-helpers` packages. `task dto`
 runs `web/scripts/generate-openapi-types.mjs`, which removes the known empty
 object branch emitted by swag v2 for required JSON request bodies before type
 generation. Keep this normalization in the generator; never post-edit
@@ -244,7 +244,7 @@ The production web image uses Caddy:
   queries `/assets/map-points` with its current WGS-84 viewport; only Trips opts
   into draining all map-point and location-cluster pages.
 - `web/scripts/check-bundle-budget.mjs` enforces a 420 KiB gzip budget for the
-  production entry chunk as part of `make web-browser-test`.
+  production entry chunk as part of `task web:test:browser`.
 
 ## Z-Index Strategy
 
@@ -338,8 +338,8 @@ need no guard — keep them assertable in CI.
 Frontend gate:
 
 ```bash
-make web-test
-make web-browser-test
+task web:test
+task web:test:browser
 ```
 
 Direct equivalent when intentionally scoped to `web/`:
@@ -352,13 +352,13 @@ cd web && vp run e2e:test --grep @smoke --workers=1
 cd web && vp run e2e:down
 ```
 
-`web-browser-test` runs the `@smoke` subset of the Playwright E2E suite against
+`web:test:browser` runs the `@smoke` subset of the Playwright E2E suite against
 the isolated Compose environment with one worker. The compact suite covers
 capabilities, login, a real repository scan, and one upload reused across album,
 viewer, Trash, and restore assertions. Authentication hardening, video
 semantics, and database recovery are separate serial suites and CI selects them
 through narrow path filters; do not fold them back into every Web run or add a
-scheduled full-library matrix. `make web-backup-recovery-test` is the targeted
+scheduled full-library matrix. `task web:test:backup-recovery` is the targeted
 public UI/API recovery gate.
 
 The first-party API, SQLite catalog, storage, and queues are real; only external

@@ -1,0 +1,5 @@
+# Generated platform icon outputs. The source assets live in appicon.png and
+# appicon.icon; Taskfile regenerates these files before packaging.
+darwin/Assets.car
+darwin/icons.icns
+windows/icon.ico

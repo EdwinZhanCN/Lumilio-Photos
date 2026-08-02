@@ -1,6 +1,6 @@
 ; Inno Setup script for Lumilio Photos (Windows x64, per-user install).
 ;
-; Packages the portable app directory produced by desktop/scripts/build-windows.sh
+;; Packages the portable app directory produced by task desktop:build:windows
 ; into a single setup.exe that:
 ;   - installs per-user to %LocalAppData%\Programs\Lumilio Photos (no UAC),
 ;   - ensures the Microsoft Edge WebView2 Runtime (required by the first-run
@@ -22,7 +22,7 @@
   #define AppVersion "0.0.0"
 #endif
 #ifndef PayloadDir
-  #define PayloadDir "..\..\build\windows\Lumilio Photos"
+  #define PayloadDir "..\..\bin\windows\Lumilio Photos"
 #endif
 
 #define MyAppName "Lumilio Photos"
@@ -46,7 +46,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir={#SourcePath}\..\..\build
+OutputDir={#SourcePath}\..\..\bin
 OutputBaseFilename=Lumilio-Photos-{#AppVersion}-windows-amd64-setup
 Compression=lzma2/max
 SolidCompression=yes

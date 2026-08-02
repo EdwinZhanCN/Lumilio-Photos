@@ -1,5 +1,9 @@
-# Bundled native binaries are large and platform-specific; they are staged by CI
-# (or manually) before packaging and must not be committed. Keep only the docs.
-*
-!.gitignore
-!README.md
+# Platform media tools are downloaded and SHA256-verified during packaging.
+# They belong in the release artifact, not in the source repository.
+ffmpeg/
+exiftool/
+.downloads/
+
+# The signed payload is generated from the staged tools before packaging.
+payload/*
+!payload/.gitkeep

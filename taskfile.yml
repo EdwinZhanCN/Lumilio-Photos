@@ -1,0 +1,221 @@
+# Root orchestration layer (Taskfile v3).
+#
+# Ownership boundary (per third_party/MIGRATION.md):
+#   - GitHub Actions: triggers, path filters, runner OS, native packages,
+#     credentials, caches, Buildx, artifacts, branch-protection aggregation.
+#   - This file + the included module Taskfiles: repository commands, working
+#     directories, sequencing, platform-specific Go flags, and local/CI
+#     command consistency.
+#
+# Module Taskfiles use the plain names (server/taskfile.yml, web/taskfile.yml,
+# ...) so `task test` inside a module directory resolves to that module's
+# Taskfile. Root aggregates are named with colons (dev:config, compose:test,
+# ci:*) and are invoked from the repository root.
+version: '3'
+
+includes:
+  server:
+    taskfile: ./server/taskfile.yml
+    dir: ./server
+    aliases: [s]
+    vars:
+      REPO_ROOT: '{{.ROOT_DIR}}'
+      DEV_CONFIG: '{{.DEV_CONFIG}}'
+      GO_BUILD_TAGS: '{{.GO_BUILD_TAGS}}'
+  web:
+    taskfile: ./web/taskfile.yml
+    dir: ./web
+    aliases: [w]
+    vars:
+      API_URL: '{{.API_URL}}'
+      WEB_DEV_PORT: '{{.WEB_DEV_PORT}}'
+  desktop:
+    taskfile: ./desktop/taskfile.yml
+    dir: ./desktop
+    aliases: [d]
+    vars:
+      GO_BUILD_TAGS: '{{.GO_BUILD_TAGS}}'
+  site:
+    taskfile: ./site/taskfile.yml
+    dir: ./site
+
+# prefixed output keeps parallel dependency output attributable; the strict
+# shell options match what the repository's POSIX scripts already set.
+output: prefixed
+set: [errexit, nounset, pipefail]
+
+vars:
+  GO_BUILD_TAGS: '{{.GO_BUILD_TAGS | default "sqlite_fts5"}}'
+  API_URL: '{{.API_URL | default "http://127.0.0.1:6680"}}'
+  WEB_DEV_PORT: '{{.WEB_DEV_PORT | default "6657"}}'
+  DEV_ROOT: '{{joinPath .ROOT_DIR ".local" "dev"}}'
+  DEV_CONFIG: '{{joinPath .DEV_ROOT "config" "server.toml"}}'
+  DEV_STATE_SCRIPT: '{{joinPath .ROOT_DIR "scripts" "dev-state.sh"}}'
+
+# Keep these at the orchestration boundary so Server and Desktop commands get
+# the same CGo allowlist locally and in CI.
+env:
+  CGO_LDFLAGS_ALLOW: -Xpreprocessor
+  CGO_CFLAGS_ALLOW: -Xpreprocessor
+
+tasks:
+  default:
+    desc: List available repository tasks
+    silent: true
+    cmds:
+      - task --list
+
+  setup:
+    desc: Install repository dependencies and development tools
+    cmds:
+      - task: server:install
+      - task: dev:config
+      - task: web:install
+      - task: site:install
+      - task: tools:install
+      - task: hooks:install
+
+  dev:
+    desc: Start Server and Web development processes
+    cmds:
+      - task: dev:config
+      - task: dev:services
+
+  dev:services:
+    internal: true
+    deps:
+      - server:dev
+      - web:dev
+
+  test:
+    desc: Run repository architecture, Server, and Web tests
+    cmds:
+      - task: architecture:check
+      - task: test:modules
+
+  test:modules:
+    internal: true
+    deps:
+      - server:test
+      - web:test
+
+  dto:
+    desc: Generate OpenAPI, TypeScript types, and API documentation
+    cmds:
+      - task: server:openapi
+      - task: web:openapi-types
+      - task: site:openapi-docs
+
+  architecture:check:
+    desc: Check repository architecture constraints
+    cmds:
+      - ./scripts/check-architecture.sh
+
+  compose:test:
+    desc: Validate every Docker Compose configuration
+    cmds:
+      - docker compose -f deploy/compose/compose.yml config --quiet
+      - >-
+        LUMILIO_STORAGE=/srv/lumilio/media
+        LUMILIO_STATE=/srv/lumilio/state
+        LUMILIO_DOMAIN=photos.example.com
+        docker compose -f deploy/compose/compose.caddy.yml config --quiet
+      - >-
+        LUMILIO_STORAGE=/srv/lumilio/media
+        LUMILIO_STATE=/srv/lumilio/state
+        docker compose -f deploy/compose/compose.acme.yml config --quiet
+      - docker compose -f web/e2e/compose.yml -f web/e2e/compose.ci.yml config --quiet
+
+  config:examples:
+    desc: Regenerate runtime configuration schema and examples
+    cmds:
+      - task: server:config-examples
+
+  dev:config:
+    desc: Initialize local development state and generate server.toml
+    cmds:
+      - sh "{{.DEV_STATE_SCRIPT}}" init "{{.ROOT_DIR}}"
+      - task: server:config-init
+
+  dev:clean:
+    desc: Clean generated local development files
+    cmds:
+      - sh "{{.DEV_STATE_SCRIPT}}" clean "{{.ROOT_DIR}}"
+
+  dev:reset:
+    desc: Reset local development state
+    cmds:
+      - sh "{{.DEV_STATE_SCRIPT}}" reset "{{.ROOT_DIR}}"
+
+  dev:purge:
+    desc: Permanently remove local development state
+    prompt: This permanently deletes local development state, including media. Continue?
+    cmds:
+      - CONFIRM_DEV_PURGE=dev-purge sh "{{.DEV_STATE_SCRIPT}}" purge "{{.ROOT_DIR}}"
+
+  hooks:install:
+    desc: Configure repository Git hooks
+    if: git rev-parse --git-dir >/dev/null 2>&1
+    cmds:
+      - git config --local core.hooksPath .githooks
+
+  tools:install:
+    desc: Install required development CLIs when missing
+    cmds:
+      - task: tools:wasm-pack
+      - task: tools:swag
+
+  tools:wasm-pack:
+    internal: true
+    status:
+      - command -v wasm-pack >/dev/null 2>&1
+    cmds:
+      - cmd: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        platforms: [linux, darwin]
+      - cmd: cargo install wasm-pack
+        platforms: [windows]
+
+  tools:swag:
+    internal: true
+    status:
+      - command -v swag >/dev/null 2>&1
+    cmds:
+      - go install github.com/swaggo/swag/v2/cmd/swag@v2.0.0-rc5
+
+  # CI contracts. GitHub Actions provisions runners, native packages, caches,
+  # credentials, and artifacts; these tasks own repository command semantics.
+  ci:architecture:
+    desc: Run architecture and Compose CI gates
+    cmds:
+      - task: architecture:check
+      - task: compose:test
+
+  ci:server:
+    desc: Run the standalone Server CI gate
+    cmds:
+      - task: server:test
+
+  ci:web:
+    desc: Install and test the Web application in CI mode
+    cmds:
+      - task: web:install:ci
+      - task: web:test
+
+  ci:site:
+    desc: Install and build the documentation site in CI mode
+    cmds:
+      - task: site:install:ci
+      - task: site:build
+
+  ci:desktop:panel:
+    desc: Install and build the Desktop control panel frontend
+    cmds:
+      - task: desktop:frontend:install:ci
+      - task: desktop:frontend:build
+
+  ci:desktop:native:
+    desc: Test embedded Server and Desktop modules, then compile Desktop
+    cmds:
+      - task: server:test
+      - task: desktop:test:ci
+      - task: desktop:compile

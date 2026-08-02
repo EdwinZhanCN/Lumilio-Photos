@@ -77,6 +77,18 @@ type OperatorControls struct {
 	// the Desktop host. Standalone leaves it nil; no HTTP path or secret is
 	// created by this hook.
 	RepositoryManagerReady func(RepositoryControl)
+	// RuntimeReady is called once, after the listener, migrations, and core
+	// workers are available. Desktop uses this typed handoff instead of probing
+	// its own loopback listener to establish generation ownership.
+	RuntimeReady func(RuntimeInfo)
+}
+
+// RuntimeInfo describes the listener published by one server generation. It
+// intentionally contains no mutable server handles; RepositoryManagerReady is
+// the separate handoff for the in-process storage control plane.
+type RuntimeInfo struct {
+	Listen     string
+	ProductURL string
 }
 
 // Run boots the API server from an already-resolved configuration and blocks
@@ -686,6 +698,12 @@ func run(
 		}
 		appLogger.Info("restored SQLite runtime generation is healthy", zap.String("operation", "database.restore"))
 	}
+	if controls.RuntimeReady != nil {
+		controls.RuntimeReady(RuntimeInfo{
+			Listen:     appConfig.ServerConfig.Listen,
+			ProductURL: productURL(appConfig.ServerConfig.Listen),
+		})
+	}
 
 	appLogger.Info("server starting",
 		zap.String("operation", "server.listen"),
@@ -737,6 +755,17 @@ func run(
 	}
 	appLogger.Info("shutdown complete", zap.String("operation", "server.shutdown"))
 	return nil
+}
+
+func productURL(listen string) string {
+	listen = strings.TrimSpace(listen)
+	if strings.HasPrefix(listen, ":") {
+		listen = "127.0.0.1" + listen
+	}
+	if strings.HasPrefix(listen, "0.0.0.0:") {
+		listen = "127.0.0.1:" + strings.TrimPrefix(listen, "0.0.0.0:")
+	}
+	return "http://" + listen
 }
 
 type riverStopper interface {

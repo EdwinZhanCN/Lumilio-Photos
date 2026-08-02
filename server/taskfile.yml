@@ -1,0 +1,76 @@
+# Server (Go API + embedded SQLite) tasks. Runs in the server/ directory.
+#
+# DEV_CONFIG / GO_BUILD_TAGS are injected by the root Taskfile include; the
+# `default` fallbacks at each use site keep standalone runs (`cd server && task
+# test`) working without shadowing the injected values.
+version: '3'
+
+env:
+  # cgo needs these for the libraw binding; see the root taskfile for details.
+  # Declared here (not only at the root) so standalone runs behave identically.
+  CGO_LDFLAGS_ALLOW: -Xpreprocessor
+  CGO_CFLAGS_ALLOW: -Xpreprocessor
+
+tasks:
+  install:
+    desc: Download Go module dependencies
+    cmds:
+      - go mod download
+
+  test:
+    desc: Run Go Server tests
+    env:
+      # Windows MSYS2 requires these (Go defaults CGO off and the mingw64 git
+      # breaks VCS stamping); harmless on Linux/macOS. CI no longer declares
+      # them, keeping platform test parameters in the Taskfile.
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    cmds:
+      - go test -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./...
+
+  test:ci:
+    desc: Run Go Server tests in CI mode with a clean cache
+    internal: true
+    env:
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    cmds:
+      # The mingw64 toolchain can reuse cgo objects linked against stale
+      # package paths; rebuild from a clean cache like the Desktop CI task.
+      - go clean -cache
+      - go test -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./...
+
+  dev:
+    desc: Start only the Go API against the development manifest
+    deps:
+      - ':dev:config'
+    preconditions:
+      - sh: 'test -n "{{.DEV_CONFIG}}"'
+        msg: 'DEV_CONFIG is empty; run from the repository root (task dev / task dev:config)'
+    cmds:
+      - go run -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./cmd --config '{{.DEV_CONFIG}}'
+
+  config-init:
+    desc: Generate the development manifest into .local/dev/config/server.toml
+    internal: true
+    preconditions:
+      - sh: 'test -n "{{.DEV_CONFIG}}"'
+        msg: 'DEV_CONFIG is empty; run from the repository root (task dev / task dev:config)'
+    cmds:
+      - go run -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./cmd config init --profile dev-vite --state-dir ../state --storage-dir ../storage --output '{{.DEV_CONFIG}}' --force
+
+  openapi:
+    desc: Generate the OpenAPI spec (server/docs/swagger.yaml)
+    cmds:
+      - swag init --v3.1 -g cmd/main.go -o docs/
+
+  config-examples:
+    desc: Regenerate the config schema and example manifests from profiles.go
+    cmds:
+      - go run ./tools/configgen >/dev/null
+      - go run ./tools/configgen
+
+  sqlc:
+    desc: Regenerate SQL code from the queries in internal/db/repo/queries
+    cmds:
+      - sqlc generate

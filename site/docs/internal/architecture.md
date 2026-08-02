@@ -18,12 +18,12 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/config/examples/` holds one complete manifest per deployment scenario
   (`dev/`, `desktop/`, `docker/`), generated from `server/config/profiles.go`.
   Because TOML comments cannot express conditional legality, a valid manifest
-  per scenario is what documents the matrix; `make dev` renders `dev-vite`
+  per scenario is what documents the matrix; `task dev` renders `dev-vite`
   into `.local/dev/config/server.toml`. Container images ship complete
   `docker-http` and `docker-caddy` manifests; ACME and custom operator
   manifests are generated into app-state by `server config init`. The
-  `desktop/supervisor/server.template.toml` is the versioned desktop compiler
-  input.
+  Desktop keeps a complete schema-v3 runtime intent and projects it through
+  the same strict `server/config` loader before calling `server/app`.
 - Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
 
 ## Backend
@@ -64,23 +64,34 @@ useful; implementation plans belong in `exec-plans/`.
 
 ## Desktop
 
-- `desktop/`: Wails v3 tray host; runs `server/app` and the machine-local
-  `library.sqlite3` in-process and serves the React SPA at `localhost:6680`.
-  Its supervisor owns the host-lifetime lock and one runtime generation.
-  App-data `config/runtime.toml` is the persistent schema-v3 intent; Desktop
-  validates it with `LoadAppConfigBytes`, projects host-owned paths, and writes
-  the immutable per-generation `config/server.toml` with mode `0600`.
-  Candidate apply is journaled and readiness-gated, with
-  `runtime.last-known-good.toml` rollback and launch-time reconciliation. The
-  host lock is acquired before runtime setup or Wails UI construction.
-  Recovery reads invalid active intent as raw, fingerprinted control-plane data
-  while every replacement candidate still passes the strict Server loader. The
-  private Wails Control Panel consumes the supervisor's typed runtime snapshot
-  and remains available after recoverable startup failures.
+- `desktop/`: Wails v3 tray host with a private React Settings window. `main.go`
+  only assembles services; `internal/host` owns Wails application/window/tray
+  adapters, while `internal/state` owns the immutable revisioned snapshot and
+  `internal/operation` owns request-id idempotency and aggregate mutation gates.
+- `internal/runtime` calls `server/app.Run` in-process and owns one guarded
+  Server generation. `RuntimeReady` and `RepositoryManagerReady` are the typed
+  readiness/Storage handoffs; Desktop never proves ownership by probing its own
+  HTTP listener. The product SPA remains in the system browser.
+- `internal/lumen` is an optional supervised child-process boundary with signed,
+  staged artifacts, an owner lock, parent-liveness contract, and platform
+  process-tree termination. Its install, desired, and process states remain
+  separate in the snapshot.
+- `internal/runtime/runtimeconfig`, `internal/resources`, and
+  `internal/update` use schema-versioned metadata, atomic files, fingerprints,
+  signatures, and explicit journals. `internal/storage` exposes only the typed
+  repository handoff and a discardable shortcut cache; no private HTTP bridge
+  exists.
+- Desktop onboarding materialises a complete candidate from the explicit
+  `desktop-local` profile, substitutes OS-owned paths, and runs the same strict
+  loader before exposing a small structured projection to React. Draft reads
+  and patches do not persist intent; Save/Apply is the only pointer-changing
+  boundary. The Settings UI is a sidebar-free Linear-style single column with
+  beUI controls and a six-destination Dock; full TOML is an optional Advanced
+  recovery surface, not a first-run requirement.
 
 ## Contracts
 
-- OpenAPI is the HTTP contract source of truth. Run `make dto` after backend API changes.
+- OpenAPI is the HTTP contract source of truth. Run `task dto` after backend API changes.
 - Do not hand-edit generated OpenAPI artifacts.
 - `storage.path` is registered at startup as the non-removable default Storage
   Location, identified by `.lumilioroot`; startup does not create repositories.

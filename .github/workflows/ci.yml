@@ -12,6 +12,10 @@ concurrency:
     group: ci-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
+# Ownership boundary: this workflow owns triggers, path filters, runner OS,
+# native packages, credentials, caches, Buildx, and artifacts. Repository
+# commands and their sequencing live in the Taskfiles (task ci:* / web:* /
+# desktop:* contracts); see third_party/MIGRATION.md.
 jobs:
     # Detect which subtrees changed so each gate only runs when relevant.
     changes:
@@ -38,12 +42,12 @@ jobs:
                   filters: |
                       server:
                           - 'server/**'
-                          - 'Makefile'
+                          - 'taskfile.yml'
                           - 'scripts/check-architecture.sh'
                           - '.github/workflows/ci.yml'
                       web:
                           - 'web/**'
-                          - 'Makefile'
+                          - 'taskfile.yml'
                           - '.github/workflows/ci.yml'
                       # Keep the required browser gate compact. This filter
                       # follows only the low-cost first-party journeys; heavier
@@ -51,7 +55,7 @@ jobs:
                       # below and share the same one-time E2E environment.
                       browser_smoke:
                           - '.github/workflows/ci.yml'
-                          - 'Makefile'
+                          - 'taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/Dockerfile'
                           - 'server/go.mod'
@@ -97,7 +101,7 @@ jobs:
                           - 'web/src/lib/http-commons/**'
                       auth_e2e:
                           - '.github/workflows/ci.yml'
-                          - 'Makefile'
+                          - 'taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/config/**'
                           - 'server/internal/api/handler/auth*.go'
@@ -112,7 +116,7 @@ jobs:
                           - 'web/src/lib/http-commons/client.ts'
                       video_e2e:
                           - '.github/workflows/ci.yml'
-                          - 'Makefile'
+                          - 'taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/internal/processors/video*.go'
                           - 'server/internal/processors/*transcode*.go'
@@ -128,7 +132,7 @@ jobs:
                           - 'web/src/features/settings/flows/ai/**'
                       recovery_e2e:
                           - '.github/workflows/ci.yml'
-                          - 'Makefile'
+                          - 'taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/Dockerfile'
                           - 'server/internal/db/backup/**'
@@ -142,7 +146,7 @@ jobs:
                       desktop:
                           - 'desktop/**'
                           - 'server/**'
-                          - 'Makefile'
+                          - 'taskfile.yml'
                           - '.github/workflows/ci.yml'
                       site:
                           - 'site/**'
@@ -155,6 +159,11 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
             - uses: actions/setup-go@v6
               with:
                   go-version-file: server/go.mod
@@ -165,37 +174,46 @@ jobs:
             - name: Install CGo package metadata
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev
+                  # libheif plugins give vips AVIF/HEIC encode-decode (hard requirement
+                  # for export?format=avif) — noble splits them into plugin packages.
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libheif-plugin-aomenc libheif-plugin-libde265
 
-            - run: make architecture-check
-            - run: make compose-test
+            - name: Run architecture and Compose gates
+              run: task ci:architecture
 
     # Linux is the standalone Server deployment target. macOS and Windows run
     # the same complete Server suite below as part of their Desktop App gates,
     # because the App hosts server/app in-process rather than a smaller runtime.
     server-linux:
-        name: server linux (make server-test)
+        name: server linux (Task)
         needs: changes
         if: needs.changes.outputs.server == 'true'
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v7
 
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
             - uses: actions/setup-go@v6
               with:
                   go-version-file: server/go.mod
                   cache-dependency-path: server/go.sum
 
-            # CGO headers for govips, libraw, and the vendored Vec1 source.
+            # CGO headers for govips, libraw, and the vendored Vec1 source; the
+            # libheif plugins cover AVIF/HEIC export (libvips loads them lazily).
             - name: Install libvips, libraw, and SQLite headers
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev
+                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev libheif-plugin-aomenc libheif-plugin-libde265
 
-            - run: make server-test
+            - name: Run Server CI gate
+              run: task ci:server
 
     web:
-        name: web (make web-test)
+        name: web (Task)
         needs: changes
         if: needs.changes.outputs.web_job == 'true'
         runs-on: ubuntu-latest
@@ -204,6 +222,11 @@ jobs:
             packages: read
         steps:
             - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
 
             - uses: voidzero-dev/setup-vp@v1
               with:
@@ -218,11 +241,12 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install dependencies
-              run: cd web && vp install --frozen-lockfile
+              run: task web:install:ci
 
             # Keyed on the lockfile, which changes when the Playwright version
             # does. A hit still needs `install-deps` for the apt libraries the
-            # browser links against.
+            # browser links against; the commands themselves live in the Web
+            # Taskfile (playwright:install / playwright:install:deps).
             - name: Cache Playwright browsers
               id: playwright-cache
               uses: actions/cache@v4
@@ -231,16 +255,16 @@ jobs:
                   key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
 
             - name: Install Playwright Chromium
-              run: |
-                  cd web
-                  if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-                      vp exec playwright install-deps chromium
-                  else
-                      vp exec playwright install --with-deps chromium
-                  fi
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              run: task web:playwright:install
 
-            - run: make web-test
+            - name: Install Playwright browser system dependencies
+              if: steps.playwright-cache.outputs.cache-hit == 'true'
+              run: task web:playwright:install:deps
+
+            - name: Run Web checks and unit tests
               if: needs.changes.outputs.web == 'true'
+              run: task web:test
 
             # A docker-container builder plus the ACTIONS_* runtime env let the
             # E2E image builds read and write the GitHub Actions layer cache;
@@ -252,25 +276,25 @@ jobs:
 
             - name: Start isolated E2E environment
               if: needs.changes.outputs.e2e == 'true'
-              run: cd web && vp run e2e:up
+              run: task web:e2e:up
               env:
                   LUMILIO_E2E_COMPOSE_EXTRA: web/e2e/compose.ci.yml
 
             - name: Run Chromium smoke
               if: needs.changes.outputs.browser_smoke == 'true'
-              run: make web-browser-test
+              run: task web:test:browser
 
             - name: Run authentication hardening regression
               if: needs.changes.outputs.auth_e2e == 'true'
-              run: make web-auth-hardening-test
+              run: task web:test:auth-hardening
 
             - name: Run video semantic regression
               if: needs.changes.outputs.video_e2e == 'true'
-              run: make web-video-semantic-test
+              run: task web:test:video-semantic
 
             - name: Run database backup and recovery regression
               if: needs.changes.outputs.recovery_e2e == 'true'
-              run: make web-backup-recovery-test
+              run: task web:test:backup-recovery
 
             - name: Capture E2E service logs
               if: ${{ failure() && needs.changes.outputs.e2e == 'true' }}
@@ -292,7 +316,7 @@ jobs:
 
             - name: Stop isolated E2E environment
               if: ${{ always() && needs.changes.outputs.e2e == 'true' }}
-              run: cd web && vp run e2e:down
+              run: task web:e2e:down
 
     # macOS and Windows intentionally validate the same product surface:
     # complete embedded Server tests, complete Desktop tests, and a native CGo
@@ -306,6 +330,11 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
             - uses: actions/setup-go@v6
               with:
                   go-version-file: desktop/go.mod
@@ -313,10 +342,10 @@ jobs:
                       desktop/go.sum
                       server/go.sum
 
-            # `make desktop-test` builds the Svelte control panel first, which
-            # needs `vp`. The panel's dependencies are all public, so it needs
-            # no GitHub Packages token, and `desktop-panel` runs `vp install`
-            # itself.
+            # `task ci:desktop:panel` builds the React control panel first,
+            # which needs `vp`. The panel's dependencies are all public, so it
+            # needs no GitHub Packages token, and `frontend:install:ci` runs
+            # `vp install` itself.
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
@@ -331,17 +360,17 @@ jobs:
             - name: Install libvips, libraw, and media tools
               run: brew install vips libraw ffmpeg exiftool
 
+            - name: Build control panel
+              run: task ci:desktop:panel
+
             - name: Run complete embedded Server tests
-              run: make server-test
+              run: task server:test
 
             - name: Run complete Desktop tests
-              run: |
-                  go clean -cache
-                  make desktop-test
+              run: task desktop:test:ci
 
             - name: Compile Desktop App
-              working-directory: desktop
-              run: go build -tags=sqlite_fts5 ./...
+              run: task desktop:compile
 
     # Windows uses the same test/build scope as macOS, but runs Go inside the
     # MSYS2/mingw64 environment that supplies the release CGo toolchain. The
@@ -356,13 +385,13 @@ jobs:
         needs: changes
         if: needs.changes.outputs.desktop == 'true'
         runs-on: windows-2025
-        env:
-            CGO_ENABLED: '1'
-            GOFLAGS: -buildvcs=false -tags=sqlite_fts5
-            CGO_LDFLAGS_ALLOW: -Xpreprocessor
-            CGO_CFLAGS_ALLOW: -Xpreprocessor
         steps:
             - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
 
             - uses: msys2/setup-msys2@v2
               with:
@@ -384,7 +413,7 @@ jobs:
                   cache: true
 
             - name: Build control panel
-              run: cd desktop/panel && vp install && vp run build
+              run: task ci:desktop:panel
 
             # MSYS2 ships ffmpeg/ffprobe but not exiftool. Desktop hostProjection
             # only needs a resolvable absolute path for strict manifest load in
@@ -408,24 +437,20 @@ jobs:
             - name: Run complete embedded Server tests
               shell: msys2 {0}
               run: |
-                  go clean -cache
                   go version
                   pkgconf --modversion vips libraw
-                  cd server
-                  go test ./...
+                  task server:test:ci
 
             - name: Run complete Desktop tests
               shell: msys2 {0}
               run: |
                   export PATH="${LUMILIO_TOOL_STUBS}:${PATH}"
-                  cd desktop
-                  go test ./...
+                  task desktop:test:ci
 
             - name: Compile Desktop App
               shell: msys2 {0}
               run: |
-                  cd desktop
-                  go build ./...
+                  task desktop:compile
 
     site:
         name: site (vitepress build)
@@ -434,6 +459,11 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
 
             # setup-vp provisions the runtime, the package manager pinned by
             # site/package.json, and install caching, so pnpm needs no separate
@@ -444,10 +474,10 @@ jobs:
                   cache: true
 
             - name: Install dependencies
-              run: cd site && vp install
+              run: task site:install:ci
 
             - name: Build docs site
-              run: cd site && vp run build
+              run: task site:build
 
     # This is the single stable branch-protection check. It always runs, even
     # when a path-filtered job is skipped, and verifies that every job which was
@@ -457,6 +487,7 @@ jobs:
         if: always()
         needs:
             - changes
+            - sqlite-architecture
             - server-linux
             - web
             - desktop-macos
@@ -467,6 +498,7 @@ jobs:
             - name: Require all applicable CI jobs
               env:
                   CHANGES_RESULT: ${{ needs.changes.result }}
+                  SQLITE_ARCHITECTURE_RESULT: ${{ needs.sqlite-architecture.result }}
                   SERVER_CHANGED: ${{ needs.changes.outputs.server }}
                   SERVER_RESULT: ${{ needs.server-linux.result }}
                   WEB_REQUIRED: ${{ needs.changes.outputs.web_job }}
@@ -481,6 +513,11 @@ jobs:
 
                   if [ "$CHANGES_RESULT" != "success" ]; then
                       echo "::error::changes job finished with $CHANGES_RESULT"
+                      exit 1
+                  fi
+
+                  if [ "$SQLITE_ARCHITECTURE_RESULT" != "success" ]; then
+                      echo "::error::sqlite architecture finished with $SQLITE_ARCHITECTURE_RESULT"
                       exit 1
                   fi
 

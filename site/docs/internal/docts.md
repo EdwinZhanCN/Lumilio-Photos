@@ -109,7 +109,7 @@ lint: {
 }
 ```
 
-The rule runs as part of `make web-test` / `vp check`. The `@edwinzhancn` scope
+The rule runs as part of `task web:test` / `vp check`. The `@edwinzhancn` scope
 is mapped to GitHub Packages in `web/.npmrc`; installing needs a `read:packages`
 token (local: your `~/.npmrc`; CI: a secret).
 
