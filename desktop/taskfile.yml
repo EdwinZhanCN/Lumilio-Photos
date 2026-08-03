@@ -70,8 +70,8 @@ tasks:
       GOFLAGS: -buildvcs=false
     cmds:
       # Cached cgo objects can bake in Homebrew Cellar paths that no longer
-      # exist after a runner-image brew bump; rebuild from a clean cache.
-      - go clean -cache
+      # exist after a runner-image brew bump; rebuild from clean caches.
+      - go clean -cache -testcache
       - go test -tags={{.GO_TAGS | default "sqlite_fts5"}} ./...
 
   compile:
@@ -93,7 +93,7 @@ tasks:
       CI: '1'
       VITE_GIT_HOOKS: '0'
     cmds:
-      - vp install
+      - vp install --frozen-lockfile
 
   frontend:build:
     summary: Builds the control panel frontend for production
