@@ -78,7 +78,7 @@ func Verify(root string, manifest Manifest) error {
 		if err := verifyFile(path, entry.SHA256); err != nil {
 			return fmt.Errorf("resource %s failed verification: %w", entry.LogicalName, err)
 		}
-		if entry.Mode != 0 && uint32(info.Mode().Perm()) != entry.Mode {
+		if entry.Mode != 0 && !fileModeMatches(info.Mode(), os.FileMode(entry.Mode)) {
 			return fmt.Errorf("resource %s has mode %o, want %o", entry.LogicalName, info.Mode().Perm(), entry.Mode)
 		}
 	}

@@ -61,10 +61,15 @@ func EnsurePrivateDirectory(path string) error {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("app-data path %q is not a private directory", path)
 	}
-	if info.Mode().Perm() != 0o700 {
-		if err := os.Chmod(path, 0o700); err != nil {
-			return fmt.Errorf("repair permissions for %q: %w", path, err)
-		}
+	if err := applyPrivateDirectoryMode(path); err != nil {
+		return fmt.Errorf("repair permissions for %q: %w", path, err)
+	}
+	private, err := directoryIsPrivate(path)
+	if err != nil {
+		return fmt.Errorf("verify permissions for %q: %w", path, err)
+	}
+	if !private {
+		return fmt.Errorf("app-data path %q is not private", path)
 	}
 	return nil
 }
