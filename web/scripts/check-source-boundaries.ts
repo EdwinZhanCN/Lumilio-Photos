@@ -54,15 +54,22 @@ const allowedLowerLayerFeatureImports = new Map([
   ],
 ]);
 
-function toPosix(value) {
+type ImportInfo = {
+  specifier: string;
+  typeOnly: boolean;
+};
+
+type Graph = Map<string, Set<string>>;
+
+function toPosix(value: string): string {
   return value.split(path.sep).join("/");
 }
 
-function relativeToSrc(filename) {
+function relativeToSrc(filename: string): string {
   return toPosix(path.relative(srcRoot, filename));
 }
 
-function shouldCheckFile(filename) {
+function shouldCheckFile(filename: string): boolean {
   const relative = relativeToSrc(filename);
   return (
     sourceExtensions.includes(path.extname(filename)) &&
@@ -73,13 +80,13 @@ function shouldCheckFile(filename) {
   );
 }
 
-function isTestFile(filename) {
+function isTestFile(filename: string): boolean {
   return /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(relativeToSrc(filename));
 }
 
-async function collectSourceFiles(directory) {
+async function collectSourceFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
+  const files: string[] = [];
 
   for (const entry of entries) {
     const filename = path.join(directory, entry.name);
@@ -93,7 +100,7 @@ async function collectSourceFiles(directory) {
   return files;
 }
 
-async function checkFeatureRootShape(violations) {
+async function checkFeatureRootShape(violations: string[]): Promise<void> {
   const featuresRoot = path.join(srcRoot, "features");
   const features = await readdir(featuresRoot, { withFileTypes: true });
 
@@ -104,7 +111,7 @@ async function checkFeatureRootShape(violations) {
       withFileTypes: true,
     });
     const entryNames = new Set(entries.map((entry) => entry.name));
-    const allowedDirectories = featureDirectoryExceptions.get(feature.name) ?? new Set();
+    const allowedDirectories = featureDirectoryExceptions.get(feature.name) ?? new Set<string>();
 
     for (const entry of entries) {
       if (
@@ -126,44 +133,44 @@ async function checkFeatureRootShape(violations) {
   }
 }
 
-function featureOf(filename) {
+function featureOf(filename: string): string | null {
   const parts = relativeToSrc(filename).split("/");
   return parts[0] === "features" && parts[1] ? parts[1] : null;
 }
 
-function rootLayerOf(filename) {
+function rootLayerOf(filename: string): string {
   return relativeToSrc(filename).split("/")[0] ?? "";
 }
 
-function isAllowedLowerLayerFeatureImport(importerRelative, specifier) {
+function isAllowedLowerLayerFeatureImport(importerRelative: string, specifier: string): boolean {
   return allowedLowerLayerFeatureImports.get(importerRelative)?.has(specifier) ?? false;
 }
 
-function importClauseIsTypeOnly(clause) {
+function importClauseIsTypeOnly(clause: ts.ImportClause | undefined): boolean {
   if (!clause) return false;
   if (clause.isTypeOnly) return true;
   if (clause.name) return false;
 
   const bindings = clause.namedBindings;
-  return (
+  return Boolean(
     bindings &&
     ts.isNamedImports(bindings) &&
     bindings.elements.length > 0 &&
-    bindings.elements.every((element) => element.isTypeOnly)
+    bindings.elements.every((element) => element.isTypeOnly),
   );
 }
 
-function exportClauseIsTypeOnly(node) {
+function exportClauseIsTypeOnly(node: ts.ExportDeclaration): boolean {
   if (node.isTypeOnly) return true;
-  return (
+  return Boolean(
     node.exportClause &&
     ts.isNamedExports(node.exportClause) &&
     node.exportClause.elements.length > 0 &&
-    node.exportClause.elements.every((element) => element.isTypeOnly)
+    node.exportClause.elements.every((element) => element.isTypeOnly),
   );
 }
 
-function readImports(filename, sourceText) {
+function readImports(filename: string, sourceText: string): ImportInfo[] {
   const sourceFile = ts.createSourceFile(
     filename,
     sourceText,
@@ -171,9 +178,9 @@ function readImports(filename, sourceText) {
     true,
     filename.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
-  const imports = [];
+  const imports: ImportInfo[] = [];
 
-  function visit(node) {
+  function visit(node: ts.Node): void {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       imports.push({
         specifier: node.moduleSpecifier.text,
@@ -204,7 +211,7 @@ function readImports(filename, sourceText) {
   return imports;
 }
 
-async function isFile(filename) {
+async function isFile(filename: string): Promise<boolean> {
   try {
     return (await stat(filename)).isFile();
   } catch {
@@ -212,8 +219,11 @@ async function isFile(filename) {
   }
 }
 
-async function resolveInternalImport(importer, specifier) {
-  let candidate;
+async function resolveInternalImport(
+  importer: string,
+  specifier: string,
+): Promise<string | null | undefined> {
+  let candidate: string;
   if (specifier.startsWith("@/")) {
     candidate = path.join(srcRoot, specifier.slice(2));
   } else if (specifier.startsWith(".")) {
@@ -242,21 +252,21 @@ async function resolveInternalImport(importer, specifier) {
   return undefined;
 }
 
-function isPublicFeatureImport(specifier, feature) {
+function isPublicFeatureImport(specifier: string, feature: string): boolean {
   if (specifier === `@/features/${feature}`) return true;
   const featureEntry = specifier.slice("@/features/".length);
   return allowedFeatureEntries.has(featureEntry);
 }
 
-function stronglyConnectedComponents(graph) {
+function stronglyConnectedComponents(graph: Graph): string[][] {
   let index = 0;
-  const indices = new Map();
-  const lowLinks = new Map();
-  const stack = [];
-  const onStack = new Set();
-  const components = [];
+  const indices = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const components: string[][] = [];
 
-  function connect(node) {
+  function connect(node: string): void {
     indices.set(node, index);
     lowLinks.set(node, index);
     index += 1;
@@ -266,21 +276,22 @@ function stronglyConnectedComponents(graph) {
     for (const neighbor of graph.get(node) ?? []) {
       if (!indices.has(neighbor)) {
         connect(neighbor);
-        lowLinks.set(node, Math.min(lowLinks.get(node), lowLinks.get(neighbor)));
+        lowLinks.set(node, Math.min(lowLinks.get(node)!, lowLinks.get(neighbor)!));
       } else if (onStack.has(neighbor)) {
-        lowLinks.set(node, Math.min(lowLinks.get(node), indices.get(neighbor)));
+        lowLinks.set(node, Math.min(lowLinks.get(node)!, indices.get(neighbor)!));
       }
     }
 
     if (lowLinks.get(node) !== indices.get(node)) return;
 
-    const component = [];
-    let member;
+    const component: string[] = [];
     do {
-      member = stack.pop();
+      const member = stack.pop();
+      if (member === undefined) throw new Error("Tarjan stack underflow");
       onStack.delete(member);
       component.push(member);
-    } while (member !== node);
+      if (member === node) break;
+    } while (stack.length > 0);
     components.push(component);
   }
 
@@ -294,10 +305,19 @@ function stronglyConnectedComponents(graph) {
 const files = await collectSourceFiles(srcRoot);
 const runtimeFiles = files.filter((filename) => !isTestFile(filename));
 const runtimeFileSet = new Set(runtimeFiles.map((filename) => path.resolve(filename)));
-const graph = new Map(runtimeFiles.map((filename) => [path.resolve(filename), new Set()]));
-const featureNames = new Set(runtimeFiles.map(featureOf).filter(Boolean));
-const featureGraph = new Map([...featureNames].map((feature) => [feature, new Set()]));
-const violations = [];
+const graph: Graph = new Map(
+  runtimeFiles.map((filename): [string, Set<string>] => [
+    path.resolve(filename),
+    new Set<string>(),
+  ]),
+);
+const featureNames = new Set(
+  runtimeFiles.map(featureOf).filter((feature): feature is string => Boolean(feature)),
+);
+const featureGraph: Graph = new Map(
+  [...featureNames].map((feature): [string, Set<string>] => [feature, new Set<string>()]),
+);
+const violations: string[] = [];
 let internalRuntimeEdges = 0;
 
 await checkFeatureRootShape(violations);
@@ -439,7 +459,7 @@ for (const filename of files) {
     }
 
     if (!importerIsTest && !typeOnly && runtimeFileSet.has(resolvedAbsolute)) {
-      graph.get(importer).add(resolvedAbsolute);
+      graph.get(importer)?.add(resolvedAbsolute);
       internalRuntimeEdges += 1;
     }
 
@@ -450,7 +470,7 @@ for (const filename of files) {
       importedFeature &&
       importerFeature !== importedFeature
     ) {
-      featureGraph.get(importerFeature).add(importedFeature);
+      featureGraph.get(importerFeature)?.add(importedFeature);
     }
   }
 }

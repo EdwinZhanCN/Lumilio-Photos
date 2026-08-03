@@ -19,7 +19,7 @@ const compose = [
   "lumilio-photos-e2e",
 ];
 
-/** Bootstrap admin created by `e2e/support/seed.mjs`. */
+/** Bootstrap admin created by `e2e/support/seed.ts`. */
 const bootstrap = {
   username: process.env.LUMILIO_E2E_USERNAME ?? "e2e-admin",
   password: process.env.LUMILIO_E2E_PASSWORD ?? "Lumilio-E2E-2026!",

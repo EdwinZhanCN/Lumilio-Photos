@@ -155,7 +155,7 @@ importers:
         specifier: ^1.9.17
         version: 1.9.21
       '@types/node':
-        specifier: ^25.0.10
+        specifier: ^25.6.2
         version: 25.6.2
       '@types/qrcode':
         specifier: ^1.5.6

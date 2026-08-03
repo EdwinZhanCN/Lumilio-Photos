@@ -32,7 +32,7 @@ async function getDepthPipeline(): Promise<DepthPipeline> {
       const transformers = await import("@huggingface/transformers");
       // Fully self-hosted: model from public/models, onnxruntime wasm from
       // public/ort — no HuggingFace CDN at runtime (vendored by
-      // scripts/fetch-depth-model.mjs). Keeps the app local-first. In the browser
+      // scripts/fetch-depth-model.ts). Keeps the app local-first. In the browser
       // allowLocalModels defaults to false, so it must be turned on explicitly.
       transformers.env.allowLocalModels = true;
       transformers.env.allowRemoteModels = false;

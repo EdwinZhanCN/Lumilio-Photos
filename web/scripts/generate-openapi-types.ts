@@ -9,13 +9,25 @@ const document = parse(await readFile(inputPath, "utf8"));
 
 const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
 
-function isGeneratedEmptyObject(schema) {
+type OpenApiOperation = {
+  requestBody?: {
+    required?: boolean;
+    content?: Record<string, { schema?: Record<string, unknown> }>;
+  };
+};
+
+type OpenApiDocument = {
+  paths?: Record<string, Record<string, OpenApiOperation>>;
+};
+
+function isGeneratedEmptyObject(schema: unknown): boolean {
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) return false;
-  const keys = Object.keys(schema);
-  return schema.type === "object" && keys.every((key) => key === "type");
+  const record = schema as Record<string, unknown>;
+  const keys = Object.keys(record);
+  return record.type === "object" && keys.every((key) => key === "type");
 }
 
-function normalizeRequiredJsonBodies(openapi) {
+function normalizeRequiredJsonBodies(openapi: OpenApiDocument): number {
   let normalized = 0;
 
   for (const pathItem of Object.values(openapi.paths ?? {})) {
@@ -27,6 +39,7 @@ function normalizeRequiredJsonBodies(openapi) {
       const media = requestBody.content?.["application/json"];
       const alternatives = media?.schema?.oneOf;
       if (!Array.isArray(alternatives)) continue;
+      if (!media?.schema) continue;
 
       const meaningful = alternatives.filter((schema) => !isGeneratedEmptyObject(schema));
       if (meaningful.length === alternatives.length) continue;
@@ -36,7 +49,7 @@ function normalizeRequiredJsonBodies(openapi) {
         );
       }
 
-      media.schema = meaningful[0];
+      media.schema = meaningful[0] as Record<string, unknown>;
       normalized += 1;
     }
   }
@@ -44,7 +57,7 @@ function normalizeRequiredJsonBodies(openapi) {
   return normalized;
 }
 
-const normalizedCount = normalizeRequiredJsonBodies(document);
+const normalizedCount = normalizeRequiredJsonBodies(document as OpenApiDocument);
 const nodes = await openapiTS(document);
 await writeFile(outputPath, astToString(nodes));
 console.log(`Generated ${outputPath}; normalized ${normalizedCount} required JSON request bodies.`);

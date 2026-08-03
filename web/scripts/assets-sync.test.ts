@@ -4,9 +4,9 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { parseLock, selectProfile, validateMaterializedAssets } from "./assets-sync.mjs";
+import { parseLock, selectProfile, validateMaterializedAssets } from "./assets-sync.ts";
 
-const digest = (value) => createHash("sha256").update(value).digest("hex");
+const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 
 await test("parseLock requires immutable revision and manifest hashes", () => {
   const lock = parseLock(

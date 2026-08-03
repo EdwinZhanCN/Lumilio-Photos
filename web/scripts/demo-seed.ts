@@ -1,6 +1,6 @@
 // Materializes the pinned `demo` asset profile into a running Lumilio instance
 // through the real setup, repository and upload APIs. Shares profile resolution
-// and verification with the E2E seed via assets-sync.mjs; the only difference is
+// and verification with the E2E seed via assets-sync.ts; the only difference is
 // that this profile selects the full demonstration pool instead of the minimal
 // smoke subset.
 import { readFile } from "node:fs/promises";
@@ -8,7 +8,7 @@ import { openAsBlob } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { selectProfile, syncAssets } from "./assets-sync.mjs";
+import { selectProfile, syncAssets } from "./assets-sync.ts";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(webRoot, "..");
@@ -18,7 +18,35 @@ const username = process.env.LUMILIO_DEMO_USERNAME ?? "lumilio-demo";
 const password = process.env.LUMILIO_DEMO_PASSWORD ?? "Lumilio-Demo-2026!";
 const repositoryName = process.env.LUMILIO_DEMO_REPOSITORY ?? "Lumilio Demo";
 
-function parseOptions(args) {
+type DemoOptions = {
+  concurrency: number;
+  timeoutMs: number;
+};
+
+type ApiOptions = {
+  method?: string;
+  body?: string;
+  token?: string;
+  form?: FormData;
+};
+
+type Repository = {
+  id: string;
+  name: string;
+};
+
+type CatalogAsset = {
+  id: string;
+  path: string;
+  sha256: string;
+  bytes: number;
+};
+
+type DemoAsset = CatalogAsset & {
+  absolutePath: string;
+};
+
+function parseOptions(args: string[]): DemoOptions {
   const options = { concurrency: 4, timeoutMs: 20 * 60 * 1000 };
   for (let index = 0; index < args.length; index += 1) {
     const [flag, inline] = args[index].split("=");
@@ -40,9 +68,11 @@ function parseOptions(args) {
   return options;
 }
 
-async function api(pathname, { method = "GET", body, token, form } = {}) {
-  /** @type {RequestInit} */
-  const request = {
+async function api<T = Record<string, unknown>>(
+  pathname: string,
+  { method = "GET", body, token, form }: ApiOptions = {},
+): Promise<T> {
+  const request: RequestInit = {
     method,
     headers: {
       ...(form ? {} : { "content-type": "application/json" }),
@@ -56,20 +86,20 @@ async function api(pathname, { method = "GET", body, token, form } = {}) {
   if (!response.ok) {
     throw new Error(`${method} ${pathname}: ${response.status} ${JSON.stringify(payload)}`);
   }
-  return payload;
+  return payload as T;
 }
 
 /** Brings an empty instance up to an authenticated admin session. */
-async function ensureAdmin() {
-  const status = await api("/api/v1/setup/status");
+async function ensureAdmin(): Promise<{ token: string }> {
+  const status = await api<{ admin_initialized: boolean }>("/api/v1/setup/status");
 
   if (!status.admin_initialized) {
-    return api("/api/v1/auth/register/start", {
+    return api<{ token: string }>("/api/v1/auth/register/start", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     });
   }
-  return api("/api/v1/auth/login", {
+  return api<{ token: string }>("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
@@ -86,12 +116,12 @@ async function ensureAdmin() {
  * the primary; when a primary already exists (e.g. a developer's real library),
  * the demo lands in a separate regular repository.
  */
-async function ensureRepository(token) {
-  const status = await api("/api/v1/setup/status");
+async function ensureRepository(token: string): Promise<Repository> {
+  const status = await api<{ primary_repository_initialized: boolean }>("/api/v1/setup/status");
 
   if (!status.primary_repository_initialized) {
     try {
-      const { repository } = await api("/api/v1/repositories", {
+      const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
         method: "POST",
         token,
         body: JSON.stringify({
@@ -109,11 +139,13 @@ async function ensureRepository(token) {
     }
   }
 
-  const { repositories } = await api("/api/v1/repositories", { token });
-  const existing = repositories?.find((candidate) => candidate.name === repositoryName);
+  const { repositories } = await api<{ repositories: Repository[] }>("/api/v1/repositories", {
+    token,
+  });
+  const existing = repositories?.find((candidate: Repository) => candidate.name === repositoryName);
   if (existing) return existing;
 
-  const { repository } = await api("/api/v1/repositories", {
+  const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
     method: "POST",
     token,
     body: JSON.stringify({
@@ -126,10 +158,10 @@ async function ensureRepository(token) {
   return repository;
 }
 
-async function countAssets(token, repositoryId) {
+async function countAssets(token: string, repositoryId: string): Promise<number> {
   // QueryAssetsResponseDTO.total_assets counts assets rather than browse items,
   // so stacking does not change the number.
-  const payload = await api("/api/v1/assets/list", {
+  const payload = await api<{ total_assets?: number }>("/api/v1/assets/list", {
     method: "POST",
     token,
     body: JSON.stringify({
@@ -140,10 +172,15 @@ async function countAssets(token, repositoryId) {
   return payload.total_assets ?? 0;
 }
 
-async function uploadAll(assets, token, repositoryId, concurrency) {
+async function uploadAll(
+  assets: DemoAsset[],
+  token: string,
+  repositoryId: string,
+  concurrency: number,
+): Promise<string[]> {
   let next = 0;
   let done = 0;
-  const failures = [];
+  const failures: string[] = [];
 
   async function worker() {
     while (next < assets.length) {
@@ -168,7 +205,12 @@ async function uploadAll(assets, token, repositoryId, concurrency) {
 }
 
 /** Ingestion continues after upload responses, so wait for the count to settle. */
-async function waitForIngestion(token, repositoryId, expected, timeoutMs) {
+async function waitForIngestion(
+  token: string,
+  repositoryId: string,
+  expected: number,
+  timeoutMs: number,
+): Promise<number> {
   const deadline = Date.now() + timeoutMs;
   let last = -1;
   while (Date.now() < deadline) {
@@ -178,7 +220,7 @@ async function waitForIngestion(token, repositoryId, expected, timeoutMs) {
       console.log(`  ingested ${total}/${expected}`);
       last = total;
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
   }
   throw new Error(`ingestion did not reach ${expected} assets before the timeout`);
 }
@@ -194,9 +236,16 @@ async function main() {
   });
   console.log(`${cached ? "Verified cached" : "Synchronized"} demo assets at ${target}`);
 
-  const catalog = JSON.parse(await readFile(path.join(target, "assets.json"), "utf8"));
-  const profile = JSON.parse(await readFile(path.join(target, "profiles/demo.json"), "utf8"));
-  const assets = selectProfile(catalog, profile, "demo").map((asset) => ({
+  const catalog = JSON.parse(await readFile(path.join(target, "assets.json"), "utf8")) as {
+    schemaVersion: number;
+    assets: CatalogAsset[];
+  };
+  const profile = JSON.parse(await readFile(path.join(target, "profiles/demo.json"), "utf8")) as {
+    schemaVersion: number;
+    name: string;
+    assets: string[];
+  };
+  const assets: DemoAsset[] = selectProfile(catalog, profile, "demo").map((asset) => ({
     ...asset,
     absolutePath: path.join(target, asset.path),
   }));
