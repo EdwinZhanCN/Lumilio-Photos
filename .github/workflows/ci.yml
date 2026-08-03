@@ -43,7 +43,6 @@ jobs:
                       server:
                           - 'server/**'
                           - 'taskfile.yml'
-                          - 'scripts/check-architecture.sh'
                           - '.github/workflows/ci.yml'
                       web:
                           - 'web/**'
@@ -56,6 +55,7 @@ jobs:
                       browser_smoke:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
+                          - 'web/taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/Dockerfile'
                           - 'server/go.mod'
@@ -102,6 +102,7 @@ jobs:
                       auth_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
+                          - 'web/taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/config/**'
                           - 'server/internal/api/handler/auth*.go'
@@ -117,6 +118,7 @@ jobs:
                       video_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
+                          - 'web/taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/internal/processors/video*.go'
                           - 'server/internal/processors/*transcode*.go'
@@ -133,6 +135,7 @@ jobs:
                       recovery_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
+                          - 'web/taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/Dockerfile'
                           - 'server/internal/db/backup/**'
@@ -150,6 +153,7 @@ jobs:
                           - '.github/workflows/ci.yml'
                       site:
                           - 'site/**'
+                          - 'taskfile.yml'
                           - '.github/workflows/ci.yml'
 
     sqlite-architecture:
@@ -241,7 +245,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install dependencies
-              run: task web:install:ci
+              run: task ci:web:install
 
             # Keyed on the lockfile, which changes when the Playwright version
             # does. A hit still needs `install-deps` for the apt libraries the
@@ -256,15 +260,15 @@ jobs:
 
             - name: Install Playwright Chromium
               if: steps.playwright-cache.outputs.cache-hit != 'true'
-              run: task web:playwright:install
+              run: task ci:web:playwright:install
 
             - name: Install Playwright browser system dependencies
               if: steps.playwright-cache.outputs.cache-hit == 'true'
-              run: task web:playwright:install:deps
+              run: task ci:web:playwright:install:deps
 
             - name: Run Web checks and unit tests
               if: needs.changes.outputs.web == 'true'
-              run: task web:test
+              run: task ci:web:test
 
             # A docker-container builder plus the ACTIONS_* runtime env let the
             # E2E image builds read and write the GitHub Actions layer cache;
@@ -276,25 +280,25 @@ jobs:
 
             - name: Start isolated E2E environment
               if: needs.changes.outputs.e2e == 'true'
-              run: task web:e2e:up
+              run: task ci:web:e2e:up
               env:
                   LUMILIO_E2E_COMPOSE_EXTRA: web/e2e/compose.ci.yml
 
             - name: Run Chromium smoke
               if: needs.changes.outputs.browser_smoke == 'true'
-              run: task web:test:browser
+              run: task ci:web:e2e:browser
 
             - name: Run authentication hardening regression
               if: needs.changes.outputs.auth_e2e == 'true'
-              run: task web:test:auth-hardening
+              run: task ci:web:e2e:auth-hardening
 
             - name: Run video semantic regression
               if: needs.changes.outputs.video_e2e == 'true'
-              run: task web:test:video-semantic
+              run: task ci:web:e2e:video-semantic
 
             - name: Run database backup and recovery regression
               if: needs.changes.outputs.recovery_e2e == 'true'
-              run: task web:test:backup-recovery
+              run: task ci:web:e2e:backup-recovery
 
             - name: Capture E2E service logs
               if: ${{ failure() && needs.changes.outputs.e2e == 'true' }}
@@ -316,7 +320,7 @@ jobs:
 
             - name: Stop isolated E2E environment
               if: ${{ always() && needs.changes.outputs.e2e == 'true' }}
-              run: task web:e2e:down
+              run: task ci:web:e2e:down
 
     # macOS and Windows intentionally validate the same product surface:
     # complete embedded Server tests, complete Desktop tests, and a native CGo
@@ -363,14 +367,8 @@ jobs:
             - name: Build control panel
               run: task ci:desktop:panel
 
-            - name: Run complete embedded Server tests
-              run: task server:test
-
-            - name: Run complete Desktop tests
-              run: task desktop:test:ci
-
-            - name: Compile Desktop App
-              run: task desktop:compile
+            - name: Run native Desktop CI gate
+              run: task ci:desktop:native
 
     # Windows uses the same test/build scope as macOS, but runs Go inside the
     # MSYS2/mingw64 environment that supplies the release CGo toolchain. The
@@ -434,23 +432,13 @@ jobs:
                   command -v ffprobe
                   command -v exiftool
 
-            - name: Run complete embedded Server tests
+            - name: Run native Desktop CI gate
               shell: msys2 {0}
               run: |
                   go version
                   pkgconf --modversion vips libraw
-                  task server:test:ci
-
-            - name: Run complete Desktop tests
-              shell: msys2 {0}
-              run: |
                   export PATH="${LUMILIO_TOOL_STUBS}:${PATH}"
-                  task desktop:test:ci
-
-            - name: Compile Desktop App
-              shell: msys2 {0}
-              run: |
-                  task desktop:compile
+                  task ci:desktop:native
 
     site:
         name: site (vitepress build)
@@ -473,11 +461,8 @@ jobs:
                   node-version: '24'
                   cache: true
 
-            - name: Install dependencies
-              run: task site:install:ci
-
-            - name: Build docs site
-              run: task site:build
+            - name: Install and build docs site
+              run: task ci:site
 
     # This is the single stable branch-protection check. It always runs, even
     # when a path-filtered job is skipped, and verifies that every job which was

@@ -70,11 +70,10 @@ jobs:
             # whose //go:embed frontend needs frontend/dist to exist — so the
             # control panel bundle must be built before the licenses task.
             - name: Build control panel frontend
-              run: task desktop:frontend:install:ci desktop:frontend:build
+              run: task ci:desktop:panel
 
             - name: Build web SPA
-              run: |
-                  cd web && VITE_GIT_HOOKS=0 vp install && vp build
+              run: task ci:web:build
 
             - name: Generate third-party notices
               run: task desktop:licenses
