@@ -26,6 +26,9 @@ services:
       - storage_data:/data/storage
       - app_state_data:/data/app-state
       - ./support/server.e2e.toml:/data/app-state/server.toml:ro
+    # The image default is the production Docker manifest. E2E mounts a
+    # complete test manifest above, so explicitly select it for this service.
+    command: ["server", "--config", "/data/app-state/server.toml"]
     ports:
       - "${LUMILIO_E2E_PORT:-16657}:6680"
     healthcheck:
