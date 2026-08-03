@@ -57,6 +57,9 @@ ARG VERSION=dev
 # Build API binary
 RUN go build -tags=sqlite_fts5 -ldflags "-X server/internal/version.Version=${VERSION}" -o /out/server ./cmd
 
+# Build the bind-mount permission and privilege-drop entrypoint.
+RUN go build -o /out/lumilio-entrypoint ./docker-entrypoint.go
+
 ############################################
 # Runtime
 ############################################
@@ -125,7 +128,7 @@ COPY --from=builder /out/server /usr/local/bin/server
 COPY --from=web-builder /web/dist /app/web
 COPY server/config/examples/docker/http.toml /app/config/docker-http.toml
 COPY server/config/examples/docker/caddy.toml /app/config/docker-caddy.toml
-COPY server/docker-entrypoint.sh /usr/local/bin/lumilio-entrypoint
+COPY --from=builder /out/lumilio-entrypoint /usr/local/bin/lumilio-entrypoint
 
 # Prepare storage path
 RUN chmod +x /usr/local/bin/lumilio-entrypoint \
