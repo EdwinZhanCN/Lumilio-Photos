@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
-import { constants } from 'node:fs'
+import { constants, type Dirent } from 'node:fs'
 import { dirname, extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
@@ -17,7 +17,7 @@ const sourceRoot = resolve(siteRoot, sourceArgumentIndex === -1 ? 'media' : proc
 const dryRun = process.argv.includes('--dry-run')
 const command = process.argv[2]
 
-const contentTypes = new Map([
+const contentTypes = new Map<string, string>([
   ['.avif', 'image/avif'],
   ['.gif', 'image/gif'],
   ['.jpeg', 'image/jpeg'],
@@ -28,12 +28,14 @@ const contentTypes = new Map([
   ['.webp', 'image/webp'],
 ])
 
-function usage() {
-  console.error('Usage: node scripts/media.mjs <manifest|sync|verify> [--source <directory>] [--dry-run]')
+type MediaManifest = Record<string, string>
+
+function usage(): void {
+  console.error('Usage: node scripts/media.ts <manifest|sync|verify> [--source <directory>] [--dry-run]')
   process.exitCode = 1
 }
 
-async function exists(path) {
+async function exists(path: string): Promise<boolean> {
   try {
     await access(path, constants.R_OK)
     return true
@@ -42,9 +44,9 @@ async function exists(path) {
   }
 }
 
-async function walk(directory) {
+async function walk(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
-  const files = await Promise.all(entries.map(async (entry) => {
+  const files = await Promise.all(entries.map(async (entry: Dirent): Promise<string[]> => {
     const path = join(directory, entry.name)
     if (entry.isDirectory()) return walk(path)
     return entry.isFile() ? [path] : []
@@ -52,12 +54,12 @@ async function walk(directory) {
   return files.flat()
 }
 
-async function sha256(path) {
+async function sha256(path: string): Promise<string> {
   return createHash('sha256').update(await readFile(path)).digest('hex')
 }
 
-async function mediaFiles() {
-  const files = []
+async function mediaFiles(): Promise<string[]> {
+  const files: string[] = []
   for (const directory of ['images', 'videos']) {
     const path = join(sourceRoot, directory)
     if (await exists(path)) files.push(...await walk(path))
@@ -65,11 +67,11 @@ async function mediaFiles() {
   return files.filter((file) => contentTypes.has(extname(file).toLowerCase())).sort()
 }
 
-async function createManifest() {
+async function createManifest(): Promise<MediaManifest> {
   const files = await mediaFiles()
   if (files.length === 0) throw new Error(`No media found below ${sourceRoot}/images or ${sourceRoot}/videos`)
 
-  const manifest = {}
+  const manifest: MediaManifest = {}
   for (const file of files) {
     const logicalPath = `/${relative(sourceRoot, file).split('\\').join('/')}`
     const digest = await sha256(file)
@@ -82,15 +84,26 @@ async function createManifest() {
   return manifest
 }
 
-async function loadManifest() {
+function isMediaManifest(value: unknown): value is MediaManifest {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && Object.values(value).every((objectKey) => typeof objectKey === 'string')
+}
+
+async function loadManifest(): Promise<MediaManifest> {
   if (!await exists(manifestPath)) {
     throw new Error(`Missing ${relative(siteRoot, manifestPath)}; run media:manifest first`)
   }
-  return JSON.parse(await readFile(manifestPath, 'utf8'))
+  const manifest: unknown = JSON.parse(await readFile(manifestPath, 'utf8'))
+  if (!isMediaManifest(manifest)) {
+    throw new Error(`Invalid media manifest at ${relative(siteRoot, manifestPath)}`)
+  }
+  return manifest
 }
 
-function runWrangler(args) {
-  return new Promise((resolveRun, rejectRun) => {
+function runWrangler(args: string[]): Promise<void> {
+  return new Promise<void>((resolveRun, rejectRun) => {
     const child = spawn('wrangler', args, { cwd: siteRoot, stdio: 'inherit' })
     child.once('error', rejectRun)
     child.once('exit', (code) => code === 0 ? resolveRun() : rejectRun(new Error(`wrangler exited with status ${code}`)))
@@ -118,7 +131,7 @@ async function sync() {
 
 async function verify() {
   const manifest = await loadManifest()
-  const failures = []
+  const failures: string[] = []
   for (const [logicalPath, objectKey] of Object.entries(manifest)) {
     const response = await fetch(`${origin}/${objectKey}`, { method: 'HEAD' })
     if (!response.ok) failures.push(`${logicalPath}: ${response.status}`)
