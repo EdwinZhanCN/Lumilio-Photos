@@ -122,6 +122,44 @@ export interface HostSnapshot {
     "recovery"?: Error;
 }
 
+export enum LumenControlPhase {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    LumenControlUnspecified = "unspecified",
+    LumenControlStarting = "starting",
+    LumenControlDownloading = "downloading",
+    LumenControlLoading = "loading",
+    LumenControlWarmup = "warmup",
+    LumenControlReady = "ready",
+    LumenControlFailed = "failed",
+    LumenControlStopping = "stopping",
+};
+
+export interface LumenControlStatus {
+    "connected": boolean;
+    "inferenceReady": boolean;
+    "phase": LumenControlPhase;
+    "version"?: string;
+    "backend"?: string;
+    "startedAtUnixMS"?: number;
+    "download"?: LumenDownloadProgress | null;
+    "services": LumenServiceStatus[] | null;
+    "error"?: Error | null;
+    "sequence": number;
+}
+
+export interface LumenDownloadProgress {
+    "model": string;
+    "file": string;
+    "bytesDone": number;
+    "bytesTotal": number;
+    "filesDone": number;
+    "filesTotal": number;
+}
+
 export enum LumenInstallPhase {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -133,6 +171,14 @@ export enum LumenInstallPhase {
     LumenInstalled = "installed",
     LumenInstallFailed = "failed",
 };
+
+export interface LumenLogEntry {
+    "timeUnixMS": number;
+    "level": string;
+    "target": string;
+    "message": string;
+    "fields": { [_ in string]?: string } | null;
+}
 
 export enum LumenProcessPhase {
     /**
@@ -148,6 +194,12 @@ export enum LumenProcessPhase {
     LumenFailed = "failed",
 };
 
+export interface LumenServiceStatus {
+    "service": string;
+    "phase": LumenControlPhase;
+    "error"?: Error | null;
+}
+
 export interface LumenSnapshot {
     "version": number;
     "installPhase": LumenInstallPhase;
@@ -156,6 +208,11 @@ export interface LumenSnapshot {
     "ownership": Ownership;
     "recoveryCause"?: ErrorCode;
     "profile"?: string;
+    "preset": string;
+    "cacheDir": string;
+    "availableProfiles": string[] | null;
+    "availablePresets": string[] | null;
+    "control": LumenControlStatus;
     "installerAvailable": boolean;
     "processAvailable": boolean;
     "presentation": ProcessPresentation;

@@ -3,6 +3,7 @@ package runtimeconfig
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"desktop/internal/control/dto"
@@ -94,6 +95,82 @@ func TestReadDraftGeneratesCompleteFirstRunIntent(t *testing.T) {
 	}
 	if pointer, err := store.CurrentPointer(); err != nil || pointer.Fingerprint != "" {
 		t.Fatalf("reading the first-run draft persisted configuration: %#v, %v", pointer, err)
+	}
+}
+
+func TestRuntimeConfigProjectsBundledMediaTools(t *testing.T) {
+	paths, err := platform.NewPaths(filepath.Join(t.TempDir(), "app-data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := paths.Ensure(); err != nil {
+		t.Fatal(err)
+	}
+	resources := t.TempDir()
+	for _, relative := range []string{
+		"exiftool/exiftool",
+		"ffmpeg/ffmpeg",
+		"ffmpeg/ffprobe",
+	} {
+		path := filepath.Join(resources, relative)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("create tool directory: %v", err)
+		}
+		if err := os.WriteFile(path, []byte("tool"), 0o755); err != nil {
+			t.Fatalf("write tool fixture: %v", err)
+		}
+	}
+	t.Setenv("LUMILIO_RESOURCES_DIR", resources)
+
+	store := NewStore(paths)
+	draft, err := store.ReadDraft()
+	if err != nil {
+		t.Fatalf("ReadDraft() error = %v", err)
+	}
+	for _, expected := range []string{
+		filepath.Join(resources, "exiftool", "exiftool"),
+		filepath.Join(resources, "ffmpeg", "ffmpeg"),
+		filepath.Join(resources, "ffmpeg", "ffprobe"),
+	} {
+		if !strings.Contains(draft.TOML, expected) {
+			t.Fatalf("draft does not contain bundled tool path %q:\n%s", expected, draft.TOML)
+		}
+	}
+
+	validation, err := store.Validate(filepath.Join(paths.RuntimeIntents, "candidate.toml"), []byte(draft.TOML))
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	if err := store.WriteIntent(validation); err != nil {
+		t.Fatal(err)
+	}
+	bundleExifTool := filepath.Join(resources, "exiftool", "exiftool")
+	bundleFFmpeg := filepath.Join(resources, "ffmpeg", "ffmpeg")
+	bundleFFprobe := filepath.Join(resources, "ffmpeg", "ffprobe")
+	legacyTOML := strings.NewReplacer(
+		bundleExifTool, "exiftool",
+		bundleFFmpeg, "ffmpeg",
+		bundleFFprobe, "ffprobe",
+	).Replace(draft.TOML)
+	legacyCanonical, err := Canonicalize([]byte(legacyTOML))
+	if err != nil {
+		t.Fatalf("canonicalize legacy intent: %v", err)
+	}
+	legacyValidation := Validation{Canonical: legacyCanonical, Fingerprint: Fingerprint(legacyCanonical)}
+	if err := store.WriteIntent(legacyValidation); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WritePointer(paths.RuntimeCurrent, legacyValidation.Fingerprint); err != nil {
+		t.Fatal(err)
+	}
+	config, err := store.LoadCurrentConfig()
+	if err != nil {
+		t.Fatalf("LoadCurrentConfig() error = %v", err)
+	}
+	if config.Tools.ExifToolPath != bundleExifTool ||
+		config.Tools.FFmpegPath != bundleFFmpeg ||
+		config.Tools.FFprobePath != bundleFFprobe {
+		t.Fatalf("projected tools = %+v", config.Tools)
 	}
 }
 

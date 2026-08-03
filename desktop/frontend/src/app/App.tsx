@@ -6,6 +6,7 @@ import {
   FolderOpen,
   FolderPlus,
   HardDrive,
+  Info,
   RefreshCw,
   RotateCcw,
   Server,
@@ -13,7 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   DesktopService,
@@ -24,9 +26,13 @@ import {
 } from "../../bindings/desktop/internal/control/index.js";
 import {
   LumenInstallPhase,
+  LumenControlPhase,
+  LumenProcessPhase,
   RuntimePhase,
   type DesktopPreferences,
   type DesktopSnapshot,
+  type LumenLogEntry,
+  type LumenSnapshot,
   type ProcessPresentation,
   type RuntimeConfigSettings,
   type StorageShortcut,
@@ -77,6 +83,45 @@ const dockRoutes = [
 ] as const;
 
 type MainRoute = (typeof dockRoutes)[number]["route"];
+
+type PresetCapability = {
+  id: "semantic" | "ocr" | "people" | "species";
+  model: string;
+  dataset?: string;
+};
+
+type PresetInfo = {
+  id: "minimal" | "basic" | "brave";
+  capabilities: PresetCapability[];
+};
+
+const presetCatalog: PresetInfo[] = [
+  {
+    id: "minimal",
+    capabilities: [
+      { id: "semantic", model: "siglip2-base-patch16-224" },
+      { id: "people", model: "antelopev2" },
+    ],
+  },
+  {
+    id: "basic",
+    capabilities: [
+      { id: "semantic", model: "siglip2-base-patch16-224" },
+      { id: "ocr", model: "pp-ocrv6-small" },
+      { id: "people", model: "antelopev2" },
+      { id: "species", model: "bioclip-2", dataset: "TreeOfLife200MCore" },
+    ],
+  },
+  {
+    id: "brave",
+    capabilities: [
+      { id: "semantic", model: "siglip2-so400m-patch14-384" },
+      { id: "ocr", model: "pp-ocrv6-small" },
+      { id: "people", model: "antelopev2" },
+      { id: "species", model: "bioclip-2", dataset: "TreeOfLife200M" },
+    ],
+  },
+];
 
 export function App() {
   const { t } = useTranslation();
@@ -152,7 +197,6 @@ export function App() {
             <AnimatedBadge
               status={presentationStatus(snapshot.runtime.presentation)}
               size="sm"
-              contentKey={`${snapshot.runtime.phase}-${snapshot.revision}`}
             >
               {snapshot.runtime.presentation.label}
             </AnimatedBadge>
@@ -699,14 +743,50 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
   const lumen = snapshot.lumen;
   const [state, setState] = useState<ButtonState>("idle");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState(lumen.profile || lumen.availableProfiles?.[0] || "");
+  const [selectedPreset, setSelectedPreset] = useState(lumen.preset || lumen.availablePresets?.[0] || "basic");
+  const [selectedCacheDir, setSelectedCacheDir] = useState(lumen.cacheDir || "");
+  const [presetInfoOpen, setPresetInfoOpen] = useState(false);
+  const [logLevel, setLogLevel] = useState("INFO");
+  const [logs, setLogs] = useState<LumenLogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
   const releaseReady = lumen.installerAvailable && lumen.processAvailable;
+
+  const loadLogs = useCallback(async () => {
+    if (lumen.processPhase !== LumenProcessPhase.LumenRunning || !lumen.control.connected) {
+      setLogs([]);
+      setLogsError(null);
+      return;
+    }
+    setLogsLoading(true);
+    try {
+      setLogs((await LumenService.GetLogs(200, logLevel)) ?? []);
+      setLogsError(null);
+    } catch (reason: unknown) {
+      setLogsError(errorMessage(reason));
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [logLevel, lumen.control.connected, lumen.processPhase]);
+
+  useEffect(() => {
+    if (lumen.processPhase !== LumenProcessPhase.LumenRunning || !lumen.control.connected) {
+      setLogs([]);
+      setLogsError(null);
+      return;
+    }
+    void loadLogs();
+    const timer = window.setInterval(() => void loadLogs(), 5000);
+    return () => window.clearInterval(timer);
+  }, [loadLogs, lumen.control.connected, lumen.processPhase]);
 
   const invoke = async (action: "install" | "start" | "stop" | "restart" | "retry") => {
     setState("loading");
     setActionError(null);
     const requestID = `lumen-${crypto.randomUUID()}`;
     try {
-      if (action === "install") await LumenService.Install(requestID, lumen.version, lumen.profile || "");
+      if (action === "install") await LumenService.Install(requestID, lumen.version, selectedProfile, selectedPreset, selectedCacheDir);
       else if (action === "start") await LumenService.Start(requestID, lumen.version);
       else if (action === "stop") await LumenService.Stop(requestID, lumen.version);
       else if (action === "restart") await LumenService.Restart(requestID, lumen.version);
@@ -721,9 +801,40 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
     }
   };
 
+  const setupMutable = lumen.installPhase === LumenInstallPhase.LumenAbsent || lumen.installPhase === LumenInstallPhase.LumenInstallFailed;
   const canInstall = lumen.installerAvailable
-    && Boolean(lumen.profile)
-    && (lumen.installPhase === LumenInstallPhase.LumenAbsent || lumen.installPhase === LumenInstallPhase.LumenInstallFailed);
+    && Boolean(selectedProfile)
+    && Boolean(selectedPreset)
+    && Boolean(selectedCacheDir)
+    && setupMutable;
+  const canChooseSetup = setupMutable && state !== "loading";
+
+  const chooseCacheDirectory = async () => {
+    try {
+      const path = await LumenService.PickCacheDirectory(t("lumen.chooseCacheDirectory", "Choose the Lumen model cache directory"));
+      if (path) {
+        setSelectedCacheDir(path);
+        setActionError(null);
+      }
+    } catch (reason: unknown) {
+      const message = errorMessage(reason);
+      setActionError(message);
+      showToast({ title: t("lumen.cachePickFailed", "Cache directory could not be selected"), description: message, status: "error" });
+    }
+  };
+
+  const presetLabel = (preset: string) => {
+    if (preset === "minimal") return t("lumen.presetNameMinimal", "Minimal");
+    if (preset === "brave") return t("lumen.presetNameBrave", "Brave");
+    if (preset === "basic") return t("lumen.presetNameBasic", "Basic");
+    return preset;
+  };
+
+  const backendLabel = (profile: string) => {
+    if (profile.endsWith("-metal")) return t("lumen.backendMetal", "Metal");
+    if (profile.endsWith("-gpu")) return t("lumen.backendGPU", "GPU (WGPU)");
+    return t("lumen.backendCPU", "CPU");
+  };
 
   return (
     <>
@@ -741,7 +852,55 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
 
       {releaseReady ? (
         <SettingsSection title={t("lumen.service")}>
-          <SettingRow title={t("lumen.installation")} description={lumen.profile ? `${t("lumen.profile")}: ${lumen.profile}` : t("lumen.noProfile")}>
+          <SettingRow
+            title={
+              <span className="lumen-preset-title">
+                {t("lumen.preset", "Preset")}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lumen-preset-info"
+                  aria-label={t("lumen.presetInfo", "Show preset capabilities")}
+                  title={t("lumen.presetInfo", "Show preset capabilities")}
+                  onClick={() => setPresetInfoOpen(true)}
+                >
+                  <Info className="size-3.5" />
+                </Button>
+              </span>
+            }
+            description={t("lumen.presetDescription", "Choose which AI services and model sizes to install.")}
+          >
+            <Select value={selectedPreset} onValueChange={setSelectedPreset} disabled={!canChooseSetup} className="w-80 max-w-full">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(lumen.availablePresets ?? []).map((preset) => (
+                  <SelectItem key={preset} value={preset}>{presetLabel(preset)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingRow>
+          <SettingRow
+            title={t("lumen.backend", "Backend")}
+            description={t("lumen.backendDescription", "Backend determines which platform-specific Lumen Hub package is downloaded.")}
+          >
+            <Select value={selectedProfile} onValueChange={setSelectedProfile} disabled={!canChooseSetup} className="w-80 max-w-full">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(lumen.availableProfiles ?? []).map((profile) => (
+                  <SelectItem key={profile} value={profile}>{backendLabel(profile)} · {profile}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingRow>
+          <SettingRow
+            title={t("lumen.cacheDirectory", "Model cache")}
+            description={selectedCacheDir || t("lumen.cacheDirectoryDescription", "Choose where Lumen stores downloaded models.")}
+          >
+            <Button variant="secondary" size="sm" disabled={!canChooseSetup} onClick={() => void chooseCacheDirectory()}>
+              <FolderOpen className="size-3.5" /> {t("common.choose")}
+            </Button>
+          </SettingRow>
+          <SettingRow title={t("lumen.installation")} description={selectedProfile ? `${t("lumen.profile")}: ${selectedProfile}` : t("lumen.noProfile")}>
             <StatefulButton
               variant="secondary"
               size="sm"
@@ -769,9 +928,280 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
         </SettingsSection>
       ) : null}
 
+      {releaseReady && lumen.installPhase === LumenInstallPhase.LumenInstalled ? (
+        <LumenControlPanel lumen={lumen} />
+      ) : null}
+
+      {releaseReady && lumen.installPhase === LumenInstallPhase.LumenInstalled ? (
+        <SettingsSection
+          title={t("lumen.logs", "Control logs")}
+          description={t("lumen.logsDescription", "Structured logs from Lumen Control. The view refreshes every five seconds while Hub is running.")}
+        >
+          <div className="lumen-log-toolbar">
+            <Select value={logLevel} onValueChange={setLogLevel} disabled={!lumen.control.connected} className="compact-select">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] as const).map((level) => (
+                  <SelectItem key={level} value={level}>{level}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="secondary" size="sm" disabled={!lumen.control.connected || logsLoading} onClick={() => void loadLogs()}>
+              <RefreshCw className={logsLoading ? "size-3.5 animate-spin" : "size-3.5"} />
+              {t("common.refresh", "Refresh")}
+            </Button>
+          </div>
+          {logsError ? <InlineNotice tone="danger" title={t("lumen.logsUnavailable", "Logs unavailable")}>{logsError}</InlineNotice> : null}
+          <LumenLogViewer logs={logs} connected={lumen.control.connected} loading={logsLoading} />
+        </SettingsSection>
+      ) : null}
+
       {actionError ? <ActionNotice component={t("dock.lumen")} message={actionError} /> : null}
+      <PresetInfoModal open={presetInfoOpen} onClose={() => setPresetInfoOpen(false)} />
     </>
   );
+}
+
+const lumenPhaseOrder = [
+  LumenControlPhase.LumenControlStarting,
+  LumenControlPhase.LumenControlDownloading,
+  LumenControlPhase.LumenControlLoading,
+  LumenControlPhase.LumenControlWarmup,
+  LumenControlPhase.LumenControlReady,
+] as const;
+
+function LumenControlPanel({ lumen }: { lumen: LumenSnapshot }) {
+  const { t } = useTranslation();
+  const control = lumen.control;
+  const currentIndex = lumenPhaseOrder.indexOf(control.phase as (typeof lumenPhaseOrder)[number]);
+  const downloadPercent = control.download?.bytesTotal
+    ? Math.min(100, Math.max(0, (control.download.bytesDone / control.download.bytesTotal) * 100))
+    : null;
+
+  return (
+    <SettingsSection
+      title={t("lumen.controlStatus", "Control status")}
+      description={t("lumen.controlDescription", "Live lifecycle and model state reported by lumen.control.v1.")}
+    >
+      <div className="lumen-control-summary">
+        <div>
+          <span className="lumen-control-kicker">{t("lumen.inference", "Inference")}</span>
+          <strong>{control.inferenceReady ? t("lumen.ready", "Ready") : control.connected ? t("lumen.preparing", "Preparing") : t("lumen.disconnected", "Disconnected")}</strong>
+        </div>
+        <AnimatedBadge status={controlPhaseStatus(control.phase)} size="sm">{controlPhaseLabel(control.phase, t)}</AnimatedBadge>
+        <dl className="lumen-control-meta">
+          <div><dt>{t("lumen.version", "Version")}</dt><dd>{control.version || "—"}</dd></div>
+          <div><dt>{t("lumen.backend", "Backend")}</dt><dd>{control.backend || "—"}</dd></div>
+          <div><dt>{t("lumen.sequence", "Sequence")}</dt><dd>{control.sequence || "—"}</dd></div>
+        </dl>
+      </div>
+
+      {control.connected ? (
+        <ol className="lumen-phase-track" aria-label={t("lumen.lifecycle", "Lumen startup lifecycle")}>
+          {lumenPhaseOrder.map((phase, index) => (
+            <li key={phase} className={index < currentIndex ? "complete" : index === currentIndex ? "current" : undefined} aria-current={index === currentIndex ? "step" : undefined}>
+              <span aria-hidden />
+              <small>{controlPhaseLabel(phase, t)}</small>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <InlineNotice title={t("lumen.controlWaiting", "Waiting for Control")}>{t("lumen.controlWaitingDescription", "Start Lumen Hub to connect to its local control plane.")}</InlineNotice>
+      )}
+
+      {control.download ? (
+        <div className="lumen-download" aria-label={t("lumen.downloadProgress", "Model download progress")}>
+          <div className="lumen-download-heading">
+            <div><strong>{control.download.model || t("lumen.model", "Model")}</strong><span>{control.download.file || t("lumen.preparingDownload", "Preparing download")}</span></div>
+            <span className="tabular-value">{downloadPercent === null ? t("lumen.downloading", "Downloading") : `${downloadPercent.toFixed(1)}%`}</span>
+          </div>
+          <progress value={control.download.bytesDone} max={control.download.bytesTotal || undefined} />
+          <div className="lumen-download-meta">
+            <span>{formatBytes(control.download.bytesDone)}{control.download.bytesTotal ? ` / ${formatBytes(control.download.bytesTotal)}` : ""}</span>
+            <span>{t("lumen.filesProgress", "Files {{done}} / {{total}}", { done: control.download.filesDone, total: control.download.filesTotal })}</span>
+          </div>
+        </div>
+      ) : null}
+
+      {control.error ? <InlineNotice tone="danger" title={t("lumen.controlFailed", "Lumen startup failed")}>{control.error.message}</InlineNotice> : null}
+
+      <div className="lumen-services">
+        <div className="lumen-subheading"><h3>{t("lumen.services", "AI services")}</h3><span>{t("lumen.servicesReported", "{{count}} reported", { count: control.services?.length ?? 0 })}</span></div>
+        {control.services?.length ? control.services.map((service) => (
+          <div className="lumen-service-row" key={service.service}>
+            <div><strong>{serviceDisplayName(service.service)}</strong>{service.error ? <span>{service.error.message}</span> : null}</div>
+            <AnimatedBadge status={controlPhaseStatus(service.phase)} size="sm">{controlPhaseLabel(service.phase, t)}</AnimatedBadge>
+          </div>
+        )) : <p className="lumen-empty-copy">{control.connected ? t("lumen.servicesPending", "Service states will appear after model construction.") : t("lumen.servicesOffline", "No service state is available while Hub is stopped.")}</p>}
+      </div>
+    </SettingsSection>
+  );
+}
+
+function presetNameLabel(id: PresetInfo["id"], t: ReturnType<typeof useTranslation>["t"]) {
+  if (id === "minimal") return t("lumen.presetNameMinimal", "Minimal");
+  if (id === "brave") return t("lumen.presetNameBrave", "Brave");
+  return t("lumen.presetNameBasic", "Basic");
+}
+
+function presetDescriptionLabel(id: PresetInfo["id"], t: ReturnType<typeof useTranslation>["t"]) {
+  if (id === "minimal") return t("lumen.presetDescriptionMinimal", "Core semantic search and people recognition.");
+  if (id === "brave") return t("lumen.presetDescriptionBrave", "Higher-capacity semantic and species recognition models.");
+  return t("lumen.presetDescriptionBasic", "The complete everyday photo analysis set.");
+}
+
+function capabilityLabel(id: PresetCapability["id"], t: ReturnType<typeof useTranslation>["t"]) {
+  if (id === "semantic") return t("lumen.capabilitySemantic", "Image semantic analysis");
+  if (id === "ocr") return t("lumen.capabilityOCR", "OCR text recognition");
+  if (id === "people") return t("lumen.capabilityPeople", "People recognition");
+  return t("lumen.capabilitySpecies", "BioCLIP species recognition");
+}
+
+function PresetInfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="lumen-modal-root"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16 }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) onClose();
+          }}
+        >
+          <motion.section
+            className="lumen-preset-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lumen-preset-modal-title"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 360, damping: 30, mass: 0.75 }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="lumen-preset-modal-header">
+              <div>
+                <p className="lumen-control-kicker">{t("lumen.presetDetailsEyebrow", "Lumen setup")}</p>
+                <h2 id="lumen-preset-modal-title">{t("lumen.presetDetails", "Preset capabilities")}</h2>
+                <p>{t("lumen.presetDetailsDescription", "Compare the AI services, models, and datasets included with each preset.")}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t("common.close", "Close")}
+                title={t("common.close", "Close")}
+                onClick={onClose}
+              >
+                <X className="size-4" />
+              </Button>
+            </header>
+            <div className="lumen-preset-grid">
+              {presetCatalog.map((preset) => (
+                <article className="lumen-preset-card" key={preset.id}>
+                  <div className="lumen-preset-card-heading">
+                    <div>
+                      <h3>{presetNameLabel(preset.id, t)}</h3>
+                      <p>{presetDescriptionLabel(preset.id, t)}</p>
+                    </div>
+                    <span className="lumen-preset-code">{preset.id}</span>
+                  </div>
+                  <div className="lumen-capability-list">
+                    {preset.capabilities.map((capability) => (
+                      <div className="lumen-capability" key={capability.id}>
+                        <strong>{capabilityLabel(capability.id, t)}</strong>
+                        <span><em>{t("lumen.model", "Model")}</em>{capability.model}</span>
+                        <span><em>{t("lumen.dataset", "Dataset")}</em>{capability.dataset || t("lumen.datasetDefault", "Upstream model default")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </motion.section>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
+function LumenLogViewer({ logs, connected, loading }: { logs: LumenLogEntry[]; connected: boolean; loading: boolean }) {
+  const { t } = useTranslation();
+  if (!connected) return <p className="lumen-empty-copy lumen-log-empty">{t("lumen.logsOffline", "Start Lumen Hub to read Control logs.")}</p>;
+  if (!logs.length && loading) return <p className="lumen-empty-copy lumen-log-empty">{t("lumen.logsLoading", "Reading Control logs…")}</p>;
+  if (!logs.length) return <p className="lumen-empty-copy lumen-log-empty">{t("lumen.logsEmpty", "No log entries match this level.")}</p>;
+  return (
+    <div className="lumen-log-view" role="log" aria-label={t("lumen.logs", "Control logs")}>
+      {logs.map((entry, index) => (
+        <div className="lumen-log-line" key={`${entry.timeUnixMS}-${index}`} data-level={entry.level}>
+          <time>{formatLogTime(entry.timeUnixMS)}</time>
+          <span className="lumen-log-level">{entry.level}</span>
+          <span className="lumen-log-target">{entry.target}</span>
+          <span className="lumen-log-message">{entry.message}{formatLogFields(entry.fields)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function controlPhaseStatus(phase: LumenControlPhase): AnimatedBadgeStatus {
+  if (phase === LumenControlPhase.LumenControlReady) return "success";
+  if (phase === LumenControlPhase.LumenControlFailed) return "danger";
+  if (phase === LumenControlPhase.LumenControlUnspecified || phase === LumenControlPhase.LumenControlStopping) return "neutral";
+  return "warning";
+}
+
+function controlPhaseLabel(phase: LumenControlPhase, t: ReturnType<typeof useTranslation>["t"]) {
+  if (phase === LumenControlPhase.LumenControlStarting) return t("lumen.phaseStarting", "Starting");
+  if (phase === LumenControlPhase.LumenControlDownloading) return t("lumen.phaseDownloading", "Downloading");
+  if (phase === LumenControlPhase.LumenControlLoading) return t("lumen.phaseLoading", "Loading");
+  if (phase === LumenControlPhase.LumenControlWarmup) return t("lumen.phaseWarmup", "Warmup");
+  if (phase === LumenControlPhase.LumenControlReady) return t("lumen.phaseReady", "Ready");
+  if (phase === LumenControlPhase.LumenControlFailed) return t("lumen.phaseFailed", "Failed");
+  if (phase === LumenControlPhase.LumenControlStopping) return t("lumen.phaseStopping", "Stopping");
+  return t("lumen.phaseUnavailable", "Unavailable");
+}
+
+function serviceDisplayName(service: string) {
+  const names: Record<string, string> = { siglip: "SigLIP", face: "InsightFace", insightface: "InsightFace", ocr: "PP-OCR", ppocr: "PP-OCR", bioclip: "BioCLIP" };
+  return names[service] || service;
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  return `${(bytes / 1024 ** index).toFixed(index > 1 ? 1 : 0)} ${units[index]}`;
+}
+
+function formatLogTime(unixMS: number) {
+  if (!unixMS) return "--:--:--";
+  return new Date(unixMS).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function formatLogFields(fields: LumenLogEntry["fields"]) {
+  const entries = Object.entries(fields ?? {});
+  return entries.length ? ` · ${entries.map(([key, value]) => `${key}=${value}`).join(" ")}` : "";
 }
 
 function UpdatesPanel({

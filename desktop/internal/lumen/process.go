@@ -13,7 +13,7 @@ import (
 	"desktop/internal/operation"
 )
 
-// ReadinessProbe performs the Hub's authenticated version/profile handshake.
+// ReadinessProbe performs the Hub's protocol-level version/profile handshake.
 // A TCP listener alone is not sufficient evidence of ownership or readiness.
 type ReadinessProbe func(context.Context, string, string) error
 
@@ -27,6 +27,7 @@ type ExecFactory struct {
 	WorkDir      string
 	OwnerLock    string
 	Profile      string
+	Endpoint     string
 	Probe        ReadinessProbe
 	ProbeTimeout time.Duration
 }
@@ -54,6 +55,10 @@ func (f ExecFactory) Start(parent context.Context, id uint64, profile string) (P
 		"LUMILIO_LAUNCH_TOKEN="+owner.Token(),
 		"LUMILIO_PROFILE="+profile,
 		"LUMILIO_PARENT_LIVENESS=required",
+		// The Desktop Hub binds loopback. Advertising that same address keeps
+		// existing Desktop manifests (which predate the static node) working
+		// through mDNS without exposing inference on a LAN interface.
+		"ADVERTISE_IP=127.0.0.1",
 	)
 	configureProcessGroup(cmd)
 	closeChildLiveness, closeParentLiveness, err := attachParentLiveness(cmd)
@@ -85,6 +90,7 @@ func (f ExecFactory) Start(parent context.Context, id uint64, profile string) (P
 	finish := func() {
 		waitOnce.Do(func() {
 			err := cmd.Wait()
+			cancel()
 			_ = releaseProcessGroup()
 			_ = closeParentLiveness()
 			_ = owner.Close()
@@ -93,10 +99,12 @@ func (f ExecFactory) Start(parent context.Context, id uint64, profile string) (P
 		})
 	}
 	_ = closeChildLiveness()
+	// Wait immediately so an unexpected child exit is observable through Done.
+	// Cancellation paths also call finish; waitOnce keeps the single Wait owner.
+	go finish()
 	stop := func() {
 		cancel()
 		terminateProcessTree(cmd)
-		go finish()
 	}
 	go func() {
 		<-ctx.Done()
@@ -116,12 +124,12 @@ func (f ExecFactory) Start(parent context.Context, id uint64, profile string) (P
 			return
 		}
 		select {
-		case ready <- ReadyInfo{Endpoint: f.Binary}:
+		case ready <- ReadyInfo{Endpoint: f.Endpoint}:
 		case <-ctx.Done():
 		}
 	}()
 	_ = id // the process identity is tracked by Controller's Process.ID.
-	return Process{ID: id, Cancel: stop, Done: done, Ready: ready, Profile: profile}, nil
+	return Process{ID: id, Cancel: stop, Lifetime: ctx, Done: done, Ready: ready, Profile: profile}, nil
 }
 
 func operationError(code dto.ErrorCode, message string) error {

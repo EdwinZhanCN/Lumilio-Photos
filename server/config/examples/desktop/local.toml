@@ -192,7 +192,7 @@ discovery_mdns_enabled = true
 discovery_hub_url = ""
 
 # Explicit host:port Lumen nodes, tried regardless of discovery results.
-discovery_static_nodes = []
+discovery_static_nodes = ["127.0.0.1:50051"]
 
 # mDNS service type to browse.
 discovery_service_type = "_lumen._tcp"

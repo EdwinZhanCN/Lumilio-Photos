@@ -3,6 +3,7 @@ package lumen
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -23,6 +24,7 @@ func (p *fakeProcess) finish(err error) { p.finishOnce.Do(func() { p.done <- err
 type fakeFactory struct {
 	mu         sync.Mutex
 	processes  []*fakeProcess
+	statuses   <-chan dto.LumenControlStatus
 	autoStop   bool
 	blockReady bool
 }
@@ -33,7 +35,7 @@ func (f *fakeFactory) Start(_ context.Context, id uint64, profile string) (Proce
 	if !f.blockReady {
 		ready <- ReadyInfo{Endpoint: "unix:///tmp/lumen-test.sock"}
 	}
-	process := &fakeProcess{Process: Process{ID: id, Done: done, Ready: ready, Profile: profile}, done: done}
+	process := &fakeProcess{Process: Process{ID: id, Done: done, Ready: ready, Status: f.statuses, Profile: profile}, done: done}
 	process.Cancel = func() {
 		if f.autoStop {
 			process.finish(nil)
@@ -71,6 +73,7 @@ func newTestController(t *testing.T, factory *fakeFactory) *Controller {
 	controller := NewController(Options{
 		Store: store, Operations: operation.New(), Desired: NewMemoryDesiredState(dto.DesiredDisabled),
 		Factory: factory, Installer: fakeInstaller{}, Installed: true, InstalledVer: "lumen-test-v1", Profile: "balanced",
+		CacheDir:    t.TempDir(),
 		ReadyBudget: 100 * time.Millisecond, StopBudget: 20 * time.Millisecond,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -101,7 +104,12 @@ func TestControllerStartStopAndInstall(t *testing.T) {
 	factory := &fakeFactory{autoStop: true}
 	controller := newTestController(t, factory)
 
-	install, err := controller.Install("install", 0, "balanced")
+	cacheDir := controller.Snapshot().CacheDir
+	wantCacheDir, err := CanonicalCacheDirectory(cacheDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	install, err := controller.Install("install", 0, "balanced", "brave", cacheDir)
 	if err != nil {
 		t.Fatalf("install: %v", err)
 	}
@@ -111,6 +119,12 @@ func TestControllerStartStopAndInstall(t *testing.T) {
 	})
 	if got := controller.Snapshot().InstallPhase; got != dto.LumenInstalled {
 		t.Fatalf("install phase = %q, want installed", got)
+	}
+	if got := controller.Snapshot().Preset; got != "brave" {
+		t.Fatalf("preset = %q, want brave", got)
+	}
+	if got := controller.Snapshot().CacheDir; got != wantCacheDir {
+		t.Fatalf("cache dir = %q, want %q", got, wantCacheDir)
 	}
 
 	if _, err := controller.Start("start", 0); err != nil {
@@ -130,6 +144,101 @@ func TestControllerStartStopAndInstall(t *testing.T) {
 	})
 	if stopped.DesiredState != dto.DesiredDisabled {
 		t.Fatalf("desired state = %q, want disabled", stopped.DesiredState)
+	}
+}
+
+func TestControllerRejectsUnavailableInstallChoices(t *testing.T) {
+	controller := newTestController(t, &fakeFactory{})
+	cacheDir := controller.Snapshot().CacheDir
+	if _, err := controller.Install("bad-profile", 0, "windows-x64-gpu", "basic", cacheDir); operation.ErrorCodeOf(err) != dto.ErrorInvalidArgument {
+		t.Fatalf("profile error = %v", err)
+	}
+	if _, err := controller.Install("bad-preset", 0, "balanced", "huge", cacheDir); operation.ErrorCodeOf(err) != dto.ErrorInvalidArgument {
+		t.Fatalf("preset error = %v", err)
+	}
+	if _, err := controller.Install("bad-cache", 0, "balanced", "basic", string(filepath.Separator)); operation.ErrorCodeOf(err) != dto.ErrorInvalidArgument {
+		t.Fatalf("cache error = %v", err)
+	}
+}
+
+func TestControllerPicksCanonicalCacheDirectory(t *testing.T) {
+	controller := newTestController(t, &fakeFactory{})
+	want := t.TempDir()
+	wantCanonical, err := CanonicalCacheDirectory(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller.SetPickDirectory(func(title string) (string, error) {
+		if title != "Choose cache" {
+			t.Fatalf("picker title = %q", title)
+		}
+		return want, nil
+	})
+	got, err := controller.PickCacheDirectory("Choose cache")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != wantCanonical {
+		t.Fatalf("picked cache = %q, want %q", got, wantCanonical)
+	}
+}
+
+func TestControllerValidatesControlLogRequests(t *testing.T) {
+	controller := newTestController(t, &fakeFactory{})
+	if _, err := controller.Logs(200, "INFO"); operation.ErrorCodeOf(err) != dto.ErrorRuntimeNotReady {
+		t.Fatalf("stopped log error = %v", err)
+	}
+	if _, err := controller.Start("start-for-logs", 0); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool { return snapshot.ProcessPhase == dto.LumenRunning })
+	if _, err := controller.Logs(501, "INFO"); operation.ErrorCodeOf(err) != dto.ErrorInvalidArgument {
+		t.Fatalf("backlog error = %v", err)
+	}
+	if _, err := controller.Logs(20, "VERBOSE"); operation.ErrorCodeOf(err) != dto.ErrorInvalidArgument {
+		t.Fatalf("level error = %v", err)
+	}
+}
+
+func TestControllerPublishesControlStatusWithoutInvalidatingLifecycleVersion(t *testing.T) {
+	statuses := make(chan dto.LumenControlStatus, 3)
+	controller := newTestController(t, &fakeFactory{statuses: statuses})
+	if _, err := controller.Start("start-for-status", 0); err != nil {
+		t.Fatal(err)
+	}
+	running := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool {
+		return snapshot.ProcessPhase == dto.LumenRunning
+	})
+
+	statuses <- dto.LumenControlStatus{
+		Connected: true, Phase: dto.LumenControlDownloading,
+		StartedAtUnixMS: 100, Sequence: 2,
+	}
+	observed := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool {
+		return snapshot.Control.Sequence == 2
+	})
+	if observed.Version != running.Version {
+		t.Fatalf("control status changed lifecycle version from %d to %d", running.Version, observed.Version)
+	}
+
+	statuses <- dto.LumenControlStatus{
+		Connected: true, Phase: dto.LumenControlStarting,
+		StartedAtUnixMS: 100, Sequence: 1,
+	}
+	time.Sleep(10 * time.Millisecond)
+	if got := controller.Snapshot().Control.Sequence; got != 2 {
+		t.Fatalf("stale control sequence replaced current sequence: got %d, want 2", got)
+	}
+
+	statuses <- dto.LumenControlStatus{
+		Connected: true, Phase: dto.LumenControlReady,
+		StartedAtUnixMS: 200, Sequence: 1,
+	}
+	newProcessStatus := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool {
+		return snapshot.Control.StartedAtUnixMS == 200
+	})
+	if newProcessStatus.Control.Sequence != 1 {
+		t.Fatalf("new process sequence = %d, want 1", newProcessStatus.Control.Sequence)
 	}
 }
 

@@ -21,6 +21,7 @@ func TestSavePreservesLifecycleSettingsAndPublishesPreferences(t *testing.T) {
 	settings := runtimeconfig.DefaultSettings()
 	settings.OnboardingComplete = true
 	settings.RuntimeDesiredState = dto.DesiredRunning
+	settings.LumenPreset = "brave"
 	if err := runtimeconfig.SaveSettings(path, settings); err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +45,7 @@ func TestSavePreservesLifecycleSettingsAndPublishesPreferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !persisted.OnboardingComplete || persisted.RuntimeDesiredState != dto.DesiredRunning {
+	if !persisted.OnboardingComplete || persisted.RuntimeDesiredState != dto.DesiredRunning || persisted.LumenPreset != "brave" {
 		t.Fatalf("lifecycle settings were overwritten: %+v", persisted)
 	}
 	if persisted.Locale != "zh-CN" || persisted.Region != "china" || persisted.UpdateChannel != "beta" || !persisted.OpenProductOnLaunch {

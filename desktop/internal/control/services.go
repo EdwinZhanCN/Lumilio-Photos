@@ -236,7 +236,9 @@ func (s *StorageService) AttachRepository(requestID string, expectedVersion uint
 
 type LumenAdapter interface {
 	Snapshot() dto.LumenSnapshot
-	Install(string, uint64, string) (dto.OperationReceipt, error)
+	Logs(uint32, string) ([]dto.LumenLogEntry, error)
+	PickCacheDirectory(string) (string, error)
+	Install(string, uint64, string, string, string) (dto.OperationReceipt, error)
 	Start(string, uint64) (dto.OperationReceipt, error)
 	Stop(string, uint64) (dto.OperationReceipt, error)
 	Restart(string, uint64) (dto.OperationReceipt, error)
@@ -252,11 +254,25 @@ func (s *LumenService) GetSnapshot() dto.LumenSnapshot {
 	return s.Controller.Snapshot()
 }
 
-func (s *LumenService) Install(requestID string, version uint64, profile string) (dto.OperationReceipt, error) {
+func (s *LumenService) GetLogs(backlog uint32, minLevel string) ([]dto.LumenLogEntry, error) {
+	if s == nil || s.Controller == nil {
+		return nil, operation.NewError(dto.ErrorRuntimeNotReady, "Lumen controller is unavailable")
+	}
+	return s.Controller.Logs(backlog, minLevel)
+}
+
+func (s *LumenService) PickCacheDirectory(title string) (string, error) {
+	if s == nil || s.Controller == nil {
+		return "", operation.NewError(dto.ErrorRuntimeNotReady, "Lumen controller is unavailable")
+	}
+	return s.Controller.PickCacheDirectory(title)
+}
+
+func (s *LumenService) Install(requestID string, version uint64, profile, preset, cacheDir string) (dto.OperationReceipt, error) {
 	if s == nil || s.Controller == nil {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorRuntimeNotReady, "Lumen controller is unavailable")
 	}
-	return s.Controller.Install(requestID, version, profile)
+	return s.Controller.Install(requestID, version, profile, preset, cacheDir)
 }
 
 func (s *LumenService) Start(requestID string, version uint64) (dto.OperationReceipt, error) {

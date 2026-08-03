@@ -52,7 +52,7 @@ export function SettingRow({
   children,
   stacked = false,
 }: {
-  title: string;
+  title: ReactNode;
   description?: string;
   children: ReactNode;
   stacked?: boolean;

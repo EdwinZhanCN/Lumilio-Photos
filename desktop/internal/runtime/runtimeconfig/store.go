@@ -91,6 +91,10 @@ func Canonicalize(data []byte) ([]byte, error) {
 }
 
 func (s *Store) Validate(path string, data []byte) (Validation, error) {
+	data, err := s.projectHostMediaPaths(data)
+	if err != nil {
+		return Validation{}, err
+	}
 	canonical, err := Canonicalize(data)
 	if err != nil {
 		return Validation{}, err
@@ -100,6 +104,39 @@ func (s *Store) Validate(path string, data []byte) (Validation, error) {
 		return Validation{}, err
 	}
 	return Validation{Config: cfg, Canonical: canonical, Fingerprint: Fingerprint(canonical)}, nil
+}
+
+// projectHostMediaPaths projects host-specific media paths before strict
+// validation/loading. Existing manifests may still contain bare development
+// command names; the host projection repairs those at validation/startup.
+// Missing tools remain empty and are rejected by the strict Server loader
+// instead of falling back to an ambient package-manager PATH at runtime.
+func (s *Store) projectHostMediaPaths(data []byte) ([]byte, error) {
+	var document map[string]any
+	if err := toml.Unmarshal(data, &document); err != nil {
+		return nil, fmt.Errorf("parse runtime intent TOML: %w", err)
+	}
+	tools, err := requireTable(document, "tools")
+	if err != nil {
+		return nil, err
+	}
+	server, err := requireTable(document, "server")
+	if err != nil {
+		return nil, err
+	}
+	paths, err := platform.ResolveMediaToolPaths()
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range map[string]string{
+		"exiftool_path": paths.ExifTool,
+		"ffmpeg_path":   paths.FFmpeg,
+		"ffprobe_path":  paths.FFprobe,
+	} {
+		tools[key] = value
+	}
+	server["web_root"] = s.paths.WebRoot
+	return toml.Marshal(document)
 }
 
 // ReadDraft returns the current intent, or a complete Desktop-local candidate
@@ -315,6 +352,10 @@ func (s *Store) LoadCurrentConfig() (config.AppConfig, error) {
 		return config.AppConfig{}, fmt.Errorf("runtime is not configured")
 	}
 	data, err := s.LoadIntent(pointer.Fingerprint)
+	if err != nil {
+		return config.AppConfig{}, err
+	}
+	data, err = s.projectHostMediaPaths(data)
 	if err != nil {
 		return config.AppConfig{}, err
 	}

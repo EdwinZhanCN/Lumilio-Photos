@@ -268,7 +268,11 @@ func baseManifest(environment string, deploymentID string, logLevel string, l la
 }
 
 func desktopBase() manifest {
-	return baseManifest("production", "desktop", "info", desktopLayout())
+	m := baseManifest("production", "desktop", "info", desktopLayout())
+	// Desktop supervises its optional local Lumen Hub on loopback. mDNS remains
+	// enabled so an explicitly operated LAN Hub can still augment or replace it.
+	m.Lumen.DiscoveryStaticNodes = ptr([]string{"127.0.0.1:50051"})
+	return m
 }
 
 func dockerBase(inputs ProfileInputs) manifest {
