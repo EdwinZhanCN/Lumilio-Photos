@@ -38,16 +38,17 @@ tasks:
     cmds:
       - ./node_modules/.bin/redocly build-docs ../server/docs/swagger.yaml --output docs/public/redoc-static.html
 
-  media:
-    manifest:
-      desc: Generate the media manifest
-      cmds:
-        - node scripts/media.mjs manifest
-    sync:
-      desc: Sync versioned site media
-      cmds:
-        - node scripts/media.mjs sync
-    verify:
-      desc: Verify site media integrity
-      cmds:
-        - node scripts/media.mjs verify
+  media:manifest:
+    desc: Generate the media manifest
+    cmds:
+      - node scripts/media.ts manifest
+
+  media:sync:
+    desc: Sync versioned site media
+    cmds:
+      - node scripts/media.ts sync
+
+  media:verify:
+    desc: Verify site media integrity
+    cmds:
+      - node scripts/media.ts verify
