@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -950,7 +951,11 @@ func validDomainName(value string) bool {
 }
 func resolvePath(base, value string) string {
 	value = strings.TrimSpace(value)
-	if value == "" || filepath.IsAbs(value) {
+	// Docker and desktop example manifests use POSIX-rooted paths even when
+	// the examples are validated by the Windows Desktop build. filepath.IsAbs
+	// only recognizes paths native to the current OS, so also recognize a
+	// slash-rooted path before resolving it relative to the manifest.
+	if value == "" || filepath.IsAbs(value) || path.IsAbs(value) {
 		return filepath.Clean(value)
 	}
 	return filepath.Clean(filepath.Join(base, value))

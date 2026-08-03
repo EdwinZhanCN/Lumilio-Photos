@@ -101,7 +101,7 @@ func TestProfileScenarioInvariants(t *testing.T) {
 		}},
 		{ProfileDockerHTTP, func(t *testing.T, cfg AppConfig) {
 			if cfg.ServerConfig.Listen != ":6680" || cfg.ServerConfig.TLS.Mode != TLSModeOff ||
-				cfg.ServerConfig.WebRoot != "/app/web" {
+				cfg.ServerConfig.WebRoot != filepath.Clean("/app/web") {
 				t.Fatalf("Docker HTTP profile = %+v", cfg.ServerConfig)
 			}
 		}},

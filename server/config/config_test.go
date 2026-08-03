@@ -141,6 +141,13 @@ func TestLoadAppConfigBytesPreservesManifestBase(t *testing.T) {
 	}
 }
 
+func TestResolvePathKeepsPOSIXAbsolutePathsAbsolute(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "manifest")
+	if got, want := resolvePath(base, "/app/web"), filepath.Clean("/app/web"); got != want {
+		t.Fatalf("resolvePath(%q) = %q, want %q", "/app/web", got, want)
+	}
+}
+
 func TestLoadAppConfigRejectsUnknownRemovedAndMissingFields(t *testing.T) {
 	for name, contents := range map[string]string{
 		"unknown":        completeManifest + "\nunknown_field = true\n",
