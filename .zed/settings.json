@@ -1,0 +1,40 @@
+{
+  "languages": {
+    "TypeScript": {
+      "language_servers": [
+        "vtsls",
+        "!typescript-ls",
+        "!typescript-language-server",
+        "!eslint",
+        "..."
+      ]
+    },
+    "TSX": {
+      "language_servers": [
+        "vtsls",
+        "!typescript-ls",
+        "!typescript-language-server",
+        "!eslint",
+        "..."
+      ]
+    },
+    "JavaScript": {
+      "language_servers": [
+        "vtsls",
+        "!typescript-ls",
+        "!typescript-language-server",
+        "!eslint",
+        "..."
+      ]
+    },
+    "JSX": {
+      "language_servers": [
+        "vtsls",
+        "!typescript-ls",
+        "!typescript-language-server",
+        "!eslint",
+        "..."
+      ]
+    }
+  }
+}
