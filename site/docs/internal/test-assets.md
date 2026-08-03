@@ -17,7 +17,7 @@ media files here.
 
 ## Sync — `vp run assets:sync [--profile <name>]`
 
-`web/scripts/assets-sync.mjs`. Shallow-fetches the pinned revision with
+`web/scripts/assets-sync.ts`. Shallow-fetches the pinned revision with
 `GIT_LFS_SKIP_SMUDGE=1`, verifies `assets.json` against `manifestSha256`,
 sparse-checkouts only the selected profile's media + manifest, `git lfs pull`s
 just those files, verifies each file's `sha256`+`bytes`, and atomically
@@ -29,13 +29,13 @@ validated (revision+profile+manifest) and reused, so re-runs are cheap.
 Both seeders drive the real setup-status, repository, and upload HTTP APIs; they
 do not touch the catalog directly.
 
-- **`vp run demo:seed`** (`web/scripts/demo-seed.mjs`) — local demo. Syncs the
+- **`vp run demo:seed`** (`web/scripts/demo-seed.ts`) — local demo. Syncs the
   `demo` profile, creates/logs in admin
   `lumilio-demo` / `Lumilio-Demo-2026!`, creates a dedicated `Lumilio Demo`
   repository, uploads via `POST /api/v1/assets` against `http://localhost:6680`
   (`LUMILIO_DEMO_BASE_URL`), then waits for ingestion. Flags: `--concurrency`
   (1–8), `--timeout` (seconds).
-- **`vp run e2e:seed`** — `assets:sync` (smoke) + `e2e/support/seed.mjs` into the
+- **`vp run e2e:seed`** — `assets:sync` (smoke) + `e2e/support/seed.ts` into the
   e2e stack (base `:16657`, admin `e2e-admin`). The `web/e2e/compose.yml`
   stack is managed by `vp run e2e:up | e2e:down | e2e:logs`.
 

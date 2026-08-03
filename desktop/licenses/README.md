@@ -26,7 +26,7 @@ license). Regenerate dependency notices after dependency changes:
 
 ```sh
 cd web && vp install
-cd .. && node desktop/scripts/generate-third-party-notices.mjs
+cd .. && go run ./cmd/devtool notices
 ```
 
 The generator inventories runtime Go packages from `desktop/` and `server/`,

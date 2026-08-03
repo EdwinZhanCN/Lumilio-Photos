@@ -305,6 +305,30 @@ calls SDK defaults or env loading. ML and LLM feature settings remain
 runtime-mutable catalog settings and do not belong in `AppConfig`. Zero-shot
 classifier preview is exposed through `/api/v1/classifiers/preview`.
 
+Desktop installs a platform-specific, release-pinned Lumen Hub into private
+app-data and supervises it as a separate process tree. Its Hub configuration
+is rendered and validated from the same platform/backend/preset/region/cache
+selection model as the upstream CLI/Launcher. Before installation the Desktop
+control panel offers `minimal`, `basic`, and `brave`, together with the pinned
+backend artifacts supported by the current platform and a native model-cache
+directory picker. The selected preset and canonical non-root cache path are
+persisted together in host settings; the installed profile remains
+authoritative for the backend. Config generation reads that persisted cache
+path, falling back to the private Desktop model directory for legacy settings.
+It binds loopback port
+`50051`; the complete Desktop Server profiles name that
+endpoint as a static node. The Hub also advertises only its loopback address so
+older Desktop runtime intents can discover it through mDNS without exposing
+inference on a LAN interface; separately operated LAN nodes remain discoverable.
+Desktop readiness uses Lumen's versioned control gRPC service,
+not a TCP-listener probe, and the model download/warmup lifecycle remains
+independent from Server readiness. The Desktop host maintains a `WatchStatus`
+subscription and projects its phase, inference-ready bit, download progress,
+service states, release identity, and failures into the typed UI snapshot.
+Structured Control logs are queried with a bounded, non-following `TailLogs`
+request. Control telemetry is deliberately separate from the lifecycle version
+counter so a status frame cannot make a concurrent start/stop command stale.
+
 The app should remain useful when ML/LLM features are disabled.
 
 ## Quality Gate

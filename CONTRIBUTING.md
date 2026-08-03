@@ -70,6 +70,12 @@ not reset with the development instance.
 | `task web:test` | Run frontend type, lint, boundary, and unit checks |
 | `task desktop:test` | Run the Wails desktop race-test gate |
 | `task compose:test` | Validate production and E2E Compose files |
+| `task ci:architecture` | Run the architecture and Compose CI gates |
+| `task ci:server` | Run the clean-cache Server CI gate |
+| `task ci:web` | Install Web dependencies with the lockfile and run Web checks |
+| `task ci:site` | Install the documentation site with the lockfile and build it |
+| `task ci:desktop:panel` | Install and build the Desktop control-panel frontend |
+| `task ci:desktop:native` | Test Server and Desktop modules, then compile Desktop |
 | `task dto` | Regenerate OpenAPI, frontend API types, and API documentation |
 | `task config:examples` | Regenerate the configuration schema and TOML examples |
 | `task dev:clean` | Delete rebuildable development indexes and logs |
@@ -97,14 +103,24 @@ section in
 [FRONTEND.md](site/docs/internal/FRONTEND.md) when choosing frontend test
 file names and runners, including GPU and WebGL capability tests.
 
-Browser tests use an isolated Compose environment:
+The root `ci:*` targets are the commands used by GitHub Actions. Run them from
+the repository root when reproducing a workflow failure:
 
 ```bash
-cd web
-vp run e2e:up
-vp run e2e:seed
-vp run e2e:test --grep @smoke --workers=1
-vp run e2e:down
+task ci:architecture
+task ci:server
+task ci:web
+task ci:site
+task ci:desktop:panel
+task ci:desktop:native
+```
+
+Browser tests use an isolated Compose environment and the Web Taskfile targets:
+
+```bash
+task web:e2e:up
+task web:test:browser
+task web:e2e:down
 ```
 
 The repository also provides narrower root targets:
@@ -115,6 +131,11 @@ task web:test:auth-hardening
 task web:test:video-semantic
 task web:test:backup-recovery
 ```
+
+The matching CI E2E contracts are `task ci:web:e2e:browser`,
+`task ci:web:e2e:auth-hardening`, `task ci:web:e2e:video-semantic`, and
+`task ci:web:e2e:backup-recovery`. Playwright installation is exposed through
+`task ci:web:playwright:install` and `task ci:web:playwright:install:deps`.
 
 Versioned demo and E2E media comes from the
 [`Lumilio-Assets`](https://github.com/EdwinZhanCN/Lumilio-Assets) repository.
