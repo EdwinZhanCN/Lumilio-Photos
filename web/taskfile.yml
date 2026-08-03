@@ -50,14 +50,17 @@ tasks:
   check:boundaries:
     desc: Enforce frontend source boundaries
     cmds:
-      - vp node scripts/check-source-boundaries.mjs
+      - vp node scripts/check-source-boundaries.ts
 
   test:
     desc: Run frontend type, lint, boundary, and unit checks
+    env:
+      # Keep local task runs aligned with the CI Playwright/Vitest behavior.
+      CI: "1"
     cmds:
       - vp check --no-fmt --no-lint
       - vp lint
-      - vp node scripts/check-source-boundaries.mjs
+      - vp node scripts/check-source-boundaries.ts
       - vp test
 
   test:coverage:
@@ -70,48 +73,59 @@ tasks:
     cmds:
       - vp test watch
 
-  e2e:
-    up:
-      desc: Start the isolated E2E Compose environment
-      cmds:
-        - vp run e2e:up
-    down:
-      desc: Stop the isolated E2E Compose environment
-      cmds:
-        - vp run e2e:down
-    logs:
-      desc: Show E2E service logs
-      cmds:
-        - vp run e2e:logs
-    seed:
-      desc: Sync assets and seed the E2E environment
-      cmds:
-        - vp run e2e:seed
-    seed:video-semantic:
-      desc: Sync E2E-profile assets and seed for the video semantic regression
-      cmds:
-        - vp run e2e:seed:video-semantic
+  e2e:up:
+    desc: Start the isolated E2E Compose environment
+    cmds:
+      - vp run e2e:up
+
+  e2e:down:
+    desc: Stop the isolated E2E Compose environment
+    cmds:
+      - vp run e2e:down
+
+  e2e:logs:
+    desc: Show E2E service logs
+    cmds:
+      - vp run e2e:logs
+
+  e2e:seed:
+    desc: Sync assets and seed the E2E environment
+    cmds:
+      - vp run e2e:seed
+
+  e2e:seed:video-semantic:
+    desc: Sync E2E-profile assets and seed for the video semantic regression
+    cmds:
+      - vp run e2e:seed:video-semantic
 
   test:browser:
     desc: Run the Playwright smoke regression
+    env:
+      CI: "1"
     cmds:
       - task: e2e:seed
       - vp run e2e:test --grep @smoke --workers=1
 
   test:auth-hardening:
     desc: Run the authentication hardening regression
+    env:
+      CI: "1"
     cmds:
       - task: e2e:seed
       - vp run e2e:test --grep @auth-hardening --workers=1
 
   test:video-semantic:
     desc: Run the video semantic regression
+    env:
+      CI: "1"
     cmds:
       - task: e2e:seed:video-semantic
       - vp run e2e:test --grep @video-regression --workers=1
 
   test:backup-recovery:
     desc: Run the database backup and recovery regression
+    env:
+      CI: "1"
     cmds:
       - task: e2e:seed
       - vp run e2e:test --grep @backup-recovery --workers=1
@@ -119,7 +133,7 @@ tasks:
   openapi-types:
     desc: Regenerate frontend OpenAPI types from the server spec
     cmds:
-      - vp node scripts/generate-openapi-types.mjs
+      - vp node scripts/generate-openapi-types.ts
 
   playwright:install:
     desc: Install the Playwright Chromium browser with system dependencies

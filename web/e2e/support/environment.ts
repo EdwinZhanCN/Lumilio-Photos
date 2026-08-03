@@ -24,7 +24,7 @@ const compose = [
   "lumilio-photos-e2e",
 ];
 
-function run(args) {
+function run(args: string[]): void {
   const result = spawnSync("docker", args, { cwd: root, stdio: "inherit", env: process.env });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`docker ${args.join(" ")} failed (${result.status})`);
@@ -46,5 +46,5 @@ if (command === "up") {
 } else if (command === "logs") {
   run([...compose, "logs", "--no-color"]);
 } else {
-  throw new Error("usage: environment.mjs <up|down|logs>");
+  throw new Error("usage: environment.ts <up|down|logs>");
 }

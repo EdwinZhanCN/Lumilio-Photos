@@ -25,5 +25,5 @@
     },
     "types": ["node", "vite-plus/client", "vite-plus/test/globals"]
   },
-  "include": ["src", "e2e", "test", "playwright.config.ts", "vite.config.ts"]
+  "include": ["src", "e2e", "test", "playwright.config.ts", "vite.config.ts", "scripts"]
 }

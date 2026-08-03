@@ -9,11 +9,54 @@ import { fileURLToPath } from "node:url";
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(webRoot, "..");
 
-function sha256(bytes) {
+type AssetLock = {
+  schemaVersion: number;
+  repository: string;
+  revision: string;
+  profile: string;
+  manifestSha256: string;
+};
+
+type Asset = {
+  id: string;
+  path: string;
+  sha256: string;
+  bytes: number;
+};
+
+type AssetCatalog = {
+  schemaVersion: number;
+  assets: Asset[];
+};
+
+type AssetProfile = {
+  schemaVersion: number;
+  name: string;
+  assets: string[];
+};
+
+type RunOptions = {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  capture?: boolean;
+};
+
+type SyncOptions = {
+  lockPath: string;
+  cacheRoot: string;
+  profileName?: string;
+};
+
+type SyncResult = {
+  target: string;
+  cached: boolean;
+};
+
+function sha256(bytes: string | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function run(command, args, options = {}) {
+function run(command: string, args: string[], options: RunOptions = {}): string {
   const result = spawnSync(command, args, {
     cwd: options.cwd,
     encoding: "utf8",
@@ -30,8 +73,8 @@ function run(command, args, options = {}) {
   return options.capture ? result.stdout : "";
 }
 
-export function parseLock(raw) {
-  const lock = JSON.parse(raw);
+export function parseLock(raw: string): AssetLock {
+  const lock = JSON.parse(raw) as AssetLock;
   if (lock.schemaVersion !== 1) throw new Error("assets.lock.json must use schemaVersion 1");
   if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(lock.repository)) {
     throw new Error("assets.lock.json repository must be an HTTPS GitHub .git URL");
@@ -48,7 +91,11 @@ export function parseLock(raw) {
   return lock;
 }
 
-export function selectProfile(catalog, profile, profileName) {
+export function selectProfile(
+  catalog: AssetCatalog,
+  profile: AssetProfile,
+  profileName: string,
+): Asset[] {
   if (catalog.schemaVersion !== 1 || !Array.isArray(catalog.assets)) {
     throw new Error("assets.json must contain a schemaVersion 1 assets array");
   }
@@ -60,7 +107,7 @@ export function selectProfile(catalog, profile, profileName) {
     throw new Error(`profiles/${profileName}.json is invalid`);
   }
 
-  const catalogById = new Map();
+  const catalogById = new Map<string, Asset>();
   for (const asset of catalog.assets) {
     if (!asset.id || catalogById.has(asset.id))
       throw new Error(`duplicate or missing asset ID: ${asset.id}`);
@@ -89,7 +136,7 @@ export function selectProfile(catalog, profile, profileName) {
   });
 }
 
-export async function validateMaterializedAssets(root, assets) {
+export async function validateMaterializedAssets(root: string, assets: Asset[]): Promise<void> {
   for (const asset of assets) {
     const file = path.join(root, asset.path);
     const bytes = await readFile(file);
@@ -99,27 +146,34 @@ export async function validateMaterializedAssets(root, assets) {
   }
 }
 
-function readGitFile(gitRoot, revision, relativePath) {
+function readGitFile(gitRoot: string, revision: string, relativePath: string): string {
   return run("git", ["show", `${revision}:${relativePath}`], { cwd: gitRoot, capture: true });
 }
 
-function parseProfileArgument(args, fallback) {
+function parseProfileArgument(args: string[], fallback: string): string {
   let profile = fallback;
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--") continue;
     if (argument.startsWith("--profile=")) profile = argument.slice("--profile=".length);
-    else if (argument === "--profile") profile = args[++index];
-    else throw new Error(`unknown argument: ${argument}`);
+    else if (argument === "--profile") {
+      const value = args[++index];
+      if (!value) throw new Error("--profile requires a value");
+      profile = value;
+    } else throw new Error(`unknown argument: ${argument}`);
   }
   if (!/^[a-z0-9][a-z0-9-]*$/.test(profile ?? "")) throw new Error("profile is invalid");
   return profile;
 }
 
-async function validateCache(target, lock, profileName) {
+async function validateCache(
+  target: string,
+  lock: AssetLock,
+  profileName: string,
+): Promise<boolean> {
   const metadataPath = path.join(target, ".lumilio-assets-sync.json");
   if (!existsSync(metadataPath)) return false;
-  const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+  const metadata = JSON.parse(await readFile(metadataPath, "utf8")) as Partial<AssetLock>;
   if (
     metadata.revision !== lock.revision ||
     metadata.profile !== profileName ||
@@ -129,16 +183,20 @@ async function validateCache(target, lock, profileName) {
   }
   const manifestBytes = await readFile(path.join(target, "assets.json"));
   if (sha256(manifestBytes) !== lock.manifestSha256) return false;
-  const catalog = JSON.parse(manifestBytes);
+  const catalog = JSON.parse(manifestBytes.toString("utf8")) as AssetCatalog;
   const profile = JSON.parse(
     await readFile(path.join(target, `profiles/${profileName}.json`), "utf8"),
-  );
+  ) as AssetProfile;
   const assets = selectProfile(catalog, profile, profileName);
   await validateMaterializedAssets(target, assets);
   return true;
 }
 
-export async function syncAssets({ lockPath, cacheRoot, profileName }) {
+export async function syncAssets({
+  lockPath,
+  cacheRoot,
+  profileName,
+}: SyncOptions): Promise<SyncResult> {
   const lock = parseLock(await readFile(lockPath, "utf8"));
   const selectedProfile = profileName ?? lock.profile;
   if (!/^[a-z0-9][a-z0-9-]*$/.test(selectedProfile)) throw new Error("profile is invalid");
@@ -170,8 +228,8 @@ export async function syncAssets({ lockPath, cacheRoot, profileName }) {
       throw new Error("assets.json does not match assets.lock.json manifestSha256");
     }
     const profileRaw = readGitFile(temporary, "FETCH_HEAD", `profiles/${selectedProfile}.json`);
-    const catalog = JSON.parse(manifestRaw);
-    const profile = JSON.parse(profileRaw);
+    const catalog = JSON.parse(manifestRaw) as AssetCatalog;
+    const profile = JSON.parse(profileRaw) as AssetProfile;
     const assets = selectProfile(catalog, profile, selectedProfile);
 
     run("git", ["sparse-checkout", "init", "--no-cone"], { cwd: temporary });

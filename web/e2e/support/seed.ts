@@ -4,7 +4,21 @@ const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://localhost:16657";
 const username = process.env.LUMILIO_E2E_USERNAME ?? "e2e-admin";
 const password = process.env.LUMILIO_E2E_PASSWORD ?? "Lumilio-E2E-2026!";
 
-async function request(pathname, init = {}) {
+type RequestOptions = {
+  method?: string;
+  body?: string;
+  headers?: Record<string, string>;
+};
+
+type Repository = {
+  id: string;
+  is_primary?: boolean;
+};
+
+async function request<T = Record<string, unknown>>(
+  pathname: string,
+  init: RequestOptions = {},
+): Promise<T> {
   const response = await fetch(`${baseURL}${pathname}`, {
     ...init,
     headers: { "content-type": "application/json", ...init.headers },
@@ -14,30 +28,34 @@ async function request(pathname, init = {}) {
     throw new Error(
       `${init.method ?? "GET"} ${pathname}: ${response.status} ${JSON.stringify(body)}`,
     );
-  return body;
+  return body as T;
 }
 
-const status = await request("/api/v1/setup/status");
+const status = await request<{ admin_initialized: boolean }>("/api/v1/setup/status");
 
-let auth;
+let auth: { token: string };
 if (!status.admin_initialized) {
-  auth = await request("/api/v1/auth/register/start", {
+  auth = await request<{ token: string }>("/api/v1/auth/register/start", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
 } else {
-  auth = await request("/api/v1/auth/login", {
+  auth = await request<{ token: string }>("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
 }
 const headers = { authorization: `Bearer ${auth.token}` };
-const repositories = await request("/api/v1/repositories", { headers }).catch(() => ({
+const repositories = await request<{ repositories: Repository[] }>("/api/v1/repositories", {
+  headers,
+}).catch(() => ({
   repositories: [],
 }));
-let primary = repositories.repositories?.find((repository) => repository.is_primary);
+let primary: Repository | undefined = repositories.repositories?.find(
+  (repository) => repository.is_primary,
+);
 if (!primary) {
-  const created = await request("/api/v1/repositories", {
+  const created = await request<{ repository: Repository }>("/api/v1/repositories", {
     method: "POST",
     headers,
     body: JSON.stringify({

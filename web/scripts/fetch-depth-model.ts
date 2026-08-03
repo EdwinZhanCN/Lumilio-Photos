@@ -22,14 +22,14 @@ const MODEL_FILES = [
 const modelDir = path.join(webRoot, "public", "models", MODEL_ID);
 const ortDir = path.join(webRoot, "public", "ort");
 
-async function exists(p) {
+async function exists(p: string): Promise<boolean> {
   return fs.access(p).then(
     () => true,
     () => false,
   );
 }
 
-async function download(file) {
+async function download(file: string): Promise<void> {
   const dest = path.join(modelDir, file);
   if (await exists(dest)) {
     console.log(`✓ ${file} (cached)`);
