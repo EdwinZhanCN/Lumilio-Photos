@@ -395,6 +395,9 @@ jobs:
               with:
                   msystem: MINGW64
                   update: false
+                  # Keep tools installed by Windows actions, especially Task,
+                  # visible inside the MSYS2 shell used by the native gate.
+                  path-type: inherit
                   install: >-
                       git
                       mingw-w64-x86_64-go
