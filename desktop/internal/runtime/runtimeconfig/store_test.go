@@ -3,6 +3,7 @@ package runtimeconfig
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -107,11 +108,16 @@ func TestRuntimeConfigProjectsBundledMediaTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	resources := t.TempDir()
-	for _, relative := range []string{
-		"exiftool/exiftool",
-		"ffmpeg/ffmpeg",
-		"ffmpeg/ffprobe",
-	} {
+	suffix := ""
+	if runtime.GOOS == "windows" {
+		suffix = ".exe"
+	}
+	toolPaths := []string{
+		filepath.Join("exiftool", "exiftool"+suffix),
+		filepath.Join("ffmpeg", "ffmpeg"+suffix),
+		filepath.Join("ffmpeg", "ffprobe"+suffix),
+	}
+	for _, relative := range toolPaths {
 		path := filepath.Join(resources, relative)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatalf("create tool directory: %v", err)
@@ -127,11 +133,8 @@ func TestRuntimeConfigProjectsBundledMediaTools(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadDraft() error = %v", err)
 	}
-	for _, expected := range []string{
-		filepath.Join(resources, "exiftool", "exiftool"),
-		filepath.Join(resources, "ffmpeg", "ffmpeg"),
-		filepath.Join(resources, "ffmpeg", "ffprobe"),
-	} {
+	for _, relative := range toolPaths {
+		expected := filepath.Join(resources, relative)
 		if !strings.Contains(draft.TOML, expected) {
 			t.Fatalf("draft does not contain bundled tool path %q:\n%s", expected, draft.TOML)
 		}
@@ -144,9 +147,9 @@ func TestRuntimeConfigProjectsBundledMediaTools(t *testing.T) {
 	if err := store.WriteIntent(validation); err != nil {
 		t.Fatal(err)
 	}
-	bundleExifTool := filepath.Join(resources, "exiftool", "exiftool")
-	bundleFFmpeg := filepath.Join(resources, "ffmpeg", "ffmpeg")
-	bundleFFprobe := filepath.Join(resources, "ffmpeg", "ffprobe")
+	bundleExifTool := filepath.Join(resources, toolPaths[0])
+	bundleFFmpeg := filepath.Join(resources, toolPaths[1])
+	bundleFFprobe := filepath.Join(resources, toolPaths[2])
 	legacyTOML := strings.NewReplacer(
 		bundleExifTool, "exiftool",
 		bundleFFmpeg, "ffmpeg",

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestPathsUsePrivateSchemaAndRepairDirectoryMode(t *testing.T) {
+func TestPathsUsePrivateSchemaAndRepairDirectoryPrivacy(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "app-data")
 	paths, err := NewPaths(root)
 	if err != nil {
@@ -21,12 +21,12 @@ func TestPathsUsePrivateSchemaAndRepairDirectoryMode(t *testing.T) {
 	if err := paths.Ensure(); err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(paths.SecretsDir)
+	private, err := directoryIsPrivate(paths.SecretsDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o700 {
-		t.Fatalf("secrets mode = %o, want 700", info.Mode().Perm())
+	if !private {
+		t.Fatal("secrets directory is not private")
 	}
 }
 
