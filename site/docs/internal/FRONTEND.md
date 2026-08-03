@@ -138,7 +138,7 @@ For API changes:
 
 The checked-in fetch/query runtime comes from the official `openapi-fetch`,
 `openapi-react-query`, and `openapi-typescript-helpers` packages. `task dto`
-runs `web/scripts/generate-openapi-types.mjs`, which removes the known empty
+runs `web/scripts/generate-openapi-types.ts`, which removes the known empty
 object branch emitted by swag v2 for required JSON request bodies before type
 generation. Keep this normalization in the generator; never post-edit
 `schema.d.ts`.
@@ -243,7 +243,7 @@ The production web image uses Caddy:
 - The Home map waits until visible and requests a bounded preview. The Map route
   queries `/assets/map-points` with its current WGS-84 viewport; only Trips opts
   into draining all map-point and location-cluster pages.
-- `web/scripts/check-bundle-budget.mjs` enforces a 420 KiB gzip budget for the
+- `web/scripts/check-bundle-budget.ts` enforces a 420 KiB gzip budget for the
   production entry chunk as part of `task web:test:browser`.
 
 ## Z-Index Strategy

@@ -51,10 +51,27 @@ historical records, not required reading.
 
 ## Non-Negotiable Rules
 
-- Prefer root Task targets. Use `task server:test` for backend changes,
-  `task web:test` for frontend changes, `task desktop:test` for desktop changes,
-  and `task compose:test` for deployment changes. `task test` runs the
-  architecture, Server, and Web gates.
+- Prefer root Task targets for repository workflows. Use `task server:test` for
+  backend changes, `task web:test` for frontend changes, `task desktop:test` for
+  desktop changes, and `task compose:test` for deployment changes. These are
+  local development gates; `task test` intentionally runs only the architecture,
+  Server, and Web gates. It does not include Site, Desktop, or browser E2E.
+- The root `ci:*` targets are the CI contracts and must be runnable from the
+  repository root: `task ci:architecture`, `task ci:server`, `task ci:web`,
+  `task ci:site`, `task ci:desktop:panel`, and `task ci:desktop:native`.
+  Web CI slices use `task ci:web:playwright:*` and
+  `task ci:web:e2e:*`; use the corresponding `web:*` targets for local,
+  module-scoped runs.
+- Keep the Taskfile/workflow boundary explicit. `.github/workflows/*.yml`
+  owns triggers, path filters, runner and native dependency setup, credentials,
+  caches, Buildx, and artifacts. Taskfiles own repository commands, working
+  directories, sequencing, flags, and CI environment variables. Workflows
+  should invoke root `task ci:*` contracts rather than reimplementing repository
+  commands inline.
+- When adding or changing a CI-relevant Taskfile target, update the affected
+  workflow path filters in the same change. In particular, Web E2E filters must
+  include `web/taskfile.yml`, and Site/Server/Web filters must include the root
+  `taskfile.yml` when its orchestration changes.
 - Follow the frontend “Test layers” taxonomy in
   [FRONTEND.md](site/docs/internal/FRONTEND.md); do not invent test-file
   conventions.
