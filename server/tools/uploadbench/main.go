@@ -52,7 +52,7 @@ type config struct {
 	pollEvery   time.Duration
 	timeout     time.Duration
 	limit       int    // cap number of files (0 = all)
-	sampler     string // path to sample.sh; empty = do not spawn
+	sampler     string // path to a sampler executable or .go source; empty = do not spawn
 	sqlitePath  string // optional SQLite catalog path for exact river_job timing
 }
 
@@ -93,7 +93,7 @@ func parseFlags() config {
 	flag.StringVar(&pollRaw, "poll-interval", "1s", "completion poll interval")
 	flag.StringVar(&toRaw, "timeout", "60m", "overall completion timeout")
 	flag.IntVar(&cfg.limit, "limit", 0, "cap number of files uploaded (0 = all; useful for smoke tests)")
-	flag.StringVar(&cfg.sampler, "sampler", "", "path to sample.sh to spawn for resource sampling (empty = skip)")
+	flag.StringVar(&cfg.sampler, "sampler", "", "path to a resource sampler executable or .go source (empty = skip)")
 	flag.StringVar(&cfg.sqlitePath, "sqlite", "", "optional SQLite catalog path for exact river_job timing (removes the poll-cadence bound on completion latency)")
 	flag.Parse()
 

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -467,14 +468,19 @@ func postflight(ctx context.Context, rc *runContext) {
 	rc.qAfter, _ = rc.cli.queueSummary(ctx)
 }
 
-// startSampler optionally spawns sample.sh in the background and returns a stop
+// startSampler optionally spawns a resource sampler in the background and returns a stop
 // function. If cfg.sampler is empty the sampler is skipped.
 func startSampler(ctx context.Context, cfg config) func() {
 	if cfg.sampler == "" {
 		return func() {}
 	}
-	args := []string{cfg.sampler, cfg.outDir, fmt.Sprintf("%d", int(cfg.pollEvery.Seconds()))}
-	cmd := exec.Command("bash", args...)
+	commandArgs := []string{cfg.outDir, fmt.Sprintf("%d", int(cfg.pollEvery.Seconds()))}
+	var cmd *exec.Cmd
+	if strings.HasSuffix(strings.ToLower(cfg.sampler), ".go") {
+		cmd = exec.Command("go", append([]string{"run", cfg.sampler}, commandArgs...)...)
+	} else {
+		cmd = exec.Command(cfg.sampler, commandArgs...)
+	}
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
