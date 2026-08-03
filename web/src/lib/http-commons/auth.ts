@@ -15,7 +15,11 @@ const CSRF_TOKEN_KEY = "csrf_token";
 const MEDIA_TOKEN_KEY = "media_token";
 const MEDIA_TOKEN_EXPIRES_AT_KEY = "media_token_expires_at";
 
-const hasStorage = () => typeof localStorage !== "undefined";
+const hasStorage = () =>
+  typeof localStorage !== "undefined" &&
+  typeof localStorage.getItem === "function" &&
+  typeof localStorage.setItem === "function" &&
+  typeof localStorage.removeItem === "function";
 
 /**
  * Get the current access token from localStorage
