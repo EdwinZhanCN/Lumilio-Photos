@@ -9,12 +9,20 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as dto$0 from "./dto/models.js";
 
+export function GetLogs(backlog: number, minLevel: string): $CancellablePromise<dto$0.LumenLogEntry[] | null> {
+    return $Call.ByID(1550118414, backlog, minLevel);
+}
+
 export function GetSnapshot(): $CancellablePromise<dto$0.LumenSnapshot> {
     return $Call.ByID(3081089605);
 }
 
-export function Install(requestID: string, version: number, profile: string): $CancellablePromise<dto$0.OperationReceipt> {
-    return $Call.ByID(559805074, requestID, version, profile);
+export function Install(requestID: string, version: number, profile: string, preset: string, cacheDir: string): $CancellablePromise<dto$0.OperationReceipt> {
+    return $Call.ByID(559805074, requestID, version, profile, preset, cacheDir);
+}
+
+export function PickCacheDirectory(title: string): $CancellablePromise<string> {
+    return $Call.ByID(2488406303, title);
 }
 
 export function Restart(requestID: string, version: number): $CancellablePromise<dto$0.OperationReceipt> {

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"desktop/internal/control/dto"
 	"desktop/internal/platform"
@@ -23,6 +25,8 @@ type Settings struct {
 	OpenProductOnLaunch bool             `json:"openProductOnLaunch"`
 	RuntimeDesiredState dto.DesiredState `json:"runtimeDesiredState"`
 	LumenDesiredState   dto.DesiredState `json:"lumenDesiredState"`
+	LumenPreset         string           `json:"lumenPreset"`
+	LumenCacheDir       string           `json:"lumenCacheDir,omitempty"`
 }
 
 func DefaultSettings() Settings {
@@ -34,6 +38,7 @@ func DefaultSettings() Settings {
 		Theme:               "system",
 		RuntimeDesiredState: dto.DesiredStopped,
 		LumenDesiredState:   dto.DesiredDisabled,
+		LumenPreset:         "basic",
 	}
 }
 
@@ -58,6 +63,9 @@ func LoadSettings(path string) (Settings, error) {
 	if settings.LumenDesiredState == "" {
 		settings.LumenDesiredState = dto.DesiredDisabled
 	}
+	if settings.LumenPreset == "" {
+		settings.LumenPreset = "basic"
+	}
 	if settings.Locale == "" {
 		settings.Locale = "en"
 	}
@@ -75,6 +83,12 @@ func LoadSettings(path string) (Settings, error) {
 	}
 	if settings.LumenDesiredState != dto.DesiredDisabled && settings.LumenDesiredState != dto.DesiredRunning {
 		return Settings{}, fmt.Errorf("unsupported Lumen desired state %q", settings.LumenDesiredState)
+	}
+	if !validLumenPreset(settings.LumenPreset) {
+		return Settings{}, fmt.Errorf("unsupported Lumen preset %q", settings.LumenPreset)
+	}
+	if !validLumenCacheDir(settings.LumenCacheDir) {
+		return Settings{}, fmt.Errorf("invalid Lumen cache directory %q", settings.LumenCacheDir)
 	}
 	if settings.UpdateChannel != "" && settings.UpdateChannel != "stable" && settings.UpdateChannel != "beta" {
 		return Settings{}, fmt.Errorf("unsupported update channel %q", settings.UpdateChannel)
@@ -98,6 +112,12 @@ func SaveSettings(path string, settings Settings) error {
 	if settings.LumenDesiredState != dto.DesiredDisabled && settings.LumenDesiredState != dto.DesiredRunning {
 		return fmt.Errorf("unsupported Lumen desired state %q", settings.LumenDesiredState)
 	}
+	if !validLumenPreset(settings.LumenPreset) {
+		return fmt.Errorf("unsupported Lumen preset %q", settings.LumenPreset)
+	}
+	if !validLumenCacheDir(settings.LumenCacheDir) {
+		return fmt.Errorf("invalid Lumen cache directory %q", settings.LumenCacheDir)
+	}
 	if settings.UpdateChannel != "stable" && settings.UpdateChannel != "beta" {
 		return fmt.Errorf("unsupported update channel %q", settings.UpdateChannel)
 	}
@@ -115,4 +135,20 @@ func SaveSettings(path string, settings Settings) error {
 		return err
 	}
 	return platform.WriteAtomic(path, append(data, '\n'), 0o600)
+}
+
+func validLumenPreset(preset string) bool {
+	return preset == "minimal" || preset == "basic" || preset == "brave"
+}
+
+func validLumenCacheDir(path string) bool {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return true
+	}
+	if !filepath.IsAbs(path) {
+		return false
+	}
+	clean := filepath.Clean(path)
+	return filepath.Dir(clean) != clean
 }

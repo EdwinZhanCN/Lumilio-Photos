@@ -32,6 +32,9 @@ type Paths struct {
 	LumenVersions string
 	LumenCurrent  string
 	LumenInstall  string
+	LumenConfig   string
+	LumenModels   string
+	LumenOwner    string
 
 	UpdatesDir     string
 	UpdatesStaging string
@@ -115,6 +118,9 @@ func NewPaths(root string) (Paths, error) {
 		LumenVersions:      filepath.Join(lumenDir, "versions"),
 		LumenCurrent:       filepath.Join(lumenDir, "current.json"),
 		LumenInstall:       filepath.Join(lumenDir, "install.json"),
+		LumenConfig:        filepath.Join(lumenDir, "config.yaml"),
+		LumenModels:        filepath.Join(lumenDir, "models"),
+		LumenOwner:         filepath.Join(lumenDir, "owner.lock"),
 		UpdatesDir:         updatesDir,
 		UpdatesStaging:     filepath.Join(updatesDir, "staging"),
 		UpgradeFile:        filepath.Join(updatesDir, "upgrade.json"),
@@ -126,7 +132,7 @@ func (p Paths) Ensure() error {
 		p.Root, p.SecretsDir, p.LogsDir,
 		p.RuntimeDir, p.RuntimeIntents, p.RuntimeGenerations,
 		p.ResourcesDir, p.ResourcesVersions,
-		p.LumenDir, p.LumenVersions,
+		p.LumenDir, p.LumenVersions, p.LumenModels,
 		p.UpdatesDir, p.UpdatesStaging,
 	} {
 		if err := EnsurePrivateDirectory(path); err != nil {

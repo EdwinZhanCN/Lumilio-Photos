@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,11 +32,13 @@ var ErrControllerClosed = errors.New("Lumen controller is closed")
 // factory owns platform-specific process-group/Job Object setup; the actor
 // owns the single Done consumer.
 type Process struct {
-	ID      uint64
-	Cancel  context.CancelFunc
-	Done    <-chan error
-	Ready   <-chan ReadyInfo
-	Profile string
+	ID       uint64
+	Cancel   context.CancelFunc
+	Lifetime context.Context
+	Done     <-chan error
+	Ready    <-chan ReadyInfo
+	Status   <-chan dto.LumenControlStatus
+	Profile  string
 }
 
 type ReadyInfo struct {
@@ -53,6 +56,21 @@ type Installer interface {
 type DesiredStateStore interface {
 	Load(context.Context) (dto.DesiredState, error)
 	Save(context.Context, dto.DesiredState) error
+}
+
+type SetupStore interface {
+	SaveSetup(context.Context, string, string) error
+}
+
+type MemorySetupStore struct {
+	Preset   string
+	CacheDir string
+}
+
+func (s *MemorySetupStore) SaveSetup(_ context.Context, preset, cacheDir string) error {
+	s.Preset = preset
+	s.CacheDir = cacheDir
+	return nil
 }
 
 type MemoryDesiredState struct {
@@ -86,9 +104,15 @@ type Options struct {
 	Desired         DesiredStateStore
 	Factory         Factory
 	Installer       Installer
+	SetupStore      SetupStore
 	Installed       bool
 	InstalledVer    string
 	Profile         string
+	Preset          string
+	CacheDir        string
+	Profiles        []string
+	Presets         []string
+	Endpoint        string
 	CommandCapacity int
 	ReadyBudget     time.Duration
 	StopBudget      time.Duration
@@ -110,6 +134,8 @@ type command struct {
 	receipt      dto.OperationReceipt
 	generationID uint64
 	profile      string
+	preset       string
+	cacheDir     string
 }
 
 type resultKind string
@@ -121,6 +147,7 @@ const (
 	resultFailed    resultKind = "failed"
 	resultExited    resultKind = "exited"
 	resultStable    resultKind = "stable"
+	resultStatus    resultKind = "status"
 )
 
 type workerResult struct {
@@ -128,6 +155,8 @@ type workerResult struct {
 	kind        resultKind
 	process     *ownedProcess
 	profile     string
+	preset      string
+	cacheDir    string
 	version     string
 	err         error
 	ownership   bool
@@ -136,6 +165,7 @@ type workerResult struct {
 	cancelled   bool
 	preserve    bool
 	previous    dto.LumenSnapshot
+	status      dto.LumenControlStatus
 }
 
 type completion struct {
@@ -177,6 +207,7 @@ type Controller struct {
 	desired     DesiredStateStore
 	factory     Factory
 	installer   Installer
+	setupStore  SetupStore
 	readyBudget time.Duration
 	stopBudget  time.Duration
 	commands    chan command
@@ -196,6 +227,10 @@ type Controller struct {
 	installed bool
 	version   string
 	profile   string
+	preset    string
+	cacheDir  string
+	endpoint  string
+	pick      func(string) (string, error)
 }
 
 func NewController(options Options) *Controller {
@@ -208,6 +243,21 @@ func NewController(options Options) *Controller {
 	if options.Desired == nil {
 		options.Desired = NewMemoryDesiredState(dto.DesiredDisabled)
 	}
+	if options.SetupStore == nil {
+		options.SetupStore = &MemorySetupStore{}
+	}
+	if options.Preset == "" {
+		options.Preset = "basic"
+	}
+	if len(options.Profiles) == 0 && options.Profile != "" {
+		options.Profiles = []string{options.Profile}
+	}
+	if len(options.Presets) == 0 {
+		options.Presets = []string{"minimal", "basic", "brave"}
+	}
+	if options.Endpoint == "" {
+		options.Endpoint = DefaultEndpoint
+	}
 	if options.CommandCapacity < 1 {
 		options.CommandCapacity = DefaultCommandCapacity
 	}
@@ -219,10 +269,10 @@ func NewController(options Options) *Controller {
 	}
 	controller := &Controller{
 		store: options.Store, operations: options.Operations, desired: options.Desired,
-		factory: options.Factory, installer: options.Installer,
+		factory: options.Factory, installer: options.Installer, setupStore: options.SetupStore,
 		readyBudget: options.ReadyBudget, stopBudget: options.StopBudget,
 		commands: make(chan command, options.CommandCapacity), quiesce: make(chan command, 1), done: make(chan struct{}),
-		installed: options.Installed, version: options.InstalledVer, profile: options.Profile,
+		installed: options.Installed, version: options.InstalledVer, profile: options.Profile, preset: options.Preset, cacheDir: options.CacheDir, endpoint: options.Endpoint,
 	}
 	if desired, err := options.Desired.Load(context.Background()); err == nil && desired != "" {
 		controller.commit(func(snapshot *dto.LumenSnapshot) { snapshot.DesiredState = desired })
@@ -234,6 +284,10 @@ func NewController(options Options) *Controller {
 			snapshot.InstallPhase = dto.LumenAbsent
 		}
 		snapshot.Profile = controller.profile
+		snapshot.Preset = controller.preset
+		snapshot.CacheDir = controller.cacheDir
+		snapshot.AvailableProfiles = append([]string(nil), options.Profiles...)
+		snapshot.AvailablePresets = append([]string(nil), options.Presets...)
 		snapshot.InstallerAvailable = controller.installer != nil
 		snapshot.ProcessAvailable = controller.factory != nil
 	})
@@ -261,7 +315,60 @@ func (c *Controller) Close() {
 
 func (c *Controller) Snapshot() dto.LumenSnapshot { return c.store.Get().Lumen }
 
+func (c *Controller) Logs(backlog uint32, minLevel string) ([]dto.LumenLogEntry, error) {
+	if c.store.Get().Lumen.ProcessPhase != dto.LumenRunning {
+		return nil, operation.NewError(dto.ErrorRuntimeNotReady, "Lumen must be running to read logs")
+	}
+	if backlog == 0 {
+		backlog = 200
+	}
+	if backlog > 500 {
+		return nil, operation.NewError(dto.ErrorInvalidArgument, "Lumen log backlog exceeds 500 lines")
+	}
+	minLevel = strings.ToUpper(strings.TrimSpace(minLevel))
+	if minLevel == "" {
+		minLevel = "INFO"
+	}
+	if !slices.Contains([]string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR"}, minLevel) {
+		return nil, operation.NewError(dto.ErrorInvalidArgument, "unsupported Lumen log level")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	logs, err := readControlLogs(ctx, c.endpoint, backlog, minLevel)
+	if err != nil {
+		return nil, operation.NewError(dto.ErrorRuntimeNotReady, "Lumen logs are unavailable")
+	}
+	return logs, nil
+}
+
 func (c *Controller) LumenSnapshot() dto.LumenSnapshot { return c.Snapshot() }
+
+func (c *Controller) SetPickDirectory(pick func(string) (string, error)) {
+	c.mu.Lock()
+	c.pick = pick
+	c.mu.Unlock()
+}
+
+func (c *Controller) PickCacheDirectory(title string) (string, error) {
+	c.mu.Lock()
+	pick := c.pick
+	c.mu.Unlock()
+	if pick == nil {
+		return "", operation.NewError(dto.ErrorRuntimeNotReady, "directory picker is unavailable")
+	}
+	path, err := pick(strings.TrimSpace(title))
+	if err != nil {
+		return "", operation.NewError(dto.ErrorInvalidArgument, "directory selection was cancelled or unavailable")
+	}
+	if strings.TrimSpace(path) == "" {
+		return "", nil
+	}
+	canonical, err := CanonicalCacheDirectory(path)
+	if err != nil {
+		return "", operation.NewError(dto.ErrorInvalidArgument, "selected Lumen cache directory is unavailable")
+	}
+	return canonical, nil
+}
 
 func (c *Controller) SetInstalled(version, profile string) {
 	c.mu.Lock()
@@ -276,8 +383,28 @@ func (c *Controller) SetInstalled(version, profile string) {
 	})
 }
 
-func (c *Controller) Install(requestID string, expectedVersion uint64, profile string) (dto.OperationReceipt, error) {
-	return c.submit(command{kind: commandInstall, profile: profile}, requestID, expectedVersion)
+func (c *Controller) Install(requestID string, expectedVersion uint64, profile, preset, cacheDir string) (dto.OperationReceipt, error) {
+	snapshot := c.store.Get().Lumen
+	if profile == "" {
+		profile = snapshot.Profile
+	}
+	if preset == "" {
+		preset = snapshot.Preset
+	}
+	if cacheDir == "" {
+		cacheDir = snapshot.CacheDir
+	}
+	if !slices.Contains(snapshot.AvailableProfiles, profile) {
+		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "unsupported Lumen release profile")
+	}
+	if !slices.Contains(snapshot.AvailablePresets, preset) {
+		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "unsupported Lumen preset")
+	}
+	canonical, err := CanonicalCacheDirectory(cacheDir)
+	if err != nil {
+		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "Lumen cache directory must be an available non-root directory")
+	}
+	return c.submit(command{kind: commandInstall, profile: profile, preset: preset, cacheDir: canonical}, requestID, expectedVersion)
 }
 
 func (c *Controller) Start(requestID string, expectedVersion uint64) (dto.OperationReceipt, error) {
@@ -357,6 +484,7 @@ func (c *Controller) run() {
 	var pendingQuiesce *command
 	var process *ownedProcess
 	results := make(chan workerResult, 1)
+	events := make(chan workerResult, 16)
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -364,12 +492,14 @@ func (c *Controller) run() {
 		case result := <-results:
 			active = nil
 			c.activeCancel = nil
-			c.handleResult(result, &process, results)
+			c.handleResult(result, &process, events)
 			if pendingQuiesce != nil {
 				quiesce := *pendingQuiesce
 				pendingQuiesce = nil
 				c.beginCommand(quiesce, process, &active, results)
 			}
+		case event := <-events:
+			c.handleResult(event, &process, events)
 		case quiesce := <-c.quiesce:
 			if active != nil {
 				if pendingQuiesce != nil {
@@ -451,6 +581,12 @@ func (c *Controller) worker(item command, process *ownedProcess, results chan<- 
 		if profile == "" {
 			profile = snapshot.Profile
 		}
+		if err := c.setupStore.SaveSetup(workerCtx, item.preset, item.cacheDir); err != nil {
+			result.kind = resultFailed
+			result.err = fmt.Errorf("persist Lumen setup: %w", err)
+			results <- result
+			return
+		}
 		version, err := c.installer.Install(workerCtx, profile)
 		if err != nil {
 			result.kind = resultFailed
@@ -458,7 +594,7 @@ func (c *Controller) worker(item command, process *ownedProcess, results chan<- 
 			results <- result
 			return
 		}
-		result.kind, result.version, result.profile = resultInstalled, version, profile
+		result.kind, result.version, result.profile, result.preset, result.cacheDir = resultInstalled, version, profile, item.preset, item.cacheDir
 	case commandStart:
 		if snapshot.InstallPhase != dto.LumenInstalled {
 			result.kind = resultFailed
@@ -602,13 +738,15 @@ func (c *Controller) handleResult(result workerResult, process **ownedProcess, r
 	switch result.kind {
 	case resultInstalled:
 		c.mu.Lock()
-		c.installed, c.version, c.profile = true, result.version, result.profile
+		c.installed, c.version, c.profile, c.preset, c.cacheDir = true, result.version, result.profile, result.preset, result.cacheDir
 		c.mu.Unlock()
 		_ = c.operations.Succeed(result.operationID)
 		c.commit(func(snapshot *dto.LumenSnapshot) {
 			snapshot.InstallPhase = dto.LumenInstalled
 			snapshot.ProcessPhase = dto.LumenStopped
 			snapshot.Profile = result.profile
+			snapshot.Preset = result.preset
+			snapshot.CacheDir = result.cacheDir
 			snapshot.Version++
 		})
 	case resultStarted:
@@ -624,6 +762,19 @@ func (c *Controller) handleResult(result workerResult, process **ownedProcess, r
 		})
 		c.watch(result.process, results)
 		c.resetRetryAfterStable(result.process, results)
+		c.watchControlStatus(result.process, results)
+	case resultStatus:
+		if *process != result.process {
+			return
+		}
+		current := c.store.Get().Lumen.Control
+		if current.StartedAtUnixMS == result.status.StartedAtUnixMS &&
+			current.Sequence != 0 && result.status.Sequence != 0 && result.status.Sequence <= current.Sequence {
+			return
+		}
+		c.commit(func(snapshot *dto.LumenSnapshot) {
+			snapshot.Control = result.status
+		})
 	case resultStopped:
 		if *process == result.process {
 			*process = nil
@@ -640,6 +791,7 @@ func (c *Controller) handleResult(result workerResult, process **ownedProcess, r
 			snapshot.ProcessPhase = dto.LumenStopped
 			snapshot.Ownership = dto.OwnershipNone
 			snapshot.RecoveryCause = ""
+			snapshot.Control = dto.LumenControlStatus{Phase: dto.LumenControlUnspecified}
 			snapshot.Version++
 		})
 	case resultExited:
@@ -651,6 +803,8 @@ func (c *Controller) handleResult(result workerResult, process **ownedProcess, r
 			snapshot.ProcessPhase = dto.LumenFailed
 			snapshot.Ownership = dto.OwnershipNone
 			snapshot.RecoveryCause = dto.ErrorRuntimeNotReady
+			snapshot.Control.Connected = false
+			snapshot.Control.InferenceReady = false
 			snapshot.Version++
 		})
 		if c.store.Get().Lumen.DesiredState == dto.DesiredRunning && !c.quiesced.Load() && c.retryCount < 3 {
@@ -705,6 +859,29 @@ func (c *Controller) handleResult(result workerResult, process **ownedProcess, r
 		})
 	}
 	c.syncOperations()
+}
+
+func (c *Controller) watchControlStatus(process *ownedProcess, results chan<- workerResult) {
+	if process.Status == nil {
+		return
+	}
+	go func() {
+		for {
+			select {
+			case <-c.ctx.Done():
+				return
+			case status, ok := <-process.Status:
+				if !ok {
+					return
+				}
+				select {
+				case results <- workerResult{kind: resultStatus, process: process, status: status}:
+				case <-c.ctx.Done():
+					return
+				}
+			}
+		}
+	}()
 }
 
 func (c *Controller) scheduleRetry(delay time.Duration, retryNumber int) {

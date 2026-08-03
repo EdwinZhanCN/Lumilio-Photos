@@ -43,6 +43,19 @@ const (
 	LumenFailed   LumenProcessPhase = "failed"
 )
 
+type LumenControlPhase string
+
+const (
+	LumenControlUnspecified LumenControlPhase = "unspecified"
+	LumenControlStarting    LumenControlPhase = "starting"
+	LumenControlDownloading LumenControlPhase = "downloading"
+	LumenControlLoading     LumenControlPhase = "loading"
+	LumenControlWarmup      LumenControlPhase = "warmup"
+	LumenControlReady       LumenControlPhase = "ready"
+	LumenControlFailed      LumenControlPhase = "failed"
+	LumenControlStopping    LumenControlPhase = "stopping"
+)
+
 type Ownership string
 
 const (
@@ -141,10 +154,51 @@ type LumenSnapshot struct {
 	Ownership          Ownership           `json:"ownership"`
 	RecoveryCause      ErrorCode           `json:"recoveryCause,omitempty"`
 	Profile            string              `json:"profile,omitempty"`
+	Preset             string              `json:"preset"`
+	CacheDir           string              `json:"cacheDir"`
+	AvailableProfiles  []string            `json:"availableProfiles"`
+	AvailablePresets   []string            `json:"availablePresets"`
+	Control            LumenControlStatus  `json:"control"`
 	InstallerAvailable bool                `json:"installerAvailable"`
 	ProcessAvailable   bool                `json:"processAvailable"`
 	Presentation       ProcessPresentation `json:"presentation"`
 	Capabilities       Capabilities        `json:"capabilities"`
+}
+
+type LumenDownloadProgress struct {
+	Model      string `json:"model"`
+	File       string `json:"file"`
+	BytesDone  uint64 `json:"bytesDone"`
+	BytesTotal uint64 `json:"bytesTotal"`
+	FilesDone  uint32 `json:"filesDone"`
+	FilesTotal uint32 `json:"filesTotal"`
+}
+
+type LumenServiceStatus struct {
+	Service string            `json:"service"`
+	Phase   LumenControlPhase `json:"phase"`
+	Error   *Error            `json:"error,omitempty"`
+}
+
+type LumenControlStatus struct {
+	Connected       bool                   `json:"connected"`
+	InferenceReady  bool                   `json:"inferenceReady"`
+	Phase           LumenControlPhase      `json:"phase"`
+	Version         string                 `json:"version,omitempty"`
+	Backend         string                 `json:"backend,omitempty"`
+	StartedAtUnixMS int64                  `json:"startedAtUnixMS,omitempty"`
+	Download        *LumenDownloadProgress `json:"download,omitempty"`
+	Services        []LumenServiceStatus   `json:"services"`
+	Error           *Error                 `json:"error,omitempty"`
+	Sequence        uint64                 `json:"sequence"`
+}
+
+type LumenLogEntry struct {
+	TimeUnixMS int64             `json:"timeUnixMS"`
+	Level      string            `json:"level"`
+	Target     string            `json:"target"`
+	Message    string            `json:"message"`
+	Fields     map[string]string `json:"fields"`
 }
 
 type StorageShortcut struct {
@@ -268,6 +322,8 @@ func InitialSnapshot(instanceID string) DesktopSnapshot {
 			DesiredState: DesiredDisabled,
 			ProcessPhase: LumenStopped,
 			Ownership:    OwnershipNone,
+			Preset:       "basic",
+			Control:      LumenControlStatus{Phase: LumenControlUnspecified},
 			Presentation: ProcessPresentation{Color: DotGray, Label: "Not Installed"},
 		},
 		Update: UpdateSnapshot{Version: 1, Phase: "idle", Channel: "stable"},
@@ -277,5 +333,22 @@ func InitialSnapshot(instanceID string) DesktopSnapshot {
 func (s DesktopSnapshot) Clone() DesktopSnapshot {
 	clone := s
 	clone.Operations = append([]OperationSnapshot(nil), s.Operations...)
+	clone.Lumen.AvailableProfiles = append([]string(nil), s.Lumen.AvailableProfiles...)
+	clone.Lumen.AvailablePresets = append([]string(nil), s.Lumen.AvailablePresets...)
+	clone.Lumen.Control.Services = append([]LumenServiceStatus(nil), s.Lumen.Control.Services...)
+	if s.Lumen.Control.Download != nil {
+		download := *s.Lumen.Control.Download
+		clone.Lumen.Control.Download = &download
+	}
+	if s.Lumen.Control.Error != nil {
+		controlError := *s.Lumen.Control.Error
+		clone.Lumen.Control.Error = &controlError
+	}
+	for index := range clone.Lumen.Control.Services {
+		if s.Lumen.Control.Services[index].Error != nil {
+			serviceError := *s.Lumen.Control.Services[index].Error
+			clone.Lumen.Control.Services[index].Error = &serviceError
+		}
+	}
 	return clone
 }

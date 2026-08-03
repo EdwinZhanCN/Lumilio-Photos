@@ -38,6 +38,8 @@ type InstallJournal struct {
 	Version       string `json:"version"`
 	Profile       string `json:"profile"`
 	TargetHash    string `json:"targetHash"`
+	Target        string `json:"target,omitempty"`
+	Staging       string `json:"staging,omitempty"`
 }
 
 type CurrentPointer struct {

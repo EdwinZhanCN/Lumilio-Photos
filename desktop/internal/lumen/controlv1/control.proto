@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package lumen.control.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "desktop/internal/lumen/controlv1";
+
+// Mirrored from Lumen-Hub v0.1.0 crates/lumen-hub/proto/control.proto.
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_STARTING = 1;
+  PHASE_DOWNLOADING = 2;
+  PHASE_LOADING = 3;
+  PHASE_WARMUP = 4;
+  PHASE_READY = 5;
+  PHASE_FAILED = 6;
+  PHASE_STOPPING = 7;
+}
+
+message DownloadProgress {
+  string model = 1;
+  string file = 2;
+  uint64 bytes_done = 3;
+  uint64 bytes_total = 4;
+  uint32 files_done = 5;
+  uint32 files_total = 6;
+}
+
+message ServiceState {
+  string service = 1;
+  Phase phase = 2;
+  string error = 3;
+}
+
+message StatusSnapshot {
+  Phase phase = 1;
+  string version = 2;
+  string profile = 3;
+  int64 started_at_unix_ms = 4;
+  DownloadProgress download = 5;
+  repeated ServiceState services = 6;
+  string error = 7;
+  uint64 seq = 8;
+}
+
+message TailLogsRequest {
+  uint32 backlog_lines = 1;
+  string min_level = 2;
+  bool follow = 3;
+}
+
+message LogEntry {
+  int64 time_unix_ms = 1;
+  string level = 2;
+  string target = 3;
+  string message = 4;
+  map<string, string> fields = 5;
+}
+
+service Control {
+  rpc GetStatus(google.protobuf.Empty) returns (StatusSnapshot);
+  rpc WatchStatus(google.protobuf.Empty) returns (stream StatusSnapshot);
+  rpc TailLogs(TailLogsRequest) returns (stream LogEntry);
+}

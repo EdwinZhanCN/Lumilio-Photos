@@ -11,6 +11,20 @@ type DesiredStateStore struct {
 	Lumen bool
 }
 
+type LumenSetupStore struct{ Path string }
+
+func NewLumenSetupStore(path string) *LumenSetupStore { return &LumenSetupStore{Path: path} }
+
+func (s *LumenSetupStore) SaveSetup(_ context.Context, preset, cacheDir string) error {
+	settings, err := LoadSettings(s.Path)
+	if err != nil {
+		return err
+	}
+	settings.LumenPreset = preset
+	settings.LumenCacheDir = cacheDir
+	return SaveSettings(s.Path, settings)
+}
+
 func NewDesiredStateStore(path string) *DesiredStateStore {
 	return &DesiredStateStore{Path: path}
 }

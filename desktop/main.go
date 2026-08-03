@@ -51,12 +51,25 @@ var trayIconDark []byte
 const applicationID = "com.lumilio.photos.desktop"
 
 func main() {
+	if handled, err := lumen.RunSupervisorMode(os.Args[1:]); handled {
+		if err != nil {
+			log.Printf("Lumen supervisor exited with error: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
 	paths, err := platform.ResolvePaths()
 	if err != nil {
 		log.Fatalf("resolve Desktop app-data: %v", err)
 	}
 	if err := paths.Ensure(); err != nil {
 		log.Fatalf("prepare Desktop app-data: %v", err)
+	}
+	if err := platform.ConfigureBundledVipsModules(); err != nil {
+		log.Printf("configure bundled libvips modules: %v", err)
+	}
+	if err := platform.ClearBundledResourcesQuarantine(); err != nil {
+		log.Printf("bundled media resources quarantine cleanup (non-fatal): %v", err)
 	}
 	resourceData, resourceErr := fs.ReadFile(packagedResources, "resources/manifest.json")
 	if resourceErr == nil {
@@ -77,6 +90,10 @@ func main() {
 		// Keep a safe in-memory value for non-mutating UI projection, but never
 		// write it back or treat a corrupt settings file as onboarding success.
 		settings = runtimeconfig.DefaultSettings()
+	}
+	lumenCacheDir := settings.LumenCacheDir
+	if lumenCacheDir == "" {
+		lumenCacheDir = paths.LumenModels
 	}
 	configStore := runtimeconfig.NewStore(paths)
 	configured := false
@@ -105,7 +122,14 @@ func main() {
 	lumenInstalled := false
 	lumenVersion := ""
 	lumenProfile := ""
+	if profile, available := lumen.CurrentReleaseProfile(); available {
+		lumenProfile = profile
+	}
 	lumenRecovery := false
+	if reconcileErr := lumen.ReconcileOfficialReleaseInstall(paths.LumenDir); reconcileErr != nil {
+		log.Printf("Desktop Lumen installation journal requires recovery: %v", reconcileErr)
+		lumenRecovery = true
+	}
 	if current, currentErr := lumen.LoadCurrent(paths.LumenDir); currentErr == nil {
 		lumenInstalled = true
 		lumenVersion = current.Version
@@ -133,10 +157,39 @@ func main() {
 		},
 	})
 	configController := runtimeconfig.NewTransactionController(configStore, store, operations, runtimeController)
+	var lumenInstaller lumen.Installer
+	var lumenFactory lumen.Factory
+	if _, available := lumen.CurrentReleaseProfile(); available {
+		lumenInstaller = lumen.NewOfficialReleaseInstaller(paths.LumenDir)
+		lumenFactory = lumen.CurrentFactory{
+			Root: paths.LumenDir, ConfigPath: paths.LumenConfig,
+			OwnerLock: paths.LumenOwner, Endpoint: lumen.DefaultEndpoint,
+			Prepare: func(profile string) error {
+				currentSettings, err := runtimeconfig.LoadSettings(paths.SettingsFile)
+				if err != nil {
+					return err
+				}
+				cacheDir := currentSettings.LumenCacheDir
+				if cacheDir == "" {
+					cacheDir = paths.LumenModels
+				}
+				selection, err := lumen.NewSetupSelection(paths.LumenConfig, cacheDir, currentSettings.Region, profile, currentSettings.LumenPreset)
+				if err != nil {
+					return err
+				}
+				return lumen.EnsureSetupConfig(selection)
+			},
+		}
+	}
 	lumenController := lumen.NewController(lumen.Options{
 		Store: store, Operations: operations,
-		Desired:   runtimeconfig.NewLumenDesiredStateStore(paths.SettingsFile),
+		Desired:    runtimeconfig.NewLumenDesiredStateStore(paths.SettingsFile),
+		SetupStore: runtimeconfig.NewLumenSetupStore(paths.SettingsFile),
+		Installer:  lumenInstaller, Factory: lumenFactory,
 		Installed: lumenInstalled, InstalledVer: lumenVersion, Profile: lumenProfile,
+		Preset: settings.LumenPreset, CacheDir: lumenCacheDir,
+		Profiles: lumen.CurrentReleaseProfiles(), Presets: lumen.SetupPresetNames(),
+		Endpoint: lumen.DefaultEndpoint,
 	})
 	storageController := storage.NewController(storage.Options{
 		Paths: paths, Runtime: runtimeController, Store: store,
@@ -220,14 +273,16 @@ func main() {
 		return app.Env.OpenFileManager(paths.RuntimeIntents, false)
 	}
 	storageController.SetOpenFileManager(app.Env.OpenFileManager)
-	storageController.SetPickDirectory(func(title string) (string, error) {
+	pickDirectory := func(title string) (string, error) {
 		dialog := app.Dialog.OpenFile().
 			CanChooseDirectories(true).
 			CanChooseFiles(false).
 			CanCreateDirectories(true).
 			SetTitle(title)
 		return dialog.PromptForSingleSelection()
-	})
+	}
+	storageController.SetPickDirectory(pickDirectory)
+	lumenController.SetPickDirectory(pickDirectory)
 	desktopHost.SetQuitArmed(app.Quit)
 
 	settingsWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
