@@ -40,3 +40,19 @@ func TestWriteAtomicRejectsSymlink(t *testing.T) {
 		t.Fatal("WriteAtomic accepted symlink")
 	}
 }
+
+func TestWriteAtomicWritesAndReplacesFile(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "metadata.json")
+	for _, contents := range []string{"first", "second"} {
+		if err := WriteAtomic(target, []byte(contents), 0o600); err != nil {
+			t.Fatalf("write %q: %v", contents, err)
+		}
+		data, err := os.ReadFile(target)
+		if err != nil {
+			t.Fatalf("read %q: %v", contents, err)
+		}
+		if string(data) != contents {
+			t.Fatalf("contents = %q, want %q", data, contents)
+		}
+	}
+}

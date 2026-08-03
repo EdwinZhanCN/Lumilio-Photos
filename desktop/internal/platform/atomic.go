@@ -44,7 +44,7 @@ func WriteAtomic(path string, data []byte, mode fs.FileMode) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
+	if err := replaceFile(temporaryPath, path); err != nil {
 		return err
 	}
 	return syncDirectory(filepath.Dir(path))
@@ -67,13 +67,4 @@ func EnsurePrivateDirectory(path string) error {
 		}
 	}
 	return nil
-}
-
-func syncDirectory(path string) error {
-	directory, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	return directory.Sync()
 }
