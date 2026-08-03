@@ -35,9 +35,9 @@ tasks:
       CGO_ENABLED: '1'
       GOFLAGS: -buildvcs=false
     cmds:
-      # The mingw64 toolchain can reuse cgo objects linked against stale
-      # package paths; rebuild from a clean cache like the Desktop CI task.
-      - go clean -cache
+      # Native runners can reuse cgo objects linked against stale package paths;
+      # rebuild from clean build and test caches like the Desktop CI task.
+      - go clean -cache -testcache
       - go test -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./...
 
   dev:

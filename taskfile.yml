@@ -40,7 +40,7 @@ includes:
     dir: ./site
 
 # prefixed output keeps parallel dependency output attributable; the strict
-# shell options match what the repository's POSIX scripts already set.
+# shell options keep Task subprocesses aligned across local and CI runs.
 output: prefixed
 set: [errexit, nounset, pipefail]
 
@@ -50,7 +50,6 @@ vars:
   WEB_DEV_PORT: '{{.WEB_DEV_PORT | default "6657"}}'
   DEV_ROOT: '{{joinPath .ROOT_DIR ".local" "dev"}}'
   DEV_CONFIG: '{{joinPath .DEV_ROOT "config" "server.toml"}}'
-  DEV_STATE_SCRIPT: '{{joinPath .ROOT_DIR "scripts" "dev-state.sh"}}'
 
 # Keep these at the orchestration boundary so Server and Desktop commands get
 # the same CGo allowlist locally and in CI.
@@ -109,7 +108,7 @@ tasks:
   architecture:check:
     desc: Check repository architecture constraints
     cmds:
-      - ./scripts/check-architecture.sh
+      - go -C server run ./tools/architecturecheck
 
   compose:test:
     desc: Validate every Docker Compose configuration
@@ -134,24 +133,26 @@ tasks:
   dev:config:
     desc: Initialize local development state and generate server.toml
     cmds:
-      - sh "{{.DEV_STATE_SCRIPT}}" init "{{.ROOT_DIR}}"
+      - go -C server run ./tools/devstate init "{{.ROOT_DIR}}"
       - task: server:config-init
 
   dev:clean:
     desc: Clean generated local development files
     cmds:
-      - sh "{{.DEV_STATE_SCRIPT}}" clean "{{.ROOT_DIR}}"
+      - go -C server run ./tools/devstate clean "{{.ROOT_DIR}}"
 
   dev:reset:
     desc: Reset local development state
     cmds:
-      - sh "{{.DEV_STATE_SCRIPT}}" reset "{{.ROOT_DIR}}"
+      - go -C server run ./tools/devstate reset "{{.ROOT_DIR}}"
 
   dev:purge:
     desc: Permanently remove local development state
     prompt: This permanently deletes local development state, including media. Continue?
+    env:
+      CONFIRM_DEV_PURGE: dev-purge
     cmds:
-      - CONFIRM_DEV_PURGE=dev-purge sh "{{.DEV_STATE_SCRIPT}}" purge "{{.ROOT_DIR}}"
+      - go -C server run ./tools/devstate purge "{{.ROOT_DIR}}"
 
   hooks:install:
     desc: Configure repository Git hooks
@@ -193,13 +194,69 @@ tasks:
   ci:server:
     desc: Run the standalone Server CI gate
     cmds:
-      - task: server:test
+      - task: server:test:ci
 
   ci:web:
     desc: Install and test the Web application in CI mode
     cmds:
+      - task: ci:web:install
+      - task: ci:web:test
+
+  ci:web:install:
+    desc: Install Web dependencies with the CI lockfile contract
+    cmds:
       - task: web:install:ci
+
+  ci:web:test:
+    desc: Run the Web checks and unit tests with CI behavior
+    cmds:
       - task: web:test
+
+  ci:web:build:
+    desc: Install and build the Web application in CI mode
+    cmds:
+      - task: ci:web:install
+      - task: web:build
+
+  ci:web:playwright:install:
+    desc: Install the CI Playwright browser and system dependencies
+    cmds:
+      - task: web:playwright:install
+
+  ci:web:playwright:install:deps:
+    desc: Install CI Playwright system dependencies for a cached browser
+    cmds:
+      - task: web:playwright:install:deps
+
+  ci:web:e2e:up:
+    desc: Start the isolated CI E2E environment
+    cmds:
+      - task: web:e2e:up
+
+  ci:web:e2e:down:
+    desc: Stop the isolated CI E2E environment
+    cmds:
+      - task: web:e2e:down
+
+  ci:web:e2e:browser:
+    desc: Run the CI Chromium smoke regression
+    cmds:
+      - task: web:test:browser
+
+  ci:web:e2e:auth-hardening:
+    desc: Run the CI authentication hardening regression
+    cmds:
+      - task: web:test:auth-hardening
+
+  ci:web:e2e:video-semantic:
+    desc: Run the CI video semantic regression
+    cmds:
+      - task: web:test:video-semantic
+
+  ci:web:e2e:backup-recovery:
+    desc: Run the CI database backup and recovery regression
+    cmds:
+      - task: web:test:backup-recovery
 
   ci:site:
     desc: Install and build the documentation site in CI mode
@@ -216,6 +273,6 @@ tasks:
   ci:desktop:native:
     desc: Test embedded Server and Desktop modules, then compile Desktop
     cmds:
-      - task: server:test
+      - task: server:test:ci
       - task: desktop:test:ci
       - task: desktop:compile
