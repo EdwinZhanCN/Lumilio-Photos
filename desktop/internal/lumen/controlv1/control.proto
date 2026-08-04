@@ -6,7 +6,7 @@ import "google/protobuf/empty.proto";
 
 option go_package = "desktop/internal/lumen/controlv1";
 
-// Mirrored from Lumen-Hub v0.1.0 crates/lumen-hub/proto/control.proto.
+// Mirrored from Lumen-Hub v0.1.1 crates/lumen-hub/proto/control.proto.
 enum Phase {
   PHASE_UNSPECIFIED = 0;
   PHASE_STARTING = 1;

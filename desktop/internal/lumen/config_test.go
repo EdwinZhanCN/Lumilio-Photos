@@ -24,7 +24,7 @@ func TestDefaultSetupSelectionFollowsReleaseProfile(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if selection.Version != "0.1.0" || selection.Region != "cn" || selection.Preset.Name != "basic" {
+			if selection.Version != "0.1.1" || selection.Region != "cn" || selection.Preset.Name != "basic" {
 				t.Fatalf("unexpected defaults: %+v", selection)
 			}
 			if selection.Platform.Name != test.platform || selection.Backend.Name != test.backend || selection.Backend.ReleaseProfile != test.profile {

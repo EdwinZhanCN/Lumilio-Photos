@@ -23,7 +23,7 @@ import (
 // OfficialReleaseVersion is deliberately pinned to the Lumen Hub release
 // catalog embedded in the Desktop binary. Updating Lumen is an explicit
 // Desktop release change, not a mutable "latest" download at runtime.
-const OfficialReleaseVersion = "v0.1.0"
+const OfficialReleaseVersion = "v0.1.1"
 
 const officialReleasePrefix = "https://github.com/EdwinZhanCN/Lumen-Hub/releases/download/"
 
@@ -41,28 +41,28 @@ var officialReleaseArtifacts = map[string]ReleaseArtifact{
 		Version: OfficialReleaseVersion, Profile: "darwin-arm64-cpu",
 		FileName: "lumen-hub-darwin-arm64-cpu.zip",
 		URL:      officialReleasePrefix + OfficialReleaseVersion + "/lumen-hub-darwin-arm64-cpu.zip",
-		SHA256:   "a611b78a640f10fdd6a61d5bdb6db5dfd0ba9d6fc2e103a5c619f0e810342950",
+		SHA256:   "38b2b9228747edcc15b56874de63c08d06020b5ccb6f569165e1f85d2c2a4258",
 		Binary:   "bin/lumen-hub",
 	},
 	"darwin-arm64-metal": {
 		Version: OfficialReleaseVersion, Profile: "darwin-arm64-metal",
 		FileName: "lumen-hub-darwin-arm64-metal.zip",
 		URL:      officialReleasePrefix + OfficialReleaseVersion + "/lumen-hub-darwin-arm64-metal.zip",
-		SHA256:   "9b26ac3d37cfff5bb4c0608ff789d1dda41dd9e5dac9fc3b12d5435d8869aedc",
+		SHA256:   "cd379dd8500c1807f6455ce718c4ad0deb440fc03668e4559fd3ed7307b65219",
 		Binary:   "bin/lumen-hub",
 	},
 	"windows-x64-cpu": {
 		Version: OfficialReleaseVersion, Profile: "windows-x64-cpu",
 		FileName: "lumen-hub-windows-x64-cpu.zip",
 		URL:      officialReleasePrefix + OfficialReleaseVersion + "/lumen-hub-windows-x64-cpu.zip",
-		SHA256:   "c5f5a8932f48840b4e12656971bb291faaaefd8e22da1c36913468a9a4052d22",
+		SHA256:   "8687708affebe557ea3dd855225b53f618d4eee8ca5cda31e26bfbda9ba83b25",
 		Binary:   "bin/lumen-hub.exe",
 	},
 	"windows-x64-gpu": {
 		Version: OfficialReleaseVersion, Profile: "windows-x64-gpu",
 		FileName: "lumen-hub-windows-x64-gpu.zip",
 		URL:      officialReleasePrefix + OfficialReleaseVersion + "/lumen-hub-windows-x64-gpu.zip",
-		SHA256:   "73315a919e8837e319d1fc4401499082ea1c4122b894475f92ed595220d96292",
+		SHA256:   "3a1ba438184a7ec8e115044862945c62dbde62299ea874b1fb785772af4654e7",
 		Binary:   "bin/lumen-hub.exe",
 	},
 }
