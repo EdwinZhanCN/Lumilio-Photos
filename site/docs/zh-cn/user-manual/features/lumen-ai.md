@@ -4,6 +4,7 @@ description: 从 Desktop、Server 或 lumen-cli 开始使用本地优先的媒�
 ---
 
 <script setup lang="ts">
+import DockerComposeConfigurator from "../../../.vitepress/components/DockerComposeConfigurator.vue";
 import LumenConfigBuilder from "../../../.vitepress/components/LumenConfigBuilder.vue";
 </script>
 
@@ -13,7 +14,7 @@ Lumen Hub 能够为流明集提供强大且多样的AI能力，它可以使用�
 
 为什么我们需要算力和存储解耦？在NAS上，大多都使用低功耗芯片例如 Intel N100 等，这极大的限制了媒体的AI处理流程。如果你同时在单台NAS上运行 Jellyfin 做视频转码，Lumilio Photos 做照片处理，和各种AI图像推理任务，这些任务各自都需要占用大量的计算资源，导致任务被阻塞，性能下降，功耗增加。
 
-Lumen Hub 使用 Home Native 协议，创新性将 AI 算力和存储解耦，让你能够在任何地方部署和运行推理服务，而不必担心硬件限制。你可以在NAS上部署 Lumilio Photos 和 简单的 OCR 服务，同时在GPU算力更强的服务器或者PC上部署更复杂的模型推理服务，如 SigLIP 图像语义分析，BioCLIP 物种识别 和 InsightFace 人物识别等。并且你可以仅在需要时开启这些Lumen Hub 服务，从而降低能源消耗。
+Lumen Hub 使用 Home Native 协议，创新性将 AI 算力和存储解耦，让你能够在任何地方部署和运行推理服务，而不必担心硬件限制。你可以在 NAS 上部署 Lumilio Photos 和简单的 OCR文字识别服务，同时在 GPU 算力更强的服务器或者 PC 上部署图像语义分析、人物识别和 BioCLIP物种识别。你也可以仅在需要时开启这些 Lumen Hub 服务，从而降低能源消耗。
 
 ## Desktop
 
@@ -98,7 +99,7 @@ lumen-cli start
 
 `lumen-cli init` 会依次询问下载区域、预设、计算后端和模型缓存目录，并在用户目录下的 `.lumen/` 写入 `config.yaml` 与 `bootstrap.json`。`lumen-cli start` 会下载匹配当前系统的 Hub，校验文件后在后台启动；模型会在 Hub 第一次启动时下载。
 
-CLI 生成的 Hub 默认监听 `0.0.0.0:50051` 并启用 mDNS。等待 Hub 完成模型下载和预热后，局域网中的 Desktop 可以直接发现它。使用 Lumilio Photos 时，如果容器收不到 mDNS，就把该设备的 `IP:50051` 加入 `discovery_static_nodes`，然后重启 Lumilio Photos。还要在运行 CLI 的设备防火墙中允许来自局域网的 TCP `50051`。
+CLI 生成的 Hub 默认监听 `0.0.0.0:50051` 并启用 mDNS。等待 Hub 完成模型下载和预热后，局域网中的 Desktop 或使用默认 host network 的 Lumilio Server 会自动发现它。还要在运行 CLI 的设备防火墙中允许来自局域网的 TCP `50051` 和 mDNS 组播。
 
 常用维护命令：
 
@@ -117,170 +118,61 @@ lumen-cli stop       # 停止后台 Hub
 
 <LumenConfigBuilder />
 
-## Docker Compose 部署 （仅受限环境下）
+## Docker Compose 部署
 
-::: tip 关于 Docker Compose 部署
-在最佳实践中，我们不推荐你使用 Docker Compose 部署 Lumen Hub。Lumen Hub 是使用 Rust 开发的高性能推理引擎，容器会带来额外的开销和不确定性。使用 CLI 或 单二进制文件运行是更加轻量且方便的部署方式。
+Docker 是 Linux 服务器、NAS 和独立 GPU 计算主机的正式分发路径。向导会把地区、预设和自定义模型组合直接写入完整 Compose，不要求用户手写 YAML、`.env`、端口映射或静态节点地址。
+
+开始前只需确认目标设备能够运行现代 Docker Compose，并支持 Linux `host` network。Vulkan 还要求主机提供 `/dev/dri`；CUDA 还要求安装 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
+
+<DockerComposeConfigurator />
+
+### 为什么必须使用 host network
+
+Lumen Hub 会在模型就绪后通过 mDNS 发布自己的地址与能力。Lumilio Server 的默认 Compose 同样使用 host network，因此两者可以直接使用宿主机的局域网接口：
+
+```mermaid
+flowchart LR
+  photos["NAS · Lumilio Photos"] -. "mDNS 自动发现" .-> hub["计算设备 · Lumen Hub"]
+  photos -->|"gRPC 推理任务"| hub
+
+  classDef app fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+  classDef node fill:#ecfdf5,stroke:#10b981,color:#064e3b
+  class photos app
+  class hub node
+```
+
+这保留了 Lumen 的核心拓扑：媒体和数据库留在 NAS，AI 可以运行在局域网中任何更合适的计算设备上，并且可以随时上线或下线。正常部署不需要把两者塞进同一个 Compose，也不需要把 Hub 地址写进 Lumilio 配置。
+
+::: warning Host network 是当前 Docker 支持边界
+不要把下载的配置改成 `bridge`，也不要添加 `ports: 50051` 后假设 mDNS 仍受支持。如果容器平台不能创建 host network 项目，当前官方 Docker 路径不支持在该平台上保留自动发现能力。
 :::
 
-Docker Compose 适合在 Linux 服务器、NAS 或独立的 GPU 主机上运行 Lumen Hub。容器网络不会可靠转发 mDNS，因此 Compose 部署应使用主机的静态 IP 地址与 Lumilio Photos 建立连接。
+### 启动与就绪状态
 
-开始前请先安装 Docker Engine 和 Compose v2，并确认 `docker compose version` 可以正常执行。下文不支持已经停止维护的 `docker-compose` v1；部分 NAS 自带的旧版 Compose 也可能无法正确传递 GPU。
-
-下面三份配置分别对应 CPU、Vulkan GPU 和 CUDA GPU。选择其中一份保存为 `compose.yml` 即可，不要同时启动三个版本。模型保存在 `lumen-models` 卷中，更新或重建容器不会重新下载已经缓存的模型。
-
-### CPU 版本
-
-CPU 是兼容性最好的后端，也是唯一同时提供 `amd64` 和 `arm64` 容器镜像的后端。它不需要显卡或额外的主机驱动，适合没有可用 GPU 的 NAS、家庭服务器和 ARM 设备。CPU 也可以运行完整的默认模型组合，但处理速度取决于处理器性能；在低功耗设备上，我们通常只建议运行 OCR 等负载较轻的服务。
-
-~~~yaml
-services:
-  lumen-hub:
-    image: ghcr.io/edwinzhancn/lumen-hub:cpu
-    restart: unless-stopped
-    ports:
-      - "50051:50051"
-    volumes:
-      - lumen-models:/models
-      # 如需修改服务组合或下载地区，先创建配置文件，再取消下一行注释：
-      # - ./lumen-config.yaml:/etc/lumen/config.yaml:ro
-
-volumes:
-  lumen-models:
-~~~
-
-### Vulkan GPU 版本
-
-Vulkan 镜像通过 Mesa 使用 Intel 或 AMD GPU，适合没有 NVIDIA 显卡、但希望利用核显或独立显卡加速的 Linux `amd64` 主机。
-
-- **Intel**：Skylake 及更新的核显，以及 Intel Arc 独立显卡；主机驱动需要支持 Vulkan 1.3。Skylake 之前的 Intel 核显请使用 CPU 版本。
-- **AMD**：由当前 Linux 内核和 Mesa RADV 驱动支持 Vulkan 1.3 的 AMD GPU。具体支持范围取决于主机发行版的内核与 Mesa 版本。
-- **NVIDIA**：不要使用 Vulkan 镜像，请直接使用下面的 CUDA 版本。
-
-启动前先确认主机存在 `/dev/dri`，并查询 `render` 组的 GID：
+图形化容器管理器可以直接导入组件下载的文件。拥有终端时，也可以在文件所在目录运行：
 
 ~~~bash
-ls -l /dev/dri
-getent group render
+docker compose -f lumen-cpu.compose.yml up -d --wait
 ~~~
 
-将 `getent` 输出中的数字 GID 导出为 `RENDER_GID`。例如输出为 `render:x:109:` 时：
+把文件名替换成实际下载的 Vulkan 或 CUDA 版本即可。三份配置都使用名为 `lumen-models` 的持久化卷；更新或重建容器不会重复下载已经缓存的模型。
+
+第一次启动会下载并加载向导中选择的模型。在这段时间里容器保持 `starting` 是正常现象；只有标准 gRPC Health 返回 `Serving` 后，容器才会变为 `healthy` 并开始发布 mDNS。可用下面两条命令查看状态和启动日志：
 
 ~~~bash
-export RENDER_GID=109
+docker compose -f lumen-cpu.compose.yml ps
+docker compose -f lumen-cpu.compose.yml logs -f lumen-hub
 ~~~
 
-部分 NAS 没有名为 `render` 的组，此时 `getent` 不会输出内容。可以直接读取渲染设备的数字 GID：
+Hub 变为 `healthy` 后，到 Lumilio Photos 的[状态](./monitor)页确认节点和模型能力已经出现。只要 Photos 与 Hub 都按发行文件使用 host network，连接过程不需要额外配置。
 
-~~~bash
-stat -c '%g' /dev/dri/renderD*
-~~~
+### GPU 映射已经包含在文件中
 
-如果命令输出 `109`，同样执行 `export RENDER_GID=109`。存在多个 `renderD*` 设备时，请选择准备交给 Lumen Hub 的设备所使用的 GID。
+- **Vulkan** 文件已经映射 `/dev/dri:/dev/dri`，用于支持 Vulkan 1.3 的 Intel 或 AMD GPU；默认容器无需 `RENDER_GID` 或 `.env`。
+- **CUDA** 文件已经使用 Compose 的 `gpus: all` 把 NVIDIA GPU 交给容器。启动前应确保 `nvidia-smi` 正常，并已安装 NVIDIA Container Toolkit。
+- **CPU** 文件不映射硬件设备，也是唯一同时提供 `amd64` 与 `arm64` 镜像的版本。
 
-然后使用下面的 Compose 配置：
-
-~~~yaml
-services:
-  lumen-hub:
-    image: ghcr.io/edwinzhancn/lumen-hub:vulkan
-    restart: unless-stopped
-    ports:
-      - "50051:50051"
-    devices:
-      - /dev/dri:/dev/dri
-    group_add:
-      - "${RENDER_GID:?set RENDER_GID before starting Compose}"
-    volumes:
-      - lumen-models:/models
-      # 如需修改服务组合或下载地区，先创建配置文件，再取消下一行注释：
-      # - ./lumen-config.yaml:/etc/lumen/config.yaml:ro
-
-volumes:
-  lumen-models:
-~~~
-
-每次重新创建容器前，都需要在当前终端设置 `RENDER_GID`；也可以在 `compose.yml` 同目录的 `.env` 文件中写入相同的值，例如 `RENDER_GID=109`。启动后检查日志中的 `backend`：它应显示实际的 Intel 或 AMD 适配器。如果日志显示 `llvmpipe` 或 `Cpu`，说明容器没有正确取得 GPU，请检查设备映射、`render` 组和主机驱动。
-
-### CUDA GPU 版本
-
-CUDA 是面向 NVIDIA GPU 的后端，适合部署完整的 Lumen AI 服务。当前 CUDA 容器仅提供 Linux `amd64` 镜像，并基于 CUDA 12.6 运行时构建。
-
-兼容性主要取决于 NVIDIA 驱动，而不是显卡的商品名称。GeForce、NVIDIA RTX、Quadro、RTX A 系列和数据中心 GPU 中，能够安装支持 CUDA 12.6 驱动的型号均可使用；较旧的显卡可能因为无法安装满足要求的驱动而不可用。先运行 `nvidia-smi`，确认主机能够识别 GPU，再安装并配置 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
-
-可以用下面的命令确认 Docker 已经能够访问 GPU：
-
-~~~bash
-docker run --rm --gpus all nvidia/cuda:12.6.3-base-ubuntu24.04 nvidia-smi
-~~~
-
-验证通过后使用下面的 Compose 配置：
-
-~~~yaml
-services:
-  lumen-hub:
-    image: ghcr.io/edwinzhancn/lumen-hub:cuda
-    restart: unless-stopped
-    ports:
-      - "50051:50051"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    volumes:
-      - lumen-models:/models
-      # 如需修改服务组合或下载地区，先创建配置文件，再取消下一行注释：
-      # - ./lumen-config.yaml:/etc/lumen/config.yaml:ro
-
-volumes:
-  lumen-models:
-~~~
-
-`count: all` 会把主机上的全部 NVIDIA GPU 提供给 Lumen Hub。如果只想使用一张卡，可以改为 `count: 1`；需要锁定指定 GPU 时，则用 `device_ids: ["GPU 编号"]` 替换 `count`，两者不能同时使用。
-
-### 启动并等待模型就绪
-
-在 `compose.yml` 所在目录执行：
-
-~~~bash
-docker compose pull
-docker compose up -d
-docker compose ps
-docker compose logs -f lumen-hub
-~~~
-
-三种镜像都默认启用 SigLIP、InsightFace 和 PP-OCRv6。首次启动会把模型下载到 `lumen-models` 卷；端口已经开始监听并不代表模型已经就绪，请等待日志显示下载、加载和预热完成。BioCLIP 默认关闭，因为它还需要下载较大的 Tree of Life 目录。
-
-需要启用 BioCLIP、调整模型组合或在中国大陆使用镜像下载时，请从 Lumen Hub 仓库复制[容器默认配置](https://github.com/EdwinZhanCN/Lumen-Hub/blob/main/packaging/docker/config.default.yaml)，保存为 `lumen-config.yaml` 后修改，再取消 Compose 文件中的配置挂载。挂载的文件必须是完整配置，不能只写需要覆盖的字段；中国大陆下载源对应 `metadata.region: cn`。
-
-### 与 Lumilio Photos 建立连接
-
-Hub 进入就绪状态后，先从 **Lumilio Photos 所在的主机或容器**测试 Lumen Hub 的端口。把示例地址替换为实际地址：
-
-~~~bash
-nc -vz 192.168.1.30 50051
-~~~
-
-测试失败时，请检查两台主机之间的路由，并在 Lumen Hub 主机的防火墙中允许来自 Lumilio Server 的 TCP `50051`。能打开 Lumilio Web 页面，只能说明浏览器可以访问 Lumilio Server，并不能证明 Lumilio Server 可以连接 Lumen Hub。
-
-确认网络可达后，把 Lumen Hub 的静态地址写进 Lumilio Server 使用的完整 TOML 清单：
-
-~~~toml
-[lumen]
-discovery_enabled = true
-discovery_mdns_enabled = false
-discovery_hub_url = ""
-discovery_static_nodes = ["192.168.1.30:50051"]
-~~~
-
-把示例地址替换为运行 Lumen Hub 的主机地址。`discovery_static_nodes` 使用 `host:port`，不要填写浏览器访问 Lumilio Photos 时使用的 HTTP 或 HTTPS 地址。修改完整清单后重启 Lumilio Server，再到[状态](./monitor)页确认节点及其模型能力已经出现。
-
-::: warning 不要把推理端口暴露到公网
-`50051` 只应对受信任的局域网和 Lumilio Server 开放。如果 Lumen Hub 与 Lumilio Server 不在同一个可信网络中，请先建立 VPN 或其他受保护的网络连接，不要直接做公网端口转发。
-:::
+地区、预设和受支持的模型组合都可以直接在向导中完成。只有需要修改批处理、服务端口等向导没有提供的底层参数时，才使用上面的[自定义配置部署](#自定义配置部署)生成完整配置，并自行扩展 Compose，将文件只读挂载到 `/etc/lumen/config.yaml`；同时移除 Compose 中的 `LUMEN_REGION`、`LUMEN_PRESET` 和其他模型环境变量，让挂载文件保持完整权威。
 
 ## 预设、模型能力与资源占用
 
@@ -290,11 +182,11 @@ Desktop、CLI 和 Server 使用同一套 Lumen 模型与任务接口。Desktop �
 
 | 能力 | 你会看到的结果 | Lumen 服务 | 适合的场景 |
 | --- | --- | --- | --- |
-| 语义搜索 | 用自然语言查找“海边的船”“生日聚会”等内容；也可以用一张媒体查找相似内容 | SigLIP 2 | 不想先建立文件夹或标签时，用内容找媒体 |
+| 图像语义分析 | 用自然语言查找“海边的船”“生日聚会”等内容；也可以用一张媒体查找相似内容 | SigLIP 2 | 不想先建立文件夹或标签时，用内容找媒体 |
 | 视频语义 | 从视频帧生成语义索引，搜索视频中的场景 | SigLIP 2 + Lumilio 视频采样 | 查找包含某个场景的视频 |
 | 人物 | 检测人脸、生成特征并聚类，随后可以在人物页整理和命名 | InsightFace `antelopev2` | 按人物回顾家庭活动或旅行记录 |
-| OCR | 识别媒体中的文字并建立全文检索 | PP-OCRv6 small | 收据、菜单、文档、截图和路牌 |
-| 物种识别 | 根据图像给出物种候选，并在生物图鉴相册中整理 | BioCLIP-2 | 植物、动物和自然观察记录 |
+| OCR文字识别 | 识别媒体中的文字并建立全文检索 | PP-OCRv6 small | 收据、菜单、文档、截图和路牌 |
+| BioCLIP物种识别 | 根据图像给出物种候选，并在生物图鉴相册中整理 | BioCLIP-2 | 植物、动物和自然观察记录 |
 
 这些任务由 Lumilio 的后台队列按需执行。打开任务开关不会立即处理已有的全部媒体；可以在[状态](./monitor)中查看节点、队列和覆盖率，再选择补齐或重建。
 
@@ -304,11 +196,11 @@ Desktop、CLI 和 Server 使用同一套 Lumen 模型与任务接口。Desktop �
 
 | 预设 | 包含能力 | 主要模型和数据集 | 资源参考 |
 | --- | --- | --- | --- |
-| **最小（minimal）** | 语义搜索、人脸 | SigLIP 2 base + InsightFace `antelopev2` | 至少 4 GB 内存、2 GB GPU/统一内存、约 2 GB 磁盘 |
-| **基础（basic）** | 最小 + OCR + 物种识别 | SigLIP 2 base、PP-OCRv6 small、BioCLIP-2 + `TreeOfLife200MCore` | 至少 6 GB 内存、3 GB GPU/统一内存、约 6 GB 磁盘 |
-| **完整（brave）** | 基础能力的更强语义模型和完整物种目录 | SigLIP 2 `so400m-patch14-384`、PP-OCRv6 small、BioCLIP-2 + `TreeOfLife200M` | 至少 8 GB 内存、4 GB GPU/统一内存、约 10 GB 磁盘 |
+| **最小（minimal）** | 图像语义分析、人物识别 | SigLIP 2 base + InsightFace `antelopev2` | 至少 4 GB 内存、2 GB GPU/统一内存、约 2 GB 磁盘 |
+| **基础（basic）** | 最小 + OCR文字识别 + BioCLIP物种识别 | SigLIP 2 base、PP-OCRv6 small、BioCLIP-2 + `TreeOfLife200MCore` | 至少 6 GB 内存、3 GB GPU/统一内存、约 6 GB 磁盘 |
+| **完整（brave）** | 更强的图像语义分析模型和完整 BioCLIP 物种目录 | SigLIP 2 `so400m-patch14-384`、PP-OCRv6 small、BioCLIP-2 + `TreeOfLife200M` | 至少 8 GB 内存、4 GB GPU/统一内存、约 10 GB 磁盘 |
 
-Compose 镜像默认启用 SigLIP、InsightFace 和 OCR，不等同于完整预设；要启用 BioCLIP 或更强的 SigLIP 模型，需要挂载自定义配置。表中的数值是选型参考，不是所有设备的硬性上限。模型权重和 BioCLIP 目录会按需映射，首次下载和预热时可能出现短时内存峰值。
+发行 Compose 默认使用 `basic`，启用图像语义分析、人物识别、OCR文字识别和 BioCLIP物种识别。向导也可以选择 `minimal`、`brave` 或自定义组合。表中的数值是选型参考，不是所有设备的硬性上限。模型权重和 BioCLIP 目录会按需映射，首次下载和预热时可能出现短时内存峰值。
 
 ### 计算后端
 
@@ -318,7 +210,7 @@ Compose 镜像默认启用 SigLIP、InsightFace 和 OCR，不等同于完整预�
 | --- | --- | --- |
 | Desktop | Metal、GPU、CPU | macOS Apple Silicon 优先 Metal；Windows x64 优先 GPU；CPU 兼容性最好 |
 | CLI | macOS 的 Metal/CPU；Windows 的 GPU/CPU；Linux 的 CPU、Vulkan、CUDA、ROCm 等发布构建 | `lumen-cli` 会根据系统和硬件选择匹配的 Hub 构建 |
-| Compose | `cpu`、`vulkan`、`cuda` 镜像标签 | 计算后端由镜像标签和容器设备映射决定 |
+| Compose | `cpu`、`vulkan`、`cuda` 镜像标签 | 计算后端由镜像标签和容器设备映射决定；地区、预设和模型组合由向导写入环境变量 |
 
 更强的后端通常速度更快，但也更依赖驱动、显存或统一内存。低功耗设备先使用最小预设和 CPU；如果节点已发现但任务不可用，先在[状态](./monitor)确认模型是否已经完成下载和预热。
 

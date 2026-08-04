@@ -386,7 +386,7 @@ async function copyCommand() {
           <label class="model-check standalone">
             <input v-model="ocrEnabled" type="checkbox" />
             <span>
-              <strong>OCR 文字识别</strong>
+              <strong>OCR文字识别</strong>
               <small>PP-OCRv6 small</small>
             </span>
           </label>
@@ -395,7 +395,7 @@ async function copyCommand() {
             <label class="model-check">
               <input v-model="bioClipEnabled" type="checkbox" />
               <span>
-                <strong>BioCLIP 物种识别</strong>
+                <strong>BioCLIP物种识别</strong>
                 <small>BioCLIP-2</small>
               </span>
             </label>

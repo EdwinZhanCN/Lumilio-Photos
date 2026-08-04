@@ -108,7 +108,7 @@ LAN. It does not need a `ports` mapping.
 Remote HTTP is unencrypted and cannot use passkeys. Existing reverse proxies
 may forward to port 6680 without configuring a public URL in Lumilio. Optional
 same-host Caddy and built-in ACME files remain available as
-`compose.caddy.yml` and `compose.acme.yml`.
+`caddy.compose.yml` and `acme.compose.yml`.
 
 ::: warning Back up through Lumilio
 While Lumilio is running, do not copy or open `library.sqlite3`, `-wal`, or
@@ -121,14 +121,17 @@ retained.
 
 ## Optional: AI features
 
-Semantic search, face recognition, and OCR are optional and provided by a
+Image Semantic Analysis, Person Recognition, OCR Text Recognition, and BioCLIP
+Species Recognition are optional and provided by a
 [Lumen Hub](https://github.com/EdwinZhanCN/Lumen-Hub) inference server. Nothing
 is downloaded until you enable it.
 
 - **Desktop (same machine):** menu-bar/tray → **Enable AI on This Machine**.
   The app downloads the right hub build for your hardware and manages it for
   you; the first start also downloads model weights (~1.3 GB).
-- **Another machine or Docker:** run a Lumen Hub on your LAN (Docker tags
-  `cpu` / `vulkan` / `cuda`) and provide a complete schema-v3 server manifest
-  with the desired discovery policy. Runtime environment variables do not
-  override immutable manifest fields. See the Lumen Hub README for details.
+- **Another machine:** use `lumen-cli` to run a native Hub that advertises over
+  LAN mDNS.
+- **Linux server or NAS:** choose and download a complete CPU, Vulkan, or CUDA
+  host-network Compose from the [Lumen AI guide](../features/lumen-ai). Once the
+  Hub is healthy, Lumilio Photos discovers it automatically; no server manifest
+  edit or static address is required.

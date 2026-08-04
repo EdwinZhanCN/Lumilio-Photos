@@ -7,7 +7,7 @@ import { Bird, ScanText, Users } from '@lucide/vue'
     <p class="section-kicker">本地媒体理解服务</p>
     <h2 class="section-heading">本地 AI 懂你所拍，<br /> 隐私不‘跑’远。</h2>
     <p class="understand-lede">
-      语义搜索让照片找得到，智能分类让照片分得开，画质与审美排序帮你挑得出。
+      图像语义分析让照片找得到，智能分类让照片分得开，画质与审美排序帮你挑得出。
       所有理解都在本地完成，结果只存在你的媒体库。
     </p>
 
@@ -37,14 +37,14 @@ import { Bird, ScanText, Users } from '@lucide/vue'
         <div>
           <p>照片里的文字</p>
           <h3>截图、票据、文档，<br/> 不再‘沉默’。</h3>
-          <span>OCR 让照片里的文字也能被搜索和复用;一段地址、一张票据、一页白板，随手找回。</span>
+          <span>OCR文字识别让照片里的文字也能被搜索和复用;一段地址、一张票据、一页白板，随手找回。</span>
         </div>
       </article>
 
       <article class="understand-card understand-bio">
         <div class="understand-icon"><Bird :size="25" :stroke-width="1.5" /></div>
         <div>
-          <p>BioCLIP 物种识别</p>
+          <p>BioCLIP物种识别</p>
           <h3>自然摄影，轻松记录。</h3>
           <span>在本地识别鸟类、野生动物与植物，生物图鉴轻松搞定。</span>
         </div>

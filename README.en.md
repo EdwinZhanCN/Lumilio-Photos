@@ -26,7 +26,8 @@ Lumilio Photos keeps your originals and application data on infrastructure you c
 - Albums, people, places, stacks, favorites, and duplicate management
 - Upload, folder scanning, metadata extraction, thumbnails, and transcoding
 - Search and filters across library metadata
-- Optional semantic search, face recognition, OCR, BioCLIP species recognition,
+- Optional Image Semantic Analysis, Person Recognition, OCR Text Recognition,
+  BioCLIP Species Recognition,
   and classification through Lumen
 - Responsive web interface plus macOS and Windows desktop packages
 - Multi-user authentication with optional MFA and passkeys
@@ -68,7 +69,8 @@ in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Optional AI with Lumen
 
-Semantic embeddings, face recognition, OCR, BioCLIP species recognition, and
+Image Semantic Analysis, Person Recognition, OCR Text Recognition,
+BioCLIP Species Recognition, and
 classification are provided by a separate
 [Lumen Hub](https://github.com/EdwinZhanCN/Lumen-Hub) inference node. They are
 opt-in and are not required for importing, browsing, or organizing media.

@@ -33,7 +33,7 @@ docker rm -f lumilio-breakglass
 docker compose up -d
 ```
 
-如果实际使用 `compose.caddy.yml` 或 `compose.acme.yml`，相应替换 `COMPOSE_FILE`。省略 `LUMILIO_BREAK_GLASS_USERNAME` 会恢复最早创建的启用中管理员。
+如果实际使用 `caddy.compose.yml` 或 `acme.compose.yml`，相应替换 `COMPOSE_FILE`。省略 `LUMILIO_BREAK_GLASS_USERNAME` 会恢复最早创建的启用中管理员。
 
 ## Desktop：macOS
 

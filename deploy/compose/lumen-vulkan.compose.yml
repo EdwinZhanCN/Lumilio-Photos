@@ -1,0 +1,17 @@
+name: lumen-hub
+
+services:
+    lumen-hub:
+        image: ghcr.io/edwinzhancn/lumen-hub:vulkan
+        restart: unless-stopped
+        network_mode: host
+        environment:
+            LUMEN_REGION: other
+            LUMEN_PRESET: basic
+        devices:
+            - /dev/dri:/dev/dri
+        volumes:
+            - lumen-models:/models
+
+volumes:
+    lumen-models:

@@ -26,7 +26,7 @@
 - 相册、人物、地点、堆叠、收藏与重复文件管理
 - 上传、目录扫描、元数据提取、缩略图生成与转码
 - 基于媒体库元数据的搜索与筛选
-- 通过 Lumen 提供可选的语义搜索、人脸识别、OCR、BioCLIP 物种识别和分类能力
+- 通过 Lumen 提供可选的图像语义分析、人物识别、OCR文字识别和BioCLIP物种识别
 - 响应式 Web 界面，以及 macOS 和 Windows 桌面应用
 - 多用户身份验证，并可选启用 MFA 和 Passkey
 
@@ -70,7 +70,7 @@ TOML。默认数据目录为 `./lumilio/media` 和 `./lumilio/app-state`，也�
 
 ## 可选的 Lumen AI
 
-语义向量、人脸识别、OCR、BioCLIP 物种识别和分类能力由独立的
+图像语义分析、人物识别、OCR文字识别和BioCLIP物种识别由独立的
 [Lumen Hub](https://github.com/EdwinZhanCN/Lumen-Hub) 推理节点提供。这些功能
 需要用户主动启用，不会影响媒体的导入、浏览和基础整理功能。
 

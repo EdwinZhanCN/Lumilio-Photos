@@ -1,0 +1,16 @@
+name: lumen-hub
+
+services:
+    lumen-hub:
+        image: ghcr.io/edwinzhancn/lumen-hub:cuda
+        restart: unless-stopped
+        network_mode: host
+        environment:
+            LUMEN_REGION: other
+            LUMEN_PRESET: basic
+        gpus: all
+        volumes:
+            - lumen-models:/models
+
+volumes:
+    lumen-models:

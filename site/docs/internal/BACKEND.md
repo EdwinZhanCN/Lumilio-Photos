@@ -18,8 +18,9 @@ This document describes the current Go backend as implemented in `server/`.
   secrets, cloud state, backups, and media under the same `.local/dev/`
   instance root while preserving the state/storage boundary.
 - Docker image: `server/Dockerfile`.
-- Linux production Compose files:
-  `deploy/compose/compose.{caddy,acme,proxy}.yml`; all use host networking.
+- Linux production Compose files: `deploy/compose/compose.yml`,
+  `deploy/compose/caddy.compose.yml`, and `deploy/compose/acme.compose.yml`;
+  all use host networking.
 - Browser E2E Compose files: `web/e2e/compose.yml` plus the CI cache overlay
   `web/e2e/compose.ci.yml`.
 

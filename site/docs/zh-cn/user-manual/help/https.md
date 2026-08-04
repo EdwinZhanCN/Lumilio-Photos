@@ -41,9 +41,9 @@ http://127.0.0.1:6680
 
 ```bash
 docker compose down
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.caddy.yml
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/caddy.compose.yml
 export LUMILIO_DOMAIN=photos.example.com
-docker compose -f compose.caddy.yml up -d
+docker compose -f caddy.compose.yml up -d
 ```
 
 Caddy 监听主机的 80/443，自动申请证书，并把请求转发给只监听 `127.0.0.1:6680` 的 Lumilio。媒体和应用状态默认仍位于 `./lumilio/media` 与 `./lumilio/app-state`；也可以继续使用 `LUMILIO_STORAGE` 和 `LUMILIO_STATE` 指定原来的目录。
@@ -73,8 +73,8 @@ docker run --rm \
   --email admin@example.com \
   --output /data/app-state/server.toml
 
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.acme.yml
-docker compose -f compose.acme.yml up -d
+curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/acme.compose.yml
+docker compose -f acme.compose.yml up -d
 ```
 
 替换示例中的域名和邮箱。证书申请失败时，Server 会停止启动，不会自动降级到 HTTP。
