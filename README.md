@@ -58,8 +58,8 @@ TOML。默认数据目录为 `./lumilio/media` 和 `./lumilio/app-state`，也�
 `LUMILIO_STORAGE` 与 `LUMILIO_STATE` 指定其他位置。
 
 需要 HTTPS 时，可在基础部署完成后使用已有反向代理、
-[`compose.caddy.yml`](deploy/compose/compose.caddy.yml) 或
-[`compose.acme.yml`](deploy/compose/compose.acme.yml)。详细步骤与安全边界见
+[`caddy.compose.yml`](deploy/compose/caddy.compose.yml) 或
+[`acme.compose.yml`](deploy/compose/acme.compose.yml)。详细步骤与安全边界见
 [安装指南](site/docs/zh-cn/user-manual/introduction/installation.md)和
 [HTTPS 与通行密钥](site/docs/zh-cn/user-manual/help/https.md)。
 

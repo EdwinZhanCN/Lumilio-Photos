@@ -118,12 +118,35 @@ tasks:
         LUMILIO_STORAGE=/srv/lumilio/media
         LUMILIO_STATE=/srv/lumilio/state
         LUMILIO_DOMAIN=photos.example.com
-        docker compose -f deploy/compose/compose.caddy.yml config --quiet
+        docker compose -f deploy/compose/caddy.compose.yml config --quiet
       - >-
         LUMILIO_STORAGE=/srv/lumilio/media
         LUMILIO_STATE=/srv/lumilio/state
-        docker compose -f deploy/compose/compose.acme.yml config --quiet
+        docker compose -f deploy/compose/acme.compose.yml config --quiet
+      - docker compose -f deploy/compose/lumen-cpu.compose.yml config --quiet
+      - docker compose -f deploy/compose/lumen-vulkan.compose.yml config --quiet
+      - docker compose -f deploy/compose/lumen-cuda.compose.yml config --quiet
       - docker compose -f web/e2e/compose.yml -f web/e2e/compose.ci.yml config --quiet
+      # Official Lumen Compose files are host-network only: mDNS discovery needs
+      # the host LAN, so bridge mode, port mapping, and Host Broker are not
+      # supported deployment paths. Assertions run on `docker compose config`
+      # output, so they also catch future render-time drift.
+      - cmd: "docker compose -f deploy/compose/lumen-cpu.compose.yml config | grep -q 'network_mode: host'"
+        msg: lumen-cpu.compose.yml must use host networking
+      - cmd: "docker compose -f deploy/compose/lumen-cpu.compose.yml config | grep -vqE '^    ports:'"
+        msg: lumen-cpu.compose.yml must not publish ports
+      - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -q 'network_mode: host'"
+        msg: lumen-vulkan.compose.yml must use host networking
+      - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -q 'source: /dev/dri'"
+        msg: lumen-vulkan.compose.yml must map /dev/dri
+      - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -vqE '^    ports:'"
+        msg: lumen-vulkan.compose.yml must not publish ports
+      - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -q 'network_mode: host'"
+        msg: lumen-cuda.compose.yml must use host networking
+      - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -q 'count: -1'"
+        msg: "lumen-cuda.compose.yml must declare gpus: all"
+      - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -vqE '^    ports:'"
+        msg: lumen-cuda.compose.yml must not publish ports
 
   config:examples:
     desc: Regenerate runtime configuration schema and examples

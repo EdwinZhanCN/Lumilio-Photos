@@ -57,8 +57,8 @@ docker compose up -d
 ```
 
 Open `http://<Linux-host-IP>:6680`. Optional
-[`compose.caddy.yml`](deploy/compose/compose.caddy.yml) and
-[`compose.acme.yml`](deploy/compose/compose.acme.yml) add HTTPS. Read the
+[`caddy.compose.yml`](deploy/compose/caddy.compose.yml) and
+[`acme.compose.yml`](deploy/compose/acme.compose.yml) add HTTPS. Read the
 [installation guide](site/docs/en/user-manual/introduction/installation.md)
 for persistent paths and advanced deployment options.
 
