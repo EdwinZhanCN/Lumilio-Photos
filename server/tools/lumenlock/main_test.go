@@ -59,3 +59,29 @@ func TestParseLockRejectsInvalidRelease(t *testing.T) {
 		t.Fatal("invalid release was accepted")
 	}
 }
+
+func TestControlProtoRawURL(t *testing.T) {
+	url, err := controlProtoRawURL("https://github.com/EdwinZhanCN/Lumen-Hub.git", "cd67719660056244c405835d07786110fc7c1223")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "https://raw.githubusercontent.com/EdwinZhanCN/Lumen-Hub/cd67719660056244c405835d07786110fc7c1223/crates/lumen-hub/proto/control.proto"
+	if url != want {
+		t.Fatalf("controlProtoRawURL() = %q, want %q", url, want)
+	}
+	if _, err := controlProtoRawURL("not-a-repo", "abc"); err == nil {
+		t.Fatal("invalid repository was accepted")
+	}
+}
+
+func TestBytesEqual(t *testing.T) {
+	if !bytesEqual([]byte("same"), []byte("same")) {
+		t.Fatal("identical bytes reported different")
+	}
+	if bytesEqual([]byte("same"), []byte("drift")) {
+		t.Fatal("different bytes reported identical")
+	}
+	if bytesEqual(nil, []byte("x")) {
+		t.Fatal("nil vs non-nil reported identical")
+	}
+}

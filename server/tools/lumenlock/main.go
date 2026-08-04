@@ -36,6 +36,10 @@ const (
 	catalogPath      = "desktop/internal/lumen/release_catalog.go"
 	userAgent        = "Lumilio-Photos-lumenlock"
 	legacyChecksName = "checksums.txt"
+	// controlProtoPath is the Desktop's vendored copy of the Hub control-plane
+	// contract; it must stay byte-for-byte identical to the pinned release's
+	// `crates/lumen-hub/proto/control.proto`.
+	controlProtoPath = "desktop/internal/lumen/controlv1/control.proto"
 )
 
 // Desktop release profiles: decision 5 pins these four exactly.
@@ -192,6 +196,13 @@ func run(mode, root string) error {
 	// Tag provenance: resolve the release tag to its commit.
 	revision, err := resolveTagCommit(lock.Repository, lock.Release)
 	if err != nil {
+		return err
+	}
+
+	// The vendored control.proto must match the pinned release byte-for-byte
+	// (the Desktop consumes the control plane through it). Neither mode
+	// rewrites the proto — regeneration needs protoc and is a manual step.
+	if err := verifyVendoredControlProto(root, lock.Repository, revision); err != nil {
 		return err
 	}
 
@@ -352,6 +363,47 @@ func composePresetNames(root string) ([]string, error) {
 		}
 	}
 	return names, nil
+}
+
+// verifyVendoredControlProto fetches the pinned revision's authoritative
+// control.proto and compares it byte-for-byte with the Desktop's vendored
+// copy, so the control-plane contract has exactly one text source.
+func verifyVendoredControlProto(root, repository, revision string) error {
+	path := filepath.Join(root, filepath.FromSlash(controlProtoPath))
+	vendored, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", controlProtoPath, err)
+	}
+
+	rawURL, err := controlProtoRawURL(repository, revision)
+	if err != nil {
+		return err
+	}
+	authoritative, err := fetch(rawURL)
+	if err != nil {
+		return err
+	}
+	if !bytesEqual(authoritative, vendored) {
+		return fmt.Errorf(
+			"%s drifted from control.proto at revision %s (%s); re-vendor the file and run `task desktop:proto:gen`",
+			controlProtoPath, revision[:12], lockFileName,
+		)
+	}
+	fmt.Printf("controlv1 ok — %s matches Hub revision %s\n", controlProtoPath, revision[:12])
+	return nil
+}
+
+// controlProtoRawURL builds the raw GitHub URL of the pinned revision's
+// authoritative control.proto.
+func controlProtoRawURL(repository, revision string) (string, error) {
+	match := repoRe.FindStringSubmatch(repository)
+	if match == nil {
+		return "", fmt.Errorf("unexpected repository %q", repository)
+	}
+	return fmt.Sprintf(
+		"https://raw.githubusercontent.com/%s/%s/%s/crates/lumen-hub/proto/control.proto",
+		match[1], match[2], revision,
+	), nil
 }
 
 func generateCatalog(release string, profiles []string, byProfile map[string]artifact) (string, error) {

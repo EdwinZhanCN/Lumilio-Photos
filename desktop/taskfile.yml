@@ -108,6 +108,25 @@ tasks:
     cmds:
       - go run ./internal/resources/cmd/manifest -root ./resources/payload -output ./resources/manifest.json
 
+  proto:gen:
+    summary: Regenerates controlv1 Go bindings from the vendored control.proto
+    desc: >-
+      Regenerates desktop/internal/lumen/controlv1 from the vendored
+      control.proto. Run after lumen:sync pins a new Hub release whose
+      control.proto changed; the vendored file must stay byte-for-byte the
+      Hub release's crates/lumen-hub/proto/control.proto (lumen:check enforces
+      it). The Go import path differs from the proto's go_package, so it is
+      mapped with --go_opt=M... instead of editing the proto.
+    dir: ..
+    cmds:
+      - >-
+        protoc --proto_path=desktop/internal/lumen/controlv1
+        --go_out=paths=source_relative:desktop/internal/lumen/controlv1
+        --go_opt=Mcontrol.proto=desktop/internal/lumen/controlv1
+        --go-grpc_out=paths=source_relative:desktop/internal/lumen/controlv1
+        --go-grpc_opt=Mcontrol.proto=desktop/internal/lumen/controlv1
+        desktop/internal/lumen/controlv1/control.proto
+
   generate:icons:
     summary: Regenerates platform icons from build/appicon.png
     desc: Regenerates platform icons from build/appicon.png
