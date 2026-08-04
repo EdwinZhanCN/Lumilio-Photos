@@ -1,3 +1,14 @@
 # Server-local build outputs
 /bin/
 /dist/
+
+# `go build ./tools/<tool>` run from this directory drops a bare binary
+# next to the module root; the Taskfile uses `go run` instead.
+/architecturecheck
+/assetslock
+/configgen
+/devstate
+/fakelumen
+/lumenlock
+/uploadbench
+/uploadbench-sampler
