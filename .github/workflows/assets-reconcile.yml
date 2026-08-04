@@ -1,0 +1,71 @@
+name: Assets lock reconcile
+
+# Manual single-PR workflow: runs `task assets:reconcile` (newest stable
+# Lumilio-Assets release, or the RELEASE input) and opens exactly one PR per
+# trigger on a one-time branch. No schedule, no fixed automation branch, and
+# no repository_dispatch; the Assets repository never holds Photos tokens.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Target release tag (assets-vX.Y.Z); empty = newest stable"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  reconcile:
+    name: Reconcile assets.lock.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: 3.52.0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Reconcile assets lock
+        run: task assets:reconcile RELEASE=${{ inputs.release || '' }}
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if git diff --quiet -- assets.lock.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open reconcile PR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release=$(sed -n 's/.*"release": "\([^"]*\)".*/\1/p' assets.lock.json | head -n 1)
+          branch="automation/assets-lock-${release}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${branch}"
+          git add assets.lock.json
+          git commit -m "chore(assets): lock Lumilio-Assets ${release}"
+          git push -u origin "${branch}"
+          gh pr create \
+            --base main \
+            --head "${branch}" \
+            --title "chore(assets): lock Lumilio-Assets ${release}" \
+            --body "Reconciled by manual \`workflow_dispatch\` (assets-reconcile). CI's \`assets:check\` validates the lock against the pinned release; merge after it passes."
+
+      - name: Report no-op
+        if: steps.changes.outputs.changed == 'false'
+        run: echo "assets.lock.json is already at the target release; no PR opened."

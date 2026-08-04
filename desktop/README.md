@@ -30,10 +30,12 @@ Runtime intent, journals, shortcut cache, resources, Lumen versions, and
 update staging are stored under the OS application-data directory. The host
 does not search the working directory or silently apply environment defaults.
 
-Lumen Hub is installed on demand from the official GitHub v0.1.1 release. The
-Desktop binary contains an immutable per-profile URL and SHA-256 catalog for
-`darwin-arm64-metal` and `windows-x64-cpu` (plus the other official Desktop
-profiles); it
+Lumen Hub is installed on demand from the official GitHub release pinned by
+`lumen.lock.json` (currently v0.1.1). The Desktop binary contains an immutable
+per-profile URL and SHA-256 catalog for `darwin-arm64-metal` and
+`windows-x64-cpu` (plus the other official Desktop profiles), generated from
+the Hub release manifest by `task lumen:sync` into
+`internal/lumen/release_catalog.go`; it
 never follows a mutable `latest` manifest. The archive is streamed into a
 private staging directory, verified, probed, and promoted through
 `lumen/current.json`. A hidden mode of the Desktop executable supervises the

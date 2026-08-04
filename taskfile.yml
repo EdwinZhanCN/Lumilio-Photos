@@ -148,6 +148,34 @@ tasks:
       - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -vqE '^    ports:'"
         msg: lumen-cuda.compose.yml must not publish ports
 
+  assets:check:
+    desc: Verify assets.lock.json against the pinned Lumilio-Assets release
+    cmds:
+      - go -C server run ./tools/assetslock check "{{.ROOT_DIR}}"
+
+  assets:reconcile:
+    desc: >-
+      Update assets.lock.json to the newest stable Lumilio-Assets release
+      (or the explicit RELEASE), rejecting downgrades
+    vars:
+      RELEASE: '{{.RELEASE | default ""}}'
+    cmds:
+      - >-
+        go -C server run ./tools/assetslock reconcile "{{.ROOT_DIR}}"
+        {{if .RELEASE}}--release {{.RELEASE}}{{end}}
+
+  lumen:check:
+    desc: Verify lumen.lock.json, SHA256SUMS, and Desktop catalog without writing
+    cmds:
+      - go -C server run ./tools/lumenlock check "{{.ROOT_DIR}}"
+
+  lumen:sync:
+    desc: >-
+      Reconcile lumen.lock.json derived fields and regenerate the Desktop
+      release catalog from the pinned Lumen-Hub release
+    cmds:
+      - go -C server run ./tools/lumenlock sync "{{.ROOT_DIR}}"
+
   config:examples:
     desc: Regenerate runtime configuration schema and examples
     cmds:
@@ -209,10 +237,12 @@ tasks:
   # CI contracts. GitHub Actions provisions runners, native packages, caches,
   # credentials, and artifacts; these tasks own repository command semantics.
   ci:architecture:
-    desc: Run architecture and Compose CI gates
+    desc: Run architecture, Compose, and cross-repository catalog CI gates
     cmds:
       - task: architecture:check
       - task: compose:test
+      - task: lumen:check
+      - task: assets:check
 
   ci:server:
     desc: Run the standalone Server CI gate
