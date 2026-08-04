@@ -266,8 +266,9 @@ func parseLock(raw []byte) (lock, error) {
 
 func parseManifest(raw []byte) (manifest, error) {
 	var parsed manifest
+	// The manifest is a remote contract that grows with schemaVersion; only the
+	// fields we consume are declared, unknown fields are ignored.
 	decoder := json.NewDecoder(strings.NewReader(string(raw)))
-	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&parsed); err != nil {
 		return parsed, fmt.Errorf("decode release manifest: %w", err)
 	}
