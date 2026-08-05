@@ -73,6 +73,7 @@ func newTestController(t *testing.T, factory *fakeFactory) *Controller {
 	controller := NewController(Options{
 		Store: store, Operations: operation.New(), Desired: NewMemoryDesiredState(dto.DesiredDisabled),
 		Factory: factory, Installer: fakeInstaller{}, Installed: true, InstalledVer: "lumen-test-v1", Profile: "balanced",
+		Preset: "basic", Presets: []string{"minimal", "basic", "brave"},
 		CacheDir:    t.TempDir(),
 		ReadyBudget: 100 * time.Millisecond, StopBudget: 20 * time.Millisecond,
 	})

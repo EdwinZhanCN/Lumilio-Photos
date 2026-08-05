@@ -30,32 +30,27 @@ Runtime intent, journals, shortcut cache, resources, Lumen versions, and
 update staging are stored under the OS application-data directory. The host
 does not search the working directory or silently apply environment defaults.
 
-Lumen Hub is installed on demand from the official GitHub v0.1.0 release. The
-Desktop binary contains an immutable per-profile URL and SHA-256 catalog for
-`darwin-arm64-metal` and `windows-x64-cpu` (plus the other official Desktop
-profiles); it
-never follows a mutable `latest` manifest. The archive is streamed into a
-private staging directory, verified, probed, and promoted through
-`lumen/current.json`. A hidden mode of the Desktop executable supervises the
-actual Hub so abrupt parent death cannot leave an unowned process behind.
+Lumen Hub is installed on demand from the immutable GitHub release pinned by
+`../lumen.lock.json`. The Desktop binary embeds the generated artifact URL and
+SHA-256 catalog in `internal/lumen/release_catalog.go`; it never follows a
+mutable `latest` endpoint. Downloads are streamed into a private staging
+directory, verified, probed, and promoted through `lumen/current.json`. A
+hidden Desktop mode owns the Hub process tree so abrupt parent exit cannot
+leave an unmanaged child.
 
-Hub configuration generation follows the upstream CLI/Launcher selection
-pipeline (platform/release profile, backend, preset, region/cache, render, then
-validate/write). Before installation, the Lumen panel offers the upstream
-`minimal`, `basic`, and `brave` presets plus every pinned backend artifact for
-the current platform, and a native directory picker for the model cache;
-`basic`, the platform's conservative profile, and the private Desktop model
-directory remain the defaults. The selected cache is canonicalized, rejected
-when it is a filesystem root, and persisted with the preset before the release
-installer runs. The result binds `127.0.0.1:50051`, advertises
-only that loopback address through mDNS for compatibility with existing runtime
-intents, stores downloaded models under the selected cache, and enables SigLIP,
-InsightFace, PP-OCR, and BioCLIP. New Desktop
-Server profiles include the loopback node explicitly while retaining mDNS
-discovery for older intents and separately operated LAN nodes. To update the
-pinned Hub release, update the catalog in `internal/lumen/release.go` from the
-upstream `manifest.json`, mirror any control-plane proto change, regenerate its
-Go bindings, and run the Desktop and Server gates.
+Desktop owns only managed-Hub intent: release profile, preset, download region,
+and model-cache directory. Immediately before every start it resolves the
+exact installed Hub binary and invokes `lumen-hub config render --target
+desktop`. The Hub's own `lumen-schema` implementation validates and renders the
+complete configuration, which Desktop then promotes atomically. Desktop does
+not duplicate model IDs, service graphs, backend runtime strings, batching
+defaults, or YAML validation. Re-rendering on each start also prevents an old
+derived file from silently becoming a second configuration authority.
+
+The available preset IDs and platform artifacts are generated from the pinned
+release by `task lumen:sync`. To upgrade, publish Hub first, then run
+`task lumen:sync RELEASE=<tag>` at the Photos repository root and commit the
+lock, generated catalog, and any vendored control-proto change together.
 
 The installed Hub's versioned Control service is also the source of truth for
 the Lumen panel. Desktop subscribes to `WatchStatus` and presents the startup

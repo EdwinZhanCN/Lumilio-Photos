@@ -2,10 +2,11 @@ module desktop
 
 go 1.25.0
 
+exclude google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
+
 require (
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.119
-	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/sys v0.46.0
 	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.10
@@ -58,7 +59,7 @@ require (
 	github.com/davidbyttow/govips/v2 v2.18.0 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/edwinzhancn/lumen-sdk v1.3.2 // indirect
+	github.com/edwinzhancn/lumen-sdk v1.4.0 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect
 	github.com/eino-contrib/ollama v0.1.0 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
@@ -157,6 +158,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/arch v0.11.0 // indirect
 	golang.org/x/crypto v0.53.0 // indirect

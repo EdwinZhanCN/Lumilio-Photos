@@ -29,8 +29,14 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ControlClient interface {
+	// Snapshot of the current status; cheap, poll-safe.
 	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StatusSnapshot, error)
+	// Pushes a fresh snapshot on every state change (download progress is
+	// throttled server-side, ~2/s). The first message is the current snapshot,
+	// so subscribers never start blind.
 	WatchStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StatusSnapshot], error)
+	// Structured log tail: optional ring-buffer backlog, then live entries.
+	// The on-disk log file remains the post-mortem source of truth.
 	TailLogs(ctx context.Context, in *TailLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LogEntry], error)
 }
 
@@ -94,8 +100,14 @@ type Control_TailLogsClient = grpc.ServerStreamingClient[LogEntry]
 // All implementations must embed UnimplementedControlServer
 // for forward compatibility.
 type ControlServer interface {
+	// Snapshot of the current status; cheap, poll-safe.
 	GetStatus(context.Context, *emptypb.Empty) (*StatusSnapshot, error)
+	// Pushes a fresh snapshot on every state change (download progress is
+	// throttled server-side, ~2/s). The first message is the current snapshot,
+	// so subscribers never start blind.
 	WatchStatus(*emptypb.Empty, grpc.ServerStreamingServer[StatusSnapshot]) error
+	// Structured log tail: optional ring-buffer backlog, then live entries.
+	// The on-disk log file remains the post-mortem source of truth.
 	TailLogs(*TailLogsRequest, grpc.ServerStreamingServer[LogEntry]) error
 	mustEmbedUnimplementedControlServer()
 }

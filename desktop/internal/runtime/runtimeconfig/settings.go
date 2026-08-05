@@ -84,8 +84,8 @@ func LoadSettings(path string) (Settings, error) {
 	if settings.LumenDesiredState != dto.DesiredDisabled && settings.LumenDesiredState != dto.DesiredRunning {
 		return Settings{}, fmt.Errorf("unsupported Lumen desired state %q", settings.LumenDesiredState)
 	}
-	if !validLumenPreset(settings.LumenPreset) {
-		return Settings{}, fmt.Errorf("unsupported Lumen preset %q", settings.LumenPreset)
+	if !validPresetIdentifier(settings.LumenPreset) {
+		return Settings{}, fmt.Errorf("invalid Lumen preset identifier %q", settings.LumenPreset)
 	}
 	if !validLumenCacheDir(settings.LumenCacheDir) {
 		return Settings{}, fmt.Errorf("invalid Lumen cache directory %q", settings.LumenCacheDir)
@@ -112,8 +112,8 @@ func SaveSettings(path string, settings Settings) error {
 	if settings.LumenDesiredState != dto.DesiredDisabled && settings.LumenDesiredState != dto.DesiredRunning {
 		return fmt.Errorf("unsupported Lumen desired state %q", settings.LumenDesiredState)
 	}
-	if !validLumenPreset(settings.LumenPreset) {
-		return fmt.Errorf("unsupported Lumen preset %q", settings.LumenPreset)
+	if !validPresetIdentifier(settings.LumenPreset) {
+		return fmt.Errorf("invalid Lumen preset identifier %q", settings.LumenPreset)
 	}
 	if !validLumenCacheDir(settings.LumenCacheDir) {
 		return fmt.Errorf("invalid Lumen cache directory %q", settings.LumenCacheDir)
@@ -137,8 +137,17 @@ func SaveSettings(path string, settings Settings) error {
 	return platform.WriteAtomic(path, append(data, '\n'), 0o600)
 }
 
-func validLumenPreset(preset string) bool {
-	return preset == "minimal" || preset == "basic" || preset == "brave"
+func validPresetIdentifier(preset string) bool {
+	if preset == "" || strings.TrimSpace(preset) != preset || len(preset) > 64 {
+		return false
+	}
+	for _, char := range preset {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func validLumenCacheDir(path string) bool {

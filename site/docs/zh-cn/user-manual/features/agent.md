@@ -5,7 +5,7 @@ description: 了解 Lumilio Agent 的入口、上下文引用、结果集、看�
 
 # Lumilio Agent
 
-Lumilio Agent 是 Lumilio Photos 中的对话式整理助手。它与负责媒体 ML 处理的 [Lumen AI](./lumen-ai) 相互独立：Agent 需要配置 LLM 提供方，Lumen AI 则负责语义索引、OCR、人脸等后台处理任务。
+Lumilio Agent 是 Lumilio Photos 中的对话式整理助手。它与负责媒体 ML 处理的 [Lumen AI](./lumen-ai) 相互独立：Agent 需要配置 LLM 提供方，Lumen AI 则负责图像语义分析、人物识别、OCR文字识别和 BioCLIP物种识别。
 
 ## 从哪里打开 Lumilio Agent
 

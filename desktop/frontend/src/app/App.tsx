@@ -6,7 +6,6 @@ import {
   FolderOpen,
   FolderPlus,
   HardDrive,
-  Info,
   RefreshCw,
   RotateCcw,
   Server,
@@ -15,7 +14,6 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   DesktopService,
@@ -83,45 +81,6 @@ const dockRoutes = [
 ] as const;
 
 type MainRoute = (typeof dockRoutes)[number]["route"];
-
-type PresetCapability = {
-  id: "semantic" | "ocr" | "people" | "species";
-  model: string;
-  dataset?: string;
-};
-
-type PresetInfo = {
-  id: "minimal" | "basic" | "brave";
-  capabilities: PresetCapability[];
-};
-
-const presetCatalog: PresetInfo[] = [
-  {
-    id: "minimal",
-    capabilities: [
-      { id: "semantic", model: "siglip2-base-patch16-224" },
-      { id: "people", model: "antelopev2" },
-    ],
-  },
-  {
-    id: "basic",
-    capabilities: [
-      { id: "semantic", model: "siglip2-base-patch16-224" },
-      { id: "ocr", model: "pp-ocrv6-small" },
-      { id: "people", model: "antelopev2" },
-      { id: "species", model: "bioclip-2", dataset: "TreeOfLife200MCore" },
-    ],
-  },
-  {
-    id: "brave",
-    capabilities: [
-      { id: "semantic", model: "siglip2-so400m-patch14-384" },
-      { id: "ocr", model: "pp-ocrv6-small" },
-      { id: "people", model: "antelopev2" },
-      { id: "species", model: "bioclip-2", dataset: "TreeOfLife200M" },
-    ],
-  },
-];
 
 export function App() {
   const { t } = useTranslation();
@@ -744,9 +703,8 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
   const [state, setState] = useState<ButtonState>("idle");
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState(lumen.profile || lumen.availableProfiles?.[0] || "");
-  const [selectedPreset, setSelectedPreset] = useState(lumen.preset || lumen.availablePresets?.[0] || "basic");
+  const [selectedPreset, setSelectedPreset] = useState(lumen.preset || lumen.availablePresets?.[0] || "");
   const [selectedCacheDir, setSelectedCacheDir] = useState(lumen.cacheDir || "");
-  const [presetInfoOpen, setPresetInfoOpen] = useState(false);
   const [logLevel, setLogLevel] = useState("INFO");
   const [logs, setLogs] = useState<LumenLogEntry[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -853,22 +811,11 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
       {releaseReady ? (
         <SettingsSection title={t("lumen.service")}>
           <SettingRow
-            title={
-              <span className="lumen-preset-title">
-                {t("lumen.preset", "Preset")}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="lumen-preset-info"
-                  aria-label={t("lumen.presetInfo", "Show preset capabilities")}
-                  title={t("lumen.presetInfo", "Show preset capabilities")}
-                  onClick={() => setPresetInfoOpen(true)}
-                >
-                  <Info className="size-3.5" />
-                </Button>
-              </span>
-            }
-            description={t("lumen.presetDescription", "Choose which AI services and model sizes to install.")}
+            title={t("lumen.preset", "Preset")}
+            description={t(
+              "lumen.presetDescription",
+              "Choose a runtime preset exposed by the pinned Lumen Hub release.",
+            )}
           >
             <Select value={selectedPreset} onValueChange={setSelectedPreset} disabled={!canChooseSetup} className="w-80 max-w-full">
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -957,7 +904,6 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
       ) : null}
 
       {actionError ? <ActionNotice component={t("dock.lumen")} message={actionError} /> : null}
-      <PresetInfoModal open={presetInfoOpen} onClose={() => setPresetInfoOpen(false)} />
     </>
   );
 }
@@ -1035,113 +981,6 @@ function LumenControlPanel({ lumen }: { lumen: LumenSnapshot }) {
         )) : <p className="lumen-empty-copy">{control.connected ? t("lumen.servicesPending", "Service states will appear after model construction.") : t("lumen.servicesOffline", "No service state is available while Hub is stopped.")}</p>}
       </div>
     </SettingsSection>
-  );
-}
-
-function presetNameLabel(id: PresetInfo["id"], t: ReturnType<typeof useTranslation>["t"]) {
-  if (id === "minimal") return t("lumen.presetNameMinimal", "Minimal");
-  if (id === "brave") return t("lumen.presetNameBrave", "Brave");
-  return t("lumen.presetNameBasic", "Basic");
-}
-
-function presetDescriptionLabel(id: PresetInfo["id"], t: ReturnType<typeof useTranslation>["t"]) {
-  if (id === "minimal") return t("lumen.presetDescriptionMinimal", "Core semantic search and people recognition.");
-  if (id === "brave") return t("lumen.presetDescriptionBrave", "Higher-capacity semantic and species recognition models.");
-  return t("lumen.presetDescriptionBasic", "The complete everyday photo analysis set.");
-}
-
-function capabilityLabel(id: PresetCapability["id"], t: ReturnType<typeof useTranslation>["t"]) {
-  if (id === "semantic") return t("lumen.capabilitySemantic", "Image semantic analysis");
-  if (id === "ocr") return t("lumen.capabilityOCR", "OCR text recognition");
-  if (id === "people") return t("lumen.capabilityPeople", "People recognition");
-  return t("lumen.capabilitySpecies", "BioCLIP species recognition");
-}
-
-function PresetInfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t } = useTranslation();
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose, open]);
-
-  if (typeof document === "undefined") return null;
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          className="lumen-modal-root"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) onClose();
-          }}
-        >
-          <motion.section
-            className="lumen-preset-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="lumen-preset-modal-title"
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 360, damping: 30, mass: 0.75 }}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header className="lumen-preset-modal-header">
-              <div>
-                <p className="lumen-control-kicker">{t("lumen.presetDetailsEyebrow", "Lumen setup")}</p>
-                <h2 id="lumen-preset-modal-title">{t("lumen.presetDetails", "Preset capabilities")}</h2>
-                <p>{t("lumen.presetDetailsDescription", "Compare the AI services, models, and datasets included with each preset.")}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t("common.close", "Close")}
-                title={t("common.close", "Close")}
-                onClick={onClose}
-              >
-                <X className="size-4" />
-              </Button>
-            </header>
-            <div className="lumen-preset-grid">
-              {presetCatalog.map((preset) => (
-                <article className="lumen-preset-card" key={preset.id}>
-                  <div className="lumen-preset-card-heading">
-                    <div>
-                      <h3>{presetNameLabel(preset.id, t)}</h3>
-                      <p>{presetDescriptionLabel(preset.id, t)}</p>
-                    </div>
-                    <span className="lumen-preset-code">{preset.id}</span>
-                  </div>
-                  <div className="lumen-capability-list">
-                    {preset.capabilities.map((capability) => (
-                      <div className="lumen-capability" key={capability.id}>
-                        <strong>{capabilityLabel(capability.id, t)}</strong>
-                        <span><em>{t("lumen.model", "Model")}</em>{capability.model}</span>
-                        <span><em>{t("lumen.dataset", "Dataset")}</em>{capability.dataset || t("lumen.datasetDefault", "Upstream model default")}</span>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </motion.section>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body,
   );
 }
 

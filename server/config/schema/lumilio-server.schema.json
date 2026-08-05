@@ -387,13 +387,13 @@
           "type": "string",
           "description": "Timeout for opening a connection to a resolved node."
         },
-        "rediscovery_backoff_min": {
+        "failure_cooldown_min": {
           "type": "string",
-          "description": "Shortest wait before retrying discovery after a failure."
+          "description": "Shortest cooldown after a node reaches the hard-failure threshold."
         },
-        "rediscovery_backoff_max": {
+        "failure_cooldown_max": {
           "type": "string",
-          "description": "Longest wait between discovery retries. Must be \u003e= the minimum."
+          "description": "Longest cooldown after repeated node failures. Must be \u003e= the minimum."
         },
         "scan_interval": {
           "type": "string",
@@ -424,8 +424,8 @@
         "deployment_id",
         "resolve_timeout",
         "connect_timeout",
-        "rediscovery_backoff_min",
-        "rediscovery_backoff_max",
+        "failure_cooldown_min",
+        "failure_cooldown_max",
         "scan_interval",
         "chunk_auto",
         "chunk_threshold_bytes",

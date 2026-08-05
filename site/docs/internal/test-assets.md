@@ -10,10 +10,16 @@ media files here.
 - Root `assets.lock.json` (schemaVersion 1) pins `repository`, `revision` (full
   40-char SHA), `release`, default `profile`, and `manifestSha256` (integrity of
   the source `assets.json` catalog). To change the fixture set, bump these — a
-  mismatch fails the sync loudly.
+  mismatch fails the sync loudly. Only `release` is chosen by hand: the
+  `assets:reconcile` workflow (manual `workflow_dispatch`) picks the newest
+  stable `assets-vX.Y.Z`, verifies the release's `release.json`, and opens one
+  PR that updates `release` + `revision` + `manifestSha256` together
+  (downgrades rejected; re-running is a no-op). `task assets:check` is the CI
+  gate that validates the lock against the pinned release.
 - The source repo holds `assets.json` (catalog: `id`, `media/...` path, `sha256`,
-  `bytes`) and `profiles/<name>.json` (a list of asset IDs). Two profiles:
-  `smoke` (minimal, for e2e) and `demo` (full image pool).
+  `bytes`), `profiles/<name>.json` (a list of asset IDs), and publishes
+  `release.json` with every release. Profiles: `smoke` (minimal, for e2e) and
+  `demo` (full image pool), plus `e2e` (the deterministic test set).
 
 ## Sync — `vp run assets:sync [--profile <name>]`
 

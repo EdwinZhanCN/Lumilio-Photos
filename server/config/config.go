@@ -140,21 +140,21 @@ type AuthRateLimitConfig struct {
 type TranscodeConfig struct{ HardwareAccel string }
 
 type LumenConfig struct {
-	DiscoveryEnabled      bool
-	DiscoveryMDNSEnabled  bool
-	DiscoveryHubURL       string
-	DiscoveryStaticNodes  []string
-	DiscoveryServiceType  string
-	DiscoveryDomain       string
-	DeploymentID          string
-	ResolveTimeout        time.Duration
-	ConnectTimeout        time.Duration
-	RediscoveryBackoffMin time.Duration
-	RediscoveryBackoffMax time.Duration
-	ScanInterval          time.Duration
-	ChunkAuto             bool
-	ChunkThresholdBytes   int
-	ChunkMaxBytes         int
+	DiscoveryEnabled     bool
+	DiscoveryMDNSEnabled bool
+	DiscoveryHubURL      string
+	DiscoveryStaticNodes []string
+	DiscoveryServiceType string
+	DiscoveryDomain      string
+	DeploymentID         string
+	ResolveTimeout       time.Duration
+	ConnectTimeout       time.Duration
+	FailureCooldownMin   time.Duration
+	FailureCooldownMax   time.Duration
+	ScanInterval         time.Duration
+	ChunkAuto            bool
+	ChunkThresholdBytes  int
+	ChunkMaxBytes        int
 }
 
 func (c LumenConfig) StaticNodes() []string {
@@ -331,10 +331,10 @@ type lumenManifest struct {
 	ResolveTimeout *string `toml:"resolve_timeout" json:"resolve_timeout"`
 	// Timeout for opening a connection to a resolved node.
 	ConnectTimeout *string `toml:"connect_timeout" json:"connect_timeout"`
-	// Shortest wait before retrying discovery after a failure.
-	RediscoveryBackoffMin *string `toml:"rediscovery_backoff_min" json:"rediscovery_backoff_min"`
-	// Longest wait between discovery retries. Must be >= the minimum.
-	RediscoveryBackoffMax *string `toml:"rediscovery_backoff_max" json:"rediscovery_backoff_max"`
+	// Shortest cooldown after a node reaches the hard-failure threshold.
+	FailureCooldownMin *string `toml:"failure_cooldown_min" json:"failure_cooldown_min"`
+	// Longest cooldown after repeated node failures. Must be >= the minimum.
+	FailureCooldownMax *string `toml:"failure_cooldown_max" json:"failure_cooldown_max"`
 	// Interval between periodic node health sweeps.
 	ScanInterval *string `toml:"scan_interval" json:"scan_interval"`
 	// Let the client choose chunked upload automatically by payload size.
@@ -498,8 +498,8 @@ func validateManifestPresence(m manifest) []string {
 		required(&p, "lumen.deployment_id", m.Lumen.DeploymentID)
 		required(&p, "lumen.resolve_timeout", m.Lumen.ResolveTimeout)
 		required(&p, "lumen.connect_timeout", m.Lumen.ConnectTimeout)
-		required(&p, "lumen.rediscovery_backoff_min", m.Lumen.RediscoveryBackoffMin)
-		required(&p, "lumen.rediscovery_backoff_max", m.Lumen.RediscoveryBackoffMax)
+		required(&p, "lumen.failure_cooldown_min", m.Lumen.FailureCooldownMin)
+		required(&p, "lumen.failure_cooldown_max", m.Lumen.FailureCooldownMax)
 		required(&p, "lumen.scan_interval", m.Lumen.ScanInterval)
 		required(&p, "lumen.chunk_auto", m.Lumen.ChunkAuto)
 		required(&p, "lumen.chunk_threshold_bytes", m.Lumen.ChunkThresholdBytes)
@@ -634,11 +634,11 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	}
 	lumen.ResolveTimeout = parsePositiveDuration(&p, "lumen.resolve_timeout", *m.Lumen.ResolveTimeout)
 	lumen.ConnectTimeout = parsePositiveDuration(&p, "lumen.connect_timeout", *m.Lumen.ConnectTimeout)
-	lumen.RediscoveryBackoffMin = parsePositiveDuration(&p, "lumen.rediscovery_backoff_min", *m.Lumen.RediscoveryBackoffMin)
-	lumen.RediscoveryBackoffMax = parsePositiveDuration(&p, "lumen.rediscovery_backoff_max", *m.Lumen.RediscoveryBackoffMax)
+	lumen.FailureCooldownMin = parsePositiveDuration(&p, "lumen.failure_cooldown_min", *m.Lumen.FailureCooldownMin)
+	lumen.FailureCooldownMax = parsePositiveDuration(&p, "lumen.failure_cooldown_max", *m.Lumen.FailureCooldownMax)
 	lumen.ScanInterval = parsePositiveDuration(&p, "lumen.scan_interval", *m.Lumen.ScanInterval)
-	if lumen.RediscoveryBackoffMax < lumen.RediscoveryBackoffMin {
-		p = append(p, "lumen.rediscovery_backoff_max must be greater than or equal to rediscovery_backoff_min")
+	if lumen.FailureCooldownMax < lumen.FailureCooldownMin {
+		p = append(p, "lumen.failure_cooldown_max must be greater than or equal to failure_cooldown_min")
 	}
 	if lumen.DiscoveryHubURL != "" {
 		requireHTTPURL(&p, "lumen.discovery_hub_url", lumen.DiscoveryHubURL)

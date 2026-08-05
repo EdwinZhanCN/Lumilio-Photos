@@ -181,7 +181,7 @@ docker compose up -d
 如果需要让不同资源库分别位于多块磁盘，不要增加第二个 `/data/storage`。完成首次设置后，按照[Server 挂载资源库](./repositories#server)把每块磁盘挂载到 `/data/storage/<资源库名称>`。
 
 ::: tip 为什么使用 host network
-默认 Compose 使用 Linux host network，让 Server 可以发现局域网中的 Lumen 节点。无需添加 `ports`。如果 NAS 平台把容器隔离在自己的网络中，请阅读 [Lumen AI](../features/lumen-ai) 了解连接限制。
+默认 Compose 使用 Linux host network，让 Server 可以发现局域网中的 Lumen 节点，无需添加 `ports`。这是 Docker 版 Lumen 自动发现的支持边界；如果平台不能创建 host network 项目，当前官方路径不支持用该平台部署 Docker 版 Lumen Hub。具体流程见 [Lumen AI](../features/lumen-ai)。
 :::
 
 ::: danger 不要直接复制运行中的数据库

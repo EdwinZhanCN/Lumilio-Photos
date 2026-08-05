@@ -29,6 +29,7 @@ export const enSidebar: DefaultTheme.Sidebar = {
         { text: "Manage Libraries", link: "/user-manual/features/manage" },
         { text: "Settings", link: "/user-manual/features/settings" },
         { text: "Server Monitor", link: "/user-manual/features/monitor" },
+        { text: "Lumen AI", link: "/user-manual/features/lumen-ai" },
       ],
     },
   ],

@@ -10,26 +10,26 @@ import (
 
 func TestValidateControlStatusMatchesPinnedRelease(t *testing.T) {
 	status := &controlv1.StatusSnapshot{
-		Phase: controlv1.Phase_PHASE_DOWNLOADING, Version: "0.1.0", Profile: "metal",
+		Phase: controlv1.Phase_PHASE_DOWNLOADING, Version: "0.1.1", Profile: "metal",
 	}
-	if err := validateControlStatus(status, "v0.1.0", "darwin-arm64-metal"); err != nil {
+	if err := validateControlStatus(status, "v0.1.1", "darwin-arm64-metal"); err != nil {
 		t.Fatalf("validate status: %v", err)
 	}
 	status.Profile = "cpu"
-	if err := validateControlStatus(status, "v0.1.0", "darwin-arm64-metal"); err == nil {
+	if err := validateControlStatus(status, "v0.1.1", "darwin-arm64-metal"); err == nil {
 		t.Fatal("backend mismatch was accepted")
 	}
 	status.Profile = "metal"
 	status.Phase = controlv1.Phase_PHASE_FAILED
 	status.Error = "weights unavailable"
-	if err := validateControlStatus(status, "v0.1.0", "darwin-arm64-metal"); err == nil || !strings.Contains(err.Error(), "weights unavailable") {
+	if err := validateControlStatus(status, "v0.1.1", "darwin-arm64-metal"); err == nil || !strings.Contains(err.Error(), "weights unavailable") {
 		t.Fatalf("failed status error = %v", err)
 	}
 }
 
 func TestControlStatusDTOCarriesProgressServicesAndFailure(t *testing.T) {
 	status := &controlv1.StatusSnapshot{
-		Phase: controlv1.Phase_PHASE_DOWNLOADING, Version: "0.1.0", Profile: "metal",
+		Phase: controlv1.Phase_PHASE_DOWNLOADING, Version: "0.1.1", Profile: "metal",
 		StartedAtUnixMs: 1234, Seq: 9,
 		Download: &controlv1.DownloadProgress{
 			Model: "bioclip", File: "vision.bpk", BytesDone: 25, BytesTotal: 100, FilesDone: 1, FilesTotal: 4,

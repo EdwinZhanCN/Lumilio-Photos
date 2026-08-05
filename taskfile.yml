@@ -1,6 +1,6 @@
 # Root orchestration layer (Taskfile v3).
 #
-# Ownership boundary (per third_party/MIGRATION.md):
+# Ownership boundary:
 #   - GitHub Actions: triggers, path filters, runner OS, native packages,
 #     credentials, caches, Buildx, artifacts, branch-protection aggregation.
 #   - This file + the included module Taskfiles: repository commands, working
@@ -118,12 +118,77 @@ tasks:
         LUMILIO_STORAGE=/srv/lumilio/media
         LUMILIO_STATE=/srv/lumilio/state
         LUMILIO_DOMAIN=photos.example.com
-        docker compose -f deploy/compose/compose.caddy.yml config --quiet
+        docker compose -f deploy/compose/caddy.compose.yml config --quiet
       - >-
         LUMILIO_STORAGE=/srv/lumilio/media
         LUMILIO_STATE=/srv/lumilio/state
-        docker compose -f deploy/compose/compose.acme.yml config --quiet
+        docker compose -f deploy/compose/acme.compose.yml config --quiet
+      - docker compose -f deploy/compose/lumen-cpu.compose.yml config --quiet
+      - docker compose -f deploy/compose/lumen-vulkan.compose.yml config --quiet
+      - docker compose -f deploy/compose/lumen-cuda.compose.yml config --quiet
       - docker compose -f web/e2e/compose.yml -f web/e2e/compose.ci.yml config --quiet
+      # Official Lumen Compose files are host-network only: mDNS discovery needs
+      # the host LAN, so bridge mode, port mapping, and Host Broker are not
+      # supported deployment paths. Assertions run on `docker compose config`
+      # output, so they also catch future render-time drift.
+      - cmd: "docker compose -f deploy/compose/lumen-cpu.compose.yml config | grep -q 'network_mode: host'"
+        msg: lumen-cpu.compose.yml must use host networking
+      - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -q 'network_mode: host'"
+        msg: lumen-vulkan.compose.yml must use host networking
+      - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -q 'source: /dev/dri'"
+        msg: lumen-vulkan.compose.yml must map /dev/dri
+      - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -q 'network_mode: host'"
+        msg: lumen-cuda.compose.yml must use host networking
+      - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -q 'count: -1'"
+        msg: "lumen-cuda.compose.yml must declare gpus: all"
+
+  assets:check:
+    desc: Validate the committed assets.lock.json without network access
+    cmds:
+      - go -C server run ./tools/assetslock check "{{.ROOT_DIR}}"
+
+  assets:verify:
+    desc: Verify assets.lock.json against the pinned Lumilio-Assets release
+    cmds:
+      - go -C server run ./tools/assetslock verify "{{.ROOT_DIR}}"
+
+  assets:reconcile:
+    desc: >-
+      Update assets.lock.json to the newest stable Lumilio-Assets release
+      (or the explicit RELEASE), rejecting downgrades
+    vars:
+      RELEASE: '{{.RELEASE | default ""}}'
+    cmds:
+      - >-
+        go -C server run ./tools/assetslock reconcile "{{.ROOT_DIR}}"
+        {{if .RELEASE}}--release {{.RELEASE}}{{end}}
+
+  lumen:check:
+    desc: Validate committed Lumen lock, catalog, proto, and Compose intent offline
+    cmds:
+      - go -C server run ./tools/lumenlock check "{{.ROOT_DIR}}"
+
+  lumen:verify:
+    desc: Verify the committed Lumen pin against the producer release
+    cmds:
+      - go -C server run ./tools/lumenlock verify "{{.ROOT_DIR}}"
+
+  lumen:sync:
+    desc: >-
+      Reconcile lumen.lock.json and regenerate the Desktop catalog from the
+      pinned release or an explicit RELEASE
+    vars:
+      RELEASE: '{{.RELEASE | default ""}}'
+    cmds:
+      - >-
+        go -C server run ./tools/lumenlock sync "{{.ROOT_DIR}}"
+        {{if .RELEASE}}--release {{.RELEASE}}{{end}}
+
+  dependencies:verify:
+    desc: Verify both cross-repository pins against their producer repositories
+    cmds:
+      - task: lumen:verify
+      - task: assets:verify
 
   config:examples:
     desc: Regenerate runtime configuration schema and examples
@@ -161,20 +226,16 @@ tasks:
       - git config --local core.hooksPath .githooks
 
   tools:install:
-    desc: Install required development CLIs when missing
+    desc: Install the core development CLIs used by the default workflow
     cmds:
-      - task: tools:wasm-pack
       - task: tools:swag
 
-  tools:wasm-pack:
-    internal: true
+  wasm:setup:
+    desc: Install the optional wasm-pack CLI for rebuilding browser WASM packages
     status:
       - command -v wasm-pack >/dev/null 2>&1
     cmds:
-      - cmd: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-        platforms: [linux, darwin]
-      - cmd: cargo install wasm-pack
-        platforms: [windows]
+      - cargo install wasm-pack --locked
 
   tools:swag:
     internal: true
@@ -186,10 +247,12 @@ tasks:
   # CI contracts. GitHub Actions provisions runners, native packages, caches,
   # credentials, and artifacts; these tasks own repository command semantics.
   ci:architecture:
-    desc: Run architecture and Compose CI gates
+    desc: Run architecture, Compose, and cross-repository catalog CI gates
     cmds:
       - task: architecture:check
       - task: compose:test
+      - task: lumen:check
+      - task: assets:check
 
   ci:server:
     desc: Run the standalone Server CI gate

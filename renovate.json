@@ -2,6 +2,18 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":dependencyDashboard", ":prHourlyLimit2"],
   "minimumReleaseAge": "3 days",
+  "customManagers": [
+    {
+      "description": "Lumen Hub release pin in lumen.lock.json (github-releases datasource; single entry point for Hub upgrades)",
+      "customType": "regex",
+      "fileMatch": ["^lumen\\.lock\\.json$"],
+      "matchStrings": ["\"release\": \"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)\""],
+      "depName": "Lumen-Hub",
+      "packageName": "EdwinZhanCN/Lumen-Hub",
+      "datasource": "github-releases",
+      "versioning": "semver"
+    }
+  ],
   "packageRules": [
     {
       "description": "Group: desktop frontend (npm) — keep before desktop gomod so paths never overlap",
@@ -79,6 +91,13 @@
       "automerge": true,
       "automergeType": "branch",
       "platformAutomerge": true
+    },
+    {
+      "description": "Lumen Hub release pin: dedicated PR, never automerged; run `task lumen:sync` before merging",
+      "matchManagers": ["regex"],
+      "matchFileNames": ["^lumen\\.lock\\.json$"],
+      "automerge": false,
+      "labels": ["lumen", "manual-review"]
     },
     {
       "description": "Major updates always need a human",

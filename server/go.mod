@@ -2,6 +2,8 @@ module server
 
 go 1.25.0
 
+exclude google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
+
 require (
 	github.com/cloudwego/eino v0.9.6
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.63
@@ -9,7 +11,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidbyttow/govips/v2 v2.18.0
-	github.com/edwinzhancn/lumen-sdk v1.3.2
+	github.com/edwinzhancn/lumen-sdk v1.4.0
 )
 
 require (

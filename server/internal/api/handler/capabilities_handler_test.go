@@ -74,8 +74,8 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesSemanticCapabilities(t *test
 		},
 		stubLumenService{
 			poolStats: service.PoolStats{
-				TotalConnections:   1,
-				HealthyConnections: 1,
+				TotalNodes:    1,
+				RoutableNodes: 1,
 			},
 			isTaskAvailFn: func(taskName string) bool {
 				return taskName == "semantic_image_embed" ||

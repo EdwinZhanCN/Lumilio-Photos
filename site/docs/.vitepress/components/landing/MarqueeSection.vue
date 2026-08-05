@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const items = ['SEMANTIC', 'OCR', 'PLACES', 'INSIGHTFACE', 'SIGLIP 2', 'BIOCLIP 2', 'AGENT TOOLS']
+const items = ['IMAGE SEMANTIC ANALYSIS', 'OCR TEXT RECOGNITION', 'PLACES', 'INSIGHTFACE', 'SIGLIP 2', 'BIOCLIP 2', 'AGENT TOOLS']
 // 动画位移 -50%，轨道必须是完全相同的两半；每半重复 3 组，保证单半宽度超过超宽视口，循环无空隙。
 const track = [...items, ...items, ...items, ...items, ...items, ...items]
 </script>

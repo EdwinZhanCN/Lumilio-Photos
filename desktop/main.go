@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"io/fs"
@@ -164,7 +165,7 @@ func main() {
 		lumenFactory = lumen.CurrentFactory{
 			Root: paths.LumenDir, ConfigPath: paths.LumenConfig,
 			OwnerLock: paths.LumenOwner, Endpoint: lumen.DefaultEndpoint,
-			Prepare: func(profile string) error {
+			Prepare: func(ctx context.Context, _ string, hubBinary string) error {
 				currentSettings, err := runtimeconfig.LoadSettings(paths.SettingsFile)
 				if err != nil {
 					return err
@@ -173,11 +174,11 @@ func main() {
 				if cacheDir == "" {
 					cacheDir = paths.LumenModels
 				}
-				selection, err := lumen.NewSetupSelection(paths.LumenConfig, cacheDir, currentSettings.Region, profile, currentSettings.LumenPreset)
+				intent, err := lumen.NewSetupIntent(paths.LumenConfig, cacheDir, currentSettings.Region, currentSettings.LumenPreset)
 				if err != nil {
 					return err
 				}
-				return lumen.EnsureSetupConfig(selection)
+				return lumen.ReconcileSetupConfig(ctx, hubBinary, intent)
 			},
 		}
 	}

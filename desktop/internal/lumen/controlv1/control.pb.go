@@ -22,17 +22,18 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Mirrored from Lumen-Hub v0.1.0 crates/lumen-hub/proto/control.proto.
+// Hub/service lifecycle. The hub binds its port in PHASE_STARTING, so every
+// later phase (downloads included) is observable over this API.
 type Phase int32
 
 const (
 	Phase_PHASE_UNSPECIFIED Phase = 0
-	Phase_PHASE_STARTING    Phase = 1
-	Phase_PHASE_DOWNLOADING Phase = 2
-	Phase_PHASE_LOADING     Phase = 3
-	Phase_PHASE_WARMUP      Phase = 4
-	Phase_PHASE_READY       Phase = 5
-	Phase_PHASE_FAILED      Phase = 6
+	Phase_PHASE_STARTING    Phase = 1 // config parsed, control plane up
+	Phase_PHASE_DOWNLOADING Phase = 2 // fetching model artifacts
+	Phase_PHASE_LOADING     Phase = 3 // constructing models / moving weights to device
+	Phase_PHASE_WARMUP      Phase = 4 // startup warmup inference
+	Phase_PHASE_READY       Phase = 5 // data plane serving
+	Phase_PHASE_FAILED      Phase = 6 // terminal until restart; see StatusSnapshot.error
 	Phase_PHASE_STOPPING    Phase = 7
 )
 
@@ -89,10 +90,10 @@ func (Phase) EnumDescriptor() ([]byte, []int) {
 
 type DownloadProgress struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`
-	File          string                 `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`
+	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"` // e.g. "bioclip-2"
+	File          string                 `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`   // artifact currently transferring
 	BytesDone     uint64                 `protobuf:"varint,3,opt,name=bytes_done,json=bytesDone,proto3" json:"bytes_done,omitempty"`
-	BytesTotal    uint64                 `protobuf:"varint,4,opt,name=bytes_total,json=bytesTotal,proto3" json:"bytes_total,omitempty"`
+	BytesTotal    uint64                 `protobuf:"varint,4,opt,name=bytes_total,json=bytesTotal,proto3" json:"bytes_total,omitempty"` // 0 when the remote did not report a length
 	FilesDone     uint32                 `protobuf:"varint,5,opt,name=files_done,json=filesDone,proto3" json:"files_done,omitempty"`
 	FilesTotal    uint32                 `protobuf:"varint,6,opt,name=files_total,json=filesTotal,proto3" json:"files_total,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -173,9 +174,9 @@ func (x *DownloadProgress) GetFilesTotal() uint32 {
 
 type ServiceState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Service       string                 `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`
-	Phase         Phase                  `protobuf:"varint,2,opt,name=phase,proto3,enum=lumen.control.v1.Phase" json:"phase,omitempty"`
-	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	Service       string                 `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`                          // "siglip","face","ocr","bioclip"
+	Phase         Phase                  `protobuf:"varint,2,opt,name=phase,proto3,enum=lumen.control.v1.Phase" json:"phase,omitempty"` // per-service lifecycle
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`                              // set when phase == PHASE_FAILED
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -234,13 +235,13 @@ func (x *ServiceState) GetError() string {
 type StatusSnapshot struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Phase           Phase                  `protobuf:"varint,1,opt,name=phase,proto3,enum=lumen.control.v1.Phase" json:"phase,omitempty"`
-	Version         string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
-	Profile         string                 `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"`
+	Version         string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"` // hub build version
+	Profile         string                 `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"` // e.g. "linux-x64-cuda"
 	StartedAtUnixMs int64                  `protobuf:"varint,4,opt,name=started_at_unix_ms,json=startedAtUnixMs,proto3" json:"started_at_unix_ms,omitempty"`
-	Download        *DownloadProgress      `protobuf:"bytes,5,opt,name=download,proto3" json:"download,omitempty"`
+	Download        *DownloadProgress      `protobuf:"bytes,5,opt,name=download,proto3" json:"download,omitempty"` // set while PHASE_DOWNLOADING
 	Services        []*ServiceState        `protobuf:"bytes,6,rep,name=services,proto3" json:"services,omitempty"`
-	Error           string                 `protobuf:"bytes,7,opt,name=error,proto3" json:"error,omitempty"`
-	Seq             uint64                 `protobuf:"varint,8,opt,name=seq,proto3" json:"seq,omitempty"`
+	Error           string                 `protobuf:"bytes,7,opt,name=error,proto3" json:"error,omitempty"` // last fatal error when PHASE_FAILED
+	Seq             uint64                 `protobuf:"varint,8,opt,name=seq,proto3" json:"seq,omitempty"`    // monotonic; lets clients discard stale snapshots
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -333,9 +334,9 @@ func (x *StatusSnapshot) GetSeq() uint64 {
 
 type TailLogsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	BacklogLines  uint32                 `protobuf:"varint,1,opt,name=backlog_lines,json=backlogLines,proto3" json:"backlog_lines,omitempty"`
-	MinLevel      string                 `protobuf:"bytes,2,opt,name=min_level,json=minLevel,proto3" json:"min_level,omitempty"`
-	Follow        bool                   `protobuf:"varint,3,opt,name=follow,proto3" json:"follow,omitempty"`
+	BacklogLines  uint32                 `protobuf:"varint,1,opt,name=backlog_lines,json=backlogLines,proto3" json:"backlog_lines,omitempty"` // ring-buffer lines replayed before live tail; 0 = live only
+	MinLevel      string                 `protobuf:"bytes,2,opt,name=min_level,json=minLevel,proto3" json:"min_level,omitempty"`              // "TRACE".."ERROR"; empty = "INFO"
+	Follow        bool                   `protobuf:"varint,3,opt,name=follow,proto3" json:"follow,omitempty"`                                 // true: keep streaming live entries; false: close after the backlog
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -394,10 +395,10 @@ func (x *TailLogsRequest) GetFollow() bool {
 type LogEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TimeUnixMs    int64                  `protobuf:"varint,1,opt,name=time_unix_ms,json=timeUnixMs,proto3" json:"time_unix_ms,omitempty"`
-	Level         string                 `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
-	Target        string                 `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
+	Level         string                 `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`   // "INFO","WARN","ERROR",...
+	Target        string                 `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"` // tracing target, e.g. "lumen_hub::model_download"
 	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
-	Fields        map[string]string      `protobuf:"bytes,5,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Fields        map[string]string      `protobuf:"bytes,5,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // structured tracing fields
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -522,7 +523,7 @@ const file_control_proto_rawDesc = "" +
 	"\aControl\x12E\n" +
 	"\tGetStatus\x12\x16.google.protobuf.Empty\x1a .lumen.control.v1.StatusSnapshot\x12I\n" +
 	"\vWatchStatus\x12\x16.google.protobuf.Empty\x1a .lumen.control.v1.StatusSnapshot0\x01\x12K\n" +
-	"\bTailLogs\x12!.lumen.control.v1.TailLogsRequest\x1a\x1a.lumen.control.v1.LogEntry0\x01B\"Z desktop/internal/lumen/controlv1b\x06proto3"
+	"\bTailLogs\x12!.lumen.control.v1.TailLogsRequest\x1a\x1a.lumen.control.v1.LogEntry0\x01B\x1cZ\x1alumen/control/v1;controlv1b\x06proto3"
 
 var (
 	file_control_proto_rawDescOnce sync.Once

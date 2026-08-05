@@ -80,7 +80,7 @@ func buildLumenSDKConfig(cfg config.LumenConfig) (*lumenconfig.Config, error) {
 		Discovery: lumenconfig.DiscoveryConfig{
 			Enabled: cfg.DiscoveryEnabled, ServiceType: cfg.DiscoveryServiceType, Domain: cfg.DiscoveryDomain,
 			DeploymentID: cfg.DeploymentID, ResolveTimeout: cfg.ResolveTimeout, ConnectTimeout: cfg.ConnectTimeout,
-			RediscoveryBackoffMin: cfg.RediscoveryBackoffMin, RediscoveryBackoffMax: cfg.RediscoveryBackoffMax,
+			FailureCooldownMin: cfg.FailureCooldownMin, FailureCooldownMax: cfg.FailureCooldownMax,
 			ScanInterval: cfg.ScanInterval, MDNSEnabled: cfg.DiscoveryMDNSEnabled,
 			BrokerURL: strings.TrimSpace(cfg.DiscoveryHubURL), StaticNodes: cfg.StaticNodes(),
 		},
@@ -157,14 +157,9 @@ func (s *lumenService) PoolStats() PoolStats { return s.lumenClient.PoolStats() 
 func (s *lumenService) GetNodes() []*discovery.NodeInfo { return s.lumenClient.GetNodes() }
 
 func (s *lumenService) IsTaskAvailable(taskName string) bool {
-	for _, n := range s.lumenClient.GetNodes() {
-		if !n.IsActive() {
-			continue
-		}
-		for _, t := range n.Tasks {
-			if t.Name == taskName {
-				return true
-			}
+	for _, node := range s.lumenClient.GetNodes() {
+		if node.IsActive() && node.SupportsTask(taskName) {
+			return true
 		}
 	}
 	return false

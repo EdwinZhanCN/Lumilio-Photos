@@ -75,12 +75,12 @@ const searchClips = [
         <h2>一个查询，<br />同时读懂画面、文字与地点。</h2>
         <p>
           三路结果并发召回，通过加权 RRF 融合排序。中文使用双字切分，无需额外中文分词插件；
-          语义服务离线时，OCR 与地点召回仍会继续工作。
+          图像语义分析离线时，OCR文字识别与地点召回仍会继续工作。
         </p>
         <div class="search-weights">
           <span><b>1.0</b> 语义</span>
           <span><b>0.8</b> 地点</span>
-          <span><b>0.7</b> OCR</span>
+          <span><b>0.7</b> OCR文字识别</span>
         </div>
       </div>
       <div class="search-shot">

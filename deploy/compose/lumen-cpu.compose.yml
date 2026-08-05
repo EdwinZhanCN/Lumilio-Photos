@@ -1,0 +1,15 @@
+name: lumen-hub
+
+services:
+    lumen-hub:
+        image: ghcr.io/edwinzhancn/lumen-hub:cpu
+        restart: unless-stopped
+        network_mode: host
+        environment:
+            LUMEN_REGION: other
+            LUMEN_PRESET: basic
+        volumes:
+            - lumen-models:/models
+
+volumes:
+    lumen-models:
