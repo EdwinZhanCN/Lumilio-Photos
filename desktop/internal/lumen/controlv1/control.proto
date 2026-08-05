@@ -28,7 +28,7 @@ enum Phase {
 }
 
 message DownloadProgress {
-  string model = 1; // e.g. "bioclip-v2"
+  string model = 1; // e.g. "bioclip-2"
   string file = 2; // artifact currently transferring
   uint64 bytes_done = 3;
   uint64 bytes_total = 4; // 0 when the remote did not report a length
@@ -37,7 +37,7 @@ message DownloadProgress {
 }
 
 message ServiceState {
-  string service = 1; // "siglip","ppocr","insightface","bioclip"
+  string service = 1; // "siglip","face","ocr","bioclip"
   Phase phase = 2; // per-service lifecycle
   string error = 3; // set when phase == PHASE_FAILED
 }
@@ -45,7 +45,7 @@ message ServiceState {
 message StatusSnapshot {
   Phase phase = 1;
   string version = 2; // hub build version
-  string profile = 3; // e.g. "darwin-arm64-metal"
+  string profile = 3; // e.g. "linux-x64-cuda"
   int64 started_at_unix_ms = 4;
   DownloadProgress download = 5; // set while PHASE_DOWNLOADING
   repeated ServiceState services = 6;

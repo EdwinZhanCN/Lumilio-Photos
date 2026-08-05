@@ -90,7 +90,7 @@ func (Phase) EnumDescriptor() ([]byte, []int) {
 
 type DownloadProgress struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"` // e.g. "bioclip-v2"
+	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"` // e.g. "bioclip-2"
 	File          string                 `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`   // artifact currently transferring
 	BytesDone     uint64                 `protobuf:"varint,3,opt,name=bytes_done,json=bytesDone,proto3" json:"bytes_done,omitempty"`
 	BytesTotal    uint64                 `protobuf:"varint,4,opt,name=bytes_total,json=bytesTotal,proto3" json:"bytes_total,omitempty"` // 0 when the remote did not report a length
@@ -174,7 +174,7 @@ func (x *DownloadProgress) GetFilesTotal() uint32 {
 
 type ServiceState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Service       string                 `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`                          // "siglip","ppocr","insightface","bioclip"
+	Service       string                 `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`                          // "siglip","face","ocr","bioclip"
 	Phase         Phase                  `protobuf:"varint,2,opt,name=phase,proto3,enum=lumen.control.v1.Phase" json:"phase,omitempty"` // per-service lifecycle
 	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`                              // set when phase == PHASE_FAILED
 	unknownFields protoimpl.UnknownFields
@@ -236,7 +236,7 @@ type StatusSnapshot struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Phase           Phase                  `protobuf:"varint,1,opt,name=phase,proto3,enum=lumen.control.v1.Phase" json:"phase,omitempty"`
 	Version         string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"` // hub build version
-	Profile         string                 `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"` // e.g. "darwin-arm64-metal"
+	Profile         string                 `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"` // e.g. "linux-x64-cuda"
 	StartedAtUnixMs int64                  `protobuf:"varint,4,opt,name=started_at_unix_ms,json=startedAtUnixMs,proto3" json:"started_at_unix_ms,omitempty"`
 	Download        *DownloadProgress      `protobuf:"bytes,5,opt,name=download,proto3" json:"download,omitempty"` // set while PHASE_DOWNLOADING
 	Services        []*ServiceState        `protobuf:"bytes,6,rep,name=services,proto3" json:"services,omitempty"`
