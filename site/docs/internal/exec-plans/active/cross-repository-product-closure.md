@@ -88,7 +88,7 @@
 
 6. Assets 发布不携带元数据文件：`node scripts/verify.mjs`（含 LFS pointer 和 profile 子集检查）通过后打 `assets-vX.Y.Z` tag 并推 GitHub Release 即可。消费者（Photos）从 tag 自身重建三个派生字段：`git ls-remote` 解析 commit、下载该 tag 的 `assets.json` 计算 sha256。
 7. Photos 提供 `task assets:reconcile [RELEASE=...]`：无参数时选择最高稳定 SemVer，一次性更新三个 lock 字段，默认拒绝降级。
-8. 手动 `workflow_dispatch` 运行该命令并开单个 PR（每次触发一次性分支，合并后删除）；无每日 schedule，无固定 `automation/assets-lock` 分支；Assets 不保存 Photos token，也不发送 `repository_dispatch`。
+8. Assets 更新走本地命令：`task assets:reconcile [RELEASE=...]` 后人工查看 diff 并提交，无 workflow、无分支、无 PR、无 schedule；Assets 不保存 Photos token，也不发送 `repository_dispatch`。（ADR-015 修订：变更由人主动发起，无需 PR 呈递机制。）
 
 完成条件：Hub 升级只改一个 release pin；Assets 升级只产生一个三字段同步 PR；两者都由 Photos CI 验证并人工合并。
 
@@ -229,7 +229,7 @@ Lumilio-Assets
 1. **已解决：Compose 无端口断言已移除。** 原 `taskfile.yml` 三处 `grep -vqE '^    ports:'` 断言写反（语义为“存在非 ports 行”，恒通过、拦不住 ports）；尝试修正为 `! grep -qE` 后无法在 go-task 的 shell 处理下可移植执行。决定：移除三处 ports 断言，保留 host-network、`/dev/dri`、gpus 断言；无端口约束继续由固定决策 2 的文档与人工 review 保证，不再设自动 gate。
 2. **完整 Hub catalog 尚未进入 Site/Desktop 消费链。** `server/tools/lumenlock` 当前只解析 artifact 和 preset ID，生成的 `desktop/internal/lumen/release_catalog.go` 也只包含 release artifact；Desktop Go、Desktop React 和 Site 仍分别维护 preset、model、dataset、资源建议或能力展示常量。需要讨论这是 Phase 1 的单一事实源缺口，还是按 Phase 3/5 的消费者和生成物工作收口。
 3. **已解决：Assets 元数据回退路径 fail-open 已随机制删除关闭。** 原 `assetslock.resolveReleaseMetadata` 对 release.json 的下载失败/损坏/不一致统一回退为 legacy 重建；ADRC 决定 Lumilio-Assets 不发布 `release.json`，该路径现为唯一路径（从 tag 重建），候选问题不再存在。
-4. **Assets reconcile workflow 的输入和分支复用需要确认。** workflow 将 `workflow_dispatch` 输入直接插入 shell 命令，并使用固定的 `automation/assets-lock-${release}` 分支；并发触发、PR 关闭后重跑或残留分支可能失败，也不完全符合“每次触发一次性分支”。可考虑通过 `env` 传入 release，并在分支名加入 `github.run_id`/`run_attempt`。
+4. **已解决：Assets reconcile workflow 已删除。** 原 `assets-reconcile.yml` 将 `workflow_dispatch` 输入直接插入 shell 命令、使用从 release 推导的固定分支名（并发/残留分支会冲突），且手动触发意味着变更是人发起的、无需 PR 呈递机制。决定：删除 workflow，改本地命令 `task assets:reconcile` + 人工提交；两个反模式随机制消失。
 5. **已按 Q5 决策修正：兼容性只做带内验证。** SDK 不再读取 TXT `proto` 或从 resolver 接收兼容性 verdict；同地址 rediscovery 不改变已形成的 capability verdict，真实重连或 endpoint 变化才重新验证。回归测试覆盖 `discover → capability v2 → rediscover → 仍 incompatible → infer 失败`。
 6. **已随 Q5 修正：`ExitIdle` 不再存在无 SubConn 的 TXT-incompatible 节点。** 所有发现节点都先建立 SubConn 并进入 `pending`，同时 `ExitIdle` 保留 `sc != nil` 防护；incompatible 只影响 picker，不移除用于检测重连的 SubConn。
 7. **已按 Q5/Q4 决策关闭：mDNS 早于 data plane Ready 的窗口由 pending 状态吸收。** Hub 可以先被发现；SDK 在 capability 返回前不调度真实任务，暂时性 `UNAVAILABLE` 保持 pending 并重试，Hub Ready 后无需新的发现事件即可恢复。因此不要求把 mDNS 注册移动到 Ready 之后。
