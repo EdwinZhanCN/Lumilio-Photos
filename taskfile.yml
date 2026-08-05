@@ -133,20 +133,14 @@ tasks:
       # output, so they also catch future render-time drift.
       - cmd: "docker compose -f deploy/compose/lumen-cpu.compose.yml config | grep -q 'network_mode: host'"
         msg: lumen-cpu.compose.yml must use host networking
-      - cmd: "docker compose -f deploy/compose/lumen-cpu.compose.yml config | grep -vqE '^    ports:'"
-        msg: lumen-cpu.compose.yml must not publish ports
       - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -q 'network_mode: host'"
         msg: lumen-vulkan.compose.yml must use host networking
       - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -q 'source: /dev/dri'"
         msg: lumen-vulkan.compose.yml must map /dev/dri
-      - cmd: "docker compose -f deploy/compose/lumen-vulkan.compose.yml config | grep -vqE '^    ports:'"
-        msg: lumen-vulkan.compose.yml must not publish ports
       - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -q 'network_mode: host'"
         msg: lumen-cuda.compose.yml must use host networking
       - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -q 'count: -1'"
         msg: "lumen-cuda.compose.yml must declare gpus: all"
-      - cmd: "docker compose -f deploy/compose/lumen-cuda.compose.yml config | grep -vqE '^    ports:'"
-        msg: lumen-cuda.compose.yml must not publish ports
 
   assets:check:
     desc: Verify assets.lock.json against the pinned Lumilio-Assets release
