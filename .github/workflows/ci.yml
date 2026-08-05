@@ -175,13 +175,6 @@ jobs:
                       server/go.sum
                       desktop/go.sum
 
-            - name: Install CGo package metadata
-              run: |
-                  sudo apt-get update
-                  # libheif plugins give vips AVIF/HEIC encode-decode (hard requirement
-                  # for export?format=avif) — noble splits them into plugin packages.
-                  sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libheif-plugin-aomenc libheif-plugin-libde265
-
             - name: Run architecture and Compose gates
               run: task ci:architecture
 

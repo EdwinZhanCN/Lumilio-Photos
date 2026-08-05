@@ -24,7 +24,7 @@ type CurrentFactory struct {
 	OwnerLock        string
 	Endpoint         string
 	SupervisorBinary string
-	Prepare          func(profile string) error
+	Prepare          func(ctx context.Context, profile, hubBinary string) error
 }
 
 // Start resolves current.json for every generation so a newly installed Hub
@@ -38,14 +38,14 @@ func (f CurrentFactory) Start(ctx context.Context, id uint64, profile string) (P
 	if current.Profile != profile {
 		return Process{}, fmt.Errorf("installed Lumen profile %q does not match requested profile %q", current.Profile, profile)
 	}
-	if f.Prepare != nil {
-		if err := f.Prepare(profile); err != nil {
-			return Process{}, fmt.Errorf("prepare Lumen configuration: %w", err)
-		}
-	}
 	hubBinary, err := safeJoin(f.Root, current.Binary)
 	if err != nil {
 		return Process{}, err
+	}
+	if f.Prepare != nil {
+		if err := f.Prepare(ctx, profile, hubBinary); err != nil {
+			return Process{}, fmt.Errorf("prepare Lumen configuration: %w", err)
+		}
 	}
 	supervisor := f.SupervisorBinary
 	if supervisor == "" {

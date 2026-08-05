@@ -24,7 +24,7 @@ configuration that boots and diagnoses cleanly.
 - [Vite+](https://viteplus.dev/) and its supported Node.js runtime
 - [Task](https://taskfile.dev/) (v3.52+; see `version: '3'` in `taskfile.yml`)
 - libvips, libraw, FFmpeg, and ExifTool
-- Rust and `wasm-pack` when rebuilding browser WASM packages
+- Rust when working on Rust components; run `task wasm:setup` only when rebuilding browser WASM packages
 - Docker Engine with Compose 2.23.1+ for delivery validation and E2E
 
 Native dependency installation varies by platform. When CGo or media libraries
@@ -41,8 +41,8 @@ task dev
 ```
 
 `task setup` installs the Go, Web, and documentation dependencies, ensures
-`wasm-pack` and the Swag CLI are available, and installs the repository commit
-hook. It also generates the complete development manifest under
+the Swag CLI is available, and installs the repository commit hook. Browser
+WASM tooling is intentionally opt-in through `task wasm:setup`. It also generates the complete development manifest under
 `.local/dev/config/server.toml`.
 
 `task dev` starts:

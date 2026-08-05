@@ -8,6 +8,15 @@ package lumen
 // Desktop release change, not a mutable "latest" download at runtime.
 const OfficialReleaseVersion = "v0.1.1"
 
+// OfficialSetupPresets is the only preset allow-list consumed by Desktop.
+// The next Hub release must publish these through manifest schemaVersion 2;
+// `task lumen:verify` intentionally rejects the legacy v0.1.1 manifest.
+var OfficialSetupPresets = []string{
+	"minimal",
+	"basic",
+	"brave",
+}
+
 var officialReleaseArtifacts = map[string]ReleaseArtifact{
 	"darwin-arm64-cpu": {
 		Version: OfficialReleaseVersion, Profile: "darwin-arm64-cpu",

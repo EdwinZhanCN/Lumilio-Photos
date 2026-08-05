@@ -1,104 +1,125 @@
 package lumen
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
 
-func TestDefaultSetupSelectionFollowsReleaseProfile(t *testing.T) {
-	tests := []struct {
-		profile  string
-		platform string
-		backend  string
-	}{
-		{profile: "darwin-arm64-metal", platform: "darwin-arm64", backend: "metal"},
-		{profile: "darwin-arm64-cpu", platform: "darwin-arm64", backend: "cpu"},
-		{profile: "windows-x64-gpu", platform: "windows-x64", backend: "gpu"},
-		{profile: "windows-x64-cpu", platform: "windows-x64", backend: "cpu"},
+func TestSetupIntentOwnsOnlyMachineIntent(t *testing.T) {
+	intent, err := NewSetupIntent("/private/lumen/config.yaml", "/private/lumen/models", "china", "basic")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, test := range tests {
-		t.Run(test.profile, func(t *testing.T) {
-			selection, err := DefaultSetupSelection("/private/config.yaml", "/private/models", "china", test.profile)
-			if err != nil {
-				t.Fatal(err)
+	if intent.Region != "cn" || intent.Preset != "basic" {
+		t.Fatalf("unexpected intent: %+v", intent)
+	}
+	if got := strings.Join(SetupPresetNames(), ","); got != "minimal,basic,brave" {
+		t.Fatalf("preset catalog = %q", got)
+	}
+}
+
+func TestConfigRenderArgsDelegateSemanticsToHub(t *testing.T) {
+	intent, err := NewSetupIntent("/private/lumen/config.yaml", "/private/lumen/models", "other", "minimal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"config", "render",
+		"--target", "desktop",
+		"--preset", "minimal",
+		"--region", "other",
+		"--cache-dir", "/private/lumen/models",
+	}
+	if got := configRenderArgs(intent); !reflect.DeepEqual(got, want) {
+		t.Fatalf("configRenderArgs() = %q, want %q", got, want)
+	}
+}
+
+func TestReconcileSetupConfigRegeneratesDerivedFileEveryStart(t *testing.T) {
+	root := t.TempDir()
+	intent, err := NewSetupIntent(
+		filepath.Join(root, "private", "config.yaml"),
+		filepath.Join(root, "models"),
+		"other",
+		"basic",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	render := func(_ context.Context, binary string, got SetupIntent) ([]byte, error) {
+		calls++
+		if binary != "/installed/lumen-hub" || got != intent {
+			t.Fatalf("renderer received binary=%q intent=%+v", binary, got)
+		}
+		return []byte("server:\n  host: 127.0.0.1\n"), nil
+	}
+	if err := reconcileSetupConfig(context.Background(), "/installed/lumen-hub", intent, render); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(intent.ConfigPath, []byte("stale user mutation\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcileSetupConfig(context.Background(), "/installed/lumen-hub", intent, render); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("renderer calls = %d, want 2", calls)
+	}
+	data, err := os.ReadFile(intent.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "server:\n  host: 127.0.0.1\n" {
+		t.Fatalf("derived config was not replaced: %q", data)
+	}
+	if info, err := os.Stat(intent.ConfigPath); err != nil || info.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("config permissions = %v, err = %v", info.Mode().Perm(), err)
+	}
+}
+
+func TestReconcileSetupConfigDoesNotCommitFailedOrEmptyRender(t *testing.T) {
+	root := t.TempDir()
+	intent, err := NewSetupIntent(filepath.Join(root, "private", "config.yaml"), filepath.Join(root, "models"), "other", "basic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(intent.ConfigPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(intent.ConfigPath, []byte("known-good\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, render := range map[string]configRenderer{
+		"error": func(context.Context, string, SetupIntent) ([]byte, error) { return nil, errors.New("boom") },
+		"empty": func(context.Context, string, SetupIntent) ([]byte, error) { return []byte(" \n"), nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := reconcileSetupConfig(context.Background(), "/installed/lumen-hub", intent, render); err == nil {
+				t.Fatal("invalid render was accepted")
 			}
-			if selection.Version != "0.1.1" || selection.Region != "cn" || selection.Preset.Name != "basic" {
-				t.Fatalf("unexpected defaults: %+v", selection)
-			}
-			if selection.Platform.Name != test.platform || selection.Backend.Name != test.backend || selection.Backend.ReleaseProfile != test.profile {
-				t.Fatalf("selection does not follow profile: %+v", selection)
+			data, readErr := os.ReadFile(intent.ConfigPath)
+			if readErr != nil || string(data) != "known-good\n" {
+				t.Fatalf("known-good config changed: %q, err=%v", data, readErr)
 			}
 		})
 	}
 }
 
-func TestEnsureSetupConfigUsesLauncherBasicPresetAndDesktopLoopback(t *testing.T) {
-	root := t.TempDir()
-	path := filepath.Join(root, "lumen", "config.yaml")
-	cache := filepath.Join(root, "models'cache")
-	selection, err := DefaultSetupSelection(path, cache, "china", "darwin-arm64-metal")
-	if err != nil {
-		t.Fatal(err)
+func TestSetupIntentRejectsUnknownPresetAndUnsafePaths(t *testing.T) {
+	if _, err := NewSetupIntent("/private/config.yaml", "/private/models", "other", "future"); err == nil {
+		t.Fatal("unknown preset was accepted")
 	}
-	if err := EnsureSetupConfig(selection); err != nil {
-		t.Fatalf("ensure config: %v", err)
+	if _, err := NewSetupIntent("config.yaml", "/private/models", "other", "basic"); err == nil {
+		t.Fatal("config path without private parent was accepted")
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	config := string(data)
-	for _, expected := range []string{
-		"# Preset: basic (siglip, face, ocr, bioclip)",
-		"# Resource guidance: RAM 6 GB, GPU/Unified memory 3 GB, disk 6 GB.",
-		"region: cn", `host: "127.0.0.1"`, "port: 50051", "mdns:", "TreeOfLife200MCore", "models''cache",
-	} {
-		if !strings.Contains(config, expected) {
-			t.Fatalf("config does not contain %q:\n%s", expected, config)
-		}
-	}
-	if strings.Contains(config, "siglip2-so400m-patch14-384") {
-		t.Fatalf("basic preset received brave SigLIP model:\n%s", config)
-	}
-	if err := os.WriteFile(path, []byte("user config\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := EnsureSetupConfig(selection); err != nil {
-		t.Fatal(err)
-	}
-	data, _ = os.ReadFile(path)
-	if string(data) != "user config\n" {
-		t.Fatalf("existing config was overwritten: %q", data)
-	}
-}
-
-func TestRenderSetupConfigFollowsPresetComponents(t *testing.T) {
-	selection, err := NewSetupSelection("/private/config.yaml", "/private/models", "other", "windows-x64-gpu", "minimal")
-	if err != nil {
-		t.Fatal(err)
-	}
-	minimalConfig := renderSetupConfig(selection)
-	for _, omitted := range []string{"  ocr:\n", "  bioclip:\n"} {
-		if strings.Contains(minimalConfig, omitted) {
-			t.Fatalf("minimal preset contains %q:\n%s", omitted, minimalConfig)
-		}
-	}
-	if err := validateRenderedSetupConfig(minimalConfig, selection); err != nil {
-		t.Fatalf("validate minimal config: %v", err)
-	}
-
-	brave, _ := setupPresetByName("brave")
-	selection.Preset = brave
-	braveConfig := renderSetupConfig(selection)
-	for _, expected := range []string{"siglip2-so400m-patch14-384", "dataset: TreeOfLife200M\n"} {
-		if !strings.Contains(braveConfig, expected) {
-			t.Fatalf("brave preset does not contain %q:\n%s", expected, braveConfig)
-		}
-	}
-	if strings.Contains(braveConfig, "dataset: TreeOfLife200MCore") {
-		t.Fatalf("brave preset received Core dataset:\n%s", braveConfig)
+	if _, err := NewSetupIntent("/private/config.yaml", "models", "other", "basic"); err == nil {
+		t.Fatal("relative cache directory was accepted")
 	}
 }
 
@@ -109,32 +130,7 @@ func TestSetupChoiceCatalogsMatchOfficialDesktopArtifacts(t *testing.T) {
 	if got := strings.Join(ReleaseProfiles("windows", "amd64"), ","); got != "windows-x64-cpu,windows-x64-gpu" {
 		t.Fatalf("windows profiles = %q", got)
 	}
-	if got := strings.Join(SetupPresetNames(), ","); got != "minimal,basic,brave" {
-		t.Fatalf("presets = %q", got)
-	}
 	if profiles := ReleaseProfiles("linux", "amd64"); len(profiles) != 0 {
 		t.Fatalf("unsupported platform profiles = %v", profiles)
-	}
-}
-
-func TestSetupSelectionRejectsMismatchedBackend(t *testing.T) {
-	selection, err := DefaultSetupSelection("/private/config.yaml", "/private/models", "other", "darwin-arm64-metal")
-	if err != nil {
-		t.Fatal(err)
-	}
-	selection.Backend.Name = "cpu"
-	if err := EnsureSetupConfig(selection); err == nil || !strings.Contains(err.Error(), "does not match release profile") {
-		t.Fatalf("expected backend mismatch, got %v", err)
-	}
-	selection, err = DefaultSetupSelection("/private/config.yaml", "/private/models", "other", "darwin-arm64-metal")
-	if err != nil {
-		t.Fatal(err)
-	}
-	selection.Version = "9.9.9"
-	if err := EnsureSetupConfig(selection); err == nil || !strings.Contains(err.Error(), "does not match release") {
-		t.Fatalf("expected release version mismatch, got %v", err)
-	}
-	if _, err := DefaultSetupSelection("/private/config.yaml", "/private/models", "other", "linux-x64-cpu"); err == nil {
-		t.Fatal("unsupported release profile was accepted")
 	}
 }

@@ -246,14 +246,14 @@ func NewController(options Options) *Controller {
 	if options.SetupStore == nil {
 		options.SetupStore = &MemorySetupStore{}
 	}
-	if options.Preset == "" {
-		options.Preset = "basic"
-	}
 	if len(options.Profiles) == 0 && options.Profile != "" {
 		options.Profiles = []string{options.Profile}
 	}
-	if len(options.Presets) == 0 {
-		options.Presets = []string{"minimal", "basic", "brave"}
+	if len(options.Presets) == 0 && options.Preset != "" {
+		options.Presets = []string{options.Preset}
+	}
+	if options.Preset == "" && len(options.Presets) > 0 {
+		options.Preset = options.Presets[0]
 	}
 	if options.Endpoint == "" {
 		options.Endpoint = DefaultEndpoint

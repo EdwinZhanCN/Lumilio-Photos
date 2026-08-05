@@ -209,11 +209,11 @@ resolve_timeout = "3s"
 # Timeout for opening a connection to a resolved node.
 connect_timeout = "3s"
 
-# Shortest wait before retrying discovery after a failure.
-rediscovery_backoff_min = "10s"
+# Shortest cooldown after a node reaches the hard-failure threshold.
+failure_cooldown_min = "10s"
 
-# Longest wait between discovery retries. Must be >= the minimum.
-rediscovery_backoff_max = "2m"
+# Longest cooldown after repeated node failures. Must be >= the minimum.
+failure_cooldown_max = "2m"
 
 # Interval between periodic node health sweeps.
 scan_interval = "30s"

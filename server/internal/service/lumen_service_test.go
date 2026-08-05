@@ -47,7 +47,7 @@ func TestNewLumenServiceFromAppConfigDisabled(t *testing.T) {
 			if _, err := svc.SemanticImageEmbed(ctx, nil); !errors.Is(err, ErrLumenDisabled) {
 				t.Fatalf("SemanticImageEmbed error = %v, want ErrLumenDisabled", err)
 			}
-			if stats := svc.PoolStats(); stats.TotalConnections != 0 || stats.HealthyConnections != 0 {
+			if stats := svc.PoolStats(); stats.TotalNodes != 0 || stats.RoutableNodes != 0 {
 				t.Fatalf("disabled pool stats should be zero, got %+v", stats)
 			}
 			if nodes := svc.GetNodes(); len(nodes) != 0 {
@@ -65,7 +65,7 @@ func TestBuildLumenSDKConfigMapsAppFields(t *testing.T) {
 		DiscoveryEnabled: true, DiscoveryMDNSEnabled: false, DiscoveryHubURL: " http://gw:5866 ",
 		DiscoveryStaticNodes: []string{"10.0.0.5:50051"}, DiscoveryServiceType: "_test._tcp", DiscoveryDomain: "example",
 		DeploymentID: "manifest-deployment", ResolveTimeout: time.Second, ConnectTimeout: 2 * time.Second,
-		RediscoveryBackoffMin: 3 * time.Second, RediscoveryBackoffMax: 4 * time.Second, ScanInterval: 5 * time.Second,
+		FailureCooldownMin: 3 * time.Second, FailureCooldownMax: 4 * time.Second, ScanInterval: 5 * time.Second,
 		ChunkAuto: true, ChunkThresholdBytes: 1000, ChunkMaxBytes: 250,
 	})
 	if err != nil {
@@ -83,7 +83,7 @@ func TestBuildLumenSDKConfigMapsAppFields(t *testing.T) {
 	if sdkCfg.Discovery.BrokerURL != "http://gw:5866" {
 		t.Fatalf("Discovery.BrokerURL = %q, want trimmed app value", sdkCfg.Discovery.BrokerURL)
 	}
-	if sdkCfg.Discovery.ServiceType != "_test._tcp" || sdkCfg.Discovery.Domain != "example" || sdkCfg.Discovery.DeploymentID != "manifest-deployment" || sdkCfg.Discovery.ResolveTimeout != time.Second || sdkCfg.Discovery.ConnectTimeout != 2*time.Second || sdkCfg.Discovery.RediscoveryBackoffMin != 3*time.Second || sdkCfg.Discovery.RediscoveryBackoffMax != 4*time.Second || sdkCfg.Discovery.ScanInterval != 5*time.Second {
+	if sdkCfg.Discovery.ServiceType != "_test._tcp" || sdkCfg.Discovery.Domain != "example" || sdkCfg.Discovery.DeploymentID != "manifest-deployment" || sdkCfg.Discovery.ResolveTimeout != time.Second || sdkCfg.Discovery.ConnectTimeout != 2*time.Second || sdkCfg.Discovery.FailureCooldownMin != 3*time.Second || sdkCfg.Discovery.FailureCooldownMax != 4*time.Second || sdkCfg.Discovery.ScanInterval != 5*time.Second {
 		t.Fatalf("discovery fields did not map exactly: %+v", sdkCfg.Discovery)
 	}
 	if !sdkCfg.Chunk.EnableAuto || sdkCfg.Chunk.Threshold != 1000 || sdkCfg.Chunk.MaxChunkBytes != 250 {

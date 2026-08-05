@@ -1,17 +1,13 @@
-// Command lumenlock owns the Lumen Hub release pin (lumen.lock.json) and the
-// Desktop's embedded release catalog.
+// Command lumenlock owns the Lumen Hub release pin and the Desktop's generated
+// artifact/preset catalog.
 //
-//   - `sync`  reconciles the lock's derived fields (revision, manifestSha256)
-//     and regenerates desktop/internal/lumen/release_catalog.go from the
-//     pinned release's manifest.json, after verifying SHA256SUMS and the
-//     consumer builds (Desktop profiles, Compose presets).
-//   - `check` performs the same verification without writing anything; it is
-//     the CI gate that fails when the pin was bumped but the catalog or the
-//     lock's derived fields are stale.
+//   - check  validates only committed local state. It is deterministic and safe
+//     for every CI run.
+//   - verify proves the pin against the remote release without writing.
+//   - sync   performs the same remote proof, then atomically reconciles derived
+//     lock fields and generated files.
 //
-// The only Renovate-managed field is `release` (github-releases datasource).
-// Everything else is derived data produced by `sync`.
-
+// Renovate owns only lock.release. All other lock fields are derived by sync.
 package main
 
 import (
@@ -34,15 +30,12 @@ import (
 const (
 	lockFileName     = "lumen.lock.json"
 	catalogPath      = "desktop/internal/lumen/release_catalog.go"
+	controlProtoPath = "desktop/internal/lumen/controlv1/control.proto"
 	userAgent        = "Lumilio-Photos-lumenlock"
 	legacyChecksName = "checksums.txt"
-	// controlProtoPath is the Desktop's vendored copy of the Hub control-plane
-	// contract; it must stay byte-for-byte identical to the pinned release's
-	// `crates/lumen-hub/proto/control.proto`.
-	controlProtoPath = "desktop/internal/lumen/controlv1/control.proto"
+	lockSchema       = 2
 )
 
-// Desktop release profiles: decision 5 pins these four exactly.
 var desktopProfiles = []string{
 	"darwin-arm64-metal",
 	"darwin-arm64-cpu",
@@ -64,11 +57,13 @@ var (
 )
 
 type lock struct {
-	SchemaVersion  int    `json:"schemaVersion"`
-	Repository     string `json:"repository"`
-	Release        string `json:"release"`
-	Revision       string `json:"revision"`
-	ManifestSHA256 string `json:"manifestSha256"`
+	SchemaVersion      int    `json:"schemaVersion"`
+	Repository         string `json:"repository"`
+	Release            string `json:"release"`
+	Revision           string `json:"revision"`
+	ManifestSHA256     string `json:"manifestSha256"`
+	CatalogSHA256      string `json:"catalogSha256"`
+	ControlProtoSHA256 string `json:"controlProtoSha256"`
 }
 
 type manifest struct {
@@ -78,7 +73,7 @@ type manifest struct {
 		Profile  string `json:"profile"`
 		FileName string `json:"file_name"`
 		URL      string `json:"url"`
-		Sha256   string `json:"sha256"`
+		SHA256   string `json:"sha256"`
 	} `json:"hub"`
 	Presets []struct {
 		ID string `json:"id"`
@@ -91,17 +86,30 @@ type artifact struct {
 	sha256   string
 }
 
+type remoteState struct {
+	revision     string
+	manifestHash string
+	catalog      []byte
+	protoHash    string
+}
+
 func main() {
-	if len(os.Args) != 3 || (os.Args[1] != "sync" && os.Args[1] != "check") {
-		fmt.Fprintln(os.Stderr, "usage: go run ./tools/lumenlock <sync|check> <repository-root>")
+	if len(os.Args) < 3 || (os.Args[1] != "sync" && os.Args[1] != "verify" && os.Args[1] != "check") {
+		fmt.Fprintln(os.Stderr, "usage: go run ./tools/lumenlock <check|verify|sync> <repository-root> [--release vX.Y.Z]")
 		os.Exit(2)
 	}
-	mode := os.Args[1]
 	root, err := filepath.Abs(os.Args[2])
 	if err != nil {
 		fail(err)
 	}
-	if err := run(mode, root); err != nil {
+	target, err := parseReleaseArg(os.Args[3:])
+	if err != nil {
+		fail(err)
+	}
+	if target != "" && os.Args[1] != "sync" {
+		fail(errors.New("--release is only valid with sync"))
+	}
+	if err := run(os.Args[1], root, target); err != nil {
 		fail(err)
 	}
 }
@@ -111,143 +119,211 @@ func fail(err error) {
 	os.Exit(1)
 }
 
-func run(mode, root string) error {
+func run(mode, root, targetRelease string) error {
 	lockPath := filepath.Join(root, lockFileName)
-	raw, err := os.ReadFile(lockPath)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", lockPath, err)
-	}
-	lock, err := parseLock(raw)
+	current, err := readLock(lockPath)
 	if err != nil {
 		return err
 	}
-
-	baseURL := strings.TrimSuffix(lock.Repository, ".git")
-	manifestURL := fmt.Sprintf("%s/releases/download/%s/manifest.json", baseURL, lock.Release)
-	manifestRaw, err := fetch(manifestURL)
-	if err != nil {
-		return err
-	}
-	manifest, err := parseManifest(manifestRaw)
-	if err != nil {
-		return err
-	}
-	if manifest.Version != lock.Release {
-		return fmt.Errorf("manifest version %q does not match lock release %q", manifest.Version, lock.Release)
-	}
-
-	// Catalog integrity: SHA256SUMS must cover the manifest itself and every
-	// artifact with a matching digest. Releases before the SHA256SUMS rename
-	// published checksums.txt; both names are accepted, SHA256SUMS first.
-	checks, err := fetchChecksums(baseURL, lock.Release)
-	if err != nil {
-		return err
-	}
-	manifestHash := sha256Hex(manifestRaw)
-	if want := checks["manifest.json"]; want != "" && !strings.EqualFold(want, manifestHash) {
-		return fmt.Errorf("SHA256SUMS digest for manifest.json does not match the downloaded manifest")
-	}
-	artifacts := make([]artifact, 0, len(manifest.Hub))
-	for _, entry := range manifest.Hub {
-		if !sha256Re.MatchString(entry.Sha256) {
-			return fmt.Errorf("artifact %s has an invalid SHA-256", entry.Profile)
-		}
-		want := checks[entry.FileName]
-		if want == "" {
-			return fmt.Errorf("SHA256SUMS is missing artifact %s", entry.FileName)
-		}
-		if !strings.EqualFold(want, entry.Sha256) {
-			return fmt.Errorf("artifact %s digest does not match SHA256SUMS", entry.FileName)
-		}
-		artifacts = append(artifacts, artifact{profile: entry.Profile, fileName: entry.FileName, sha256: entry.Sha256})
-	}
-	if len(artifacts) == 0 {
-		return fmt.Errorf("release %s has no hub artifacts", lock.Release)
-	}
-
-	// Consumer builds: the four pinned Desktop profiles must exist.
-	byProfile := make(map[string]artifact, len(artifacts))
-	for _, artifact := range artifacts {
-		byProfile[artifact.profile] = artifact
-	}
-	for _, profile := range desktopProfiles {
-		if _, ok := byProfile[profile]; !ok {
-			return fmt.Errorf("release %s lacks Desktop profile %s", lock.Release, profile)
-		}
-	}
-
-	// Consumer builds: Compose files may only reference manifest presets.
-	composePresets, err := composePresetNames(root)
-	if err != nil {
-		return err
-	}
-	if len(manifest.Presets) > 0 {
-		known := make(map[string]bool, len(manifest.Presets))
-		for _, preset := range manifest.Presets {
-			known[preset.ID] = true
-		}
-		for _, preset := range composePresets {
-			if !known[preset] {
-				return fmt.Errorf("deploy/compose references LUMEN_PRESET=%s which release %s does not define", preset, lock.Release)
-			}
-		}
-	}
-
-	// Tag provenance: resolve the release tag to its commit.
-	revision, err := resolveTagCommit(lock.Repository, lock.Release)
-	if err != nil {
-		return err
-	}
-
-	// The vendored control.proto must match the pinned release byte-for-byte
-	// (the Desktop consumes the control plane through it). Neither mode
-	// rewrites the proto — regeneration needs protoc and is a manual step.
-	if err := verifyVendoredControlProto(root, lock.Repository, revision); err != nil {
-		return err
-	}
-
-	catalog, err := generateCatalog(lock.Release, desktopProfiles, byProfile)
-	if err != nil {
-		return err
-	}
-	catalogPathAbs := filepath.Join(root, filepath.FromSlash(catalogPath))
-	existingCatalog, _ := os.ReadFile(catalogPathAbs)
-
-	staleLock := lock.ManifestSHA256 != manifestHash || lock.Revision != revision
-	staleCatalog := !bytesEqual(existingCatalog, []byte(catalog))
-
 	if mode == "check" {
-		if staleLock {
-			return fmt.Errorf("%s is stale for release %s (manifestSha256 or revision changed); run `task lumen:sync` and commit the result", lockFileName, lock.Release)
+		return checkLocal(root, current)
+	}
+	if targetRelease != "" {
+		current.Release = targetRelease
+	}
+
+	remote, err := inspectRemote(root, current)
+	if err != nil {
+		return err
+	}
+	if mode == "verify" {
+		if err := compareRemote(root, current, remote); err != nil {
+			return err
 		}
-		if staleCatalog {
-			return fmt.Errorf("%s does not match release %s; run `task lumen:sync` and commit the result", catalogPath, lock.Release)
-		}
-		fmt.Printf("lumen:check ok — %s catalog, SHA256SUMS, and consumer builds verified for %s\n", lock.Release, catalogPath)
+		fmt.Printf("lumen:verify ok — %s release, checksums, provenance, proto, presets, and Desktop profiles verified\n", current.Release)
 		return nil
 	}
 
+	catalogAbs := filepath.Join(root, filepath.FromSlash(catalogPath))
 	changed := false
-	if staleLock {
-		lock.ManifestSHA256 = manifestHash
-		lock.Revision = revision
-		if err := writeLock(lockPath, lock); err != nil {
-			return err
+	if existing, _ := os.ReadFile(catalogAbs); !bytesEqual(existing, remote.catalog) {
+		if err := writeAtomic(catalogAbs, remote.catalog, 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", catalogPath, err)
 		}
 		changed = true
-		fmt.Printf("lumen:sync updated %s (revision %s, manifestSha256 %s)\n", lockFileName, revision[:12], manifestHash[:12])
+		fmt.Printf("lumen:sync regenerated %s from %s\n", catalogPath, current.Release)
 	}
-	if staleCatalog {
-		if err := os.WriteFile(catalogPathAbs, []byte(catalog), 0o644); err != nil {
-			return err
+
+	current.Revision = remote.revision
+	current.ManifestSHA256 = remote.manifestHash
+	current.CatalogSHA256 = sha256Hex(remote.catalog)
+	current.ControlProtoSHA256 = remote.protoHash
+	encoded, err := encodeLock(current)
+	if err != nil {
+		return err
+	}
+	existingLock, _ := os.ReadFile(lockPath)
+	if !bytesEqual(existingLock, encoded) {
+		if err := writeAtomic(lockPath, encoded, 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", lockFileName, err)
 		}
 		changed = true
-		fmt.Printf("lumen:sync regenerated %s from %s\n", catalogPath, lock.Release)
+		fmt.Printf("lumen:sync reconciled %s (revision %s)\n", lockFileName, current.Revision[:12])
 	}
 	if !changed {
 		fmt.Printf("lumen:sync ok — %s and %s are already in sync\n", lockFileName, catalogPath)
 	}
+	return checkLocal(root, current)
+}
+
+func parseReleaseArg(args []string) (string, error) {
+	if len(args) == 0 {
+		return "", nil
+	}
+	if len(args) != 2 || args[0] != "--release" {
+		return "", errors.New("expected --release vX.Y.Z")
+	}
+	if !releaseRe.MatchString(args[1]) {
+		return "", fmt.Errorf("--release must be a semver tag like v0.2.0")
+	}
+	return args[1], nil
+}
+
+func readLock(path string) (lock, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return lock{}, fmt.Errorf("read %s: %w", path, err)
+	}
+	return parseLock(raw)
+}
+
+func checkLocal(root string, current lock) error {
+	catalog, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(catalogPath)))
+	if err != nil {
+		return fmt.Errorf("read %s: %w", catalogPath, err)
+	}
+	if got := sha256Hex(catalog); got != current.CatalogSHA256 {
+		return fmt.Errorf("%s hash is %s, lock expects %s; run `task lumen:sync`", catalogPath, got, current.CatalogSHA256)
+	}
+	if !strings.Contains(string(catalog), fmt.Sprintf("const OfficialReleaseVersion = %q", current.Release)) {
+		return fmt.Errorf("%s does not declare lock release %s", catalogPath, current.Release)
+	}
+
+	proto, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(controlProtoPath)))
+	if err != nil {
+		return fmt.Errorf("read %s: %w", controlProtoPath, err)
+	}
+	if got := sha256Hex(proto); got != current.ControlProtoSHA256 {
+		return fmt.Errorf("%s hash is %s, lock expects %s; re-vendor the proto and run `task lumen:sync`", controlProtoPath, got, current.ControlProtoSHA256)
+	}
+
+	composePresets, err := composePresetNames(root)
+	if err != nil {
+		return err
+	}
+	for _, preset := range composePresets {
+		if !strings.Contains(string(catalog), fmt.Sprintf("\t%q,", preset)) {
+			return fmt.Errorf("Compose references preset %q, but %s does not export it", preset, catalogPath)
+		}
+	}
+	fmt.Printf("lumen:check ok — committed lock, catalog, proto, and Compose intent are internally consistent for %s\n", current.Release)
 	return nil
+}
+
+func inspectRemote(root string, current lock) (remoteState, error) {
+	baseURL := strings.TrimSuffix(current.Repository, ".git")
+	manifestURL := fmt.Sprintf("%s/releases/download/%s/manifest.json", baseURL, current.Release)
+	manifestRaw, err := fetch(manifestURL)
+	if err != nil {
+		return remoteState{}, err
+	}
+	parsed, err := parseManifest(manifestRaw)
+	if err != nil {
+		return remoteState{}, err
+	}
+	if parsed.Version != current.Release {
+		return remoteState{}, fmt.Errorf("manifest version %q does not match lock release %q", parsed.Version, current.Release)
+	}
+
+	checks, err := fetchChecksums(baseURL, current.Release)
+	if err != nil {
+		return remoteState{}, err
+	}
+	manifestHash := sha256Hex(manifestRaw)
+	if err := verifyManifestChecksum(checks, manifestHash); err != nil {
+		return remoteState{}, err
+	}
+
+	byProfile := make(map[string]artifact, len(parsed.Hub))
+	for _, entry := range parsed.Hub {
+		want := checks[entry.FileName]
+		if want == "" {
+			return remoteState{}, fmt.Errorf("SHA256SUMS is missing artifact %s", entry.FileName)
+		}
+		if !strings.EqualFold(want, entry.SHA256) {
+			return remoteState{}, fmt.Errorf("artifact %s digest does not match SHA256SUMS", entry.FileName)
+		}
+		if _, duplicate := byProfile[entry.Profile]; duplicate {
+			return remoteState{}, fmt.Errorf("release manifest repeats profile %s", entry.Profile)
+		}
+		byProfile[entry.Profile] = artifact{profile: entry.Profile, fileName: entry.FileName, sha256: entry.SHA256}
+	}
+	for _, profile := range desktopProfiles {
+		if _, ok := byProfile[profile]; !ok {
+			return remoteState{}, fmt.Errorf("release %s lacks Desktop profile %s", current.Release, profile)
+		}
+	}
+
+	presets, err := manifestPresetNames(parsed)
+	if err != nil {
+		return remoteState{}, err
+	}
+	composePresets, err := composePresetNames(root)
+	if err != nil {
+		return remoteState{}, err
+	}
+	known := make(map[string]bool, len(presets))
+	for _, preset := range presets {
+		known[preset] = true
+	}
+	for _, preset := range composePresets {
+		if !known[preset] {
+			return remoteState{}, fmt.Errorf("deploy/compose references LUMEN_PRESET=%s which release %s does not define", preset, current.Release)
+		}
+	}
+
+	revision, err := resolveTagCommit(current.Repository, current.Release)
+	if err != nil {
+		return remoteState{}, err
+	}
+	protoHash, err := verifyVendoredControlProto(root, current.Repository, revision)
+	if err != nil {
+		return remoteState{}, err
+	}
+	catalog, err := generateCatalog(current.Release, desktopProfiles, byProfile, presets)
+	if err != nil {
+		return remoteState{}, err
+	}
+	return remoteState{
+		revision: revision, manifestHash: manifestHash, catalog: []byte(catalog), protoHash: protoHash,
+	}, nil
+}
+
+func compareRemote(root string, current lock, remote remoteState) error {
+	if current.Revision != remote.revision || current.ManifestSHA256 != remote.manifestHash {
+		return fmt.Errorf("%s remote provenance is stale; run `task lumen:sync`", lockFileName)
+	}
+	catalog, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(catalogPath)))
+	if err != nil {
+		return err
+	}
+	if !bytesEqual(catalog, remote.catalog) || current.CatalogSHA256 != sha256Hex(remote.catalog) {
+		return fmt.Errorf("%s is stale for %s; run `task lumen:sync`", catalogPath, current.Release)
+	}
+	if current.ControlProtoSHA256 != remote.protoHash {
+		return fmt.Errorf("%s hash in %s is stale; run `task lumen:sync`", controlProtoPath, lockFileName)
+	}
+	return checkLocal(root, current)
 }
 
 func parseLock(raw []byte) (lock, error) {
@@ -257,8 +333,8 @@ func parseLock(raw []byte) (lock, error) {
 	if err := decoder.Decode(&parsed); err != nil {
 		return parsed, fmt.Errorf("decode %s: %w", lockFileName, err)
 	}
-	if parsed.SchemaVersion != 1 {
-		return parsed, fmt.Errorf("%s must use schemaVersion 1", lockFileName)
+	if parsed.SchemaVersion != lockSchema {
+		return parsed, fmt.Errorf("%s must use schemaVersion %d", lockFileName, lockSchema)
 	}
 	if !repoRe.MatchString(parsed.Repository) {
 		return parsed, fmt.Errorf("%s repository must be an HTTPS GitHub URL", lockFileName)
@@ -269,35 +345,71 @@ func parseLock(raw []byte) (lock, error) {
 	if !sha40Re.MatchString(parsed.Revision) {
 		return parsed, fmt.Errorf("%s revision must be a full 40-character commit SHA", lockFileName)
 	}
-	if !sha256Re.MatchString(parsed.ManifestSHA256) {
-		return parsed, fmt.Errorf("%s manifestSha256 must be a lowercase SHA-256", lockFileName)
+	for name, value := range map[string]string{
+		"manifestSha256":     parsed.ManifestSHA256,
+		"catalogSha256":      parsed.CatalogSHA256,
+		"controlProtoSha256": parsed.ControlProtoSHA256,
+	} {
+		if !sha256Re.MatchString(value) {
+			return parsed, fmt.Errorf("%s %s must be a lowercase SHA-256", lockFileName, name)
+		}
 	}
 	return parsed, nil
 }
 
 func parseManifest(raw []byte) (manifest, error) {
 	var parsed manifest
-	// The manifest is a remote contract that grows with schemaVersion; only the
-	// fields we consume are declared, unknown fields are ignored.
-	decoder := json.NewDecoder(strings.NewReader(string(raw)))
-	if err := decoder.Decode(&parsed); err != nil {
+	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return parsed, fmt.Errorf("decode release manifest: %w", err)
 	}
-	if parsed.SchemaVersion != nil && *parsed.SchemaVersion > 2 {
+	if parsed.SchemaVersion == nil || *parsed.SchemaVersion < 2 {
+		return parsed, fmt.Errorf("release manifest must use schemaVersion 2 or newer; publish a Hub release with managed config support")
+	}
+	if *parsed.SchemaVersion > 2 {
 		return parsed, fmt.Errorf("release manifest schemaVersion %d is newer than supported", *parsed.SchemaVersion)
 	}
 	if !releaseRe.MatchString(parsed.Version) {
 		return parsed, fmt.Errorf("release manifest has an invalid version %q", parsed.Version)
 	}
 	if len(parsed.Hub) == 0 {
-		return parsed, fmt.Errorf("release manifest has no hub artifacts")
+		return parsed, errors.New("release manifest has no hub artifacts")
 	}
 	for _, entry := range parsed.Hub {
-		if entry.Profile == "" || entry.FileName == "" || entry.URL == "" || !sha256Re.MatchString(entry.Sha256) {
-			return parsed, fmt.Errorf("release manifest has an invalid artifact entry")
+		if entry.Profile == "" || entry.FileName == "" || entry.URL == "" || !sha256Re.MatchString(entry.SHA256) {
+			return parsed, errors.New("release manifest has an invalid artifact entry")
 		}
 	}
 	return parsed, nil
+}
+
+func manifestPresetNames(parsed manifest) ([]string, error) {
+	if len(parsed.Presets) == 0 {
+		return nil, errors.New("release manifest has no presets; Desktop managed config requires the canonical preset catalog")
+	}
+	seen := make(map[string]bool, len(parsed.Presets))
+	presets := make([]string, 0, len(parsed.Presets))
+	for _, preset := range parsed.Presets {
+		if !regexp.MustCompile(`^[a-z][a-z0-9-]*$`).MatchString(preset.ID) {
+			return nil, fmt.Errorf("release manifest has invalid preset id %q", preset.ID)
+		}
+		if seen[preset.ID] {
+			return nil, fmt.Errorf("release manifest repeats preset %q", preset.ID)
+		}
+		seen[preset.ID] = true
+		presets = append(presets, preset.ID)
+	}
+	return presets, nil
+}
+
+func verifyManifestChecksum(checks map[string]string, manifestHash string) error {
+	want, ok := checks["manifest.json"]
+	if !ok || want == "" {
+		return errors.New("SHA256SUMS is missing manifest.json")
+	}
+	if !strings.EqualFold(want, manifestHash) {
+		return errors.New("SHA256SUMS digest for manifest.json does not match the downloaded manifest")
+	}
+	return nil
 }
 
 func fetchChecksums(baseURL, release string) (map[string]string, error) {
@@ -314,10 +426,7 @@ func fetchChecksums(baseURL, release string) (map[string]string, error) {
 			if len(fields) != 2 || !sha256Re.MatchString(fields[0]) {
 				return nil, fmt.Errorf("%s contains an invalid line: %q", name, line)
 			}
-			checks[fields[1]] = fields[0]
-		}
-		if name == legacyChecksName {
-			fmt.Printf("note: release %s published %s (pre-SHA256SUMS release)\n", release, legacyChecksName)
+			checks[strings.TrimPrefix(fields[1], "*")] = fields[0]
 		}
 		return checks, nil
 	}
@@ -332,17 +441,12 @@ func resolveTagCommit(repository, release string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve tag %s: %w", release, err)
 	}
-	// Prefer the peeled ref (annotated tag -> commit).
-	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 2 && strings.HasSuffix(fields[1], "^{}") {
-			return fields[0], nil
-		}
-	}
-	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 2 {
-			return fields[0], nil
+	for _, suffix := range []string{"^{}", ""} {
+		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) == 2 && strings.HasSuffix(fields[1], suffix) && (suffix != "" || !strings.HasSuffix(fields[1], "^{}")) {
+				return fields[0], nil
+			}
 		}
 	}
 	return "", fmt.Errorf("git ls-remote found no ref for tag %s", release)
@@ -365,58 +469,49 @@ func composePresetNames(root string) ([]string, error) {
 	return names, nil
 }
 
-// verifyVendoredControlProto fetches the pinned revision's authoritative
-// control.proto and compares it byte-for-byte with the Desktop's vendored
-// copy, so the control-plane contract has exactly one text source.
-func verifyVendoredControlProto(root, repository, revision string) error {
+func verifyVendoredControlProto(root, repository, revision string) (string, error) {
 	path := filepath.Join(root, filepath.FromSlash(controlProtoPath))
 	vendored, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", controlProtoPath, err)
+		return "", fmt.Errorf("read %s: %w", controlProtoPath, err)
 	}
-
 	rawURL, err := controlProtoRawURL(repository, revision)
 	if err != nil {
-		return err
+		return "", err
 	}
 	authoritative, err := fetch(rawURL)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !bytesEqual(authoritative, vendored) {
-		return fmt.Errorf(
-			"%s drifted from control.proto at revision %s (%s); re-vendor the file and run `task desktop:proto:gen`",
-			controlProtoPath, revision[:12], lockFileName,
-		)
+		return "", fmt.Errorf("%s drifted from control.proto at revision %s; re-vendor it and run `task desktop:proto:gen`", controlProtoPath, revision[:12])
 	}
-	fmt.Printf("controlv1 ok — %s matches Hub revision %s\n", controlProtoPath, revision[:12])
-	return nil
+	return sha256Hex(vendored), nil
 }
 
-// controlProtoRawURL builds the raw GitHub URL of the pinned revision's
-// authoritative control.proto.
 func controlProtoRawURL(repository, revision string) (string, error) {
 	match := repoRe.FindStringSubmatch(repository)
 	if match == nil {
 		return "", fmt.Errorf("unexpected repository %q", repository)
 	}
-	return fmt.Sprintf(
-		"https://raw.githubusercontent.com/%s/%s/%s/crates/lumen-hub/proto/control.proto",
-		match[1], match[2], revision,
-	), nil
+	return fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/crates/lumen-hub/proto/control.proto", match[1], match[2], revision), nil
 }
 
-func generateCatalog(release string, profiles []string, byProfile map[string]artifact) (string, error) {
-	sorted := append([]string(nil), profiles...)
-	sort.Strings(sorted)
-
+func generateCatalog(release string, profiles []string, byProfile map[string]artifact, presets []string) (string, error) {
+	sortedProfiles := append([]string(nil), profiles...)
+	sort.Strings(sortedProfiles)
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "// Code generated by `task lumen:sync` from the Lumen-Hub release catalog.\n")
 	fmt.Fprintf(&builder, "// Source: release %s. DO NOT EDIT.\n\n", release)
 	builder.WriteString("package lumen\n\n")
-	fmt.Fprintf(&builder, "// OfficialReleaseVersion is deliberately pinned to the Lumen Hub release\n// catalog embedded in the Desktop binary. Updating Lumen is an explicit\n// Desktop release change, not a mutable \"latest\" download at runtime.\nconst OfficialReleaseVersion = %q\n\n", release)
+	fmt.Fprintf(&builder, "// OfficialReleaseVersion is pinned into the Desktop binary.\nconst OfficialReleaseVersion = %q\n\n", release)
+	builder.WriteString("// OfficialSetupPresets is the only preset allow-list consumed by Desktop.\nvar OfficialSetupPresets = []string{\n")
+	for _, preset := range presets {
+		fmt.Fprintf(&builder, "\t%q,\n", preset)
+	}
+	builder.WriteString("}\n\n")
 	builder.WriteString("var officialReleaseArtifacts = map[string]ReleaseArtifact{\n")
-	for _, profile := range sorted {
+	for _, profile := range sortedProfiles {
 		entry, ok := byProfile[profile]
 		if !ok {
 			return "", fmt.Errorf("desktop profile %s missing from release catalog", profile)
@@ -436,36 +531,46 @@ func generateCatalog(release string, profiles []string, byProfile map[string]art
 	return builder.String(), nil
 }
 
-func writeLock(path string, value lock) error {
+func encodeLock(value lock) ([]byte, error) {
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
+		return nil, err
+	}
+	return append(data, '\n'), nil
+}
+
+func writeAtomic(path string, data []byte, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	data = append(data, '\n')
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".lumen.lock.json-*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".lumenlock-*")
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmp.Name())
+	name := tmp.Name()
+	defer os.Remove(name)
+	if err := tmp.Chmod(mode); err != nil {
+		tmp.Close()
+		return err
+	}
 	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		return err
 	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), path)
+	return os.Rename(name, path)
 }
 
 func fetch(url string) ([]byte, error) {
-	client := &http.Client{
-		Timeout: 60 * time.Second,
-		Transport: &http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			ForceAttemptHTTP2:     true,
-			ResponseHeaderTimeout: 30 * time.Second,
-		},
-	}
+	client := &http.Client{Timeout: 60 * time.Second, Transport: &http.Transport{
+		Proxy: http.ProxyFromEnvironment, ForceAttemptHTTP2: true, ResponseHeaderTimeout: 30 * time.Second,
+	}}
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -482,8 +587,8 @@ func fetch(url string) ([]byte, error) {
 	return io.ReadAll(response.Body)
 }
 
-func sha256Hex(bytes []byte) string {
-	sum := sha256.Sum256(bytes)
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
 

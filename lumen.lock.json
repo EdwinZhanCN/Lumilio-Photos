@@ -1,7 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "repository": "https://github.com/EdwinZhanCN/Lumen-Hub.git",
   "release": "v0.1.1",
   "revision": "cd67719660056244c405835d07786110fc7c1223",
-  "manifestSha256": "4b8a42ca5137bc631b6d60cdca13ea08d0e2b62a035e74c5202d79d6e2842c56"
+  "manifestSha256": "4b8a42ca5137bc631b6d60cdca13ea08d0e2b62a035e74c5202d79d6e2842c56",
+  "catalogSha256": "7ca8d618182274b7c07114031c3dc87e4ca68fb87b3307ae1ea26a35f48c4f5a",
+  "controlProtoSha256": "26e345fe1727fccc2a6e15c9a7504ca142b804485a81c17f84cffe67b4ab68b3"
 }

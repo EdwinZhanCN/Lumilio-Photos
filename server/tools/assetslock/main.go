@@ -6,9 +6,10 @@
 //     derived fields (`release`, `revision`, `manifestSha256`) in one write.
 //     Downgrades are rejected by default. Running again on the same release is
 //     a no-op.
-//   - `check` verifies the committed lock against the pinned revision and
-//     release without writing anything; it is the CI gate that validates
-//     reconcile PRs.
+//   - `check` validates only the committed lock. It is deterministic and does
+//     not contact GitHub, so unrelated CI runs cannot fail on remote state.
+//   - `verify` proves the pinned tag, revision, and assets.json hash against the
+//     producer repository without writing anything.
 //
 // Assets ships no per-release metadata file; every release is verified by
 // `node scripts/verify.mjs` before the tag is pushed, and consumers
@@ -66,8 +67,8 @@ type version struct {
 }
 
 func main() {
-	if len(os.Args) < 3 || (os.Args[1] != "reconcile" && os.Args[1] != "check") {
-		fmt.Fprintln(os.Stderr, "usage: go run ./tools/assetslock <reconcile|check> <repository-root> [--release assets-vX.Y.Z]")
+	if len(os.Args) < 3 || (os.Args[1] != "reconcile" && os.Args[1] != "check" && os.Args[1] != "verify") {
+		fmt.Fprintln(os.Stderr, "usage: go run ./tools/assetslock <check|verify|reconcile> <repository-root> [--release assets-vX.Y.Z]")
 		os.Exit(2)
 	}
 	mode := os.Args[1]
@@ -99,6 +100,11 @@ func run(mode, root, target string) error {
 	if err != nil {
 		return err
 	}
+	if mode == "check" {
+		fmt.Printf("assets:check ok — %s is locally valid at %s\n", lockFileName, current.Release)
+		return nil
+	}
+
 	owner, repo, err := repoParts(current.Repository)
 	if err != nil {
 		return err
@@ -143,7 +149,10 @@ func run(mode, root, target string) error {
 			lockFileName, updated.Release, updated.Revision[:12], updated.ManifestSHA256[:12])
 		return nil
 
-	case "check":
+	case "verify":
+		if target != "" && target != current.Release {
+			return fmt.Errorf("--release is only valid for reconcile; lock pins %s", current.Release)
+		}
 		// The pinned revision must serve the exact catalog hash we locked.
 		if err := verifyCatalogAt(owner, repo, current.Revision, current.ManifestSHA256); err != nil {
 			return err
@@ -157,7 +166,7 @@ func run(mode, root, target string) error {
 			return fmt.Errorf("tag %s points at %s but lock revision is %s; run `task assets:reconcile`",
 				current.Release, tagCommit, current.Revision)
 		}
-		fmt.Printf("assets:check ok — %s verified against %s\n", lockFileName, current.Release)
+		fmt.Printf("assets:verify ok — %s verified against %s\n", lockFileName, current.Release)
 		return nil
 	}
 	return errors.New("unreachable")

@@ -1,0 +1,39 @@
+name: Cross-repository dependency contracts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/dependency-contracts.yml'
+      - 'taskfile.yml'
+      - 'assets.lock.json'
+      - 'lumen.lock.json'
+      - 'server/tools/assetslock/**'
+      - 'server/tools/lumenlock/**'
+      - 'desktop/internal/lumen/release_catalog.go'
+      - 'desktop/internal/lumen/controlv1/control.proto'
+      - 'deploy/compose/lumen-*.compose.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify producer pins
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: 3.52.0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache: false
+
+      - name: Verify remote dependency contracts
+        run: task dependencies:verify

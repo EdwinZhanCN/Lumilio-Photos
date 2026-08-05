@@ -49,12 +49,22 @@ func TestSettingsRejectsUnsafeLumenCacheDirectory(t *testing.T) {
 	}
 }
 
-func TestSettingsRejectsUnknownLumenPreset(t *testing.T) {
+func TestSettingsAcceptsFuturePresetIdentifiers(t *testing.T) {
 	settings := DefaultSettings()
-	settings.LumenPreset = "huge"
-	err := SaveSettings(filepath.Join(t.TempDir(), "settings.v1.json"), settings)
-	if err == nil || !strings.Contains(err.Error(), "unsupported Lumen preset") {
-		t.Fatalf("error = %v", err)
+	settings.LumenPreset = "future-quality"
+	if err := SaveSettings(filepath.Join(t.TempDir(), "settings.v1.json"), settings); err != nil {
+		t.Fatalf("save future preset: %v", err)
+	}
+}
+
+func TestSettingsRejectsMalformedLumenPresetIdentifier(t *testing.T) {
+	for _, preset := range []string{"", "Future", "future preset", "future/preset"} {
+		settings := DefaultSettings()
+		settings.LumenPreset = preset
+		err := SaveSettings(filepath.Join(t.TempDir(), "settings.v1.json"), settings)
+		if err == nil || !strings.Contains(err.Error(), "invalid Lumen preset identifier") {
+			t.Fatalf("preset %q error = %v", preset, err)
+		}
 	}
 }
 

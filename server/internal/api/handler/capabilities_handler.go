@@ -57,8 +57,8 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 
 	if h.lumenService != nil {
 		stats := h.lumenService.PoolStats()
-		discoveredNodeCount = stats.TotalConnections
-		activeNodeCount = stats.HealthyConnections
+		discoveredNodeCount = stats.TotalNodes
+		activeNodeCount = stats.RoutableNodes
 
 		for taskName := range taskAvailability {
 			taskAvailability[taskName] = h.lumenService.IsTaskAvailable(taskName)
