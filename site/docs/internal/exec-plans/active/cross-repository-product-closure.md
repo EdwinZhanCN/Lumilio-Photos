@@ -233,7 +233,7 @@ Lumilio-Assets
 5. **已按 Q5 决策修正：兼容性只做带内验证。** SDK 不再读取 TXT `proto` 或从 resolver 接收兼容性 verdict；同地址 rediscovery 不改变已形成的 capability verdict，真实重连或 endpoint 变化才重新验证。回归测试覆盖 `discover → capability v2 → rediscover → 仍 incompatible → infer 失败`。
 6. **已随 Q5 修正：`ExitIdle` 不再存在无 SubConn 的 TXT-incompatible 节点。** 所有发现节点都先建立 SubConn 并进入 `pending`，同时 `ExitIdle` 保留 `sc != nil` 防护；incompatible 只影响 picker，不移除用于检测重连的 SubConn。
 7. **已按 Q5/Q4 决策关闭：mDNS 早于 data plane Ready 的窗口由 pending 状态吸收。** Hub 可以先被发现；SDK 在 capability 返回前不调度真实任务，暂时性 `UNAVAILABLE` 保持 pending 并重试，Hub Ready 后无需新的发现事件即可恢复。因此不要求把 mDNS 注册移动到 Ready 之后。
-8. **Hub 的 vendored proto provenance 检查是自报 hash。** `cargo xtask contract-check` 比较 vendored `ml_service.proto` 与同仓库 `provenance.json` 里的 SHA-256，但普通 check 不重新解析记录的 SDK tag/commit，也不从 SDK 权威源取回文件做 byte-for-byte 比较；同时修改 proto 和 provenance hash 仍可能通过。`buf breaking` 会保护 wire/json 兼容，但不能证明文本来源。需要决定是否把远端权威源校验加入常规 contract check。
+8. **已解决：vendored proto provenance 检查自报 hash——修正表述并锁死 re-vendor 入口。** 常规 `contract-check` 仅验证 vendored `ml_service.proto` 与同仓库 `provenance.json` 自洽（自报 hash），不访问 SDK 远端。决定不引入远端比对（单人项目无实际收益、引入网络依赖）；改为：① 输出文案明确“仅验证与 provenance 记录一致”；② `--sync-sdk <tag>` 声明为唯一 re-vendor 入口，vendor 文件只能经它更新。
 9. **Exact Term 仍有已知展示漂移。** 例如 Desktop panel 仍出现 `Image semantic analysis`、`People recognition`、`OCR text recognition`、`BioCLIP species recognition`，中文也有 `OCR 文字识别`、`BioCLIP 物种识别` 的空格差异。Phase 5 已计划增加 scoped Exact Term lint；需要讨论是否随 catalog 消费提前修复，还是保留到 Phase 5 统一处理。
 
 ### 9.3 已执行验证
