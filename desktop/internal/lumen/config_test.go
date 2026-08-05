@@ -6,12 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestSetupIntentOwnsOnlyMachineIntent(t *testing.T) {
-	intent, err := NewSetupIntent("/private/lumen/config.yaml", "/private/lumen/models", "china", "basic")
+	root := t.TempDir()
+	intent, err := NewSetupIntent(
+		filepath.Join(root, "private", "config.yaml"),
+		filepath.Join(root, "models"),
+		"china",
+		"basic",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +31,14 @@ func TestSetupIntentOwnsOnlyMachineIntent(t *testing.T) {
 }
 
 func TestConfigRenderArgsDelegateSemanticsToHub(t *testing.T) {
-	intent, err := NewSetupIntent("/private/lumen/config.yaml", "/private/lumen/models", "other", "minimal")
+	root := t.TempDir()
+	cacheDir := filepath.Join(root, "models")
+	intent, err := NewSetupIntent(
+		filepath.Join(root, "private", "config.yaml"),
+		cacheDir,
+		"other",
+		"minimal",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +47,7 @@ func TestConfigRenderArgsDelegateSemanticsToHub(t *testing.T) {
 		"--target", "desktop",
 		"--preset", "minimal",
 		"--region", "other",
-		"--cache-dir", "/private/lumen/models",
+		"--cache-dir", cacheDir,
 	}
 	if got := configRenderArgs(intent); !reflect.DeepEqual(got, want) {
 		t.Fatalf("configRenderArgs() = %q, want %q", got, want)
@@ -78,8 +92,12 @@ func TestReconcileSetupConfigRegeneratesDerivedFileEveryStart(t *testing.T) {
 	if string(data) != "server:\n  host: 127.0.0.1\n" {
 		t.Fatalf("derived config was not replaced: %q", data)
 	}
-	if info, err := os.Stat(intent.ConfigPath); err != nil || info.Mode().Perm()&0o077 != 0 {
-		t.Fatalf("config permissions = %v, err = %v", info.Mode().Perm(), err)
+	info, err := os.Stat(intent.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("config permissions = %v, want no group/other access", info.Mode().Perm())
 	}
 }
 
