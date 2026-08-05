@@ -65,7 +65,7 @@
    - Lumen 全部使用 host network；
    - Vulkan 映射 `/dev/dri`；
    - CUDA 声明 `gpus: all`；
-   - 正式 Lumen Compose 不包含 `ports`。
+   - ~~正式 Lumen Compose 不包含 `ports`~~（该断言已随 9.2-1 移除，无端口约束由固定决策 2 文档保证）。
 4. 从 Hub `v0.1.1` manifest 读取 Desktop 所需 artifact URL/SHA-256，更新当前 pin，不手抄 checksum。
 5. 修正 Hub、SDK、Photos README/config 注释：Docker 正式路径是 host network + mDNS，Host Broker 不是主路径。
 
@@ -226,7 +226,7 @@ Lumilio-Assets
 
 ### 9.2 候选问题
 
-1. **Compose 的无端口断言可能漏检。** `taskfile.yml` 的三处检查使用 `grep -vqE '^    ports:'`；只要 Compose 输出存在任意一行不匹配 `ports:` 就会成功，因此以后即使加入 `ports:`，gate 也可能继续通过。当前三份正式 Lumen Compose 实际没有 `ports`，问题在于回归断言本身。
+1. **已解决：Compose 无端口断言已移除。** 原 `taskfile.yml` 三处 `grep -vqE '^    ports:'` 断言写反（语义为“存在非 ports 行”，恒通过、拦不住 ports）；尝试修正为 `! grep -qE` 后无法在 go-task 的 shell 处理下可移植执行。决定：移除三处 ports 断言，保留 host-network、`/dev/dri`、gpus 断言；无端口约束继续由固定决策 2 的文档与人工 review 保证，不再设自动 gate。
 2. **完整 Hub catalog 尚未进入 Site/Desktop 消费链。** `server/tools/lumenlock` 当前只解析 artifact 和 preset ID，生成的 `desktop/internal/lumen/release_catalog.go` 也只包含 release artifact；Desktop Go、Desktop React 和 Site 仍分别维护 preset、model、dataset、资源建议或能力展示常量。需要讨论这是 Phase 1 的单一事实源缺口，还是按 Phase 3/5 的消费者和生成物工作收口。
 3. **已解决：Assets 元数据回退路径 fail-open 已随机制删除关闭。** 原 `assetslock.resolveReleaseMetadata` 对 release.json 的下载失败/损坏/不一致统一回退为 legacy 重建；ADRC 决定 Lumilio-Assets 不发布 `release.json`，该路径现为唯一路径（从 tag 重建），候选问题不再存在。
 4. **Assets reconcile workflow 的输入和分支复用需要确认。** workflow 将 `workflow_dispatch` 输入直接插入 shell 命令，并使用固定的 `automation/assets-lock-${release}` 分支；并发触发、PR 关闭后重跑或残留分支可能失败，也不完全符合“每次触发一次性分支”。可考虑通过 `env` 传入 release，并在分支名加入 `github.run_id`/`run_attempt`。
