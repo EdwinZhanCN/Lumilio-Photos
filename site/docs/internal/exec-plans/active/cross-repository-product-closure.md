@@ -86,7 +86,7 @@
 
 #### Assets
 
-6. Assets release 在 verifier、LFS pointer 和 profile 子集检查通过后发布 `release.json`，记录 `release`、`revision`、`manifestSha256` 和 profiles。
+6. Assets 发布不携带元数据文件：`node scripts/verify.mjs`（含 LFS pointer 和 profile 子集检查）通过后打 `assets-vX.Y.Z` tag 并推 GitHub Release 即可。消费者（Photos）从 tag 自身重建三个派生字段：`git ls-remote` 解析 commit、下载该 tag 的 `assets.json` 计算 sha256。
 7. Photos 提供 `task assets:reconcile [RELEASE=...]`：无参数时选择最高稳定 SemVer，一次性更新三个 lock 字段，默认拒绝降级。
 8. 手动 `workflow_dispatch` 运行该命令并开单个 PR（每次触发一次性分支，合并后删除）；无每日 schedule，无固定 `automation/assets-lock` 分支；Assets 不保存 Photos token，也不发送 `repository_dispatch`。
 
@@ -97,10 +97,15 @@
 1. SDK 是 `ml_service.proto` 权威源，Hub vendor 原始文件；Hub 是 `control.proto` 权威源，Photos Desktop vendor 原始文件。
 2. 消费端记录 source tag、commit 和 proto SHA-256，并做 byte-for-byte 检查。Go import path 差异通过 `protoc --go_opt=M...` 处理，不修改 proto。
 3. SDK 与 Hub 增加 `buf lint` 和针对固定当前-major baseline tag 的 `buf breaking`，使用 `WIRE_JSON` policy。本计划不提前设计未来 major 迁移；当前 major 内 breaking change 一律失败。
-4. SDK 只把支持的 data-plane major 节点加入任务池；无法解析或不兼容的节点显示为 `incompatible`，不影响其他节点。
-5. 测试覆盖 Hub ready 后发布 mDNS、SDK 自动发现/离线移除/再次上线，以及 Photos 对兼容和不兼容节点的调度。
+4. SDK 只把已经通过**带内验证**且支持当前 data-plane major 的节点加入任务池；DNS-SD、static 和 Host Broker 的发现元数据均不得作出兼容性 verdict，也不得让 task hint 绕过验证：
+   - Hub 的 DNS-SD TXT 只保留展示级 `v`、`runtime`；节点身份来自 DNS-SD instance name。`proto`、`tasks`、`uuid`、`status`、`version` 和 `cap_hash` 不进入 Hub 广播契约。
+   - SDK 节点状态固定为 `pending → compatible | incompatible`。发现后允许建立连接，但 `pending` 节点不可被 picker 选中；只有完整读取 capability stream 后才形成 verdict。`protocol_version` 存在时必须属于当前 major；`Unimplemented`、无法解析或不同 major 均标记 `incompatible`。暂时性错误保持 `pending` 并重试。
+   - 同一节点的 resolver/mDNS 刷新只更新地址以外的展示元数据，不得清除 capability verdict；真实 transport 重连或 endpoint 变化才回到 `pending` 并重新带内验证。验证使用 generation 隔离，旧连接迟到结果不得覆盖新连接 verdict。
+   - `incompatible` 节点保持可见、不可调度；重连后的新 capability verdict 可以恢复。`NodeInfo.Compatible`/`IncompatibleReason` 保留用于展示，不作为 resolver 输入。
+   - picker 区分“未知”和“已知不支持”：存在 `pending` 节点时返回 `balancer.ErrNoSubConnAvailable`，由 RPC context/deadline 限制等待；所有节点均已验证且确实不支持 task 时才立即返回 `no node supports task`。
+5. 测试覆盖 SDK 自动发现/离线移除/再次上线、`pending` 请求等待、TXT/static/broker task hint 不可绕过验证、capability 不兼容后的同地址 rediscovery 不翻转 verdict、transport 重连后重新验证恢复、旧 generation 结果不可覆盖新 verdict，以及 Photos 对兼容和不兼容节点的调度。Hub 可以在 data plane 尚未 Ready 时发布 mDNS；SDK 必须保持 `pending`、重试 capability，并在 Ready 后无需新的发现事件即可恢复。
 
-完成条件：proto 只有一个文本源；当前 major 的破坏性修改会失败；自动发现不会把任务发送给不兼容节点。
+完成条件：proto 只有一个文本源；当前 major 的破坏性修改会失败；任何发现入口都不会在带内验证前调度任务；resolver 刷新不能推翻 verdict；不兼容节点重连后可以重新验证恢复。
 
 ### Phase 3：完成 CLI、Site 与 Desktop 配置闭环
 
@@ -195,7 +200,6 @@ Lumen-SDK
 
 Lumilio-Assets
   node scripts/verify.mjs
-  node scripts/release-metadata.mjs --tag assets-vX.Y.Z
 ```
 
 ## 8. 完成定义
@@ -206,3 +210,65 @@ Lumilio-Assets
 - Photos、Hub、SDK dry run 不产生公开发布副作用；正式 Release publish 后不可修改；
 - Desktop、Photos Docker、Lumen CLI/Docker 和动态 LAN 拓扑至少完成一次真实验收；
 - README、Site 和 release body 只描述实际支持的发行路径。
+
+## 9. Phase 0–2 审查上下文（待逐项讨论）
+
+审查日期：2026-08-04。
+
+本节只记录当前本地实现的审查上下文和候选问题，不代表已经接受、拒绝或调整原计划。后续逐项讨论后，再决定修复方式、阶段归属和是否影响对应 Phase 的完成判定。
+
+### 9.1 阶段边界修正
+
+- 实际创建 tag、发布 SDK/Hub/Assets、更新 Photos 对新 SDK 的依赖，以及完成首次 SDK → Hub → Assets（按需）→ Photos 发布列车，属于 Phase 6。
+- 因此，Photos 当前仍依赖 `lumen-sdk v1.3.2`，本身不作为 Phase 2 未完成的证据；不要求为了验收 Phase 2 现在提前发布 SDK 或更新 Photos 依赖。
+- Phase 2 所写的“Photos 对兼容和不兼容节点的调度”可在 Phase 6 消费新 SDK 时完成真实跨仓库验收。是否还需要在 Phase 2 保留一个不依赖正式 tag 的 Photos 侧测试，留待讨论。
+- Hub/SDK/Assets 本地分支领先 `origin/main` 也不单独视为 Phase 0–2 的实现缺陷；公开发布状态由 Phase 6 收口。
+
+### 9.2 候选问题
+
+1. **Compose 的无端口断言可能漏检。** `taskfile.yml` 的三处检查使用 `grep -vqE '^    ports:'`；只要 Compose 输出存在任意一行不匹配 `ports:` 就会成功，因此以后即使加入 `ports:`，gate 也可能继续通过。当前三份正式 Lumen Compose 实际没有 `ports`，问题在于回归断言本身。
+2. **完整 Hub catalog 尚未进入 Site/Desktop 消费链。** `server/tools/lumenlock` 当前只解析 artifact 和 preset ID，生成的 `desktop/internal/lumen/release_catalog.go` 也只包含 release artifact；Desktop Go、Desktop React 和 Site 仍分别维护 preset、model、dataset、资源建议或能力展示常量。需要讨论这是 Phase 1 的单一事实源缺口，还是按 Phase 3/5 的消费者和生成物工作收口。
+3. **已解决：Assets 元数据回退路径 fail-open 已随机制删除关闭。** 原 `assetslock.resolveReleaseMetadata` 对 release.json 的下载失败/损坏/不一致统一回退为 legacy 重建；ADRC 决定 Lumilio-Assets 不发布 `release.json`，该路径现为唯一路径（从 tag 重建），候选问题不再存在。
+4. **Assets reconcile workflow 的输入和分支复用需要确认。** workflow 将 `workflow_dispatch` 输入直接插入 shell 命令，并使用固定的 `automation/assets-lock-${release}` 分支；并发触发、PR 关闭后重跑或残留分支可能失败，也不完全符合“每次触发一次性分支”。可考虑通过 `env` 传入 release，并在分支名加入 `github.run_id`/`run_attempt`。
+5. **已按 Q5 决策修正：兼容性只做带内验证。** SDK 不再读取 TXT `proto` 或从 resolver 接收兼容性 verdict；同地址 rediscovery 不改变已形成的 capability verdict，真实重连或 endpoint 变化才重新验证。回归测试覆盖 `discover → capability v2 → rediscover → 仍 incompatible → infer 失败`。
+6. **已随 Q5 修正：`ExitIdle` 不再存在无 SubConn 的 TXT-incompatible 节点。** 所有发现节点都先建立 SubConn 并进入 `pending`，同时 `ExitIdle` 保留 `sc != nil` 防护；incompatible 只影响 picker，不移除用于检测重连的 SubConn。
+7. **已按 Q5/Q4 决策关闭：mDNS 早于 data plane Ready 的窗口由 pending 状态吸收。** Hub 可以先被发现；SDK 在 capability 返回前不调度真实任务，暂时性 `UNAVAILABLE` 保持 pending 并重试，Hub Ready 后无需新的发现事件即可恢复。因此不要求把 mDNS 注册移动到 Ready 之后。
+8. **Hub 的 vendored proto provenance 检查是自报 hash。** `cargo xtask contract-check` 比较 vendored `ml_service.proto` 与同仓库 `provenance.json` 里的 SHA-256，但普通 check 不重新解析记录的 SDK tag/commit，也不从 SDK 权威源取回文件做 byte-for-byte 比较；同时修改 proto 和 provenance hash 仍可能通过。`buf breaking` 会保护 wire/json 兼容，但不能证明文本来源。需要决定是否把远端权威源校验加入常规 contract check。
+9. **Exact Term 仍有已知展示漂移。** 例如 Desktop panel 仍出现 `Image semantic analysis`、`People recognition`、`OCR text recognition`、`BioCLIP species recognition`，中文也有 `OCR 文字识别`、`BioCLIP 物种识别` 的空格差异。Phase 5 已计划增加 scoped Exact Term lint；需要讨论是否随 catalog 消费提前修复，还是保留到 Phase 5 统一处理。
+
+### 9.3 已执行验证
+
+以下检查通过：
+
+- Photos：`task compose:test`、`task lumen:check`、`task assets:check`；
+- Photos Desktop：`go -C desktop test ./internal/lumen`；
+- Hub：`cargo test --workspace`、`cargo xtask contract-check`、`cargo xtask config-fixtures --check`；
+- SDK：`go test -race ./...`、`make proto:check`；
+- Assets：`node scripts/verify.mjs`；
+- 四仓库相对各自执行基线的 `git diff --check`；
+- 验证结束后四个工作树均为 clean。
+
+Photos Server 的局部 `internal/service` 和 `internal/api/handler` 测试在当前 macOS 环境被 `pkg-config` 返回的非法 `-Xpreprocessor` 参数阻断；本次未把该环境失败归因于 Phase 0–2 改动，但也没有据此宣称完整 Photos Server 测试已经通过。
+
+### 9.4 Q5/Q4 最终决策与执行修订
+
+最终决策：DNS-SD 只负责发现可连接的 host/port 和少量展示元数据；data-plane 版本与功能必须通过 `/home_native.v1.Inference/StreamCapabilities` 带内验证。发现层不得携带或推导兼容性 verdict，task hint 也不得在 capability verdict 前进入调度池。
+
+状态转换固定为：
+
+```text
+discovered
+  → pending（可连接、可见、不可调度）
+      → capability current major → compatible（按 capability task 调度）
+      → different/unparsable major 或 Unimplemented → incompatible（可见、不可调度）
+
+同地址 discovery refresh：保持 verdict
+transport reconnect / endpoint change：回到 pending，重新验证
+node expired：删除节点状态
+```
+
+Q4 选择“未知等待、已知不支持失败”：只要存在尚未完成带内验证的节点，picker 返回 `balancer.ErrNoSubConnAvailable` 等待下一次 picker update；调用方 context/deadline 是等待上限。只有不存在 pending 节点，且所有已验证节点都不支持目标 task 时，才立即返回确定性错误。
+
+本修订同时取代 Phase 2 原先隐含的 TXT 预筛方案；Photos 无需因此修改。实际发布 SDK/Hub、更新 Photos SDK 依赖和跨仓库真实验收仍按 9.1 的阶段边界留在 Phase 6。
+
+本地修正完成后已验证：Hub `cargo test --workspace`、`cargo fmt --all -- --check`、`cargo xtask contract-check`；SDK `go test -race ./...`、`make proto:check`。本次只修改 Hub、SDK 和本计划，没有发布 tag/Release，也没有更新 Photos 的 SDK 依赖。

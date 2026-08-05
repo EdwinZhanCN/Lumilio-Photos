@@ -1,16 +1,18 @@
 // Command assetslock owns the Lumilio-Assets pin (assets.lock.json).
 //
 //   - `reconcile` selects the newest stable `assets-vX.Y.Z` release (or an
-//     explicit `--release`), verifies its published `release.json` against the
-//     actual `assets.json` catalog, and updates the lock's three derived
-//     fields (`release`, `revision`, `manifestSha256`) in one write. Downgrades
-//     are rejected by default. Running again on the same release is a no-op.
+//     explicit `--release`), resolves the tag's commit SHA, hashes the raw
+//     `assets.json` catalog served at that tag, and updates the lock's three
+//     derived fields (`release`, `revision`, `manifestSha256`) in one write.
+//     Downgrades are rejected by default. Running again on the same release is
+//     a no-op.
 //   - `check` verifies the committed lock against the pinned revision and
 //     release without writing anything; it is the CI gate that validates
 //     reconcile PRs.
 //
-// Assets publishes `release.json` as a GitHub Release asset; older releases
-// predate it and are verified against the raw catalog instead.
+// Assets ships no per-release metadata file; every release is verified by
+// `node scripts/verify.mjs` before the tag is pushed, and consumers
+// reconstruct the three derived fields from the tag itself.
 
 package main
 
@@ -54,11 +56,9 @@ type lock struct {
 }
 
 type releaseMetadata struct {
-	SchemaVersion  int      `json:"schemaVersion"`
-	Release        string   `json:"release"`
-	Revision       string   `json:"revision"`
-	ManifestSHA256 string   `json:"manifestSha256"`
-	Profiles       []string `json:"profiles"`
+	Release        string
+	Revision       string
+	ManifestSHA256 string
 }
 
 type version struct {
@@ -113,7 +113,7 @@ func run(mode, root, target string) error {
 				return err
 			}
 		}
-		metadata, _, err := resolveReleaseMetadata(owner, repo, release)
+		metadata, err := resolveReleaseMetadata(owner, repo, release)
 		if err != nil {
 			return err
 		}
@@ -156,31 +156,6 @@ func run(mode, root, target string) error {
 		if tagCommit != current.Revision {
 			return fmt.Errorf("tag %s points at %s but lock revision is %s; run `task assets:reconcile`",
 				current.Release, tagCommit, current.Revision)
-		}
-		// If the release publishes release.json, it must agree with the lock.
-		metadata, published, err := resolveReleaseMetadata(owner, repo, current.Release)
-		if err != nil {
-			return err
-		}
-		if published {
-			if metadata.Release != current.Release ||
-				metadata.Revision != current.Revision ||
-				metadata.ManifestSHA256 != current.ManifestSHA256 {
-				return fmt.Errorf("%s does not match release.json of %s; run `task assets:reconcile`",
-					lockFileName, current.Release)
-			}
-			found := false
-			for _, profile := range metadata.Profiles {
-				if profile == current.Profile {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("profile %q is not published by %s", current.Profile, current.Release)
-			}
-		} else {
-			fmt.Printf("note: %s predates release.json; verified against the raw catalog\n", current.Release)
 		}
 		fmt.Printf("assets:check ok — %s verified against %s\n", lockFileName, current.Release)
 		return nil
@@ -319,58 +294,23 @@ func compareVersions(leftTag, rightTag string) (int, error) {
 	}
 }
 
-// fetchReleaseMetadata downloads and validates the release.json published
-// with a release (schemaVersion 1, self-consistent fields).
-func fetchReleaseMetadata(owner, repo, release string) (releaseMetadata, error) {
-	raw, err := fetch(fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/release.json", owner, repo, release))
-	if err != nil {
-		return releaseMetadata{}, err
-	}
-	var metadata releaseMetadata
-	decoder := json.NewDecoder(strings.NewReader(string(raw)))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&metadata); err != nil {
-		return metadata, fmt.Errorf("decode release.json of %s: %w", release, err)
-	}
-	if metadata.SchemaVersion != 1 {
-		return metadata, fmt.Errorf("release.json of %s must use schemaVersion 1", release)
-	}
-	if metadata.Release != release || !sha40Re.MatchString(metadata.Revision) || !sha256Re.MatchString(metadata.ManifestSHA256) || len(metadata.Profiles) == 0 {
-		return metadata, fmt.Errorf("release.json of %s is incomplete or inconsistent", release)
-	}
-	return metadata, nil
-}
-
-// resolveReleaseMetadata returns the release metadata for a tag. New releases
-// publish release.json; older releases predate it, in which case the metadata
-// is reconstructed from the tag itself and verified against the raw catalog.
-// The bool reports whether release.json was actually published.
-func resolveReleaseMetadata(owner, repo, release string) (releaseMetadata, bool, error) {
-	metadata, err := fetchReleaseMetadata(owner, repo, release)
-	if err == nil {
-		// Guard against a wrong release.json: the catalog hash it claims must
-		// match the actual assets.json published at that tag.
-		if err := verifyCatalogAt(owner, repo, release, metadata.ManifestSHA256); err != nil {
-			return metadata, true, err
-		}
-		return metadata, true, nil
-	}
-
-	// Fall back to reconstructing the metadata from the tag itself.
+// resolveReleaseMetadata reconstructs the release metadata for a tag: the
+// commit SHA the tag points at and the SHA-256 of assets.json served at that
+// tag. There is no per-release metadata file to read.
+func resolveReleaseMetadata(owner, repo, release string) (releaseMetadata, error) {
 	catalogRaw, catalogErr := fetch(fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/assets.json", owner, repo, release))
 	if catalogErr != nil {
-		return releaseMetadata{}, false, fmt.Errorf("release %s is neither published (release.json: %v) nor reachable as a tag (%v)", release, err, catalogErr)
+		return releaseMetadata{}, fmt.Errorf("release %s is not reachable as a tag (%v)", release, catalogErr)
 	}
 	revision, tagErr := resolveTagCommit(fmt.Sprintf("https://github.com/%s/%s.git", owner, repo), release)
 	if tagErr != nil {
-		return releaseMetadata{}, false, fmt.Errorf("release %s: %w", release, tagErr)
+		return releaseMetadata{}, fmt.Errorf("release %s: %w", release, tagErr)
 	}
 	return releaseMetadata{
-		SchemaVersion:  1,
 		Release:        release,
 		Revision:       revision,
 		ManifestSHA256: sha256Hex(catalogRaw),
-	}, false, nil
+	}, nil
 }
 
 // verifyCatalogAt checks that the assets.json served at ref hashes to want.
