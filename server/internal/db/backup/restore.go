@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"server/internal/db"
@@ -46,16 +47,20 @@ type restoreFault func(point string) error
 // stages a restore and every later generation that reconciles its file swap.
 // Paths are absolute and written only by this package.
 type PendingRestore struct {
-	State         string           `json:"state"`
-	ActivePath    string           `json:"active_path"`
-	SnapshotPath  string           `json:"snapshot_path"`
-	StagedPath    string           `json:"staged_path"`
-	PreviousPath  string           `json:"previous_path"`
-	FailedPath    string           `json:"failed_path"`
-	RestorePoint  string           `json:"restore_point,omitempty"`
-	StagedAt      time.Time        `json:"staged_at"`
-	Metadata      SnapshotMetadata `json:"metadata"`
-	Compatibility Compatibility    `json:"compatibility"`
+	State          string           `json:"state"`
+	OperationID    string           `json:"operation_id,omitempty"`
+	BackupName     string           `json:"backup_name,omitempty"`
+	FailureCode    string           `json:"failure_code,omitempty"`
+	FailureMessage string           `json:"failure_message,omitempty"`
+	ActivePath     string           `json:"active_path"`
+	SnapshotPath   string           `json:"snapshot_path"`
+	StagedPath     string           `json:"staged_path"`
+	PreviousPath   string           `json:"previous_path"`
+	FailedPath     string           `json:"failed_path"`
+	RestorePoint   string           `json:"restore_point,omitempty"`
+	StagedAt       time.Time        `json:"staged_at"`
+	Metadata       SnapshotMetadata `json:"metadata"`
+	Compatibility  Compatibility    `json:"compatibility"`
 }
 
 // PendingRestorePath returns the fixed marker adjacent to the active database.
@@ -73,44 +78,81 @@ func StageRestore(
 	metadata SnapshotMetadata,
 	compatibility Compatibility,
 ) error {
+	_, err := StageRestoreTracked(
+		ctx,
+		activePath,
+		snapshotPath,
+		filepath.Base(snapshotPath),
+		metadata,
+		compatibility,
+	)
+	return err
+}
+
+// StageRestoreTracked performs the same validation as StageRestore and creates
+// a durable observation record before writing the cross-generation marker.
+func StageRestoreTracked(
+	ctx context.Context,
+	activePath string,
+	snapshotPath string,
+	backupName string,
+	metadata SnapshotMetadata,
+	compatibility Compatibility,
+) (RestoreOperation, error) {
 	activePath, err := filepath.Abs(activePath)
 	if err != nil {
-		return fmt.Errorf("resolve active SQLite path: %w", err)
+		return RestoreOperation{}, fmt.Errorf("resolve active SQLite path: %w", err)
 	}
 	activePath = filepath.Clean(activePath)
 	snapshotPath, err = filepath.Abs(snapshotPath)
 	if err != nil {
-		return fmt.Errorf("resolve SQLite snapshot path: %w", err)
+		return RestoreOperation{}, fmt.Errorf("resolve SQLite snapshot path: %w", err)
 	}
 	snapshotPath = filepath.Clean(snapshotPath)
 	if _, _, err := ValidateSnapshot(ctx, snapshotPath, compatibility); err != nil {
-		return fmt.Errorf("reject restore snapshot: %w", err)
+		return RestoreOperation{}, fmt.Errorf("reject restore snapshot: %w", err)
 	}
 
 	markerPath := PendingRestorePath(activePath)
 	if _, err := os.Stat(markerPath); err == nil {
-		return errors.New("another restore is already in progress")
+		return RestoreOperation{}, errors.New("another restore is already in progress")
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("inspect pending restore marker: %w", err)
+		return RestoreOperation{}, fmt.Errorf("inspect pending restore marker: %w", err)
 	}
 	for _, artifact := range restoreArtifactPaths(activePath) {
 		if err := rejectExistingRestoreArtifact(artifact); err != nil {
-			return err
+			return RestoreOperation{}, err
 		}
 	}
 
+	now := time.Now().UTC()
+	operation := newRestoreOperation(backupName, now)
+	if err := writeRestoreOperation(activePath, operation); err != nil {
+		return RestoreOperation{}, err
+	}
 	marker := PendingRestore{
 		State:         pendingStateStaged,
+		OperationID:   operation.ID,
+		BackupName:    operation.BackupName,
 		ActivePath:    activePath,
 		SnapshotPath:  snapshotPath,
 		StagedPath:    activePath + ".restore-staged",
 		PreviousPath:  activePath + ".restore-previous",
 		FailedPath:    activePath + ".failed-restore",
-		StagedAt:      time.Now().UTC(),
+		StagedAt:      now,
 		Metadata:      metadata,
 		Compatibility: compatibility,
 	}
-	return writePendingRestore(markerPath, marker, true)
+	if err := writePendingRestore(markerPath, marker, true); err != nil {
+		_, updateErr := updateRestoreOperation(
+			marker,
+			RestoreOperationFailed,
+			"restore_stage_failed",
+			"Restore could not be staged.",
+		)
+		return RestoreOperation{}, errors.Join(err, updateErr)
+	}
+	return operation, nil
 }
 
 // ApplyPendingRestore reconciles a pending file swap between runtime
@@ -140,6 +182,25 @@ func applyPendingRestore(ctx context.Context, activePath string, logf Logf, faul
 	}
 	if logf == nil {
 		logf = func(string, ...any) {}
+	}
+
+	if marker.OperationID != "" {
+		status := RestoreOperationInstalling
+		message := "Installing the selected database snapshot."
+		switch {
+		case isRollbackState(marker.State):
+			status = RestoreOperationRollingBack
+			message = "Restore verification failed; rolling back."
+		case marker.State == pendingStateActiveInstalled || marker.State == pendingStateVerified:
+			status = RestoreOperationVerifying
+			message = "Verifying the restored runtime."
+		case marker.State == pendingStateCompleted:
+			status = RestoreOperationCompleted
+			message = "Restore completed."
+		}
+		if _, err := updateRestoreOperation(marker, status, marker.FailureCode, message); err != nil {
+			logf("restore: update operation %s to %s: %v", marker.OperationID, status, err)
+		}
 	}
 
 	if isRollbackState(marker.State) {
@@ -288,6 +349,14 @@ func applyPendingRestore(ctx context.Context, activePath string, logf Logf, faul
 			if err := setRestoreState(markerPath, &marker, pendingStateVerified); err != nil {
 				return false, err
 			}
+			if _, err := updateRestoreOperation(
+				marker,
+				RestoreOperationVerifying,
+				"",
+				"Verifying the restored runtime.",
+			); err != nil {
+				logf("restore: update operation %s to verifying: %v", marker.OperationID, err)
+			}
 			if err := runRestoreFault(fault, faultAfterVerifiedMarker); err != nil {
 				return false, err
 			}
@@ -336,6 +405,14 @@ func completePendingRestore(ctx context.Context, activePath string, marker *Pend
 			return err
 		}
 	}
+	if _, err := updateRestoreOperation(
+		*marker,
+		RestoreOperationCompleted,
+		"",
+		"Restore completed.",
+	); err != nil {
+		return fmt.Errorf("record completed restore operation: %w", err)
+	}
 	if err := removeFileIfPresent(marker.PreviousPath); err != nil {
 		return fmt.Errorf("remove previous SQLite catalog: %w", err)
 	}
@@ -358,10 +435,47 @@ func completePendingRestore(ctx context.Context, activePath string, marker *Pend
 // restored generation fails startup. Its intermediate renames use the same
 // durable reconciliation rules as the forward swap.
 func RollbackPendingRestore(ctx context.Context, activePath string, logf Logf) error {
-	return rollbackPendingRestore(ctx, activePath, logf, nil)
+	return rollbackPendingRestoreWithCause(
+		ctx,
+		activePath,
+		logf,
+		nil,
+		"restore_runtime_failed",
+		"The restored database did not pass runtime verification. The previous database was restored.",
+	)
+}
+
+// RollbackPendingRestoreWithCause records a stable public reason while raw
+// startup errors remain in structured server logs.
+func RollbackPendingRestoreWithCause(
+	ctx context.Context,
+	activePath string,
+	logf Logf,
+	code string,
+	message string,
+) error {
+	return rollbackPendingRestoreWithCause(ctx, activePath, logf, nil, code, message)
 }
 
 func rollbackPendingRestore(ctx context.Context, activePath string, logf Logf, fault restoreFault) error {
+	return rollbackPendingRestoreWithCause(
+		ctx,
+		activePath,
+		logf,
+		fault,
+		"restore_runtime_failed",
+		"The restored database did not pass runtime verification. The previous database was restored.",
+	)
+}
+
+func rollbackPendingRestoreWithCause(
+	ctx context.Context,
+	activePath string,
+	logf Logf,
+	fault restoreFault,
+	code string,
+	message string,
+) error {
 	activePath, err := filepath.Abs(activePath)
 	if err != nil {
 		return fmt.Errorf("resolve active SQLite path: %w", err)
@@ -378,6 +492,23 @@ func rollbackPendingRestore(ctx context.Context, activePath string, logf Logf, f
 	normalizeRestorePaths(&marker)
 	if logf == nil {
 		logf = func(string, ...any) {}
+	}
+	if strings.TrimSpace(code) != "" {
+		marker.FailureCode = strings.TrimSpace(code)
+	}
+	if strings.TrimSpace(message) != "" {
+		marker.FailureMessage = strings.TrimSpace(message)
+	}
+	if err := writePendingRestore(markerPath, marker, false); err != nil {
+		return err
+	}
+	if _, err := updateRestoreOperation(
+		marker,
+		RestoreOperationRollingBack,
+		marker.FailureCode,
+		"Restore verification failed; rolling back.",
+	); err != nil {
+		logf("restore: update operation %s to rolling_back: %v", marker.OperationID, err)
 	}
 
 	for {
@@ -449,6 +580,18 @@ func rollbackPendingRestore(ctx context.Context, activePath string, logf Logf, f
 		case pendingStatePreviousRestored:
 			if err := requireCatalogIdentity(ctx, marker.ActivePath, marker.Compatibility.LibraryID, false); err != nil {
 				return fmt.Errorf("verify rolled-back SQLite catalog: %w", err)
+			}
+			publicMessage := marker.FailureMessage
+			if publicMessage == "" {
+				publicMessage = "Restore failed and the previous database was restored."
+			}
+			if _, err := updateRestoreOperation(
+				marker,
+				RestoreOperationRolledBack,
+				marker.FailureCode,
+				publicMessage,
+			); err != nil {
+				return fmt.Errorf("record rolled-back restore operation: %w", err)
 			}
 			if err := removeFileIfPresent(marker.FailedPath); err != nil {
 				return fmt.Errorf("remove failed restored SQLite catalog: %w", err)

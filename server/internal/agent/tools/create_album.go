@@ -33,10 +33,11 @@ type CreateAlbumOutput struct {
 }
 
 type AlbumConfirmationInfo struct {
-	Action string `json:"action"`
-	Title  string `json:"title"`
-	RefID  string `json:"ref_id"`
-	Count  int    `json:"count"`
+	EffectID string `json:"effect_id"`
+	Action   string `json:"action"`
+	Title    string `json:"title"`
+	RefID    string `json:"ref_id"`
+	Count    int    `json:"count"`
 }
 
 type albumInterruptState struct {
@@ -97,7 +98,7 @@ func RegisterCreateAlbum() {
 				return &CreateAlbumOutput{Error: refErr}, nil
 			}
 			return nil, compose.StatefulInterrupt(ctx,
-				&AlbumConfirmationInfo{Action: info.Name, Title: title, RefID: r.ID, Count: r.Count()},
+				&AlbumConfirmationInfo{EffectID: effectID.String(), Action: info.Name, Title: title, RefID: r.ID, Count: r.Count()},
 				&albumInterruptState{EffectID: effectID.String(), RefID: r.ID, Title: title, Count: r.Count()},
 			)
 		})
@@ -110,8 +111,13 @@ func resumeCreateAlbum(ctx context.Context, deps *core.ToolDependencies, toolNam
 		return &CreateAlbumOutput{Error: ref.Internal("effect identity")}, nil
 	}
 	if !resumeApproved(ctx) {
-		_ = deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID)
 		message := fmt.Sprintf("Album %q was not created: the user declined.", state.Title)
+		if err := deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID); err != nil {
+			refErr := ref.Internal("album rejection")
+			sendError(deps, toolName, execID, start, refErr)
+			return &CreateAlbumOutput{Error: refErr}, nil
+		}
+		sendEffectReceipt(deps, toolName, execID, rejectedEffectReceipt(state.EffectID, toolName, state.Count, message))
 		sendSuccess(deps, toolName, execID, start, message, nil)
 		return &CreateAlbumOutput{Message: message}, nil
 	}
@@ -123,6 +129,7 @@ func resumeCreateAlbum(ctx context.Context, deps *core.ToolDependencies, toolNam
 		return &CreateAlbumOutput{Error: refErr}, nil
 	}
 	message := committedReceiptMessage(receipt)
+	sendEffectReceipt(deps, toolName, execID, receipt)
 	sendSuccess(deps, toolName, execID, start, message, &core.DataPayload{RefID: state.RefID, Count: receipt.Count})
 	return &CreateAlbumOutput{
 		Message: message, AlbumID: receipt.AlbumID, Count: receipt.Count,

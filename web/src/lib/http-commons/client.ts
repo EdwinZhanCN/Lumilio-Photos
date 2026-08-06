@@ -147,6 +147,47 @@ export function invalidateAuthRefresh(): void {
   replayRequests.clear();
 }
 
+/**
+ * Authenticated fetch for annotated endpoints that are newer than the checked-in
+ * generated TypeScript client. It uses the same token rotation and CSRF policy
+ * as openapi-fetch, so feature code never recreates authentication semantics.
+ * `task dto` remains the source-of-truth update that moves these calls back to
+ * the typed client after OpenAPI regeneration.
+ */
+export async function authenticatedFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const browserFetch = globalThis.fetch.bind(globalThis);
+  const request = new Request(`${baseUrl}${path}`, {
+    ...init,
+    credentials: "include",
+  });
+  const attachSession = (source: Request, token = getToken()) => {
+    const headers = new Headers(source.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const csrfToken = getCSRFToken();
+    if (csrfToken && !["GET", "HEAD", "OPTIONS"].includes(source.method.toUpperCase())) {
+      headers.set("X-CSRF-Token", csrfToken);
+    }
+    return new Request(source, { headers });
+  };
+
+  const replay = request.clone();
+  let response = await browserFetch(attachSession(request));
+  if (response.status !== 401) return response;
+
+  const token = await refreshAccessToken(browserFetch);
+  if (!token) {
+    invalidateAuthRefresh();
+    removeToken();
+    notifySessionExpired();
+    return response;
+  }
+  response = await browserFetch(attachSession(replay, token));
+  return response;
+}
+
 /** Auth middleware adds the access token, serializes rotation, and replays once. */
 export const authMiddleware: Middleware = {
   async onRequest({ request, id }) {

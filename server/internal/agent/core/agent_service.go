@@ -46,6 +46,7 @@ type AgentService interface {
 	ResumeAgent(ctx context.Context, userID int32, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*AgentRun, error)
 	CancelRun(ctx context.Context, userID int32, threadID string, runID uuid.UUID) (string, error)
 	FinishRun(ctx context.Context, userID int32, threadID string, runID uuid.UUID, status string) (string, error)
+	GetEffectReceipt(ctx context.Context, userID int32, threadID string, effectID uuid.UUID) (EffectReceipt, string, error)
 	GetAvailableTools() []*schema.ToolInfo
 	GetToolsByMode(mode string) []*schema.ToolInfo
 }
@@ -193,7 +194,7 @@ func buildInstruction(today string, hasRefs bool, mode string) string {
 	)
 }
 
-func (s *agentService) createRun(ctx context.Context, thread repo.AgentThread) (uuid.UUID, error) {
+func (s *agentService) createRunRecord(ctx context.Context, thread repo.AgentThread) (uuid.UUID, error) {
 	now := dbtypes.NewTimestamp(time.Now())
 	row, err := s.queries.CreateAgentRun(ctx, repo.CreateAgentRunParams{
 		RunID: uuid.New(), UserID: thread.UserID, ThreadID: thread.ThreadID,
@@ -203,6 +204,77 @@ func (s *agentService) createRun(ctx context.Context, thread repo.AgentThread) (
 		return uuid.Nil, err
 	}
 	return row.RunID, nil
+}
+
+func (s *agentService) bindRun(ctx context.Context, thread repo.AgentThread, runID uuid.UUID) error {
+	result, err := s.pool.ExecContext(ctx, `UPDATE agent_threads
+		SET active_run_id = ?, status = 'active', updated_at = ?
+		WHERE user_id = ? AND thread_id = ? AND active_run_id IS NULL`,
+		runID.String(), time.Now().UnixMilli(), thread.UserID, thread.ThreadID)
+	if err != nil {
+		return fmt.Errorf("bind active agent run: %w", err)
+	}
+	if changed, err := result.RowsAffected(); err != nil || changed != 1 {
+		if err != nil {
+			return fmt.Errorf("bind active agent run: %w", err)
+		}
+		return errors.New("agent thread already has an active run")
+	}
+	return nil
+}
+
+func (s *agentService) transitionAwaitingRun(ctx context.Context, thread repo.AgentThread, oldRunID, newRunID uuid.UUID) error {
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := dbtypes.NewTimestamp(time.Now())
+	result, err := tx.ExecContext(ctx, `UPDATE agent_runs
+		SET status = 'completed', finished_at = COALESCE(finished_at, ?), updated_at = ?
+		WHERE run_id = ? AND user_id = ? AND thread_id = ? AND status = 'awaiting_confirmation'`,
+		now, now, oldRunID.String(), thread.UserID, thread.ThreadID)
+	if err != nil {
+		return fmt.Errorf("finish awaiting agent run: %w", err)
+	}
+	if changed, err := result.RowsAffected(); err != nil || changed != 1 {
+		if err != nil {
+			return fmt.Errorf("finish awaiting agent run: %w", err)
+		}
+		return errors.New("awaiting agent run changed concurrently")
+	}
+	result, err = tx.ExecContext(ctx, `UPDATE agent_threads
+		SET active_run_id = ?, status = 'active', updated_at = ?
+		WHERE user_id = ? AND thread_id = ? AND active_run_id = ?`,
+		newRunID.String(), time.Now().UnixMilli(), thread.UserID, thread.ThreadID, oldRunID.String())
+	if err != nil {
+		return fmt.Errorf("transition active agent run: %w", err)
+	}
+	if changed, err := result.RowsAffected(); err != nil || changed != 1 {
+		if err != nil {
+			return fmt.Errorf("transition active agent run: %w", err)
+		}
+		return errors.New("awaiting agent run changed concurrently")
+	}
+	return tx.Commit()
+}
+
+func (s *agentService) createRun(ctx context.Context, thread repo.AgentThread) (uuid.UUID, error) {
+	if thread.ActiveRunID.Valid {
+		return uuid.Nil, errors.New("agent thread already has an active run")
+	}
+	runID, err := s.createRunRecord(ctx, thread)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if err := s.bindRun(ctx, thread, runID); err != nil {
+		_ = s.queries.FinishAgentRun(context.WithoutCancel(ctx), repo.FinishAgentRunParams{
+			Status: "failed", UpdatedAt: dbtypes.NewTimestamp(time.Now()), RunID: runID,
+			UserID: thread.UserID, ThreadID: thread.ThreadID,
+		})
+		return uuid.Nil, err
+	}
+	return runID, nil
 }
 
 func sideChannelOf(channels []chan<- *SideChannelEvent) chan<- *SideChannelEvent {
@@ -249,32 +321,70 @@ func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID s
 		return nil, sql.ErrNoRows
 	}
 	oldRunID := thread.ActiveRunID.UUID
-	if err := s.queries.ClearAwaitingAgentRun(ctx, repo.ClearAwaitingAgentRunParams{
-		UpdatedAt: dbtypes.NewTimestamp(time.Now()),
-		RunID:     thread.ActiveRunID.UUID, UserID: userID, ThreadID: threadID,
-	}); err != nil {
-		return nil, err
-	}
-	_ = oldRunID
-	runID, err := s.createRun(ctx, thread)
+	runID, err := s.createRunRecord(ctx, thread)
 	if err != nil {
 		return nil, err
 	}
 	sideChannel := sideChannelOf(sideChannels)
 	agent, err := s.buildAgent(ctx, thread, runID, sideChannel)
 	if err != nil {
-		_, _ = s.FinishRun(context.WithoutCancel(ctx), userID, threadID, runID, "failed")
+		// The new run is not bound yet. Finish only its record; calling
+		// FinishRun here would clear the still-retryable checkpoint and refs owned
+		// by the awaiting run.
+		_ = s.queries.FinishAgentRun(context.WithoutCancel(ctx), repo.FinishAgentRunParams{
+			Status: "failed", UpdatedAt: dbtypes.NewTimestamp(time.Now()), RunID: runID,
+			UserID: userID, ThreadID: threadID,
+		})
 		return nil, err
 	}
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent, EnableStreaming: true, CheckPointStore: s.store})
 	cancelOpt, cancelFn := adk.WithCancel()
 	iter, err := runner.ResumeWithParams(ctx, thread.CheckpointKey, params, cancelOpt)
 	if err != nil {
-		_, _ = s.FinishRun(context.WithoutCancel(ctx), userID, threadID, runID, "failed")
+		_ = s.queries.FinishAgentRun(context.WithoutCancel(ctx), repo.FinishAgentRunParams{
+			Status: "failed", UpdatedAt: dbtypes.NewTimestamp(time.Now()), RunID: runID,
+			UserID: userID, ThreadID: threadID,
+		})
 		return nil, fmt.Errorf("failed to resume agent: %w", err)
+	}
+	// Do not consume the awaiting run until the checkpoint resume has been
+	// accepted. The old-run completion and new-run binding are one transaction,
+	// so a race or write failure leaves the confirmation safely retryable.
+	if err := s.transitionAwaitingRun(ctx, thread, oldRunID, runID); err != nil {
+		if handle, _ := cancelFn(adk.WithAgentCancelMode(adk.CancelImmediate), adk.WithRecursive()); handle != nil {
+			go func() { _ = handle.Wait() }()
+		}
+		_ = s.queries.FinishAgentRun(context.WithoutCancel(ctx), repo.FinishAgentRunParams{
+			Status: "failed", UpdatedAt: dbtypes.NewTimestamp(time.Now()), RunID: runID,
+			UserID: userID, ThreadID: threadID,
+		})
+		return nil, err
 	}
 	s.runs.Register(userID, threadID, runID, cancelFn)
 	return &AgentRun{RunID: runID, ThreadID: threadID, Iterator: iter}, nil
+}
+
+func (s *agentService) GetEffectReceipt(ctx context.Context, userID int32, threadID string, effectID uuid.UUID) (EffectReceipt, string, error) {
+	effect, err := s.queries.GetPendingAgentEffectForUpdate(ctx, repo.GetPendingAgentEffectForUpdateParams{
+		EffectID: effectID, UserID: userID, ThreadID: threadID,
+	})
+	if err != nil {
+		return EffectReceipt{}, "", err
+	}
+	if len(effect.Receipt) == 0 {
+		return EffectReceipt{EffectID: effect.EffectID.String(), ToolName: effect.ToolName, Status: effect.Status}, effect.Status, nil
+	}
+	var receipt EffectReceipt
+	if err := json.Unmarshal(effect.Receipt, &receipt); err != nil {
+		return EffectReceipt{}, "", fmt.Errorf("decode effect receipt: %w", err)
+	}
+	if receipt.EffectID == "" {
+		receipt.EffectID = effect.EffectID.String()
+	}
+	if receipt.ToolName == "" {
+		receipt.ToolName = effect.ToolName
+	}
+	return receipt, effect.Status, nil
 }
 
 func (s *agentService) CancelRun(ctx context.Context, userID int32, threadID string, runID uuid.UUID) (string, error) {
@@ -320,10 +430,26 @@ func (s *agentService) FinishRun(ctx context.Context, userID int32, threadID str
 			status = "completed"
 		}
 	}
-	if err := s.queries.FinishAgentRun(ctx, repo.FinishAgentRunParams{
-		Status: status, UpdatedAt: dbtypes.NewTimestamp(time.Now()), RunID: runID,
+	now := dbtypes.NewTimestamp(time.Now())
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	q := s.queries.WithTx(tx)
+	if err := q.FinishAgentRun(ctx, repo.FinishAgentRunParams{
+		Status: status, UpdatedAt: now, RunID: runID,
 		UserID: userID, ThreadID: threadID,
 	}); err != nil {
+		return "", err
+	}
+	if err := q.FinishAgentThread(ctx, repo.FinishAgentThreadParams{
+		Status: status, RunID: nullableEffectUUID(runID), UpdatedAt: now,
+		UserID: userID, ThreadID: threadID,
+	}); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
 		return "", err
 	}
 	if status == "cancelled" {
@@ -334,11 +460,6 @@ func (s *agentService) FinishRun(ctx context.Context, userID int32, threadID str
 	}
 	if status == "completed" || status == "failed" {
 		if err := s.store.Delete(ctx, CheckpointKey(userID, threadID)); err != nil {
-			return "", err
-		}
-		if err := s.queries.DeleteTerminalPendingAgentEffects(ctx, repo.DeleteTerminalPendingAgentEffectsParams{
-			UserID: userID, ThreadID: threadID,
-		}); err != nil {
 			return "", err
 		}
 		if err := s.refStore.ReleaseScope(ctx, ref.Scope{UserID: userID, ThreadID: threadID}); err != nil {

@@ -363,9 +363,6 @@ export default function AddRepositoryModal({
                 <option value="uuid">
                   {t("manage.repositories.duplicateHandlingUuid", "Keep both (unique ID)")}
                 </option>
-                <option value="overwrite">
-                  {t("manage.repositories.duplicateHandlingOverwrite", "Overwrite existing")}
-                </option>
               </select>
               <span className="label text-[0.7rem] leading-snug text-base-content/55">
                 {t(

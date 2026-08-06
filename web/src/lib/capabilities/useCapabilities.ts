@@ -1,6 +1,7 @@
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
 import type { UseQueryResult } from "@tanstack/react-query";
+import type { AgentServerAvailability } from "./types";
 
 type CapabilitiesResponseDTO = components["schemas"]["dto.CapabilitiesResponseDTO"];
 
@@ -22,6 +23,7 @@ export type Capabilities = {
     };
   };
   llm: {
+    availability: AgentServerAvailability;
     agentEnabled: boolean;
     configured: boolean;
     provider: string;
@@ -61,6 +63,13 @@ function normalizeCapabilities(data?: CapabilitiesResponseDTO): Capabilities | u
       },
     },
     llm: {
+      availability: (() => {
+        const wire = (data.llm as typeof data.llm & { availability?: string } | undefined)
+          ?.availability;
+        if (wire === "disabled" || wire === "not_configured" || wire === "ready") return wire;
+        if (!data.llm?.agent_enabled) return "disabled";
+        return data.llm?.configured ? "ready" : "not_configured";
+      })(),
       agentEnabled: Boolean(data.llm?.agent_enabled),
       configured: Boolean(data.llm?.configured),
       provider: data.llm?.provider ?? "",

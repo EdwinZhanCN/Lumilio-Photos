@@ -22,14 +22,24 @@ type fakeProcess struct {
 func (p *fakeProcess) finish(err error) { p.finishOnce.Do(func() { p.done <- err }) }
 
 type fakeFactory struct {
-	mu         sync.Mutex
-	processes  []*fakeProcess
-	statuses   <-chan dto.LumenControlStatus
-	autoStop   bool
-	blockReady bool
+	mu          sync.Mutex
+	processes   []*fakeProcess
+	statuses    <-chan dto.LumenControlStatus
+	autoStop    bool
+	blockReady  bool
+	starts      int
+	startErrors map[int]error
 }
 
 func (f *fakeFactory) Start(_ context.Context, id uint64, profile string) (Process, error) {
+	f.mu.Lock()
+	f.starts++
+	attempt := f.starts
+	startErr := f.startErrors[attempt]
+	f.mu.Unlock()
+	if startErr != nil {
+		return Process{}, startErr
+	}
 	done := make(chan error, 1)
 	ready := make(chan ReadyInfo, 1)
 	if !f.blockReady {
@@ -56,6 +66,27 @@ func (f *fakeFactory) last() *fakeProcess {
 type fakeInstaller struct{}
 
 func (fakeInstaller) Install(context.Context, string) (string, error) { return "lumen-test-v1", nil }
+
+type recordingSetupStore struct {
+	mu       sync.Mutex
+	preset   string
+	cacheDir string
+	calls    [][2]string
+}
+
+func (s *recordingSetupStore) SaveSetup(_ context.Context, preset, cacheDir string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.preset, s.cacheDir = preset, cacheDir
+	s.calls = append(s.calls, [2]string{preset, cacheDir})
+	return nil
+}
+
+func (s *recordingSetupStore) snapshot() (string, string, [][2]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.preset, s.cacheDir, append([][2]string(nil), s.calls...)
+}
 
 type failingDesiredState struct {
 	value dto.DesiredState
@@ -346,5 +377,139 @@ func TestControllerQuiescePreemptsReadinessWait(t *testing.T) {
 	}
 	if item, ok := controller.operations.Get(quiesce.OperationID); !ok || item.State != string(operation.Succeeded) {
 		t.Fatalf("quiesce operation = %#v, want succeeded", item)
+	}
+}
+
+func TestControllerReconfiguresStoppedLumenAfterValidation(t *testing.T) {
+	store := &recordingSetupStore{preset: "basic"}
+	validated := false
+	controller := NewController(Options{
+		Store: state.NewWithInstanceID("lumen-reconfigure-stopped"), Operations: operation.New(),
+		Desired: NewMemoryDesiredState(dto.DesiredDisabled), Factory: &fakeFactory{},
+		Installer: fakeInstaller{}, SetupStore: store,
+		ValidateSetup: func(_ context.Context, preset, cacheDir string) error {
+			validated = preset == "brave" && cacheDir != ""
+			return nil
+		},
+		Installed: true, InstalledVer: "lumen-test-v1", Profile: "balanced", Preset: "basic",
+		CacheDir: t.TempDir(), Profiles: []string{"balanced"}, Presets: []string{"minimal", "basic", "brave"},
+		ReadyBudget: 100 * time.Millisecond, StopBudget: 20 * time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	controller.StartActor(ctx)
+	t.Cleanup(func() { cancel(); controller.Close(); controller.store.Close(); controller.operations.Close() })
+
+	newCache := t.TempDir()
+	receipt, err := controller.Install("configure-stopped", 0, "balanced", "brave", newCache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool {
+		item, ok := controller.operations.Get(receipt.OperationID)
+		return ok && item.State == string(operation.Succeeded) && snapshot.Preset == "brave"
+	})
+	if !validated {
+		t.Fatal("candidate setup was not validated")
+	}
+	preset, _, calls := store.snapshot()
+	if preset != "brave" || len(calls) != 1 {
+		t.Fatalf("saved setup = %q, calls=%v", preset, calls)
+	}
+}
+
+func TestControllerReconfiguresRunningLumenWithControlledRestart(t *testing.T) {
+	factory := &fakeFactory{autoStop: true}
+	setup := &recordingSetupStore{preset: "basic"}
+	controller := newTestController(t, factory)
+	controller.setupStore = setup
+	controller.validateSetup = func(context.Context, string, string) error { return nil }
+	if _, err := controller.Start("start-before-configure", 0); err != nil {
+		t.Fatal(err)
+	}
+	running := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool { return snapshot.ProcessPhase == dto.LumenRunning })
+	newCache := t.TempDir()
+	receipt, err := controller.Install("configure-running", running.Version, "balanced", "minimal", newCache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool {
+		item, ok := controller.operations.Get(receipt.OperationID)
+		return ok && item.State == string(operation.Succeeded) && snapshot.ProcessPhase == dto.LumenRunning && snapshot.Preset == "minimal"
+	})
+	if updated.DesiredState != dto.DesiredRunning {
+		t.Fatalf("desired = %q", updated.DesiredState)
+	}
+	factory.mu.Lock()
+	starts := factory.starts
+	factory.mu.Unlock()
+	if starts != 2 {
+		t.Fatalf("start attempts = %d, want 2", starts)
+	}
+}
+
+func TestControllerFailedReconfigureRestoresPreviousRunningSetup(t *testing.T) {
+	factory := &fakeFactory{autoStop: true, startErrors: map[int]error{2: errors.New("candidate failed")}}
+	setup := &recordingSetupStore{preset: "basic"}
+	controller := newTestController(t, factory)
+	controller.setupStore = setup
+	controller.validateSetup = func(context.Context, string, string) error { return nil }
+	if _, err := controller.Start("start-before-rollback", 0); err != nil {
+		t.Fatal(err)
+	}
+	running := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool { return snapshot.ProcessPhase == dto.LumenRunning })
+	oldCache := running.CacheDir
+	receipt, err := controller.Install("configure-with-rollback", running.Version, "balanced", "brave", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool {
+		item, ok := controller.operations.Get(receipt.OperationID)
+		return ok && item.State == string(operation.Failed) && snapshot.ProcessPhase == dto.LumenRunning
+	})
+	if restored.Preset != "basic" || restored.CacheDir != oldCache || restored.DesiredState != dto.DesiredRunning {
+		t.Fatalf("restored snapshot = %#v", restored)
+	}
+	preset, cacheDir, calls := setup.snapshot()
+	if preset != "basic" || cacheDir != oldCache || len(calls) != 2 {
+		t.Fatalf("rollback setup = %q %q, calls=%v", preset, cacheDir, calls)
+	}
+	factory.mu.Lock()
+	starts := factory.starts
+	factory.mu.Unlock()
+	if starts != 3 {
+		t.Fatalf("start attempts = %d, want 3", starts)
+	}
+}
+
+func TestControllerRejectedCandidateLeavesRunningGenerationUntouched(t *testing.T) {
+	factory := &fakeFactory{autoStop: true}
+	setup := &recordingSetupStore{preset: "basic"}
+	controller := newTestController(t, factory)
+	controller.setupStore = setup
+	controller.validateSetup = func(context.Context, string, string) error { return errors.New("invalid candidate") }
+	if _, err := controller.Start("start-before-validation", 0); err != nil {
+		t.Fatal(err)
+	}
+	running := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool { return snapshot.ProcessPhase == dto.LumenRunning })
+	receipt, err := controller.Install("invalid-configure", running.Version, "balanced", "brave", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged := waitFor(t, controller, func(snapshot dto.LumenSnapshot) bool {
+		item, ok := controller.operations.Get(receipt.OperationID)
+		return ok && item.State == string(operation.Failed) && snapshot.ProcessPhase == dto.LumenRunning
+	})
+	if unchanged.Preset != "basic" {
+		t.Fatalf("preset changed: %#v", unchanged)
+	}
+	_, _, calls := setup.snapshot()
+	if len(calls) != 0 {
+		t.Fatalf("invalid candidate was persisted: %v", calls)
+	}
+	factory.mu.Lock()
+	starts := factory.starts
+	factory.mu.Unlock()
+	if starts != 1 {
+		t.Fatalf("running process was restarted: starts=%d", starts)
 	}
 }

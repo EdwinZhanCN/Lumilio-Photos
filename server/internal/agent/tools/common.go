@@ -76,6 +76,29 @@ func sendError(deps *core.ToolDependencies, tool, execID string, start time.Time
 	})
 }
 
+func sendEffectReceipt(deps *core.ToolDependencies, tool, execID string, receipt core.EffectReceipt) {
+	deps.Send(&core.SideChannelEvent{
+		Type:      core.EventTypeEffectReceipt,
+		Timestamp: time.Now().UnixMilli(),
+		Tool:      core.ToolIdentity{Name: tool, ExecutionID: execID},
+		Execution: core.ExecutionInfo{
+			Status:  core.ExecutionStatusSuccess,
+			Message: receipt.Message,
+		},
+		Receipt: &receipt,
+	})
+}
+
+func rejectedEffectReceipt(effectID, toolName string, count int, message string) core.EffectReceipt {
+	return core.EffectReceipt{
+		EffectID: effectID,
+		ToolName: toolName,
+		Status:   "rejected",
+		Count:    count,
+		Message:  message,
+	}
+}
+
 func copyUUIDs(ids []uuid.UUID) []uuid.UUID {
 	return append([]uuid.UUID(nil), ids...)
 }

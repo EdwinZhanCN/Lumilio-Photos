@@ -348,7 +348,7 @@ func (sm *DefaultStagingManager) resolveInboxRelativePath(repoPath string, cfg *
 }
 
 // uniqueInboxFilename applies duplicate handling within a specific directory.
-// duplicateMode can be: "overwrite", "uuid", "rename" (default)
+// duplicateMode can be "uuid" or "rename" (default). Existing originals are never replaced.
 func (sm *DefaultStagingManager) uniqueInboxFilename(dirFullPath string, filename string, duplicateMode string) string {
 	originalPath := filepath.Join(dirFullPath, filename)
 
@@ -358,9 +358,6 @@ func (sm *DefaultStagingManager) uniqueInboxFilename(dirFullPath string, filenam
 	}
 
 	switch strings.ToLower(duplicateMode) {
-	case "overwrite":
-		// Keep original name; caller will overwrite
-		return filename
 	case "uuid":
 		ext := filepath.Ext(filename)
 		base := strings.TrimSuffix(filename, ext)

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArchiveRestoreIcon,
   DatabaseBackupIcon,
@@ -15,15 +15,22 @@ import {
   useCreateBackup,
   useDeleteBackup,
   useRestoreBackup,
+  useLatestRestoreOperation,
+  useRestoreOperation,
   type BackupEntry,
 } from "../../api/useBackups";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
+import {
+  clearRestoreOperationID,
+  readRestoreOperationID,
+  saveRestoreOperationID,
+} from "../../state/restoreOperation";
 
 const intervalPresets = [6, 12, 24, 48, 168];
 
 /** Settings → Server: automatic database-backup schedule/retention plus the
- * dump list (create now / download / restore / delete). Restoring replaces the
- * whole database, so a successful restore reloads the app. */
+ * dump list (create now / download / restore / delete). Restore is observed as
+ * a durable operation because the Server restarts between file-swap phases. */
 export default function BackupSection() {
   const { t } = useI18n();
   const settingsQuery = useSystemSettings();
@@ -36,6 +43,11 @@ export default function BackupSection() {
   const createBackup = useCreateBackup();
   const deleteBackup = useDeleteBackup();
   const restoreBackup = useRestoreBackup();
+  const [restoreOperationID, setRestoreOperationID] = useState<string | null>(
+    readRestoreOperationID,
+  );
+  const latestRestoreQuery = useLatestRestoreOperation(!restoreOperationID);
+  const restoreOperationQuery = useRestoreOperation(restoreOperationID);
 
   // Name of the entry whose destructive action awaits its second click.
   const [confirming, setConfirming] = useState<{
@@ -43,11 +55,47 @@ export default function BackupSection() {
     action: "delete" | "restore";
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [restoring, setRestoring] = useState(false);
   const downloadBusy = useRef(false);
+  const reloadScheduled = useRef(false);
+  const restoring = Boolean(restoreOperationID) || restoreBackup.isPending;
 
   const backup = settingsQuery.data?.backup;
   const backups = backupsQuery.data?.backups ?? [];
+  const restoreOperation = restoreOperationQuery.data;
+
+  useEffect(() => {
+    const latest = latestRestoreQuery.data;
+    if (restoreOperationID || !latest || latest.status === "completed" || latest.status === "rolled_back" || latest.status === "failed") {
+      return;
+    }
+    saveRestoreOperationID(latest.id);
+    setRestoreOperationID(latest.id);
+  }, [latestRestoreQuery.data, restoreOperationID]);
+
+  useEffect(() => {
+    if (!restoreOperationID || !restoreOperation) return;
+    switch (restoreOperation.status) {
+      case "completed":
+        if (!reloadScheduled.current) {
+          reloadScheduled.current = true;
+          clearRestoreOperationID();
+          window.setTimeout(() => window.location.reload(), 750);
+        }
+        break;
+      case "rolled_back":
+      case "failed":
+        clearRestoreOperationID();
+        setRestoreOperationID(null);
+        setError(
+          t("settings.serverSettings.backup.restoreFailed", {
+            defaultValue: "Restore failed. The previous database remains active.",
+          }),
+        );
+        break;
+      default:
+        break;
+    }
+  }, [restoreOperation, restoreOperationID, t]);
 
   const patchBackup = (patch: {
     enabled?: boolean;
@@ -94,25 +142,22 @@ export default function BackupSection() {
       return;
     }
     setConfirming(null);
-    setRestoring(true);
     setError(null);
-    restoreBackup.mutate(
-      { params: { path: { name } } },
-      {
-        onSuccess: () => {
-          // The entire database just changed; every cached query is stale.
-          window.location.reload();
-        },
-        onError: () => {
-          setRestoring(false);
-          setError(
-            t("settings.serverSettings.backup.restoreFailed", {
-              defaultValue: "Restore failed — the database was rolled back to its previous state.",
-            }),
-          );
-        },
+    restoreBackup.mutate(name, {
+      onSuccess: (operation) => {
+        saveRestoreOperationID(operation.id);
+        setRestoreOperationID(operation.id);
       },
-    );
+      onError: (cause) => {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : t("settings.serverSettings.backup.restoreFailed", {
+                defaultValue: "Restore could not be started.",
+              }),
+        );
+      },
+    });
   };
 
   return (
@@ -207,11 +252,28 @@ export default function BackupSection() {
 
         {error && <p className="mb-2 text-sm text-error">{error}</p>}
         {restoring && (
-          <p className="mb-2 text-sm text-warning">
-            {t("settings.serverSettings.backup.restoring", {
-              defaultValue: "Restoring… the app reloads when it finishes.",
-            })}
-          </p>
+          <div className="mb-2 rounded-box border border-warning/30 bg-warning/10 p-3 text-sm">
+            <p className="font-medium text-warning">
+              {t("settings.serverSettings.backup.restoring", {
+                defaultValue: "Database restore in progress",
+              })}
+            </p>
+            <p className="mt-1 text-base-content/70">
+              {restoreOperation
+                ? t(`settings.serverSettings.backup.restorePhases.${restoreOperation.status}`, {
+                    defaultValue: restoreOperation.message,
+                  })
+                : t("settings.serverSettings.backup.restoreDisconnect", {
+                    defaultValue:
+                      "Lumilio Photos may be temporarily unreachable while it restarts. Keep this page open; progress resumes automatically.",
+                  })}
+            </p>
+            {restoreOperation?.status && (
+              <p className="mt-1 font-mono text-xs text-base-content/50">
+                {restoreOperation.status}
+              </p>
+            )}
+          </div>
         )}
         {createBackup.isSuccess && Date.now() < pollUntil && (
           <p className="mb-2 text-sm text-base-content/60">
@@ -223,6 +285,17 @@ export default function BackupSection() {
 
         {backupsQuery.isLoading ? (
           <p className="text-sm text-base-content/60">{t("common.loading")}</p>
+        ) : backupsQuery.isError ? (
+          <div className="rounded-box border border-error/30 bg-error/10 p-3 text-sm">
+            <p className="text-error">
+              {t("settings.serverSettings.backup.listFailed", {
+                defaultValue: "Backups could not be loaded.",
+              })}
+            </p>
+            <button className="btn btn-ghost btn-xs mt-2" onClick={() => backupsQuery.refetch()}>
+              {t("common.retry", { defaultValue: "Retry" })}
+            </button>
+          </div>
         ) : backups.length === 0 ? (
           <p className="text-sm text-base-content/60">
             {t("settings.serverSettings.backup.empty", { defaultValue: "No backups yet." })}

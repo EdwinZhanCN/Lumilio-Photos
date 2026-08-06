@@ -246,6 +246,8 @@ SET executing_run_id = sqlc.arg('run_id'),
 WHERE agent_pending_effects.effect_id = sqlc.arg('effect_id')
   AND agent_pending_effects.user_id = sqlc.arg('user_id')
   AND agent_pending_effects.thread_id = sqlc.arg('thread_id')
+  AND agent_pending_effects.status = 'pending'
+  AND agent_pending_effects.executing_run_id IS NULL
   AND EXISTS (
       SELECT 1
       FROM agent_runs r

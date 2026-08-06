@@ -126,6 +126,11 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 	forceOCRRebuild := false
 	for {
 		if _, err := dbbackup.ApplyPendingRestore(context.WithoutCancel(ctx), dbConfig.Path, nil); err != nil {
+			_ = dbbackup.FailPendingRestoreOperation(
+				dbConfig.Path,
+				"restore_install_failed",
+				"Restore could not be installed. Review server logs and restart to retry.",
+			)
 			return fmt.Errorf("apply pending SQLite restore: %w", err)
 		}
 		appliedRestore := dbbackup.HasAppliedRestore(dbConfig.Path)
@@ -150,9 +155,20 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 		if err != nil {
 			if dbbackup.HasAppliedRestore(dbConfig.Path) && !errors.Is(err, errSQLiteOwnershipRetained) {
 				rollbackCtx, rollbackCancel := context.WithTimeout(context.Background(), shutdownTimeout)
-				rollbackErr := dbbackup.RollbackPendingRestore(rollbackCtx, dbConfig.Path, nil)
+				rollbackErr := dbbackup.RollbackPendingRestoreWithCause(
+					rollbackCtx,
+					dbConfig.Path,
+					nil,
+					"restore_runtime_failed",
+					"The restored database did not pass runtime verification. The previous database was restored.",
+				)
 				rollbackCancel()
 				if rollbackErr != nil {
+					_ = dbbackup.FailPendingRestoreOperation(
+						dbConfig.Path,
+						"restore_rollback_failed",
+						"Restore failed and automatic rollback could not be completed. Review server logs before restarting.",
+					)
 					return errors.Join(err, fmt.Errorf("rollback failed SQLite restore: %w", rollbackErr))
 				}
 				if ctx.Err() == nil {

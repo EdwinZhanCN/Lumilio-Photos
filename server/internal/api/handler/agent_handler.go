@@ -70,6 +70,24 @@ type AgentCancelResponse struct {
 	Status   string `json:"status" enums:"cancel_requested,cancelled,completed,failed"`
 }
 
+// AgentEffectStatusResponse lets the UI reconcile a confirmation after an SSE
+// disconnect. A terminal receipt remains queryable for a bounded retention
+// window and is scoped to the authenticated user and exact thread.
+type AgentEffectStatusResponse struct {
+	EffectID string              `json:"effect_id"`
+	Status   string              `json:"status" enums:"pending,committed,rejected,cancelled,failed"`
+	Receipt  *core.EffectReceipt `json:"receipt,omitempty"`
+}
+
+// AgentStreamError is the stable public error envelope for an already-open
+// Agent SSE stream. Internal/provider errors are logged server-side and never
+// become user-visible transport text.
+type AgentStreamError struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Retryable bool   `json:"retryable"`
+}
+
 // AgentResumeRequest represents request body for resuming agent chat
 type AgentResumeRequest struct {
 	ThreadID string         `json:"thread_id" binding:"required"`
@@ -244,6 +262,45 @@ func (h *AgentHandler) CancelChat(c *gin.Context) {
 	api.JSONOK(c, AgentCancelResponse{ThreadID: req.ThreadID, RunID: req.RunID, Status: status})
 }
 
+// GetEffectStatus reconciles one confirmation-gated mutation after a stream
+// failure. Missing, expired and cross-scope effects are all reported as 404.
+// @Summary Get Agent Effect Status
+// @Tags agent
+// @Produce json
+// @Param id path string true "Effect ID"
+// @Param thread_id query string true "Thread that owns the effect"
+// @Success 200 {object} AgentEffectStatusResponse
+// @Failure 400 {object} api.ErrorResponse
+// @Failure 401 {object} api.ErrorResponse
+// @Failure 404 {object} api.ErrorResponse
+// @Router /api/v1/agent/effects/{id} [get]
+func (h *AgentHandler) GetEffectStatus(c *gin.Context) {
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	threadID := strings.TrimSpace(c.Query("thread_id"))
+	if threadID == "" {
+		api.GinBadRequest(c, errors.New("thread_id is required"), "Missing agent thread")
+		return
+	}
+	effectID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinNotFound(c, err, "Agent effect not found")
+		return
+	}
+	receipt, status, err := h.agentService.GetEffectReceipt(c.Request.Context(), int32(user.UserID), threadID, effectID)
+	if err != nil {
+		api.GinNotFound(c, err, "Agent effect not found")
+		return
+	}
+	response := AgentEffectStatusResponse{EffectID: effectID.String(), Status: status}
+	if receipt.Message != "" || receipt.Status == "rejected" || status == "committed" {
+		response.Receipt = &receipt
+	}
+	api.JSONOK(c, response)
+}
+
 // GetRef returns ref metadata with facets (hydration: control plane handle →
 // data plane summary). Cross-scope, missing and expired refs are all 404 —
 // existence never leaks (INV-4).
@@ -379,10 +436,14 @@ func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, r
 		event *adk.AgentEvent
 		ok    bool
 	}
-	eventChan := make(chan iterResult)
+	eventChan := make(chan iterResult, 1)
 
-	// Run iterator in a separate goroutine to avoid blocking on iter.Next()
+	// Run iterator in a separate goroutine to avoid blocking on iter.Next(). A
+	// one-item buffer lets the producer publish terminal state even while the
+	// handler is flushing a side-channel event; closing makes every consumer
+	// path finite.
 	go func() {
+		defer close(eventChan)
 		for {
 			event, ok := run.Iterator.Next()
 			eventChan <- iterResult{event, ok}
@@ -434,8 +495,8 @@ func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, r
 			}
 			h.sendSSE(c, flusher, "side_event", sideEvent)
 
-		case res := <-eventChan:
-			if !res.ok {
+		case res, channelOpen := <-eventChan:
+			if !channelOpen || !res.ok {
 				// Main iterator completed.
 				// Before exiting, we must drain any remaining events from sideChannel.
 				if sideChannel != nil {
@@ -481,7 +542,7 @@ func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, r
 				log.Printf("[AgentHandler] Error event: %v", event.Err)
 				status := finish("failed")
 				h.sendSSE(c, flusher, "run_status", map[string]any{"run_id": run.RunID.String(), "status": status})
-				h.sendSSE(c, flusher, "error", map[string]interface{}{"error": event.Err.Error()})
+				h.sendAgentStreamError(c, flusher, "AGENT_RUN_FAILED", "Lumilio Agent could not complete this request.", true)
 				return
 			}
 			if event.Action != nil && event.Action.Interrupted != nil {
@@ -513,6 +574,10 @@ func drainAgentEvent(event *adk.AgentEvent) {
 			return
 		}
 	}
+}
+
+func (h *AgentHandler) sendAgentStreamError(c *gin.Context, flusher http.Flusher, code, message string, retryable bool) {
+	h.sendSSE(c, flusher, "error", AgentStreamError{Code: code, Message: message, Retryable: retryable})
 }
 
 // sendSSE sends a Server-Sent Event
@@ -593,7 +658,8 @@ func (h *AgentHandler) handleStreamingOutput(c *gin.Context, flusher http.Flushe
 		msg, err := messageVariant.MessageStream.Recv()
 		if err != nil {
 			if err != io.EOF {
-				h.sendSSE(c, flusher, "error", map[string]interface{}{"error": err.Error()})
+				log.Printf("[AgentHandler] stream receive error: %v", err)
+				h.sendAgentStreamError(c, flusher, "AGENT_STREAM_FAILED", "Lumilio Agent lost the response stream. Please retry.", true)
 			}
 			return
 		}

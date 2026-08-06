@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   DesktopService,
@@ -31,6 +31,8 @@ import {
   type DesktopSnapshot,
   type LumenLogEntry,
   type LumenSnapshot,
+  type OperationReceipt,
+  type OperationSnapshot,
   type ProcessPresentation,
   type RuntimeConfigSettings,
   type StorageShortcut,
@@ -81,6 +83,91 @@ const dockRoutes = [
 ] as const;
 
 type MainRoute = (typeof dockRoutes)[number]["route"];
+
+interface TrackedOperationOptions {
+  onSucceeded?: () => void;
+  onFailed?: (message: string) => void;
+}
+
+/** Desktop service methods acknowledge an operation before their actor work is
+ * complete. This hook makes the shared operation registry, rather than the RPC
+ * return, authoritative for button success and failure. */
+function useTrackedOperation(
+  operations: OperationSnapshot[] | null | undefined,
+  options: TrackedOperationOptions = {},
+) {
+  const [operationID, setOperationID] = useState<string | null>(null);
+  const [state, setState] = useState<ButtonState>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const optionsRef = useRef(options);
+  const resetTimer = useRef<number | null>(null);
+  optionsRef.current = options;
+
+  useEffect(
+    () => () => {
+      if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!operationID) return;
+    const operation = operations?.find((item) => item.operationID === operationID);
+    if (!operation) return;
+    if (operation.state === "accepted" || operation.state === "running") {
+      setState("loading");
+      return;
+    }
+    if (operation.state === "succeeded") {
+      setOperationID(null);
+      setError(null);
+      setState("success");
+      optionsRef.current.onSucceeded?.();
+      resetTimer.current = window.setTimeout(() => {
+        setState("idle");
+        resetTimer.current = null;
+      }, 1200);
+      return;
+    }
+    if (operation.state === "failed" || operation.state === "cancelled") {
+      const message = operation.error?.message || `Desktop operation ${operation.state}.`;
+      setOperationID(null);
+      setError(message);
+      setState("error");
+      optionsRef.current.onFailed?.(message);
+    }
+  }, [operationID, operations]);
+
+  const begin = () => {
+    if (resetTimer.current !== null) {
+      window.clearTimeout(resetTimer.current);
+      resetTimer.current = null;
+    }
+    setOperationID(null);
+    setError(null);
+    setState("loading");
+  };
+
+  const track = (receipt: OperationReceipt) => {
+    setOperationID(receipt.operationID);
+  };
+
+  const reject = (reason: unknown) => {
+    const message = errorMessage(reason);
+    setOperationID(null);
+    setError(message);
+    setState("error");
+    optionsRef.current.onFailed?.(message);
+  };
+
+  const reset = () => {
+    setOperationID(null);
+    setError(null);
+    setState("idle");
+  };
+
+  return { state, error, begin, track, reject, reset };
+}
 
 export function App() {
   const { t } = useTranslation();
@@ -150,7 +237,7 @@ export function App() {
         <header className="window-header">
           <button className="brand" type="button" onClick={() => navigate("/general")}>
             <img src={appIconURL} alt="" className="brand-icon" />
-            <span>Lumilio</span>
+            <span>{t("product.compactName", "Lumilio Photos")}</span>
           </button>
           <div className="header-actions">
             <AnimatedBadge
@@ -221,7 +308,7 @@ function LoadingScreen() {
   const { t } = useTranslation();
   return (
     <main className="boot-screen">
-      <img src={appIconURL} alt="Lumilio Photos" className="boot-icon" />
+      <img src={appIconURL} alt={t("product.compactName", "Lumilio Photos")} className="boot-icon" />
       <Loader variant="ascii-braille" size={22} label={t("loading.loadingState")} />
       <span>{t("loading.opening")}</span>
     </main>
@@ -235,7 +322,7 @@ function SetupRequiredPage({ onStart }: { onStart: () => void }) {
       <header className="bootstrap-header">
         <div className="bootstrap-brand">
           <img src={appIconURL} alt="" className="bootstrap-icon" />
-          <span>Lumilio Photos</span>
+          <span>{t("product.compactName", "Lumilio Photos")}</span>
         </div>
       </header>
       <div className="bootstrap-slide">
@@ -355,7 +442,7 @@ function Onboarding({
   if (!draft.runtime || !draft.preferences) {
     return (
       <div className="bootstrap-loading">
-        <img src={appIconURL} alt="Lumilio Photos" className="bootstrap-icon" />
+        <img src={appIconURL} alt={t("product.compactName", "Lumilio Photos")} className="bootstrap-icon" />
         <Loader variant="ascii-braille" size={24} label={t("onboarding.preparing")} />
         <span>{t("onboarding.preparingDescription")}</span>
       </div>
@@ -368,11 +455,11 @@ function Onboarding({
   const busy = draft.phase === "preparing" || draft.phase === "saving";
 
   return (
-    <section className="bootstrap" aria-label={t("onboarding.ariaLabel", "Lumilio Desktop setup")}>
+    <section className="bootstrap" aria-label={t("onboarding.ariaLabel", "Lumilio Photos Desktop setup")}>
       <header className="bootstrap-header">
         <div className="bootstrap-brand">
           <img src={appIconURL} alt="" className="bootstrap-icon" />
-          <span>Lumilio Photos</span>
+          <span>{t("product.compactName", "Lumilio Photos")}</span>
         </div>
         <span>{t("onboarding.step", { current: step + 1, total })}</span>
       </header>
@@ -505,25 +592,24 @@ function ServerPanel({
 }) {
   const { t } = useTranslation();
   const runtime = snapshot.runtime;
-  const [actionState, setActionState] = useState<ButtonState>("idle");
-  const [actionError, setActionError] = useState<string | null>(null);
+  const operation = useTrackedOperation(snapshot.operations, {
+    onFailed: (message) => showToast({ title: t("server.actionFailed"), description: message, status: "error" }),
+  });
+  const actionState = operation.state;
+  const actionError = operation.error;
 
   const invoke = async (action: "start" | "stop" | "restart" | "retry") => {
-    setActionState("loading");
-    setActionError(null);
+    operation.begin();
     const requestID = `runtime-${crypto.randomUUID()}`;
     try {
-      if (action === "start") await RuntimeService.Start(requestID, runtime.version);
-      else if (action === "stop") await RuntimeService.Stop(requestID, runtime.version);
-      else if (action === "restart") await RuntimeService.Restart(requestID, runtime.version);
-      else await RuntimeService.RetryCleanup(requestID, runtime.version);
-      setActionState("success");
-      window.setTimeout(() => setActionState("idle"), 1200);
+      let receipt: OperationReceipt;
+      if (action === "start") receipt = await RuntimeService.Start(requestID, runtime.version);
+      else if (action === "stop") receipt = await RuntimeService.Stop(requestID, runtime.version);
+      else if (action === "restart") receipt = await RuntimeService.Restart(requestID, runtime.version);
+      else receipt = await RuntimeService.RetryCleanup(requestID, runtime.version);
+      operation.track(receipt);
     } catch (reason: unknown) {
-      const message = errorMessage(reason);
-      setActionState("error");
-      setActionError(message);
-      showToast({ title: t("server.actionFailed"), description: message, status: "error" });
+      operation.reject(reason);
     }
   };
 
@@ -567,7 +653,7 @@ function ServerPanel({
       </SettingsSection>
 
       {actionError ? (
-        <ActionNotice component={t("dock.server")} message={actionError} actionLabel={t("common.retry")} onAction={() => void invoke("start")} />
+        <ActionNotice component={t("dock.server")} message={actionError} />
       ) : runtime.phase === RuntimePhase.RuntimeFailed ? (
         <ActionNotice
           component={t("dock.server")}
@@ -600,7 +686,6 @@ function StoragePanel({
 }) {
   const { t } = useTranslation();
   const [items, setItems] = useState<StorageShortcut[]>([]);
-  const [state, setState] = useState<ButtonState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = async () => {
@@ -611,25 +696,28 @@ function StoragePanel({
       setLoadError(errorMessage(reason));
     }
   };
+  const operation = useTrackedOperation(snapshot.operations, {
+    onSucceeded: () => void refresh(),
+    onFailed: (message) => showToast({ title: t("storage.addFailed"), description: message, status: "error" }),
+  });
+  const state = operation.state;
 
   useEffect(() => {
     void refresh();
   }, [snapshot.storage.version, snapshot.runtime.phase]);
 
   const addLocation = async () => {
-    setState("loading");
+    operation.begin();
     try {
-      const path = await StorageService.PickLocation(t("storage.addLocationDialogTitle", "Add a Lumilio storage location"));
+      const path = await StorageService.PickLocation(t("storage.addLocationDialogTitle", "Add a Lumilio Photos storage location"));
       if (!path) {
-        setState("idle");
+        operation.reset();
         return;
       }
-      await StorageService.AddLocation(`storage-${crypto.randomUUID()}`, snapshot.storage.version, path, "");
-      setState("success");
-      window.setTimeout(() => setState("idle"), 1200);
+      const receipt = await StorageService.AddLocation(`storage-${crypto.randomUUID()}`, snapshot.storage.version, path, "");
+      operation.track(receipt);
     } catch (reason: unknown) {
-      setState("error");
-      showToast({ title: t("storage.addFailed"), description: errorMessage(reason), status: "error" });
+      operation.reject(reason);
     }
   };
 
@@ -700,8 +788,12 @@ function StoragePanel({
 function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showToast: (input: ToastInput) => string }) {
   const { t } = useTranslation();
   const lumen = snapshot.lumen;
-  const [state, setState] = useState<ButtonState>("idle");
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const operation = useTrackedOperation(snapshot.operations, {
+    onFailed: (message) => showToast({ title: t("lumen.actionFailed"), description: message, status: "error" }),
+  });
+  const state = operation.state;
+  const actionError = operation.error ?? inputError;
   const [selectedProfile, setSelectedProfile] = useState(lumen.profile || lumen.availableProfiles?.[0] || "");
   const [selectedPreset, setSelectedPreset] = useState(lumen.preset || lumen.availablePresets?.[0] || "");
   const [selectedCacheDir, setSelectedCacheDir] = useState(lumen.cacheDir || "");
@@ -710,6 +802,12 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
   const releaseReady = lumen.installerAvailable && lumen.processAvailable;
+
+  useEffect(() => {
+    setSelectedProfile(lumen.profile || lumen.availableProfiles?.[0] || "");
+    setSelectedPreset(lumen.preset || lumen.availablePresets?.[0] || "");
+    setSelectedCacheDir(lumen.cacheDir || "");
+  }, [lumen.cacheDir, lumen.preset, lumen.profile, lumen.availablePresets, lumen.availableProfiles]);
 
   const loadLogs = useCallback(async () => {
     if (lumen.processPhase !== LumenProcessPhase.LumenRunning || !lumen.control.connected) {
@@ -740,43 +838,43 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
   }, [loadLogs, lumen.control.connected, lumen.processPhase]);
 
   const invoke = async (action: "install" | "start" | "stop" | "restart" | "retry") => {
-    setState("loading");
-    setActionError(null);
+    operation.begin();
+    setInputError(null);
     const requestID = `lumen-${crypto.randomUUID()}`;
     try {
-      if (action === "install") await LumenService.Install(requestID, lumen.version, selectedProfile, selectedPreset, selectedCacheDir);
-      else if (action === "start") await LumenService.Start(requestID, lumen.version);
-      else if (action === "stop") await LumenService.Stop(requestID, lumen.version);
-      else if (action === "restart") await LumenService.Restart(requestID, lumen.version);
-      else await LumenService.RetryCleanup(requestID, lumen.version);
-      setState("success");
-      window.setTimeout(() => setState("idle"), 1200);
+      let receipt: OperationReceipt;
+      if (action === "install") receipt = await LumenService.Install(requestID, lumen.version, selectedProfile, selectedPreset, selectedCacheDir);
+      else if (action === "start") receipt = await LumenService.Start(requestID, lumen.version);
+      else if (action === "stop") receipt = await LumenService.Stop(requestID, lumen.version);
+      else if (action === "restart") receipt = await LumenService.Restart(requestID, lumen.version);
+      else receipt = await LumenService.RetryCleanup(requestID, lumen.version);
+      operation.track(receipt);
     } catch (reason: unknown) {
-      const message = errorMessage(reason);
-      setState("error");
-      setActionError(message);
-      showToast({ title: t("lumen.actionFailed"), description: message, status: "error" });
+      operation.reject(reason);
     }
   };
 
-  const setupMutable = lumen.installPhase === LumenInstallPhase.LumenAbsent || lumen.installPhase === LumenInstallPhase.LumenInstallFailed;
-  const canInstall = lumen.installerAvailable
+  const installed = lumen.installPhase === LumenInstallPhase.LumenInstalled;
+  const setupChanged = selectedPreset !== lumen.preset || selectedCacheDir !== lumen.cacheDir;
+  const canSubmitSetup = lumen.installerAvailable
     && Boolean(selectedProfile)
     && Boolean(selectedPreset)
     && Boolean(selectedCacheDir)
-    && setupMutable;
-  const canChooseSetup = setupMutable && state !== "loading";
+    && state !== "loading"
+    && (!installed || setupChanged);
+  const canChooseIntent = state !== "loading";
+  const canChooseProfile = !installed && canChooseIntent;
 
   const chooseCacheDirectory = async () => {
     try {
       const path = await LumenService.PickCacheDirectory(t("lumen.chooseCacheDirectory", "Choose the Lumen model cache directory"));
       if (path) {
         setSelectedCacheDir(path);
-        setActionError(null);
+        setInputError(null);
       }
     } catch (reason: unknown) {
       const message = errorMessage(reason);
-      setActionError(message);
+      setInputError(message);
       showToast({ title: t("lumen.cachePickFailed", "Cache directory could not be selected"), description: message, status: "error" });
     }
   };
@@ -817,7 +915,7 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
               "Choose a runtime preset exposed by the pinned Lumen Hub release.",
             )}
           >
-            <Select value={selectedPreset} onValueChange={setSelectedPreset} disabled={!canChooseSetup} className="w-80 max-w-full">
+            <Select value={selectedPreset} onValueChange={setSelectedPreset} disabled={!canChooseIntent} className="w-80 max-w-full">
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {(lumen.availablePresets ?? []).map((preset) => (
@@ -830,7 +928,7 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
             title={t("lumen.backend", "Backend")}
             description={t("lumen.backendDescription", "Backend determines which platform-specific Lumen Hub package is downloaded.")}
           >
-            <Select value={selectedProfile} onValueChange={setSelectedProfile} disabled={!canChooseSetup} className="w-80 max-w-full">
+            <Select value={selectedProfile} onValueChange={setSelectedProfile} disabled={!canChooseProfile} className="w-80 max-w-full">
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {(lumen.availableProfiles ?? []).map((profile) => (
@@ -843,33 +941,44 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
             title={t("lumen.cacheDirectory", "Model cache")}
             description={selectedCacheDir || t("lumen.cacheDirectoryDescription", "Choose where Lumen stores downloaded models.")}
           >
-            <Button variant="secondary" size="sm" disabled={!canChooseSetup} onClick={() => void chooseCacheDirectory()}>
+            <Button variant="secondary" size="sm" disabled={!canChooseIntent} onClick={() => void chooseCacheDirectory()}>
               <FolderOpen className="size-3.5" /> {t("common.choose")}
             </Button>
           </SettingRow>
-          <SettingRow title={t("lumen.installation")} description={selectedProfile ? `${t("lumen.profile")}: ${selectedProfile}` : t("lumen.noProfile")}>
+          <SettingRow
+            title={installed ? t("lumen.reconfigure", "Reconfigure") : t("lumen.installation")}
+            description={
+              installed
+                ? lumen.processPhase === LumenProcessPhase.LumenRunning
+                  ? t("lumen.reconfigureRunning", "The new preset and cache are validated first, then applied with a controlled restart. The previous setup is restored if startup fails.")
+                  : t("lumen.reconfigureStopped", "The new preset and cache are validated before they replace the current setup.")
+                : selectedProfile
+                  ? `${t("lumen.profile")}: ${selectedProfile}`
+                  : t("lumen.noProfile")
+            }
+          >
             <StatefulButton
               variant="secondary"
               size="sm"
               state={state}
-              disabled={!canInstall}
-              loadingText={t("lumen.installing")}
-              successText={t("lumen.installed")}
+              disabled={!canSubmitSetup}
+              loadingText={installed ? t("lumen.applyingConfiguration", "Applying configuration") : t("lumen.installing")}
+              successText={installed ? t("lumen.configurationApplied", "Configuration applied") : t("lumen.installed")}
               onClick={() => void invoke("install")}
             >
-              {t("lumen.install")}
+              {installed ? t("lumen.applyConfiguration", "Apply configuration") : t("lumen.install")}
             </StatefulButton>
           </SettingRow>
           <SettingRow title={t("lumen.processStatus")} description={`${t("lumen.desiredState")}: ${lumen.desiredState || "disabled"}.`}>
             <RowActions>
               <AnimatedBadge status={presentationStatus(lumen.presentation)} size="sm">{lumen.presentation.label}</AnimatedBadge>
-              {lumen.capabilities.canStartLumen ? <Button variant="secondary" size="sm" onClick={() => void invoke("start")}>{t("common.start")}</Button> : null}
+              {lumen.capabilities.canStartLumen ? <Button variant="secondary" size="sm" disabled={state === "loading"} onClick={() => void invoke("start")}>{t("common.start")}</Button> : null}
               {lumen.capabilities.canStopLumen || lumen.capabilities.canRetryCleanupLumen ? (
-                <Button variant="secondary" size="sm" onClick={() => void invoke(lumen.capabilities.canRetryCleanupLumen ? "retry" : "stop")}>
+                <Button variant="secondary" size="sm" disabled={state === "loading"} onClick={() => void invoke(lumen.capabilities.canRetryCleanupLumen ? "retry" : "stop")}>
                   {lumen.capabilities.canRetryCleanupLumen ? t("common.retryCleanup") : t("common.stop")}
                 </Button>
               ) : null}
-              {lumen.capabilities.canRestartLumen ? <Button variant="secondary" size="sm" onClick={() => void invoke("restart")}>{t("common.restart")}</Button> : null}
+              {lumen.capabilities.canRestartLumen ? <Button variant="secondary" size="sm" disabled={state === "loading"} onClick={() => void invoke("restart")}>{t("common.restart")}</Button> : null}
             </RowActions>
           </SettingRow>
         </SettingsSection>
@@ -1054,20 +1163,22 @@ function UpdatesPanel({
 }) {
   const { t } = useTranslation();
   const update = snapshot.update;
-  const [state, setState] = useState<ButtonState>("idle");
+  const operation = useTrackedOperation(snapshot.operations, {
+    onFailed: (message) => showToast({ title: t("updates.actionFailed"), description: message, status: "error" }),
+  });
+  const state = operation.state;
 
   const invoke = async (action: "check" | "download" | "apply") => {
-    setState("loading");
+    operation.begin();
     const requestID = `update-${crypto.randomUUID()}`;
     try {
-      if (action === "check") await UpdateService.Check(requestID, update.version);
-      else if (action === "download") await UpdateService.Download(requestID, update.version);
-      else await UpdateService.RestartAndApply(requestID, update.version);
-      setState("success");
-      window.setTimeout(() => setState("idle"), 1200);
+      let receipt: OperationReceipt;
+      if (action === "check") receipt = await UpdateService.Check(requestID, update.version);
+      else if (action === "download") receipt = await UpdateService.Download(requestID, update.version);
+      else receipt = await UpdateService.RestartAndApply(requestID, update.version);
+      operation.track(receipt);
     } catch (reason: unknown) {
-      setState("error");
-      showToast({ title: t("updates.actionFailed"), description: errorMessage(reason), status: "error" });
+      operation.reject(reason);
     }
   };
 
@@ -1267,16 +1378,18 @@ function RecoveryPage({
   navigate: (route: string) => void;
 }) {
   const { t } = useTranslation();
-  const [state, setState] = useState<ButtonState>("idle");
+  const operation = useTrackedOperation(snapshot.operations, {
+    onSucceeded: () => navigate("/server"),
+    onFailed: (message) => showToast({ title: t("recovery.failed"), description: message, status: "error" }),
+  });
+  const state = operation.state;
   const restore = async () => {
-    setState("loading");
+    operation.begin();
     try {
-      await RuntimeService.RestoreLastKnownGood(`recovery-${crypto.randomUUID()}`, snapshot.runtime.version);
-      setState("success");
-      navigate("/server");
+      const receipt = await RuntimeService.RestoreLastKnownGood(`recovery-${crypto.randomUUID()}`, snapshot.runtime.version);
+      operation.track(receipt);
     } catch (reason: unknown) {
-      setState("error");
-      showToast({ title: t("recovery.failed"), description: errorMessage(reason), status: "error" });
+      operation.reject(reason);
     }
   };
   return (

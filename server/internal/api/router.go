@@ -171,6 +171,7 @@ type AgentControllerInterface interface {
 	Chat(c *gin.Context)            // POST /agent/chat - Chat with agent via SSE
 	ResumeChat(c *gin.Context)      // POST /agent/chat/resume - Resume an interrupted agent execution
 	CancelChat(c *gin.Context)      // POST /agent/chat/cancel - Cancel one exact run
+	GetEffectStatus(c *gin.Context) // GET /agent/effects/:id - Reconcile one durable effect receipt
 	GetTools(c *gin.Context)        // GET /agent/tools - Get available tools
 	GetRef(c *gin.Context)          // GET /agent/refs/:id - Get ref metadata with facets
 	GetRefAssets(c *gin.Context)    // GET /agent/refs/:id/assets - Hydrate a ref page in snapshot order
@@ -200,6 +201,8 @@ type SettingsControllerInterface interface {
 	DownloadBackup(c *gin.Context)
 	DeleteBackup(c *gin.Context)
 	RestoreBackup(c *gin.Context)
+	GetRestoreOperation(c *gin.Context)
+	GetLatestRestoreOperation(c *gin.Context)
 }
 
 type ClassifierControllerInterface interface {
@@ -370,6 +373,8 @@ func NewRouter(
 			settings.GET("/backups/:name/download", settingsController.DownloadBackup)
 			settings.DELETE("/backups/:name", settingsController.DeleteBackup)
 			settings.POST("/backups/:name/restore", settingsController.RestoreBackup)
+			settings.GET("/backup-restores/latest", settingsController.GetLatestRestoreOperation)
+			settings.GET("/backup-restores/:id", settingsController.GetRestoreOperation)
 		}
 
 		classifiers := v1.Group("/classifiers")
@@ -632,14 +637,15 @@ func NewRouter(
 			stats.GET("/available-years", statsController.GetAvailableYears)
 		}
 
-		// Agent routes - authentication required: refs are scoped to the
-		// requesting user (INV-4), so an anonymous agent session is meaningless.
+		// Lumilio Agent execution requires a configured provider, but its durable
+		// control plane must remain usable when inference is disabled or degraded.
+		// Users can still cancel a run, reconcile an effect receipt, and open pins
+		// or refs without the availability middleware blocking recovery.
 		agent := v1.Group("/agent")
-		agent.Use(appInitializedMiddleware, agentAvailabilityMiddleware, authController.AuthMiddleware())
+		agent.Use(appInitializedMiddleware, authController.AuthMiddleware())
 		{
-			agent.POST("/chat", agentController.Chat)
-			agent.POST("/chat/resume", agentController.ResumeChat)
 			agent.POST("/chat/cancel", agentController.CancelChat)
+			agent.GET("/effects/:id", agentController.GetEffectStatus)
 			agent.GET("/tools", agentController.GetTools)
 			agent.GET("/refs/:id", agentController.GetRef)
 			agent.GET("/refs/:id/assets", agentController.GetRefAssets)
@@ -652,6 +658,13 @@ func NewRouter(
 			agent.PATCH("/pins/layout", agentController.UpdatePinLayout)
 			agent.PATCH("/pins/:id", agentController.UpdatePin)
 			agent.DELETE("/pins/:id", agentController.DeletePin)
+		}
+
+		agentRuntime := v1.Group("/agent")
+		agentRuntime.Use(appInitializedMiddleware, authController.AuthMiddleware(), agentAvailabilityMiddleware)
+		{
+			agentRuntime.POST("/chat", agentController.Chat)
+			agentRuntime.POST("/chat/resume", agentController.ResumeChat)
 		}
 
 		// Share link routes: owner-scoped management, authenticated.

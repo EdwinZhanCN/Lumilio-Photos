@@ -43,6 +43,8 @@ SET executing_run_id = ?1,
 WHERE agent_pending_effects.effect_id = ?3
   AND agent_pending_effects.user_id = ?4
   AND agent_pending_effects.thread_id = ?5
+  AND agent_pending_effects.status = 'pending'
+  AND agent_pending_effects.executing_run_id IS NULL
   AND EXISTS (
       SELECT 1
       FROM agent_runs r

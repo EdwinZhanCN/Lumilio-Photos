@@ -9,6 +9,7 @@ import type {
   ConfigValidation,
   DesktopPreferences,
   DesktopSnapshot,
+  OperationReceipt,
   RuntimeConfigDraft,
   RuntimeConfigSettings,
 } from "../../../bindings/desktop/internal/control/dto/models.js";
@@ -58,6 +59,7 @@ export function useSettingsDraft(
   const snapshotRef = useRef(snapshot);
   const patchSequence = useRef(0);
   const successTimer = useRef<number | null>(null);
+  const operationWaiters = useRef(new Set<number>());
   const loadedInstance = useRef("");
 
   snapshotRef.current = snapshot;
@@ -101,7 +103,36 @@ export function useSettingsDraft(
 
   useEffect(() => () => {
     if (successTimer.current !== null) window.clearTimeout(successTimer.current);
+    for (const timer of operationWaiters.current) window.clearInterval(timer);
+    operationWaiters.current.clear();
   }, []);
+
+  const waitForOperation = useCallback((receipt: OperationReceipt) => new Promise<void>((resolve, reject) => {
+    const deadline = Date.now() + 120_000;
+    const finish = (timer: number, result?: Error) => {
+      window.clearInterval(timer);
+      operationWaiters.current.delete(timer);
+      if (result) reject(result);
+      else resolve();
+    };
+    const inspect = (timer: number) => {
+      const operation = snapshotRef.current?.operations?.find((item) => item.operationID === receipt.operationID);
+      if (operation?.state === "succeeded") {
+        finish(timer);
+        return;
+      }
+      if (operation?.state === "failed" || operation?.state === "cancelled") {
+        finish(timer, new Error(operation.error?.message || t("toast.settingsSaveFailed", "Settings could not be saved")));
+        return;
+      }
+      if (Date.now() >= deadline) {
+        finish(timer, new Error(t("toast.settingsOperationTimeout", "The settings operation did not finish in time. Review the Server status before retrying.")));
+      }
+    };
+    const timer = window.setInterval(() => inspect(timer), 100);
+    operationWaiters.current.add(timer);
+    inspect(timer);
+  }), [t]);
 
   const patchRuntime = useCallback(async (next: RuntimeConfigSettings) => {
     runtimeRef.current = next;
@@ -147,7 +178,7 @@ export function useSettingsDraft(
 
   const chooseDefaultStorage = async () => {
     try {
-      const path = await StorageService.PickLocation(t("storage.chooseDefaultLocation", "Choose the default Lumilio storage location"));
+      const path = await StorageService.PickLocation(t("storage.chooseDefaultLocation", "Choose the default Lumilio Photos storage location"));
       if (path) updateRuntime("storagePath", path);
     } catch (reason: unknown) {
       showToast({ title: t("toast.storagePickFailed", "Folder could not be selected"), description: errorMessage(reason), status: "error" });
@@ -185,21 +216,23 @@ export function useSettingsDraft(
         }
         const running = currentSnapshot.runtime.phase === "running" && currentSnapshot.runtime.ownership === "held";
         const requestID = `config-${crypto.randomUUID()}`;
+        let receipt: OperationReceipt;
         if (running) {
-          await RuntimeService.ApplyConfig(
+          receipt = await RuntimeService.ApplyConfig(
             requestID,
             currentSnapshot.runtime.version,
             currentDraft.baseFingerprint,
             candidateRef.current,
           );
         } else {
-          await RuntimeService.SaveConfig(
+          receipt = await RuntimeService.SaveConfig(
             requestID,
             currentSnapshot.runtime.version,
             currentDraft.baseFingerprint,
             candidateRef.current,
           );
         }
+        await waitForOperation(receipt);
         const savedRuntime = await RuntimeService.ReadConfigDraft();
         installRuntimeDraft(savedRuntime);
         setRuntimeDirty(false);

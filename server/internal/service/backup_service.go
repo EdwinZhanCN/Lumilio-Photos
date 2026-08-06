@@ -19,6 +19,8 @@ import (
 )
 
 // BackupEntry is one finalized SQLite snapshot with manifest provenance.
+type RestoreOperation = backup.RestoreOperation
+
 type BackupEntry struct {
 	Name          string
 	SizeBytes     int64
@@ -34,9 +36,13 @@ type BackupService interface {
 	TriggerNow(ctx context.Context) error
 	ResolvePath(name string) (string, error)
 	Delete(ctx context.Context, name string) error
-	// Restore validates and stages a snapshot, then requests a full runtime
-	// generation restart. Replacement happens only after all old DB handles close.
-	Restore(ctx context.Context, name string) error
+	// Restore validates and stages a snapshot. The handler flushes the accepted
+	// operation receipt before calling RestartRestore so the response cannot be
+	// lost when the current runtime generation begins draining.
+	Restore(ctx context.Context, name string) (backup.RestoreOperation, error)
+	RestartRestore(operationID string) error
+	GetRestoreOperation(ctx context.Context, operationID string) (backup.RestoreOperation, error)
+	LatestRestoreOperation(ctx context.Context) (backup.RestoreOperation, error)
 }
 
 // BackupRuntime carries restore staging inputs. Routine snapshots are created
@@ -134,28 +140,76 @@ func (s *backupService) Delete(_ context.Context, name string) error {
 	return nil
 }
 
-func (s *backupService) Restore(ctx context.Context, name string) error {
+func (s *backupService) Restore(ctx context.Context, name string) (backup.RestoreOperation, error) {
 	path, err := s.ResolvePath(name)
 	if err != nil {
-		return err
+		return backup.RestoreOperation{}, err
 	}
 	if _, err := os.Stat(path); err != nil {
-		return fmt.Errorf("backup %s: %w", name, err)
+		return backup.RestoreOperation{}, fmt.Errorf("backup %s: %w", name, err)
 	}
 	if !s.restore.TryLock() {
-		return errors.New("another restore is already in progress")
+		return backup.RestoreOperation{}, errors.New("another restore is already in progress")
 	}
 	defer s.restore.Unlock()
 
 	if s.rt.RequestRestart == nil {
-		return errors.New("runtime restart hook is unavailable")
+		return backup.RestoreOperation{}, errors.New("runtime restart hook is unavailable")
 	}
-	if err := backup.StageRestore(ctx, s.rt.ActivePath, path, s.rt.Metadata, s.rt.Compatibility); err != nil {
-		return err
+	operation, err := backup.StageRestoreTracked(
+		ctx,
+		s.rt.ActivePath,
+		path,
+		name,
+		s.rt.Metadata,
+		s.rt.Compatibility,
+	)
+	if err != nil {
+		return backup.RestoreOperation{}, err
 	}
-	s.rt.Logf("restore: staged %s; requesting runtime restart", name)
+	operation, err = backup.MarkPendingRestoreRestartRequested(s.rt.ActivePath)
+	if err != nil {
+		cancelErr := backup.CancelStagedRestore(
+			s.rt.ActivePath,
+			"restore_acceptance_failed",
+			"Restore could not be accepted.",
+		)
+		return backup.RestoreOperation{}, errors.Join(err, cancelErr)
+	}
+	s.rt.Logf("restore: staged %s as operation %s", name, operation.ID)
+	return operation, nil
+}
+
+func (s *backupService) RestartRestore(operationID string) error {
+	if err := backup.ValidatePendingRestoreOperation(s.rt.ActivePath, operationID); err != nil {
+		receiptErr := backup.FailRestoreOperationIfCurrent(
+			s.rt.ActivePath,
+			operationID,
+			"restore_restart_rejected",
+			"Runtime restart could not be requested; the active database was not changed.",
+		)
+		return errors.Join(err, receiptErr)
+	}
+	if s.rt.RequestRestart == nil {
+		err := errors.New("runtime restart hook is unavailable")
+		cancelErr := backup.CancelStagedRestore(
+			s.rt.ActivePath,
+			"restore_restart_unavailable",
+			"Runtime restart is unavailable; the active database was not changed.",
+		)
+		return errors.Join(err, cancelErr)
+	}
+	s.rt.Logf("restore: requesting runtime restart for operation %s", operationID)
 	s.rt.RequestRestart()
 	return nil
+}
+
+func (s *backupService) GetRestoreOperation(_ context.Context, operationID string) (backup.RestoreOperation, error) {
+	return backup.ReadRestoreOperation(s.rt.ActivePath, operationID)
+}
+
+func (s *backupService) LatestRestoreOperation(_ context.Context) (backup.RestoreOperation, error) {
+	return backup.ReadLatestRestoreOperation(s.rt.ActivePath)
 }
 
 func trimRestorePoint(name string) (string, bool) {

@@ -30,6 +30,7 @@ type MLTaskCapabilityDTO struct {
 
 // LLMCapabilitiesDTO represents de-sensitized LLM agent runtime state.
 type LLMCapabilitiesDTO struct {
+	Availability string `json:"availability" enums:"disabled,not_configured,ready" example:"ready"`
 	AgentEnabled bool   `json:"agent_enabled"`
 	Configured   bool   `json:"configured"`
 	Provider     string `json:"provider,omitempty" example:"openai"`

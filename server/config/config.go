@@ -310,7 +310,7 @@ type transcodeManifest struct {
 	HardwareAccel *string `toml:"hardware_accel" json:"hardware_accel" jsonschema:"enum=auto,enum=vaapi,enum=nvenc,enum=qsv,enum=videotoolbox,enum=none"`
 }
 type lumenManifest struct {
-	// Whether to look for external Lumen ML nodes at all. ML stays optional;
+	// Whether to look for external Lumen Intelligence nodes at all. ML stays optional;
 	// false keeps the deployment entirely local.
 	DiscoveryEnabled *bool `toml:"discovery_enabled" json:"discovery_enabled"`
 	// Discover nodes over mDNS on the local link. Containers usually cannot,

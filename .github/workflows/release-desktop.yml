@@ -330,7 +330,7 @@ jobs:
 
                       1. Download `Lumilio-Photos-${{ github.ref_name }}-macos-arm64.dmg` and drag the app into **Applications**.
                       2. First launch: the app is ad-hoc signed (not notarized), so approve it once via **System Settings → Privacy & Security → Open Anyway**.
-                      3. Allow the **local network** prompt so Lumen ML servers can be discovered over mDNS (optional — the app works without ML).
+                      3. Allow the **local network** prompt so Lumen Intelligence servers can be discovered over mDNS (optional — the app works without ML).
 
                       ## Windows Desktop (x64)
 
@@ -341,6 +341,6 @@ jobs:
                       **Portable (zip):** download `Lumilio-Photos-${{ github.ref_name }}-windows-amd64.zip`, extract anywhere, and run `Lumilio Photos\lumilio-photos.exe`.
                       Requires the Edge WebView2 Runtime to be present for the first-run setup window.
 
-                      On first launch, allow the Windows Firewall prompt if you want LAN Lumen ML discovery (optional).
+                      On first launch, allow the Windows Firewall prompt if you want LAN Lumen Intelligence discovery (optional).
 
                       Linux/Docker image: `ghcr.io/edwinzhancn/lumilio-server` — see `deploy/compose/caddy.compose.yml`.

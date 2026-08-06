@@ -112,17 +112,17 @@ func (h *SettingsHandler) UpdateSystemSettings(c *gin.Context) {
 	api.JSONOK(c, dto.ToSystemSettingsDTO(settings))
 }
 
-// ValidateLLMSettings validates the persisted LLM configuration against the current provider.
-// @Summary Validate LLM settings
-// @Description Validate the persisted LLM configuration by issuing a lightweight test request.
+// ValidateLLMSettings validates an unsaved LLM configuration draft.
+// @Summary Validate an LLM settings draft
+// @Description Validate the supplied provider/model draft without saving it or returning secret material.
 // @Tags settings
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} dto.ValidateLLMSettingsResponseDTO "LLM settings validated successfully"
+// @Param request body dto.ValidateLLMSettingsRequestDTO true "LLM settings draft"
+// @Success 200 {object} dto.ValidateLLMSettingsResponseDTO "LLM settings draft validated successfully"
 // @Failure 400 {object} api.ErrorResponse "LLM validation failed"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/settings/system/validate-llm [post]
 func (h *SettingsHandler) ValidateLLMSettings(c *gin.Context) {
 	if _, err := currentUserIDFromContext(c); err != nil {
@@ -130,7 +130,12 @@ func (h *SettingsHandler) ValidateLLMSettings(c *gin.Context) {
 		return
 	}
 
-	if err := h.settingsService.ValidateLLMSettings(c.Request.Context()); err != nil {
+	var req dto.ValidateLLMSettingsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	if err := h.settingsService.ValidateLLMDraft(c.Request.Context(), req.ToServiceInput()); err != nil {
 		api.GinBadRequest(c, err, "LLM validation failed")
 		return
 	}

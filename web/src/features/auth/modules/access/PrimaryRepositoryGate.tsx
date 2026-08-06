@@ -30,7 +30,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const [name, setName] = useState("Primary Storage");
   const [root, setRoot] = useState("");
   const [strategy, setStrategy] = useState<"cas" | "date" | "flat">("date");
-  const [duplicateHandling, setDuplicateHandling] = useState<"overwrite" | "rename" | "uuid">(
+  const [duplicateHandling, setDuplicateHandling] = useState<"rename" | "uuid">(
     "rename",
   );
 
@@ -108,7 +108,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
             <p className="mt-1 text-sm text-base-content/70">
               {t("auth.primaryRepository.description", {
                 defaultValue:
-                  "Choose where Lumilio should store the first local repository. Existing settings use this as the default for future repositories too.",
+                  "Choose where Lumilio Photos should store the first local repository. Existing settings use this as the default for future repositories too.",
               })}
             </p>
           </div>
@@ -211,7 +211,6 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
               >
                 <option value="rename">rename</option>
                 <option value="uuid">uuid</option>
-                <option value="overwrite">overwrite</option>
               </select>
             </label>
           </div>

@@ -34,6 +34,32 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "core.EffectReceipt": {
+                "properties": {
+                    "album_id": {
+                        "type": "integer"
+                    },
+                    "already_committed": {
+                        "type": "boolean"
+                    },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "effect_id": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "tool_name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dbtypes.AssetType": {
                 "enum": [
                     "PHOTO",
@@ -2155,8 +2181,7 @@ const docTemplate = `{
                     "duplicate_handling": {
                         "enum": [
                             "rename",
-                            "uuid",
-                            "overwrite"
+                            "uuid"
                         ],
                         "example": "rename",
                         "type": "string"
@@ -3137,6 +3162,15 @@ const docTemplate = `{
                 "properties": {
                     "agent_enabled": {
                         "type": "boolean"
+                    },
+                    "availability": {
+                        "enum": [
+                            "disabled",
+                            "not_configured",
+                            "ready"
+                        ],
+                        "example": "ready",
+                        "type": "string"
                     },
                     "configured": {
                         "type": "boolean"
@@ -4853,6 +4887,50 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.RestoreOperationDTO": {
+                "properties": {
+                    "backup_name": {
+                        "example": "20260711T020000.000000Z-library.sqlite3",
+                        "type": "string"
+                    },
+                    "completed_at": {
+                        "type": "string"
+                    },
+                    "error_code": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": "d62cbbf3-f564-458b-86ca-0f6d10fcd8d4",
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "requested_at": {
+                        "type": "string"
+                    },
+                    "restore_point": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "enum": [
+                            "staged",
+                            "restart_requested",
+                            "installing",
+                            "verifying",
+                            "completed",
+                            "rolling_back",
+                            "rolled_back",
+                            "failed"
+                        ],
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RuntimeInfoDTO": {
                 "properties": {
                     "acme_certificate_expires_at": {
@@ -6067,6 +6145,7 @@ const docTemplate = `{
                     },
                     "provider": {
                         "enum": [
+                            "none",
                             "ark",
                             "openai",
                             "deepseek",
@@ -6480,6 +6559,39 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.ValidateLLMSettingsRequestDTO": {
+                "properties": {
+                    "api_key": {
+                        "type": "string"
+                    },
+                    "base_url": {
+                        "example": "https://api.openai.com/v1",
+                        "type": "string"
+                    },
+                    "model_name": {
+                        "example": "gpt-4.1-mini",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "enum": [
+                            "ark",
+                            "openai",
+                            "deepseek",
+                            "ollama"
+                        ],
+                        "example": "openai",
+                        "type": "string"
+                    },
+                    "use_stored_api_key": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "model_name",
+                    "provider"
+                ],
+                "type": "object"
+            },
             "dto.ValidateLLMSettingsResponseDTO": {
                 "properties": {
                     "valid": {
@@ -6644,6 +6756,27 @@ const docTemplate = `{
                     "mode",
                     "query"
                 ],
+                "type": "object"
+            },
+            "handler.AgentEffectStatusResponse": {
+                "properties": {
+                    "effect_id": {
+                        "type": "string"
+                    },
+                    "receipt": {
+                        "$ref": "#/components/schemas/core.EffectReceipt"
+                    },
+                    "status": {
+                        "enum": [
+                            "pending",
+                            "committed",
+                            "rejected",
+                            "cancelled",
+                            "failed"
+                        ],
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handler.AgentResumeRequest": {
@@ -7260,6 +7393,76 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Resume Agent Chat",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/api/v1/agent/effects/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Effect ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Thread that owns the effect",
+                        "in": "query",
+                        "name": "thread_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handler.AgentEffectStatusResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "summary": "Get Agent Effect Status",
                 "tags": [
                     "agent"
                 ]
@@ -17545,6 +17748,129 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/settings/backup-restores/latest": {
+            "get": {
+                "description": "Return the latest durable restore receipt, if one exists.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RestoreOperationDTO"
+                                }
+                            }
+                        },
+                        "description": "Latest restore operation"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "No restore operation exists"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Restore operation could not be read"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get latest database restore operation",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
+        "/api/v1/settings/backup-restores/{id}": {
+            "get": {
+                "description": "Return the latest durable phase for an accepted restore operation, including completion or successful rollback after a runtime restart.",
+                "parameters": [
+                    {
+                        "description": "Restore operation ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RestoreOperationDTO"
+                                }
+                            }
+                        },
+                        "description": "Restore operation"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Restore operation not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Restore operation could not be read"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get database restore operation",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
         "/api/v1/settings/backups": {
             "get": {
                 "description": "List SQLite snapshots (routine backups and restore points), newest first.",
@@ -17771,7 +18097,7 @@ const docTemplate = `{
         },
         "/api/v1/settings/backups/{name}/restore": {
             "post": {
-                "description": "Restore the named SQLite snapshot. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.",
+                "description": "Validate and stage the named SQLite snapshot. The accepted operation continues across a runtime restart; poll the returned operation ID for completion or rollback.",
                 "parameters": [
                     {
                         "description": "Backup file name",
@@ -17784,15 +18110,15 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                    "$ref": "#/components/schemas/dto.RestoreOperationDTO"
                                 }
                             }
                         },
-                        "description": "Backup restored"
+                        "description": "Restore accepted"
                     },
                     "400": {
                         "content": {
@@ -17832,7 +18158,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Restore failed (database rolled back)"
+                        "description": "Restore could not be staged"
                     }
                 },
                 "security": [
@@ -18013,15 +18339,26 @@ const docTemplate = `{
         },
         "/api/v1/settings/system/validate-llm": {
             "post": {
-                "description": "Validate the persisted LLM configuration by issuing a lightweight test request.",
+                "description": "Validate the supplied provider/model draft without saving it or returning secret material.",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object"
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ValidateLLMSettingsRequestDTO",
+                                        "summary": "request",
+                                        "description": "LLM settings draft"
+                                    }
+                                ]
                             }
                         }
-                    }
+                    },
+                    "description": "LLM settings draft",
+                    "required": true
                 },
                 "responses": {
                     "200": {
@@ -18032,7 +18369,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "LLM settings validated successfully"
+                        "description": "LLM settings draft validated successfully"
                     },
                     "400": {
                         "content": {
@@ -18053,16 +18390,6 @@ const docTemplate = `{
                             }
                         },
                         "description": "Unauthorized"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Internal server error"
                     }
                 },
                 "security": [
@@ -18070,7 +18397,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Validate LLM settings",
+                "summary": "Validate an LLM settings draft",
                 "tags": [
                     "settings"
                 ]

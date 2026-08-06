@@ -282,7 +282,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <RecoveryCodesPanel
               codes={recoveryCodes}
               confirmLabel={t("auth.register.finish", {
-                defaultValue: "Continue to Lumilio",
+                defaultValue: "Continue to Lumilio Photos",
               })}
               checkboxLabel={t("auth.register.recoverySavedConfirm", {
                 defaultValue: "I’ve saved my recovery codes somewhere safe",

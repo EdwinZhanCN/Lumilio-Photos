@@ -170,7 +170,7 @@ func writeInfoPlist(path, version string) error {
 <key>CFBundleIconFile</key><string>AppIcon</string><key>CFBundleIconName</key><string>appicon</string><key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>` + version + `</string><key>CFBundleVersion</key><string>` + version + `</string>
 <key>LSMinimumSystemVersion</key><string>12.0</string><key>NSHighResolutionCapable</key><true/><key>LSUIElement</key><true/>
-<key>NSLocalNetworkUsageDescription</key><string>Lumilio Photos discovers Lumen ML servers on your local network via mDNS to enable optional AI features (semantic search, face recognition, OCR).</string>
+<key>NSLocalNetworkUsageDescription</key><string>Lumilio Photos discovers Lumen Intelligence servers on your local network via mDNS to enable optional AI features (semantic search, face recognition, OCR).</string>
 <key>NSDesktopFolderUsageDescription</key><string>Lumilio Photos needs access to folders you select on the Desktop to store and manage your photo repositories.</string>
 <key>NSDocumentsFolderUsageDescription</key><string>Lumilio Photos needs access to folders you select in Documents to store and manage your photo repositories.</string>
 <key>NSDownloadsFolderUsageDescription</key><string>Lumilio Photos needs access to folders you select in Downloads to import or manage your photo repositories.</string>

@@ -184,7 +184,7 @@ const LoginFlow: React.FC = () => {
       <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
         <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
           <CardHead
-            title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
+            title={t("auth.login.title", { defaultValue: "Sign in to Lumilio Photos" })}
             sub={t("auth.login.identifySubtitle", {
               defaultValue: "Enter your username to continue.",
             })}
@@ -224,7 +224,7 @@ const LoginFlow: React.FC = () => {
           </form>
 
           <div className="text-center text-sm text-base-content/55">
-            {t("auth.login.registerPrompt", { defaultValue: "New to Lumilio?" })}{" "}
+            {t("auth.login.registerPrompt", { defaultValue: "New to Lumilio Photos?" })}{" "}
             <Link
               to="/register"
               state={registrationState}
@@ -245,7 +245,7 @@ const LoginFlow: React.FC = () => {
         <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
           <CardHead
             icon={Fingerprint}
-            title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
+            title={t("auth.login.title", { defaultValue: "Sign in to Lumilio Photos" })}
             sub={t("auth.login.passkeySubtitle", {
               defaultValue: "Continue as {{username}} with a passkey.",
               username,
@@ -300,7 +300,7 @@ const LoginFlow: React.FC = () => {
     <div className="grid min-h-dvh place-items-center bg-base-200 px-4 py-10">
       <AuthShell appName={t("app.name", { defaultValue: "Lumilio Photos" })}>
         <CardHead
-          title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
+          title={t("auth.login.title", { defaultValue: "Sign in to Lumilio Photos" })}
           sub={t("auth.login.passwordSubtitle", {
             defaultValue: "Enter the password for {{username}}.",
             username,

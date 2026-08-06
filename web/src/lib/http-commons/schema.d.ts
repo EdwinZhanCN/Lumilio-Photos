@@ -298,6 +298,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/effects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Effect Status */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Thread that owns the effect */
+                    thread_id: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Effect ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["handler.AgentEffectStatusResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/pins": {
         parameters: {
             query?: never;
@@ -10131,6 +10200,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/backup-restores/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get database restore operation
+         * @description Return the latest durable phase for an accepted restore operation, including completion or successful rollback after a runtime restart.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Restore operation ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Restore operation */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RestoreOperationDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Restore operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Restore operation could not be read */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/backup-restores/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get latest database restore operation
+         * @description Return the latest durable restore receipt, if one exists.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Latest restore operation */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RestoreOperationDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description No restore operation exists */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Restore operation could not be read */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/backups": {
         parameters: {
             query?: never;
@@ -10378,7 +10582,7 @@ export interface paths {
         put?: never;
         /**
          * Restore a database backup
-         * @description Restore the named SQLite snapshot. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
+         * @description Validate and stage the named SQLite snapshot. The accepted operation continues across a runtime restart; poll the returned operation ID for completion or rollback.
          */
         post: {
             parameters: {
@@ -10392,13 +10596,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Backup restored */
-                200: {
+                /** @description Restore accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
+                        "application/json": components["schemas"]["dto.RestoreOperationDTO"];
                     };
                 };
                 /** @description Invalid backup name */
@@ -10428,7 +10632,7 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
-                /** @description Restore failed (database rolled back) */
+                /** @description Restore could not be staged */
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -10619,8 +10823,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Validate LLM settings
-         * @description Validate the persisted LLM configuration by issuing a lightweight test request.
+         * Validate an LLM settings draft
+         * @description Validate the supplied provider/model draft without saving it or returning secret material.
          */
         post: {
             parameters: {
@@ -10629,13 +10833,14 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
+            /** @description LLM settings draft */
+            requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["dto.ValidateLLMSettingsRequestDTO"];
                 };
             };
             responses: {
-                /** @description LLM settings validated successfully */
+                /** @description LLM settings draft validated successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10655,15 +10860,6 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -11884,6 +12080,15 @@ export interface components {
             /** @example Operation completed successfully */
             message?: string;
         };
+        "core.EffectReceipt": {
+            album_id?: number;
+            already_committed?: boolean;
+            count?: number;
+            effect_id?: string;
+            message?: string;
+            status?: string;
+            tool_name?: string;
+        };
         /** @enum {string} */
         "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
         "dbtypes.AudioSpecificMetadata": {
@@ -12675,7 +12880,7 @@ export interface components {
              * @example rename
              * @enum {string}
              */
-            duplicate_handling?: "rename" | "uuid" | "overwrite";
+            duplicate_handling?: "rename" | "uuid";
             /**
              * @description Name is preserved verbatim as the directory name for regular
              *     repositories. It accepts Unicode letters/digits, ASCII spaces, hyphens,
@@ -13056,6 +13261,11 @@ export interface components {
         };
         "dto.LLMCapabilitiesDTO": {
             agent_enabled?: boolean;
+            /**
+             * @example ready
+             * @enum {string}
+             */
+            availability?: "disabled" | "not_configured" | "ready";
             configured?: boolean;
             /** @example gpt-4.1-mini */
             model_name?: string;
@@ -13730,6 +13940,20 @@ export interface components {
             cleared_totp?: boolean;
             temporary_password?: string;
         };
+        "dto.RestoreOperationDTO": {
+            /** @example 20260711T020000.000000Z-library.sqlite3 */
+            backup_name?: string;
+            completed_at?: string;
+            error_code?: string;
+            /** @example d62cbbf3-f564-458b-86ca-0f6d10fcd8d4 */
+            id?: string;
+            message?: string;
+            requested_at?: string;
+            restore_point?: string;
+            /** @enum {string} */
+            status?: "staged" | "restart_requested" | "installing" | "verifying" | "completed" | "rolling_back" | "rolled_back" | "failed";
+            updated_at?: string;
+        };
         "dto.RuntimeInfoDTO": {
             acme_certificate_expires_at?: string;
             /** @example photos.example.com */
@@ -14242,7 +14466,7 @@ export interface components {
             base_url?: string;
             model_name?: string;
             /** @enum {string} */
-            provider?: "ark" | "openai" | "deepseek" | "ollama";
+            provider?: "none" | "ark" | "openai" | "deepseek" | "ollama";
         };
         "dto.UpdateLikeRequestDTO": {
             /** @example true */
@@ -14395,6 +14619,19 @@ export interface components {
             user_id?: number;
             username?: string;
         };
+        "dto.ValidateLLMSettingsRequestDTO": {
+            api_key?: string;
+            /** @example https://api.openai.com/v1 */
+            base_url?: string;
+            /** @example gpt-4.1-mini */
+            model_name: string;
+            /**
+             * @example openai
+             * @enum {string}
+             */
+            provider: "ark" | "openai" | "deepseek" | "ollama";
+            use_stored_api_key?: boolean;
+        };
         "dto.ValidateLLMSettingsResponseDTO": {
             valid?: boolean;
         };
@@ -14445,6 +14682,12 @@ export interface components {
             mode: "free" | "review" | "organize" | "analyze" | "curate";
             query: string;
             thread_id?: string;
+        };
+        "handler.AgentEffectStatusResponse": {
+            effect_id?: string;
+            receipt?: components["schemas"]["core.EffectReceipt"];
+            /** @enum {string} */
+            status?: "pending" | "committed" | "rejected" | "cancelled" | "failed";
         };
         "handler.AgentResumeRequest": {
             targets: {

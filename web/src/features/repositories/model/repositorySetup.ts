@@ -1,5 +1,5 @@
 export type StorageStrategy = "cas" | "date" | "flat";
-export type DuplicateHandling = "overwrite" | "rename" | "uuid";
+export type DuplicateHandling = "rename" | "uuid";
 export type RepositoryNameError =
   | "required"
   | "leadingOrTrailingSpace"
@@ -16,7 +16,7 @@ export function isStorageStrategy(value?: string): value is StorageStrategy {
 }
 
 export function isDuplicateHandling(value?: string): value is DuplicateHandling {
-  return value === "overwrite" || value === "rename" || value === "uuid";
+  return value === "rename" || value === "uuid";
 }
 
 export function validateRepositoryName(value: string): RepositoryNameError | null {

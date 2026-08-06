@@ -457,7 +457,7 @@ const BootstrapFlow: React.FC = () => {
                   })}
                   sub={t("auth.bootstrap.repository.subtitle", {
                     defaultValue:
-                      "Choose where Lumilio stores media. This becomes the default for future repositories.",
+                      "Choose where Lumilio Photos stores media. This becomes the default for future repositories.",
                   })}
                 />
 
@@ -542,7 +542,6 @@ const BootstrapFlow: React.FC = () => {
                       >
                         <option value="rename">rename</option>
                         <option value="uuid">uuid</option>
-                        <option value="overwrite">overwrite</option>
                       </select>
                     </label>
                   </div>

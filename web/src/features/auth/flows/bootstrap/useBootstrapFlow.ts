@@ -17,8 +17,8 @@ const FLOW_INDEX: Record<string, number> = {
 const isStorageStrategy = (value?: string): value is "cas" | "date" | "flat" =>
   value === "cas" || value === "date" || value === "flat";
 
-const isDuplicateHandling = (value?: string): value is "overwrite" | "rename" | "uuid" =>
-  value === "overwrite" || value === "rename" || value === "uuid";
+const isDuplicateHandling = (value?: string): value is "rename" | "uuid" =>
+  value === "rename" || value === "uuid";
 
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -44,7 +44,7 @@ export function useBootstrapFlow() {
   const [repoName, setRepoName] = useState("Primary Storage");
   const [repoRoot, setRepoRoot] = useState("");
   const [strategy, setStrategy] = useState<"cas" | "date" | "flat">("date");
-  const [duplicateHandling, setDuplicateHandling] = useState<"overwrite" | "rename" | "uuid">(
+  const [duplicateHandling, setDuplicateHandling] = useState<"rename" | "uuid">(
     "rename",
   );
 

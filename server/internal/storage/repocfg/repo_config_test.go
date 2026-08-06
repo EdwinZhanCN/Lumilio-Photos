@@ -69,11 +69,11 @@ func TestNewRepositoryConfig_SystemGeneratedFields(t *testing.T) {
 func TestNewRepositoryConfig_WithOptions(t *testing.T) {
 	cfg := NewRepositoryConfig("Archive",
 		WithStorageStrategy("cas"),
-		WithLocalSettings("overwrite"),
+		WithLocalSettings("rename"),
 	)
 
 	assert.Equal(t, "cas", cfg.StorageStrategy)
-	assert.Equal(t, "overwrite", cfg.LocalSettings.HandleDuplicateFilenames)
+	assert.Equal(t, "rename", cfg.LocalSettings.HandleDuplicateFilenames)
 	assert.NoError(t, cfg.Validate())
 }
 
@@ -91,6 +91,13 @@ func TestRepositoryConfig_ValidateFailures(t *testing.T) {
 		err := cfg.Validate()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid handle_duplicate_filenames")
+	})
+
+	t.Run("overwrite is rejected", func(t *testing.T) {
+		cfg := NewRepositoryConfig("Unsafe", WithLocalSettings("overwrite"))
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be one of: rename, uuid")
 	})
 }
 

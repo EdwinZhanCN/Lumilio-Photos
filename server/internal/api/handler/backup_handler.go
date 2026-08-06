@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"server/internal/api"
@@ -99,31 +101,90 @@ func (h *SettingsHandler) DeleteBackup(c *gin.Context) {
 	api.JSONOK(c, api.SuccessResponse{Message: "backup deleted"})
 }
 
-// RestoreBackup synchronously restores a snapshot with restore-point + rollback.
+// RestoreBackup accepts a restore operation and flushes its durable receipt
+// before the current runtime generation begins draining.
 // @Summary Restore a database backup
-// @Description Restore the named SQLite snapshot. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
+// @Description Validate and stage the named SQLite snapshot. The accepted operation continues across a runtime restart; poll the returned operation ID for completion or rollback.
 // @Tags settings
 // @Produce json
 // @Security BearerAuth
 // @Param name path string true "Backup file name"
-// @Success 200 {object} api.SuccessResponse "Backup restored"
+// @Success 202 {object} dto.RestoreOperationDTO "Restore accepted"
 // @Failure 400 {object} api.ErrorResponse "Invalid backup name"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
 // @Failure 409 {object} api.ErrorResponse "Another restore is already in progress"
-// @Failure 500 {object} api.ErrorResponse "Restore failed (database rolled back)"
+// @Failure 500 {object} api.ErrorResponse "Restore could not be staged"
 // @Router /api/v1/settings/backups/{name}/restore [post]
 func (h *SettingsHandler) RestoreBackup(c *gin.Context) {
 	name := c.Param("name")
-	if err := h.backupService.Restore(c.Request.Context(), name); err != nil {
+	operation, err := h.backupService.Restore(c.Request.Context(), name)
+	if err != nil {
 		switch {
 		case strings.Contains(err.Error(), "invalid backup name"):
 			api.GinBadRequest(c, err, "Invalid backup name")
 		case strings.Contains(err.Error(), "already in progress"):
 			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Another restore is already in progress")
 		default:
-			api.GinInternalError(c, err, "Restore failed")
+			api.GinInternalError(c, err, "Restore could not be staged")
 		}
 		return
 	}
-	api.JSONOK(c, api.SuccessResponse{Message: "backup restored"})
+
+	c.JSON(http.StatusAccepted, dto.ToRestoreOperationDTO(operation))
+	c.Writer.Flush()
+	if err := h.backupService.RestartRestore(operation.ID); err != nil {
+		// The operation receipt is already on the wire. Preserve the real error in
+		// server logs; the durable operation endpoint remains the user-facing source.
+		log.Printf("failed to restart into restore operation %s: %v", operation.ID, err)
+	}
+}
+
+// GetRestoreOperation returns the durable status of one accepted restore.
+// @Summary Get database restore operation
+// @Description Return the latest durable phase for an accepted restore operation, including completion or successful rollback after a runtime restart.
+// @Tags settings
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Restore operation ID"
+// @Success 200 {object} dto.RestoreOperationDTO "Restore operation"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "Restore operation not found"
+// @Failure 500 {object} api.ErrorResponse "Restore operation could not be read"
+// @Router /api/v1/settings/backup-restores/{id} [get]
+func (h *SettingsHandler) GetRestoreOperation(c *gin.Context) {
+	operation, err := h.backupService.GetRestoreOperation(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			api.GinNotFound(c, err, "Restore operation not found")
+			return
+		}
+		api.GinInternalError(c, err, "Failed to read restore operation")
+		return
+	}
+	api.JSONOK(c, dto.ToRestoreOperationDTO(operation))
+}
+
+// GetLatestRestoreOperation lets a reloaded browser resume observing the most
+// recently accepted restore without relying on in-memory UI state.
+// @Summary Get latest database restore operation
+// @Description Return the latest durable restore receipt, if one exists.
+// @Tags settings
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.RestoreOperationDTO "Latest restore operation"
+// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 404 {object} api.ErrorResponse "No restore operation exists"
+// @Failure 500 {object} api.ErrorResponse "Restore operation could not be read"
+// @Router /api/v1/settings/backup-restores/latest [get]
+func (h *SettingsHandler) GetLatestRestoreOperation(c *gin.Context) {
+	operation, err := h.backupService.LatestRestoreOperation(c.Request.Context())
+	if err != nil {
+		if os.IsNotExist(err) {
+			api.GinNotFound(c, err, "Restore operation not found")
+			return
+		}
+		api.GinInternalError(c, err, "Failed to read restore operation")
+		return
+	}
+	api.JSONOK(c, dto.ToRestoreOperationDTO(operation))
 }

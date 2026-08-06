@@ -68,7 +68,7 @@ TOML。默认数据目录为 `./lumilio/media` 和 `./lumilio/app-state`，也�
 开发环境准备、生成代码流程、测试方式和提交约定统一放在
 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 可选的 Lumen AI
+## 可选的 Lumen Intelligence
 
 图像语义分析、人物识别、OCR文字识别和BioCLIP物种识别由独立的
 [Lumen Hub](https://github.com/EdwinZhanCN/Lumen-Hub) 推理节点提供。这些功能

@@ -76,7 +76,7 @@ export function useLoginFlow() {
     switch (browserCapabilities.data?.passkey_unavailable_reason) {
       case "disabled":
         return t("auth.passkeyEnvironment.disabled", {
-          defaultValue: "Passkeys are disabled for this Lumilio deployment.",
+          defaultValue: "Passkeys are disabled for this Lumilio Photos deployment.",
         });
       case "secure_origin_required":
         return t("auth.passkeyEnvironment.secureOriginRequired", {

@@ -16,7 +16,7 @@ export function RootErrorFallback({ error, resetErrorBoundary }: FallbackProps):
             {t("rootError.label", "Application error")}
           </p>
           <h1 id="root-error-title" className="text-3xl font-bold sm:text-4xl">
-            {t("rootError.title", "Lumilio could not continue")}
+            {t("rootError.title", "Lumilio Photos could not continue")}
           </h1>
           <p className="mt-4 text-base-content/70">
             {t(

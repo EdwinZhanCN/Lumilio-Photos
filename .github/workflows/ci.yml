@@ -26,10 +26,11 @@ jobs:
         outputs:
             server: ${{ steps.filter.outputs.server }}
             web: ${{ steps.filter.outputs.web }}
-            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
-            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
             browser_smoke: ${{ steps.filter.outputs.browser_smoke }}
             auth_e2e: ${{ steps.filter.outputs.auth_e2e }}
+            agent_e2e: ${{ steps.filter.outputs.agent_e2e }}
             video_e2e: ${{ steps.filter.outputs.video_e2e }}
             recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
@@ -115,6 +116,34 @@ jobs:
                           - 'web/src/features/auth/**'
                           - 'web/src/lib/http-commons/auth.ts'
                           - 'web/src/lib/http-commons/client.ts'
+                      agent_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'taskfile.yml'
+                          - 'web/taskfile.yml'
+                          - 'web/package.json'
+                          - 'web/pnpm-lock.yaml'
+                          - 'web/playwright.config.ts'
+                          - 'web/e2e/compose*.yml'
+                          - 'web/e2e/fixtures/**'
+                          - 'web/e2e/pages/**'
+                          - 'web/e2e/support/**'
+                          - 'web/e2e/specs/agent-trust.spec.ts'
+                          - 'web/src/app/**'
+                          - 'web/src/components/assistant/**'
+                          - 'web/src/features/auth/modules/access/**'
+                          - 'web/src/features/lumilio/**'
+                          - 'web/src/lib/capabilities/**'
+                          - 'web/src/lib/http-commons/**'
+                          - 'web/src/locales/**'
+                          - 'server/internal/agent/**'
+                          - 'server/internal/api/router.go'
+                          - 'server/internal/api/handler/agent_handler*.go'
+                          - 'server/internal/api/handler/capabilities_handler*.go'
+                          - 'server/internal/api/dto/capabilities_dto.go'
+                          - 'server/internal/settings/**'
+                          - 'server/internal/service/settings_service*.go'
+                          - 'server/migrations/**'
+
                       video_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
@@ -138,6 +167,8 @@ jobs:
                           - 'web/taskfile.yml'
                           - 'web/e2e/compose*.yml'
                           - 'server/Dockerfile'
+                          - 'server/app/**'
+                          - 'server/internal/api/router.go'
                           - 'server/internal/db/backup/**'
                           - 'server/internal/queue/db_backup_worker.go'
                           - 'server/internal/service/backup_service.go'
@@ -146,6 +177,8 @@ jobs:
                           - 'web/e2e/specs/backup-recovery.spec.ts'
                           - 'web/src/features/settings/api/useBackups.ts'
                           - 'web/src/features/settings/flows/server/BackupSection.tsx'
+                          - 'web/src/lib/http-commons/**'
+                          - 'web/src/locales/**'
                       desktop:
                           - 'desktop/**'
                           - 'server/**'
@@ -284,6 +317,10 @@ jobs:
             - name: Run authentication hardening regression
               if: needs.changes.outputs.auth_e2e == 'true'
               run: task ci:web:e2e:auth-hardening
+
+            - name: Run Lumilio Agent trust-contract regression
+              if: needs.changes.outputs.agent_e2e == 'true'
+              run: task ci:web:e2e:agent-trust
 
             - name: Run video semantic regression
               if: needs.changes.outputs.video_e2e == 'true'

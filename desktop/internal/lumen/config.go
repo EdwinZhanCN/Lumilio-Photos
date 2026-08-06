@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"desktop/internal/platform"
 )
@@ -40,6 +41,27 @@ func NewSetupIntent(configPath, cacheDir, region, preset string) (SetupIntent, e
 
 func SetupPresetNames() []string {
 	return slices.Clone(OfficialSetupPresets)
+}
+
+// ValidateInstalledSetup asks the currently installed Hub binary to render a
+// disposable candidate. It proves a reconfiguration before Desktop stops the
+// running generation or persists new intent.
+func ValidateInstalledSetup(ctx context.Context, root, configPath, cacheDir, region, preset string) error {
+	current, err := LoadCurrent(root)
+	if err != nil {
+		return err
+	}
+	hubBinary, err := safeJoin(root, current.Binary)
+	if err != nil {
+		return err
+	}
+	candidatePath := fmt.Sprintf("%s.candidate-%d-%d", configPath, os.Getpid(), time.Now().UnixNano())
+	intent, err := NewSetupIntent(candidatePath, cacheDir, region, preset)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(candidatePath)
+	return ReconcileSetupConfig(ctx, hubBinary, intent)
 }
 
 // ReconcileSetupConfig regenerates the derived config before every start. A

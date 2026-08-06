@@ -18,8 +18,8 @@ import (
 // tool lifecycle state and ref handles only — asset data never rides the
 // side channel; the frontend hydrates refs over the hydration API (INV-1).
 type SideChannelEvent struct {
-	// Type is "tool_execution" for lifecycle updates or "widget_show" for
-	// explicit show-terminal render requests.
+	// Type identifies a lifecycle update, explicit widget request, token usage,
+	// or authoritative effect receipt.
 	Type string `json:"type"`
 
 	// Event timestamp (Unix milliseconds)
@@ -36,12 +36,18 @@ type SideChannelEvent struct {
 
 	// Usage carries token accounting for token_usage events.
 	Usage *TokenUsageInfo `json:"usage,omitempty"`
+
+	// Receipt is emitted only after the effect runtime has durably committed or
+	// rejected a confirmation-gated mutation. It is the UI authority for the
+	// confirmation result; transport acceptance alone is not success.
+	Receipt *EffectReceipt `json:"receipt,omitempty"`
 }
 
 const (
 	EventTypeToolExecution = "tool_execution"
 	EventTypeWidgetShow    = "widget_show"
 	EventTypeTokenUsage    = "token_usage"
+	EventTypeEffectReceipt = "effect_receipt"
 )
 
 // TokenUsageInfo reports the last model call's token accounting; prompt

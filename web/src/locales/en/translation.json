@@ -341,11 +341,11 @@
       }
     },
     "pin": {
-      "backToLumilio": "Back to Lumilio",
+      "backToLumilio": "Back to Lumilio Agent",
       "count_one": "{{count}} photo",
       "count_other": "{{count}} photos",
       "defaultTitle": "Agent result",
-      "expired": "This result has expired. Ask Lumilio to re-run the query.",
+      "expired": "This result has expired. Ask Lumilio Agent to re-run the query.",
       "modeFrozen": "Frozen",
       "modeLive": "Live"
     },
@@ -432,7 +432,7 @@
       },
       "repository": {
         "submit": "Create & open dashboard",
-        "subtitle": "Choose where Lumilio stores media. This becomes the default for future repositories.",
+        "subtitle": "Choose where Lumilio Photos stores media. This becomes the default for future repositories.",
         "title": "Set up primary storage"
       },
       "sidebarNote": "This wizard appears only once — until the first administrator is created.",
@@ -512,9 +512,9 @@
       "recoveryHint": "Use one of the codes you saved when setting up your account.",
       "recoveryTitle": "Enter a recovery code",
       "register": "Create an account",
-      "registerPrompt": "New to Lumilio?",
+      "registerPrompt": "New to Lumilio Photos?",
       "signIn": "Sign in",
-      "title": "Sign in to Lumilio",
+      "title": "Sign in to Lumilio Photos",
       "useAuthenticatorCode": "Use an authenticator code instead",
       "usePasswordInstead": "Use password instead",
       "useRecoveryCode": "Use recovery code",
@@ -546,7 +546,7 @@
       }
     },
     "passkeyEnvironment": {
-      "disabled": "Passkeys are disabled for this Lumilio deployment.",
+      "disabled": "Passkeys are disabled for this Lumilio Photos deployment.",
       "domainRequired": "Passkeys over HTTPS require a domain name instead of an IP address.",
       "invalidOrigin": "This browser origin cannot use passkeys.",
       "secureOriginRequired": "Passkeys require HTTPS or a localhost address."
@@ -564,7 +564,7 @@
       "weak": "Weak"
     },
     "primaryRepository": {
-      "description": "Choose where Lumilio should store the first local repository. Existing settings use this as the default for future repositories too.",
+      "description": "Choose where Lumilio Photos should store the first local repository. Existing settings use this as the default for future repositories too.",
       "duplicates": "Duplicates",
       "error": "Failed to create the primary repository.",
       "loading": "Checking repository setup...",
@@ -581,7 +581,7 @@
       "confirmPassword": "Confirm password",
       "confirmPasswordHint": "Passwords must match exactly.",
       "confirmPasswordPlaceholder": "Re-enter password",
-      "finish": "Continue to Lumilio",
+      "finish": "Continue to Lumilio Photos",
       "haveAccount": "Already have an account?",
       "login": "Sign in",
       "mfaOptionalNotice": "You can add two-factor authentication next — it’s optional, and you can do it later in settings.",
@@ -656,7 +656,7 @@
           "com": "Global iCloud"
         }
       },
-      "securityNote": "Lumilio uses the password only during authentication and stores the resulting session in an isolated credential directory.",
+      "securityNote": "Lumilio Photos uses the password only during authentication and stores the resulting session in an isolated credential directory.",
       "title": "iCloud"
     }
   },
@@ -852,7 +852,8 @@
     "selected_other": "{{count}} selected",
     "share": "Share",
     "uploaded": "Uploaded",
-    "viewAll": "View All"
+    "viewAll": "View All",
+    "undo": "Undo"
   },
   "delete": {
     "confirm": "Move to Trash",
@@ -1028,17 +1029,23 @@
   "lumilio": {
     "agent": {
       "disabled": "Lumilio Agent is disabled. Enable it in Settings > AI.",
-      "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI."
+      "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI.",
+      "checking": "Checking Lumilio Agent availability…",
+      "unreachable": "Lumilio Agent is temporarily unreachable. Check the Server connection and try again."
     },
     "board": {
-      "empty": "Nothing pinned yet. Ask Lumilio in the dock, then pin a result to keep it on this board.",
+      "empty": "Nothing pinned yet. Ask Lumilio Agent in the dock, then pin a result to keep it on this board.",
       "emptyHint": "Try “Show my beach photos from last summer”",
       "emptyTitle": "Your board is empty",
       "interactionHint": "Drag to move · use the View buttons to switch the look · the ⋯ menu sets size",
       "tidy": "Tidy",
       "tidyHint": "Compact the board upward",
       "unknownWidget": "Unknown widget type: {{type}}",
-      "untitled": "Untitled"
+      "untitled": "Untitled",
+      "deletePending": "Widget removed.",
+      "loadFailed": "The Lumilio Agent board could not be loaded.",
+      "mobileHint": "Widgets use a single-column reading order on smaller screens. Layout changes are saved on larger screens.",
+      "desktopSizeOnly": "Widget size can be adjusted on larger screens."
     },
     "chat": {
       "confirmation": {
@@ -1049,11 +1056,19 @@
         "createAlbum_one": "Create album \"{{title}}\" with {{count}} photo?",
         "createAlbum_other": "Create album \"{{title}}\" with {{count}} photos?",
         "rejected": "Cancelled",
-        "title": "Confirmation required"
+        "title": "Confirmation required",
+        "applying": "Applying…",
+        "committed": "Applied",
+        "failed": "The action was not applied.",
+        "rejecting": "Cancelling…",
+        "retry": "Try again",
+        "addToAlbum": "Add {{count}} items to “{{album}}”?",
+        "createAlbum": "Create album “{{album}}”?"
       },
-      "empty": "Start a conversation with Lumilio!",
+      "empty": "Start a conversation with Lumilio Agent!",
       "newConversation": "New conversation",
-      "openAiSettings": "Open AI settings"
+      "openAiSettings": "Open AI settings",
+      "sessionDisclosure": "This conversation is temporary. Pins, board widgets, and completed actions are kept."
     },
     "context": {
       "remove": "Remove",
@@ -1073,7 +1088,13 @@
       "replyCount_other": "{{count}} replies",
       "title": "Lumilio Agent",
       "tokens": "tokens",
-      "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens"
+      "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens",
+      "checking": "Checking",
+      "degraded": "Needs attention",
+      "disabled": "Disabled",
+      "notConfigured": "Not configured",
+      "unreachable": "Unavailable",
+      "replyCount": "{{count}} replies"
     },
     "input": {
       "modePrompt": "Continue in {{mode}} mode…",
@@ -1091,7 +1112,10 @@
       "person": "Person",
       "pin": "Pin",
       "quickActions": "Quick Actions",
-      "select": "Select"
+      "select": "Select",
+      "remove": "Remove {{label}}",
+      "selected": "Selected: {{label}}",
+      "partialFailure": "Some mentions could not be resolved. Review the request scope before sending."
     },
     "messages": {
       "stopped": "Stopped",
@@ -1131,7 +1155,7 @@
       "resultSet": "Result set"
     },
     "viewer": {
-      "ask": "Ask Lumilio about this photo"
+      "ask": "Ask Lumilio Agent about this photo"
     },
     "widgets": {
       "frozen": "Frozen",
@@ -1149,7 +1173,7 @@
       "photos": "photos",
       "pin": "Pin to board",
       "pinned": "Pinned to board",
-      "resultsTitle": "Photos from Lumilio",
+      "resultsTitle": "Photos from Lumilio Agent",
       "stat": {
         "images": "images",
         "liked": "liked",
@@ -1177,6 +1201,13 @@
         "spark": "Timeline",
         "switcher": "Switch view"
       }
+    },
+    "turnScope": {
+      "label": "Request scope",
+      "mentionDropped": "{{label}} was not sent because it is no longer available."
+    },
+    "result": {
+      "expired": "This result has expired. Ask Lumilio Agent to run the query again."
     }
   },
   "manage": {
@@ -1214,7 +1245,6 @@
       "detectStacksFailed": "Failed to detect stacks.",
       "duplicateHandlingHint": "Applied when two imported files resolve to the same name.",
       "duplicateHandlingLabel": "Filename conflicts",
-      "duplicateHandlingOverwrite": "Overwrite existing",
       "duplicateHandlingRename": "Keep both (rename)",
       "duplicateHandlingUuid": "Keep both (unique ID)",
       "duplicateScan": "Scan for duplicates",
@@ -1593,7 +1623,7 @@
     "home": "Return home",
     "label": "Application error",
     "reload": "Reload application",
-    "title": "Lumilio could not continue"
+    "title": "Lumilio Photos could not continue"
   },
   "routes": {
     "collections": "Collections",
@@ -1719,7 +1749,7 @@
     "ai": "AI",
     "aiSettings": {
       "agentDescription": "Configure the server-side LLM provider and credentials used by the agent.",
-      "agentEnabledLabel": "Enable AI agent",
+      "agentEnabledLabel": "Enable Lumilio Agent",
       "agentTitle": "Lumilio Agent",
       "apiKey": "API key",
       "apiKeyConfigured": "Stored API key",
@@ -1728,7 +1758,7 @@
       "baseUrlDescription": "Optional override for provider-compatible endpoints.",
       "clearStoredKey": "Clear stored API key",
       "loadError": "Failed to load AI settings.",
-      "mlTitle": "Photo Intelligence",
+      "mlTitle": "Lumen Intelligence",
       "modelName": "Model name",
       "provider": "Provider",
       "providerOptions": {
@@ -1756,7 +1786,9 @@
       },
       "validate": "Validate connection",
       "validationError": "Failed to validate LLM configuration.",
-      "validationSuccess": "LLM configuration validated successfully."
+      "validationSuccess": "LLM configuration validated successfully.",
+      "hideApiKey": "Hide API key",
+      "showApiKey": "Show API key"
     },
     "appearance": "Appearance",
     "appearanceSettings": {
@@ -1896,7 +1928,19 @@
         "restoreFailed": "Restore failed — the database was rolled back to its previous state.",
         "restorePoint": "restore point",
         "restoring": "Restoring… the app reloads when it finishes.",
-        "title": "Database backups"
+        "title": "Database backups",
+        "listFailed": "Backups could not be loaded. Existing backups may still be available; retry before creating or restoring one.",
+        "restoreDisconnect": "The server is restarting to apply the restore. This page will reconnect automatically.",
+        "restorePhases": {
+          "staged": "The backup has been validated and staged.",
+          "restart_requested": "Lumilio Photos is restarting to install the selected backup.",
+          "installing": "The selected database is being installed.",
+          "verifying": "The restored database is being verified before startup continues.",
+          "completed": "Restore completed. Reloading the workspace…",
+          "rolling_back": "Verification failed. The previous database is being restored.",
+          "rolled_back": "Restore failed safely. The previous database remains active.",
+          "failed": "Restore could not be completed. The active database was not replaced."
+        }
       },
       "booleanValues": {
         "false": "No",

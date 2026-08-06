@@ -24,7 +24,7 @@
   },
   "dock": {
     "label": "Desktop sections",
-    "lumen": "Lumen AI",
+    "lumen": "Lumen Intelligence",
     "server": "Server",
     "storage": "Storage",
     "updates": "Updates"
@@ -53,24 +53,24 @@
     "description": "Desktop language, appearance, and launch behavior.",
     "display": "Display",
     "language": "Language",
-    "languageDescription": "Choose the language for Lumilio Desktop.",
-    "openOnLaunch": "Open Lumilio after launch",
+    "languageDescription": "Choose the language for Lumilio Photos Desktop.",
+    "openOnLaunch": "Open Lumilio Photos after launch",
     "openOnLaunchDescription": "Open the photo library when the local Server is ready.",
     "region": "Region",
     "regionDescription": "Used for regional defaults and services.",
     "theme": "Theme",
     "themeDark": "Dark",
-    "themeDescription": "Choose the appearance of Lumilio Desktop.",
+    "themeDescription": "Choose the appearance of Lumilio Photos Desktop.",
     "themeLight": "Light",
     "themeSystem": "System",
     "title": "General"
   },
   "header": {
-    "openProduct": "Open Lumilio"
+    "openProduct": "Open Lumilio Photos"
   },
   "loading": {
     "loadingState": "Loading Desktop state",
-    "opening": "Opening Lumilio Desktop…"
+    "opening": "Opening Lumilio Photos Desktop…"
   },
   "lumen": {
     "actionFailed": "Lumen action failed",
@@ -89,7 +89,7 @@
     "controlStatus": "Control status",
     "controlWaiting": "Waiting for Control",
     "controlWaitingDescription": "Start Lumen Hub to connect to its local control plane.",
-    "description": "Manage the optional local Lumen Hub service.",
+    "description": "Manage the optional local Lumen Intelligence runtime powered by Lumen Hub.",
     "desiredState": "Desired state",
     "disconnected": "Disconnected",
     "downloading": "Downloading",
@@ -135,7 +135,18 @@
     "servicesPending": "Service states will appear after model construction.",
     "servicesReported_one": "{{count}} reported",
     "servicesReported_other": "{{count}} reported",
-    "version": "Version"
+    "version": "Version",
+    "applyConfiguration": "Apply configuration",
+    "configurationApplied": "Configuration applied",
+    "configurationDescription": "Change the preset or model cache. Desktop validates the candidate with the installed Lumen Hub and restarts it only after the new configuration is committed.",
+    "configurationFailed": "The configuration was not applied. The previous working configuration was restored.",
+    "reconfiguring": "Applying configuration",
+    "applyingConfiguration": "Applying configuration…",
+    "model": "Model",
+    "reconfigure": "Apply configuration",
+    "reconfigureRunning": "Lumen Intelligence will restart with the new configuration. The previous configuration is restored if startup fails.",
+    "reconfigureStopped": "Validate and save this configuration for the next start.",
+    "servicesReported": "Reported capabilities"
   },
   "network": {
     "access": "Network access",
@@ -144,25 +155,25 @@
     "local": "This device only"
   },
   "onboarding": {
-    "ariaLabel": "Lumilio Desktop setup",
+    "ariaLabel": "Lumilio Photos Desktop setup",
     "configured": "Configured",
     "desktop": "Desktop",
     "finishSetup": "Finish setup",
     "generalDescription": "Choose the language and region used by this Desktop.",
     "generalTitle": "General",
     "language": "Language",
-    "languageDescription": "Choose the language for Lumilio Desktop.",
-    "lumenAI": "Lumen AI",
+    "languageDescription": "Choose the language for Lumilio Photos Desktop.",
+    "lumenAI": "Lumen Intelligence",
     "lumenAvailable": "Available after setup.",
     "lumenNotIncluded": "Not included in this build. You can add it later.",
     "networkAccess": "Network access",
-    "networkDescription": "Control which devices can reach the Lumilio Server.",
+    "networkDescription": "Control which devices can reach the Lumilio Photos Server.",
     "networkRecommended": "This device only is the recommended default.",
     "networkTitle": "Network access",
     "optional": "Optional",
     "preparing": "Preparing setup",
     "preparingDescription": "Preparing a safe local configuration…",
-    "readyDescription": "Review the important choices below. Lumen AI remains optional.",
+    "readyDescription": "Review the important choices below. Lumen Intelligence remains optional.",
     "readyTitle": "Ready to start",
     "region": "Region",
     "regionDescription": "Used for regional defaults and services.",
@@ -171,7 +182,7 @@
     "setupFailed": "Setup could not be completed",
     "step": "Step {{current}} of {{total}}",
     "storage": "Storage",
-    "storageDescription": "Choose where Lumilio keeps its local photo data.",
+    "storageDescription": "Choose where Lumilio Photos keeps its local photo data.",
     "storageLocation": "Default storage location",
     "storageTitle": "Default storage location",
     "summary": "Setup summary",
@@ -185,7 +196,7 @@
     "restored": "Restored",
     "restoring": "Restoring",
     "reviewSettings": "Review Server settings",
-    "title": "Lumilio needs attention",
+    "title": "Lumilio Photos needs attention",
     "tryAgain": "Try again"
   },
   "region": {
@@ -200,7 +211,7 @@
     "debug": "Debug",
     "errors": "Errors",
     "hardwareAcceleration": "Hardware acceleration",
-    "hardwareAccelerationDescription": "Choose how Lumilio accelerates media processing on this computer.",
+    "hardwareAccelerationDescription": "Choose how Lumilio Photos accelerates media processing on this computer.",
     "info": "Info",
     "loggingLevel": "Logging level",
     "loggingLevelDescription": "Info is recommended. Use Debug only while troubleshooting.",
@@ -221,7 +232,7 @@
   },
   "server": {
     "actionFailed": "Server action failed",
-    "description": "Configure and control the local Lumilio Server.",
+    "description": "Configure and control the local Lumilio Photos Server.",
     "failedMessage": "The local Server stopped before it became ready. Review the saved settings or retry cleanup.",
     "loadingSettings": "Loading Server settings",
     "restarted": "Restarted",
@@ -234,7 +245,7 @@
   },
   "setupRequired": {
     "backToSetup": "Back to setup",
-    "description": "The Lumilio Server has no saved configuration yet. Complete the setup wizard to choose a storage location and network access — the server starts as soon as setup is finished.",
+    "description": "The Lumilio Photos Server has no saved configuration yet. Complete the setup wizard to choose a storage location and network access — the server starts as soon as setup is finished.",
     "finishSetup": "Finish setup",
     "minutes": "The wizard takes about a minute and only touches this device.",
     "nextStep": "Next step",
@@ -245,8 +256,8 @@
     "addFailed": "Storage location was not added",
     "additional": "Additional storage locations",
     "addLocation": "Add location",
-    "addLocationDialogTitle": "Add a Lumilio storage location",
-    "chooseDefaultLocation": "Choose the default Lumilio storage location",
+    "addLocationDialogTitle": "Add a Lumilio Photos storage location",
+    "chooseDefaultLocation": "Choose the default Lumilio Photos storage location",
     "choosing": "Choosing",
     "defaultLocation": "Default storage location",
     "description": "Manage the storage locations available to this Desktop.",
@@ -258,10 +269,12 @@
     "title": "Storage"
   },
   "toast": {
-    "openFailed": "Lumilio could not be opened",
+    "openFailed": "Lumilio Photos could not be opened",
     "pageFailed": "Page could not be opened",
     "settingsLoadFailed": "Server settings could not be loaded",
-    "storagePickFailed": "Folder could not be selected"
+    "storagePickFailed": "Folder could not be selected",
+    "settingsSaveFailed": "Settings could not be saved",
+    "settingsOperationTimeout": "The settings operation did not finish in time. Review the Server status before retrying."
   },
   "updates": {
     "actionFailed": "Update action failed",
@@ -276,11 +289,14 @@
     "checkNow": "Check now",
     "checkTitle": "Check for updates",
     "currentVersion": "Current version",
-    "currentVersionDescription": "The version of Lumilio Desktop currently installed.",
-    "description": "Manage Lumilio Desktop releases.",
+    "currentVersionDescription": "The version of Lumilio Photos Desktop currently installed.",
+    "description": "Manage Lumilio Photos Desktop releases.",
     "download": "Download",
     "noProvider": "A signed update provider is not configured in this build.",
     "restartInstall": "Restart and install",
     "stable": "Stable"
+  },
+  "product": {
+    "compactName": "Lumilio Photos"
   }
 }

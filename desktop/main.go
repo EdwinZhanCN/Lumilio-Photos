@@ -186,7 +186,14 @@ func main() {
 		Store: store, Operations: operations,
 		Desired:    runtimeconfig.NewLumenDesiredStateStore(paths.SettingsFile),
 		SetupStore: runtimeconfig.NewLumenSetupStore(paths.SettingsFile),
-		Installer:  lumenInstaller, Factory: lumenFactory,
+		ValidateSetup: func(ctx context.Context, preset, cacheDir string) error {
+			currentSettings, err := runtimeconfig.LoadSettings(paths.SettingsFile)
+			if err != nil {
+				return err
+			}
+			return lumen.ValidateInstalledSetup(ctx, paths.LumenDir, paths.LumenConfig, cacheDir, currentSettings.Region, preset)
+		},
+		Installer: lumenInstaller, Factory: lumenFactory,
 		Installed: lumenInstalled, InstalledVer: lumenVersion, Profile: lumenProfile,
 		Preset: settings.LumenPreset, CacheDir: lumenCacheDir,
 		Profiles: lumen.CurrentReleaseProfiles(), Presets: lumen.SetupPresetNames(),

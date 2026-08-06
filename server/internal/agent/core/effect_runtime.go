@@ -16,6 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const effectReceiptRetention = 30 * 24 * time.Hour
+
 type EffectRuntime struct {
 	pool     *sql.DB
 	queries  *repo.Queries
@@ -41,9 +43,15 @@ func nullableEffectUUID(id uuid.UUID) uuid.NullUUID {
 }
 
 func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID string, runID uuid.UUID, toolName string, membership []uuid.UUID, payload, target any) (uuid.UUID, error) {
-	if r == nil || r.queries == nil {
+	if r == nil || r.pool == nil || r.queries == nil {
 		return uuid.Nil, errors.New("effect runtime unavailable")
 	}
+	// Receipts remain queryable after a run so the client can reconcile a
+	// committed mutation when the SSE transport drops. Opportunistic bounded
+	// cleanup avoids turning this journal into unbounded conversation history.
+	cutoff := time.Now().Add(-effectReceiptRetention).UnixMilli()
+	_, _ = r.pool.ExecContext(ctx, `DELETE FROM agent_pending_effects
+		WHERE user_id = ? AND status IN ('committed', 'rejected', 'cancelled', 'failed') AND updated_at < ?`, userID, cutoff)
 	policy, ok := r.registry.EffectPolicy(toolName)
 	if !ok || !policy.Confirmation {
 		return uuid.Nil, fmt.Errorf("tool %s has no confirmed effect policy", toolName)
@@ -161,7 +169,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 
 	receipt := EffectReceipt{
 		EffectID: effectID.String(), ToolName: effect.ToolName,
-		Status: "completed", Count: len(effect.MembershipSnapshot),
+		Status: "committed", Count: len(effect.MembershipSnapshot),
 	}
 	switch effect.ToolName {
 	case "bulk_like_assets":

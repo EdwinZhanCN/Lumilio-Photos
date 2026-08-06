@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAISettingsDraft, type AISettingsDraft } from "./useAISettingsDraft";
-import { useValidateLLMSettings } from "../../api/useSystemSettings";
 import {
   BirdIcon,
   BotIcon,
   BotMessageSquareIcon,
   EyeIcon,
+  EyeOffIcon,
   FilmIcon,
   KeyRoundIcon,
   LinkIcon,
@@ -60,15 +60,16 @@ export default function AiTab() {
     isDirty,
     isSaving,
     save,
-    saveAsync,
     reset,
     saveError,
     justSaved,
     apiKeyConfigured,
     query: settingsQuery,
+    isValidating,
+    validateDraft,
   } = useAISettingsDraft();
-  const validateMutation = useValidateLLMSettings();
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [showAPIKey, setShowAPIKey] = useState(false);
 
   useEffect(() => {
     if (justSaved) {
@@ -85,7 +86,7 @@ export default function AiTab() {
     }
   }, [saveError, t]);
 
-  const isBusy = isSaving || validateMutation.isPending;
+  const isBusy = isSaving || isValidating;
 
   const mlTasks = [
     {
@@ -121,19 +122,8 @@ export default function AiTab() {
   const handleValidate = async () => {
     if (!draft) return;
     setFeedback(null);
-    if (isDirty) {
-      try {
-        await saveAsync();
-      } catch (error) {
-        setFeedback({
-          tone: "error",
-          message: getErrorMessage(error, t("settings.aiSettings.saveError")),
-        });
-        return;
-      }
-    }
     try {
-      await validateMutation.mutateAsync({});
+      await validateDraft();
       setFeedback({ tone: "success", message: t("settings.aiSettings.validationSuccess") });
     } catch (error) {
       setFeedback({
@@ -202,7 +192,7 @@ export default function AiTab() {
               id="ai-provider"
               value={draft.llm.provider}
               options={[
-                { value: "", label: t("settings.aiSettings.providerOptions.unset") },
+                { value: "none", label: t("settings.aiSettings.providerOptions.unset") },
                 { value: "ark", label: t("settings.aiSettings.providerOptions.ark") },
                 { value: "openai", label: t("settings.aiSettings.providerOptions.openai") },
                 { value: "deepseek", label: t("settings.aiSettings.providerOptions.deepseek") },
@@ -210,7 +200,19 @@ export default function AiTab() {
               ]}
               onChange={(provider) => {
                 setFeedback(null);
-                setDraft({ ...draft, llm: { ...draft.llm, provider } });
+                setDraft({
+                  ...draft,
+                  llm: {
+                    ...draft.llm,
+                    provider,
+                    agentEnabled: provider === "none" ? false : draft.llm.agentEnabled,
+                    // A stored secret belongs to the previous provider. The
+                    // server clears it on provider change unless a replacement
+                    // is supplied in the same save.
+                    apiKey: "",
+                    clearStoredKey: false,
+                  },
+                });
               }}
               ariaLabel={t("settings.aiSettings.provider")}
               className="w-40"
@@ -259,20 +261,35 @@ export default function AiTab() {
             <KeyRoundIcon className="size-3.5 text-base-content/50" />
             {t("settings.aiSettings.apiKey")}
           </label>
-          <input
-            id="ai-apikey"
-            type="text"
-            className="input input-bordered input-sm mt-2 w-full"
-            autoComplete="off"
-            spellCheck={false}
-            value={draft.llm.apiKey}
-            disabled={draft.llm.clearStoredKey}
-            placeholder={t("settings.aiSettings.apiKeyPlaceholder")}
-            onChange={(event) => {
-              setFeedback(null);
-              setDraft({ ...draft, llm: { ...draft.llm, apiKey: event.target.value } });
-            }}
-          />
+          <div className="relative mt-2">
+            <input
+              id="ai-apikey"
+              type={showAPIKey ? "text" : "password"}
+              className="input input-bordered input-sm w-full pr-10"
+              autoComplete="new-password"
+              spellCheck={false}
+              value={draft.llm.apiKey}
+              disabled={draft.llm.clearStoredKey}
+              placeholder={t("settings.aiSettings.apiKeyPlaceholder")}
+              onChange={(event) => {
+                setFeedback(null);
+                setDraft({ ...draft, llm: { ...draft.llm, apiKey: event.target.value } });
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs absolute right-1 top-1/2 -translate-y-1/2"
+              disabled={draft.llm.clearStoredKey}
+              aria-label={
+                showAPIKey
+                  ? t("settings.aiSettings.hideApiKey", "Hide API key")
+                  : t("settings.aiSettings.showApiKey", "Show API key")
+              }
+              onClick={() => setShowAPIKey((value) => !value)}
+            >
+              {showAPIKey ? <EyeOffIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
+            </button>
+          </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/55">
             <span>
               {t("settings.aiSettings.apiKeyConfigured")}:{" "}
@@ -362,7 +379,7 @@ export default function AiTab() {
             disabled={isBusy}
             onClick={() => void handleValidate()}
           >
-            {validateMutation.isPending ? t("common.loading") : t("settings.aiSettings.validate")}
+            {isValidating ? t("common.loading") : t("settings.aiSettings.validate")}
           </button>
         }
       />

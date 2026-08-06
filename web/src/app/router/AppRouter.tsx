@@ -1,6 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
-import { BootstrapGate, PrimaryRepositoryGate, ProtectedRoute } from "@/features/auth";
+import { BootstrapGate, PrimaryRepositoryGate, ProtectedRoute, RoleRoute } from "@/features/auth";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { UploadProvider } from "@/features/upload";
 import AppShellLayout from "@/app/shell/AppShellLayout";
@@ -62,7 +62,11 @@ export default function AppRouter(): ReactNode {
               <Route
                 key={route.path}
                 path={route.path}
-                element={<Suspense fallback={<RouteLoadingFallback />}>{route.element}</Suspense>}
+                element={
+                  <RoleRoute requiredRole={route.requiredRole} fallback={<NotFound />}>
+                    <Suspense fallback={<RouteLoadingFallback />}>{route.element}</Suspense>
+                  </RoleRoute>
+                }
               />
             ))}
           </Route>

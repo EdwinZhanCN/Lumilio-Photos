@@ -13,6 +13,19 @@ vi.mock("../api/agentStream", () => ({
 
 import { useLumilioChatStore } from "./chatStore";
 
+const resetStore = () =>
+  useLumilioChatStore.setState({
+    threadId: null,
+    activeRunId: null,
+    messages: [],
+    isGenerating: false,
+    isStopping: false,
+    awaitingConfirmation: false,
+    pendingConfirmation: null,
+    connectionError: null,
+    usage: null,
+  });
+
 describe("Lumilio chat run lifecycle", () => {
   let streamSignal: AbortSignal | undefined;
   let runSequence = 0;
@@ -22,16 +35,7 @@ describe("Lumilio chat run lifecycle", () => {
     cancelAgentRunMock.mockReset();
     streamSignal = undefined;
     runSequence = 0;
-    useLumilioChatStore.setState({
-      threadId: null,
-      activeRunId: null,
-      messages: [],
-      isGenerating: false,
-      isStopping: false,
-      awaitingConfirmation: false,
-      connectionError: null,
-      usage: null,
-    });
+    resetStore();
 
     streamAgentMock.mockImplementation(
       async (
@@ -42,7 +46,7 @@ describe("Lumilio chat run lifecycle", () => {
       ) => {
         runSequence += 1;
         streamSignal = signal;
-        callbacks.onSessionInfo("thread-1", `run-${runSequence}`);
+        callbacks.onSessionInfo("thread-1", `run-${runSequence}`, []);
         callbacks.onRunStatus(`run-${runSequence}`, "running");
         await new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve()));
       },
@@ -53,12 +57,21 @@ describe("Lumilio chat run lifecycle", () => {
     });
   });
 
-  it("always sends explicit free mode and cancels server-side before aborting SSE", async () => {
-    const sending = useLumilioChatStore.getState().sendMessage("hello");
+  it("sends an immutable request snapshot and cancels server-side before aborting SSE", async () => {
+    const sending = useLumilioChatStore.getState().sendMessage("hello", {
+      mode: "review",
+      context: [{ id: "selection", type: "selection", label: "2 selected", assetIds: ["a", "b"] }],
+      mentions: [{ type: "person", id: "1", label: "Ada" }],
+    });
     await vi.waitFor(() => expect(useLumilioChatStore.getState().activeRunId).toBe("run-1"));
 
     const body = streamAgentMock.mock.calls[0][1];
-    expect(body).toMatchObject({ query: "hello", mode: "free" });
+    expect(body).toMatchObject({ query: "hello", mode: "review" });
+    expect(useLumilioChatStore.getState().messages[0].request).toEqual({
+      mode: "review",
+      context: [{ id: "selection", type: "selection", label: "2 selected", count: 2 }],
+      mentions: [{ type: "person", id: "1", label: "Ada", status: "accepted" }],
+    });
 
     await useLumilioChatStore.getState().stopGeneration();
     await sending;
@@ -86,5 +99,57 @@ describe("Lumilio chat run lifecycle", () => {
     expect(cancelAgentRunMock).toHaveBeenCalledTimes(1);
     expect(useLumilioChatStore.getState().threadId).toBeNull();
     expect(useLumilioChatStore.getState().messages).toEqual([]);
+  });
+
+  it("waits for the effect receipt before showing a confirmation as committed", async () => {
+    streamAgentMock.mockReset();
+    streamAgentMock
+      .mockImplementationOnce(async (_path, _body, callbacks: AgentStreamCallbacks) => {
+        callbacks.onSessionInfo("thread-1", "run-1", []);
+        callbacks.onRunStatus("run-1", "running");
+        callbacks.onInterrupt({
+          InterruptContexts: [
+            {
+              ID: "interrupt-1",
+              IsRootCause: true,
+              Info: { effect_id: "effect-1", action: "tag_assets", count: 2 },
+            },
+          ],
+        });
+        callbacks.onRunStatus("run-1", "awaiting_confirmation");
+        callbacks.onDone();
+      })
+      .mockImplementationOnce(async (_path, _body, callbacks: AgentStreamCallbacks) => {
+        callbacks.onSessionInfo("thread-1", "run-2", []);
+        callbacks.onRunStatus("run-2", "running");
+        expect(
+          useLumilioChatStore.getState().messages[1].blocks.find((block) => block.kind === "confirm"),
+        ).toMatchObject({ state: "submitting_approval" });
+        callbacks.onSideEvent({
+          type: "effect_receipt",
+          timestamp: Date.now(),
+          tool: { name: "tag_assets", executionId: "exec-1" },
+          execution: { status: "success" },
+          receipt: {
+            effect_id: "effect-1",
+            tool_name: "tag_assets",
+            status: "committed",
+            count: 2,
+            message: "Applied tag change to 2 assets",
+          },
+        });
+        callbacks.onRunStatus("run-2", "completed");
+        callbacks.onDone();
+      });
+
+    await useLumilioChatStore.getState().sendMessage("tag these");
+    await useLumilioChatStore.getState().confirmInterrupt("interrupt-1", true);
+
+    const confirm = useLumilioChatStore
+      .getState()
+      .messages.flatMap((message) => message.blocks)
+      .find((block) => block.kind === "confirm");
+    expect(confirm).toMatchObject({ state: "committed", receipt: { effect_id: "effect-1" } });
+    expect(useLumilioChatStore.getState().pendingConfirmation).toBeNull();
   });
 });

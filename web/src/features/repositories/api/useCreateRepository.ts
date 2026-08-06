@@ -8,7 +8,7 @@ type CreateRepositoryInput = {
   cloudCredentialId?: string;
   role?: "primary" | "regular";
   storageStrategy?: "cas" | "date" | "flat";
-  duplicateHandling?: "overwrite" | "rename" | "uuid";
+  duplicateHandling?: "rename" | "uuid";
 };
 
 export function useCreateRepository() {

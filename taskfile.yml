@@ -311,6 +311,11 @@ tasks:
     cmds:
       - task: web:test:auth-hardening
 
+  ci:web:e2e:agent-trust:
+    desc: Run the deterministic Lumilio Agent trust-contract regression
+    cmds:
+      - task: web:test:agent-trust
+
   ci:web:e2e:video-semantic:
     desc: Run the CI video semantic regression
     cmds:

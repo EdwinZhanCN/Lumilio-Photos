@@ -12,7 +12,7 @@ describe("RootErrorFallback", () => {
     );
 
     await expect
-      .element(screen.getByRole("heading", { name: "Lumilio could not continue" }))
+      .element(screen.getByRole("heading", { name: "Lumilio Photos could not continue" }))
       .toBeVisible();
     await expect.element(screen.getByText("render failed")).toBeVisible();
     await expect

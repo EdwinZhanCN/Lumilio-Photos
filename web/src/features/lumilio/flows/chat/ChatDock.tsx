@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BarChart3,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
+import { useAuth } from "@/features/auth";
 import { useI18n } from "@/lib/i18n.tsx";
 import { LumilioAvatar } from "@/components/assistant/LumilioAvatar";
 import { useLumilioChatStore } from "../../state/chatStore";
@@ -21,6 +22,7 @@ import { useContextStore, useDockStore } from "@/lib/assistant";
 import { useSlashMacros } from "../../modules/slash/slashMacros";
 import type { MentionPayload } from "../../modules/mentions/mentionSources";
 import type { AgentMode } from "../../model/chatTypes";
+import { resolveAgentAvailability } from "../../model/availability";
 import { MentionInput } from "./MentionInput";
 import { ContextChips } from "./ContextChips";
 
@@ -34,7 +36,7 @@ function formatTokens(count: number): string {
   return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
 }
 
-/** Per-mode glyph, reused by the empty-state cards and the sticky mode pill so
+/** Per-mode glyph, reused by the empty-state cards and the next-turn mode pill so
  * a mode reads the same wherever it appears. */
 const MODE_ICON: Record<string, LucideIcon> = {
   review: History,
@@ -51,11 +53,14 @@ interface ChatDockProps {
 
 export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const { t } = useI18n();
+  const { user } = useAuth();
   const QUICK_ACTIONS = useSlashMacros();
-  // Sticky agent mode: set once (empty-state chip, "/" menu, or Plus button),
-  // kept across turns until the user clears it. Single source of truth for the
-  // tool-subset constraint sent with every message.
+  // Quick-action mode applies to one immutable turn. It is cleared only after
+  // that turn is handed to the store, so a later question never silently
+  // inherits a previous tool-subset constraint.
   const [activeMode, setActiveMode] = useState<Exclude<AgentMode, "free"> | null>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const collapsedOverride = useDockStore((s) => s.collapsedOverride);
   const setCollapsedOverride = useDockStore((s) => s.setCollapsed);
   const setGenerating = useDockStore((s) => s.setGenerating);
@@ -88,41 +93,130 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   const sendMessage = useLumilioChatStore((s) => s.sendMessage);
   const newConversation = useLumilioChatStore((s) => s.newConversation);
   const stopGeneration = useLumilioChatStore((s) => s.stopGeneration);
-  const { capabilities } = useCapabilities(5000);
+  const capabilitiesQuery = useCapabilities(5000);
+  const { capabilities } = capabilitiesQuery;
+  const availability = resolveAgentAvailability({
+    server: capabilities?.llm.availability,
+    isLoading: capabilitiesQuery.isLoading,
+    isError: capabilitiesQuery.isError,
+    isGenerating,
+    hasRuntimeError: Boolean(connectionError),
+  });
   const replyCount = messages.filter(
     (message) => message.role === "assistant" && message.blocks.length > 0,
   ).length;
 
-  const agentDisabledReason =
-    capabilities && !capabilities.llm.agentEnabled
-      ? t("lumilio.agent.disabled")
-      : capabilities && !capabilities.llm.configured
-        ? t("lumilio.agent.notConfigured")
-        : null;
+  const availabilityCopy = {
+    checking: {
+      label: t("lumilio.dock.checking", "Checking availability"),
+      reason: t("lumilio.agent.checking", "Checking whether Lumilio Agent is available…"),
+      dot: "bg-base-content/30 animate-pulse",
+    },
+    disabled: {
+      label: t("lumilio.dock.disabled", "Disabled"),
+      reason: t("lumilio.agent.disabled"),
+      dot: "bg-base-content/35",
+    },
+    not_configured: {
+      label: t("lumilio.dock.notConfigured", "Not configured"),
+      reason: t("lumilio.agent.notConfigured"),
+      dot: "bg-warning",
+    },
+    ready: {
+      label: t("lumilio.dock.ready", "Ready"),
+      reason: null,
+      dot: "bg-success",
+    },
+    busy: {
+      label: t("lumilio.dock.busy", "Working"),
+      reason: null,
+      dot: "bg-warning animate-pulse",
+    },
+    degraded: {
+      label: t("lumilio.dock.degraded", "Needs attention"),
+      reason: null,
+      dot: "bg-warning",
+    },
+    unreachable: {
+      label: t("lumilio.dock.unreachable", "Unavailable"),
+      reason: t(
+        "lumilio.agent.unreachable",
+        "Lumilio Agent availability could not be verified. Check the server connection and retry.",
+      ),
+      dot: "bg-error",
+    },
+  } as const;
+  const status = availabilityCopy[availability];
+  const agentUnavailableReason = status.reason;
 
   const toggleCollapsed = useCallback(() => {
     setCollapsedOverride(!collapsed);
   }, [collapsed, setCollapsedOverride]);
 
-  // Drawer: Escape closes it, matching the scrim click-away.
+  // The global drawer is a real modal region: opening moves focus inside,
+  // Tab stays within it, Escape closes it, and focus returns to the launcher.
   useEffect(() => {
-    if (!isDrawer || collapsed) return;
+    if (!isDrawer || collapsed) return undefined;
+
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const frame = window.requestAnimationFrame(() => {
+      const panel = drawerRef.current;
+      const target = panel?.querySelector<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      (target ?? panel)?.focus();
+    });
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCollapsedOverride(true);
+      const panel = drawerRef.current;
+      if (!panel) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setCollapsedOverride(true);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = [...panel.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )].filter((item) => item.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKey);
+      const restore = restoreFocusRef.current;
+      restoreFocusRef.current = null;
+      if (restore?.isConnected) restore.focus();
+    };
   }, [isDrawer, collapsed, setCollapsedOverride]);
 
   const handleSubmit = useCallback(
     (value: string, mentions: MentionPayload[]) => {
       setCollapsedOverride(false);
-      // Mode is sticky — read it here, don't clear it on send.
       void sendMessage(value, {
         context: snapshotForSend(),
         mentions,
         mode: activeMode ?? "free",
       });
+      setActiveMode(null);
       clearExclusions();
     },
     [sendMessage, snapshotForSend, clearExclusions, setCollapsedOverride, activeMode],
@@ -141,9 +235,8 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   const statusDot = (
     <span
-      className={`h-3 w-3 shrink-0 rounded-full ${
-        isGenerating ? "bg-warning animate-pulse" : "bg-success"
-      }`}
+      className={`h-3 w-3 shrink-0 rounded-full ${status.dot}`}
+      aria-label={status.label}
     />
   );
 
@@ -156,13 +249,16 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
     >
       <LumilioAvatar start={isGenerating} size={0.13} className="shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-base-content">
+        <div
+          id={isDrawer ? "lumilio-chat-dock-title" : undefined}
+          className="truncate text-sm font-semibold text-base-content"
+        >
           {t("lumilio.dock.title", "Lumilio Agent")}
         </div>
         <div className="flex min-w-0 items-center gap-1.5 text-xs text-base-content/55">
           {statusDot}
           <span className="truncate">
-            {isGenerating ? t("lumilio.dock.busy", "Working") : t("lumilio.dock.ready", "Ready")}
+            {status.label}
             {usage && (
               <span
                 title={t("lumilio.dock.usageHint", {
@@ -209,6 +305,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         aria-controls="lumilio-chat-dock-panel"
         aria-expanded={!collapsed}
         title={isDrawer ? t("lumilio.dock.close", "Close") : toggleLabel}
+        aria-label={isDrawer ? t("lumilio.dock.close", "Close") : toggleLabel}
         onClick={(event) => {
           event.stopPropagation();
           toggleCollapsed();
@@ -221,12 +318,19 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
 
   const bodyContent = (
     <>
-      {agentDisabledReason && (
-        <div className="border-b border-base-300 bg-warning/10 px-3 py-2 text-xs text-base-content/80">
-          <span>{agentDisabledReason}</span>{" "}
-          <Link className="underline hover:opacity-80" to="/settings?tab=ai">
-            {t("lumilio.chat.openAiSettings")}
-          </Link>
+      {agentUnavailableReason && (
+        <div
+          className={`border-b border-base-300 px-3 py-2 text-xs text-base-content/80 ${
+            availability === "unreachable" ? "bg-error/10" : "bg-warning/10"
+          }`}
+          role="status"
+        >
+          <span>{agentUnavailableReason}</span>{" "}
+          {user?.role === "admin" && availability !== "unreachable" && (
+            <Link className="underline hover:opacity-80" to="/settings?tab=ai">
+              {t("lumilio.chat.openAiSettings")}
+            </Link>
+          )}
         </div>
       )}
       {connectionError && (
@@ -238,6 +342,12 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         <div className="flex flex-col items-center gap-4 px-4 py-7">
           <LumilioAvatar size={0.3} />
           <p className="text-center text-sm text-base-content/55">{t("lumilio.chat.empty")}</p>
+          <p className="max-w-md text-center text-xs leading-relaxed text-base-content/45">
+            {t(
+              "lumilio.chat.sessionDisclosure",
+              "Conversation memory is temporary. Pins and completed actions remain in Lumilio Photos.",
+            )}
+          </p>
           <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
             {QUICK_ACTIONS.map((action) => {
               const active = activeMode === action.mode;
@@ -284,7 +394,11 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
     </>
   );
 
-  const body = <div className="max-h-[calc(58vh-3.5rem)] overflow-y-auto">{bodyContent}</div>;
+  const body = (
+    <div data-lumilio-chat-scroll className="max-h-[calc(58vh-3.5rem)] overflow-y-auto">
+      {bodyContent}
+    </div>
+  );
 
   const ModePillIcon = activeMode ? (MODE_ICON[activeMode] ?? Sparkles) : null;
   const modePill =
@@ -311,8 +425,8 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
         isGenerating={isGenerating}
         awaitingConfirmation={awaitingConfirmation}
         isStopping={isStopping}
-        disabled={Boolean(agentDisabledReason)}
-        placeholder={agentDisabledReason ?? undefined}
+        disabled={Boolean(agentUnavailableReason)}
+        placeholder={agentUnavailableReason ?? undefined}
         activeMode={activeMode}
         onSetMode={setActiveMode}
         onSubmit={handleSubmit}
@@ -336,8 +450,13 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           }`}
         />
         <section
+          ref={drawerRef}
           id="lumilio-chat-dock-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lumilio-chat-dock-title"
           aria-hidden={collapsed}
+          tabIndex={-1}
           inert={collapsed ? true : undefined}
           className={`fixed inset-y-0 right-0 z-agent isolate flex w-[min(28rem,100vw)] flex-col border-l border-base-300 bg-base-100/95 shadow-xl backdrop-blur transition-transform duration-300 ease-out ${
             collapsed ? "translate-x-full" : "translate-x-0"
@@ -346,7 +465,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           {header}
           {!collapsed && (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto">{bodyContent}</div>
+              <div data-lumilio-chat-scroll className="min-h-0 flex-1 overflow-y-auto">{bodyContent}</div>
               <div className="border-t border-base-300 p-2">{inputArea}</div>
             </>
           )}
@@ -398,11 +517,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
               count: replyCount,
             })}
           </span>
-          <span
-            className={`ml-1 h-3 w-3 rounded-full ${
-              isGenerating ? "bg-warning animate-pulse" : "bg-success"
-            }`}
-          />
+          <span className={`ml-1 h-3 w-3 rounded-full ${status.dot}`} aria-label={status.label} />
         </button>
       </div>
 

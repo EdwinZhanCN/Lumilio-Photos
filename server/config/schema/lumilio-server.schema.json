@@ -350,7 +350,7 @@
       "properties": {
         "discovery_enabled": {
           "type": "boolean",
-          "description": "Whether to look for external Lumen ML nodes at all. ML stays optional;\nfalse keeps the deployment entirely local."
+          "description": "Whether to look for external Lumen Intelligence nodes at all. ML stays optional;\nfalse keeps the deployment entirely local."
         },
         "discovery_mdns_enabled": {
           "type": "boolean",

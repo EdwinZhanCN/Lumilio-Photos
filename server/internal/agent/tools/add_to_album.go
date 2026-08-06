@@ -30,10 +30,11 @@ type AddToAlbumOutput struct {
 }
 
 type AddToAlbumConfirmationInfo struct {
-	Action  string `json:"action"`
-	AlbumID int    `json:"album_id"`
-	RefID   string `json:"ref_id"`
-	Count   int    `json:"count"`
+	EffectID string `json:"effect_id"`
+	Action   string `json:"action"`
+	AlbumID  int    `json:"album_id"`
+	RefID    string `json:"ref_id"`
+	Count    int    `json:"count"`
 }
 
 type addToAlbumInterruptState struct {
@@ -97,7 +98,7 @@ func RegisterAddToAlbum() {
 				return &AddToAlbumOutput{Error: refErr}, nil
 			}
 			return nil, compose.StatefulInterrupt(ctx,
-				&AddToAlbumConfirmationInfo{Action: info.Name, AlbumID: input.AlbumID, RefID: r.ID, Count: r.Count()},
+				&AddToAlbumConfirmationInfo{EffectID: effectID.String(), Action: info.Name, AlbumID: input.AlbumID, RefID: r.ID, Count: r.Count()},
 				&addToAlbumInterruptState{EffectID: effectID.String(), RefID: r.ID, AlbumID: int32(input.AlbumID), Count: r.Count()},
 			)
 		})
@@ -110,8 +111,13 @@ func resumeAddToAlbum(ctx context.Context, deps *core.ToolDependencies, toolName
 		return &AddToAlbumOutput{Error: ref.Internal("effect identity")}, nil
 	}
 	if !resumeApproved(ctx) {
-		_ = deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID)
 		message := "Album update was not applied: the user declined."
+		if err := deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID); err != nil {
+			refErr := ref.Internal("album update rejection")
+			sendError(deps, toolName, execID, start, refErr)
+			return &AddToAlbumOutput{Error: refErr}, nil
+		}
+		sendEffectReceipt(deps, toolName, execID, rejectedEffectReceipt(state.EffectID, toolName, state.Count, message))
 		sendSuccess(deps, toolName, execID, start, message, nil)
 		return &AddToAlbumOutput{Message: message}, nil
 	}
@@ -123,6 +129,7 @@ func resumeAddToAlbum(ctx context.Context, deps *core.ToolDependencies, toolName
 		return &AddToAlbumOutput{Error: refErr}, nil
 	}
 	message := committedReceiptMessage(receipt)
+	sendEffectReceipt(deps, toolName, execID, receipt)
 	sendSuccess(deps, toolName, execID, start, message, &core.DataPayload{RefID: state.RefID, Count: receipt.Count})
 	return &AddToAlbumOutput{
 		Message: message, AlbumID: receipt.AlbumID, Count: receipt.Count,

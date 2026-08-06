@@ -18,6 +18,7 @@ import {
   Sparkles,
   ChevronRight,
   Square,
+  X,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -90,9 +91,9 @@ type MentionInputProps = {
   isStopping: boolean;
   disabled?: boolean;
   placeholder?: string;
-  /** Sticky agent mode owned by the parent (null = free mode). */
+  /** One-turn agent mode owned by the parent (null = free mode). */
   activeMode: Exclude<AgentMode, "free"> | null;
-  /** Set/clear the sticky mode (e.g. picking a quick action). */
+  /** Set/clear the next-turn mode (e.g. picking a quick action). */
   onSetMode: (mode: Exclude<AgentMode, "free"> | null) => void;
   onSubmit: (query: string, mentions: MentionPayload[]) => void;
   onStop: () => void;
@@ -126,7 +127,8 @@ export function MentionInput({
   // Pins live behind the LLM-agent gate; when the agent is disabled the endpoint
   // returns 404 and would otherwise trip React Query's default retry loop on
   // every mount. Gate the query on the (cached) capabilities flag instead.
-  const { capabilities } = useCapabilities();
+  const capabilitiesQuery = useCapabilities();
+  const { capabilities } = capabilitiesQuery;
   const agentEnabled = capabilities?.llm?.agentEnabled ?? false;
   const pinsQuery = $api.useQuery(
     "get",
@@ -276,8 +278,7 @@ export function MentionInput({
   const submit = useCallback(() => {
     const text = value.replace(/\s+/g, " ").trim();
     if (!text || disabled || isGenerating || awaitingConfirmation) return;
-    const kept = mentions.filter((m) => value.includes(`@${m.label}`));
-    onSubmit(text, kept);
+    onSubmit(text, mentions);
     setValue("");
     setMentions([]);
     setMenu({ kind: "idle" });
@@ -300,7 +301,7 @@ export function MentionInput({
         return;
       }
 
-      // Quick action: set the sticky mode (parent-owned). Strip the "/query"
+      // Quick action: set the next-turn mode (parent-owned). Strip the "/query"
       // trigger token; never insert a template — picking a mode only constrains
       // the agent, the user types their own request.
       if (item.kind === "macro") {
@@ -314,14 +315,16 @@ export function MentionInput({
         return;
       }
 
-      // Second level (entity): replace the trigger token with the chosen label.
+      // Second level (entity): remove the trigger token and keep the entity as
+      // an explicit chip. The payload is authoritative; labels in free text are
+      // never parsed back into identity.
       const start = menu.start;
       const caret = textareaRef.current?.selectionStart ?? value.length;
       const before = value.slice(0, start);
       const after = value.slice(caret);
-      const inserted = `@${item.entity.label} `;
-      setValue(before + inserted + after);
-      pendingCaretRef.current = before.length + inserted.length;
+      const joiner = before && after && !/\s$/.test(before) && !/^\s/.test(after) ? " " : "";
+      setValue(before + joiner + after);
+      pendingCaretRef.current = before.length + joiner.length;
       setMentions((prev) =>
         prev.some((m) => m.id === item.entity.id && m.type === item.entity.type)
           ? prev
@@ -341,6 +344,7 @@ export function MentionInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.nativeEvent.isComposing) return;
       if (menuOpen) {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -377,6 +381,19 @@ export function MentionInput({
     [menuOpen, items, safeIndex, choose, submit, closeMenu],
   );
 
+  const mentionSourcesFailed =
+    peopleQuery.isError ||
+    albumsQuery.isError ||
+    pinsQuery.isError ||
+    filterOptionsQuery.isError ||
+    capabilitiesQuery.isError;
+
+  const removeMention = useCallback((type: MentionType, id: string) => {
+    setMentions((current) =>
+      current.filter((mention) => mention.type !== type || mention.id !== id),
+    );
+  }, []);
+
   const activeModeLabel = SLASH_MACROS.find((m) => m.mode === activeMode)?.label;
   const resolvedPlaceholder =
     placeholder ??
@@ -399,8 +416,50 @@ export function MentionInput({
 
   return (
     <div className="relative">
+      {mentions.length > 0 && (
+        <div
+          className="mb-1.5 flex flex-wrap gap-1 px-1"
+          aria-label={t("lumilio.mention.selected", "Selected mentions")}
+        >
+          {mentions.map((mention) => (
+            <span
+              key={`${mention.type}:${mention.id}`}
+              className={`badge badge-sm gap-1 pr-1 ${TYPE_STYLE[mention.type].chip}`}
+            >
+              {TYPE_STYLE[mention.type].icon}
+              <span className="max-w-40 truncate">{mention.label}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle h-4 min-h-0 w-4"
+                aria-label={t("lumilio.mention.remove", {
+                  defaultValue: "Remove mention {{label}}",
+                  label: mention.label,
+                })}
+                onClick={() => removeMention(mention.type, mention.id)}
+              >
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {mentionSourcesFailed && (
+        <div
+          className="mb-1.5 rounded-lg bg-warning/10 px-2 py-1 text-xs text-warning"
+          role="status"
+        >
+          {t(
+            "lumilio.mention.partialFailure",
+            "Some mention sources are unavailable. Existing selections can still be sent.",
+          )}
+        </div>
+      )}
       {menuOpen && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-2xl shadow-base-content/10">
+        <div
+          className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-2xl shadow-base-content/10"
+          role="listbox"
+          aria-label={menuHeader}
+        >
           <div className="px-3 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-wider text-base-content/45">
             {menuHeader}
           </div>
@@ -410,7 +469,7 @@ export function MentionInput({
             </div>
           )}
           {items.length > 0 && (
-            <ul className="max-h-64 overflow-y-auto px-1.5 pb-1.5">
+            <ul className="max-h-64 overflow-y-auto px-1.5 pb-1.5" role="presentation">
               {items.map((item, index) => {
                 const active = index === safeIndex;
                 const style =
@@ -436,6 +495,8 @@ export function MentionInput({
                   <li key={key}>
                     <button
                       type="button"
+                      role="option"
+                      aria-selected={active}
                       className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors ${
                         active ? "bg-base-200" : "hover:bg-base-200/60"
                       }`}
