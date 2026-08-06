@@ -1,11 +1,11 @@
 ---
-title: Lumen AI 进阶
-description: 理解 Lumen Hub 的发现、连接、就绪状态和 Docker 网络边界，并按数据路径排查问题。
+title: Lumen Intelligence 进阶
+description: 理解节点发现、连接、就绪状态和 Docker 网络边界，并按数据路径排查问题。
 ---
 
-# Lumen AI 进阶
+# Lumen Intelligence 进阶
 
-普通部署先看 [Lumen AI](../features/lumen-ai)。本页只解释网络边界和排障方法，不是另一套安装流程。
+普通部署先看 [Lumen Intelligence](../features/lumen-intelligence)。本页只解释网络边界和排障方法，不是另一套安装流程。
 
 ## 发现和推理是两条链路
 

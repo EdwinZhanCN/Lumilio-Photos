@@ -330,6 +330,7 @@ tasks:
     desc: Install and build the documentation site in CI mode
     cmds:
       - task: site:install:ci
+      - task: site:checks
       - task: site:build
 
   ci:desktop:panel:
