@@ -1,47 +1,14 @@
 package jobs
 
 import (
-	"encoding/json"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
-
-func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
-	tests := map[string]any{
-		"semantic": &ProcessSemanticArgs{},
-		"bioclip":  &ProcessBioClipArgs{},
-		"ocr":      &ProcessOcrArgs{},
-		"face":     &ProcessFaceArgs{},
-	}
-
-	for name, args := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := json.Unmarshal([]byte(`{
-				"assetId": "11111111-1111-1111-1111-111111111111",
-				"imageData": "aW1hZ2U=",
-				"preprocessVersion": "ml-image-v1"
-			}`), args)
-			if err != nil {
-				t.Fatalf("decode args: %v", err)
-			}
-
-			encoded, err := json.Marshal(args)
-			if err != nil {
-				t.Fatalf("marshal args: %v", err)
-			}
-			if !json.Valid(encoded) {
-				t.Fatalf("expected valid json, got %s", encoded)
-			}
-			if containsJSONField(encoded, "imageData") {
-				t.Fatalf("expected marshaled args to omit legacy imageData: %s", encoded)
-			}
-		})
-	}
-}
 
 func TestMLProcessArgsInsertOpts(t *testing.T) {
 	tests := map[string]river.InsertOpts{
@@ -149,10 +116,10 @@ func TestProcessPHashArgsInsertOpts(t *testing.T) {
 
 func TestDiscoverAssetArgsInsertOptsAreUniqueByPath(t *testing.T) {
 	args := DiscoverAssetArgs{
-		RepositoryID: "11111111-1111-1111-1111-111111111111",
-		RelativePath: "album/photo.jpg",
-		Operation:    DiscoverOperationUpsert,
-		FileName:     "photo.jpg",
+		RepositoryID:     uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		StoragePath:      "album/photo.jpg",
+		ScanID:           uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		ObservationToken: "obs-v1:test",
 	}
 
 	if args.Kind() != "discover_asset" {
@@ -165,13 +132,4 @@ func TestDiscoverAssetArgsInsertOptsAreUniqueByPath(t *testing.T) {
 	if opts.UniqueOpts.ByPeriod == 0 {
 		t.Fatalf("expected discover asset jobs to use uniqueness by period")
 	}
-}
-
-func containsJSONField(data []byte, field string) bool {
-	var decoded map[string]any
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		return false
-	}
-	_, ok := decoded[field]
-	return ok
 }

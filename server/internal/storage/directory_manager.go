@@ -138,11 +138,11 @@ type StructureValidation struct {
 
 // StagingFile represents a file in the staging area
 type StagingFile struct {
-	ID        string    `json:"id"`
-	RepoPath  string    `json:"repo_path"`
-	Path      string    `json:"path"`
-	Filename  string    `json:"filename"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	RepositoryID uuid.UUID `json:"repository_id"`
+	PrivatePath  string    `json:"private_path"`
+	Filename     string    `json:"filename"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // TempFile represents a temporary processing file

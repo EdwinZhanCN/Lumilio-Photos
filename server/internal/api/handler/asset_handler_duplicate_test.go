@@ -1,15 +1,36 @@
 package handler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
+	"server/internal/storage"
+	"server/internal/storage/repocfg"
 	"server/internal/utils/hash"
+
+	"github.com/google/uuid"
 )
 
-func TestVerifyDuplicateAssetFileRequiresMatchingBytes(t *testing.T) {
+func duplicateTestRepository(t *testing.T) (*AssetHandler, repo.Repository) {
+	t.Helper()
 	repositoryPath := t.TempDir()
+	repositoryID := uuid.New()
+	config := repocfg.NewRepositoryConfig("Test")
+	config.ID = repositoryID.String()
+	if err := config.SaveConfigToFile(repositoryPath); err != nil {
+		t.Fatal(err)
+	}
+	factory := storage.NewRepositoryFSFactory(nil, nil)
+	return &AssetHandler{files: factory}, repo.Repository{RepoID: repositoryID, Path: repositoryPath, Status: dbtypes.RepoStatusActive}
+}
+
+func TestVerifyDuplicateAssetFileRequiresMatchingBytes(t *testing.T) {
+	handler, repository := duplicateTestRepository(t)
+	repositoryPath := repository.Path
 	targetPath := filepath.Join(repositoryPath, "inbox", "asset.jpg")
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o700); err != nil {
 		t.Fatal(err)
@@ -25,11 +46,11 @@ func TestVerifyDuplicateAssetFileRequiresMatchingBytes(t *testing.T) {
 	storagePath := "inbox/asset.jpg"
 	duplicate := &duplicateAsset{storagePath: &storagePath}
 
-	verified, err := verifyDuplicateAssetFile(repositoryPath, duplicate, contentHash, int64(len(content)))
+	verified, err := handler.verifyDuplicateAssetFile(context.Background(), repository, duplicate, contentHash, int64(len(content)))
 	if err != nil || !verified {
 		t.Fatalf("matching duplicate = %t/%v", verified, err)
 	}
-	verified, err = verifyDuplicateAssetFile(repositoryPath, duplicate, contentHash, int64(len(content)+1))
+	verified, err = handler.verifyDuplicateAssetFile(context.Background(), repository, duplicate, contentHash, int64(len(content)+1))
 	if err != nil || verified {
 		t.Fatalf("size-conflicting duplicate = %t/%v", verified, err)
 	}
@@ -44,14 +65,15 @@ func TestVerifyDuplicateAssetFileRequiresMatchingBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verified, err = verifyDuplicateAssetFile(repositoryPath, duplicate, conflictingHash, int64(len(content)))
+	verified, err = handler.verifyDuplicateAssetFile(context.Background(), repository, duplicate, conflictingHash, int64(len(content)))
 	if err != nil || verified {
 		t.Fatalf("hash-conflicting duplicate = %t/%v", verified, err)
 	}
 }
 
 func TestVerifyDuplicateAssetFileRejectsSymlinkEscape(t *testing.T) {
-	repositoryPath := t.TempDir()
+	handler, repository := duplicateTestRepository(t)
+	repositoryPath := repository.Path
 	outsidePath := filepath.Join(t.TempDir(), "outside.jpg")
 	if err := os.WriteFile(outsidePath, []byte("outside"), 0o600); err != nil {
 		t.Fatal(err)
@@ -65,8 +87,9 @@ func TestVerifyDuplicateAssetFileRejectsSymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 	storagePath := "outside-link.jpg"
-	verified, err := verifyDuplicateAssetFile(
-		repositoryPath,
+	verified, err := handler.verifyDuplicateAssetFile(
+		context.Background(),
+		repository,
 		&duplicateAsset{storagePath: &storagePath},
 		contentHash,
 		int64(len("outside")),

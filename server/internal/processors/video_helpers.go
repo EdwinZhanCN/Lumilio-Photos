@@ -17,6 +17,7 @@ import (
 	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 	"server/internal/utils/sysproc"
@@ -32,13 +33,7 @@ type VideoInfo struct {
 }
 
 // extractVideoMetadata updates the asset with ffprobe/EXIF-derived metadata.
-func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.Asset, videoPath string, videoInfo *VideoInfo) error {
-	file, err := os.Open(videoPath)
-	if err != nil {
-		return fmt.Errorf("open video file: %w", err)
-	}
-	defer file.Close()
-
+func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.Asset, reader io.Reader, videoInfo *VideoInfo) error {
 	config := &exif.Config{
 		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
 		MaxFileSize:  20 * 1024 * 1024 * 1024, // 20GB
@@ -51,7 +46,7 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 	defer extractor.Close()
 
 	req := &exif.StreamingExtractRequest{
-		Reader:    file,
+		Reader:    reader,
 		AssetType: dbtypes.AssetTypeVideo,
 		Filename:  asset.OriginalFilename,
 		Size:      asset.FileSize,
@@ -93,7 +88,7 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 // transcodeVideoSmart applies a best-effort, resource-aware transcoding strategy.
 // Constrains by the longer side: landscape videos are capped at 1080p height,
 // portrait videos are capped at 1080p width.
-func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, videoInfo *VideoInfo, cfg config.TranscodeConfig) error {
+func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, videoPath string, videoInfo *VideoInfo, cfg config.TranscodeConfig) error {
 	maxDimension := 1080
 	longSide := videoInfo.Width
 	if videoInfo.Height > longSide {
@@ -105,7 +100,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath stri
 	// Already within bounds: copy if H.264 MP4, otherwise transcode at original size.
 	if longSide <= maxDimension {
 		if isLandscape && strings.ToLower(videoInfo.Format) == "mp4" && strings.Contains(strings.ToLower(videoInfo.Codec), "h264") {
-			return ap.copyVideoAsWebVersion(ctx, repoPath, asset, videoPath, "web")
+			return copyVideoAsWebVersion(files, sourcePath, asset, "web")
 		}
 		scaleFilter := buildScaleFilter(videoInfo.Width, videoInfo.Height, videoInfo.Width, videoInfo.Height)
 		outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, scaleFilter, videoInfo.Width, videoInfo.Height, cfg)
@@ -113,7 +108,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath stri
 			return fmt.Errorf("transcode to mp4: %w", err)
 		}
 		defer os.Remove(outputPath)
-		return ap.saveTranscodedVideo(ctx, repoPath, asset, outputPath, "web")
+		return ap.saveTranscodedVideo(files, asset, outputPath, "web")
 	}
 
 	// Scale down: constrain the longer side to maxDimension, let ffmpeg compute
@@ -136,7 +131,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath stri
 	}
 	defer os.Remove(outputPath)
 
-	if err := ap.saveTranscodedVideo(ctx, repoPath, asset, outputPath, "web"); err != nil {
+	if err := ap.saveTranscodedVideo(files, asset, outputPath, "web"); err != nil {
 		return fmt.Errorf("save %dp version: %w", maxDimension, err)
 	}
 
@@ -310,29 +305,29 @@ func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, 
 }
 
 // copyVideoAsWebVersion saves the provided video file as the web version.
-func (ap *AssetProcessor) copyVideoAsWebVersion(ctx context.Context, repoPath string, asset *repo.Asset, videoPath, version string) error {
-	videoFile, err := os.Open(videoPath)
+func copyVideoAsWebVersion(files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, version string) error {
+	videoFile, err := files.OpenMedia(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open video file: %w", err)
 	}
 	defer videoFile.Close()
 
-	return ap.assetService.SaveVideoVersion(ctx, repoPath, videoFile, asset, version)
+	return saveVideoVersion(files, videoFile, asset, version)
 }
 
 // saveTranscodedVideo saves a transcoded output as the web version.
-func (ap *AssetProcessor) saveTranscodedVideo(ctx context.Context, repoPath string, asset *repo.Asset, outputPath, version string) error {
+func (ap *AssetProcessor) saveTranscodedVideo(files *storage.RepositoryFS, asset *repo.Asset, outputPath, version string) error {
 	transcodedFile, err := os.Open(outputPath)
 	if err != nil {
 		return fmt.Errorf("open transcoded file: %w", err)
 	}
 	defer transcodedFile.Close()
 
-	return ap.assetService.SaveVideoVersion(ctx, repoPath, transcodedFile, asset, version)
+	return saveVideoVersion(files, transcodedFile, asset, version)
 }
 
 // generateVideoThumbnail creates thumbnails from a representative video frame.
-func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, info *VideoInfo, cfg config.TranscodeConfig) error {
+func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, files *storage.RepositoryFS, asset *repo.Asset, videoPath string, info *VideoInfo, cfg config.TranscodeConfig) error {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_%s.jpg", asset.AssetID))
 	defer os.Remove(outputPath)
 
@@ -409,7 +404,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 		if buf.Len() == 0 {
 			continue
 		}
-		if err := ap.assetService.SaveNewThumbnail(ctx, repoPath, buf, asset, name); err != nil {
+		if err := ap.saveThumbnail(ctx, files, buf, asset, name); err != nil {
 			return fmt.Errorf("save thumbnail %s: %w", name, err)
 		}
 	}

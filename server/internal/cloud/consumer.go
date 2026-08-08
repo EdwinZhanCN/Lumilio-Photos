@@ -41,32 +41,29 @@ func NewCloudSyncConsumer(
 	}
 }
 
-// Run starts the discovery → materialize loop.  It blocks until discovery
-// completes or ctx is cancelled.
+// Run materializes candidates synchronously so the source cannot advance its
+// pagination cursor ahead of the repository and SQLite commit.
 func (c *CloudSyncConsumer) Run(ctx context.Context) error {
-	ch, err := c.source.Discover(ctx)
-	if err != nil {
-		return fmt.Errorf("start cloud discovery: %w", err)
-	}
-
-	for candidate := range ch {
+	return c.source.ForEach(ctx, func(candidate sourcing.IngestSource) error {
 		// Materialize: staging → inbox → asset record → pipeline
-		asset, err := c.materializer.Materialize(ctx, candidate)
+		asset, err := c.materializer.MaterializeStaged(ctx, candidate)
 		if err != nil {
+			remoteKey, _ := candidate.Metadata["remote_key"].(string)
 			c.logger.Error("materialize cloud asset failed",
-				zap.String("remote_key", candidate.Metadata["remote_key"].(string)),
+				zap.String("remote_key", remoteKey),
 				zap.String("filename", candidate.OriginalFilename),
 				zap.Error(err),
 			)
-			// Materialization owns staging recovery. A commit or quarantine
-			// error must leave the original bytes available for retry.
 			c.progress(ImportProgressDelta{Failed: 1})
-			continue
+			return fmt.Errorf("materialize cloud asset: %w", err)
 		}
 
-		provider := candidate.Metadata["provider"].(ProviderKind)
-		remoteKey := candidate.Metadata["remote_key"].(string)
-		etag := candidate.Metadata["remote_etag"].(string)
+		provider, providerOK := candidate.Metadata["provider"].(ProviderKind)
+		remoteKey, keyOK := candidate.Metadata["remote_key"].(string)
+		etag, etagOK := candidate.Metadata["remote_etag"].(string)
+		if !providerOK || !keyOK || !etagOK {
+			return fmt.Errorf("cloud candidate metadata is incomplete")
+		}
 
 		// Record the synced etag so subsequent runs skip this remote file via
 		// IsFileSynced. We do this for both freshly ingested assets and content
@@ -77,11 +74,12 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 			assetUUID = asset.AssetID
 		}
 		if err := c.state.MarkFileSynced(ctx, candidate.RepositoryID, provider, remoteKey, etag, assetUUID); err != nil {
-			c.logger.Warn("failed to mark cloud file as synced",
+			c.logger.Error("failed to mark cloud file as synced",
 				zap.String("remote_key", remoteKey),
 				zap.String("asset_id", assetUUID.String()),
 				zap.Error(err),
 			)
+			return fmt.Errorf("mark cloud file synced: %w", err)
 		}
 
 		if asset != nil {
@@ -97,9 +95,8 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 				zap.String("remote_key", remoteKey),
 			)
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (c *CloudSyncConsumer) progress(delta ImportProgressDelta) {

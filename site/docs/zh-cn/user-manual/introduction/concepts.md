@@ -1,11 +1,15 @@
 ---
-title: 核心概念已整合
+title: "页面已迁移：流明集的心智模型"
+description: "旧文档地址兼容页。"
+page_id: "legacy-introduction-concepts"
+search: false
+outline: false
+baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
+last_verified: "2026-08-06"
 ---
 
-# 核心概念已整合
+# 页面已迁移
 
-这部分内容已按实际任务重新整理：
+这条旧地址保留用于兼容已有书签。权威内容已经合并到[流明集的心智模型](../concepts/mental-model.md)。
 
-- [认识 Lumilio Photos](./)
-- [理解资源库与原始文件](./repositories)
-- [备份与数据完整性](./integrity)
+请不要在此页面继续维护第二份正文。

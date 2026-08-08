@@ -333,7 +333,9 @@ func run(
 	}
 
 	// Initialize new repository-based storage system
-	repoManager, err := storage.NewRepositoryManager(queries, repositoryLogger, repoAuditProvider)
+	repositoryAccess := storage.NewRepositoryAccessCoordinator()
+	repositoryFiles := storage.NewRepositoryFSFactory(repositoryAccess, queries)
+	repoManager, err := storage.NewRepositoryManager(queries, repositoryLogger, repoAuditProvider, repositoryFiles)
 	if err != nil {
 		return fmt.Errorf("initialize repository manager: %w", err)
 	}
@@ -345,7 +347,7 @@ func run(
 		zap.String("operation", "repository_root.init"),
 		zap.String("path", defaultRoot.Path),
 	)
-	stagingManager := storage.NewStagingManager()
+	stagingManager := storage.NewStagingManager(repositoryFiles)
 	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
 
 	// Drives get unplugged, remounted, and replaced while the server is down.
@@ -375,9 +377,9 @@ func run(
 	river.AddWorker[queue.ProcessOCROutboxArgs](workers, &queue.ProcessOCROutboxWorker{
 		Writer: ocrIndexWriter,
 	})
-	faceService := service.NewFaceService(queries, repoManager, sqlDB)
+	faceService := service.NewFaceService(queries, repositoryFiles, sqlDB)
 
-	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, queries, workers, appLogger, lumenLogger, settingsService, faceService)
+	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, queries, workers, appLogger, lumenLogger, settingsService, faceService, repositoryFiles)
 	if err != nil {
 		return fmt.Errorf("initialize ML services: %w", err)
 	}
@@ -403,7 +405,7 @@ func run(
 	}
 	locationService := service.NewLocationService(queries, sqlDB, appConfig.Geocoding)
 	speciesReferenceService := service.NewSpeciesReferenceService()
-	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, sqlDB, indexingLogger, repoAuditProvider)
+	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, sqlDB, indexingLogger, repoAuditProvider, repositoryFiles)
 	stackService := service.NewStackService(queries, sqlDB, appLogger.Named("stack"), repoAuditProvider)
 	duplicateService := service.NewDuplicateService(queries, sqlDB, appLogger.Named("duplicate"), assetService)
 	authService, err := service.NewAuthService(queries, sqlDB, appConfig.Auth, appLogger.Named("auth"), securityLogger)
@@ -450,10 +452,10 @@ func run(
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
 	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
-	sourceMaterializer := sourcing.NewSourceMaterializer(database, stagingManager, queueClient, processorLogger, repoAuditProvider)
+	sourceMaterializer := sourcing.NewSourceMaterializer(database, stagingManager, queueClient, processorLogger, repoAuditProvider, repositoryFiles)
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, appConfig.Transcode, appConfig.Tools, processorLogger, repoAuditProvider)
-	repositoryScanner := scanner.NewScanner(queries, queueClient, appConfig.RepositoryScan, scannerLogger)
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, appConfig.Transcode, appConfig.Tools, processorLogger, repoAuditProvider, repositoryFiles)
+	repositoryScanner := scanner.NewScanner(database, queueClient, repositoryFiles, appConfig.RepositoryScan, scannerLogger)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
@@ -469,6 +471,7 @@ func run(
 	river.AddWorker[queue.ProcessPHashArgs](workers, &queue.ProcessPHashWorker{
 		Queries:          queries,
 		EmbeddingService: embeddingService,
+		Files:            repositoryFiles,
 	})
 	river.AddWorker[queue.ScheduleRepositoryScansArgs](workers, &queue.ScheduleRepositoryScansWorker{
 		EnqueueAll: repositoryScanner.EnqueueAllPeriodicScans,
@@ -591,12 +594,12 @@ func run(
 	))
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
+	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService, repositoryFiles)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
 	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
-	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
+	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager, repositoryFiles)
 	locationController := handler.NewLocationHandler(locationService, queueClient)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService, securityLogger)
@@ -607,7 +610,7 @@ func run(
 	settingsController := handler.NewSettingsHandler(settingsService, backupService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
-	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appConfig.Auth.SecretKeyFile, appConfig.StorageConfig.CloudDir(), appLogger.Named("cloud_sync"))
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, stagingManager, appConfig.Auth.SecretKeyFile, appConfig.StorageConfig.CloudDir(), appLogger.Named("cloud_sync"))
 	// Reconcile import runs left "running"/"queued" by a previous crash/restart
 	// so repositories are not stuck with an import that never finishes.
 	if err := cloudSyncService.RecoverInterruptedRuns(ctx); err != nil {
@@ -622,7 +625,7 @@ func run(
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, cloudSyncService)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandler(eventService, sqlDB, shareLinkService)
-	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries)
+	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries, repositoryFiles)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -904,6 +907,7 @@ func initMLServices(
 	lumenLogger *zap.Logger,
 	settingsService service.SettingsService,
 	faceService service.FaceService,
+	repositoryFiles *storage.RepositoryFSFactory,
 ) (service.LumenService, service.EmbeddingService, service.ClassifierService, error) {
 	appLogger.Info("initializing ML services", zap.String("operation", "ml.init"))
 
@@ -924,7 +928,7 @@ func initMLServices(
 	embeddingService := service.NewEmbeddingService(queries, sqlDB)
 	speciesService := service.NewSpeciesService(queries)
 	ocrService := service.NewOCRService(queries, sqlDB)
-	imageLoader := queue.NewDBMLImageLoader(queries)
+	imageLoader := queue.NewDBMLImageLoader(queries, repositoryFiles)
 
 	river.AddWorker[queue.ProcessSemanticArgs](workers, &queue.ProcessSemanticWorker{
 		LumenService:     lumenService,

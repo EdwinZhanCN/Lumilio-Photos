@@ -11,6 +11,7 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { useRepositoryCloudStatus } from "@/features/cloud";
+import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 import type { RepositoryOption } from "../../types";
 import { useRepositoryAssetCount } from "../../api/useRepositoryAssetCount";
@@ -46,6 +47,13 @@ export default function RepositoryCard({
   const { t } = useI18n();
   const countQuery = useRepositoryAssetCount(repository.id);
   const cloudStatusQuery = useRepositoryCloudStatus(repository.id);
+  const scanQuery = $api.useQuery(
+    "get",
+    "/api/v1/repositories/{id}/scans/latest",
+    { params: { path: { id: repository.id } } },
+    { enabled: Boolean(repository.id), retry: false, staleTime: 30_000 },
+  );
+  const latestScan = scanQuery.data;
   const cloudStatus = cloudStatusQuery.data;
   const latestRun = cloudStatus?.latest_run;
   const name = getRepositoryDisplayName(repository, t);
@@ -241,15 +249,50 @@ export default function RepositoryCard({
           </div>
           <div className="text-xs text-base-content/55">{t("manage.repositories.assetCount")}</div>
         </div>
-        {hasCloudBinding && latestRun && (
-          <div className="text-right text-xs text-base-content/60">
-            <div className="font-medium capitalize text-base-content/80">{latestRun.status}</div>
-            <div>
-              {(latestRun.imported_count ?? 0).toLocaleString()} imported ·{" "}
-              {(latestRun.failed_count ?? 0).toLocaleString()} failed
+        <div className="max-w-[70%] space-y-2 text-right text-xs text-base-content/60">
+          {latestScan?.status === "completed" && (
+            <div title={latestScan.partial_reason}>
+              <div
+                className={`font-medium ${latestScan.authoritative ? "text-success" : "text-warning"}`}
+              >
+                {latestScan.authoritative
+                  ? t("manage.repositories.scanAuthoritative", "Scan complete")
+                  : t("manage.repositories.scanPartial", "Partial scan")}
+              </div>
+              <div>
+                {t(
+                  "manage.repositories.scanCounts",
+                  "{{discovered}} new · {{updated}} updated · {{moved}} moved · {{deferred}} deferred · {{ambiguous}} ambiguous · {{deleted}} deleted",
+                  {
+                    discovered: latestScan.discovered_count ?? 0,
+                    updated: latestScan.updated_count ?? 0,
+                    moved: latestScan.moved_count ?? 0,
+                    deferred: latestScan.deferred_count ?? 0,
+                    ambiguous: latestScan.ambiguous_count ?? 0,
+                    deleted: latestScan.deleted_count ?? 0,
+                  },
+                )}
+              </div>
+              {(latestScan.ambiguous_count ?? 0) > 0 && (
+                <div className="text-warning">
+                  {t(
+                    "manage.repositories.scanAmbiguousHelp",
+                    "No identity guess was made. Remove extra copies or restore a one-to-one layout, then scan again.",
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
+          {hasCloudBinding && latestRun && (
+            <div>
+              <div className="font-medium capitalize text-base-content/80">{latestRun.status}</div>
+              <div>
+                {(latestRun.imported_count ?? 0).toLocaleString()} imported ·{" "}
+                {(latestRun.failed_count ?? 0).toLocaleString()} failed
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </article>
   );

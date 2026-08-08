@@ -28,7 +28,7 @@ RUN printf '%s\n' \
 ############################################
 # Builder
 ############################################
-FROM golang:1.25.0-trixie AS builder
+FROM golang:1.25.12-trixie AS builder
 
 ENV CGO_ENABLED=1 \
     GO111MODULE=on

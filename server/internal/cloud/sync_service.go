@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 	"server/internal/sourcing"
+	"server/internal/storage"
 )
 
 const (
@@ -131,6 +131,7 @@ type activeImport struct {
 type cloudSyncService struct {
 	queries      *repo.Queries
 	materializer *sourcing.SourceMaterializer
+	staging      storage.StagingManager
 	logger       *zap.Logger
 	registry     *ProviderRegistry
 	secretBox    *secretbox.Box
@@ -144,6 +145,7 @@ type cloudSyncService struct {
 func NewCloudSyncService(
 	queries *repo.Queries,
 	materializer *sourcing.SourceMaterializer,
+	staging storage.StagingManager,
 	secretKeyPath string,
 	cloudStateDir string,
 	logger *zap.Logger,
@@ -159,6 +161,7 @@ func NewCloudSyncService(
 	return &cloudSyncService{
 		queries:       queries,
 		materializer:  materializer,
+		staging:       staging,
 		logger:        scopedLogger,
 		registry:      NewDefaultProviderRegistry(cloudStateDir),
 		secretBox:     box,
@@ -677,17 +680,14 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 		finish(ImportRunStatusFailed, fmt.Errorf("get repository: %w", err))
 		return
 	}
-	stagingDir := filepath.Join(repository.Path, ".lumilio", "staging", "incoming")
-
 	stateStore := NewSQLiteSyncStateStore(s.queries, credentialID)
 	source := NewCloudImportSource(CloudImportSourceConfig{
 		Provider:   provider,
 		State:      stateStore,
-		StagingDir: stagingDir,
-		RepoID:     repositoryID,
+		Repository: repository,
+		Staging:    s.staging,
 		OwnerID:    &ownerID,
 		OnProgress: progress,
-		Logger:     s.logger,
 	})
 	consumer := NewCloudSyncConsumer(source, s.materializer, stateStore, progress, s.logger)
 

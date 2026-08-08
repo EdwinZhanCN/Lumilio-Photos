@@ -6,8 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
-
-	"server/internal/db/dbtypes"
 )
 
 // ProcessSemanticArgs is the River job payload for semantic embedding/classification.
@@ -313,20 +311,13 @@ func (IngestAssetArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
 }
 
-const (
-	DiscoverOperationUpsert = "upsert"
-	DiscoverOperationDelete = "delete"
-)
-
-// DiscoverAssetArgs handles repository file-tree discovery ingestion.
+// DiscoverAssetArgs is a generation-bound repository observation. The worker
+// reloads the file-index row and rejects stale tokens before materialization.
 type DiscoverAssetArgs struct {
-	RepositoryID string    `json:"repositoryId" river:"unique"`
-	RelativePath string    `json:"relativePath" river:"unique"`        // repository-relative user workspace path, e.g. albums/2026/02/a.jpg
-	Operation    string    `json:"operation,omitempty" river:"unique"` // upsert (default) or delete
-	FileName     string    `json:"fileName"`
-	ContentType  string    `json:"contentType,omitempty"`
-	FileSize     int64     `json:"fileSize,omitempty"`
-	DetectedAt   time.Time `json:"detectedAt"`
+	RepositoryID     uuid.UUID `json:"repositoryId" river:"unique"`
+	StoragePath      string    `json:"storagePath" river:"unique"`
+	ScanID           uuid.UUID `json:"scanId" river:"unique"`
+	ObservationToken string    `json:"observationToken" river:"unique"`
 }
 
 func (DiscoverAssetArgs) Kind() string { return "discover_asset" }
@@ -344,13 +335,9 @@ func (DiscoverAssetArgs) InsertOpts() river.InsertOpts {
 
 // MetadataArgs triggers EXIF/ffprobe metadata extraction per asset.
 type MetadataArgs struct {
-	AssetID          uuid.UUID         `json:"assetId"`
-	RepoPath         string            `json:"repoPath"`
-	StoragePath      string            `json:"storagePath"`
-	AssetType        dbtypes.AssetType `json:"assetType"`
-	OriginalFilename string            `json:"originalFilename,omitempty"`
-	FileSize         int64             `json:"fileSize,omitempty"`
-	MimeType         string            `json:"mimeType,omitempty"`
+	AssetID             uuid.UUID `json:"assetId"`
+	ObservationToken    string    `json:"observationToken"`
+	ExpectedContentHash string    `json:"expectedContentHash"`
 }
 
 func (MetadataArgs) Kind() string { return "metadata_asset" }
@@ -361,10 +348,9 @@ func (MetadataArgs) InsertOpts() river.InsertOpts {
 
 // ThumbnailArgs triggers thumbnail generation per asset.
 type ThumbnailArgs struct {
-	AssetID     uuid.UUID         `json:"assetId"`
-	RepoPath    string            `json:"repoPath"`
-	StoragePath string            `json:"storagePath"`
-	AssetType   dbtypes.AssetType `json:"assetType"`
+	AssetID             uuid.UUID `json:"assetId"`
+	ObservationToken    string    `json:"observationToken"`
+	ExpectedContentHash string    `json:"expectedContentHash"`
 }
 
 func (ThumbnailArgs) Kind() string { return "thumbnail_asset" }
@@ -375,10 +361,9 @@ func (ThumbnailArgs) InsertOpts() river.InsertOpts {
 
 // TranscodeArgs triggers audio/video transcoding per asset.
 type TranscodeArgs struct {
-	AssetID     uuid.UUID         `json:"assetId"`
-	RepoPath    string            `json:"repoPath"`
-	StoragePath string            `json:"storagePath"`
-	AssetType   dbtypes.AssetType `json:"assetType"`
+	AssetID             uuid.UUID `json:"assetId"`
+	ObservationToken    string    `json:"observationToken"`
+	ExpectedContentHash string    `json:"expectedContentHash"`
 }
 
 func (TranscodeArgs) Kind() string { return "transcode_asset" }

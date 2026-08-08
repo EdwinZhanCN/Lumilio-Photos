@@ -1,13 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
-	"os"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -28,10 +29,6 @@ const (
 	faceCropPaddingMultiplier  = float32(0.12)
 	faceCropQuality            = 85
 )
-
-type faceRepositoryPathResolver interface {
-	GetRepositoryPath(repoID string) (string, error)
-}
 
 // FaceService defines face detection and recognition related operations interface.
 type FaceService interface {
@@ -129,21 +126,17 @@ type FaceClusterRebuildResult struct {
 }
 
 type faceService struct {
-	queries          *repo.Queries
-	pool             *sql.DB
-	repoPathResolver faceRepositoryPathResolver
+	queries *repo.Queries
+	pool    *sql.DB
+	files   *storage.RepositoryFSFactory
 }
 
 // NewFaceService creates face service instance.
-func NewFaceService(queries *repo.Queries, repoPathResolver faceRepositoryPathResolver, pool ...*sql.DB) FaceService {
-	var database *sql.DB
-	if len(pool) > 0 {
-		database = pool[0]
-	}
+func NewFaceService(queries *repo.Queries, files *storage.RepositoryFSFactory, database *sql.DB) FaceService {
 	return &faceService{
-		queries:          queries,
-		pool:             database,
-		repoPathResolver: repoPathResolver,
+		queries: queries,
+		pool:    database,
+		files:   files,
 	}
 }
 
@@ -173,12 +166,17 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, fa
 		return fmt.Errorf("face result payload is required")
 	}
 
-	repoPath, asset, err := s.resolveAssetRepository(ctx, assetID)
+	repository, asset, err := s.resolveAssetRepository(ctx, assetID)
 	if err != nil {
 		return err
 	}
+	repositoryFS, err := s.files.Open(repository)
+	if err != nil {
+		return err
+	}
+	defer repositoryFS.Close()
 
-	affectedClusters, err := s.cleanupExistingFaceState(ctx, assetID, repoPath)
+	affectedClusters, err := s.cleanupExistingFaceState(ctx, assetID, repositoryFS)
 	if err != nil {
 		return err
 	}
@@ -225,7 +223,7 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, fa
 
 		isPrimary := i == primaryFaceIndex
 
-		faceImagePath, err := s.persistFaceCrop(repoPath, assetID, i, imageData, faceItemMeta.BoundingBox)
+		faceImagePath, err := s.persistFaceCrop(repositoryFS, assetID, i, imageData, faceItemMeta.BoundingBox)
 		if err != nil {
 			return fmt.Errorf("failed to persist face crop %d: %w", i, err)
 		}
@@ -307,28 +305,27 @@ func (s *faceService) convertLumenFaceToDBFace(lumenFace types.Face, index int) 
 	}, nil
 }
 
-func (s *faceService) resolveAssetRepository(ctx context.Context, assetID uuid.UUID) (string, *repo.Asset, error) {
+func (s *faceService) resolveAssetRepository(ctx context.Context, assetID uuid.UUID) (repo.Repository, *repo.Asset, error) {
 	asset, err := s.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to load asset for face processing: %w", err)
+		return repo.Repository{}, nil, fmt.Errorf("failed to load asset for face processing: %w", err)
 	}
 	if !asset.RepositoryID.Valid {
-		return "", nil, fmt.Errorf("asset %s does not have a repository", assetID)
+		return repo.Repository{}, nil, fmt.Errorf("asset %s does not have a repository", assetID)
 	}
-	if s.repoPathResolver == nil {
-		return "", nil, fmt.Errorf("face repository path resolver is unavailable")
+	if s.files == nil {
+		return repo.Repository{}, nil, fmt.Errorf("face repository filesystem is unavailable")
 	}
 
-	repositoryID := asset.RepositoryID.UUID.String()
-	repoPath, err := s.repoPathResolver.GetRepositoryPath(repositoryID)
+	repository, err := s.queries.GetRepository(ctx, asset.RepositoryID.UUID)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to resolve repository path for asset %s: %w", assetID, err)
+		return repo.Repository{}, nil, fmt.Errorf("failed to resolve repository for asset %s: %w", assetID, err)
 	}
 
-	return repoPath, &asset, nil
+	return repository, &asset, nil
 }
 
-func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid.UUID, repoPath string) ([]int32, error) {
+func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid.UUID, repositoryFS *storage.RepositoryFS) ([]int32, error) {
 	existingItems, err := s.queries.GetFaceItemsByAsset(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load existing face items: %w", err)
@@ -343,7 +340,11 @@ func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid
 		if item.FaceImagePath == nil || strings.TrimSpace(*item.FaceImagePath) == "" {
 			continue
 		}
-		if err := removeRepositoryFile(repoPath, *item.FaceImagePath); err != nil {
+		privatePath, parseErr := storage.ParsePrivateRepositoryPath(*item.FaceImagePath)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse previous face crop: %w", parseErr)
+		}
+		if err := repositoryFS.RemovePrivate(privatePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("failed to remove previous face crop: %w", err)
 		}
 	}
@@ -489,7 +490,7 @@ func isClusterCandidate(item repo.FaceItem) bool {
 	return true
 }
 
-func (s *faceService) persistFaceCrop(repoPath string, assetID uuid.UUID, index int, imageData []byte, bbox *dbtypes.FaceBoundingBox) (*string, error) {
+func (s *faceService) persistFaceCrop(repositoryFS *storage.RepositoryFS, assetID uuid.UUID, index int, imageData []byte, bbox *dbtypes.FaceBoundingBox) (*string, error) {
 	if bbox == nil {
 		return nil, fmt.Errorf("bounding box is required")
 	}
@@ -527,19 +528,22 @@ func (s *faceService) persistFaceCrop(repoPath string, assetID uuid.UUID, index 
 	}
 
 	filename := fmt.Sprintf("%s_%d.webp", assetID, index)
-	relativePath := filepath.Join(storage.DefaultStructure.FacesDir, filename)
-	fullPath, err := resolveRepositoryFile(repoPath, relativePath)
+	privatePath, err := storage.ParsePrivateRepositoryPath(path.Join(storage.DefaultStructure.FacesDir, filename))
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+	directory, err := storage.ParsePrivateRepositoryPath(path.Dir(privatePath.String()))
+	if err != nil {
+		return nil, err
+	}
+	if err := repositoryFS.MkdirAllPrivate(directory, 0o755); err != nil {
 		return nil, fmt.Errorf("create face crop directory: %w", err)
 	}
-	if err := os.WriteFile(fullPath, cropBytes, 0644); err != nil {
+	if _, err := repositoryFS.WritePrivateFileAtomic(privatePath, bytes.NewReader(cropBytes), 0o644); err != nil {
 		return nil, fmt.Errorf("write face crop: %w", err)
 	}
 
-	normalized := filepath.ToSlash(relativePath)
+	normalized := privatePath.String()
 	return &normalized, nil
 }
 
@@ -563,42 +567,6 @@ func clampFaceCropBounds(bbox *dbtypes.FaceBoundingBox, imageWidth, imageHeight 
 	return left, top, width, height
 }
 
-func resolveRepositoryFile(repoPath, relativeOrAbsolutePath string) (string, error) {
-	if strings.TrimSpace(relativeOrAbsolutePath) == "" {
-		return "", fmt.Errorf("repository file path is empty")
-	}
-
-	if filepath.IsAbs(relativeOrAbsolutePath) {
-		clean := filepath.Clean(relativeOrAbsolutePath)
-		rel, err := filepath.Rel(repoPath, clean)
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve repository file path: %w", err)
-		}
-		if strings.HasPrefix(rel, "..") {
-			return "", fmt.Errorf("path %q is outside repository root", relativeOrAbsolutePath)
-		}
-		return clean, nil
-	}
-
-	cleanRel := filepath.Clean(relativeOrAbsolutePath)
-	if strings.HasPrefix(cleanRel, "..") {
-		return "", fmt.Errorf("path %q escapes repository root", relativeOrAbsolutePath)
-	}
-
-	return filepath.Join(repoPath, cleanRel), nil
-}
-
-func removeRepositoryFile(repoPath, relativeOrAbsolutePath string) error {
-	fullPath, err := resolveRepositoryFile(repoPath, relativeOrAbsolutePath)
-	if err != nil {
-		return err
-	}
-	if err := os.Remove(fullPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	return nil
-}
-
 // GetFaceResults gets face detection results for specified asset.
 func (s *faceService) GetFaceResults(ctx context.Context, assetID uuid.UUID) (*FaceResultWithItems, error) {
 	result, err := s.queries.GetFaceResultByAsset(ctx, assetID)
@@ -619,12 +587,17 @@ func (s *faceService) GetFaceResults(ctx context.Context, assetID uuid.UUID) (*F
 
 // DeleteFaceResults deletes face results for specified asset, including crops and cluster memberships.
 func (s *faceService) DeleteFaceResults(ctx context.Context, assetID uuid.UUID) error {
-	repoPath, _, err := s.resolveAssetRepository(ctx, assetID)
+	repository, _, err := s.resolveAssetRepository(ctx, assetID)
 	if err != nil {
 		return err
 	}
+	repositoryFS, err := s.files.Open(repository)
+	if err != nil {
+		return err
+	}
+	defer repositoryFS.Close()
 
-	affectedClusters, err := s.cleanupExistingFaceState(ctx, assetID, repoPath)
+	affectedClusters, err := s.cleanupExistingFaceState(ctx, assetID, repositoryFS)
 	if err != nil {
 		return err
 	}

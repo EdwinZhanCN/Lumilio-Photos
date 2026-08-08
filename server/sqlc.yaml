@@ -7,6 +7,7 @@ sql:
       schema:
           - "migrations/000003_vec1_baseline.up.sql"
           - "migrations/000004_media_semantic_events.up.sql"
+          - "migrations/000005_repository_file_index.up.sql"
       gen:
           go:
               package: "repo"
@@ -26,6 +27,16 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "assets.repository_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_file_index.asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_file_index.first_seen_scan_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_file_index.last_seen_scan_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_file_index.missing_since_scan_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_scan_runs.authoritative"
+                    go_type: { type: "bool" }
                   - column: "repositories.root_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "media_items.repository_id"

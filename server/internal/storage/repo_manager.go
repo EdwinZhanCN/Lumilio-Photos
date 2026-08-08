@@ -109,20 +109,17 @@ type RepositoryManager interface {
 	CreateRepository(ctx context.Context, spec CreateRepositorySpec) (*CreateRepositoryResult, error)
 	EnsurePrimaryRepository(ctx context.Context, root string, ownerID *int32) (*repo.Repository, error)
 
-	// GetStagingManager and GetDirectoryManager expose the sub-managers.
-	// Transitional: consumers should eventually receive these by direct
-	// injection instead of reaching through the repository manager.
-	GetStagingManager() StagingManager
+	// GetDirectoryManager exposes storage-owned private sidecar operations.
 	GetDirectoryManager() DirectoryManager
 }
 
 // DefaultRepositoryManager implements the RepositoryManager interface
 type DefaultRepositoryManager struct {
-	queries        *repo.Queries
-	dirManager     DirectoryManager
-	stagingManager StagingManager
-	logger         *zap.Logger
-	auditProvider  logging.RepositoryAuditProvider
+	queries       *repo.Queries
+	dirManager    DirectoryManager
+	files         *RepositoryFSFactory
+	logger        *zap.Logger
+	auditProvider logging.RepositoryAuditProvider
 }
 
 // NewRepositoryManager creates a new repository manager instance
@@ -130,6 +127,7 @@ func NewRepositoryManager(
 	queries *repo.Queries,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
+	files *RepositoryFSFactory,
 ) (*DefaultRepositoryManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -137,13 +135,16 @@ func NewRepositoryManager(
 	if auditProvider == nil {
 		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
+	if files == nil {
+		files = NewRepositoryFSFactory(nil, queries)
+	}
 
 	rm := &DefaultRepositoryManager{
-		queries:        queries,
-		dirManager:     NewDirectoryManager(),
-		stagingManager: NewStagingManager(),
-		logger:         logger.With(zap.String("component", "repository")),
-		auditProvider:  auditProvider,
+		queries:       queries,
+		dirManager:    NewDirectoryManager(),
+		files:         files,
+		logger:        logger.With(zap.String("component", "repository")),
+		auditProvider: auditProvider,
 	}
 	return rm, nil
 }
@@ -213,6 +214,8 @@ func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *i
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
+	releaseMutation := rm.acquireRepositoryMutation(repoUUID)
+	defer releaseMutation()
 	associatedRootID := firstRootID(rootID)
 	if !associatedRootID.Valid {
 		associatedRootID, err = rm.repositoryRootIDForPath(context.Background(), cleanPath)
@@ -441,6 +444,12 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
+	repoUUID, err := uuid.Parse(config.ID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid repository ID: %w", err)
+	}
+	releaseMutation := rm.acquireRepositoryMutation(repoUUID)
+	defer releaseMutation()
 
 	// A Server operator may bind-mount an empty host directory directly at this
 	// path before creating the repository. Prove the exact target is empty and
@@ -469,12 +478,6 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	if err := config.SaveConfigToFile(cleanPath); err != nil {
 		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
 		return nil, rollback(fmt.Errorf("failed to save configuration: %w", err))
-	}
-
-	repoUUID, err := uuid.Parse(config.ID)
-	if err != nil {
-		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
-		return nil, rollback(fmt.Errorf("invalid repository ID: %w", err))
 	}
 
 	now := time.Now()
@@ -628,6 +631,8 @@ func (rm *DefaultRepositoryManager) RemoveRepository(id string) error {
 		rm.logger.Warn("repository remove failed: invalid id", zap.String("operation", "repository.remove"), zap.String("repository_id", id), zap.Error(err))
 		return fmt.Errorf("invalid repository ID: %w", err)
 	}
+	releaseMutation := rm.acquireRepositoryMutation(repoUUID)
+	defer releaseMutation()
 
 	var repoPath string
 	if rm.queries != nil {
@@ -648,11 +653,6 @@ func (rm *DefaultRepositoryManager) RemoveRepository(id string) error {
 	return nil
 }
 
-// GetStagingManager returns the staging manager instance
-func (rm *DefaultRepositoryManager) GetStagingManager() StagingManager {
-	return rm.stagingManager
-}
-
 // GetDirectoryManager returns the underlying DirectoryManager for direct file operations.
 func (rm *DefaultRepositoryManager) GetDirectoryManager() DirectoryManager {
 	return rm.dirManager
@@ -664,6 +664,8 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 		rm.logger.Warn("repository update failed: invalid id", zap.String("operation", "repository.update"), zap.String("repository_id", id), zap.Error(err))
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
+	releaseMutation := rm.acquireRepositoryMutation(repoUUID)
+	defer releaseMutation()
 
 	// Validate configuration
 	if err := config.Validate(); err != nil {
@@ -715,6 +717,13 @@ func (rm *DefaultRepositoryManager) repoAudit(repoPath string) logging.Repositor
 		return logging.NoopRepositoryAuditLogger()
 	}
 	return rm.auditProvider.ForPath(repoPath)
+}
+
+func (rm *DefaultRepositoryManager) acquireRepositoryMutation(repositoryID uuid.UUID) func() {
+	if rm == nil || rm.files == nil || rm.files.AccessCoordinator() == nil {
+		return func() {}
+	}
+	return rm.files.AccessCoordinator().AcquireMutation(repositoryID)
 }
 
 func normalizeRepoRole(role dbtypes.RepoRole) dbtypes.RepoRole {

@@ -61,6 +61,7 @@ type Querier interface {
 	AssignFaceClusterMemberExclusive(ctx context.Context, arg AssignFaceClusterMemberExclusiveParams) (FaceClusterMember, error)
 	AttachAssetToMediaItem(ctx context.Context, arg AttachAssetToMediaItemParams) error
 	BindPendingAgentEffectExecutingRun(ctx context.Context, arg BindPendingAgentEffectExecutingRunParams) (uuid.UUID, error)
+	BindRepositoryFileIndexAsset(ctx context.Context, arg BindRepositoryFileIndexAssetParams) (RepositoryFileIndex, error)
 	BulkToggleAssetLiked(ctx context.Context, assetIds []uuid.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
@@ -188,6 +189,7 @@ type Querier interface {
 	DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error
 	DeleteRepositories(ctx context.Context, repoIds []uuid.UUID) error
 	DeleteRepository(ctx context.Context, repoID uuid.UUID) error
+	DeleteRepositoryFileIndexEntry(ctx context.Context, arg DeleteRepositoryFileIndexEntryParams) error
 	DeleteSearchEmbeddingsByAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteShareLink(ctx context.Context, arg DeleteShareLinkParams) (int64, error)
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID uuid.UUID) error
@@ -400,6 +402,7 @@ type Querier interface {
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
 	GetRepositoryCloudBinding(ctx context.Context, arg GetRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	GetRepositoryDefaults(ctx context.Context) (RepositoryDefault, error)
+	GetRepositoryFileIndexEntry(ctx context.Context, arg GetRepositoryFileIndexEntryParams) (RepositoryFileIndex, error)
 	GetRepositoryRoot(ctx context.Context, rootID uuid.UUID) (RepositoryRoot, error)
 	GetRepositoryRootByPath(ctx context.Context, path string) (RepositoryRoot, error)
 	GetRepositoryScanRun(ctx context.Context, scanID uuid.UUID) (RepositoryScanRun, error)
@@ -503,8 +506,10 @@ type Querier interface {
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, arg ListPhotoAssetsMissingSemanticEmbeddingParams) ([]Asset, error)
+	ListRecoverableIngestClaims(ctx context.Context, repositoryID uuid.NullUUID) ([]ListRecoverableIngestClaimsRow, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID uuid.UUID) ([]RepositoryCloudBinding, error)
+	ListRepositoryFileIndex(ctx context.Context, repositoryID uuid.UUID) ([]RepositoryFileIndex, error)
 	ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
 	ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error)
@@ -568,6 +573,7 @@ type Querier interface {
 	RepositoryExists(ctx context.Context, path string) (int64, error)
 	RequestAgentRunCancel(ctx context.Context, arg RequestAgentRunCancelParams) (AgentRun, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error)
+	ResetRepositoryFileIndex(ctx context.Context, repositoryID uuid.UUID) error
 	ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error)
 	RestoreAsset(ctx context.Context, assetID uuid.UUID) error
 	RevokeRefreshToken(ctx context.Context, tokenID int64) error
@@ -634,6 +640,7 @@ type Querier interface {
 	// has marked offline.
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg UpdateRepositoryCloudBindingLastRunParams) (RepositoryCloudBinding, error)
+	UpdateRepositoryFileIndexState(ctx context.Context, arg UpdateRepositoryFileIndexStateParams) (RepositoryFileIndex, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error)
 	UpdateRepositoryRootFromDisk(ctx context.Context, arg UpdateRepositoryRootFromDiskParams) (RepositoryRoot, error)
@@ -662,6 +669,7 @@ type Querier interface {
 	UpsertOCRIndexOutbox(ctx context.Context, arg UpsertOCRIndexOutboxParams) error
 	UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	UpsertRepositoryDefaults(ctx context.Context, arg UpsertRepositoryDefaultsParams) (RepositoryDefault, error)
+	UpsertRepositoryFileObservation(ctx context.Context, arg UpsertRepositoryFileObservationParams) (RepositoryFileIndex, error)
 	UpsertRepositoryRoot(ctx context.Context, arg UpsertRepositoryRootParams) (RepositoryRoot, error)
 	UpsertReverseGeocodeCache(ctx context.Context, arg UpsertReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)

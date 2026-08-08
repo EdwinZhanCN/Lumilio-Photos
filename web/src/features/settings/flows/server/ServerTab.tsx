@@ -1,7 +1,7 @@
 import { useDebouncedPreference } from "../../state/preferences";
 import { useRuntimeInfo } from "../../api/useRuntimeInfo";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useBrowserCapabilities } from "@/features/auth";
+import { useBrowserCapabilities, BrowserSecurityNotice } from "@/features/auth";
 import { GaugeIcon } from "lucide-react";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import BackupSection from "./BackupSection";
@@ -50,6 +50,8 @@ export default function ServerTab() {
 
   return (
     <div className="w-full space-y-8 lg:space-y-10">
+      <BrowserSecurityNotice />
+
       <SettingsGroup
         title={t("settings.serverSettings.healthCheckInterval")}
         description={t("settings.serverSettings.healthCheckDescription")}

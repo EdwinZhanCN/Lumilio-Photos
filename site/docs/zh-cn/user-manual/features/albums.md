@@ -1,7 +1,15 @@
 ---
-title: 相册入口已整合
+title: "页面已迁移：相册与堆叠"
+description: "旧文档地址兼容页。"
+page_id: "legacy-features-albums"
+search: false
+outline: false
+baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
+last_verified: "2026-08-06"
 ---
 
-# 相册入口已整合
+# 页面已迁移
 
-相册的创建、成员关系、封面、范围和删除边界已经统一写在[相册与合集](./collections)。本页保留为旧链接兼容入口。
+这条旧地址保留用于兼容已有书签。权威内容已经合并到[相册与堆叠](../use/albums.md)。
+
+请不要在此页面继续维护第二份正文。

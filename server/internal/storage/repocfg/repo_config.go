@@ -128,12 +128,17 @@ func LoadConfigFromFile(repoPath string) (*RepositoryConfig, error) {
 		return nil, fmt.Errorf("failed to read repository config: %w", err)
 	}
 
+	return ParseConfig(data)
+}
+
+// ParseConfig parses and validates .lumiliorepo contents read through a
+// repository-scoped filesystem capability.
+func ParseConfig(data []byte) (*RepositoryConfig, error) {
 	var config RepositoryConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse repository config: %w", err)
 	}
 
-	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid repository configuration: %w", err)
 	}

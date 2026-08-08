@@ -12,9 +12,13 @@ import (
 	"testing"
 
 	"server/internal/api/dto"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage"
+	"server/internal/storage/repocfg"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,6 +72,12 @@ func TestUniqueZipArchiveName_DisambiguatesDuplicates(t *testing.T) {
 
 func TestAssetHandlerWriteAssetToZip_UsesOriginalFilenames(t *testing.T) {
 	tempDir := t.TempDir()
+	repositoryID := uuid.New()
+	config := repocfg.NewRepositoryConfig("download test")
+	config.ID = repositoryID.String()
+	require.NoError(t, config.SaveConfigToFile(tempDir))
+	repository := repo.Repository{RepoID: repositoryID, Path: tempDir, Status: dbtypes.RepoStatusActive, Config: *config}
+	factory := storage.NewRepositoryFSFactory(nil, nil)
 	firstPath := filepath.Join(tempDir, "first.bin")
 	secondPath := filepath.Join(tempDir, "second.bin")
 	require.NoError(t, os.WriteFile(firstPath, []byte("first"), 0o644))
@@ -77,13 +87,19 @@ func TestAssetHandlerWriteAssetToZip_UsesOriginalFilenames(t *testing.T) {
 	zipWriter := zip.NewWriter(&archive)
 	archiveNames := map[string]int{}
 
-	require.NoError(t, writeAssetToZip(zipWriter, archiveNames, assetDownloadFile{
-		asset: repo.Asset{OriginalFilename: "IMG_0001.jpg"},
-		path:  firstPath,
+	firstRepositoryPath, err := storage.ParseUserMediaPath("first.bin")
+	require.NoError(t, err)
+	secondRepositoryPath, err := storage.ParseUserMediaPath("second.bin")
+	require.NoError(t, err)
+	require.NoError(t, writeAssetToZip(factory, zipWriter, archiveNames, assetDownloadFile{
+		asset:      repo.Asset{OriginalFilename: "IMG_0001.jpg"},
+		repository: repository,
+		path:       firstRepositoryPath,
 	}))
-	require.NoError(t, writeAssetToZip(zipWriter, archiveNames, assetDownloadFile{
-		asset: repo.Asset{OriginalFilename: "IMG_0001.jpg"},
-		path:  secondPath,
+	require.NoError(t, writeAssetToZip(factory, zipWriter, archiveNames, assetDownloadFile{
+		asset:      repo.Asset{OriginalFilename: "IMG_0001.jpg"},
+		repository: repository,
+		path:       secondRepositoryPath,
 	}))
 	require.NoError(t, zipWriter.Close())
 

@@ -9,11 +9,12 @@
 //	      ↓
 //	CloudImportSource                  ← implements sourcing.AssetSource
 //	      ↓
-//	CloudSyncConsumer                  ← channel → materializer loop
+//	CloudSyncConsumer                  ← acknowledged materializer loop
 package cloud
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,7 +71,7 @@ type CloudProvider interface {
 	// Pass nil cursor to start from the beginning (full listing).
 	List(ctx context.Context, repoID uuid.UUID, cursor *Cursor) (*Page, error)
 
-	// Download fetches a remote file to the given local path.
+	// Download streams a remote file to the caller-owned staging handle.
 	// Returns the number of bytes written.
-	Download(ctx context.Context, repoID uuid.UUID, remoteKey string, localPath string) (int64, error)
+	Download(ctx context.Context, repoID uuid.UUID, remoteKey string, destination io.Writer) (int64, error)
 }

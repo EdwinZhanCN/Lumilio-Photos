@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -45,25 +43,11 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 		}
 	}
 
-	// Get repository information
-	if !asset.RepositoryID.Valid {
-		return fmt.Errorf("asset has no repository")
-	}
-	repository, err := ap.queries.GetRepository(ctx, asset.RepositoryID.UUID)
+	source, err := ap.resolveCurrentAssetSource(ctx, assetID, "", "")
 	if err != nil {
-		return fmt.Errorf("failed to get repository: %w", err)
+		return err
 	}
-
-	// Check if storage path exists
-	if asset.StoragePath == nil || *asset.StoragePath == "" {
-		return fmt.Errorf("asset has no storage path")
-	}
-
-	// Check if the file exists
-	assetPath := filepath.Join(repository.Path, *asset.StoragePath)
-	if _, err := os.Stat(assetPath); os.IsNotExist(err) {
-		return fmt.Errorf("asset file not found: %s", assetPath)
-	}
+	defer source.Close()
 
 	// Determine which tasks to retry
 	tasksToRetry := retryTasks
@@ -90,7 +74,7 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	// Re-enqueue tasks based on failed task names (using queue names as canonical task names)
 	assetType := dbtypes.AssetType(asset.Type)
 	log.Printf("Retrying %d tasks for %s asset %s: %v", len(tasksToRetry), assetType, asset.AssetID.String(), tasksToRetry)
-	return ap.enqueueRetryTasks(ctx, &asset, repository, assetType, tasksToRetry)
+	return ap.enqueueRetryTasks(ctx, &asset, assetType, tasksToRetry, source.observation.ObservationToken)
 }
 
 // enqueueRetryTasks re-enqueues specific tasks to their respective queues.
@@ -98,9 +82,9 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 func (ap *AssetProcessor) enqueueRetryTasks(
 	ctx context.Context,
 	asset *repo.Asset,
-	repository repo.Repository,
 	assetType dbtypes.AssetType,
 	tasksToRetry []string,
+	observationToken string,
 ) error {
 	// Build queue set from task/queue names (they are the same in our bijection)
 	queueSet := make(map[string]bool)
@@ -109,26 +93,12 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	}
 
 	// Prepare common job arguments
-	commonMeta := jobs.MetadataArgs{
-		AssetID:          asset.AssetID,
-		RepoPath:         repository.Path,
-		StoragePath:      *asset.StoragePath,
-		AssetType:        assetType,
-		OriginalFilename: asset.OriginalFilename,
-		FileSize:         asset.FileSize,
-		MimeType:         asset.MimeType,
-	}
+	commonMeta := jobs.MetadataArgs{AssetID: asset.AssetID, ObservationToken: observationToken, ExpectedContentHash: asset.ContentHash}
 	commonThumb := jobs.ThumbnailArgs{
-		AssetID:     asset.AssetID,
-		RepoPath:    repository.Path,
-		StoragePath: *asset.StoragePath,
-		AssetType:   assetType,
+		AssetID: asset.AssetID, ObservationToken: observationToken, ExpectedContentHash: asset.ContentHash,
 	}
 	commonTranscode := jobs.TranscodeArgs{
-		AssetID:     asset.AssetID,
-		RepoPath:    repository.Path,
-		StoragePath: *asset.StoragePath,
-		AssetType:   assetType,
+		AssetID: asset.AssetID, ObservationToken: observationToken, ExpectedContentHash: asset.ContentHash,
 	}
 
 	// Enqueue tasks based on queue names (bijection: queue name = task name)

@@ -107,11 +107,6 @@ func midpointTimestampMs(durationSec float64) int32 {
 	return int32(math.Round(durationSec * 500))
 }
 
-func webVideoPath(repoPath, contentHash string) string {
-	filename := fmt.Sprintf("%s_web.mp4", contentHash)
-	return filepath.Join(repoPath, ".lumilio/assets/videos/web", filename)
-}
-
 // extractSemanticFrames samples up to N_max frames from a transcoded web.mp4
 // using the duration-based strategy from settings.ML. The caller owns cleanup
 // of nothing — frames are returned as in-memory JPEG bytes.

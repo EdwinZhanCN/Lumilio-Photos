@@ -1,276 +1,156 @@
 package upload
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"log"
-	"os"
 	"sort"
 	"sync"
 
+	"server/internal/db/repo"
 	"server/internal/storage"
 )
 
-// ChunkMerger handles the merging of uploaded file chunks
+// ChunkMerger tracks relative chunk handles and streams them into a new
+// repository-private staging file. It never receives a host path.
 type ChunkMerger struct {
-	directoryManager storage.DirectoryManager
-	mu               sync.RWMutex
-	chunks           map[string][]ChunkInfo // sessionID -> chunks
+	staging storage.StagingManager
+	mu      sync.RWMutex
+	chunks  map[string][]ChunkInfo
 }
 
-// NewChunkMerger creates a new chunk merger instance
-func NewChunkMerger(directoryManager storage.DirectoryManager) *ChunkMerger {
-	return &ChunkMerger{
-		directoryManager: directoryManager,
-		chunks:           make(map[string][]ChunkInfo),
-	}
+func NewChunkMerger(staging storage.StagingManager) *ChunkMerger {
+	return &ChunkMerger{staging: staging, chunks: make(map[string][]ChunkInfo)}
 }
 
-// MergeResult represents the result of a chunk merging operation
 type MergeResult struct {
-	MergedFilePath string `json:"merged_file_path"`
-	TotalSize      int64  `json:"total_size"`
-	Error          string `json:"error,omitempty"`
+	StagingFile *storage.StagingFile `json:"staging_file"`
+	TotalSize   int64                `json:"total_size"`
 }
 
-// ChunkInfo represents information about a file chunk
 type ChunkInfo struct {
-	SessionID  string `json:"session_id"`
-	ChunkIndex int    `json:"chunk_index"`
-	FilePath   string `json:"file_path"`
-	Size       int64  `json:"size"`
+	SessionID   string `json:"session_id"`
+	ChunkIndex  int    `json:"chunk_index"`
+	PrivatePath string `json:"private_path"`
+	Size        int64  `json:"size"`
 }
 
-// AddChunks adds chunks to the session's chunk collection
 func (cm *ChunkMerger) AddChunks(sessionID string, newChunks []ChunkInfo) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-
-	if _, exists := cm.chunks[sessionID]; !exists {
-		cm.chunks[sessionID] = make([]ChunkInfo, 0)
+	existing := cm.chunks[sessionID]
+	seen := make(map[int]bool, len(existing))
+	for _, chunk := range existing {
+		seen[chunk.ChunkIndex] = true
 	}
-
-	existingChunks := cm.chunks[sessionID]
-
-	// Create a map of existing chunk indices for quick lookup
-	existingIndices := make(map[int]bool)
-	for _, chunk := range existingChunks {
-		existingIndices[chunk.ChunkIndex] = true
-	}
-
-	// Add new chunks that don't already exist
-	for _, newChunk := range newChunks {
-		if !existingIndices[newChunk.ChunkIndex] {
-			existingChunks = append(existingChunks, newChunk)
+	for _, chunk := range newChunks {
+		if !seen[chunk.ChunkIndex] {
+			existing = append(existing, chunk)
+			seen[chunk.ChunkIndex] = true
 		}
 	}
-
-	cm.chunks[sessionID] = existingChunks
+	cm.chunks[sessionID] = existing
 }
 
-// GetChunks returns all chunks for a session
 func (cm *ChunkMerger) GetChunks(sessionID string) []ChunkInfo {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-
-	return cm.chunks[sessionID]
+	return append([]ChunkInfo(nil), cm.chunks[sessionID]...)
 }
 
-// HasAllChunks checks if all chunks for a session have been received
 func (cm *ChunkMerger) HasAllChunks(sessionID string, totalChunks int) bool {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-
-	chunks := cm.chunks[sessionID]
+	chunks := cm.GetChunks(sessionID)
 	if len(chunks) != totalChunks {
 		return false
 	}
-
-	// Check if we have all indices from 0 to totalChunks-1
-	indices := make(map[int]bool)
+	seen := make(map[int]bool, len(chunks))
 	for _, chunk := range chunks {
-		indices[chunk.ChunkIndex] = true
+		seen[chunk.ChunkIndex] = true
 	}
-
-	for i := 0; i < totalChunks; i++ {
-		if !indices[i] {
+	for index := 0; index < totalChunks; index++ {
+		if !seen[index] {
 			return false
 		}
 	}
-
 	return true
 }
 
-// MergeChunks merges all chunks for a session into a single file
-func (cm *ChunkMerger) MergeChunks(sessionID string, totalChunks int, repoPath string) (*MergeResult, error) {
+func (cm *ChunkMerger) MergeChunks(repository repo.Repository, sessionID string, totalChunks int, filename string) (*MergeResult, error) {
 	chunks := cm.GetChunks(sessionID)
-
-	if len(chunks) == 0 {
-		return nil, fmt.Errorf("no chunks provided for session %s", sessionID)
-	}
-
 	if !cm.HasAllChunks(sessionID, totalChunks) {
-		return nil, fmt.Errorf("not all chunks received for session %s: have %d, need %d",
-			sessionID, len(chunks), totalChunks)
+		return nil, fmt.Errorf("incomplete chunk sequence: have %d, need %d", len(chunks), totalChunks)
+	}
+	sort.Slice(chunks, func(i, j int) bool { return chunks[i].ChunkIndex < chunks[j].ChunkIndex })
+	for index, chunk := range chunks {
+		if chunk.ChunkIndex != index {
+			return nil, fmt.Errorf("missing chunk index %d", index)
+		}
 	}
 
-	sort.Slice(chunks, func(i, j int) bool {
-		return chunks[i].ChunkIndex < chunks[j].ChunkIndex
-	})
-
-	if err := cm.validateChunkSequence(chunks, totalChunks); err != nil {
-		return nil, fmt.Errorf("invalid chunk sequence for session %s: %w", sessionID, err)
-	}
-
-	tempFile, err := cm.directoryManager.CreateTempFile(repoPath, "merged_chunks")
+	merged, destination, err := cm.staging.CreateStagingFile(repository, filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create merged file: %w", err)
+		return nil, err
 	}
-
-	dst, err := os.Create(tempFile.Path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open merged file: %w", err)
-	}
-	defer dst.Close()
-
-	buf := make([]byte, 1<<20) // 1MiB shared buffer
+	cleanup := true
+	defer func() {
+		_ = destination.Close()
+		if cleanup {
+			_ = cm.staging.RemoveStagingFile(repository, merged)
+		}
+	}()
+	buffer := make([]byte, 1<<20)
 	var totalSize int64
-
 	for _, chunk := range chunks {
-		chunkFile, err := os.Open(chunk.FilePath)
+		handle := &storage.StagingFile{ID: chunk.SessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath}
+		source, err := cm.staging.OpenStagingFile(repository, handle)
 		if err != nil {
-			cm.CleanupMergedFile(tempFile.Path)
-			return nil, fmt.Errorf("failed to open chunk file %s: %w", chunk.FilePath, err)
+			return nil, fmt.Errorf("open chunk %d: %w", chunk.ChunkIndex, err)
 		}
-
-		bytesWritten, err := io.CopyBuffer(dst, chunkFile, buf)
-		chunkFile.Close()
-		if err != nil {
-			cm.CleanupMergedFile(tempFile.Path)
-			return nil, fmt.Errorf("failed to copy chunk %d: %w", chunk.ChunkIndex, err)
+		written, copyErr := io.CopyBuffer(destination, source, buffer)
+		closeErr := source.Close()
+		if copyErr != nil || closeErr != nil {
+			return nil, fmt.Errorf("copy chunk %d: %w", chunk.ChunkIndex, errors.Join(copyErr, closeErr))
 		}
-
-		if bytesWritten != chunk.Size {
-			cm.CleanupMergedFile(tempFile.Path)
-			return nil, fmt.Errorf("chunk size mismatch: expected %d, wrote %d", chunk.Size, bytesWritten)
+		if written != chunk.Size {
+			return nil, fmt.Errorf("chunk %d size mismatch: got %d, want %d", chunk.ChunkIndex, written, chunk.Size)
 		}
-
-		totalSize += bytesWritten
+		totalSize += written
 	}
-
-	if err := dst.Sync(); err != nil {
-		cm.CleanupMergedFile(tempFile.Path)
-		return nil, fmt.Errorf("failed to sync merged file: %w", err)
+	if err := destination.Sync(); err != nil {
+		return nil, err
 	}
-
-	if err := cm.verifyFileSize(tempFile.Path, totalSize); err != nil {
-		cm.CleanupMergedFile(tempFile.Path)
-		return nil, fmt.Errorf("file size verification failed: %w", err)
-	}
-
-	return &MergeResult{
-		MergedFilePath: tempFile.Path,
-		TotalSize:      totalSize,
-	}, nil
-}
-
-// appendChunkToFile appends a chunk to the merged file at the correct position
-
-// calculateChunkPosition calculates the file position for a chunk based on previous chunks
-
-// validateChunkSequence validates that chunks form a complete sequence
-func (cm *ChunkMerger) validateChunkSequence(chunks []ChunkInfo, totalChunks int) error {
-	// Check for duplicate chunk indices
-	seen := make(map[int]bool)
-	for _, chunk := range chunks {
-		if seen[chunk.ChunkIndex] {
-			return fmt.Errorf("duplicate chunk index %d", chunk.ChunkIndex)
-		}
-		seen[chunk.ChunkIndex] = true
-	}
-
-	// Check if we have a continuous sequence from 0 to totalChunks-1
-	for i := 0; i < totalChunks; i++ {
-		if !seen[i] {
-			return fmt.Errorf("missing chunk index %d", i)
-		}
-	}
-
-	return nil
-}
-
-// verifyFileSize verifies that the merged file has the expected size
-func (cm *ChunkMerger) verifyFileSize(filePath string, expectedSize int64) error {
-	info, err := os.Stat(filePath)
+	info, err := destination.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to stat merged file: %w", err)
+		return nil, err
 	}
-
-	if info.Size() != expectedSize {
-		return fmt.Errorf("file size mismatch: expected %d, got %d", expectedSize, info.Size())
+	if info.Size() != totalSize {
+		return nil, fmt.Errorf("merged file size mismatch: got %d, want %d", info.Size(), totalSize)
 	}
-
-	return nil
+	if err := destination.Close(); err != nil {
+		return nil, err
+	}
+	cleanup = false
+	return &MergeResult{StagingFile: merged, TotalSize: totalSize}, nil
 }
 
-// CleanupChunks removes temporary chunk files after successful merge
-func (cm *ChunkMerger) CleanupChunks(sessionID string) {
+func (cm *ChunkMerger) CleanupChunks(repository repo.Repository, sessionID string) {
 	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if chunks, exists := cm.chunks[sessionID]; exists {
-		var deletionErrors []string
-		successCount := 0
-
-		for _, chunk := range chunks {
-			err := os.Remove(chunk.FilePath)
-			if err != nil {
-				// Log the error but continue with other files
-				errMsg := fmt.Sprintf("failed to delete chunk file %s: %v", chunk.FilePath, err)
-				log.Print(errMsg)
-				deletionErrors = append(deletionErrors, errMsg)
-			} else {
-				successCount++
-			}
-		}
-
-		// Log summary of cleanup operation
-		if len(deletionErrors) > 0 {
-			log.Printf("CleanupChunks: session %s - deleted %d files, %d errors",
-				sessionID, successCount, len(deletionErrors))
-		} else {
-			log.Printf("CleanupChunks: session %s - successfully deleted all %d files",
-				sessionID, len(chunks))
-		}
-
-		delete(cm.chunks, sessionID)
+	chunks := cm.chunks[sessionID]
+	delete(cm.chunks, sessionID)
+	cm.mu.Unlock()
+	for _, chunk := range chunks {
+		_ = cm.staging.RemoveStagingFile(repository, &storage.StagingFile{
+			ID: chunk.SessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath,
+		})
 	}
 }
 
-// CleanupMergedFile removes the temporary merged file
-func (cm *ChunkMerger) CleanupMergedFile(filePath string) error {
-	return os.Remove(filePath)
-}
-
-// GetChunkFileSize gets the size of a chunk file
-func (cm *ChunkMerger) GetChunkFileSize(filePath string) (int64, error) {
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return 0, err
-	}
-	return info.Size(), nil
-}
-
-// ClearSession removes all chunks for a session
 func (cm *ChunkMerger) ClearSession(sessionID string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	delete(cm.chunks, sessionID)
 }
 
-// GetChunkCount returns the number of chunks received for a session
 func (cm *ChunkMerger) GetChunkCount(sessionID string) int {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-	return len(cm.chunks[sessionID])
+	return len(cm.GetChunks(sessionID))
 }

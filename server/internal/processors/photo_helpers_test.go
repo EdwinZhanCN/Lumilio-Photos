@@ -12,8 +12,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
+	"server/internal/storage"
+	"server/internal/storage/repocfg"
 	"server/internal/utils/imaging"
 	"server/internal/utils/phash"
 )
@@ -69,16 +72,12 @@ type thumbnailAssetServiceStub struct {
 	saved map[string][]byte
 }
 
-func (s *thumbnailAssetServiceStub) SaveNewThumbnail(_ context.Context, _ string, r io.Reader, _ *repo.Asset, size string) error {
+func (s *thumbnailAssetServiceStub) CreateThumbnail(_ context.Context, _ uuid.UUID, size, thumbnailPath string) (*repo.Thumbnail, error) {
 	if s.saved == nil {
 		s.saved = make(map[string][]byte)
 	}
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return err
-	}
-	s.saved[size] = data
-	return nil
+	s.saved[size] = []byte(thumbnailPath)
+	return &repo.Thumbnail{}, nil
 }
 
 func TestGenerateThumbnailsStoresInlinePHashAndKeepsLarge(t *testing.T) {
@@ -95,7 +94,7 @@ func TestGenerateThumbnailsStoresInlinePHashAndKeepsLarge(t *testing.T) {
 		embeddingService: embedding,
 	}
 
-	fallback, err := ap.generateThumbnails(context.Background(), bytes.NewReader(testJPEG(t)), repo.Repository{Path: t.TempDir()}, asset)
+	fallback, err := ap.generateThumbnails(context.Background(), bytes.NewReader(testJPEG(t)), openProcessorRepositoryFS(t), asset)
 	if err != nil {
 		t.Fatalf("generateThumbnails: %v", err)
 	}
@@ -125,13 +124,35 @@ func TestGenerateThumbnailsFallsBackWhenInlinePHashSaveFails(t *testing.T) {
 		embeddingService: &pHashEmbeddingStub{err: fmt.Errorf("boom")},
 	}
 
-	fallback, err := ap.generateThumbnails(context.Background(), bytes.NewReader(testJPEG(t)), repo.Repository{Path: t.TempDir()}, asset)
+	fallback, err := ap.generateThumbnails(context.Background(), bytes.NewReader(testJPEG(t)), openProcessorRepositoryFS(t), asset)
 	if err != nil {
 		t.Fatalf("generateThumbnails: %v", err)
 	}
 	if !fallback {
 		t.Fatal("expected pHash fallback when SaveEmbedding fails")
 	}
+}
+
+func openProcessorRepositoryFS(t *testing.T) *storage.RepositoryFS {
+	t.Helper()
+	repositoryID := uuid.New()
+	repositoryPath := t.TempDir()
+	config := repocfg.NewRepositoryConfig("processor test")
+	config.ID = repositoryID.String()
+	if err := config.SaveConfigToFile(repositoryPath); err != nil {
+		t.Fatal(err)
+	}
+	files, err := storage.NewRepositoryFSFactory(nil, nil).Open(repo.Repository{
+		RepoID: repositoryID,
+		Path:   repositoryPath,
+		Status: dbtypes.RepoStatusActive,
+		Config: *config,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = files.Close() })
+	return files
 }
 
 func TestSavePHashEmbeddingFromReaderStoresPHashVector(t *testing.T) {

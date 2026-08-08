@@ -156,6 +156,20 @@ may manage every credential while regular users can only access their own.
 Owner identity is instance-local database policy rather than portable
 `.lumiliorepo` metadata.
 
+All runtime access inside a registered repository goes through the shared
+`internal/storage.RepositoryFS` factory. It verifies the catalog UUID against
+`.lumiliorepo`, holds a lifecycle read lease, and owns canonical user/private
+path parsing. `assets.storage_path`, ingest recovery paths, and River asset-job
+payloads never contain repository root paths. Native media tools use the
+documented RepositoryFS local-path adapter immediately before invocation.
+
+`repository_file_index` is rebuildable SQLite state, not product identity.
+Repository scans enumerate the full user tree including `inbox/`, skip only
+application-private `.lumilio/`, and bind observations to Assets transactionally
+with River work. A move requires a unique full-BLAKE3 match; ambiguous groups
+remain unchanged, and soft deletion needs two consecutive authoritative
+absences separated by the configured settle interval.
+
 ## Database And API Contracts
 
 - `github.com/mattn/go-sqlite3` is the only database driver. `internal/db.Open`

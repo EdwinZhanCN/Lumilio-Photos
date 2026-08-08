@@ -13876,6 +13876,12 @@ export interface components {
             force?: boolean;
         };
         "dto.RepositoryScanRunDTO": {
+            /** @example 0 */
+            ambiguous_count?: number;
+            /** @example true */
+            authoritative?: boolean;
+            /** @example 1 */
+            deferred_count?: number;
             /** @example 1 */
             deleted_count?: number;
             /** @example 10 */
@@ -13884,6 +13890,9 @@ export interface components {
             finished_at?: string;
             /** @example manual */
             mode?: string;
+            /** @example 1 */
+            moved_count?: number;
+            partial_reason?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example edwin */

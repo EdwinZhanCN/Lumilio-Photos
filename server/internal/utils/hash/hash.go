@@ -48,19 +48,35 @@ type LayeredHashResult struct {
 // CalculateLayeredBLAKE3 always calculates a full BLAKE3 content hash. Large
 // files additionally receive a versioned quick fingerprint.
 func CalculateLayeredBLAKE3(filePath string) (*LayeredHashResult, error) {
-	full, err := CalculateFileHash(filePath, AlgorithmBLAKE3, false)
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
-	result := &LayeredHashResult{ContentHash: full.Hash, FileSize: full.FileSize}
-	if full.FileSize <= QuickHashThreshold {
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return CalculateLayeredBLAKE3Reader(file, info.Size())
+}
+
+// CalculateLayeredBLAKE3Reader hashes a caller-owned stable file descriptor.
+// The SectionReader leaves the descriptor offset untouched so the same handle
+// can also be used for the quick fingerprint and post-hash validation.
+func CalculateLayeredBLAKE3Reader(reader io.ReaderAt, fileSize int64) (*LayeredHashResult, error) {
+	full, err := CalculateReaderHash(io.NewSectionReader(reader, 0, fileSize), AlgorithmBLAKE3)
+	if err != nil {
+		return nil, err
+	}
+	result := &LayeredHashResult{ContentHash: full, FileSize: fileSize}
+	if fileSize <= QuickHashThreshold {
 		return result, nil
 	}
-	quick, err := CalculateFileHash(filePath, AlgorithmBLAKE3, true)
+	quick, err := CalculateQuickHash(reader, fileSize, AlgorithmBLAKE3)
 	if err != nil {
 		return nil, err
 	}
-	result.QuickFingerprint = &quick.Hash
+	result.QuickFingerprint = &quick
 	version := QuickFingerprintVersion
 	result.QuickFingerprintVersion = &version
 	return result, nil
@@ -165,7 +181,7 @@ func calculateFullHash(reader io.Reader, algorithm HashAlgorithm) (string, error
 // Strategy: hash(first_chunk + last_chunk + file_size)
 // This provides fast hashing for large video/audio files while maintaining
 // reasonable collision resistance for the same file types
-func calculateQuickHash(file *os.File, fileSize int64, algorithm HashAlgorithm) (string, error) {
+func calculateQuickHash(file io.ReaderAt, fileSize int64, algorithm HashAlgorithm) (string, error) {
 	var hasher interface {
 		io.Writer
 		Sum([]byte) []byte
@@ -217,6 +233,13 @@ func calculateQuickHash(file *os.File, fileSize int64, algorithm HashAlgorithm) 
 // CalculateReaderHash calculates hash from an io.Reader
 func CalculateReaderHash(reader io.Reader, algorithm HashAlgorithm) (string, error) {
 	return calculateFullHash(reader, algorithm)
+}
+
+// CalculateQuickHash calculates the versioned first/last-chunk fingerprint
+// from a caller-owned, already-open file. Repository code uses this form so
+// path validation, stat, hashing, and revalidation share one handle.
+func CalculateQuickHash(reader io.ReaderAt, fileSize int64, algorithm HashAlgorithm) (string, error) {
+	return calculateQuickHash(reader, fileSize, algorithm)
 }
 
 // ValidateHash checks if a hash string is valid for the given algorithm

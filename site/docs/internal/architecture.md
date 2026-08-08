@@ -100,4 +100,12 @@ useful; implementation plans belong in `exec-plans/`.
 - The SQLite catalog, cloud sessions, secrets, logs, and database backups are app-private state and
   must be configured outside `storage.path`. Repository staging remains inside
   its repository under `.lumilio/staging`.
+- Registered repository I/O is rooted by `internal/storage.RepositoryFS` and
+  serialized against repository relocation/removal. Durable asset and job paths
+  are canonical repository-relative values; native codecs receive absolute
+  filenames only through the explicit local-path adapter.
+- The application SQLite catalog owns the rebuildable `repository_file_index`.
+  Scans include `inbox/`, exclude `.lumilio/`, preserve asset identity only for
+  unique full-BLAKE3 move matches, and require two authoritative absences before
+  soft deletion.
 - ML/Lumen paths should degrade when features are disabled; media management should remain usable without external ML.

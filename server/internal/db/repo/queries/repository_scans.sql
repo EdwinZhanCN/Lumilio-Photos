@@ -43,6 +43,11 @@ SET
     updated_count = ?4,
     deleted_count = ?5,
     skipped_count = ?6,
+    moved_count = ?7,
+    deferred_count = ?8,
+    ambiguous_count = ?9,
+    authoritative = ?10,
+    partial_reason = ?11,
     error = NULL
 WHERE scan_id = ?1
 RETURNING *;
@@ -56,7 +61,12 @@ SET
     updated_count = ?4,
     deleted_count = ?5,
     skipped_count = ?6,
-    error = ?7
+    moved_count = ?7,
+    deferred_count = ?8,
+    ambiguous_count = ?9,
+    authoritative = ?10,
+    partial_reason = ?11,
+    error = ?12
 WHERE scan_id = ?1
 RETURNING *;
 

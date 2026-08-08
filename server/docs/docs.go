@@ -4753,6 +4753,18 @@ const docTemplate = `{
             },
             "dto.RepositoryScanRunDTO": {
                 "properties": {
+                    "ambiguous_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "authoritative": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "deferred_count": {
+                        "example": 1,
+                        "type": "integer"
+                    },
                     "deleted_count": {
                         "example": 1,
                         "type": "integer"
@@ -4769,6 +4781,13 @@ const docTemplate = `{
                     },
                     "mode": {
                         "example": "manual",
+                        "type": "string"
+                    },
+                    "moved_count": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "partial_reason": {
                         "type": "string"
                     },
                     "repository_id": {

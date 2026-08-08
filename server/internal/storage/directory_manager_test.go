@@ -190,108 +190,6 @@ func TestDirectoryManager_ProtectedPaths(t *testing.T) {
 	})
 }
 
-func TestDirectoryManager_StagingOperations(t *testing.T) {
-	dm := NewDirectoryManager()
-	sm := NewStagingManager()
-	testDir := t.TempDir()
-
-	err := dm.CreateStructure(testDir)
-	require.NoError(t, err)
-
-	t.Run("create staging file", func(t *testing.T) {
-		stagingFile, err := sm.CreateStagingFile(testDir, "test-upload.jpg")
-		require.NoError(t, err)
-
-		assert.NotEmpty(t, stagingFile.ID)
-		assert.Equal(t, testDir, stagingFile.RepoPath)
-		assert.Equal(t, "test-upload.jpg", stagingFile.Filename)
-		assert.True(t, time.Since(stagingFile.CreatedAt) < time.Minute)
-
-		// Verify file exists
-		_, err = os.Stat(stagingFile.Path)
-		assert.NoError(t, err)
-
-		// Verify it's in the correct staging directory
-		expectedDir := filepath.Join(testDir, DefaultStructure.IncomingDir)
-		assert.Contains(t, stagingFile.Path, expectedDir)
-	})
-
-	t.Run("commit staging file", func(t *testing.T) {
-		stagingFile, err := sm.CreateStagingFile(testDir, "commit-test.jpg")
-		require.NoError(t, err)
-
-		// Write some content to the staging file
-		content := []byte("test image content")
-		err = os.WriteFile(stagingFile.Path, content, 0644)
-		require.NoError(t, err)
-
-		finalPath := "user-content/photos/final.jpg"
-		err = sm.CommitStagingFile(stagingFile, finalPath)
-		require.NoError(t, err)
-
-		// Verify file moved to final location
-		finalFullPath := filepath.Join(testDir, finalPath)
-		finalContent, err := os.ReadFile(finalFullPath)
-		require.NoError(t, err)
-		assert.Equal(t, content, finalContent)
-
-		// Verify staging file no longer exists
-		_, err = os.Stat(stagingFile.Path)
-		assert.True(t, os.IsNotExist(err))
-	})
-
-	t.Run("commit staging file validation", func(t *testing.T) {
-		stagingFile, err := sm.CreateStagingFile(testDir, "validation-test.jpg")
-		require.NoError(t, err)
-
-		// Test with nil staging file
-		err = sm.CommitStagingFile(nil, "some/path.jpg")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "staging file is nil")
-
-		// Test with empty final path
-		err = sm.CommitStagingFile(stagingFile, "")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "final path cannot be empty")
-
-		// Test with absolute final path
-		err = sm.CommitStagingFile(stagingFile, "/absolute/path.jpg")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "final path must be repository-relative")
-	})
-
-	t.Run("cleanup staging files", func(t *testing.T) {
-		// Create some staging files
-		staging1, err := sm.CreateStagingFile(testDir, "old-file1.jpg")
-		require.NoError(t, err)
-		staging2, err := sm.CreateStagingFile(testDir, "old-file2.jpg")
-		require.NoError(t, err)
-		staging3, err := sm.CreateStagingFile(testDir, "new-file.jpg")
-		require.NoError(t, err)
-
-		// Make first two files old
-		oldTime := time.Now().Add(-2 * time.Hour)
-		err = os.Chtimes(staging1.Path, oldTime, oldTime)
-		require.NoError(t, err)
-		err = os.Chtimes(staging2.Path, oldTime, oldTime)
-		require.NoError(t, err)
-
-		// Cleanup files older than 1 hour
-		err = sm.CleanupStaging(testDir, time.Hour)
-		require.NoError(t, err)
-
-		// Old files should be gone
-		_, err = os.Stat(staging1.Path)
-		assert.True(t, os.IsNotExist(err))
-		_, err = os.Stat(staging2.Path)
-		assert.True(t, os.IsNotExist(err))
-
-		// New file should remain
-		_, err = os.Stat(staging3.Path)
-		assert.NoError(t, err)
-	})
-}
-
 func TestDirectoryManager_TempFileOperations(t *testing.T) {
 	dm := NewDirectoryManager()
 	testDir := t.TempDir()
@@ -501,13 +399,9 @@ func TestDirectoryManager_EdgeCases(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("cleanup nonexistent directories", func(t *testing.T) {
-		// Should not error for valid repo path with missing staging dir
+	t.Run("cleanup nonexistent temp directory", func(t *testing.T) {
 		testDir := t.TempDir()
-		err := NewStagingManager().CleanupStaging(testDir, time.Hour)
-		assert.NoError(t, err) // Should succeed even if staging dir doesn't exist
-
-		err = dm.CleanupTempFiles(testDir, time.Hour)
+		err := dm.CleanupTempFiles(testDir, time.Hour)
 		assert.NoError(t, err) // Should succeed even if temp dir doesn't exist
 	})
 }

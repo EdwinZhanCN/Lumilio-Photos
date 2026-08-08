@@ -2705,7 +2705,8 @@ SET
     storage_path = ?1,
     original_filename = ?2,
     is_deleted = false,
-    deleted_at = NULL
+    deleted_at = NULL,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE asset_id = ?3
   AND repository_id = ?4
 RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw

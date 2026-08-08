@@ -97,8 +97,13 @@ type RepositoryScanRunDTO struct {
 	FinishedAt      *time.Time `json:"finished_at,omitempty"`
 	DiscoveredCount int64      `json:"discovered_count" example:"10"`
 	UpdatedCount    int64      `json:"updated_count" example:"2"`
+	MovedCount      int64      `json:"moved_count" example:"1"`
 	DeletedCount    int64      `json:"deleted_count" example:"1"`
 	SkippedCount    int64      `json:"skipped_count" example:"4"`
+	DeferredCount   int64      `json:"deferred_count" example:"1"`
+	AmbiguousCount  int64      `json:"ambiguous_count" example:"0"`
+	Authoritative   bool       `json:"authoritative" example:"true"`
+	PartialReason   *string    `json:"partial_reason,omitempty"`
 	Error           *string    `json:"error,omitempty"`
 }
 

@@ -513,8 +513,13 @@ func toRepositoryScanRunDTO(scanRun repo.RepositoryScanRun) dto.RepositoryScanRu
 		FinishedAt:      finishedAt,
 		DiscoveredCount: scanRun.DiscoveredCount,
 		UpdatedCount:    scanRun.UpdatedCount,
+		MovedCount:      scanRun.MovedCount,
 		DeletedCount:    scanRun.DeletedCount,
 		SkippedCount:    scanRun.SkippedCount,
+		DeferredCount:   scanRun.DeferredCount,
+		AmbiguousCount:  scanRun.AmbiguousCount,
+		Authoritative:   scanRun.Authoritative,
+		PartialReason:   scanRun.PartialReason,
 		Error:           scanRun.Error,
 	}
 }

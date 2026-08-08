@@ -15,7 +15,7 @@ import (
 
 func reconcileTestManager(t *testing.T) *DefaultRepositoryManager {
 	t.Helper()
-	manager, err := NewRepositoryManager(nil, zap.NewNop(), nil)
+	manager, err := NewRepositoryManager(nil, zap.NewNop(), nil, nil)
 	if err != nil {
 		t.Fatalf("NewRepositoryManager: %v", err)
 	}

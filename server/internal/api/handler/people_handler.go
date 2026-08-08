@@ -4,43 +4,47 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/repo"
 	"server/internal/service"
+	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type PeopleHandler struct {
-	assetService     service.AssetService
-	faceService      service.FaceService
-	authService      *service.AuthService
-	repoPathResolver peopleRepositoryPathResolver
+	assetService service.AssetService
+	faceService  service.FaceService
+	authService  *service.AuthService
+	repoResolver peopleRepositoryResolver
+	files        *storage.RepositoryFSFactory
 }
 
-type peopleRepositoryPathResolver interface {
-	GetRepositoryPath(repoID string) (string, error)
+type peopleRepositoryResolver interface {
+	GetRepository(repoID string) (*repo.Repository, error)
 }
 
 func NewPeopleHandler(
 	assetService service.AssetService,
 	faceService service.FaceService,
 	authService *service.AuthService,
-	repoPathResolver peopleRepositoryPathResolver,
+	repoResolver peopleRepositoryResolver,
+	files *storage.RepositoryFSFactory,
 ) *PeopleHandler {
 	return &PeopleHandler{
-		assetService:     assetService,
-		faceService:      faceService,
-		authService:      authService,
-		repoPathResolver: repoPathResolver,
+		assetService: assetService,
+		faceService:  faceService,
+		authService:  authService,
+		repoResolver: repoResolver,
+		files:        files,
 	}
 }
 
@@ -351,29 +355,30 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 		api.GinInternalError(c, errors.New("cover asset has no repository"), "Failed to resolve person cover repository")
 		return
 	}
-	if h.repoPathResolver == nil {
-		api.GinInternalError(c, errors.New("repository path resolver unavailable"), "Failed to resolve person cover repository")
+	if h.repoResolver == nil || h.files == nil {
+		api.GinInternalError(c, errors.New("repository filesystem unavailable"), "Failed to resolve person cover repository")
 		return
 	}
 
-	repoPath, err := h.repoPathResolver.GetRepositoryPath(asset.RepositoryID.UUID.String())
+	repository, err := h.repoResolver.GetRepository(asset.RepositoryID.UUID.String())
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to resolve person cover repository")
 		return
 	}
 
-	fullPath, err := resolvePeopleRepositoryFile(repoPath, *person.CoverFaceImagePath)
+	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, *person.CoverFaceImagePath)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve person cover path")
-		return
-	}
-
-	fileInfo, err := os.Stat(fullPath)
-	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			api.GinNotFound(c, err, "Person cover file not found")
 			return
 		}
+		api.GinInternalError(c, err, "Failed to access person cover file")
+		return
+	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		_ = repositoryFS.Close()
 		api.GinInternalError(c, err, "Failed to access person cover file")
 		return
 	}
@@ -384,11 +389,13 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 	c.Header("Vary", "Accept-Encoding")
 	c.Header("Content-Type", "image/webp")
 	if match := c.GetHeader("If-None-Match"); match == etag {
+		_ = file.Close()
+		_ = repositoryFS.Close()
 		c.Status(http.StatusNotModified)
 		return
 	}
 
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, *person.CoverFaceImagePath)
 }
 
 // ListPersonFaces lists UI-safe face crops belonging to a person.
@@ -482,29 +489,30 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to load face crop")
 		return
 	}
-	if h.repoPathResolver == nil {
-		api.GinInternalError(c, errors.New("repository path resolver unavailable"), "Failed to resolve face crop repository")
+	if h.repoResolver == nil || h.files == nil {
+		api.GinInternalError(c, errors.New("repository filesystem unavailable"), "Failed to resolve face crop repository")
 		return
 	}
 
-	repoPath, err := h.repoPathResolver.GetRepositoryPath(crop.RepositoryID)
+	repository, err := h.repoResolver.GetRepository(crop.RepositoryID)
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to resolve face crop repository")
 		return
 	}
 
-	fullPath, err := resolvePeopleRepositoryFile(repoPath, crop.FaceImagePath)
+	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, crop.FaceImagePath)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve face crop path")
-		return
-	}
-
-	fileInfo, err := os.Stat(fullPath)
-	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			api.GinNotFound(c, err, "Face crop file not found")
 			return
 		}
+		api.GinInternalError(c, err, "Failed to access face crop file")
+		return
+	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		_ = repositoryFS.Close()
 		api.GinInternalError(c, err, "Failed to access face crop file")
 		return
 	}
@@ -515,11 +523,13 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 	c.Header("Vary", "Accept-Encoding")
 	c.Header("Content-Type", "image/webp")
 	if match := c.GetHeader("If-None-Match"); match == etag {
+		_ = file.Close()
+		_ = repositoryFS.Close()
 		c.Status(http.StatusNotModified)
 		return
 	}
 
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, crop.FaceImagePath)
 }
 
 // MergePeople merges one or more source people into the target person.
@@ -869,12 +879,4 @@ func (h *PeopleHandler) resolveMediaOwnerScope(c *gin.Context) (*int32, bool) {
 
 	ownerID := int32(claims.UserID)
 	return &ownerID, true
-}
-
-func resolvePeopleRepositoryFile(repoPath, relativePath string) (string, error) {
-	cleanRel := filepath.Clean(relativePath)
-	if strings.HasPrefix(cleanRel, "..") {
-		return "", errors.New("person cover path escapes repository root")
-	}
-	return filepath.Join(repoPath, cleanRel), nil
 }

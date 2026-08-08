@@ -851,9 +851,9 @@
     "selected_one": "{{count}} selected",
     "selected_other": "{{count}} selected",
     "share": "Share",
+    "undo": "Undo",
     "uploaded": "Uploaded",
-    "viewAll": "View All",
-    "undo": "Undo"
+    "viewAll": "View All"
   },
   "delete": {
     "confirm": "Move to Trash",
@@ -1028,42 +1028,39 @@
   },
   "lumilio": {
     "agent": {
+      "checking": "Checking Lumilio Agent availability…",
       "disabled": "Lumilio Agent is disabled. Enable it in Settings > AI.",
       "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI.",
-      "checking": "Checking Lumilio Agent availability…",
       "unreachable": "Lumilio Agent is temporarily unreachable. Check the Server connection and try again."
     },
     "board": {
+      "deletePending": "Widget removed.",
+      "desktopSizeOnly": "Widget size can be adjusted on larger screens.",
       "empty": "Nothing pinned yet. Ask Lumilio Agent in the dock, then pin a result to keep it on this board.",
       "emptyHint": "Try “Show my beach photos from last summer”",
       "emptyTitle": "Your board is empty",
       "interactionHint": "Drag to move · use the View buttons to switch the look · the ⋯ menu sets size",
+      "loadFailed": "The Lumilio Agent board could not be loaded.",
+      "mobileHint": "Widgets use a single-column reading order on smaller screens. Layout changes are saved on larger screens.",
       "tidy": "Tidy",
       "tidyHint": "Compact the board upward",
       "unknownWidget": "Unknown widget type: {{type}}",
-      "untitled": "Untitled",
-      "deletePending": "Widget removed.",
-      "loadFailed": "The Lumilio Agent board could not be loaded.",
-      "mobileHint": "Widgets use a single-column reading order on smaller screens. Layout changes are saved on larger screens.",
-      "desktopSizeOnly": "Widget size can be adjusted on larger screens."
+      "untitled": "Untitled"
     },
     "chat": {
       "confirmation": {
         "addToAlbum_one": "Add {{count}} photos to this album?",
         "addToAlbum_other": "Add {{count}} photos to this album?",
-        "approved": "Confirmed",
+        "applying": "Applying…",
+        "committed": "Applied",
         "confirm": "Confirm",
         "createAlbum_one": "Create album \"{{title}}\" with {{count}} photo?",
         "createAlbum_other": "Create album \"{{title}}\" with {{count}} photos?",
-        "rejected": "Cancelled",
-        "title": "Confirmation required",
-        "applying": "Applying…",
-        "committed": "Applied",
         "failed": "The action was not applied.",
+        "rejected": "Cancelled",
         "rejecting": "Cancelling…",
         "retry": "Try again",
-        "addToAlbum": "Add {{count}} items to “{{album}}”?",
-        "createAlbum": "Create album “{{album}}”?"
+        "title": "Confirmation required"
       },
       "empty": "Start a conversation with Lumilio Agent!",
       "newConversation": "New conversation",
@@ -1078,23 +1075,22 @@
     },
     "dock": {
       "busy": "Working",
+      "checking": "Checking",
       "close": "Close",
       "collapse": "Collapse chat",
       "conversation": "Conversation",
+      "degraded": "Needs attention",
+      "disabled": "Disabled",
       "expand": "Expand chat",
+      "notConfigured": "Not configured",
       "openBoard": "Open full board",
       "ready": "Ready",
       "replyCount_one": "{{count}} reply",
       "replyCount_other": "{{count}} replies",
       "title": "Lumilio Agent",
       "tokens": "tokens",
-      "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens",
-      "checking": "Checking",
-      "degraded": "Needs attention",
-      "disabled": "Disabled",
-      "notConfigured": "Not configured",
       "unreachable": "Unavailable",
-      "replyCount": "{{count}} replies"
+      "usageHint": "Last model call: {{prompt}} context + {{completion}} output tokens"
     },
     "input": {
       "modePrompt": "Continue in {{mode}} mode…",
@@ -1109,13 +1105,13 @@
       "mention": "Mention",
       "navigate": "Navigate",
       "noResults": "No results",
+      "partialFailure": "Some mentions could not be resolved. Review the request scope before sending.",
       "person": "Person",
       "pin": "Pin",
       "quickActions": "Quick Actions",
-      "select": "Select",
       "remove": "Remove {{label}}",
-      "selected": "Selected: {{label}}",
-      "partialFailure": "Some mentions could not be resolved. Review the request scope before sending."
+      "select": "Select",
+      "selected": "Selected: {{label}}"
     },
     "messages": {
       "stopped": "Stopped",
@@ -1153,6 +1149,10 @@
       "cancelled": "Stopped",
       "emptyResult": "No matching photos",
       "resultSet": "Result set"
+    },
+    "turnScope": {
+      "label": "Request scope",
+      "mentionDropped": "{{label}} was not sent because it is no longer available."
     },
     "viewer": {
       "ask": "Ask Lumilio Agent about this photo"
@@ -1201,13 +1201,6 @@
         "spark": "Timeline",
         "switcher": "Switch view"
       }
-    },
-    "turnScope": {
-      "label": "Request scope",
-      "mentionDropped": "{{label}} was not sent because it is no longer available."
-    },
-    "result": {
-      "expired": "This result has expired. Ask Lumilio Agent to run the query again."
     }
   },
   "manage": {
@@ -1262,8 +1255,13 @@
       "scanAll": "Scan all libraries",
       "scanAllQueued_one": "Scan queued for {{count}} library.",
       "scanAllQueued_other": "Scan queued for {{count}} libraries.",
+      "scanAmbiguousHelp": "No identity guess was made. Remove extra copies or restore a one-to-one layout, then scan again.",
+      "scanAuthoritative": "Scan complete",
+      "scanCompletedSummary": "{{name}} scan complete: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous, {{deleted}} deleted.",
+      "scanCounts": "{{discovered}} new · {{updated}} updated · {{moved}} moved · {{deferred}} deferred · {{ambiguous}} ambiguous · {{deleted}} deleted",
       "scanFailed": "Failed to queue scan.",
-      "scanQueued": "Scan queued for {{name}}.",
+      "scanPartial": "Partial scan",
+      "scanPartialSummary": "{{name}} scan was partial: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous. Missing files were not confirmed.",
       "selectCloudCredential": "Select credential",
       "sourceCloud": "Cloud",
       "sourceLabel": "Source",
@@ -1757,6 +1755,7 @@
       "baseUrl": "Base URL",
       "baseUrlDescription": "Optional override for provider-compatible endpoints.",
       "clearStoredKey": "Clear stored API key",
+      "hideApiKey": "Hide API key",
       "loadError": "Failed to load AI settings.",
       "mlTitle": "Lumen Intelligence",
       "modelName": "Model name",
@@ -1770,6 +1769,7 @@
       },
       "saveError": "Failed to save settings.",
       "saveSuccess": "Settings saved.",
+      "showApiKey": "Show API key",
       "taskDescriptions": {
         "bioclip": "Identify plants, animals, and other biological subjects.",
         "face": "Detect and group recognizable faces.",
@@ -1786,9 +1786,7 @@
       },
       "validate": "Validate connection",
       "validationError": "Failed to validate LLM configuration.",
-      "validationSuccess": "LLM configuration validated successfully.",
-      "hideApiKey": "Hide API key",
-      "showApiKey": "Show API key"
+      "validationSuccess": "LLM configuration validated successfully."
     },
     "appearance": "Appearance",
     "appearanceSettings": {
@@ -1921,26 +1919,16 @@
         "intervalHours": "{{hours}} h",
         "intervalLabel": "Backup every",
         "keepLastLabel": "Keep last",
+        "listFailed": "Backups could not be loaded. Existing backups may still be available; retry before creating or restoring one.",
         "listTitle": "Available backups",
         "queued": "Backup queued — it appears below when finished.",
         "refresh": "Refresh",
         "restore": "Restore",
+        "restoreDisconnect": "The server is restarting to apply the restore. This page will reconnect automatically.",
         "restoreFailed": "Restore failed — the database was rolled back to its previous state.",
         "restorePoint": "restore point",
         "restoring": "Restoring… the app reloads when it finishes.",
-        "title": "Database backups",
-        "listFailed": "Backups could not be loaded. Existing backups may still be available; retry before creating or restoring one.",
-        "restoreDisconnect": "The server is restarting to apply the restore. This page will reconnect automatically.",
-        "restorePhases": {
-          "staged": "The backup has been validated and staged.",
-          "restart_requested": "Lumilio Photos is restarting to install the selected backup.",
-          "installing": "The selected database is being installed.",
-          "verifying": "The restored database is being verified before startup continues.",
-          "completed": "Restore completed. Reloading the workspace…",
-          "rolling_back": "Verification failed. The previous database is being restored.",
-          "rolled_back": "Restore failed safely. The previous database remains active.",
-          "failed": "Restore could not be completed. The active database was not replaced."
-        }
+        "title": "Database backups"
       },
       "booleanValues": {
         "false": "No",

@@ -1,11 +1,15 @@
 ---
-title: AI 帮助已拆分
-description: Lumen Intelligence 与 Lumilio Agent 的进阶文档入口。
+title: "页面已迁移：搜索与索引"
+description: "旧文档地址兼容页。"
+page_id: "legacy-help-ai-details"
+search: false
+outline: false
+baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
+last_verified: "2026-08-06"
 ---
 
-# AI 帮助已拆分
+# 页面已迁移
 
-- [Lumen Intelligence 进阶](./lumen-intelligence-details)：节点发现、连接、能力、Docker 网络边界和排障；
-- [Lumilio Agent 进阶](./agent-details)：引用、结果集、看板和确认机制。
+这条旧地址保留用于兼容已有书签。权威内容已经合并到[搜索与索引](../concepts/search-and-indexes.md)。
 
-本页保留为旧链接兼容入口。
+请不要在此页面继续维护第二份正文。

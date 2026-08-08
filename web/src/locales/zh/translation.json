@@ -847,9 +847,9 @@
     "selected_one": "已选 {{count}} 项",
     "selected_other": "已选 {{count}} 项",
     "share": "分享",
+    "undo": "撤销",
     "uploaded": "上传于",
-    "viewAll": "查看全部",
-    "undo": "撤销"
+    "viewAll": "查看全部"
   },
   "delete": {
     "confirm": "移入回收站",
@@ -1024,42 +1024,39 @@
   },
   "lumilio": {
     "agent": {
+      "checking": "正在检查 Lumilio Agent 可用性…",
       "disabled": "Lumilio Agent 已禁用。请在“设置 > AI”中启用。",
       "notConfigured": "Lumilio Agent 尚未配置。请在“设置 > AI”中完成提供方、模型和 API Key。",
-      "checking": "正在检查 Lumilio Agent 可用性…",
       "unreachable": "Lumilio Agent 暂时无法连接。请检查 Server 连接后重试。"
     },
     "board": {
+      "deletePending": "小组件已移除。",
+      "desktopSizeOnly": "可在较宽的屏幕上调整卡片尺寸。",
       "empty": "这里还没有固定内容。请在对话抽屉中向 Lumilio Agent 提问，再把结果固定到看板。",
       "emptyHint": "试试“给我看去年夏天的海滩照片”",
       "emptyTitle": "看板还是空的",
       "interactionHint": "拖拽移动 · 用视图按钮切换展示 · ⋯ 菜单调尺寸",
+      "loadFailed": "无法加载 Lumilio Agent 看板。",
+      "mobileHint": "小屏幕会按单列阅读顺序显示小组件；只有在较大屏幕上调整的布局会被保存。",
       "tidy": "整理",
       "tidyHint": "向上收拢看板",
       "unknownWidget": "未知的小组件类型：{{type}}",
-      "untitled": "未命名",
-      "deletePending": "小组件已移除。",
-      "loadFailed": "无法加载 Lumilio Agent 看板。",
-      "mobileHint": "小屏幕会按单列阅读顺序显示小组件；只有在较大屏幕上调整的布局会被保存。",
-      "desktopSizeOnly": "可在较宽的屏幕上调整卡片尺寸。"
+      "untitled": "未命名"
     },
     "chat": {
       "confirmation": {
         "addToAlbum_one": "将 {{count}} 张照片加入此相册？",
         "addToAlbum_other": "将 {{count}} 张照片加入此相册？",
-        "approved": "已确认",
+        "applying": "正在应用…",
+        "committed": "已应用",
         "confirm": "确认",
         "createAlbum_one": "创建相册「{{title}}」并加入 {{count}} 张照片？",
         "createAlbum_other": "创建相册「{{title}}」并加入 {{count}} 张照片？",
-        "rejected": "已取消",
-        "title": "需要确认",
-        "applying": "正在应用…",
-        "committed": "已应用",
         "failed": "操作未应用。",
+        "rejected": "已取消",
         "rejecting": "正在取消…",
         "retry": "重试",
-        "addToAlbum": "将 {{count}} 个项目加入“{{album}}”？",
-        "createAlbum": "创建相册“{{album}}”？"
+        "title": "需要确认"
       },
       "empty": "开始与 Lumilio Agent 对话吧！",
       "newConversation": "新对话",
@@ -1073,23 +1070,22 @@
     },
     "dock": {
       "busy": "处理中",
+      "checking": "检查中",
       "close": "关闭",
       "collapse": "折叠对话",
       "conversation": "对话",
+      "degraded": "需要处理",
+      "disabled": "已禁用",
       "expand": "展开对话",
+      "notConfigured": "未配置",
       "openBoard": "打开完整面板",
       "ready": "就绪",
       "replyCount_one": "{{count}} 条回复",
       "replyCount_other": "{{count}} 条回复",
       "title": "Lumilio Agent",
       "tokens": "tokens",
-      "usageHint": "上次模型调用：{{prompt}} 上下文 + {{completion}} 输出 tokens",
-      "checking": "检查中",
-      "degraded": "需要处理",
-      "disabled": "已禁用",
-      "notConfigured": "未配置",
       "unreachable": "不可用",
-      "replyCount": "{{count}} 条回复"
+      "usageHint": "上次模型调用：{{prompt}} 上下文 + {{completion}} 输出 tokens"
     },
     "input": {
       "modePrompt": "在「{{mode}}」模式下继续…",
@@ -1104,13 +1100,13 @@
       "mention": "提及",
       "navigate": "切换",
       "noResults": "无结果",
+      "partialFailure": "部分引用无法解析。发送前请检查本轮请求范围。",
       "person": "人物",
       "pin": "固定项",
       "quickActions": "快捷操作",
-      "select": "选择",
       "remove": "移除 {{label}}",
-      "selected": "已选择：{{label}}",
-      "partialFailure": "部分引用无法解析。发送前请检查本轮请求范围。"
+      "select": "选择",
+      "selected": "已选择：{{label}}"
     },
     "messages": {
       "stopped": "已停止",
@@ -1148,6 +1144,10 @@
       "cancelled": "已停止",
       "emptyResult": "没有匹配的照片",
       "resultSet": "结果集"
+    },
+    "turnScope": {
+      "label": "请求范围",
+      "mentionDropped": "{{label}} 已不可用，因此没有随本轮请求发送。"
     },
     "viewer": {
       "ask": "向 Lumilio Agent 询问这张照片"
@@ -1195,13 +1195,6 @@
         "spark": "时间线",
         "switcher": "切换视图"
       }
-    },
-    "turnScope": {
-      "label": "请求范围",
-      "mentionDropped": "{{label}} 已不可用，因此没有随本轮请求发送。"
-    },
-    "result": {
-      "expired": "此结果已过期。请让 Lumilio Agent 重新运行查询。"
     }
   },
   "manage": {
@@ -1256,8 +1249,13 @@
       "scanAll": "扫描全部资源库",
       "scanAllQueued_one": "已为 {{count}} 个库添加扫描队列。",
       "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
+      "scanAmbiguousHelp": "Lumilio 未猜测文件身份。请移除多余副本或恢复为一一对应的布局，然后再次扫描。",
+      "scanAuthoritative": "扫描完成",
+      "scanCompletedSummary": "{{name}} 扫描完成：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个，删除 {{deleted}} 个。",
+      "scanCounts": "新增 {{discovered}} · 更新 {{updated}} · 移动 {{moved}} · 暂缓 {{deferred}} · 歧义 {{ambiguous}} · 删除 {{deleted}}",
       "scanFailed": "加入扫描队列失败。",
-      "scanQueued": "已为 {{name}} 加入扫描队列。",
+      "scanPartial": "部分扫描",
+      "scanPartialSummary": "{{name}} 本轮扫描不完整：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个。本轮未确认缺失文件。",
       "selectCloudCredential": "选择凭证",
       "sourceCloud": "云导入",
       "sourceLabel": "来源",
@@ -1746,6 +1744,7 @@
       "baseUrl": "Base URL",
       "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
       "clearStoredKey": "清除已保存的 API Key",
+      "hideApiKey": "隐藏 API Key",
       "loadError": "加载 AI 设置失败。",
       "mlTitle": "Lumen Intelligence",
       "modelName": "模型名称",
@@ -1759,6 +1758,7 @@
       },
       "saveError": "保存设置失败。",
       "saveSuccess": "设置已保存。",
+      "showApiKey": "显示 API Key",
       "taskDescriptions": {
         "bioclip": "识别植物、动物等生物主题。",
         "face": "检测并归类可识别的人脸。",
@@ -1775,9 +1775,7 @@
       },
       "validate": "验证连接",
       "validationError": "LLM 配置验证失败。",
-      "validationSuccess": "LLM 配置验证成功。",
-      "hideApiKey": "隐藏 API Key",
-      "showApiKey": "显示 API Key"
+      "validationSuccess": "LLM 配置验证成功。"
     },
     "appearance": "外观",
     "appearanceSettings": {
@@ -1910,26 +1908,16 @@
         "intervalHours": "{{hours}} 小时",
         "intervalLabel": "备份间隔",
         "keepLastLabel": "保留最近备份数",
+        "listFailed": "无法加载备份列表。已有备份可能仍然存在；请先重试，再创建或恢复备份。",
         "listTitle": "可用备份",
         "queued": "备份已加入队列，完成后会显示在下方。",
         "refresh": "刷新",
         "restore": "恢复",
+        "restoreDisconnect": "服务器正在重启以应用恢复操作，本页面会自动重新连接。",
         "restoreFailed": "恢复失败，数据库已回滚到之前的状态。",
         "restorePoint": "恢复点",
         "restoring": "正在恢复，完成后应用将重新加载。",
-        "title": "数据库备份",
-        "listFailed": "无法加载备份列表。已有备份可能仍然存在；请先重试，再创建或恢复备份。",
-        "restoreDisconnect": "服务器正在重启以应用恢复操作，本页面会自动重新连接。",
-        "restorePhases": {
-          "staged": "备份已验证并完成暂存。",
-          "restart_requested": "流明集（Lumilio Photos）正在重启以安装所选备份。",
-          "installing": "正在安装所选数据库。",
-          "verifying": "正在验证恢复后的数据库，验证成功后才会继续启动。",
-          "completed": "恢复已完成，正在重新载入工作区…",
-          "rolling_back": "验证失败，正在恢复之前的数据库。",
-          "rolled_back": "恢复已安全失败，之前的数据库仍在使用。",
-          "failed": "无法完成恢复，当前数据库未被替换。"
-        }
+        "title": "数据库备份"
       },
       "booleanValues": {
         "false": "否",

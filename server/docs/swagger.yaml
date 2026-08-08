@@ -3299,6 +3299,15 @@ components:
       type: object
     dto.RepositoryScanRunDTO:
       properties:
+        ambiguous_count:
+          example: 0
+          type: integer
+        authoritative:
+          example: true
+          type: boolean
+        deferred_count:
+          example: 1
+          type: integer
         deleted_count:
           example: 1
           type: integer
@@ -3311,6 +3320,11 @@ components:
           type: string
         mode:
           example: manual
+          type: string
+        moved_count:
+          example: 1
+          type: integer
+        partial_reason:
           type: string
         repository_id:
           example: 550e8400-e29b-41d4-a716-446655440000

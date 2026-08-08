@@ -588,6 +588,31 @@ type RepositoryDefault struct {
 	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type RepositoryFileIndex struct {
+	RepositoryID            uuid.UUID         `db:"repository_id" json:"repository_id"`
+	StoragePath             string            `db:"storage_path" json:"storage_path"`
+	AssetID                 uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+	EntryKind               string            `db:"entry_kind" json:"entry_kind"`
+	FileSize                int64             `db:"file_size" json:"file_size"`
+	ModifiedAtNs            int64             `db:"modified_at_ns" json:"modified_at_ns"`
+	ChangedAtNs             *int64            `db:"changed_at_ns" json:"changed_at_ns"`
+	FileIdentityKind        *string           `db:"file_identity_kind" json:"file_identity_kind"`
+	FileIdentityValue       *string           `db:"file_identity_value" json:"file_identity_value"`
+	ObservationToken        string            `db:"observation_token" json:"observation_token"`
+	QuickFingerprint        *string           `db:"quick_fingerprint" json:"quick_fingerprint"`
+	QuickFingerprintVersion *string           `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
+	ContentHash             *string           `db:"content_hash" json:"content_hash"`
+	State                   string            `db:"state" json:"state"`
+	FirstSeenScanID         uuid.NullUUID     `db:"first_seen_scan_id" json:"first_seen_scan_id"`
+	LastSeenScanID          uuid.NullUUID     `db:"last_seen_scan_id" json:"last_seen_scan_id"`
+	MissingSinceScanID      uuid.NullUUID     `db:"missing_since_scan_id" json:"missing_since_scan_id"`
+	MissingConfirmations    int64             `db:"missing_confirmations" json:"missing_confirmations"`
+	AmbiguityGroup          *string           `db:"ambiguity_group" json:"ambiguity_group"`
+	ReconciliationReason    *string           `db:"reconciliation_reason" json:"reconciliation_reason"`
+	LastInspectionError     *string           `db:"last_inspection_error" json:"last_inspection_error"`
+	UpdatedAt               dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type RepositoryRoot struct {
 	RootID    uuid.UUID                    `db:"root_id" json:"root_id"`
 	Name      string                       `db:"name" json:"name"`
@@ -611,6 +636,11 @@ type RepositoryScanRun struct {
 	DeletedCount    int64             `db:"deleted_count" json:"deleted_count"`
 	SkippedCount    int64             `db:"skipped_count" json:"skipped_count"`
 	Error           *string           `db:"error" json:"error"`
+	MovedCount      int64             `db:"moved_count" json:"moved_count"`
+	DeferredCount   int64             `db:"deferred_count" json:"deferred_count"`
+	AmbiguousCount  int64             `db:"ambiguous_count" json:"ambiguous_count"`
+	Authoritative   bool              `db:"authoritative" json:"authoritative"`
+	PartialReason   *string           `db:"partial_reason" json:"partial_reason"`
 }
 
 type ReverseGeocodeCache struct {

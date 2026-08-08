@@ -49,6 +49,14 @@ Local and cloud-backed creation use the same location and file policies. Cloud c
 
 **No import policy ever replaces an existing original.** If a new file needs to be written to `inbox/` where a same-named file already exists, the conflict is resolved by renaming the new file — `rename` appends `(1)`, `(2)`, … and `uuid` appends a short UUID — and the existing file stays untouched. A same-name, same-content file is recognized as a duplicate by content fingerprint before any naming applies, so it is not written a second time; a different-name, same-content file is still a duplicate.
 
+## Inbox is a landing area, not a lock
+
+Uploads and cloud imports finish in `inbox/`, but a completed original remains an ordinary user-controlled file. After an upload reports completion, you may move or rename it anywhere else inside the same repository with Finder, Explorer, or another filesystem tool. A later repository scan includes `inbox/` and can preserve the existing asset identity and catalog relationships when the move has one unambiguous full-content match.
+
+Lumilio never reorganizes originals during a scan. If several identical new paths could match a missing original, the scan reports an ambiguous result and makes no identity guess. Remove the extra copies or restore a one-to-one layout, then scan again. Files that are still being written and incomplete directory reads make a scan partial; they are not evidence that an original was deleted.
+
+`.lumilio/` is the only application-private subtree inside a repository. Do not move files into it or edit its staging and derived files. `.lumiliorepo` is the repository identity marker; every other ordinary directory, including `inbox/`, is part of the user-visible media tree.
+
 The primary repository is the exception: first-run setup creates it in the non-removable default Storage Location. Regular repositories can use any registered, active Storage Location.
 
 ## Attaching is only for an existing repository

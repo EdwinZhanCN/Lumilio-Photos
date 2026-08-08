@@ -14,6 +14,9 @@ const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof u
     queryClient.invalidateQueries({
       queryKey: ["post", "/api/v1/assets/search"],
     }),
+    queryClient.invalidateQueries({
+      queryKey: ["get", "/api/v1/repositories/{id}/scans/latest"],
+    }),
   ]);
 };
 
@@ -39,8 +42,9 @@ export function useRepositoryScan() {
             force: false,
           },
         });
-        await waitForRepositoryScan(repositoryId, requestedAt);
+        const result = await waitForRepositoryScan(repositoryId, requestedAt);
         await invalidateRepositoryAwareQueries(queryClient);
+        return result;
       } finally {
         setScanningIds((current) => {
           const next = new Set(current);

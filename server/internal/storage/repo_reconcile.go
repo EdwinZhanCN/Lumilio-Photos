@@ -50,6 +50,8 @@ func (rm *DefaultRepositoryManager) ReconcileAll(ctx context.Context) error {
 }
 
 func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, current repo.Repository) error {
+	releaseMutation := rm.acquireRepositoryMutation(current.RepoID)
+	defer releaseMutation()
 	if current.Status == dbtypes.RepoStatusScanning {
 		return nil
 	}

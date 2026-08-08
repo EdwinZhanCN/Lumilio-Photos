@@ -39,12 +39,29 @@ export default function RepositoryMaintenancePanel() {
   const handleScanRepository = useCallback(
     async (repository: RepositoryOption) => {
       try {
-        await scanRepository(repository.id);
+        const result = await scanRepository(repository.id);
+        const summaryValues = {
+          name: getRepositoryDisplayName(repository, t),
+          discovered: result.discovered_count ?? 0,
+          updated: result.updated_count ?? 0,
+          moved: result.moved_count ?? 0,
+          deferred: result.deferred_count ?? 0,
+          ambiguous: result.ambiguous_count ?? 0,
+          deleted: result.deleted_count ?? 0,
+        };
         showMessage(
-          "success",
-          t("manage.repositories.scanQueued", {
-            name: getRepositoryDisplayName(repository, t),
-          }),
+          result.authoritative ? "success" : "info",
+          result.authoritative
+            ? t(
+                "manage.repositories.scanCompletedSummary",
+                "{{name}} scan complete: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous, {{deleted}} deleted.",
+                summaryValues,
+              )
+            : t(
+                "manage.repositories.scanPartialSummary",
+                "{{name}} scan was partial: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous. Missing files were not confirmed.",
+                summaryValues,
+              ),
         );
       } catch (error) {
         showMessage(

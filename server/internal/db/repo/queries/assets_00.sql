@@ -184,7 +184,8 @@ SET
     storage_path = sqlc.arg('storage_path'),
     original_filename = sqlc.arg('original_filename'),
     is_deleted = false,
-    deleted_at = NULL
+    deleted_at = NULL,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE asset_id = sqlc.arg('asset_id')
   AND repository_id = sqlc.arg('repository_id')
 RETURNING *;

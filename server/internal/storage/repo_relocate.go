@@ -56,6 +56,8 @@ func (rm *DefaultRepositoryManager) RelocateRepository(ctx context.Context, id s
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
+	releaseMutation := rm.acquireRepositoryMutation(repoUUID)
+	defer releaseMutation()
 
 	cleanPath, err := CanonicalizeRepositoryPath(newPath)
 	if err != nil {
@@ -146,6 +148,12 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	}
 
 	previousID := config.ID
+	previousUUID, err := uuid.Parse(previousID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid copied repository identity: %w", err)
+	}
+	releaseMutation := rm.acquireRepositoryMutation(previousUUID)
+	defer releaseMutation()
 	config.ID = uuid.New().String()
 	if err := config.SaveConfigToFile(cleanPath); err != nil {
 		return nil, fmt.Errorf("failed to write new repository identity: %w", err)

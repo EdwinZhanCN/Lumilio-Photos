@@ -2,10 +2,10 @@ package processors
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"math"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -28,14 +28,24 @@ func (ap *AssetProcessor) ProcessMetadataTask(ctx context.Context, args jobs.Met
 	defer func() {
 		ap.logger.Debug("metadata_task",
 			zap.String("asset_id", args.AssetID.String()),
-			zap.String("type", string(args.AssetType)),
 			zap.Duration("duration", time.Since(start)),
 		)
 	}()
-	asset, _, err := ap.loadAssetAndRepo(ctx, args.AssetID)
+	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ObservationToken, args.ExpectedContentHash)
+	if err != nil {
+		if errors.Is(err, ErrAssetSourceStale) {
+			return nil
+		}
+		return err
+	}
+	defer source.Close()
+	asset := source.asset
+	assetType := dbtypes.AssetType(asset.Type)
+	original, err := source.files.OpenMedia(source.path)
 	if err != nil {
 		return err
 	}
+	defer original.Close()
 
 	return ap.runTrackedAssetTask(
 		ctx,
@@ -44,44 +54,37 @@ func (ap *AssetProcessor) ProcessMetadataTask(ctx context.Context, args jobs.Met
 		"Extracting metadata",
 		"Metadata extracted",
 		func() error {
-			fullPath := filepath.Join(args.RepoPath, args.StoragePath)
-			switch args.AssetType {
+			switch assetType {
 			case dbtypes.AssetTypePhoto:
-				return ap.extractPhotoMetadata(ctx, asset, fullPath)
+				return ap.extractPhotoMetadata(ctx, asset, original)
 			case dbtypes.AssetTypeVideo:
-				info, err := ap.getVideoInfo(fullPath)
+				info, err := ap.getVideoInfo(source.localPath)
 				if err != nil {
 					return err
 				}
-				return ap.extractVideoMetadata(ctx, asset, fullPath, info)
+				return ap.extractVideoMetadata(ctx, asset, original, info)
 			case dbtypes.AssetTypeAudio:
-				info, err := ap.getAudioInfo(fullPath)
+				info, err := ap.getAudioInfo(source.localPath)
 				if err != nil {
 					return err
 				}
-				return ap.extractAudioMetadata(ctx, asset, fullPath, info)
+				return ap.extractAudioMetadata(ctx, asset, original, info)
 			default:
-				return fmt.Errorf("unsupported asset type for metadata: %s", args.AssetType)
+				return fmt.Errorf("unsupported asset type for metadata: %s", assetType)
 			}
 		},
 	)
 }
 
 // extractPhotoMetadata extracts EXIF metadata for photos.
-func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.Asset, fullPath string) error {
+func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.Asset, reader io.Reader) error {
 	// EXIF extraction
 	exifCfg := ap.createEXIFConfig()
 	extractor := exif.NewExtractor(exifCfg)
 	defer extractor.Close()
 
-	f, err := os.Open(fullPath)
-	if err != nil {
-		return fmt.Errorf("open photo for exif: %w", err)
-	}
-	defer f.Close()
-
 	req := &exif.StreamingExtractRequest{
-		Reader:    f,
+		Reader:    reader,
 		AssetType: dbtypes.AssetTypePhoto,
 		Filename:  asset.OriginalFilename,
 		Size:      asset.FileSize,

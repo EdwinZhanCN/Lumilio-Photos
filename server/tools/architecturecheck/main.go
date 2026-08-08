@@ -40,6 +40,11 @@ func main() {
 		fail(err)
 	}
 	fmt.Println("Desktop architecture checks passed")
+
+	if err := checkRepositoryPathArchitecture(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Repository path architecture checks passed")
 }
 
 func fail(err error) {
@@ -271,6 +276,31 @@ func checkDesktopArchitecture(root string) error {
 	}
 	if len(serverImports) > 0 {
 		return errors.New("Desktop architecture check found a server -> desktop import.")
+	}
+	return nil
+}
+
+func checkRepositoryPathArchitecture(root string) error {
+	violations, err := scanGoLines(root, "server", func(relative, line string) bool {
+		if strings.HasSuffix(relative, "_test.go") || strings.HasPrefix(relative, "server/internal/storage/") {
+			return false
+		}
+		if !strings.Contains(line, "filepath.Join(") {
+			return false
+		}
+		return strings.Contains(line, "repository.Path") ||
+			strings.Contains(line, "repo.Path") ||
+			strings.Contains(line, "repoPath") ||
+			strings.Contains(line, "repositoryPath")
+	})
+	if err != nil {
+		return err
+	}
+	if len(violations) > 0 {
+		return fmt.Errorf(
+			"Repository path architecture check found a direct repository-root join outside storage:\n%s\nUse RepositoryFS; native tools may use its explicit local-path adapter.",
+			strings.Join(violations, "\n"),
+		)
 	}
 	return nil
 }

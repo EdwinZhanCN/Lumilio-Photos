@@ -14,6 +14,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/storage"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 	"server/internal/utils/phash"
@@ -40,7 +41,7 @@ func (ap *AssetProcessor) createEXIFConfig() *exif.Config {
 
 // generateThumbnails builds all configured thumbnail sizes from the provided
 // image stream and opportunistically stores pHash from the generated small WebP.
-func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Reader, repository repo.Repository, asset *repo.Asset) (bool, error) {
+func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Reader, files *storage.RepositoryFS, asset *repo.Asset) (bool, error) {
 	outputs := make(map[string]io.Writer, len(thumbnailSizes))
 	buffers := make(map[string]*bytes.Buffer, len(thumbnailSizes))
 
@@ -63,7 +64,7 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 		if buf.Len() == 0 {
 			continue
 		}
-		if err := ap.assetService.SaveNewThumbnail(ctx, repository.Path, buf, asset, name); err != nil {
+		if err := ap.saveThumbnail(ctx, files, buf, asset, name); err != nil {
 			return false, fmt.Errorf("save_thumbnails: %w", err)
 		}
 	}

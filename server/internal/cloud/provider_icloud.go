@@ -3,7 +3,7 @@ package cloud
 import (
 	"context"
 	"fmt"
-	"os"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -212,7 +212,7 @@ func (p *ICloudProvider) List(ctx context.Context, repoID uuid.UUID, cursor *Cur
 // and writes it to localPath. It checks the local cache first, and falls back
 // to walking the album if cache misses. Keys ending with livePhotoKeySuffix
 // download the Live Photo video component.
-func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteKey string, localPath string) (int64, error) {
+func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteKey string, destination io.Writer) (int64, error) {
 	_ = repoID
 
 	isLive := strings.HasSuffix(remoteKey, livePhotoKeySuffix)
@@ -247,16 +247,16 @@ func (p *ICloudProvider) Download(ctx context.Context, repoID uuid.UUID, remoteK
 		return 0, fmt.Errorf("photo %s not found in iCloud", assetID)
 	}
 
-	if err := target.DownloadTo(icloud.PhotoVersionOriginal, isLive, localPath); err != nil {
+	reader, err := target.Download(icloud.PhotoVersionOriginal, isLive)
+	if err != nil {
 		return 0, fmt.Errorf("download photo %s: %w", remoteKey, err)
 	}
-
-	info, err := os.Stat(localPath)
+	defer reader.Close()
+	written, err := io.Copy(destination, reader)
 	if err != nil {
-		return 0, fmt.Errorf("stat downloaded file: %w", err)
+		return written, fmt.Errorf("write photo %s: %w", remoteKey, err)
 	}
-
-	return info.Size(), nil
+	return written, nil
 }
 
 const livePhotoKeySuffix = ":live"

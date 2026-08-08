@@ -9,8 +9,6 @@ import (
 	"io"
 	"log"
 	"math"
-	"os"
-	"path/filepath"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
@@ -92,13 +90,10 @@ type AssetService interface {
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error)
 
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
-	SaveNewThumbnail(ctx context.Context, repoPath string, buffers io.Reader, asset *repo.Asset, size string) error
 	GetDistinctCameraModels(ctx context.Context) ([]string, error)
 	GetDistinctLenses(ctx context.Context) ([]string, error)
 
 	// Video and Audio processing methods
-	SaveVideoVersion(ctx context.Context, repoPath string, videoReader io.Reader, asset *repo.Asset, version string) error
-	SaveAudioVersion(ctx context.Context, repoPath string, audioReader io.Reader, asset *repo.Asset, version string) error
 	UpdateAssetDuration(ctx context.Context, id uuid.UUID, duration float64) error
 	UpdateAssetDimensions(ctx context.Context, id uuid.UUID, width, height int32) error
 
@@ -820,76 +815,6 @@ func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID
 	return &dbThumbnail, nil
 }
 
-// SaveNewThumbnail saves thumbnail file to repository and creates database record
-//
-// asset repo.Asset must be valid in following cases:
-//   - asset ID is not empty
-//   - asset hash is not empty
-//   - asset storage path is not empty
-func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, buffers io.Reader, asset *repo.Asset, size string) error {
-	// Require: valid inputs
-	if buffers == nil {
-		return fmt.Errorf("buffers cannot be nil")
-	}
-	if asset == nil {
-		return fmt.Errorf("asset cannot be nil")
-	}
-	if size == "" {
-		return fmt.Errorf("size cannot be empty")
-	}
-	if asset.ContentHash == "" {
-		return fmt.Errorf("asset hash is required")
-	}
-	if repoPath == "" {
-		return fmt.Errorf("repository path is required")
-	}
-
-	// Generate thumbnail filename using hash and size
-	filename := fmt.Sprintf("%s_%s.webp", asset.ContentHash, size)
-
-	// Construct full path: .lumilio/assets/thumbnails/{size}/{hash}_{size}.webp
-	thumbnailDir := filepath.Join(repoPath, ".lumilio/assets/thumbnails", size)
-	thumbnailPath := filepath.Join(thumbnailDir, filename)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(thumbnailDir, 0755); err != nil {
-		return fmt.Errorf("failed to create thumbnail directory: %w", err)
-	}
-
-	// Write the thumbnail file
-	file, err := os.Create(thumbnailPath)
-	if err != nil {
-		return fmt.Errorf("failed to create thumbnail file: %w", err)
-	}
-	defer file.Close()
-
-	written, err := io.Copy(file, buffers)
-	if err != nil {
-		// Clean up partial file on error
-		os.Remove(thumbnailPath)
-		return fmt.Errorf("failed to write thumbnail: %w", err)
-	}
-
-	// Ensure: file was written
-	if written == 0 {
-		os.Remove(thumbnailPath)
-		return fmt.Errorf("no data written for thumbnail")
-	}
-
-	log.Printf("Saved thumbnail for asset %s: size=%s, path=%s, bytes=%d", asset.AssetID.String(), size, thumbnailPath, written)
-
-	// Create database record with relative path
-	relPath := filepath.Join(".lumilio/assets/thumbnails", size, filename)
-	_, err = s.CreateThumbnail(ctx, asset.AssetID, size, relPath)
-	if err != nil {
-		// Clean up file if database insertion fails
-		os.Remove(thumbnailPath)
-		return fmt.Errorf("failed to create thumbnail database record: %w", err)
-	}
-
-	return nil
-}
-
 // ================================
 // Helper functions
 // ================================
@@ -1062,126 +987,6 @@ func (s *assetService) GetLikedAssets(ctx context.Context, ownerID *int32, limit
 	}
 
 	return s.queries.GetLikedAssets(ctx, params)
-}
-
-// SaveVideoVersion Video and Audio processing methods implementation
-//
-// asset repo.Asset must be valid in following cases:
-//   - asset ID is not empty
-//   - asset hash is not empty
-//   - asset storage path is not empty
-func (s *assetService) SaveVideoVersion(ctx context.Context, repoPath string, videoReader io.Reader, asset *repo.Asset, version string) error {
-	// Require: valid inputs
-	if videoReader == nil {
-		return fmt.Errorf("videoReader cannot be nil")
-	}
-	if asset == nil {
-		return fmt.Errorf("asset cannot be nil")
-	}
-	if version == "" {
-		return fmt.Errorf("version cannot be empty")
-	}
-	if asset.ContentHash == "" {
-		return fmt.Errorf("asset hash is required")
-	}
-	if repoPath == "" {
-		return fmt.Errorf("repository path is required")
-	}
-
-	// Generate filename using hash and version
-	filename := fmt.Sprintf("%s_%s.mp4", asset.ContentHash, version)
-
-	// Construct full path: .lumilio/assets/videos/web/{hash}_{version}.mp4
-	videoDir := filepath.Join(repoPath, ".lumilio/assets/videos", version)
-	videoPath := filepath.Join(videoDir, filename)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(videoDir, 0755); err != nil {
-		return fmt.Errorf("failed to create video directory: %w", err)
-	}
-
-	// Write the video file
-	file, err := os.Create(videoPath)
-	if err != nil {
-		return fmt.Errorf("failed to create video file: %w", err)
-	}
-	defer file.Close()
-
-	written, err := io.Copy(file, videoReader)
-	if err != nil {
-		// Clean up partial file on error
-		os.Remove(videoPath)
-		return fmt.Errorf("failed to write video: %w", err)
-	}
-
-	// Ensure: file was written
-	if written == 0 {
-		os.Remove(videoPath)
-		return fmt.Errorf("no data written for video version")
-	}
-
-	log.Printf("Saved video version %s for asset %s at path %s, bytes=%d", version, asset.AssetID.String(), videoPath, written)
-	return nil
-}
-
-// SaveAudioVersion saves an audio version of an asset.
-//
-// asset repo.Asset must be valid in following cases:
-//   - asset ID is not empty
-//   - asset hash is not empty
-//   - asset storage path is not empty
-func (s *assetService) SaveAudioVersion(ctx context.Context, repoPath string, audioReader io.Reader, asset *repo.Asset, version string) error {
-	// Require: valid inputs
-	if audioReader == nil {
-		return fmt.Errorf("audioReader cannot be nil")
-	}
-	if asset == nil {
-		return fmt.Errorf("asset cannot be nil")
-	}
-	if version == "" {
-		return fmt.Errorf("version cannot be empty")
-	}
-	if asset.ContentHash == "" {
-		return fmt.Errorf("asset hash is required")
-	}
-	if repoPath == "" {
-		return fmt.Errorf("repository path is required")
-	}
-
-	// Generate filename using hash and version
-	filename := fmt.Sprintf("%s_%s.mp3", asset.ContentHash, version)
-
-	// Construct full path: .lumilio/assets/audios/web/{hash}_{version}.mp3
-	audioDir := filepath.Join(repoPath, ".lumilio/assets/audios", version)
-	audioPath := filepath.Join(audioDir, filename)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(audioDir, 0755); err != nil {
-		return fmt.Errorf("failed to create audio directory: %w", err)
-	}
-
-	// Write the audio file
-	file, err := os.Create(audioPath)
-	if err != nil {
-		return fmt.Errorf("failed to create audio file: %w", err)
-	}
-	defer file.Close()
-
-	written, err := io.Copy(file, audioReader)
-	if err != nil {
-		// Clean up partial file on error
-		os.Remove(audioPath)
-		return fmt.Errorf("failed to write audio: %w", err)
-	}
-
-	// Ensure: file was written
-	if written == 0 {
-		os.Remove(audioPath)
-		return fmt.Errorf("no data written for audio version")
-	}
-
-	log.Printf("Saved audio version %s for asset %s at path %s, bytes=%d", version, asset.AssetID.String(), audioPath, written)
-	return nil
 }
 
 func (s *assetService) UpdateAssetDuration(ctx context.Context, id uuid.UUID, duration float64) error {
