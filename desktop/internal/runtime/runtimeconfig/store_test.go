@@ -9,6 +9,8 @@ import (
 
 	"desktop/internal/control/dto"
 	"desktop/internal/platform"
+
+	"github.com/google/uuid"
 )
 
 func TestFingerprintAndPointerRoundTrip(t *testing.T) {
@@ -212,7 +214,7 @@ func TestPatchDraftUpdatesStructuredSettingsThroughStrictLoader(t *testing.T) {
 	}
 }
 
-func TestPatchDraftRejectsDefaultStorageChangeAfterSetup(t *testing.T) {
+func TestPatchDraftAllowsMovedDefaultStorageIdentityAfterSetup(t *testing.T) {
 	paths, err := platform.NewPaths(filepath.Join(t.TempDir(), "app-data"))
 	if err != nil {
 		t.Fatal(err)
@@ -222,6 +224,16 @@ func TestPatchDraftRejectsDefaultStorageChangeAfterSetup(t *testing.T) {
 	}
 	store := NewStore(paths)
 	draft, err := store.ReadDraft()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldPath := filepath.Join(t.TempDir(), "default-old")
+	if err := os.MkdirAll(filepath.Join(oldPath, "primary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writePortableStorageIdentity(t, oldPath, uuid.NewString(), uuid.NewString())
+	draft.Settings.StoragePath = oldPath
+	draft, err = store.PatchDraft(draft.TOML, draft.Settings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,8 +248,80 @@ func TestPatchDraftRejectsDefaultStorageChangeAfterSetup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	draft.Settings.StoragePath = filepath.Join(t.TempDir(), "moved")
-	if _, err := store.PatchDraft(draft.TOML, draft.Settings); err == nil {
-		t.Fatal("configured default storage location was allowed to move")
+	newPath := filepath.Join(filepath.Dir(oldPath), "default-new")
+	if err := os.Rename(oldPath, newPath); err != nil {
+		t.Fatal(err)
+	}
+	draft.Settings.StoragePath = newPath
+	patched, err := store.PatchDraft(draft.TOML, draft.Settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if patched.Settings.StoragePath != newPath {
+		t.Fatalf("moved storage path = %q", patched.Settings.StoragePath)
+	}
+}
+
+func TestPatchDraftRejectsDefaultStorageIdentityMismatch(t *testing.T) {
+	paths, err := platform.NewPaths(filepath.Join(t.TempDir(), "app-data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := paths.Ensure(); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(paths)
+	draft, err := store.ReadDraft()
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := filepath.Join(t.TempDir(), "current")
+	if err := os.MkdirAll(filepath.Join(current, "primary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	currentRootID := uuid.NewString()
+	currentPrimaryID := uuid.NewString()
+	writePortableStorageIdentity(t, current, currentRootID, currentPrimaryID)
+	draft.Settings.StoragePath = current
+	draft, err = store.PatchDraft(draft.TOML, draft.Settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	validation, err := store.Validate(filepath.Join(paths.RuntimeIntents, "candidate.toml"), []byte(draft.TOML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteIntent(validation); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WritePointer(paths.RuntimeCurrent, validation.Fingerprint); err != nil {
+		t.Fatal(err)
+	}
+
+	candidate := filepath.Join(t.TempDir(), "different")
+	if err := os.MkdirAll(filepath.Join(candidate, "primary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writePortableStorageIdentity(t, candidate, currentRootID, uuid.NewString())
+	draft.Settings.StoragePath = candidate
+	if _, err := store.PatchDraft(draft.TOML, draft.Settings); err == nil || !strings.Contains(err.Error(), "primary repository identity") {
+		t.Fatalf("different primary identity error = %v", err)
+	}
+	writePortableStorageIdentity(t, candidate, uuid.NewString(), currentPrimaryID)
+	if _, err := store.PatchDraft(draft.TOML, draft.Settings); err == nil || !strings.Contains(err.Error(), ".lumilioroot identity") {
+		t.Fatalf("different root identity error = %v", err)
+	}
+}
+
+func writePortableStorageIdentity(t *testing.T, rootPath, rootID, primaryID string) {
+	t.Helper()
+	markers := map[string]string{
+		filepath.Join(rootPath, ".lumilioroot"):            "version: \"1.0\"\nid: " + rootID + "\n",
+		filepath.Join(rootPath, "primary", ".lumiliorepo"): "version: \"1.0\"\nid: " + primaryID + "\n",
+	}
+	for path, contents := range markers {
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

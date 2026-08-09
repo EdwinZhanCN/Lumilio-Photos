@@ -223,7 +223,7 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 // @Success 200 {object} dto.QueryAssetsResponseDTO "Assets listed successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 404 {object} api.ErrorResponse "Person not found"
-// @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
+// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/people/{id}/assets/list [post]
 func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
@@ -286,7 +286,7 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
+			api.GinError(c, 503, err, 503, "Image Semantic Analysis is currently unavailable")
 			return
 		}
 		log.Printf("Failed to list assets for person %d: %v", personID, err)
@@ -534,7 +534,7 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 
 // MergePeople merges one or more source people into the target person.
 // @Summary Merge people
-// @Description Merge one or more source people into the target person. Assets remain in the library and corrections become manual.
+// @Description Merge one or more source people into the target person. Assets remain in the Lumilio catalog and corrections become manual.
 // @Tags people
 // @Accept json
 // @Produce json

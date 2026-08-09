@@ -41,5 +41,3 @@ code-evidence:
 ## 成功标志
 
 创建后，默认存储位置下应出现 `primary/.lumiliorepo`、`primary/inbox/` 和 `primary/.lumilio/`。应用会解除主资源库门禁并进入正常页面。
-
-<!-- TODO(terminology): 当前初始化界面部分文案使用“主仓库”，本文统一称“主资源库”。可选术语：仓库、媒体库；为区分整个产品级媒体库与单个 Repository，暂不采用“媒体库”。 -->

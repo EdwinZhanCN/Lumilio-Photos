@@ -58,15 +58,20 @@ type RebuildAssetIndexesResponseDTO struct {
 
 type IndexingRepositoryOptionDTO struct {
 	ID   string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name string `json:"name" example:"Photos Library"`
+	Name string `json:"name" example:"Family Repository"`
 	// Path is only populated for admin callers; repository filesystem
 	// locations are never exposed to regular users.
 	Path string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
 	Role string `json:"role" example:"regular"`
-	// Status lets a selector keep an unreachable repository visible as a browse
-	// filter while refusing it as an upload target.
-	Status    string `json:"status" example:"active"`
-	IsPrimary bool   `json:"is_primary" example:"false"`
+	// RootID identifies the parent Storage Location so clients can derive an
+	// effective state with parent reachability taking priority.
+	RootID string `json:"root_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// Reachability lets a selector keep an unreachable repository visible as a
+	// browse filter while refusing it as an upload target. Activity is separate
+	// so scanning never masks storage availability.
+	Reachability string `json:"reachability" example:"active"`
+	Activity     string `json:"activity" example:"idle"`
+	IsPrimary    bool   `json:"is_primary" example:"false"`
 }
 
 type IndexingRepositoryListResponseDTO struct {
@@ -609,7 +614,7 @@ type TagSummaryListResponseDTO struct {
 // repository-relative; absolute host paths are never exposed here.
 type FolderSummaryDTO struct {
 	RepositoryID   string     `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RepositoryName string     `json:"repository_name" example:"Primary Library"`
+	RepositoryName string     `json:"repository_name" example:"Primary Repository"`
 	FolderPath     string     `json:"folder_path" example:"inbox/2026/05"`
 	DisplayName    string     `json:"display_name" example:"05"`
 	Depth          int        `json:"depth" example:"3"`

@@ -223,6 +223,7 @@ type CloudImportRun struct {
 	OwnerID         int32             `db:"owner_id" json:"owner_id"`
 	Provider        string            `db:"provider" json:"provider"`
 	Status          string            `db:"status" json:"status"`
+	ResumeOfRunID   *string           `db:"resume_of_run_id" json:"resume_of_run_id"`
 	TotalSeen       int64             `db:"total_seen" json:"total_seen"`
 	DownloadedCount int64             `db:"downloaded_count" json:"downloaded_count"`
 	ImportedCount   int64             `db:"imported_count" json:"imported_count"`
@@ -435,6 +436,70 @@ type FaceResult struct {
 	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type HostAction struct {
+	ActionID        string            `db:"action_id" json:"action_id"`
+	RequestID       string            `db:"request_id" json:"request_id"`
+	RequestHash     string            `db:"request_hash" json:"request_hash"`
+	Kind            string            `db:"kind" json:"kind"`
+	Actor           string            `db:"actor" json:"actor"`
+	ActorUserID     *int64            `db:"actor_user_id" json:"actor_user_id"`
+	HostInstanceID  string            `db:"host_instance_id" json:"host_instance_id"`
+	SessionID       uuid.UUID         `db:"session_id" json:"session_id"`
+	RequestSummary  string            `db:"request_summary" json:"request_summary"`
+	ExpectedVersion int64             `db:"expected_version" json:"expected_version"`
+	Nonce           string            `db:"nonce" json:"nonce"`
+	Status          string            `db:"status" json:"status"`
+	SelectedPath    *string           `db:"selected_path" json:"selected_path"`
+	Result          *string           `db:"result" json:"result"`
+	ErrorCode       *string           `db:"error_code" json:"error_code"`
+	ErrorMessage    *string           `db:"error_message" json:"error_message"`
+	ExpiresAt       dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	CompletedAt     *int64            `db:"completed_at" json:"completed_at"`
+}
+
+type LifecycleAuditEvent struct {
+	EventID          string  `db:"event_id" json:"event_id"`
+	OccurredAt       int64   `db:"occurred_at" json:"occurred_at"`
+	Actor            string  `db:"actor" json:"actor"`
+	ActorUserID      *int64  `db:"actor_user_id" json:"actor_user_id"`
+	HostInstanceID   string  `db:"host_instance_id" json:"host_instance_id"`
+	RequestID        string  `db:"request_id" json:"request_id"`
+	OperationID      *string `db:"operation_id" json:"operation_id"`
+	Action           string  `db:"action" json:"action"`
+	TargetType       string  `db:"target_type" json:"target_type"`
+	TargetID         *string `db:"target_id" json:"target_id"`
+	Source           string  `db:"source" json:"source"`
+	ConfirmationType string  `db:"confirmation_type" json:"confirmation_type"`
+	OldPath          *string `db:"old_path" json:"old_path"`
+	NewPath          *string `db:"new_path" json:"new_path"`
+	Result           string  `db:"result" json:"result"`
+	FailureStage     *string `db:"failure_stage" json:"failure_stage"`
+	Details          string  `db:"details" json:"details"`
+}
+
+type LifecycleOperation struct {
+	OperationID    string            `db:"operation_id" json:"operation_id"`
+	RequestID      string            `db:"request_id" json:"request_id"`
+	Kind           string            `db:"kind" json:"kind"`
+	PayloadHash    string            `db:"payload_hash" json:"payload_hash"`
+	Payload        dbtypes.JSON      `db:"payload" json:"payload"`
+	Actor          string            `db:"actor" json:"actor"`
+	ActorUserID    *int64            `db:"actor_user_id" json:"actor_user_id"`
+	HostInstanceID string            `db:"host_instance_id" json:"host_instance_id"`
+	TargetType     string            `db:"target_type" json:"target_type"`
+	TargetID       *string           `db:"target_id" json:"target_id"`
+	Phase          string            `db:"phase" json:"phase"`
+	Status         string            `db:"status" json:"status"`
+	Result         *dbtypes.JSON     `db:"result" json:"result"`
+	RollbackData   *dbtypes.JSON     `db:"rollback_data" json:"rollback_data"`
+	Error          *string           `db:"error" json:"error"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	CompletedAt    *int64            `db:"completed_at" json:"completed_at"`
+}
+
 type LocationCluster struct {
 	ClusterID         uuid.UUID         `db:"cluster_id" json:"cluster_id"`
 	OwnerID           *int32            `db:"owner_id" json:"owner_id"`
@@ -557,17 +622,19 @@ type RegistrationSession struct {
 }
 
 type Repository struct {
-	RepoID         uuid.UUID                `db:"repo_id" json:"repo_id"`
-	Name           string                   `db:"name" json:"name"`
-	Path           string                   `db:"path" json:"path"`
-	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
-	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
-	LastSync       dbtypes.Timestamp        `db:"last_sync" json:"last_sync"`
-	CreatedAt      dbtypes.Timestamp        `db:"created_at" json:"created_at"`
-	UpdatedAt      dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
-	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
-	Role           dbtypes.RepoRole         `db:"role" json:"role"`
-	RootID         uuid.NullUUID            `db:"root_id" json:"root_id"`
+	RepoID         uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Name           string                         `db:"name" json:"name"`
+	Path           string                         `db:"path" json:"path"`
+	Config         repocfg.RepositoryConfig       `db:"config" json:"config"`
+	Reachability   dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	Activity       dbtypes.RepositoryActivity     `db:"activity" json:"activity"`
+	PauseReason    string                         `db:"pause_reason" json:"pause_reason"`
+	LastSync       dbtypes.Timestamp              `db:"last_sync" json:"last_sync"`
+	CreatedAt      dbtypes.Timestamp              `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
+	DefaultOwnerID *int32                         `db:"default_owner_id" json:"default_owner_id"`
+	Role           dbtypes.RepoRole               `db:"role" json:"role"`
+	RootID         uuid.UUID                      `db:"root_id" json:"root_id"`
 }
 
 type RepositoryCloudBinding struct {
@@ -575,6 +642,7 @@ type RepositoryCloudBinding struct {
 	CredentialID    uuid.UUID         `db:"credential_id" json:"credential_id"`
 	OwnerID         int32             `db:"owner_id" json:"owner_id"`
 	Provider        string            `db:"provider" json:"provider"`
+	RemoteScope     dbtypes.JSON      `db:"remote_scope" json:"remote_scope"`
 	Enabled         bool              `db:"enabled" json:"enabled"`
 	LastImportRunID uuid.NullUUID     `db:"last_import_run_id" json:"last_import_run_id"`
 	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
@@ -614,13 +682,14 @@ type RepositoryFileIndex struct {
 }
 
 type RepositoryRoot struct {
-	RootID    uuid.UUID                    `db:"root_id" json:"root_id"`
-	Name      string                       `db:"name" json:"name"`
-	Path      string                       `db:"path" json:"path"`
-	Kind      dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
-	Status    dbtypes.RepositoryRootStatus `db:"status" json:"status"`
-	CreatedAt dbtypes.Timestamp            `db:"created_at" json:"created_at"`
-	UpdatedAt dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
+	RootID           uuid.UUID                    `db:"root_id" json:"root_id"`
+	Name             string                       `db:"name" json:"name"`
+	Path             string                       `db:"path" json:"path"`
+	Kind             dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
+	Status           dbtypes.RepositoryRootStatus `db:"status" json:"status"`
+	MountFingerprint string                       `db:"mount_fingerprint" json:"mount_fingerprint"`
+	CreatedAt        dbtypes.Timestamp            `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryScanRun struct {

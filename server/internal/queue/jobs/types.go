@@ -343,7 +343,7 @@ type MetadataArgs struct {
 func (MetadataArgs) Kind() string { return "metadata_asset" }
 
 func (MetadataArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
+	return localProcessingInsertOpts()
 }
 
 // ThumbnailArgs triggers thumbnail generation per asset.
@@ -356,7 +356,7 @@ type ThumbnailArgs struct {
 func (ThumbnailArgs) Kind() string { return "thumbnail_asset" }
 
 func (ThumbnailArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
+	return localProcessingInsertOpts()
 }
 
 // TranscodeArgs triggers audio/video transcoding per asset.
@@ -369,7 +369,23 @@ type TranscodeArgs struct {
 func (TranscodeArgs) Kind() string { return "transcode_asset" }
 
 func (TranscodeArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: LocalToolMaxAttempts}
+	return localProcessingInsertOpts()
+}
+
+func localProcessingInsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		MaxAttempts: LocalToolMaxAttempts,
+		UniqueOpts: river.UniqueOpts{
+			ByArgs: true,
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateRunning,
+				rivertype.JobStateScheduled,
+			},
+		},
+	}
 }
 
 // DatabaseBackupArgs is the periodic database-backup tick. The worker decides

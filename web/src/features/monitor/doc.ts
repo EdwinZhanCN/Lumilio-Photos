@@ -2,13 +2,13 @@
  * # Monitor
  *
  * Monitor owns the admin-only `/server-monitor` operational dashboard for
- * River queues, ML indexing coverage, rebuild commands, and runtime
- * capabilities. It observes and triggers backend work but does not define task
- * enablement, queue semantics, or repository configuration.
+ * River queues, ML indexing coverage, rebuild commands, runtime capabilities,
+ * and hierarchical storage health. It observes and triggers backend work but
+ * does not define task enablement, queue semantics, or repository configuration.
  *
  * ## State
  *
- * {@link MonitorOverview} keeps the selected queue/ML/capabilities tab in the
+ * {@link MonitorOverview} keeps the selected queue/ML/capabilities/storage tab in the
  * `tab` URL parameter. The ML view's optional repository scope is local to the
  * route and is not persisted as browse or upload preference.
  * {@link QueueSummaryList} keeps only expanded rows and transient copied status;
@@ -22,10 +22,12 @@
  * ```mermaid
  * flowchart TD
  *     ROUTE["/server-monitor"] --> ADMIN["admin gate"]
- *     ADMIN --> TABS["queue / ML / capabilities"]
+ *     ADMIN --> TABS["queue / ML / capabilities / storage"]
  *     TABS --> QUEUE["StatMonitor + QueueSummaryList"]
  *     TABS --> ML["MLMonitor"]
  *     TABS --> CAP["CapabilitiesMonitor"]
+ *     TABS --> STORAGE["StorageMonitor"]
+ *     STORAGE --> HISTORY["LifecycleHistory"]
  *     ML --> REPOSITORY["optional repository scope"]
  *     ML --> REBUILD["task rebuild"]
  * ```
@@ -33,7 +35,11 @@
  * {@link StatMonitor} and {@link QueueSummaryList} form the queue view.
  * {@link MLMonitor} combines coverage, repository options, and one confirmed
  * rebuild command. {@link CapabilitiesMonitor} is display-only; durable ML and
- * agent settings stay in Settings.
+ * agent settings stay in Settings. {@link StorageMonitor} groups repositories
+ * below their owning Storage Locations and exposes capacity, mount, risk, and
+ * redacted support-bundle diagnostics in a fixed-height master-detail pane
+ * whose tree and detail column scroll independently.
+ * {@link LifecycleHistory} renders the durable lifecycle audit below the pane.
  *
  * ## Data
  *
@@ -58,10 +64,12 @@ import type {
   useRebuildAssetIndexes,
 } from "./api/useAssetIndexing.ts";
 import type { CapabilitiesMonitor } from "./flows/overview/CapabilitiesMonitor.tsx";
+import type { LifecycleHistory } from "./flows/overview/LifecycleHistory.tsx";
 import type { MLMonitor } from "./flows/overview/MLMonitor.tsx";
 import type MonitorOverview from "./flows/overview/MonitorOverview.tsx";
 import type { QueueSummaryList } from "./flows/overview/QueueSummaryList.tsx";
 import type { StatMonitor } from "./flows/overview/StatMonitor.tsx";
+import type { StorageMonitor } from "./flows/overview/StorageMonitor.tsx";
 import type { useCapabilities } from "../../lib/capabilities/useCapabilities.ts";
 
 export {};

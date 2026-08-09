@@ -12,6 +12,40 @@ import (
 	"server/internal/db/dbtypes"
 )
 
+const beginCloudImportCancellation = `-- name: BeginCloudImportCancellation :one
+UPDATE cloud_import_runs
+SET status = 'cancelling',
+    error = NULL,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE run_id = ?1 AND status IN ('queued', 'running')
+RETURNING run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+`
+
+func (q *Queries) BeginCloudImportCancellation(ctx context.Context, runID uuid.UUID) (CloudImportRun, error) {
+	row := q.db.QueryRowContext(ctx, beginCloudImportCancellation, runID)
+	var i CloudImportRun
+	err := row.Scan(
+		&i.RunID,
+		&i.RepositoryID,
+		&i.CredentialID,
+		&i.OwnerID,
+		&i.Provider,
+		&i.Status,
+		&i.ResumeOfRunID,
+		&i.TotalSeen,
+		&i.DownloadedCount,
+		&i.ImportedCount,
+		&i.SkippedCount,
+		&i.FailedCount,
+		&i.Error,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const countRepositoryCloudBindingsByCredential = `-- name: CountRepositoryCloudBindingsByCredential :one
 SELECT COUNT(*) FROM repository_cloud_bindings
 WHERE credential_id = ?1 AND enabled = true
@@ -97,22 +131,24 @@ INSERT INTO cloud_import_runs (
     provider,
     status,
     owner_id,
+    resume_of_run_id,
     created_at,
     updated_at
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6,
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-) RETURNING run_id, repository_id, credential_id, owner_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+) RETURNING run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
 `
 
 type CreateCloudImportRunParams struct {
-	RunID        uuid.UUID `db:"run_id" json:"run_id"`
-	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
-	CredentialID uuid.UUID `db:"credential_id" json:"credential_id"`
-	Provider     string    `db:"provider" json:"provider"`
-	Status       string    `db:"status" json:"status"`
-	OwnerID      int32     `db:"owner_id" json:"owner_id"`
+	RunID         uuid.UUID `db:"run_id" json:"run_id"`
+	RepositoryID  uuid.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID  uuid.UUID `db:"credential_id" json:"credential_id"`
+	Provider      string    `db:"provider" json:"provider"`
+	Status        string    `db:"status" json:"status"`
+	OwnerID       int32     `db:"owner_id" json:"owner_id"`
+	ResumeOfRunID *string   `db:"resume_of_run_id" json:"resume_of_run_id"`
 }
 
 func (q *Queries) CreateCloudImportRun(ctx context.Context, arg CreateCloudImportRunParams) (CloudImportRun, error) {
@@ -123,6 +159,7 @@ func (q *Queries) CreateCloudImportRun(ctx context.Context, arg CreateCloudImpor
 		arg.Provider,
 		arg.Status,
 		arg.OwnerID,
+		arg.ResumeOfRunID,
 	)
 	var i CloudImportRun
 	err := row.Scan(
@@ -132,6 +169,7 @@ func (q *Queries) CreateCloudImportRun(ctx context.Context, arg CreateCloudImpor
 		&i.OwnerID,
 		&i.Provider,
 		&i.Status,
+		&i.ResumeOfRunID,
 		&i.TotalSeen,
 		&i.DownloadedCount,
 		&i.ImportedCount,
@@ -167,14 +205,63 @@ func (q *Queries) DisableRepositoryCloudBindingsByCredential(ctx context.Context
 	return err
 }
 
+const finalizeCloudImportCancellation = `-- name: FinalizeCloudImportCancellation :one
+UPDATE cloud_import_runs
+SET status = 'cancelled',
+    error = NULL,
+    finished_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE run_id = ?1 AND status = 'cancelling'
+RETURNING run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+`
+
+func (q *Queries) FinalizeCloudImportCancellation(ctx context.Context, runID uuid.UUID) (CloudImportRun, error) {
+	row := q.db.QueryRowContext(ctx, finalizeCloudImportCancellation, runID)
+	var i CloudImportRun
+	err := row.Scan(
+		&i.RunID,
+		&i.RepositoryID,
+		&i.CredentialID,
+		&i.OwnerID,
+		&i.Provider,
+		&i.Status,
+		&i.ResumeOfRunID,
+		&i.TotalSeen,
+		&i.DownloadedCount,
+		&i.ImportedCount,
+		&i.SkippedCount,
+		&i.FailedCount,
+		&i.Error,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const finalizeStaleCloudImportCancellations = `-- name: FinalizeStaleCloudImportCancellations :exec
+UPDATE cloud_import_runs
+SET status = 'cancelled',
+    error = NULL,
+    finished_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE status = 'cancelling'
+`
+
+func (q *Queries) FinalizeStaleCloudImportCancellations(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, finalizeStaleCloudImportCancellations)
+	return err
+}
+
 const finishCloudImportRun = `-- name: FinishCloudImportRun :one
 UPDATE cloud_import_runs
 SET status = ?2,
     error = ?3,
     finished_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE run_id = ?1
-RETURNING run_id, repository_id, credential_id, owner_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+WHERE run_id = ?1 AND status NOT IN ('cancelling', 'cancelled')
+RETURNING run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
 `
 
 type FinishCloudImportRunParams struct {
@@ -193,6 +280,7 @@ func (q *Queries) FinishCloudImportRun(ctx context.Context, arg FinishCloudImpor
 		&i.OwnerID,
 		&i.Provider,
 		&i.Status,
+		&i.ResumeOfRunID,
 		&i.TotalSeen,
 		&i.DownloadedCount,
 		&i.ImportedCount,
@@ -208,7 +296,7 @@ func (q *Queries) FinishCloudImportRun(ctx context.Context, arg FinishCloudImpor
 }
 
 const getActiveRepositoryCloudBinding = `-- name: GetActiveRepositoryCloudBinding :one
-SELECT repository_id, credential_id, owner_id, provider, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+SELECT repository_id, credential_id, owner_id, provider, remote_scope, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
 WHERE repository_id = ?1 AND enabled = true
 ORDER BY created_at DESC
 LIMIT 1
@@ -222,6 +310,34 @@ func (q *Queries) GetActiveRepositoryCloudBinding(ctx context.Context, repositor
 		&i.CredentialID,
 		&i.OwnerID,
 		&i.Provider,
+		&i.RemoteScope,
+		&i.Enabled,
+		&i.LastImportRunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getActiveRepositoryCloudBindingByCredential = `-- name: GetActiveRepositoryCloudBindingByCredential :one
+SELECT repository_id, credential_id, owner_id, provider, remote_scope, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+WHERE repository_id = ?1 AND credential_id = ?2 AND enabled = true
+`
+
+type GetActiveRepositoryCloudBindingByCredentialParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID uuid.UUID `db:"credential_id" json:"credential_id"`
+}
+
+func (q *Queries) GetActiveRepositoryCloudBindingByCredential(ctx context.Context, arg GetActiveRepositoryCloudBindingByCredentialParams) (RepositoryCloudBinding, error) {
+	row := q.db.QueryRowContext(ctx, getActiveRepositoryCloudBindingByCredential, arg.RepositoryID, arg.CredentialID)
+	var i RepositoryCloudBinding
+	err := row.Scan(
+		&i.RepositoryID,
+		&i.CredentialID,
+		&i.OwnerID,
+		&i.Provider,
+		&i.RemoteScope,
 		&i.Enabled,
 		&i.LastImportRunID,
 		&i.CreatedAt,
@@ -286,7 +402,7 @@ func (q *Queries) GetCloudCredentialByIdentity(ctx context.Context, arg GetCloud
 }
 
 const getCloudImportRun = `-- name: GetCloudImportRun :one
-SELECT run_id, repository_id, credential_id, owner_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at FROM cloud_import_runs
+SELECT run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at FROM cloud_import_runs
 WHERE run_id = ?1
 `
 
@@ -300,6 +416,7 @@ func (q *Queries) GetCloudImportRun(ctx context.Context, runID uuid.UUID) (Cloud
 		&i.OwnerID,
 		&i.Provider,
 		&i.Status,
+		&i.ResumeOfRunID,
 		&i.TotalSeen,
 		&i.DownloadedCount,
 		&i.ImportedCount,
@@ -315,7 +432,7 @@ func (q *Queries) GetCloudImportRun(ctx context.Context, runID uuid.UUID) (Cloud
 }
 
 const getRepositoryCloudBinding = `-- name: GetRepositoryCloudBinding :one
-SELECT repository_id, credential_id, owner_id, provider, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+SELECT repository_id, credential_id, owner_id, provider, remote_scope, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
 WHERE repository_id = ?1 AND provider = ?2
 `
 
@@ -332,6 +449,34 @@ func (q *Queries) GetRepositoryCloudBinding(ctx context.Context, arg GetReposito
 		&i.CredentialID,
 		&i.OwnerID,
 		&i.Provider,
+		&i.RemoteScope,
+		&i.Enabled,
+		&i.LastImportRunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getRepositoryCloudBindingByCredential = `-- name: GetRepositoryCloudBindingByCredential :one
+SELECT repository_id, credential_id, owner_id, provider, remote_scope, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+WHERE repository_id = ?1 AND credential_id = ?2
+`
+
+type GetRepositoryCloudBindingByCredentialParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID uuid.UUID `db:"credential_id" json:"credential_id"`
+}
+
+func (q *Queries) GetRepositoryCloudBindingByCredential(ctx context.Context, arg GetRepositoryCloudBindingByCredentialParams) (RepositoryCloudBinding, error) {
+	row := q.db.QueryRowContext(ctx, getRepositoryCloudBindingByCredential, arg.RepositoryID, arg.CredentialID)
+	var i RepositoryCloudBinding
+	err := row.Scan(
+		&i.RepositoryID,
+		&i.CredentialID,
+		&i.OwnerID,
+		&i.Provider,
+		&i.RemoteScope,
 		&i.Enabled,
 		&i.LastImportRunID,
 		&i.CreatedAt,
@@ -350,7 +495,7 @@ SET
     failed_count = failed_count + ?6,
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 WHERE run_id = ?1
-RETURNING run_id, repository_id, credential_id, owner_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+RETURNING run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
 `
 
 type IncrementCloudImportRunCountsParams struct {
@@ -379,6 +524,7 @@ func (q *Queries) IncrementCloudImportRunCounts(ctx context.Context, arg Increme
 		&i.OwnerID,
 		&i.Provider,
 		&i.Status,
+		&i.ResumeOfRunID,
 		&i.TotalSeen,
 		&i.DownloadedCount,
 		&i.ImportedCount,
@@ -395,6 +541,7 @@ func (q *Queries) IncrementCloudImportRunCounts(ctx context.Context, arg Increme
 
 const listCloudCredentials = `-- name: ListCloudCredentials :many
 SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
+WHERE status <> 'removed'
 ORDER BY created_at DESC
 `
 
@@ -436,7 +583,7 @@ func (q *Queries) ListCloudCredentials(ctx context.Context) ([]CloudCredential, 
 
 const listCloudCredentialsForOwner = `-- name: ListCloudCredentialsForOwner :many
 SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
-WHERE owner_id = ?1
+WHERE owner_id = ?1 AND status <> 'removed'
 ORDER BY created_at DESC
 `
 
@@ -477,7 +624,7 @@ func (q *Queries) ListCloudCredentialsForOwner(ctx context.Context, ownerID int3
 }
 
 const listCloudImportRunsForRepository = `-- name: ListCloudImportRunsForRepository :many
-SELECT run_id, repository_id, credential_id, owner_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at FROM cloud_import_runs
+SELECT run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at FROM cloud_import_runs
 WHERE repository_id = ?1
 ORDER BY created_at DESC
 LIMIT ?2 OFFSET ?3
@@ -505,6 +652,7 @@ func (q *Queries) ListCloudImportRunsForRepository(ctx context.Context, arg List
 			&i.OwnerID,
 			&i.Provider,
 			&i.Status,
+			&i.ResumeOfRunID,
 			&i.TotalSeen,
 			&i.DownloadedCount,
 			&i.ImportedCount,
@@ -530,7 +678,7 @@ func (q *Queries) ListCloudImportRunsForRepository(ctx context.Context, arg List
 }
 
 const listRepositoryCloudBindings = `-- name: ListRepositoryCloudBindings :many
-SELECT repository_id, credential_id, owner_id, provider, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+SELECT repository_id, credential_id, owner_id, provider, remote_scope, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
 WHERE repository_id = ?1
 ORDER BY created_at DESC
 `
@@ -549,6 +697,7 @@ func (q *Queries) ListRepositoryCloudBindings(ctx context.Context, repositoryID 
 			&i.CredentialID,
 			&i.OwnerID,
 			&i.Provider,
+			&i.RemoteScope,
 			&i.Enabled,
 			&i.LastImportRunID,
 			&i.CreatedAt,
@@ -572,8 +721,8 @@ UPDATE cloud_import_runs
 SET status = 'running',
     started_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE run_id = ?1
-RETURNING run_id, repository_id, credential_id, owner_id, provider, status, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
+WHERE run_id = ?1 AND status = 'queued'
+RETURNING run_id, repository_id, credential_id, owner_id, provider, status, resume_of_run_id, total_seen, downloaded_count, imported_count, skipped_count, failed_count, error, started_at, finished_at, created_at, updated_at
 `
 
 func (q *Queries) MarkCloudImportRunStarted(ctx context.Context, runID uuid.UUID) (CloudImportRun, error) {
@@ -586,6 +735,7 @@ func (q *Queries) MarkCloudImportRunStarted(ctx context.Context, runID uuid.UUID
 		&i.OwnerID,
 		&i.Provider,
 		&i.Status,
+		&i.ResumeOfRunID,
 		&i.TotalSeen,
 		&i.DownloadedCount,
 		&i.ImportedCount,
@@ -611,6 +761,38 @@ WHERE status IN ('queued', 'running')
 func (q *Queries) MarkStaleCloudImportRunsInterrupted(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, markStaleCloudImportRunsInterrupted)
 	return err
+}
+
+const retireCloudCredential = `-- name: RetireCloudCredential :one
+UPDATE cloud_credentials
+SET status = 'removed',
+    secret_ciphertext = NULL,
+    public_config = '{}',
+    artifact_dir = NULL,
+    masked_identity = '',
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE credential_id = ?1
+RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, owner_id, created_at, updated_at, public_config, secret_ciphertext
+`
+
+func (q *Queries) RetireCloudCredential(ctx context.Context, credentialID uuid.UUID) (CloudCredential, error) {
+	row := q.db.QueryRowContext(ctx, retireCloudCredential, credentialID)
+	var i CloudCredential
+	err := row.Scan(
+		&i.CredentialID,
+		&i.Provider,
+		&i.DisplayName,
+		&i.IdentityHash,
+		&i.MaskedIdentity,
+		&i.Status,
+		&i.ArtifactDir,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PublicConfig,
+		&i.SecretCiphertext,
+	)
+	return i, err
 }
 
 const updateCloudCredentialAuthState = `-- name: UpdateCloudCredentialAuthState :one
@@ -693,24 +875,25 @@ func (q *Queries) UpdateCloudCredentialStatus(ctx context.Context, arg UpdateClo
 const updateRepositoryCloudBindingLastRun = `-- name: UpdateRepositoryCloudBindingLastRun :one
 UPDATE repository_cloud_bindings
 SET last_import_run_id = ?3, updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE repository_id = ?1 AND provider = ?2
-RETURNING repository_id, credential_id, owner_id, provider, enabled, last_import_run_id, created_at, updated_at
+WHERE repository_id = ?1 AND credential_id = ?2
+RETURNING repository_id, credential_id, owner_id, provider, remote_scope, enabled, last_import_run_id, created_at, updated_at
 `
 
 type UpdateRepositoryCloudBindingLastRunParams struct {
 	RepositoryID    uuid.UUID     `db:"repository_id" json:"repository_id"`
-	Provider        string        `db:"provider" json:"provider"`
+	CredentialID    uuid.UUID     `db:"credential_id" json:"credential_id"`
 	LastImportRunID uuid.NullUUID `db:"last_import_run_id" json:"last_import_run_id"`
 }
 
 func (q *Queries) UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg UpdateRepositoryCloudBindingLastRunParams) (RepositoryCloudBinding, error) {
-	row := q.db.QueryRowContext(ctx, updateRepositoryCloudBindingLastRun, arg.RepositoryID, arg.Provider, arg.LastImportRunID)
+	row := q.db.QueryRowContext(ctx, updateRepositoryCloudBindingLastRun, arg.RepositoryID, arg.CredentialID, arg.LastImportRunID)
 	var i RepositoryCloudBinding
 	err := row.Scan(
 		&i.RepositoryID,
 		&i.CredentialID,
 		&i.OwnerID,
 		&i.Provider,
+		&i.RemoteScope,
 		&i.Enabled,
 		&i.LastImportRunID,
 		&i.CreatedAt,
@@ -725,29 +908,31 @@ INSERT INTO repository_cloud_bindings (
     credential_id,
     provider,
     owner_id,
+    remote_scope,
     enabled,
     last_import_run_id,
     created_at,
     updated_at
 ) VALUES (
-    ?1, ?2, ?3, ?4, true, NULL,
+    ?1, ?2, ?3, ?4, ?5, true, NULL,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
-ON CONFLICT (repository_id, provider)
+ON CONFLICT (repository_id, credential_id)
 DO UPDATE SET
-    credential_id = ?2,
     owner_id = ?4,
+    remote_scope = ?5,
     enabled = true,
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-RETURNING repository_id, credential_id, owner_id, provider, enabled, last_import_run_id, created_at, updated_at
+RETURNING repository_id, credential_id, owner_id, provider, remote_scope, enabled, last_import_run_id, created_at, updated_at
 `
 
 type UpsertRepositoryCloudBindingParams struct {
-	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
-	CredentialID uuid.UUID `db:"credential_id" json:"credential_id"`
-	Provider     string    `db:"provider" json:"provider"`
-	OwnerID      int32     `db:"owner_id" json:"owner_id"`
+	RepositoryID uuid.UUID    `db:"repository_id" json:"repository_id"`
+	CredentialID uuid.UUID    `db:"credential_id" json:"credential_id"`
+	Provider     string       `db:"provider" json:"provider"`
+	OwnerID      int32        `db:"owner_id" json:"owner_id"`
+	RemoteScope  dbtypes.JSON `db:"remote_scope" json:"remote_scope"`
 }
 
 func (q *Queries) UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error) {
@@ -756,6 +941,7 @@ func (q *Queries) UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRe
 		arg.CredentialID,
 		arg.Provider,
 		arg.OwnerID,
+		arg.RemoteScope,
 	)
 	var i RepositoryCloudBinding
 	err := row.Scan(
@@ -763,6 +949,7 @@ func (q *Queries) UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRe
 		&i.CredentialID,
 		&i.OwnerID,
 		&i.Provider,
+		&i.RemoteScope,
 		&i.Enabled,
 		&i.LastImportRunID,
 		&i.CreatedAt,

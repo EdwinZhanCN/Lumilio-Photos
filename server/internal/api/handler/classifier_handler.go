@@ -19,9 +19,9 @@ func NewClassifierHandler(classifierService service.ClassifierService) *Classifi
 	return &ClassifierHandler{classifierService: classifierService}
 }
 
-// PreviewClassifier evaluates an ad-hoc zero-shot classifier over the library.
+// PreviewClassifier evaluates an ad-hoc zero-shot classifier over catalog assets.
 // @Summary Preview a zero-shot classifier
-// @Description Embed positive/negative prompts with semantic and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.
+// @Description Embed positive/negative prompts with Image Semantic Analysis and return catalog assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.
 // @Tags classifiers
 // @Accept json
 // @Produce json

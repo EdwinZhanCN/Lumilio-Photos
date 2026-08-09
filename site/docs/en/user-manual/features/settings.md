@@ -35,7 +35,7 @@ In the **Cloud import** tab, click **Add credential**, pick a provider from the 
 - **Reconnect**: re-establishes a session with the saved credential;
 - **Remove**: deletes the local credential and session data. Media already imported into a repository is not deleted.
 
-Cloud credentials do not import anything by themselves. Import starts only when you create a repository with a cloud source or click **Import from cloud** on a repository card bound to a cloud credential.
+Cloud credentials do not import anything by themselves. Create or open the destination repository separately, then click **Import from cloud** on its repository card.
 
 ::: warning Credentials and authorization
 Enter cloud account passwords only on trusted Lumilio pages. Disconnecting or removing a local credential does not revoke other authorizations on the cloud provider's side; to fully revoke, also check the provider's account security page.
@@ -47,7 +47,7 @@ The **Server** tab contains:
 
 - **Health check interval**: how often this browser checks whether the Server is online, 1–50 seconds;
 - **Database backups**: enable automatic backups, choose an interval, set how many to keep, and create, download, restore, or delete a backup immediately;
-- **Runtime configuration**: a read-only projection of the parsed TOML manifest, for example listen address, TLS, storage root, scanning, and Lumen Intelligence status.
+- **Runtime configuration**: a read-only projection of the parsed TOML manifest, for example listen address, TLS, Default Storage Location, scanning, and Lumen Intelligence status.
 
 In-app backups contain only the SQLite catalog data (albums, people, edit records, and so on) — not the original media files. Restore is **asynchronous**: clicking **Restore** only submits the request (the server returns `202 Accepted` with an operation ID); it does not mean the restore is complete. The page may briefly disconnect during the controlled restart, which is expected; you can use the operation ID to keep observing the same operation from the settings page. The flow moves through staged, restart, install, and verify; if verification fails, the previous database is restored. See [Backup and data integrity](../introduction/integrity). Before restoring, confirm the backup time and source are correct and that the original media and application data have their own independent backup.
 

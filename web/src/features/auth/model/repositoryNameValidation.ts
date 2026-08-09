@@ -20,12 +20,12 @@ export function repositoryNameErrorMessage(error: RepositoryNameError, t: Transl
     case "tooManyBytes":
       return t(
         "manage.repositories.createNameTooManyBytes",
-        "The name is too long when encoded for the filesystem.",
+        "The name cannot exceed 240 UTF-8 bytes.",
       );
-    case "unsupportedCharacter":
+    case "controlCharacter":
       return t(
-        "manage.repositories.createNameUnsupportedCharacter",
-        "Use only letters, numbers, spaces, hyphens, and underscores.",
+        "manage.repositories.createNameControlCharacter",
+        "The name cannot contain control characters.",
       );
   }
 }

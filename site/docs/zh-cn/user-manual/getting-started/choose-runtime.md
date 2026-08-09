@@ -36,7 +36,7 @@ Desktop 通过 Wails 承载界面，并在应用内部启动 Server 与 SQLite�
 
 ## Docker Server
 
-Docker 镜像以非 root 用户运行，媒体与应用私有状态必须通过不同挂载保存。默认 Compose 使用主机网络并在 `6680` 端口提供 HTTP 服务。Docker 的 Web 管理面目前只能列出已知存储位置，不能像 Desktop 一样通过目录选择器注册任意新根目录。
+Docker 镜像以非 root 用户运行，媒体与应用私有状态必须通过不同挂载保存。默认 Compose 使用主机网络并在 `6680` 端口提供 HTTP 服务。Web 不能像 Desktop 一样选择任意宿主机目录，但可检查默认存储位置下预先挂载的一级子目录，并明确创建或打开符合条件的候选。
 
 ::: tip 简化原则
 个人电脑优先选择 Desktop；需要多人和长期在线时选择 Docker Server。不要仅因为“以后可能会扩展”而提前承担不必要的容器和网络复杂度。

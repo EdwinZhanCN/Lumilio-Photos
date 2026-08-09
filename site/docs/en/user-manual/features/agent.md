@@ -11,7 +11,7 @@ Lumilio Agent is the conversational organizing assistant: describe what you want
 
 **Build an album from selected photos**:
 
-1. Select a batch of photos in the library (the selection scope is shown next to your message);
+1. Select a batch of photos from your Repositories (the selection scope is shown next to your message);
 2. Ask: “Put these photos into an album called Beach Holiday”;
 3. Check the impact scope the Agent shows (target album, media count);
 4. Click **confirm** — this only submits; the interface shows `submitting → committed / rejected / failed / cancelled`;
@@ -31,7 +31,7 @@ A result set is a **working snapshot** of the current query and permissions; new
 - **Disabled**: the administrator turned off “Enable Lumilio Agent”;
 - **Unreachable**: configured but connection fails, the secret is invalid, or validation did not pass.
 
-All three states are shown honestly. **The base media library does not depend on the Agent** — importing, browsing, and organizing keep working in every state.
+All three states are shown honestly. **Core media management does not depend on the Agent** — importing, browsing, and organizing keep working in every state.
 
 ## Configuration and privacy
 

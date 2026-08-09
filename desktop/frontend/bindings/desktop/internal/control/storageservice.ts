@@ -9,12 +9,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as dto$0 from "./dto/models.js";
 
-export function AddLocation(requestID: string, expectedVersion: number, path: string, name: string): $CancellablePromise<dto$0.OperationReceipt> {
-    return $Call.ByID(2693934117, requestID, expectedVersion, path, name);
+export function ApproveHostAction(requestID: string, expectedVersion: number, actionID: string, nonce: string): $CancellablePromise<dto$0.OperationReceipt> {
+    return $Call.ByID(1294281888, requestID, expectedVersion, actionID, nonce);
 }
 
-export function AttachRepository(requestID: string, expectedVersion: number, path: string): $CancellablePromise<dto$0.OperationReceipt> {
-    return $Call.ByID(2532803878, requestID, expectedVersion, path);
+export function DeclineHostAction(actionID: string): $CancellablePromise<void> {
+    return $Call.ByID(2463511999, actionID);
+}
+
+export function ListHostActions(): $CancellablePromise<dto$0.HostActionTicket[] | null> {
+    return $Call.ByID(3798355756);
 }
 
 export function ListShortcuts(): $CancellablePromise<dto$0.StorageShortcut[] | null> {

@@ -15,6 +15,13 @@ export {
   useRemoveCloudCredential,
   useVerifyCloudCredentialChallenge,
 } from "./api/useCloudCredentials";
-export { useRepositoryCloudStatus, useStartRepositoryCloudImport } from "./api/useRepositoryCloud";
+export {
+  useBindRepositoryCloudSource,
+  useCancelCloudImport,
+  useRepositoryCloudStatus,
+  useResumeCloudImport,
+  useStartRepositoryCloudImport,
+} from "./api/useRepositoryCloud";
+export { default as CloudSourcesModal } from "./flows/repository-sources/CloudSourcesModal";
 export { createProviderTextResolver } from "./model/providerText";
 export type { ProviderTextResolver } from "./model/providerText";

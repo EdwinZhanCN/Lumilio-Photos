@@ -16,22 +16,26 @@ import (
 
 // AssetProcessor holds shared dependencies for per-task processors.
 type AssetProcessor struct {
-	assetService     service.AssetService
-	queries          *repo.Queries
-	files            *storage.RepositoryFSFactory
-	materializer     *sourcing.SourceMaterializer
-	queueClient      *river.Client[*sql.Tx]
-	settingsService  service.SettingsService
-	embeddingService service.EmbeddingService
-	lumenService     service.LumenService
-	transcodeConfig  config.TranscodeConfig
-	toolsConfig      config.ToolsConfig
-	logger           *zap.Logger
-	auditProvider    logging.RepositoryAuditProvider
+	database          *sql.DB
+	assetService      service.AssetService
+	queries           *repo.Queries
+	files             *storage.RepositoryFSFactory
+	repositories      storage.RepositoryManager
+	materializer      *sourcing.SourceMaterializer
+	queueClient       *river.Client[*sql.Tx]
+	settingsService   service.SettingsService
+	embeddingService  service.EmbeddingService
+	lumenService      service.LumenService
+	transcodeConfig   config.TranscodeConfig
+	toolsConfig       config.ToolsConfig
+	logger            *zap.Logger
+	auditProvider     logging.RepositoryAuditProvider
+	beforeRetryInsert func(queue string) error
 }
 
 // NewAssetProcessor constructs the processor with required dependencies.
 func NewAssetProcessor(
+	database *sql.DB,
 	assetService service.AssetService,
 	queries *repo.Queries,
 	materializer *sourcing.SourceMaterializer,
@@ -44,6 +48,7 @@ func NewAssetProcessor(
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 	files *storage.RepositoryFSFactory,
+	repositories storage.RepositoryManager,
 ) *AssetProcessor {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -52,9 +57,11 @@ func NewAssetProcessor(
 		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
 	return &AssetProcessor{
+		database:         database,
 		assetService:     assetService,
 		queries:          queries,
 		files:            files,
+		repositories:     repositories,
 		materializer:     materializer,
 		queueClient:      queueClient,
 		settingsService:  settingsService,

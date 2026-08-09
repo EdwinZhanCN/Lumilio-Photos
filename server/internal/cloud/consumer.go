@@ -62,7 +62,7 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 		remoteKey, keyOK := candidate.Metadata["remote_key"].(string)
 		etag, etagOK := candidate.Metadata["remote_etag"].(string)
 		if !providerOK || !keyOK || !etagOK {
-			return fmt.Errorf("cloud candidate metadata is incomplete")
+			return sourcing.WithStagingOwnership(fmt.Errorf("cloud candidate metadata is incomplete"), true)
 		}
 
 		// Record the synced etag so subsequent runs skip this remote file via
@@ -79,7 +79,7 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 				zap.String("asset_id", assetUUID.String()),
 				zap.Error(err),
 			)
-			return fmt.Errorf("mark cloud file synced: %w", err)
+			return sourcing.WithStagingOwnership(fmt.Errorf("mark cloud file synced: %w", err), true)
 		}
 
 		if asset != nil {

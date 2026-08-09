@@ -33,8 +33,14 @@ export interface SettingsDraftController {
   phase: SettingsDraftPhase;
   dirty: boolean;
   error: string | null;
-  updateRuntime: <K extends keyof RuntimeConfigSettings>(key: K, value: RuntimeConfigSettings[K]) => void;
-  updatePreference: <K extends keyof DesktopPreferences>(key: K, value: DesktopPreferences[K]) => void;
+  updateRuntime: <K extends keyof RuntimeConfigSettings>(
+    key: K,
+    value: RuntimeConfigSettings[K],
+  ) => void;
+  updatePreference: <K extends keyof DesktopPreferences>(
+    key: K,
+    value: DesktopPreferences[K],
+  ) => void;
   chooseDefaultStorage: () => Promise<void>;
   cancel: () => Promise<void>;
   save: () => Promise<boolean>;
@@ -61,6 +67,7 @@ export function useSettingsDraft(
   const successTimer = useRef<number | null>(null);
   const operationWaiters = useRef(new Set<number>());
   const loadedInstance = useRef("");
+  const savedStoragePath = useRef("");
 
   snapshotRef.current = snapshot;
 
@@ -74,6 +81,7 @@ export function useSettingsDraft(
     setRuntimeDirty(firstRun);
     setPhase(firstRun ? "draft" : "saved");
     setError(null);
+    savedStoragePath.current = next.settings.storagePath;
   }, []);
 
   const load = useCallback(async () => {
@@ -101,38 +109,61 @@ export function useSettingsDraft(
     void load();
   }, [load, snapshot]);
 
-  useEffect(() => () => {
-    if (successTimer.current !== null) window.clearTimeout(successTimer.current);
-    for (const timer of operationWaiters.current) window.clearInterval(timer);
-    operationWaiters.current.clear();
-  }, []);
+  useEffect(
+    () => () => {
+      if (successTimer.current !== null) window.clearTimeout(successTimer.current);
+      for (const timer of operationWaiters.current) window.clearInterval(timer);
+      operationWaiters.current.clear();
+    },
+    [],
+  );
 
-  const waitForOperation = useCallback((receipt: OperationReceipt) => new Promise<void>((resolve, reject) => {
-    const deadline = Date.now() + 120_000;
-    const finish = (timer: number, result?: Error) => {
-      window.clearInterval(timer);
-      operationWaiters.current.delete(timer);
-      if (result) reject(result);
-      else resolve();
-    };
-    const inspect = (timer: number) => {
-      const operation = snapshotRef.current?.operations?.find((item) => item.operationID === receipt.operationID);
-      if (operation?.state === "succeeded") {
-        finish(timer);
-        return;
-      }
-      if (operation?.state === "failed" || operation?.state === "cancelled") {
-        finish(timer, new Error(operation.error?.message || t("toast.settingsSaveFailed", "Settings could not be saved")));
-        return;
-      }
-      if (Date.now() >= deadline) {
-        finish(timer, new Error(t("toast.settingsOperationTimeout", "The settings operation did not finish in time. Review the Server status before retrying.")));
-      }
-    };
-    const timer = window.setInterval(() => inspect(timer), 100);
-    operationWaiters.current.add(timer);
-    inspect(timer);
-  }), [t]);
+  const waitForOperation = useCallback(
+    (receipt: OperationReceipt) =>
+      new Promise<void>((resolve, reject) => {
+        const deadline = Date.now() + 120_000;
+        const finish = (timer: number, result?: Error) => {
+          window.clearInterval(timer);
+          operationWaiters.current.delete(timer);
+          if (result) reject(result);
+          else resolve();
+        };
+        const inspect = (timer: number) => {
+          const operation = snapshotRef.current?.operations?.find(
+            (item) => item.operationID === receipt.operationID,
+          );
+          if (operation?.state === "succeeded") {
+            finish(timer);
+            return;
+          }
+          if (operation?.state === "failed" || operation?.state === "cancelled") {
+            finish(
+              timer,
+              new Error(
+                operation.error?.message ||
+                  t("toast.settingsSaveFailed", "Settings could not be saved"),
+              ),
+            );
+            return;
+          }
+          if (Date.now() >= deadline) {
+            finish(
+              timer,
+              new Error(
+                t(
+                  "toast.settingsOperationTimeout",
+                  "The settings operation did not finish in time. Review the Server status before retrying.",
+                ),
+              ),
+            );
+          }
+        };
+        const timer = window.setInterval(() => inspect(timer), 100);
+        operationWaiters.current.add(timer);
+        inspect(timer);
+      }),
+    [t],
+  );
 
   const patchRuntime = useCallback(async (next: RuntimeConfigSettings) => {
     runtimeRef.current = next;
@@ -144,7 +175,9 @@ export function useSettingsDraft(
     try {
       const patched = await RuntimeService.PatchConfigDraft(candidateRef.current, next);
       if (sequence !== patchSequence.current) return;
-      setRuntimeDraft((current) => current ? { ...patched, baseFingerprint: current.baseFingerprint } : patched);
+      setRuntimeDraft((current) =>
+        current ? { ...patched, baseFingerprint: current.baseFingerprint } : patched,
+      );
       setRuntime(patched.settings);
       runtimeRef.current = patched.settings;
       candidateRef.current = patched.toml;
@@ -159,13 +192,19 @@ export function useSettingsDraft(
     }
   }, []);
 
-  const updateRuntime = <K extends keyof RuntimeConfigSettings>(key: K, value: RuntimeConfigSettings[K]) => {
+  const updateRuntime = <K extends keyof RuntimeConfigSettings>(
+    key: K,
+    value: RuntimeConfigSettings[K],
+  ) => {
     const current = runtimeRef.current;
     if (!current) return;
     void patchRuntime({ ...current, [key]: value });
   };
 
-  const updatePreference = <K extends keyof DesktopPreferences>(key: K, value: DesktopPreferences[K]) => {
+  const updatePreference = <K extends keyof DesktopPreferences>(
+    key: K,
+    value: DesktopPreferences[K],
+  ) => {
     setPreferences((current) => {
       if (!current) return current;
       const next = { ...current, [key]: value };
@@ -178,10 +217,26 @@ export function useSettingsDraft(
 
   const chooseDefaultStorage = async () => {
     try {
-      const path = await StorageService.PickLocation(t("storage.chooseDefaultLocation", "Choose the default Lumilio Photos storage location"));
-      if (path) updateRuntime("storagePath", path);
+      const path = await StorageService.PickLocation(
+        t("storage.chooseDefaultLocation", "Choose the default Lumilio Photos storage location"),
+      );
+      if (!path || path === runtimeRef.current?.storagePath) return;
+      if (savedStoragePath.current) {
+        const confirmed = window.confirm(
+          t(
+            "storage.defaultLocationMigrationConfirmation",
+            "Before applying this change, move the complete default Storage Location to the selected folder. Lumilio will verify the existing .lumilioroot identity and fixed primary/.lumiliorepo marker during the controlled Server restart. It will not copy files or create a new identity. Continue?",
+          ),
+        );
+        if (!confirmed) return;
+      }
+      updateRuntime("storagePath", path);
     } catch (reason: unknown) {
-      showToast({ title: t("toast.storagePickFailed", "Folder could not be selected"), description: errorMessage(reason), status: "error" });
+      showToast({
+        title: t("toast.storagePickFailed", "Folder could not be selected"),
+        description: errorMessage(reason),
+        status: "error",
+      });
     }
   };
 
@@ -194,7 +249,13 @@ export function useSettingsDraft(
     const currentSnapshot = snapshotRef.current;
     const currentDraft = runtimeDraft;
     const currentPreferences = preferences;
-    if (!currentSnapshot || !currentDraft || !currentPreferences || phase === "preparing" || phase === "saving") {
+    if (
+      !currentSnapshot ||
+      !currentDraft ||
+      !currentPreferences ||
+      phase === "preparing" ||
+      phase === "saving"
+    ) {
       return false;
     }
     setPhase("saving");
@@ -212,9 +273,14 @@ export function useSettingsDraft(
         const checked = await RuntimeService.ValidateConfig(candidateRef.current);
         setValidation(checked);
         if (!checked.valid) {
-          throw new Error(checked.issues?.[0]?.message || t("server.settingsInvalid", "Server settings are invalid"));
+          throw new Error(
+            checked.issues?.[0]?.message ||
+              t("server.settingsInvalid", "Server settings are invalid"),
+          );
         }
-        const running = currentSnapshot.runtime.phase === "running" && currentSnapshot.runtime.ownership === "held";
+        const running =
+          currentSnapshot.runtime.phase === "running" &&
+          currentSnapshot.runtime.ownership === "held";
         const requestID = `config-${crypto.randomUUID()}`;
         let receipt: OperationReceipt;
         if (running) {
@@ -270,10 +336,12 @@ export function useSettingsDraft(
 }
 
 function preferencesEqual(left: DesktopPreferences, right: DesktopPreferences | null) {
-  return right !== null
-    && left.locale === right.locale
-    && left.region === right.region
-    && left.updateChannel === right.updateChannel
-    && left.theme === right.theme
-    && left.openProductOnLaunch === right.openProductOnLaunch;
+  return (
+    right !== null &&
+    left.locale === right.locale &&
+    left.region === right.region &&
+    left.updateChannel === right.updateChannel &&
+    left.theme === right.theme &&
+    left.openProductOnLaunch === right.openProductOnLaunch
+  );
 }

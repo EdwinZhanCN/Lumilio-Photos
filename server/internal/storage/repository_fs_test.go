@@ -15,6 +15,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/rootcfg"
 	"server/internal/utils/hash"
 
 	"github.com/google/uuid"
@@ -27,7 +28,7 @@ func TestRepositoryFSOpenFailsClosedOnStatusAndIdentity(t *testing.T) {
 	factory := NewRepositoryFSFactory(nil, nil)
 
 	offline := repository
-	offline.Status = dbtypes.RepoStatusOffline
+	offline.Reachability = dbtypes.RepositoryReachabilityOffline
 	if _, err := factory.Open(offline); !errors.Is(err, ErrRepositoryUnavailable) {
 		t.Fatalf("offline error = %v", err)
 	}
@@ -75,6 +76,36 @@ func TestRepositoryFSWalkIncludesInboxAndProtectsPrivateTree(t *testing.T) {
 	for _, unwanted := range []string{".lumilio/assets/private.jpg", ".lumiliorepo", "notes.txt"} {
 		if paths[unwanted] {
 			t.Errorf("unexpected observation for %s", unwanted)
+		}
+	}
+}
+
+func TestRepositoryFSWalkStopsAtNestedRepositoryBoundary(t *testing.T) {
+	t.Parallel()
+
+	repository := createRepositoryFSTestRoot(t)
+	writeRepositoryFSTestFile(t, repository.Path, "outside.jpg", []byte("outside"))
+	nestedPath := filepath.Join(repository.Path, "nested")
+	if err := os.MkdirAll(nestedPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	nestedConfig := repocfg.NewRepositoryConfig("Nested")
+	if err := nestedConfig.SaveConfigToFile(nestedPath); err != nil {
+		t.Fatal(err)
+	}
+	writeRepositoryFSTestFile(t, repository.Path, "nested/must-not-scan.jpg", []byte("nested"))
+
+	repositoryFS := openRepositoryFSTestFS(t, repository)
+	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{ScanID: uuid.New()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Authoritative || !errors.Is(summary.Issues[0].Err, ErrNestedRepository) {
+		t.Fatalf("summary = %#v, want nested-repository topology failure", summary)
+	}
+	for _, observation := range summary.Observations {
+		if observation.Path.String() == "nested/must-not-scan.jpg" {
+			t.Fatal("walk crossed nested .lumiliorepo boundary")
 		}
 	}
 }
@@ -229,9 +260,23 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 
 	stale := createRepositoryFSTestRoot(t)
 	now := dbtypes.NewTimestamp(time.Now().UTC())
+	rootID := uuid.New()
+	rootMarker := rootcfg.New("test root")
+	rootMarker.ID = rootID.String()
+	if err := rootMarker.Save(filepath.Dir(stale.Path)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: "test root", Path: filepath.Dir(stale.Path),
+		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	stale, err = catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: stale.RepoID, Name: "relocated", Path: stale.Path, Config: stale.Config,
-		Role: dbtypes.RepoRoleRegular, Status: dbtypes.RepoStatusActive, CreatedAt: now, UpdatedAt: now,
+		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive,
+		Activity: dbtypes.RepositoryActivityIdle, CreatedAt: now, UpdatedAt: now, RootID: rootID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -245,7 +290,8 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	coordinator := NewRepositoryAccessCoordinator()
 	release := coordinator.AcquireMutation(stale.RepoID)
 	if _, err := catalog.Queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-		RepoID: stale.RepoID, Path: newPath, Status: dbtypes.RepoStatusActive, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		RepoID: stale.RepoID, Path: newPath, RootID: rootID,
+		Reachability: dbtypes.RepositoryReachabilityActive, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}); err != nil {
 		release()
 		t.Fatal(err)
@@ -274,10 +320,11 @@ func createRepositoryFSTestRoot(t *testing.T) repo.Repository {
 		t.Fatal(err)
 	}
 	return repo.Repository{
-		RepoID: repositoryID,
-		Path:   repositoryPath,
-		Status: dbtypes.RepoStatusActive,
-		Config: *config,
+		RepoID:       repositoryID,
+		Path:         repositoryPath,
+		Reachability: dbtypes.RepositoryReachabilityActive,
+		Activity:     dbtypes.RepositoryActivityIdle,
+		Config:       *config,
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"server/internal/logging"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/rootcfg"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -94,9 +95,23 @@ func TestCommitAndQuarantineFailurePreservesRecoverableEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
+	rootID := uuid.New()
+	rootConfig := rootcfg.New("failure root")
+	rootConfig.ID = rootID.String()
+	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: "failure root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "failure evidence", Path: repositoryPath, Config: *repositoryConfig,
-		Role: dbtypes.RepoRoleRegular, Status: dbtypes.RepoStatusActive, CreatedAt: now, UpdatedAt: now,
+		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
+		CreatedAt: now, UpdatedAt: now, RootID: rootID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -130,6 +145,9 @@ func TestCommitAndQuarantineFailurePreservesRecoverableEvidence(t *testing.T) {
 	if asset != nil || !errors.Is(err, commitErr) {
 		t.Fatalf("materialize = %+v/%v", asset, err)
 	}
+	if !StagingIsPrepared(err) {
+		t.Fatalf("prepared commit failure did not transfer staging ownership: %v", err)
+	}
 	repositoryFS, err := files.Open(repository)
 	if err != nil {
 		t.Fatal(err)
@@ -155,9 +173,19 @@ func TestCommitAndQuarantineFailurePreservesRecoverableEvidence(t *testing.T) {
 		catalog, actualStaging, newTestPipelineClient(t, catalog), zap.NewNop(),
 		logging.NewRepositoryAuditProvider(zap.NewNop(), false), files,
 	)
+	redundant, redundantWriter, err := actualStaging.CreateStagingFile(repository, "original.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := redundantWriter.WriteString("only original media"); err != nil {
+		t.Fatal(err)
+	}
+	if err := redundantWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
 	recovered, err := restarted.MaterializeStaged(ctx, IngestSource{
-		RepositoryID: repositoryID, Kind: IngestSourceUpload, StagingPath: staged.PrivatePath,
-		OriginalFilename: "original.jpg", Timestamp: staged.CreatedAt, ContentType: "image/jpeg",
+		RepositoryID: repositoryID, Kind: IngestSourceCloud, StagingPath: redundant.PrivatePath,
+		OriginalFilename: "original.jpg", Timestamp: redundant.CreatedAt, ContentType: "image/jpeg",
 	})
 	if err != nil {
 		t.Fatalf("recover prepared ingest after restart: %v", err)
@@ -165,10 +193,37 @@ func TestCommitAndQuarantineFailurePreservesRecoverableEvidence(t *testing.T) {
 	if recovered.AssetID != assets[0].AssetID {
 		t.Fatalf("recovery replaced asset %s with %s", assets[0].AssetID, recovered.AssetID)
 	}
+	redundantPath, _ := storage.ParsePrivateRepositoryPath(redundant.PrivatePath)
+	repositoryFS, err = files.Open(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repositoryFS.StatPrivate(redundantPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("resume left redundant staging file: %v", err)
+	}
+	_ = repositoryFS.Close()
+	assets, err = catalog.Queries.ListAssetsByRepositoryAny(ctx, uuid.NullUUID{UUID: repositoryID, Valid: true})
+	if err != nil || len(assets) != 1 {
+		t.Fatalf("resume created duplicate assets = %d/%v", len(assets), err)
+	}
 	indexed, err := catalog.Queries.GetRepositoryFileIndexEntry(ctx, repo.GetRepositoryFileIndexEntryParams{
 		RepositoryID: repositoryID, StoragePath: *recovered.StoragePath,
 	})
 	if err != nil || !indexed.AssetID.Valid || indexed.AssetID.UUID != recovered.AssetID {
 		t.Fatalf("recovered index binding = %+v/%v", indexed, err)
+	}
+}
+
+func TestMaterializerReportsUnclaimedStagingBeforePreparation(t *testing.T) {
+	materializer := &SourceMaterializer{}
+	_, err := materializer.MaterializeStaged(context.Background(), IngestSource{
+		Kind: IngestSourceCloud, OriginalFilename: "malware.exe", ContentType: "application/octet-stream",
+	})
+	if err == nil {
+		t.Fatal("invalid cloud candidate unexpectedly materialized")
+	}
+	var ownership *StagingMaterializationError
+	if !errors.As(err, &ownership) || ownership.Prepared {
+		t.Fatalf("preparation ownership = %#v, error = %v", ownership, err)
 	}
 }

@@ -65,7 +65,13 @@ export default function BackupSection() {
 
   useEffect(() => {
     const latest = latestRestoreQuery.data;
-    if (restoreOperationID || !latest || latest.status === "completed" || latest.status === "rolled_back" || latest.status === "failed") {
+    if (
+      restoreOperationID ||
+      !latest ||
+      latest.status === "completed" ||
+      latest.status === "rolled_back" ||
+      latest.status === "failed"
+    ) {
       return;
     }
     saveRestoreOperationID(latest.id);
@@ -165,7 +171,7 @@ export default function BackupSection() {
       title={t("settings.serverSettings.backup.title", { defaultValue: "Database backups" })}
       description={t("settings.serverSettings.backup.description", {
         defaultValue:
-          "Automatic dumps of the metadata database (albums, people, edits) stored in the library's backups folder. Media files are not included.",
+          "Automatic snapshots of the metadata database (albums, people, edits) stored in the configured backups folder. Repository media files are not included.",
       })}
     >
       <SettingsRow

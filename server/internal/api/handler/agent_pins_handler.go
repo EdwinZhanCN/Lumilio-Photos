@@ -236,7 +236,7 @@ func (h *AgentHandler) resolvePinAssetSource(c *gin.Context) (*service.AssetSetS
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
 // @Failure 404 {object} api.ErrorResponse "Pin not found"
-// @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
+// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/agent/pins/{id}/assets/list [post]
 func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
@@ -288,7 +288,7 @@ func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
+			api.GinError(c, 503, err, 503, "Image Semantic Analysis is currently unavailable")
 			return
 		}
 		log.Printf("Failed to query pin assets: %v", err)

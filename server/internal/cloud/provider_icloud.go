@@ -126,7 +126,7 @@ func (p *ICloudProvider) IsAuthenticated() bool {
 
 // List retrieves all photos from iCloud "All Photos" album in a paginated way
 // using the provided Cursor.
-func (p *ICloudProvider) List(ctx context.Context, repoID uuid.UUID, cursor *Cursor) (*Page, error) {
+func (p *ICloudProvider) List(ctx context.Context, repoID uuid.UUID, cursor *Cursor, remoteScope map[string]string) (*Page, error) {
 	_ = repoID
 
 	photoCli, err := p.ensurePhotoCli(ctx)
@@ -134,9 +134,13 @@ func (p *ICloudProvider) List(ctx context.Context, repoID uuid.UUID, cursor *Cur
 		return nil, err
 	}
 
-	album, err := photoCli.GetAlbum(icloud.AlbumNameAll)
+	albumName := icloud.AlbumNameAll
+	if requested := strings.TrimSpace(remoteScope["album"]); requested != "" {
+		albumName = requested
+	}
+	album, err := photoCli.GetAlbum(albumName)
 	if err != nil {
-		return nil, fmt.Errorf("get all photos album: %w", err)
+		return nil, fmt.Errorf("get remote album %q: %w", albumName, err)
 	}
 
 	offset := int64(0)

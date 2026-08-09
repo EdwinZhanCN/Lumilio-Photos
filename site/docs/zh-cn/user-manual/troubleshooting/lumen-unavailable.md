@@ -22,7 +22,7 @@ code-evidence:
 
 ## Desktop
 
-查看 Lumen 安装、当前版本、进程状态、缓存和日志。主 Server 正常而 Lumen 子进程失败时，基本媒体库应继续可用。
+查看 Lumen 安装、当前版本、进程状态、缓存和日志。主 Server 正常而 Lumen 子进程失败时，基础照片管理应继续可用。
 
 ## Docker 或独立节点
 

@@ -11,6 +11,22 @@ import (
 	"github.com/google/uuid"
 )
 
+const deleteCloudSyncCursorForSource = `-- name: DeleteCloudSyncCursorForSource :exec
+DELETE FROM cloud_sync_cursors
+WHERE repository_id = ?1 AND credential_id = ?2 AND provider = ?3
+`
+
+type DeleteCloudSyncCursorForSourceParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID uuid.UUID `db:"credential_id" json:"credential_id"`
+	Provider     string    `db:"provider" json:"provider"`
+}
+
+func (q *Queries) DeleteCloudSyncCursorForSource(ctx context.Context, arg DeleteCloudSyncCursorForSourceParams) error {
+	_, err := q.db.ExecContext(ctx, deleteCloudSyncCursorForSource, arg.RepositoryID, arg.CredentialID, arg.Provider)
+	return err
+}
+
 const getCloudSyncCursor = `-- name: GetCloudSyncCursor :one
 SELECT cursor_value FROM cloud_sync_cursors
 WHERE repository_id = ?1 AND credential_id = ?2 AND provider = ?3

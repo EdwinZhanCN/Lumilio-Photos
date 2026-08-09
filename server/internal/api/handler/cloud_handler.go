@@ -306,9 +306,11 @@ func (h *CloudHandler) RemoveCredential(c *gin.Context) {
 // @Summary Start repository cloud import
 // @Description Start an import run for the repository's configured cloud credential.
 // @Tags cloud
+// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
+// @Param request body dto.StartRepositoryCloudImportRequest false "Cloud source selection"
 // @Success 200 {object} dto.StartCloudImportResponse "Import started"
 // @Failure 400 {object} api.ErrorResponse "Invalid request"
 // @Failure 401 {object} api.ErrorResponse "Unauthorized"
@@ -326,8 +328,24 @@ func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 		return
 	}
 
+	var req dto.StartRepositoryCloudImportRequest
+	if c.Request.ContentLength != 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			api.GinBadRequest(c, err, "Invalid request data")
+			return
+		}
+	}
+	var credentialID uuid.UUID
+	if req.CredentialID != "" {
+		credentialID, err = uuid.Parse(req.CredentialID)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid credential id")
+			return
+		}
+	}
 	runID, err := h.cloudService.StartRepositoryImport(c.Request.Context(), cloud.StartRepositoryImportInput{
 		RepositoryID: repositoryID,
+		CredentialID: credentialID,
 		Access:       cloudCredentialAccess(user),
 	})
 	if err != nil {
@@ -335,6 +353,55 @@ func (h *CloudHandler) StartRepositoryImport(c *gin.Context) {
 		return
 	}
 
+	run, err := h.cloudService.GetImportRun(c.Request.Context(), runID, cloudCredentialAccess(user))
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to load cloud import run")
+		return
+	}
+	api.JSONOK(c, dto.StartCloudImportResponse{Run: toCloudImportRunDTO(run)})
+}
+
+// BindRepositoryCloudSource binds a credential and starts its first import.
+// @Summary Bind a cloud source to a repository
+// @Description Bind one user-owned credential plus remote scope to an existing repository and start an independent import run.
+// @Tags cloud
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Repository UUID"
+// @Param request body dto.BindRepositoryCloudSourceRequest true "Cloud source"
+// @Success 200 {object} dto.StartCloudImportResponse "Source bound and import started"
+// @Router /api/v1/repositories/{id}/cloud/sources [post]
+func (h *CloudHandler) BindRepositoryCloudSource(c *gin.Context) {
+	user, ok := requireAdminUser(c)
+	if !ok {
+		return
+	}
+	repositoryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid repository id")
+		return
+	}
+	var req dto.BindRepositoryCloudSourceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+	credentialID, err := uuid.Parse(req.CredentialID)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid credential id")
+		return
+	}
+	runID, err := h.cloudService.BindRepositoryCredentialAndStartImport(c.Request.Context(), cloud.BindRepositoryCredentialInput{
+		RepositoryID: repositoryID,
+		CredentialID: credentialID,
+		RemoteScope:  req.RemoteScope,
+		Access:       cloudCredentialAccess(user),
+	})
+	if err != nil {
+		writeCloudAccessError(c, err, "Failed to bind cloud source")
+		return
+	}
 	run, err := h.cloudService.GetImportRun(c.Request.Context(), runID, cloudCredentialAccess(user))
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to load cloud import run")
@@ -406,6 +473,63 @@ func (h *CloudHandler) GetImportRun(c *gin.Context) {
 		return
 	}
 	api.JSONOK(c, toCloudImportRunDTO(run))
+}
+
+// CancelImportRun durably cancels one exact cloud import receipt.
+// @Summary Cancel cloud import run
+// @Tags cloud
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Import run UUID"
+// @Success 200 {object} dto.CloudImportRunDTO "Cancelled run"
+// @Router /api/v1/cloud/import-runs/{id}/cancel [post]
+func (h *CloudHandler) CancelImportRun(c *gin.Context) {
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	runID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid import run id")
+		return
+	}
+	run, err := h.cloudService.CancelImportRun(c.Request.Context(), runID, cloudCredentialAccess(user))
+	if err != nil {
+		writeCloudAccessError(c, err, "Failed to cancel cloud import run")
+		return
+	}
+	api.JSONOK(c, toCloudImportRunDTO(run))
+}
+
+// ResumeImportRun starts a new receipt from an interrupted, failed, or cancelled run.
+// @Summary Resume cloud import run
+// @Tags cloud
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Import run UUID"
+// @Success 200 {object} dto.StartCloudImportResponse "Resumed import"
+// @Router /api/v1/cloud/import-runs/{id}/resume [post]
+func (h *CloudHandler) ResumeImportRun(c *gin.Context) {
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	runID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid import run id")
+		return
+	}
+	resumedID, err := h.cloudService.ResumeImportRun(c.Request.Context(), runID, cloudCredentialAccess(user))
+	if err != nil {
+		writeCloudAccessError(c, err, "Failed to resume cloud import run")
+		return
+	}
+	run, err := h.cloudService.GetImportRun(c.Request.Context(), resumedID, cloudCredentialAccess(user))
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to load resumed cloud import run")
+		return
+	}
+	api.JSONOK(c, dto.StartCloudImportResponse{Run: toCloudImportRunDTO(run)})
 }
 
 // TriggerSync is kept temporarily as an explicit deprecation response.
@@ -503,14 +627,30 @@ func toCloudImportRunDTO(run repo.CloudImportRun) dto.CloudImportRunDTO {
 }
 
 func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus, cloudService cloud.CloudSyncService) dto.RepositoryCloudStatusDTO {
+	result := dto.RepositoryCloudStatusDTO{Sources: make([]dto.RepositoryCloudSourceDTO, 0, len(status.Sources))}
+	for _, source := range status.Sources {
+		item := dto.RepositoryCloudSourceDTO{
+			Provider:    source.Binding.Provider,
+			OwnerID:     source.Binding.OwnerID,
+			Enabled:     source.Binding.Enabled,
+			RemoteScope: publicConfigMap(source.Binding.RemoteScope),
+			Credential:  toCloudCredentialDTO(source.Credential, cloudService.ProviderTitle(cloud.ProviderKind(source.Credential.Provider))),
+		}
+		if source.Binding.LastImportRunID.Valid {
+			item.LastImportRun = source.Binding.LastImportRunID.UUID.String()
+		}
+		if source.LatestRun != nil {
+			run := toCloudImportRunDTO(*source.LatestRun)
+			item.LatestRun = &run
+		}
+		result.Sources = append(result.Sources, item)
+	}
 	if status.Binding == nil {
-		return dto.RepositoryCloudStatusDTO{}
+		return result
 	}
-	result := dto.RepositoryCloudStatusDTO{
-		Provider: status.Binding.Provider,
-		Enabled:  status.Binding.Enabled,
-		OwnerID:  status.Binding.OwnerID,
-	}
+	result.Provider = status.Binding.Provider
+	result.Enabled = status.Binding.Enabled
+	result.OwnerID = status.Binding.OwnerID
 	if status.Binding.LastImportRunID.Valid {
 		result.LastImportRun = status.Binding.LastImportRunID.UUID.String()
 	}

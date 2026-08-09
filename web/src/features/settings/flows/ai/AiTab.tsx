@@ -91,30 +91,30 @@ export default function AiTab() {
   const mlTasks = [
     {
       key: "semanticEnabled",
-      label: t("settings.aiSettings.taskNames.semantic"),
+      label: t("settings.aiSettings.taskNames.semantic", "Image Semantic Analysis"),
       description: t("settings.aiSettings.taskDescriptions.semantic"),
     },
     {
       key: "videoSemanticEnabled",
-      label: t("settings.aiSettings.taskNames.videoSemantic", "Video semantic search"),
+      label: t("settings.aiSettings.taskNames.videoSemantic", "Image Semantic Analysis (video)"),
       description: t(
         "settings.aiSettings.taskDescriptions.videoSemantic",
-        "Embed sampled frames from videos for text search. Requires semantic search.",
+        "Embed sampled frames from videos for text search. Requires Image Semantic Analysis.",
       ),
     },
     {
       key: "bioclipEnabled",
-      label: t("settings.aiSettings.taskNames.bioclip"),
+      label: t("settings.aiSettings.taskNames.bioclip", "BioCLIP Species Recognition"),
       description: t("settings.aiSettings.taskDescriptions.bioclip"),
     },
     {
       key: "ocrEnabled",
-      label: t("settings.aiSettings.taskNames.ocr"),
+      label: t("settings.aiSettings.taskNames.ocr", "OCR Text Recognition"),
       description: t("settings.aiSettings.taskDescriptions.ocr"),
     },
     {
       key: "faceEnabled",
-      label: t("settings.aiSettings.taskNames.face"),
+      label: t("settings.aiSettings.taskNames.face", "Person Recognition"),
       description: t("settings.aiSettings.taskDescriptions.face"),
     },
   ] as const;

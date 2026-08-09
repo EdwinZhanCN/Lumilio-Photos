@@ -1,6 +1,6 @@
 # Home
 
-Home owns the authenticated `/` dashboard: featured media, library
+Home owns the authenticated `/` dashboard: featured media, catalog
 statistics, and a bounded spacetime-map preview. It is a read-oriented
 composition surface; editing, asset browsing, collection membership, upload
 destinations, and preference persistence remain with their owning features.

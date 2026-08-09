@@ -24,9 +24,9 @@ code-evidence:
 
 ## 它适合什么情况
 
-流明集适合已经拥有照片、RAW、视频或音频目录，希望在不把原件锁入私有容器的前提下建立统一媒体库的人。它也适合愿意为家庭媒体库负责存储、账户、备份和升级的一位管理员。
+流明集适合已经拥有照片、RAW、视频或音频目录，希望在不把原件锁入私有容器的前提下建立统一照片收藏的人。它也适合愿意为家庭资源库负责存储、账户、备份和升级的一位管理员。
 
-媒体浏览和基本整理不依赖 Lumen Intelligence。语义搜索、OCR、人物识别、BioCLIP 分类等能力需要可用的 Lumen Intelligence 节点；Lumilio Agent 还需要管理员配置受支持的模型提供方。
+媒体浏览和基本整理不依赖 Lumen Intelligence。图像语义分析、OCR文字识别、人物识别、BioCLIP物种识别等能力需要可用的 Lumen Intelligence 节点；Lumilio Agent 还需要管理员配置受支持的模型提供方。
 
 ## 它当前不是什么
 
@@ -37,7 +37,7 @@ code-evidence:
 ## 产品组成
 
 - **流明集（Lumilio Photos）**：Web、Server 与 Desktop 组成的媒体管理产品。
-- **Lumen Intelligence**：独立的计算能力层，为流明集提供语义、OCR、人物和分类等任务。
+- **Lumen Intelligence**：独立的计算能力层，为流明集提供图像语义分析、OCR文字识别、人物识别和BioCLIP物种识别等任务。
 - **Lumilio Agent**：在明确权限和确认机制下，通过模型提供方协助检索与整理媒体。
 
 <!-- TODO(product-positioning): 当前注册入口在初始化后仍公开存在，因此“家庭成员由管理员邀请加入”并不符合代码。可选方向：关闭公开注册、邀请码、管理员创建账户。本文只描述现状。 -->

@@ -143,10 +143,10 @@ func openProcessorRepositoryFS(t *testing.T) *storage.RepositoryFS {
 		t.Fatal(err)
 	}
 	files, err := storage.NewRepositoryFSFactory(nil, nil).Open(repo.Repository{
-		RepoID: repositoryID,
-		Path:   repositoryPath,
-		Status: dbtypes.RepoStatusActive,
-		Config: *config,
+		RepoID:       repositoryID,
+		Path:         repositoryPath,
+		Reachability: dbtypes.RepositoryReachabilityActive,
+		Config:       *config,
 	})
 	if err != nil {
 		t.Fatal(err)

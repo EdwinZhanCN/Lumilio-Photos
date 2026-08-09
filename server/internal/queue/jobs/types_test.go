@@ -67,6 +67,25 @@ func TestAssetRetryPayloadDedupesOnlyOverlappingRequestsPerAsset(t *testing.T) {
 	}
 }
 
+func TestLocalProcessingJobsDeduplicateOnlyActiveEquivalentWork(t *testing.T) {
+	t.Parallel()
+	for name, opts := range map[string]river.InsertOpts{
+		"metadata":  (MetadataArgs{}).InsertOpts(),
+		"thumbnail": (ThumbnailArgs{}).InsertOpts(),
+		"transcode": (TranscodeArgs{}).InsertOpts(),
+	} {
+		if !opts.UniqueOpts.ByArgs {
+			t.Fatalf("%s retry jobs must deduplicate identical arguments", name)
+		}
+		if slices.Contains(opts.UniqueOpts.ByState, rivertype.JobStateCompleted) {
+			t.Fatalf("completed %s work must not block a later explicit retry", name)
+		}
+		if !slices.Contains(opts.UniqueOpts.ByState, rivertype.JobStateRunning) {
+			t.Fatalf("running %s work must block duplicate retry fan-out", name)
+		}
+	}
+}
+
 func TestScanRepositoryArgsKindAndInsertOpts(t *testing.T) {
 	args := ScanRepositoryArgs{
 		RepositoryID: "11111111-1111-1111-1111-111111111111",

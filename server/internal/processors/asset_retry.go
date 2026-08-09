@@ -2,6 +2,7 @@ package processors
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 
@@ -33,6 +34,14 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	if err != nil {
 		return fmt.Errorf("asset not found: %w", err)
 	}
+	if !asset.RepositoryID.Valid || ap.repositories == nil {
+		return fmt.Errorf("asset retry repository gate unavailable")
+	}
+	_, releaseWork, err := ap.repositories.BeginRepositoryWork(ctx, asset.RepositoryID.UUID.String(), dbtypes.RepositoryActivityProcessing)
+	if err != nil {
+		return err
+	}
+	defer releaseWork()
 
 	// Parse current status
 	var currentStatus status.AssetStatus
@@ -60,7 +69,13 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 		return fmt.Errorf("no failed tasks to retry")
 	}
 
-	err = ap.queries.MutateAssetStatus(ctx, asset.AssetID, func(current status.AssetStatus) (status.AssetStatus, error) {
+	tx, err := ap.database.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin asset retry transaction: %w", err)
+	}
+	defer tx.Rollback()
+	txQueries := ap.queries.WithTx(tx)
+	err = txQueries.MutateAssetStatus(ctx, asset.AssetID, func(current status.AssetStatus) (status.AssetStatus, error) {
 		current.EnsureTasks(tasksToRetry)
 		for _, taskName := range tasksToRetry {
 			current.MarkTaskPending(taskName, fmt.Sprintf("Retry queued for %s", taskName))
@@ -74,13 +89,20 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	// Re-enqueue tasks based on failed task names (using queue names as canonical task names)
 	assetType := dbtypes.AssetType(asset.Type)
 	log.Printf("Retrying %d tasks for %s asset %s: %v", len(tasksToRetry), assetType, asset.AssetID.String(), tasksToRetry)
-	return ap.enqueueRetryTasks(ctx, &asset, assetType, tasksToRetry, source.observation.ObservationToken)
+	if err := ap.enqueueRetryTasks(ctx, tx, &asset, assetType, tasksToRetry, source.observation.ObservationToken); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit asset retry transaction: %w", err)
+	}
+	return nil
 }
 
 // enqueueRetryTasks re-enqueues specific tasks to their respective queues.
 // tasksToRetry uses queue names directly (bijection: queue name = task identifier).
 func (ap *AssetProcessor) enqueueRetryTasks(
 	ctx context.Context,
+	tx *sql.Tx,
 	asset *repo.Asset,
 	assetType dbtypes.AssetType,
 	tasksToRetry []string,
@@ -108,7 +130,7 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 
 	// Enqueue metadata_asset if requested (all asset types support metadata)
 	if queueSet["metadata_asset"] {
-		_, err := ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
+		err := ap.insertRetryJob(ctx, tx, commonMeta, "metadata_asset")
 		if err != nil {
 			return fmt.Errorf("enqueue metadata_asset retry: %w", err)
 		}
@@ -119,13 +141,13 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	if queueSet["thumbnail_asset"] {
 		switch assetType {
 		case dbtypes.AssetTypePhoto:
-			_, err := ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
+			err := ap.insertRetryJob(ctx, tx, commonThumb, "thumbnail_asset")
 			if err != nil {
 				return fmt.Errorf("enqueue thumbnail_asset retry for photo: %w", err)
 			}
 			log.Printf("Enqueued thumbnail task for photo asset %s", asset.AssetID.String())
 		case dbtypes.AssetTypeVideo:
-			_, err := ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
+			err := ap.insertRetryJob(ctx, tx, commonThumb, "thumbnail_asset")
 			if err != nil {
 				return fmt.Errorf("enqueue thumbnail_asset retry for video: %w", err)
 			}
@@ -142,13 +164,13 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	if queueSet["transcode_asset"] {
 		switch assetType {
 		case dbtypes.AssetTypeVideo:
-			_, err := ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
+			err := ap.insertRetryJob(ctx, tx, commonTranscode, "transcode_asset")
 			if err != nil {
 				return fmt.Errorf("enqueue transcode_asset retry for video: %w", err)
 			}
 			log.Printf("Enqueued transcode task for video asset %s", asset.AssetID.String())
 		case dbtypes.AssetTypeAudio:
-			_, err := ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
+			err := ap.insertRetryJob(ctx, tx, commonTranscode, "transcode_asset")
 			if err != nil {
 				return fmt.Errorf("enqueue transcode_asset retry for audio: %w", err)
 			}
@@ -166,14 +188,23 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	if assetType == dbtypes.AssetTypePhoto {
 		// Check each ML task queue name
 		if queueSet["process_semantic"] || queueSet["process_bioclip"] || queueSet["process_ocr"] || queueSet["process_face"] {
-			err := ap.retryMLJobs(ctx, asset, queueSet)
+			err := ap.retryMLJobs(ctx, tx, asset, queueSet)
 			if err != nil {
 				return fmt.Errorf("enqueue ML retry: %w", err)
 			}
 		}
 	}
 	if assetType == dbtypes.AssetTypeVideo && queueSet["process_video_frames"] {
-		if err := ap.enqueueVideoFramesJob(ctx, asset.AssetID); err != nil {
+		mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("load ML settings: %w", err)
+		}
+		if mlConfig.SemanticEnabled && mlConfig.VideoSemanticEnabled {
+			err = ap.insertRetryJob(ctx, tx, jobs.ProcessVideoFramesArgs{
+				AssetID: asset.AssetID, PreprocessVersion: jobs.MLPreprocessVersionV1,
+			}, "process_video_frames")
+		}
+		if err != nil {
 			return fmt.Errorf("enqueue process_video_frames retry: %w", err)
 		}
 	}
@@ -183,53 +214,68 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 }
 
 // retryMLJobs re-enqueues specific ML pointer jobs that failed.
-func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, taskSet map[string]bool) error {
+func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *repo.Asset, taskSet map[string]bool) error {
 	mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load ML settings: %w", err)
 	}
 
 	if taskSet["process_semantic"] && mlConfig.SemanticEnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
+		err = ap.insertRetryJob(ctx, tx, jobs.ProcessSemanticArgs{
 			AssetID:           asset.AssetID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_semantic"})
+		}, "process_semantic")
 		if err != nil {
 			return fmt.Errorf("enqueue process_semantic retry: %w", err)
 		}
 	}
 
 	if taskSet["process_bioclip"] && mlConfig.BioCLIPEnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessBioClipArgs{
+		err = ap.insertRetryJob(ctx, tx, jobs.ProcessBioClipArgs{
 			AssetID:           asset.AssetID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_bioclip"})
+		}, "process_bioclip")
 		if err != nil {
 			return fmt.Errorf("enqueue process_bioclip retry: %w", err)
 		}
 	}
 
 	if taskSet["process_ocr"] && mlConfig.OCREnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
+		err = ap.insertRetryJob(ctx, tx, jobs.ProcessOcrArgs{
 			AssetID:           asset.AssetID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_ocr"})
+		}, "process_ocr")
 		if err != nil {
 			return fmt.Errorf("enqueue process_ocr retry: %w", err)
 		}
 	}
 
 	if taskSet["process_face"] && mlConfig.FaceEnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
+		err = ap.insertRetryJob(ctx, tx, jobs.ProcessFaceArgs{
 			AssetID:           asset.AssetID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_face"})
+		}, "process_face")
 		if err != nil {
 			return fmt.Errorf("enqueue process_face retry: %w", err)
 		}
 	}
 
 	return nil
+}
+
+func (ap *AssetProcessor) insertRetryJob(ctx context.Context, tx *sql.Tx, args river.JobArgs, queue string) error {
+	if ap.beforeRetryInsert != nil {
+		if err := ap.beforeRetryInsert(queue); err != nil {
+			return err
+		}
+	}
+	opts := river.InsertOpts{Queue: queue}
+	if provider, ok := args.(interface{ InsertOpts() river.InsertOpts }); ok {
+		opts = provider.InsertOpts()
+		opts.Queue = queue
+	}
+	_, err := ap.queueClient.InsertTx(ctx, tx, args, &opts)
+	return err
 }
 
 // RetryAssetTask retries a specific task for an asset

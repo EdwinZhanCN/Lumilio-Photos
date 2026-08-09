@@ -113,7 +113,7 @@ export function EventDetailFlow() {
         confirmationTitle: t("events.removeConfirmTitle", "Remove selected media?"),
         confirmationMessage: t(
           "events.removeConfirmMessage",
-          "The media stays in your library and will be excluded from this Event.",
+          "The media stays in its Repository and will be excluded from this Event.",
         ),
         onRun: async () => {
           for (const mediaID of mediaIDs) await eventQuery.remove(mediaID);

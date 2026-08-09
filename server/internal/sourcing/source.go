@@ -5,10 +5,38 @@ package sourcing
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// StagingMaterializationError records whether the materializer established a
+// durable prepared-asset claim before failing. Sources may clean unclaimed
+// staging, but must preserve prepared staging for deterministic resume.
+type StagingMaterializationError struct {
+	Err      error
+	Prepared bool
+}
+
+func (e *StagingMaterializationError) Error() string { return e.Err.Error() }
+func (e *StagingMaterializationError) Unwrap() error { return e.Err }
+
+func WithStagingOwnership(err error, prepared bool) error {
+	if err == nil {
+		return nil
+	}
+	var existing *StagingMaterializationError
+	if errors.As(err, &existing) {
+		return err
+	}
+	return &StagingMaterializationError{Err: err, Prepared: prepared}
+}
+
+func StagingIsPrepared(err error) bool {
+	var ownership *StagingMaterializationError
+	return errors.As(err, &ownership) && ownership.Prepared
+}
 
 // IngestSourceKind identifies the origin of an asset being ingested.
 type IngestSourceKind string

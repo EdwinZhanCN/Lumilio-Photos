@@ -35,7 +35,7 @@ The map only shows media with GPS; media without GPS are never assigned a locati
 2. Inside an event you can: rename, set cover, add/remove media, split before selected media, move to another event, merge, hide, share.
 3. If the list is empty or stale, click **Rebuild** in the title bar.
 
-> Add/remove/split/merge writes manual constraints; “waiting for event rebuild” means the constraints are saved but regrouping is not published yet — re-check after rebuilding. Removing media from an event does not delete it; to delete, use **Move to trash** in the library.
+> Add/remove/split/merge writes manual constraints; “waiting for event rebuild” means the constraints are saved but regrouping is not published yet — re-check after rebuilding. Removing media from an event does not delete it; to delete, use **Move to trash** in the media browser.
 
 ## When results are missing
 
@@ -43,7 +43,7 @@ The map only shows media with GPS; media without GPS are never assigned a locati
 2. Wrong people groups: **Rebuild person recognition** at the top of the **Manage** page (cross-repository);
 3. Missing map points: **Rebuild location clusters** in the repository card **⋯** menu;
 4. Stale/empty events: **Collections → Events → Rebuild**;
-5. Confirm the library scope is not set to another repository.
+5. Confirm the Repository scope is not set to another Repository.
 
 ::: info Privacy reminder
 People, locations, and capture times can be sensitive. Check the people and places scope before creating a public share, and verify with a logged-out window what recipients actually see.

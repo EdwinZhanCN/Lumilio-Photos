@@ -8,5 +8,13 @@ services:
         restart: unless-stopped
         network_mode: host
         volumes:
-            - ${LUMILIO_STORAGE:-./lumilio/media}:/data/storage
-            - ${LUMILIO_STATE:-./lumilio/app-state}:/data/app-state
+            - type: bind
+              source: ${LUMILIO_STORAGE:-./lumilio/media}
+              target: /data/storage
+              bind:
+                  create_host_path: false
+            - type: bind
+              source: ${LUMILIO_STATE:-./lumilio/app-state}
+              target: /data/app-state
+              bind:
+                  create_host_path: false

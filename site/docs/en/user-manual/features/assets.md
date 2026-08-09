@@ -1,10 +1,10 @@
-# Media Library
+# Media
 
 <!-- This page is a placeholder for the English version. Content will follow the Chinese version. -->
 
 ## Overview
 
-## Browsing the Library
+## Browsing Repositories
 
 ### Layout Modes
 

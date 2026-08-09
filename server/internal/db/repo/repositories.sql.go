@@ -14,6 +14,82 @@ import (
 	"server/internal/storage/repocfg"
 )
 
+const beginRepositoryActivity = `-- name: BeginRepositoryActivity :one
+UPDATE repositories
+SET
+    activity = ?2,
+    updated_at = ?3
+WHERE repo_id = ?1
+  AND reachability = 'active'
+  AND activity = 'idle'
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
+`
+
+type BeginRepositoryActivityParams struct {
+	RepoID    uuid.UUID                  `db:"repo_id" json:"repo_id"`
+	Activity  dbtypes.RepositoryActivity `db:"activity" json:"activity"`
+	UpdatedAt dbtypes.Timestamp          `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) BeginRepositoryActivity(ctx context.Context, arg BeginRepositoryActivityParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, beginRepositoryActivity, arg.RepoID, arg.Activity, arg.UpdatedAt)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.RootID,
+	)
+	return i, err
+}
+
+const beginRepositoryMaintenance = `-- name: BeginRepositoryMaintenance :one
+UPDATE repositories
+SET reachability = 'maintenance',
+    activity = 'paused',
+    pause_reason = 'maintenance',
+    updated_at = ?2
+WHERE repo_id = ?1
+  AND reachability <> 'maintenance'
+  AND activity = 'idle'
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
+`
+
+type BeginRepositoryMaintenanceParams struct {
+	RepoID    uuid.UUID         `db:"repo_id" json:"repo_id"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) BeginRepositoryMaintenance(ctx context.Context, arg BeginRepositoryMaintenanceParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, beginRepositoryMaintenance, arg.RepoID, arg.UpdatedAt)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.RootID,
+	)
+	return i, err
+}
+
 const countPrimaryRepositories = `-- name: CountPrimaryRepositories :one
 SELECT COUNT(*) FROM repositories
 WHERE role = 'primary'
@@ -37,13 +113,13 @@ func (q *Queries) CountRepositories(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const countRepositoriesByStatus = `-- name: CountRepositoriesByStatus :one
+const countRepositoriesByReachability = `-- name: CountRepositoriesByReachability :one
 SELECT COUNT(*) FROM repositories
-WHERE status = ?1
+WHERE reachability = ?1
 `
 
-func (q *Queries) CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countRepositoriesByStatus, status)
+func (q *Queries) CountRepositoriesByReachability(ctx context.Context, reachability dbtypes.RepositoryReachability) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRepositoriesByReachability, reachability)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -56,27 +132,29 @@ INSERT INTO repositories (
     path,
     config,
     role,
-    status,
+    reachability,
+    activity,
     default_owner_id,
     created_at,
     updated_at,
     root_id
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
-) RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
+) RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type CreateRepositoryParams struct {
-	RepoID         uuid.UUID                `db:"repo_id" json:"repo_id"`
-	Name           string                   `db:"name" json:"name"`
-	Path           string                   `db:"path" json:"path"`
-	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
-	Role           dbtypes.RepoRole         `db:"role" json:"role"`
-	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
-	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
-	CreatedAt      dbtypes.Timestamp        `db:"created_at" json:"created_at"`
-	UpdatedAt      dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
-	RootID         uuid.NullUUID            `db:"root_id" json:"root_id"`
+	RepoID         uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Name           string                         `db:"name" json:"name"`
+	Path           string                         `db:"path" json:"path"`
+	Config         repocfg.RepositoryConfig       `db:"config" json:"config"`
+	Role           dbtypes.RepoRole               `db:"role" json:"role"`
+	Reachability   dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	Activity       dbtypes.RepositoryActivity     `db:"activity" json:"activity"`
+	DefaultOwnerID *int32                         `db:"default_owner_id" json:"default_owner_id"`
+	CreatedAt      dbtypes.Timestamp              `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
+	RootID         uuid.UUID                      `db:"root_id" json:"root_id"`
 }
 
 func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
@@ -86,7 +164,8 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		arg.Path,
 		arg.Config,
 		arg.Role,
-		arg.Status,
+		arg.Reachability,
+		arg.Activity,
 		arg.DefaultOwnerID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -98,7 +177,9 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -139,6 +220,75 @@ func (q *Queries) DeleteRepository(ctx context.Context, repoID uuid.UUID) error 
 	return err
 }
 
+const endRepositoryMaintenance = `-- name: EndRepositoryMaintenance :one
+UPDATE repositories
+SET reachability = ?2,
+    activity = ?3,
+    pause_reason = CASE WHEN ?3 = 'paused' THEN 'manual' ELSE '' END,
+    updated_at = ?4
+WHERE repo_id = ?1
+  AND reachability = 'maintenance'
+  AND activity = 'paused'
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
+`
+
+type EndRepositoryMaintenanceParams struct {
+	RepoID       uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Reachability dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	Activity     dbtypes.RepositoryActivity     `db:"activity" json:"activity"`
+	UpdatedAt    dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) EndRepositoryMaintenance(ctx context.Context, arg EndRepositoryMaintenanceParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, endRepositoryMaintenance,
+		arg.RepoID,
+		arg.Reachability,
+		arg.Activity,
+		arg.UpdatedAt,
+	)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.RootID,
+	)
+	return i, err
+}
+
+const finishRepositoryActivity = `-- name: FinishRepositoryActivity :execrows
+UPDATE repositories
+SET
+    activity = 'idle',
+    pause_reason = '',
+    updated_at = ?3
+WHERE repo_id = ?1
+  AND activity = ?2
+`
+
+type FinishRepositoryActivityParams struct {
+	RepoID    uuid.UUID                  `db:"repo_id" json:"repo_id"`
+	Activity  dbtypes.RepositoryActivity `db:"activity" json:"activity"`
+	UpdatedAt dbtypes.Timestamp          `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) FinishRepositoryActivity(ctx context.Context, arg FinishRepositoryActivityParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, finishRepositoryActivity, arg.RepoID, arg.Activity, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getHostOwnerID = `-- name: GetHostOwnerID :one
 SELECT candidate.owner_id AS host_owner_id
 FROM (
@@ -167,9 +317,9 @@ func (q *Queries) GetHostOwnerID(ctx context.Context) (int32, error) {
 }
 
 const getPrimaryRepository = `-- name: GetPrimaryRepository :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE role = 'primary'
-  AND status = 'active'
+  AND reachability = 'active'
 `
 
 func (q *Queries) GetPrimaryRepository(ctx context.Context) (Repository, error) {
@@ -180,7 +330,35 @@ func (q *Queries) GetPrimaryRepository(ctx context.Context) (Repository, error) 
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.RootID,
+	)
+	return i, err
+}
+
+const getPrimaryRepositoryRecord = `-- name: GetPrimaryRepositoryRecord :one
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
+WHERE role = 'primary'
+`
+
+func (q *Queries) GetPrimaryRepositoryRecord(ctx context.Context) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, getPrimaryRepositoryRecord)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -192,7 +370,7 @@ func (q *Queries) GetPrimaryRepository(ctx context.Context) (Repository, error) 
 }
 
 const getRepository = `-- name: GetRepository :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE repo_id = ?1
 `
 
@@ -204,7 +382,9 @@ func (q *Queries) GetRepository(ctx context.Context, repoID uuid.UUID) (Reposito
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -216,7 +396,7 @@ func (q *Queries) GetRepository(ctx context.Context, repoID uuid.UUID) (Reposito
 }
 
 const getRepositoryByPath = `-- name: GetRepositoryByPath :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 WHERE path = ?1
 `
 
@@ -228,7 +408,9 @@ func (q *Queries) GetRepositoryByPath(ctx context.Context, path string) (Reposit
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -240,8 +422,8 @@ func (q *Queries) GetRepositoryByPath(ctx context.Context, path string) (Reposit
 }
 
 const listActiveRepositories = `-- name: ListActiveRepositories :many
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
-WHERE status = 'active'
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
+WHERE reachability = 'active'
 ORDER BY created_at DESC
 `
 
@@ -259,7 +441,9 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 			&i.Name,
 			&i.Path,
 			&i.Config,
-			&i.Status,
+			&i.Reachability,
+			&i.Activity,
+			&i.PauseReason,
 			&i.LastSync,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -281,7 +465,7 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 }
 
 const listRepositories = `-- name: ListRepositories :many
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
+SELECT repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id FROM repositories
 ORDER BY created_at DESC
 `
 
@@ -299,7 +483,9 @@ func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
 			&i.Name,
 			&i.Path,
 			&i.Config,
-			&i.Status,
+			&i.Reachability,
+			&i.Activity,
+			&i.PauseReason,
 			&i.LastSync,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -320,6 +506,43 @@ func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
 	return items, nil
 }
 
+const pauseRepositoryForLowSpace = `-- name: PauseRepositoryForLowSpace :one
+UPDATE repositories
+SET activity = 'paused',
+    pause_reason = 'low_space',
+    updated_at = ?2
+WHERE repo_id = ?1
+  AND reachability = 'active'
+  AND (activity <> 'paused' OR pause_reason = 'low_space')
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
+`
+
+type PauseRepositoryForLowSpaceParams struct {
+	RepoID    uuid.UUID         `db:"repo_id" json:"repo_id"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) PauseRepositoryForLowSpace(ctx context.Context, arg PauseRepositoryForLowSpaceParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, pauseRepositoryForLowSpace, arg.RepoID, arg.UpdatedAt)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.RootID,
+	)
+	return i, err
+}
+
 const repositoryExists = `-- name: RepositoryExists :one
 SELECT EXISTS(
     SELECT 1 FROM repositories
@@ -332,6 +555,66 @@ func (q *Queries) RepositoryExists(ctx context.Context, path string) (int64, err
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const resetRepositoriesByActivity = `-- name: ResetRepositoriesByActivity :execrows
+UPDATE repositories
+SET
+    activity = 'idle',
+    pause_reason = '',
+    updated_at = ?2
+WHERE activity = ?1
+`
+
+type ResetRepositoriesByActivityParams struct {
+	Activity  dbtypes.RepositoryActivity `db:"activity" json:"activity"`
+	UpdatedAt dbtypes.Timestamp          `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ResetRepositoriesByActivity(ctx context.Context, arg ResetRepositoriesByActivityParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, resetRepositoriesByActivity, arg.Activity, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const resumeRepositoryAfterLowSpace = `-- name: ResumeRepositoryAfterLowSpace :one
+UPDATE repositories
+SET activity = 'idle',
+    pause_reason = '',
+    updated_at = ?2
+WHERE repo_id = ?1
+  AND reachability = 'active'
+  AND activity = 'paused'
+  AND pause_reason = 'low_space'
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
+`
+
+type ResumeRepositoryAfterLowSpaceParams struct {
+	RepoID    uuid.UUID         `db:"repo_id" json:"repo_id"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ResumeRepositoryAfterLowSpace(ctx context.Context, arg ResumeRepositoryAfterLowSpaceParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, resumeRepositoryAfterLowSpace, arg.RepoID, arg.UpdatedAt)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.RootID,
+	)
+	return i, err
 }
 
 const setUnownedRepositoryHostOwner = `-- name: SetUnownedRepositoryHostOwner :exec
@@ -355,7 +638,7 @@ SET
     default_owner_id = ?4,
     updated_at = ?5
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryParams struct {
@@ -366,8 +649,8 @@ type UpdateRepositoryParams struct {
 	UpdatedAt      dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
 }
 
-// Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
-// Letting a settings edit write status resurrects a repository that reconcile
+// Reachability and activity are deliberately absent: their state machines own
+// those columns. Letting a settings edit write reachability resurrects a repository that reconcile
 // has marked offline.
 func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error) {
 	row := q.db.QueryRowContext(ctx, updateRepository,
@@ -383,7 +666,46 @@ func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryPara
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+		&i.Role,
+		&i.RootID,
+	)
+	return i, err
+}
+
+const updateRepositoryActivity = `-- name: UpdateRepositoryActivity :one
+UPDATE repositories
+SET
+    activity = ?2,
+    pause_reason = CASE WHEN ?2 = 'paused' THEN 'manual' ELSE '' END,
+    updated_at = ?3
+WHERE repo_id = ?1
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
+`
+
+type UpdateRepositoryActivityParams struct {
+	RepoID    uuid.UUID                  `db:"repo_id" json:"repo_id"`
+	Activity  dbtypes.RepositoryActivity `db:"activity" json:"activity"`
+	UpdatedAt dbtypes.Timestamp          `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateRepositoryActivity(ctx context.Context, arg UpdateRepositoryActivityParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, updateRepositoryActivity, arg.RepoID, arg.Activity, arg.UpdatedAt)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -400,7 +722,7 @@ SET
     last_sync = ?2,
     updated_at = ?3
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryLastSyncParams struct {
@@ -417,7 +739,9 @@ func (q *Queries) UpdateRepositoryLastSync(ctx context.Context, arg UpdateReposi
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -433,18 +757,18 @@ UPDATE repositories
 SET
     path = ?2,
     root_id = ?3,
-    status = ?4,
+    reachability = ?4,
     updated_at = ?5
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
 type UpdateRepositoryPathParams struct {
-	RepoID    uuid.UUID          `db:"repo_id" json:"repo_id"`
-	Path      string             `db:"path" json:"path"`
-	RootID    uuid.NullUUID      `db:"root_id" json:"root_id"`
-	Status    dbtypes.RepoStatus `db:"status" json:"status"`
-	UpdatedAt dbtypes.Timestamp  `db:"updated_at" json:"updated_at"`
+	RepoID       uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Path         string                         `db:"path" json:"path"`
+	RootID       uuid.UUID                      `db:"root_id" json:"root_id"`
+	Reachability dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	UpdatedAt    dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error) {
@@ -452,7 +776,7 @@ func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepository
 		arg.RepoID,
 		arg.Path,
 		arg.RootID,
-		arg.Status,
+		arg.Reachability,
 		arg.UpdatedAt,
 	)
 	var i Repository
@@ -461,7 +785,9 @@ func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepository
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -472,30 +798,32 @@ func (q *Queries) UpdateRepositoryPath(ctx context.Context, arg UpdateRepository
 	return i, err
 }
 
-const updateRepositoryStatus = `-- name: UpdateRepositoryStatus :one
+const updateRepositoryReachability = `-- name: UpdateRepositoryReachability :one
 UPDATE repositories
 SET
-    status = ?2,
+    reachability = ?2,
     updated_at = ?3
 WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
+RETURNING repo_id, name, path, config, reachability, activity, pause_reason, last_sync, created_at, updated_at, default_owner_id, role, root_id
 `
 
-type UpdateRepositoryStatusParams struct {
-	RepoID    uuid.UUID          `db:"repo_id" json:"repo_id"`
-	Status    dbtypes.RepoStatus `db:"status" json:"status"`
-	UpdatedAt dbtypes.Timestamp  `db:"updated_at" json:"updated_at"`
+type UpdateRepositoryReachabilityParams struct {
+	RepoID       uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Reachability dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	UpdatedAt    dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, updateRepositoryStatus, arg.RepoID, arg.Status, arg.UpdatedAt)
+func (q *Queries) UpdateRepositoryReachability(ctx context.Context, arg UpdateRepositoryReachabilityParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, updateRepositoryReachability, arg.RepoID, arg.Reachability, arg.UpdatedAt)
 	var i Repository
 	err := row.Scan(
 		&i.RepoID,
 		&i.Name,
 		&i.Path,
 		&i.Config,
-		&i.Status,
+		&i.Reachability,
+		&i.Activity,
+		&i.PauseReason,
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,

@@ -60,6 +60,9 @@ type Querier interface {
 	ApplyMergedKeeperPreferences(ctx context.Context, arg ApplyMergedKeeperPreferencesParams) error
 	AssignFaceClusterMemberExclusive(ctx context.Context, arg AssignFaceClusterMemberExclusiveParams) (FaceClusterMember, error)
 	AttachAssetToMediaItem(ctx context.Context, arg AttachAssetToMediaItemParams) error
+	BeginCloudImportCancellation(ctx context.Context, runID uuid.UUID) (CloudImportRun, error)
+	BeginRepositoryActivity(ctx context.Context, arg BeginRepositoryActivityParams) (Repository, error)
+	BeginRepositoryMaintenance(ctx context.Context, arg BeginRepositoryMaintenanceParams) (Repository, error)
 	BindPendingAgentEffectExecutingRun(ctx context.Context, arg BindPendingAgentEffectExecutingRunParams) (uuid.UUID, error)
 	BindRepositoryFileIndexAsset(ctx context.Context, arg BindRepositoryFileIndexAssetParams) (RepositoryFileIndex, error)
 	BulkToggleAssetLiked(ctx context.Context, assetIds []uuid.UUID) error
@@ -76,6 +79,7 @@ type Querier interface {
 	ClearOCRIndexOutbox(ctx context.Context) error
 	ClearStaleEventDirtyClaims(ctx context.Context, claimedAt *int64) (int64, error)
 	CompareAndAdvanceEventRevision(ctx context.Context, arg CompareAndAdvanceEventRevisionParams) (int64, error)
+	CompleteLifecycleOperation(ctx context.Context, arg CompleteLifecycleOperationParams) (LifecycleOperation, error)
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
@@ -116,7 +120,7 @@ type Querier interface {
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
 	CountPrimaryRepositories(ctx context.Context) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
-	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
+	CountRepositoriesByReachability(ctx context.Context, reachability dbtypes.RepositoryReachability) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) (int64, error)
 	CountStackedMediaItems(ctx context.Context, mediaItemIds []uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
@@ -136,6 +140,7 @@ type Querier interface {
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
 	CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error)
 	CreateFaceResult(ctx context.Context, arg CreateFaceResultParams) (FaceResult, error)
+	CreateLifecycleOperation(ctx context.Context, arg CreateLifecycleOperationParams) (LifecycleOperation, error)
 	CreateLocationCluster(ctx context.Context, arg CreateLocationClusterParams) (LocationCluster, error)
 	CreateMediaItemForAsset(ctx context.Context, arg CreateMediaItemForAssetParams) error
 	CreateOCRResult(ctx context.Context, arg CreateOCRResultParams) (OcrResult, error)
@@ -161,6 +166,7 @@ type Querier interface {
 	DeleteCheckpoint(ctx context.Context, id string) error
 	DeleteClaimedEventDirtyRanges(ctx context.Context, arg DeleteClaimedEventDirtyRangesParams) (int64, error)
 	DeleteCloudCredential(ctx context.Context, credentialID uuid.UUID) error
+	DeleteCloudSyncCursorForSource(ctx context.Context, arg DeleteCloudSyncCursorForSourceParams) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
 	DeleteEmptyFaceClusters(ctx context.Context) error
 	DeleteEmptyUnconfirmedFaceClusters(ctx context.Context) error
@@ -203,9 +209,13 @@ type Querier interface {
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
 	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) error
+	EndRepositoryMaintenance(ctx context.Context, arg EndRepositoryMaintenanceParams) (Repository, error)
 	EventCandidateTimeBounds(ctx context.Context, ownerID *int32) (EventCandidateTimeBoundsRow, error)
 	ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLinkExpiryParams) (ShareLink, error)
+	FailLifecycleOperation(ctx context.Context, arg FailLifecycleOperationParams) (LifecycleOperation, error)
 	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
+	FinalizeCloudImportCancellation(ctx context.Context, runID uuid.UUID) (CloudImportRun, error)
+	FinalizeStaleCloudImportCancellations(ctx context.Context) error
 	// Structural and burst detection ------------------------------------------
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID uuid.NullUUID) ([]FindCandidatesForStackingByNameRow, error)
 	FindLivePhotoPair(ctx context.Context, arg FindLivePhotoPairParams) ([]FindLivePhotoPairRow, error)
@@ -218,8 +228,10 @@ type Querier interface {
 	FinishAgentRun(ctx context.Context, arg FinishAgentRunParams) error
 	FinishAgentThread(ctx context.Context, arg FinishAgentThreadParams) error
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
+	FinishRepositoryActivity(ctx context.Context, arg FinishRepositoryActivityParams) (int64, error)
 	GetActiveAgentRun(ctx context.Context, arg GetActiveAgentRunParams) (AgentRun, error)
 	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID uuid.UUID) (RepositoryCloudBinding, error)
+	GetActiveRepositoryCloudBindingByCredential(ctx context.Context, arg GetActiveRepositoryCloudBindingByCredentialParams) (RepositoryCloudBinding, error)
 	GetActiveShareLinkByTokenHash(ctx context.Context, tokenHash []byte) (ShareLink, error)
 	GetAgentPin(ctx context.Context, arg GetAgentPinParams) (AgentPin, error)
 	GetAgentRef(ctx context.Context, arg GetAgentRefParams) (AgentRef, error)
@@ -350,6 +362,8 @@ type Querier interface {
 	// the Host Owner.
 	GetHostOwnerID(ctx context.Context) (int32, error)
 	GetLatestRepositoryScanRun(ctx context.Context, repositoryID uuid.UUID) (RepositoryScanRun, error)
+	GetLifecycleOperation(ctx context.Context, operationID string) (LifecycleOperation, error)
+	GetLifecycleOperationByRequestID(ctx context.Context, requestID string) (LifecycleOperation, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
@@ -392,6 +406,7 @@ type Querier interface {
 	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (GetPrimaryEmbeddingRow, error)
 	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
 	GetPrimaryRepository(ctx context.Context) (Repository, error)
+	GetPrimaryRepositoryRecord(ctx context.Context) (Repository, error)
 	GetPrimarySearchEmbedding(ctx context.Context, assetID uuid.UUID) (GetPrimarySearchEmbeddingRow, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRefreshTokenRecordByToken(ctx context.Context, token string) (RefreshToken, error)
@@ -401,6 +416,7 @@ type Querier interface {
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
 	GetRepositoryCloudBinding(ctx context.Context, arg GetRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
+	GetRepositoryCloudBindingByCredential(ctx context.Context, arg GetRepositoryCloudBindingByCredentialParams) (RepositoryCloudBinding, error)
 	GetRepositoryDefaults(ctx context.Context) (RepositoryDefault, error)
 	GetRepositoryFileIndexEntry(ctx context.Context, arg GetRepositoryFileIndexEntryParams) (RepositoryFileIndex, error)
 	GetRepositoryRoot(ctx context.Context, rootID uuid.UUID) (RepositoryRoot, error)
@@ -467,6 +483,7 @@ type Querier interface {
 	InsertEventDirtyRange(ctx context.Context, arg InsertEventDirtyRangeParams) error
 	InsertEventMembership(ctx context.Context, arg InsertEventMembershipParams) error
 	InsertEventRedirect(ctx context.Context, arg InsertEventRedirectParams) error
+	InsertLifecycleAuditEvent(ctx context.Context, arg InsertLifecycleAuditEventParams) (LifecycleAuditEvent, error)
 	InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error
 	// Dedicated fixed-dimension authoritative semantic search vectors.
 	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
@@ -491,6 +508,9 @@ type Querier interface {
 	ListEventMembership(ctx context.Context, arg ListEventMembershipParams) ([]EventMediaItem, error)
 	ListEventMembershipPage(ctx context.Context, arg ListEventMembershipPageParams) ([]EventMediaItem, error)
 	ListEventsPage(ctx context.Context, arg ListEventsPageParams) ([]Event, error)
+	ListIncompleteLifecycleOperations(ctx context.Context) ([]LifecycleOperation, error)
+	ListLifecycleAuditEvents(ctx context.Context, arg ListLifecycleAuditEventsParams) ([]LifecycleAuditEvent, error)
+	ListLifecycleAuditEventsForTarget(ctx context.Context, arg ListLifecycleAuditEventsForTargetParams) ([]LifecycleAuditEvent, error)
 	ListLocationClusterCandidatesForScope(ctx context.Context, arg ListLocationClusterCandidatesForScopeParams) ([]ListLocationClusterCandidatesForScopeRow, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
 	ListOCRIndexOutboxBatch(ctx context.Context, limit int64) ([]ListOCRIndexOutboxBatchRow, error)
@@ -546,6 +566,7 @@ type Querier interface {
 	MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error)
 	MoveClusterMembersToClusterManual(ctx context.Context, arg MoveClusterMembersToClusterManualParams) error
 	MoveMediaItemComponent(ctx context.Context, arg MoveMediaItemComponentParams) error
+	PauseRepositoryForLowSpace(ctx context.Context, arg PauseRepositoryForLowSpaceParams) (Repository, error)
 	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
 	// rank(by=quality) ascending, using the aesthetic score from the SigLIP MLP
 	// head when available, falling back to the legacy heuristic (rating, liked,
@@ -573,9 +594,12 @@ type Querier interface {
 	RepositoryExists(ctx context.Context, path string) (int64, error)
 	RequestAgentRunCancel(ctx context.Context, arg RequestAgentRunCancelParams) (AgentRun, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error)
+	ResetRepositoriesByActivity(ctx context.Context, arg ResetRepositoriesByActivityParams) (int64, error)
 	ResetRepositoryFileIndex(ctx context.Context, repositoryID uuid.UUID) error
 	ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error)
 	RestoreAsset(ctx context.Context, assetID uuid.UUID) error
+	ResumeRepositoryAfterLowSpace(ctx context.Context, arg ResumeRepositoryAfterLowSpaceParams) (Repository, error)
+	RetireCloudCredential(ctx context.Context, credentialID uuid.UUID) (CloudCredential, error)
 	RevokeRefreshToken(ctx context.Context, tokenID int64) error
 	RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams) (ShareLink, error)
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
@@ -595,7 +619,6 @@ type Querier interface {
 	SetFaceClusterHidden(ctx context.Context, arg SetFaceClusterHiddenParams) (FaceCluster, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
-	SetRepositoryRoot(ctx context.Context, arg SetRepositoryRootParams) (Repository, error)
 	SetUnownedRepositoryHostOwner(ctx context.Context, defaultOwnerID *int32) error
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
 	TouchAgentPinLiveRefresh(ctx context.Context, arg TouchAgentPinLiveRefreshParams) error
@@ -628,6 +651,7 @@ type Querier interface {
 	UpdateFaceClusterRepresentative(ctx context.Context, arg UpdateFaceClusterRepresentativeParams) (FaceCluster, error)
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
 	UpdateFaceResultStats(ctx context.Context, assetID uuid.UUID) error
+	UpdateLifecycleOperationPhase(ctx context.Context, arg UpdateLifecycleOperationPhaseParams) (LifecycleOperation, error)
 	UpdateLocationClusterGeocode(ctx context.Context, arg UpdateLocationClusterGeocodeParams) error
 	UpdateMediaItemAfterStructuralMerge(ctx context.Context, arg UpdateMediaItemAfterStructuralMergeParams) error
 	UpdateMediaItemAsLivePhoto(ctx context.Context, arg UpdateMediaItemAsLivePhotoParams) error
@@ -635,16 +659,18 @@ type Querier interface {
 	UpdateOCRResultStats(ctx context.Context, assetID uuid.UUID) error
 	UpdatePendingAgentEffect(ctx context.Context, arg UpdatePendingAgentEffectParams) error
 	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
-	// Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
-	// Letting a settings edit write status resurrects a repository that reconcile
+	// Reachability and activity are deliberately absent: their state machines own
+	// those columns. Letting a settings edit write reachability resurrects a repository that reconcile
 	// has marked offline.
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
+	UpdateRepositoryActivity(ctx context.Context, arg UpdateRepositoryActivityParams) (Repository, error)
 	UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg UpdateRepositoryCloudBindingLastRunParams) (RepositoryCloudBinding, error)
 	UpdateRepositoryFileIndexState(ctx context.Context, arg UpdateRepositoryFileIndexStateParams) (RepositoryFileIndex, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error)
+	UpdateRepositoryReachability(ctx context.Context, arg UpdateRepositoryReachabilityParams) (Repository, error)
 	UpdateRepositoryRootFromDisk(ctx context.Context, arg UpdateRepositoryRootFromDiskParams) (RepositoryRoot, error)
-	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
+	UpdateRepositoryRootMountFingerprint(ctx context.Context, arg UpdateRepositoryRootMountFingerprintParams) (RepositoryRoot, error)
 	UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error)
 	UpdateStackCover(ctx context.Context, arg UpdateStackCoverParams) error
 	UpdateStackMemberPosition(ctx context.Context, arg UpdateStackMemberPositionParams) error

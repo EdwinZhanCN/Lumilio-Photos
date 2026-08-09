@@ -45,13 +45,13 @@ export const RETRY_TASK_OPTIONS: RetryTaskOption[] = [
   {
     key: "process_semantic",
     label: "Semantic Embedding",
-    description: "Generate AI embeddings for semantic search",
+    description: "Generate embeddings for Image Semantic Analysis",
     category: "ml",
     supportedAssetTypes: ["PHOTO"],
   },
   {
     key: "process_ocr",
-    label: "OCR Text Extraction",
+    label: "OCR Text Recognition",
     description: "Extract text from images using OCR",
     category: "ml",
     supportedAssetTypes: ["PHOTO"],

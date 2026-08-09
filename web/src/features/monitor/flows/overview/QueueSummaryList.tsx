@@ -98,15 +98,21 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
       description: t("monitor.queueSummary.queues.metadata_asset.description"),
     },
     process_bioclip: {
-      name: t("monitor.queueSummary.queues.process_bioclip.name"),
+      name: t("monitor.queueSummary.queues.process_bioclip.name", {
+        defaultValue: "BioCLIP Species Recognition",
+      }),
       description: t("monitor.queueSummary.queues.process_bioclip.description"),
     },
     process_face: {
-      name: t("monitor.queueSummary.queues.process_face.name"),
+      name: t("monitor.queueSummary.queues.process_face.name", {
+        defaultValue: "Person Recognition",
+      }),
       description: t("monitor.queueSummary.queues.process_face.description"),
     },
     process_ocr: {
-      name: t("monitor.queueSummary.queues.process_ocr.name"),
+      name: t("monitor.queueSummary.queues.process_ocr.name", {
+        defaultValue: "OCR Text Recognition",
+      }),
       description: t("monitor.queueSummary.queues.process_ocr.description"),
     },
     process_phash: {

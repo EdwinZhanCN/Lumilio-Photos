@@ -512,7 +512,16 @@ func (c *Controller) startWorker(result workerResult, generationID uint64, worke
 	result.ready, result.err = waitReady(workerCtx, owned, c.readyBudget)
 	if result.err != nil {
 		result.kind = resultFailed
-		result.ownership = true
+		// An app.Run startup error closes Done before readiness. In that case
+		// ownership is already proven released and a config transaction may
+		// safely start its LKG rollback generation. Timeouts/cancellation remain
+		// conservative because the process may still be shutting down.
+		select {
+		case <-owned.completion.finished:
+			result.ownership = false
+		default:
+			result.ownership = true
+		}
 		if owned.Cancel != nil {
 			owned.Cancel()
 		}

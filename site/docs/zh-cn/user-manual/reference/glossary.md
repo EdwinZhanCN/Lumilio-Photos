@@ -25,7 +25,7 @@ code-evidence:
 | Lumen Intelligence | 独立计算能力层，不设中文产品名 |
 | Lumilio Agent | 模型驱动的受控检索与整理能力，不设中文产品名 |
 | 存储位置 | 带 `.lumilioroot` 的父位置，可容纳多个资源库 |
-| 资源库 | 带 `.lumiliorepo` 的具体媒体单元；界面部分位置仍写“仓库” |
+| 资源库 | 带 `.lumiliorepo` 的具体媒体单元；产品界面的唯一正式名称 |
 | 主资源库 | 默认存储位置下固定目录 `primary` 的唯一主库 |
 | 原件 | 用户提供的普通媒体文件 |
 | 派生文件 | 缩略图、Web 转码、人脸裁剪等可重建输出 |
@@ -39,5 +39,3 @@ code-evidence:
 | 通行密钥 | Passkey / WebAuthn 凭据 |
 | 数据库快照 | 通过 SQLite Online Backup 创建并验证的目录状态副本 |
 | 完整备份 | 至少包含媒体存储与数据库快照 |
-
-<!-- TODO(terminology): UI i18n 仍混用“仓库”“库”“资源库”“媒体库”。替代方案见交付包 `review/terminology-decisions.md`；正文在复述具体按钮时才保留界面原文。 -->

@@ -44,7 +44,10 @@ export function AssetFieldGuide({
                 </div>
                 <div>
                   <h2 className="text-sm font-semibold tracking-wide">
-                    {t("assets.photos.fullscreen.fieldGuide.topLabels")}
+                    {t(
+                      "assets.photos.fullscreen.fieldGuide.topLabels",
+                      "BioCLIP Species Recognition",
+                    )}
                   </h2>
                   <p className="text-xs text-white/45">
                     {loading
@@ -170,14 +173,17 @@ export function AssetFieldGuide({
               : "border-white/15 bg-zinc-950/64 shadow-black/40 hover:border-emerald-200/45 hover:bg-emerald-400/18 hover:shadow-emerald-500/20"
           }`}
           onClick={onToggle}
-          aria-label={t("assets.photos.fullscreen.fieldGuide.open")}
-          title={t("assets.photos.fullscreen.fieldGuide.open")}
+          aria-label={t(
+            "assets.photos.fullscreen.fieldGuide.open",
+            "Open BioCLIP Species Recognition",
+          )}
+          title={t("assets.photos.fullscreen.fieldGuide.open", "Open BioCLIP Species Recognition")}
         >
           <span className="grid size-9 place-items-center rounded-full bg-emerald-300 text-zinc-950 ring-4 ring-emerald-300/18 transition group-hover:scale-105">
             <Bird className="size-5" />
           </span>
           <span className="hidden pr-1 text-sm font-semibold tracking-wide sm:inline">
-            {t("assets.photos.fullscreen.fieldGuide.button")}
+            {t("assets.photos.fullscreen.fieldGuide.button", "BioCLIP Species Recognition")}
           </span>
         </button>
       )}

@@ -42,7 +42,7 @@ The browser filters by extension first; the server validates again. Unsupported 
 - **Duplicate**: the content fingerprint matches existing media in the target repository; Lumilio skipped the second copy and does not use extra storage.
 - **Failed**: ingestion did not finish. The failed file stays in the upload queue; fix the network, permission, or disk issue and click upload again.
 
-After a successful upload, the original file first goes through the repository's staging pipeline, then into `inbox/` according to the policy chosen when the repository was created. Never edit `inbox/` manually in a file manager; the storage details page explains policies and the directory layout.
+After a successful upload, the original file first goes through the repository's staging pipeline, then into `inbox/` according to the repository policy. Repository creation uses the Server's safe defaults instead of asking for layout details in the primary task. After the upload is complete, `inbox/` is an ordinary user-visible landing area: you may move or rename its originals inside the same repository, then rescan. Only `.lumilio/` is application-private.
 
 ::: tip Validate with a small batch first
 When importing from a new camera, a phone export folder, or an external drive, select a few files first. Confirm dates, orientation, duplicate handling, and thumbnails before submitting the full set.
@@ -54,29 +54,26 @@ Scanning does not copy files and does not make the browser choose server paths; 
 
 ### Preparation
 
-- Put the files in the repository's **free zone**: any directory under the repository root except `inbox/` and `.lumilio/`.
+- Put the files anywhere in the user-visible media tree under the repository root, including `inbox/`, but never under `.lumilio/`.
 - Desktop: authorize the Storage Location in the Desktop Control Panel first.
 - Server: complete the bind mount per [repository mounting and creation](../introduction/repositories); the in-container path must be readable.
 
-::: danger Do not put files into protected directories
-`inbox/` is managed by the upload and cloud-import pipeline, and `.lumilio/` holds thumbnails, staging files, logs, and other system data. The scanner skips both; manual changes can make the database and the files disagree.
+::: danger Do not put files into the private directory
+`.lumilio/` holds staging files, derived resources, and other application-private state. The scanner skips it, and manual changes can make the catalog and files disagree. `inbox/` is not private and is included in scans.
 :::
 
 ### Running a scan
 
-1. Put media into the free zone and wait until copying finishes.
+1. Put media into the repository and wait until copying finishes.
 2. Open the **⋯** menu on the repository card and choose **Rescan**.
 3. To scan every repository, click **Scan all repositories** above the cards.
 4. Wait for the operation to finish, then check the repository or the [Server Monitor](./monitor) page for new media and background tasks.
 
-The scanner only registers supported media extensions. For already-registered files in the free zone, it tries to recognize “the same file moved to a new path” and updates the record instead of creating a second media record; deleting a free-zone file marks the record deleted.
+The scanner only registers supported media extensions. For already-registered files, including files in `inbox/`, it tries to recognize “the same file moved to a new path” and updates the record instead of creating a second media record. A missing path is confirmed only after a complete authoritative scan; partial reads and ambiguous matches do not prove deletion.
 
 ## Method 3: cloud import
 
-Cloud import needs a connected cloud credential. First complete the login and any required verification on the **Cloud import** tab of [Settings](./settings), then choose by source:
-
-- **Import when creating a repository**: click **Create repository**, pick the cloud source and a connected credential. The new repository queues an import automatically.
-- **Import again into an existing cloud repository**: choose **Import from cloud** in the card's **⋯** menu. This only appears for repositories bound to a cloud credential.
+Cloud import needs a connected cloud credential. First complete the login and any required verification on the **Cloud import** tab of [Settings](./settings). Repository creation and cloud authorization are separate tasks: create or open the destination repository first, then choose **Import from cloud** in its card menu and select the connected credential.
 
 Cloud-imported files enter `inbox/` like uploads and follow the repository's storage policy. The card shows the last import status, imported count, and failed count; while the task is “queued” or “running”, the trigger button is disabled.
 
@@ -86,28 +83,28 @@ iCloud import depends on Apple's unofficial network service behavior, may requir
 
 ## Creating a repository (administrator)
 
-The **Add repository** (create) button in the card area is for administrators. Creation decides the following once:
+The **Create repository** button in the card area is for administrators. Its primary path asks for:
 
 1. **Storage Location**: Desktop picks from locations registered in the Control Panel; Server uses the mounted Storage Location from Compose.
-2. **Repository name**: for regular repositories the name is also the directory name. Only letters, digits, full-width text, half-width spaces, `-`, and `_` are allowed, 1–80 characters, no leading/trailing spaces; case is preserved.
-3. **Source**: local files or a cloud credential.
-4. **File layout**:
-   - `date`: archive into `inbox/YYYY/MM/` by ingestion time;
-   - `flat`: all ingested files in the `inbox/` root;
-   - `cas`: content-hash-sharded storage.
-5. **Filename conflict handling**: `rename` (default — safe rename on conflict) or `uuid` (append a short UUID). **No policy replaces an existing original.**
+2. **Repository name**: the user-facing display name. It is independent of the folder name.
+3. **Storage folder**: one portable direct-child directory name. Only letters, digits, full-width text, half-width spaces, `-`, and `_` are allowed, 1–80 characters, no leading/trailing spaces; case is preserved.
 
-Creation validates the name, directory state, and write permissions and fails fast; an incomplete repository is never registered. If the target directory already contains a valid `.lumiliorepo`, Lumilio registers it as an existing repository; an ordinary non-empty directory cannot be initialized as a new one. After creation, the current version cannot change the name, layout, or conflict policy, nor delete the repository from Lumilio. For Server, follow the “mount first, then create” order and exact directory-name correspondence in [repository mounting and creation](../introduction/repositories).
+Creation validates the name, direct-child topology, directory state, and write permissions and fails fast; an incomplete repository is never registered. It applies the Server's safe layout and filename-conflict defaults. If the target already contains a valid `.lumiliorepo`, creation stops and directs you to the explicit **Open Existing Repository** task; it never attaches that identity implicitly. An ordinary non-empty unmarked directory cannot be initialized as a new repository.
+
+Desktop can also start **Add Storage Location** or **Open Existing Repository** from Web. The request appears under **Desktop Settings → Storage → Requests from Web**; a person at that computer must review it and choose the directory locally. Web never submits an arbitrary Desktop path. Standalone and Docker Server instead list classified direct-child candidates from the configured default Storage Location.
+
+For Docker, create a new folder by entering a directory name, or mount an existing empty host directory at that exact direct-child path before creation. On Linux, an existing empty target must be verified as an actual mount point. Follow the long-syntax Compose example in [Storage Locations and Repositories](../introduction/repositories).
 
 ## Maintenance actions on a repository card
 
 Open the **⋯** menu on a card for the current repository's actions:
 
-- **Rescan**: scan only this repository's free zone; use after copying a batch of files.
+- **Rescan**: scan this repository's user-visible media tree, including `inbox/`; use after copying, moving, or renaming a batch of files.
 - **Detect stacks**: run automatic stack detection; review results in [Browse, filter & batch](./assets).
 - **Scan duplicates**: run duplicate analysis; results are handled in [Duplicates, likes & trash](./utilities).
 - **Rebuild location clusters**: recompute media location clusters; never moves originals.
 - **Import from cloud**: only for repositories bound to a cloud credential.
+- **Remove from Lumilio**: unregisters a non-primary, idle repository after showing its impact. `.lumiliorepo`, `.lumilio/`, and every media file remain on disk; this is not physical deletion.
 
 The counts and “offline / needs attention” marks on the cards come from the server's current state. When a Storage Location is unavailable, write and maintenance buttons are disabled; restore the mount or permissions first, then retry.
 
@@ -118,4 +115,4 @@ Ingestion and derived processing are two stages: the original file may already b
 - Queue still running and the completed count is growing: wait; do not rescan or re-upload;
 - Media shows as duplicate: confirm the target repository; usually no second import is needed;
 - Failures keep growing or nothing progresses: confirm the disk is online, writable, and has space, then check task errors on the [Server Monitor](./monitor) page;
-- Scan found 0: confirm files are not in `inbox/`/`.lumilio/`, the extension is supported, and the files really are under the current repository's mounted path.
+- Scan found 0: confirm files are not under `.lumilio/`, the extension is supported, and the files really are under the current repository's mounted path.

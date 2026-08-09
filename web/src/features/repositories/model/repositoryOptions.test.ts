@@ -11,7 +11,9 @@ describe("normalizeRepositoryOptions", () => {
             name: "Primary",
             path: "/photos/primary",
             role: "primary",
-            status: "offline",
+            root_id: "root-1",
+            reachability: "offline",
+            activity: "scanning",
             is_primary: false,
           },
           {
@@ -26,7 +28,9 @@ describe("normalizeRepositoryOptions", () => {
         name: "Primary",
         path: "/photos/primary",
         role: "primary",
-        status: "offline",
+        rootId: "root-1",
+        reachability: "offline",
+        activity: "scanning",
         isPrimary: true,
       },
       {
@@ -34,18 +38,26 @@ describe("normalizeRepositoryOptions", () => {
         name: "",
         path: "",
         role: "regular",
-        status: "active",
+        rootId: "",
+        reachability: "recovery_required",
+        activity: "idle",
         isPrimary: true,
       },
     ]);
   });
 
-  it("falls back to active for a missing or unrecognized status, so uploads are not blocked", () => {
+  it("fails closed for a missing or unrecognized reachability", () => {
     expect(
       normalizeRepositoryOptions({
-        repositories: [{ id: "no-status" }, { id: "bogus", status: "wat" as never }],
-      }).map((repository) => repository.status),
-    ).toEqual(["active", "active"]);
+        repositories: [
+          { id: "no-status" },
+          { id: "bogus", reachability: "wat" as never, activity: "wat" as never },
+        ],
+      }).map((repository) => [repository.reachability, repository.activity]),
+    ).toEqual([
+      ["recovery_required", "idle"],
+      ["recovery_required", "idle"],
+    ]);
   });
 
   it("returns an empty list when the response has no repositories", () => {

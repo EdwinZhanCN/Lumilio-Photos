@@ -6,8 +6,8 @@
     "back": "返回",
     "cancel": "取消",
     "choose": "选择",
-    "close": "关闭",
     "continue": "继续",
+    "decline": "拒绝",
     "finishing": "完成中…",
     "loading": "{{label}}…",
     "loadingEllipsis": "加载中…",
@@ -74,6 +74,8 @@
   },
   "lumen": {
     "actionFailed": "Lumen 操作失败",
+    "applyConfiguration": "应用配置",
+    "applyingConfiguration": "正在应用配置…",
     "availability": "可用性",
     "backend": "后端",
     "backendCPU": "CPU",
@@ -84,6 +86,7 @@
     "cacheDirectoryDescription": "选择 Lumen 存放已下载模型的位置。",
     "cachePickFailed": "无法选择缓存目录",
     "chooseCacheDirectory": "选择 Lumen 模型缓存目录",
+    "configurationApplied": "配置已应用",
     "controlDescription": "由 lumen.control.v1 实时报告生命周期与模型状态。",
     "controlFailed": "Lumen 启动失败",
     "controlStatus": "Control 状态",
@@ -107,6 +110,7 @@
     "logsLoading": "正在读取 Control 日志…",
     "logsOffline": "启动 Lumen Hub 后即可读取 Control 日志。",
     "logsUnavailable": "日志不可用",
+    "model": "模型",
     "noProfile": "没有可用的签名安装配置。",
     "notIncluded": "此构建不包含签名的安装程序与进程运行时。",
     "phaseDownloading": "下载中",
@@ -127,6 +131,9 @@
     "processStatus": "进程状态",
     "profile": "配置",
     "ready": "就绪",
+    "reconfigure": "应用配置",
+    "reconfigureRunning": "Lumen Intelligence 将使用新配置重新启动；若启动失败，会恢复原配置。",
+    "reconfigureStopped": "验证并保存此配置，供下次启动使用。",
     "releaseReady": "签名的安装程序与受监管的进程运行时可用。",
     "sequence": "序号",
     "service": "服务",
@@ -135,18 +142,7 @@
     "servicesPending": "模型构建完成后将显示各服务状态。",
     "servicesReported_one": "已报告 {{count}} 项",
     "servicesReported_other": "已报告 {{count}} 项",
-    "version": "版本",
-    "applyConfiguration": "应用配置",
-    "configurationApplied": "配置已应用",
-    "configurationDescription": "更改预设或模型缓存。Desktop 会先让已安装的 Lumen Hub 验证候选配置，提交成功后才重启运行时。",
-    "configurationFailed": "配置未应用，已恢复之前可工作的配置。",
-    "reconfiguring": "正在应用配置",
-    "applyingConfiguration": "正在应用配置…",
-    "model": "模型",
-    "reconfigure": "应用配置",
-    "reconfigureRunning": "Lumen Intelligence 将使用新配置重新启动；若启动失败，会恢复原配置。",
-    "reconfigureStopped": "验证并保存此配置，供下次启动使用。",
-    "servicesReported": "已报告能力"
+    "version": "版本"
   },
   "network": {
     "access": "网络访问",
@@ -188,6 +184,9 @@
     "summary": "设置摘要",
     "unavailable": "不可用"
   },
+  "product": {
+    "compactName": "流明集"
+  },
   "recovery": {
     "description": "本地 Server 无法达到健康状态。",
     "failed": "恢复失败",
@@ -223,8 +222,8 @@
     "nvenc": "NVIDIA NVENC",
     "processing": "处理",
     "qsv": "Intel Quick Sync",
-    "repositoryScan": "仓库扫描",
-    "repositoryScanDescription": "定期将已注册仓库与目录对账。",
+    "repositoryScan": "资源库扫描",
+    "repositoryScanDescription": "定期将已注册资源库与目录对账。",
     "softwareOnly": "仅软件",
     "vaapi": "VA-API",
     "videoToolbox": "VideoToolbox",
@@ -252,29 +251,55 @@
     "title": "需要完成设置"
   },
   "storage": {
-    "added": "已添加",
-    "addFailed": "存储位置未能添加",
     "additional": "其他存储位置",
-    "addLocation": "添加位置",
-    "addLocationDialogTitle": "添加流明集存储位置",
+    "capacityAvailable": "可用 {{available}}，总计 {{total}}",
+    "capacityUnknown": "容量不可用",
     "chooseDefaultLocation": "选择默认流明集存储位置",
-    "choosing": "选择中",
+    "confirmRiskAndContinue": "确认风险并继续",
     "defaultLocation": "默认存储位置",
+    "defaultLocationMigrationConfirmation": "应用此更改前，请先把完整的默认存储位置移动到所选文件夹。流明集会在受控重启 Server 时验证原有 .lumilioroot 身份和固定的 primary/.lumiliorepo 标记；不会复制文件或创建新身份。是否继续？",
     "description": "管理此桌面可用的存储位置。",
+    "hostAction": "存储请求",
+    "hostActionAddLocation": "添加存储位置",
+    "hostActionApproved": "已批准",
+    "hostActionChoosing": "正在选择文件夹",
+    "hostActionConfirmingRisk": "正在确认风险",
+    "hostActionDeclineFailed": "无法拒绝请求",
+    "hostActionDescription": "一位已登录的管理员请求访问此电脑上的文件夹。",
+    "hostActionExpires": "于 {{time}} 过期",
+    "hostActionFailed": "无法完成请求",
+    "hostActionLocateLocation": "定位存储位置",
+    "hostActionLocateRepository": "定位资源库",
+    "hostActionOpenRepository": "打开现有资源库",
+    "hostActionRequestedBy": "{{purpose}} · 请求者：{{actor}}",
+    "hostActionRiskTitle": "继续前请确认存储风险",
+    "locateDefaultLocation": "重新定位默认存储位置",
     "location": "存储位置",
     "noAdditional": "没有其他位置",
     "noAdditionalHint": "使用“添加位置”注册另一个文件夹。",
     "noDefault": "尚未选择默认位置。",
+    "noWebRequests": "没有待处理的 Web 请求",
+    "noWebRequestsHint": "Web 应用发起的本机文件夹请求会显示在这里，等待本机确认。",
+    "readOnly": "只读",
+    "repositoryCount_other": "{{count}} 个资源库",
+    "reviewAndChoose": "检查并选择文件夹",
+    "riskCloudSync": "云同步软件管理的文件夹",
+    "riskMountChanged": "挂载的文件系统已变化",
+    "riskNetwork": "网络文件系统",
+    "riskPlaceholder": "必须先下载文件",
+    "riskRemovable": "可移动存储",
     "startServerHint": "请先启动服务器，再添加其他位置。",
-    "title": "存储"
+    "title": "存储",
+    "webRequests": "来自 Web 的请求",
+    "writable": "可写"
   },
   "toast": {
     "openFailed": "无法打开流明集",
     "pageFailed": "页面无法打开",
     "settingsLoadFailed": "服务器设置无法加载",
-    "storagePickFailed": "无法选择文件夹",
+    "settingsOperationTimeout": "设置操作未能及时完成。请先检查 Server 状态，再决定是否重试。",
     "settingsSaveFailed": "无法保存设置",
-    "settingsOperationTimeout": "设置操作未能及时完成。请先检查 Server 状态，再决定是否重试。"
+    "storagePickFailed": "无法选择文件夹"
   },
   "updates": {
     "actionFailed": "更新操作失败",
@@ -295,8 +320,5 @@
     "noProvider": "此构建未配置已签名的更新提供方。",
     "restartInstall": "重启并安装",
     "stable": "稳定版"
-  },
-  "product": {
-    "compactName": "流明集"
   }
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,8 +14,10 @@ import (
 	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/queue/jobs"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/rootcfg"
 	hashutil "server/internal/utils/hash"
 
 	"github.com/google/uuid"
@@ -27,6 +30,63 @@ type scannerFixture struct {
 	database   *db.DB
 	repository repo.Repository
 	scanner    *Scanner
+	manager    *storage.DefaultRepositoryManager
+}
+
+func TestScanWorkerReturnsRetryableBusyDuringMaintenance(t *testing.T) {
+	fixture := newScannerFixture(t, 0)
+	now := dbtypes.NewTimestamp(time.Now().UTC())
+	if _, err := fixture.database.Queries.BeginRepositoryMaintenance(fixture.ctx, repo.BeginRepositoryMaintenanceParams{
+		RepoID: fixture.repository.RepoID, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	err := fixture.scanner.ProcessScanRepository(fixture.ctx, jobs.ScanRepositoryArgs{
+		RepositoryID: fixture.repository.RepoID.String(), Mode: jobs.RepositoryScanModeManual,
+	})
+	if !errors.Is(err, storage.ErrRepositoryBusy) {
+		t.Fatalf("scan maintenance error = %v, want ErrRepositoryBusy for River retry", err)
+	}
+	var runs int
+	if err := fixture.database.SQL.QueryRowContext(fixture.ctx,
+		`SELECT count(*) FROM repository_scan_runs WHERE repository_id = ?`, fixture.repository.RepoID,
+	).Scan(&runs); err != nil {
+		t.Fatal(err)
+	}
+	if runs != 0 {
+		t.Fatalf("maintenance scan created %d run receipts", runs)
+	}
+}
+
+func TestScanEnqueueHoldsRepositoryGateAgainstRemoval(t *testing.T) {
+	fixture := newScannerFixture(t, 0)
+	fixture.scanner.beforeScanInsert = func() {
+		removeCtx, cancel := context.WithTimeout(fixture.ctx, 30*time.Millisecond)
+		defer cancel()
+		err := fixture.manager.RemoveRepository(removeCtx, fixture.repository.RepoID.String())
+		if !errors.Is(err, storage.ErrRepositoryBusy) {
+			t.Fatalf("remove during scan enqueue = %v, want ErrRepositoryBusy", err)
+		}
+	}
+	result, err := fixture.scanner.EnqueueManualScan(fixture.ctx, fixture.repository.RepoID.String(), "test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.JobID == 0 {
+		t.Fatal("scan enqueue returned no job")
+	}
+	if _, err := fixture.database.Queries.GetRepository(fixture.ctx, fixture.repository.RepoID); err != nil {
+		t.Fatalf("repository was removed during enqueue: %v", err)
+	}
+
+	if _, err := fixture.database.Queries.BeginRepositoryMaintenance(fixture.ctx, repo.BeginRepositoryMaintenanceParams{
+		RepoID: fixture.repository.RepoID, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.scanner.EnqueueManualScan(fixture.ctx, fixture.repository.RepoID.String(), "test", false); !errors.Is(err, storage.ErrRepositoryBusy) {
+		t.Fatalf("enqueue during maintenance = %v, want ErrRepositoryBusy", err)
+	}
 }
 
 func newScannerFixture(t *testing.T, settleSeconds int) *scannerFixture {
@@ -53,10 +113,24 @@ func newScannerFixture(t *testing.T, settleSeconds int) *scannerFixture {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
+	rootID := uuid.New()
+	rootConfig := rootcfg.New("scanner root")
+	rootConfig.ID = rootID.String()
+	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: "scanner root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	repository, err := database.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "scanner integration", Path: repositoryPath,
-		Config: *repositoryConfig, Role: dbtypes.RepoRoleRegular, Status: dbtypes.RepoStatusActive,
-		CreatedAt: now, UpdatedAt: now,
+		Config: *repositoryConfig, Role: dbtypes.RepoRoleRegular,
+		Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
+		CreatedAt: now, UpdatedAt: now, RootID: rootID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -65,11 +139,17 @@ func newScannerFixture(t *testing.T, settleSeconds int) *scannerFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	files := storage.NewRepositoryFSFactory(nil, database.Queries)
+	manager, err := storage.NewRepositoryManager(database.SQL, database.Queries, nil, nil, files)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &scannerFixture{
 		ctx:        ctx,
 		database:   database,
 		repository: repository,
-		scanner: NewScanner(database, queueClient, storage.NewRepositoryFSFactory(nil, database.Queries), config.RepositoryScanConfig{
+		manager:    manager,
+		scanner: NewScanner(database, queueClient, files, manager, config.RepositoryScanConfig{
 			SettleSeconds:      settleSeconds,
 			MaxConcurrentRepos: 1,
 		}, nil),

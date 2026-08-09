@@ -18,6 +18,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/rootcfg"
 	fileutil "server/internal/utils/file"
 	hashutil "server/internal/utils/hash"
 
@@ -31,6 +32,7 @@ var (
 	ErrRepositoryFSClosed         = errors.New("repository filesystem is closed")
 	ErrRepositoryFileUnstable     = errors.New("repository file changed during inspection")
 	ErrRepositoryEntryUnsupported = errors.New("repository entry is unsupported")
+	ErrNestedRepository           = errors.New("nested repository boundary encountered")
 )
 
 type EntryKind string
@@ -105,26 +107,69 @@ func (f *RepositoryFSFactory) AccessCoordinator() *RepositoryAccessCoordinator {
 	return f.access
 }
 
+// ValidateRepositoryParent is the common pre-I/O identity gate. Repository
+// reachability never overrides its parent Storage Location: an offline,
+// maintenance, missing, or replaced root fails before any repository handle or
+// staging writer is opened.
+func (f *RepositoryFSFactory) ValidateRepositoryParent(ctx context.Context, repository repo.Repository) error {
+	if f == nil || f.queries == nil {
+		return nil
+	}
+	root, err := f.queries.GetRepositoryRoot(ctx, repository.RootID)
+	if err != nil {
+		return fmt.Errorf("%w: load parent Storage Location: %v", ErrRepositoryUnavailable, err)
+	}
+	if root.Status != dbtypes.RepositoryRootStatusActive {
+		return fmt.Errorf("%w: parent Storage Location status=%s", ErrRepositoryUnavailable, root.Status)
+	}
+	marker, err := rootcfg.Load(root.Path)
+	if err != nil || marker.ID != root.RootID.String() {
+		_, _ = f.queries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
+			RootID: root.RootID, Name: root.Name, Status: dbtypes.RepositoryRootStatusError,
+			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		})
+		return fmt.Errorf("%w: parent Storage Location identity changed", ErrRepositoryUnavailable)
+	}
+	return nil
+}
+
 // Open verifies catalog reachability and the portable repository marker before
 // returning any media capability.
 func (f *RepositoryFSFactory) Open(repository repo.Repository) (*RepositoryFS, error) {
+	return f.OpenContext(context.Background(), repository)
+}
+
+// OpenContext is Open with a bounded wait for the in-process repository lease.
+// Request paths use it so lifecycle maintenance cannot leave an HTTP request
+// blocked after its context has been cancelled.
+func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.Repository) (*RepositoryFS, error) {
 	if f == nil || f.access == nil {
 		return nil, fmt.Errorf("%w: factory is unavailable", ErrRepositoryUnavailable)
 	}
-	if f.queries == nil && (repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError) {
-		return nil, fmt.Errorf("%w: status=%s", ErrRepositoryUnavailable, repository.Status)
+	if ctx == nil {
+		return nil, errors.New("context is required")
 	}
-	release := f.access.acquireRead(repository.RepoID)
+	if f.queries == nil && repository.Reachability != dbtypes.RepositoryReachabilityActive {
+		return nil, fmt.Errorf("%w: reachability=%s", ErrRepositoryUnavailable, repository.Reachability)
+	}
+	release, err := f.access.acquireReadContext(ctx, repository.RepoID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: repository is busy: %v", ErrRepositoryBusy, err)
+	}
 	if f.queries != nil {
-		current, err := f.queries.GetRepository(context.Background(), repository.RepoID)
+		current, err := f.queries.GetRepository(ctx, repository.RepoID)
 		if err != nil {
 			release()
 			return nil, fmt.Errorf("%w: refresh repository location: %v", ErrRepositoryUnavailable, err)
 		}
 		repository = current
-		if repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError {
+		if repository.Reachability != dbtypes.RepositoryReachabilityActive {
 			release()
-			return nil, fmt.Errorf("%w: status=%s", ErrRepositoryUnavailable, repository.Status)
+			return nil, fmt.Errorf("%w: reachability=%s", ErrRepositoryUnavailable, repository.Reachability)
+		}
+		if err := f.ValidateRepositoryParent(ctx, repository); err != nil {
+			release()
+			return nil, err
 		}
 	}
 	root, err := os.OpenRoot(repository.Path)
@@ -642,6 +687,14 @@ func (r *RepositoryFS) WalkUserMedia(ctx context.Context, options WalkOptions) (
 		}
 		if entry.IsDir() {
 			if name == ".lumilio" {
+				return fs.SkipDir
+			}
+			if _, markerErr := root.Stat(path.Join(name, ".lumiliorepo")); markerErr == nil {
+				topologyErr := fmt.Errorf("%w: %s", ErrNestedRepository, name)
+				summary.markPartial(name, "nested_repository", topologyErr)
+				return fs.SkipDir
+			} else if !errors.Is(markerErr, fs.ErrNotExist) {
+				summary.markPartial(name, "nested_repository_check", markerErr)
 				return fs.SkipDir
 			}
 			return nil

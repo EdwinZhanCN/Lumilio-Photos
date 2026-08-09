@@ -113,6 +113,20 @@ export enum ErrorCode {
     ErrorRecoveryRequired = "recovery_required",
 };
 
+export interface HostActionTicket {
+    "id": string;
+    "requestID": string;
+    "kind": string;
+    "actor": string;
+    "purpose"?: string;
+    "name"?: string;
+    "expectedVersion": number;
+    "nonce": string;
+    "status": string;
+    "riskWarnings"?: string[] | null;
+    "expiresAt": string;
+}
+
 export interface HostSnapshot {
     "bootPhase": string;
     "settingsVisible": boolean;
@@ -333,6 +347,16 @@ export interface StorageShortcut {
     "kind"?: string;
     "status": string;
     "canOpen": boolean;
+    "repositoryCount": number;
+    "activeOperationCount": number;
+    "canRemove": boolean;
+    "removalBlockedBy"?: string;
+    "filesPreserved": boolean;
+    "writable": boolean;
+    "capacityKnown": boolean;
+    "totalBytes"?: number;
+    "availableBytes"?: number;
+    "filesystem"?: string;
 }
 
 export interface StorageSummary {

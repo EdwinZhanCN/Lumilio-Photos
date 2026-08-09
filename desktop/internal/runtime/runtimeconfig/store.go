@@ -18,9 +18,10 @@ import (
 	"desktop/internal/control/dto"
 	"desktop/internal/platform"
 
-	"server/config"
-
+	"github.com/google/uuid"
 	"github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
+	"server/config"
 )
 
 const PointerSchemaVersion = 1
@@ -258,10 +259,56 @@ func (s *Store) validateStoragePathChange(candidate string) error {
 	}
 	currentPath := filepath.Clean(strings.TrimSpace(current.StorageConfig.Path))
 	candidatePath := filepath.Clean(strings.TrimSpace(candidate))
-	if currentPath != candidatePath {
-		return errors.New("default storage location cannot be changed after setup")
+	if currentPath == candidatePath {
+		return nil
+	}
+	newRootID, err := loadPortableMarkerID(filepath.Join(candidatePath, ".lumilioroot"))
+	if err != nil {
+		return fmt.Errorf("selected default storage location has no valid .lumilioroot marker: %w", err)
+	}
+	newPrimaryID, err := loadPortableMarkerID(filepath.Join(candidatePath, "primary", ".lumiliorepo"))
+	if err != nil {
+		return fmt.Errorf("selected default storage location has no valid primary/.lumiliorepo marker: %w", err)
+	}
+	// If the old path is still online, the Desktop can prove immediately that
+	// the selected directory is the same portable root and primary repository.
+	// A true move normally leaves the old path offline; the Server then performs
+	// the authoritative comparison against the catalog during controlled restart.
+	if oldRootID, loadErr := loadPortableMarkerID(filepath.Join(currentPath, ".lumilioroot")); loadErr == nil {
+		if oldRootID != newRootID {
+			return errors.New("selected default storage location has a different .lumilioroot identity")
+		}
+		oldPrimaryID, primaryErr := loadPortableMarkerID(filepath.Join(currentPath, "primary", ".lumiliorepo"))
+		if primaryErr != nil {
+			return fmt.Errorf("current default storage location primary marker is invalid: %w", primaryErr)
+		}
+		if oldPrimaryID != newPrimaryID {
+			return errors.New("selected default storage location has a different primary repository identity")
+		}
 	}
 	return nil
+}
+
+func loadPortableMarkerID(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	var marker struct {
+		Version string `yaml:"version"`
+		ID      string `yaml:"id"`
+	}
+	if err := yaml.Unmarshal(data, &marker); err != nil {
+		return "", err
+	}
+	if marker.Version != "1.0" {
+		return "", fmt.Errorf("unsupported marker version %q", marker.Version)
+	}
+	parsed, err := uuid.Parse(strings.TrimSpace(marker.ID))
+	if err != nil {
+		return "", err
+	}
+	return parsed.String(), nil
 }
 
 func (s *Store) defaultIntent() ([]byte, error) {

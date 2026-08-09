@@ -3,7 +3,7 @@
  *
  * Cloud is an API capability shared by Settings, Repositories, and Manage. It
  * owns provider descriptors, authenticated cloud credentials, repository
- * bindings, and explicit import runs; it has no route or feature-owned UI.
+ * bindings, explicit import runs, and the repository source-management flow.
  *
  * ## State
  *
@@ -17,26 +17,28 @@
  * ```mermaid
  * flowchart TD
  *     SETTINGS["Settings"] --> CREDENTIALS["credential hooks"]
- *     REPOSITORIES["Repositories"] --> STATUS["repository cloud status"]
- *     MANAGE["Manage"] --> IMPORT["start import"]
+ *     REPOSITORIES["Repositories"] --> SOURCES["CloudSourcesModal"]
+ *     SOURCES --> STATUS["repository cloud sources"]
+ *     SOURCES --> IMPORT["start / cancel / resume import"]
  *     CREDENTIALS --> API["Cloud API"]
  *     STATUS --> API
  *     IMPORT --> API
  * ```
  *
- * Settings composes provider and credential setup. Repositories uses cloud
- * credentials when creating a cloud-backed repository and renders binding
- * status on repository cards. Manage starts repository-scoped imports. These
- * consumers use the root public entry; Cloud does not import their UI.
+ * Settings composes provider and credential setup. After repository creation,
+ * {@link CloudSourcesModal} binds one or more connected accounts (including a
+ * provider-specific remote scope), renders their durable receipts, and starts,
+ * cancels, or resumes repository-scoped imports.
  *
  * ## Data
  *
  * {@link useCloudProviders} and {@link useCloudCredentials} read server
  * metadata and connected accounts. Credential creation, challenge,
  * reconnect, disconnect, and removal live beside those queries.
- * {@link useRepositoryCloudStatus} reads one binding and latest import run;
- * {@link useStartRepositoryCloudImport} queues a new run and invalidates
- * repository-facing status.
+ * {@link useRepositoryCloudStatus} reads every visible binding and latest run.
+ * {@link useBindRepositoryCloudSource}, {@link useStartRepositoryCloudImport},
+ * {@link useCancelCloudImport}, and {@link useResumeCloudImport} mutate that
+ * server-owned state and invalidate repository-facing status.
  *
  * Generated OpenAPI aliases live in `types.ts` because both API modules and
  * consumers share them. {@link createProviderTextResolver} maps backend i18n
@@ -48,9 +50,13 @@
  */
 import type { useCloudCredentials, useCloudProviders } from "./api/useCloudCredentials.ts";
 import type {
+  useBindRepositoryCloudSource,
+  useCancelCloudImport,
   useRepositoryCloudStatus,
+  useResumeCloudImport,
   useStartRepositoryCloudImport,
 } from "./api/useRepositoryCloud.ts";
+import type CloudSourcesModal from "./flows/repository-sources/CloudSourcesModal.tsx";
 import type { createProviderTextResolver } from "./model/providerText.ts";
 
 export {};

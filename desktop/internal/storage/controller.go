@@ -145,40 +145,97 @@ func (c *Controller) PickLocation(title string) (string, error) {
 	return canonical, nil
 }
 
-// AddLocation validates the native-picker result before handing it to the
-// in-process repository control plane. The database operation is performed
-// asynchronously and represented by the shared operation registry.
-func (c *Controller) AddLocation(requestID string, expectedVersion uint64, path, name string) (dto.OperationReceipt, error) {
+func (c *Controller) ListHostActions(ctx context.Context) ([]dto.HostActionTicket, error) {
+	control, err := c.repositoryControl()
+	if err != nil {
+		return nil, err
+	}
+	actions, err := control.ListPendingHostActions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	currentVersion := c.store.Get().Storage.Version
+	for index := range actions {
+		if actions[index].ExpectedVersion == 0 && currentVersion != 0 {
+			bound, bindErr := control.SetHostActionExpectedVersion(ctx, actions[index].ID, actions[index].Nonce, currentVersion)
+			if bindErr != nil {
+				return nil, bindErr
+			}
+			actions[index] = bound
+		}
+	}
+	items := make([]dto.HostActionTicket, 0, len(actions))
+	for _, action := range actions {
+		items = append(items, dto.HostActionTicket{
+			ID: action.ID, RequestID: action.RequestID, Kind: action.Kind, Actor: action.Actor,
+			Purpose: action.Purpose, Name: action.Name, ExpectedVersion: action.ExpectedVersion,
+			Nonce: action.Nonce, Status: action.Status, RiskWarnings: action.RiskWarnings, ExpiresAt: action.ExpiresAt,
+		})
+	}
+	return items, nil
+}
+
+func (c *Controller) ApproveHostAction(requestID string, expectedVersion uint64, actionID, nonce string) (dto.OperationReceipt, error) {
 	if existing, ok := c.operations.ReceiptForRequest(requestID); ok {
 		return existing, nil
-	}
-	canonical, err := canonicalShortcutPath(path)
-	if err != nil {
-		return dto.OperationReceipt{}, operation.NewError(dto.ErrorStorageLocationOffline, "storage location is not an existing directory")
 	}
 	control, err := c.repositoryControl()
 	if err != nil {
 		return dto.OperationReceipt{}, err
 	}
-	if expectedVersion != 0 && expectedVersion != c.store.Get().Storage.Version {
+	currentVersion := c.store.Get().Storage.Version
+	if expectedVersion != 0 && expectedVersion != currentVersion {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorStaleVersion, "storage summary version is stale")
 	}
-	receipt, err := c.operations.Accept(requestID, "storage", c.store.Get().Storage.Version, true)
+	actions, err := control.ListPendingHostActions(context.Background())
 	if err != nil {
 		return dto.OperationReceipt{}, err
 	}
-	if strings.TrimSpace(name) == "" {
-		name = filepath.Base(canonical)
+	var selected *runtime.HostAction
+	for i := range actions {
+		if actions[i].ID == actionID && actions[i].Nonce == nonce {
+			selected = &actions[i]
+			break
+		}
 	}
+	if selected == nil {
+		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "host action is no longer pending")
+	}
+	if selected.ExpectedVersion != 0 && selected.ExpectedVersion != currentVersion {
+		return dto.OperationReceipt{}, operation.NewError(dto.ErrorStaleVersion, "host action expected a different storage version")
+	}
+	riskConfirmation := selected.Status == "needs_decision" && len(selected.RiskWarnings) > 0
+	canonical := ""
+	if !riskConfirmation {
+		c.openMu.Lock()
+		pick := c.pick
+		c.openMu.Unlock()
+		if pick == nil {
+			return dto.OperationReceipt{}, operation.NewError(dto.ErrorRuntimeNotReady, "directory picker is unavailable")
+		}
+		path, pickErr := pick(hostActionPickerTitle(*selected))
+		if pickErr != nil || strings.TrimSpace(path) == "" {
+			return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "directory selection was cancelled")
+		}
+		canonical, err = canonicalShortcutPath(path)
+		if err != nil {
+			return dto.OperationReceipt{}, operation.NewError(dto.ErrorStorageLocationOffline, "selected directory is unavailable")
+		}
+	}
+	receipt, err := c.operations.Accept(requestID, "host-action:"+actionID, currentVersion, false)
+	if err != nil {
+		return dto.OperationReceipt{}, err
+	}
+	instanceID := c.store.Get().InstanceID
 	go func() {
-		_, _, callErr := control.AddStorageLocation(context.Background(), canonical, name)
+		_, callErr := control.ExecuteHostAction(context.Background(), actionID, nonce, instanceID, canonical, riskConfirmation)
 		if callErr == nil {
 			if locations, listErr := control.ListStorageLocations(context.Background()); listErr == nil {
 				_, callErr = c.refresh(locations)
 			}
 		}
 		if callErr != nil {
-			_ = c.operations.Fail(receipt.OperationID, operation.WithOperation(operation.NewError(dto.ErrorRecoveryRequired, "storage location could not be added"), receipt.OperationID))
+			_ = c.operations.Fail(receipt.OperationID, operation.WithOperation(operation.NewError(dto.ErrorRecoveryRequired, "native host action failed"), receipt.OperationID))
 		} else {
 			_ = c.operations.Succeed(receipt.OperationID)
 		}
@@ -188,36 +245,28 @@ func (c *Controller) AddLocation(requestID string, expectedVersion uint64, path,
 	return receipt, nil
 }
 
-func (c *Controller) AttachRepository(requestID string, expectedVersion uint64, path string) (dto.OperationReceipt, error) {
-	if existing, ok := c.operations.ReceiptForRequest(requestID); ok {
-		return existing, nil
-	}
-	canonical, err := canonicalShortcutPath(path)
-	if err != nil {
-		return dto.OperationReceipt{}, operation.NewError(dto.ErrorStorageLocationOffline, "repository path is not an existing directory")
-	}
+func (c *Controller) DeclineHostAction(actionID string) error {
 	control, err := c.repositoryControl()
 	if err != nil {
-		return dto.OperationReceipt{}, err
+		return err
 	}
-	if expectedVersion != 0 && expectedVersion != c.store.Get().Storage.Version {
-		return dto.OperationReceipt{}, operation.NewError(dto.ErrorStaleVersion, "storage summary version is stale")
+	_, err = control.CancelHostAction(context.Background(), strings.TrimSpace(actionID))
+	return err
+}
+
+func hostActionPickerTitle(action runtime.HostAction) string {
+	switch action.Kind {
+	case "authorize_storage_location":
+		return "Authorize Storage Location"
+	case "open_repository":
+		return "Open Existing Repository"
+	case "locate_storage_location":
+		return "Locate Storage Location"
+	case "locate_repository":
+		return "Locate Repository"
+	default:
+		return "Choose Folder"
 	}
-	receipt, err := c.operations.Accept(requestID, "storage", c.store.Get().Storage.Version, true)
-	if err != nil {
-		return dto.OperationReceipt{}, err
-	}
-	go func() {
-		_, callErr := control.AttachRepository(context.Background(), canonical)
-		if callErr != nil {
-			_ = c.operations.Fail(receipt.OperationID, operation.WithOperation(operation.NewError(dto.ErrorRecoveryRequired, "repository could not be attached"), receipt.OperationID))
-		} else {
-			_ = c.operations.Succeed(receipt.OperationID)
-		}
-		c.syncOperations()
-	}()
-	c.syncOperations()
-	return receipt, nil
 }
 
 func (c *Controller) repositoryControl() (runtime.StorageControl, error) {
@@ -247,6 +296,10 @@ func (c *Controller) refresh(locations []runtime.StorageLocation) ([]dto.Storage
 		}
 		items = append(items, dto.StorageShortcut{
 			ID: location.ID, Name: location.Name, Path: path, Kind: location.Kind, Status: status, CanOpen: canOpen,
+			RepositoryCount: location.RepositoryCount, ActiveOperationCount: location.ActiveOperationCount,
+			CanRemove: location.CanRemove, RemovalBlockedBy: location.RemovalBlockedBy, FilesPreserved: location.FilesPreserved,
+			Writable: location.Writable, CapacityKnown: location.CapacityKnown, TotalBytes: location.TotalBytes,
+			AvailableBytes: location.AvailableBytes, Filesystem: location.Filesystem,
 		})
 	}
 	cache, err := c.loadCache()

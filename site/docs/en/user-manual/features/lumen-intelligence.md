@@ -1,6 +1,6 @@
 ---
 title: Lumen Intelligence
-description: "Enable local media understanding on Desktop, a standalone device, or Docker: semantic search, people, OCR, and species recognition."
+description: "Enable Image Semantic Analysis, Person Recognition, OCR Text Recognition, and BioCLIP Species Recognition on Desktop, a standalone device, or Docker."
 ---
 
 <script setup lang="ts">

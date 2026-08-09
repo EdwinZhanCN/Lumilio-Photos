@@ -29,12 +29,12 @@ code-evidence:
 
 ## 独立 Lumen 节点
 
-适合把计算负载与媒体 Server 分开。节点只负责声明和执行支持的智能任务，基本媒体库应在节点下线时继续工作。
+适合把计算负载与媒体 Server 分开。节点只负责声明和执行支持的智能任务，基础照片管理应在节点下线时继续工作。
 
 ## 不要混淆的边界
 
 - Desktop 不是只连接远程 Server 的轻客户端。
-- Docker Web 当前不能像 Desktop 那样任意添加存储根。
+- Docker Web 当前不能像 Desktop 那样任意添加存储位置。
 - Lumen Intelligence 不是原件存储或数据库。
 - Lumilio Agent 的模型提供方不等同于 Lumen 节点。
 

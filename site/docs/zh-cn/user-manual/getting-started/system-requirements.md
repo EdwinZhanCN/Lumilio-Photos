@@ -35,6 +35,6 @@ Windows 构建同时产出安装包和便携压缩包。当前发布工作流没
 
 ## Lumen Intelligence
 
-基础媒体库可以在没有 Lumen Intelligence 的情况下运行。启用智能能力时，CPU、内存、GPU、模型缓存和任务耗时取决于节点能力及选择的能力方案。当前 Desktop 安装流程公开的 Lumen Intelligence 预设名称是 `minimal`、`basic` 和 `brave`。
+基础照片管理可以在没有 Lumen Intelligence 的情况下运行。启用智能能力时，CPU、内存、GPU、模型缓存和任务耗时取决于节点能力及选择的能力方案。当前 Desktop 安装流程公开的 Lumen Intelligence 预设名称是 `minimal`、`basic` 和 `brave`。
 
 <!-- TODO(support-matrix): 代码和发布工作流没有给出统一的最低操作系统版本、最低内存和推荐磁盘空间。可选方向：由真实发布门禁生成支持矩阵，或在发行清单中维护。本文不虚构数值。 -->

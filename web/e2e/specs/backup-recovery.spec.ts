@@ -63,6 +63,7 @@ async function createRepository(token: string, name: string): Promise<Repository
     token,
     body: JSON.stringify({
       name,
+      directory_name: name,
       role: "regular",
       storage_strategy: "flat",
       duplicate_handling: "rename",
@@ -200,7 +201,10 @@ async function rejectRestoreFromRow(page: Page, row: Locator): Promise<void> {
   expect(response.status()).toBe(500);
 }
 
-async function readRestoreOperation(token: string, operationID: string): Promise<RestoreOperation | null> {
+async function readRestoreOperation(
+  token: string,
+  operationID: string,
+): Promise<RestoreOperation | null> {
   try {
     return await api<RestoreOperation>(
       `/api/v1/settings/backup-restores/${encodeURIComponent(operationID)}`,

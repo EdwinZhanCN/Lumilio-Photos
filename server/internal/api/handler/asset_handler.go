@@ -49,6 +49,7 @@ type AssetHandler struct {
 	indexingService service.AssetIndexingService
 	stackService    service.StackService
 	queries         *repo.Queries
+	database        *sql.DB
 	repoManager     storage.RepositoryManager
 	stagingManager  storage.StagingManager
 	files           *storage.RepositoryFSFactory
@@ -68,6 +69,7 @@ func NewAssetHandler(
 	indexingService service.AssetIndexingService,
 	stackService service.StackService,
 	queries *repo.Queries,
+	database *sql.DB,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[*sql.Tx],
@@ -87,6 +89,7 @@ func NewAssetHandler(
 		indexingService: indexingService,
 		stackService:    stackService,
 		queries:         queries,
+		database:        database,
 		repoManager:     repoManager,
 		stagingManager:  stagingManager,
 		files:           files,
@@ -140,8 +143,11 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 // currently reachable. Staging a file for a repository that cannot be written is
 // a guaranteed failure later, with a worse error attached.
 func rejectOfflineRepository(repository repo.Repository) error {
-	if repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError {
+	if repository.Reachability != dbtypes.RepositoryReachabilityActive {
 		return fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
+	}
+	if repository.Activity == dbtypes.RepositoryActivityPaused {
+		return fmt.Errorf("%w: %s is paused", storage.ErrRepositoryBusy, repository.Name)
 	}
 	return nil
 }
@@ -155,6 +161,8 @@ func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 		api.GinNotFound(c, err, "Repository not found")
 	case errors.Is(err, storage.ErrRepositoryOffline):
 		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is unavailable")
+	case errors.Is(err, storage.ErrRepositoryBusy):
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository writes are paused")
 	default:
 		api.GinBadRequest(c, err, "Please specify a repository_id or create a repository first")
 	}
@@ -208,6 +216,10 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	repository, err := h.resolveUploadRepository(ctx, req.RepositoryID)
 	if err != nil {
 		h.respondRepositoryError(c, err)
+		return
+	}
+	if _, err := h.repoManager.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), uint64(max(header.Size, 0))); err != nil {
+		h.respondCapacityError(c, err)
 		return
 	}
 
@@ -781,6 +793,10 @@ func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 		h.respondRepositoryError(c, err)
 		return
 	}
+	if _, err := h.repoManager.CheckRepositoryWriteCapacity(c.Request.Context(), repository.RepoID.String(), uint64(req.TotalSize)); err != nil {
+		h.respondCapacityError(c, err)
+		return
+	}
 	userID := "anonymous"
 	if id, ok := c.Get("user_id"); ok {
 		userID = fmt.Sprintf("%d", id)
@@ -795,6 +811,17 @@ func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 	}
 	h.chunkMerger.AddChunks(session.SessionID, chunks)
 	api.JSONOK(c, dto.UploadSessionResponseDTO{SessionID: session.SessionID, Status: session.Status, TotalChunks: session.TotalChunks, ReceivedChunks: session.ReceivedChunks, BytesReceived: session.BytesReceived, TaskID: session.TaskID})
+}
+
+func (h *AssetHandler) respondCapacityError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, storage.ErrRepositoryReadOnly):
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository storage is read-only")
+	case errors.Is(err, storage.ErrInsufficientSpace):
+		api.GinError(c, http.StatusInsufficientStorage, err, http.StatusInsufficientStorage, "Repository does not have enough free space for this write and its safety margin; work was paused")
+	default:
+		api.GinInternalError(c, err, "Repository capacity could not be verified")
+	}
 }
 
 // GetUploadProgress returns upload progress for sessions
@@ -1038,7 +1065,7 @@ func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.Uploa
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.
+// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, BioCLIP Species Recognition predictions, OCR Text Recognition results, Person Recognition results, and captions.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -1047,8 +1074,8 @@ func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.Uploa
 // @Param include_tags query bool false "Include tags" default(true)
 // @Param include_albums query bool false "Include albums" default(true)
 // @Param include_species query bool false "Include species predictions" default(true)
-// @Param include_ocr query bool false "Include OCR results" default(false)
-// @Param include_faces query bool false "Include face recognition" default(false)
+// @Param include_ocr query bool false "Include OCR Text Recognition results" default(false)
+// @Param include_faces query bool false "Include Person Recognition results" default(false)
 // @Success 200 {object} dto.AssetDetailDTO "Asset details with optional relationships"
 // @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
 // @Failure 404 {object} api.ErrorResponse "Asset not found"
@@ -1154,17 +1181,14 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 		return
 	}
 
-	repoPath, err := h.resolveAssetRepoPath(c.Request.Context(), asset)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
-		return
-	}
-
-	dirManager := h.repoManager.GetDirectoryManager()
 	sidecar := h.defaultSidecarForAsset(id, asset)
 	exists := false
 
-	content, err := dirManager.ReadSidecar(repoPath, id.String())
+	if !asset.RepositoryID.Valid {
+		api.GinInternalError(c, errors.New("asset has no repository"), "Failed to resolve asset sidecar")
+		return
+	}
+	content, err := h.repoManager.ReadRepositorySidecar(c.Request.Context(), asset.RepositoryID.UUID.String(), id.String())
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to read asset sidecar")
 		return
@@ -1226,20 +1250,17 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 	sidecar.Source = h.sidecarSourceForAsset(asset)
 	sidecar.UpdatedAt = time.Now().UTC()
 
-	repoPath, err := h.resolveAssetRepoPath(c.Request.Context(), asset)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
-		return
-	}
-
 	content, err := json.MarshalIndent(sidecar, "", "  ")
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to encode asset sidecar")
 		return
 	}
 
-	dirManager := h.repoManager.GetDirectoryManager()
-	if err := dirManager.WriteSidecar(repoPath, id.String(), content); err != nil {
+	if !asset.RepositoryID.Valid {
+		api.GinInternalError(c, errors.New("asset has no repository"), "Failed to resolve asset sidecar")
+		return
+	}
+	if err := h.repoManager.WriteRepositorySidecar(c.Request.Context(), asset.RepositoryID.UUID.String(), id.String(), content); err != nil {
 		api.GinInternalError(c, err, "Failed to save asset sidecar")
 		return
 	}
@@ -2090,11 +2111,13 @@ func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository, includ
 			continue
 		}
 		item := dto.IndexingRepositoryOptionDTO{
-			ID:        repository.RepoID.String(),
-			Name:      repository.Name,
-			Role:      string(repository.Role),
-			Status:    string(repository.Status),
-			IsPrimary: repository.Role == dbtypes.RepoRolePrimary,
+			ID:           repository.RepoID.String(),
+			Name:         repository.Name,
+			Role:         string(repository.Role),
+			RootID:       repository.RootID.String(),
+			Reachability: string(repository.Reachability),
+			Activity:     string(repository.Activity),
+			IsPrimary:    repository.Role == dbtypes.RepoRolePrimary,
 		}
 		if includePath {
 			item.Path = repository.Path
@@ -2461,7 +2484,7 @@ func toSearchDebugItemDTOs(debug []service.SearchDebugItem) []dto.SearchDebugIte
 // @Param data body dto.AssetQueryRequestDTO true "Query parameters"
 // @Success 200 {object} dto.QueryAssetsResponseDTO "Assets queried successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
+// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/list [post]
 func (h *AssetHandler) QueryAssets(c *gin.Context) {
@@ -2506,7 +2529,7 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		}
 		// Check for semantic search unavailable error
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
+			api.GinError(c, 503, err, 503, "Image Semantic Analysis is currently unavailable")
 			return
 		}
 		log.Printf("Failed to query assets: %v", err)
@@ -3692,7 +3715,7 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 			for _, repo := range repositories {
 				// An offline repository has no reachable staging directory;
 				// walking it only produces I/O errors and false failure counts.
-				if repo.Status == dbtypes.RepoStatusOffline || repo.Status == dbtypes.RepoStatusError {
+				if repo.Reachability != dbtypes.RepositoryReachabilityActive {
 					continue
 				}
 				// Use staging manager's cleanup function with short max age (1 hour)
@@ -4031,31 +4054,26 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 
 	// Determine retry strategy
 	if len(req.Tasks) == 0 || req.ForceFullRetry {
-		// Full retry - reset status and enqueue full processing job
-		updatedAsset, err := h.queries.ResetAssetStatusForRetry(ctx, assetID)
-		if err != nil {
-			api.GinInternalError(c, err, "Failed to reset asset status")
-			return
-		}
-
-		// Get repository information
-		if !updatedAsset.RepositoryID.Valid {
+		// Validate the current source before entering the short persistent
+		// repository work gate. Status reset and every enqueue then happen while
+		// removal/maintenance is excluded.
+		if !asset.RepositoryID.Valid {
 			api.GinInternalError(c, errors.New("asset has no repository"), "Failed to get repository")
 			return
 		}
-		repository, err := h.queries.GetRepository(ctx, updatedAsset.RepositoryID.UUID)
+		repository, err := h.queries.GetRepository(ctx, asset.RepositoryID.UUID)
 		if err != nil {
 			api.GinInternalError(c, err, "Failed to get repository")
 			return
 		}
 
 		// Check if storage path exists
-		if updatedAsset.StoragePath == nil || *updatedAsset.StoragePath == "" {
+		if asset.StoragePath == nil || *asset.StoragePath == "" {
 			api.GinBadRequest(c, errors.New("asset has no storage path"), "Asset has no storage path")
 			return
 		}
 
-		repositoryPath, err := storage.ParseUserMediaPath(*updatedAsset.StoragePath)
+		repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
 		if err != nil {
 			api.GinBadRequest(c, err, "Invalid asset storage path")
 			return
@@ -4063,7 +4081,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		indexed, err := h.queries.GetRepositoryFileIndexEntry(ctx, repo.GetRepositoryFileIndexEntryParams{
 			RepositoryID: repository.RepoID, StoragePath: repositoryPath.String(),
 		})
-		if err != nil || !indexed.AssetID.Valid || indexed.AssetID.UUID != updatedAsset.AssetID || indexed.State != "present" {
+		if err != nil || !indexed.AssetID.Valid || indexed.AssetID.UUID != asset.AssetID || indexed.State != "present" {
 			api.GinNotFound(c, err, "Asset file is not currently indexed")
 			return
 		}
@@ -4079,48 +4097,88 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			return
 		}
 
+		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, repository.RepoID.String(), dbtypes.RepositoryActivityProcessing)
+		if err != nil {
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is busy or unavailable")
+			return
+		}
+		finishWork := func() bool {
+			if releaseErr := releaseWork(); releaseErr != nil {
+				api.GinInternalError(c, releaseErr, "Failed to finish repository work")
+				return false
+			}
+			return true
+		}
+		tx, err := h.database.BeginTx(ctx, nil)
+		if err != nil {
+			_ = releaseWork()
+			api.GinInternalError(c, err, "Failed to begin reprocessing transaction")
+			return
+		}
+		defer tx.Rollback()
+		txQueries := h.queries.WithTx(tx)
+		updatedAsset, err := txQueries.ResetAssetStatusForRetry(ctx, assetID)
+		if err != nil {
+			_ = releaseWork()
+			api.GinInternalError(c, err, "Failed to reset asset status")
+			return
+		}
+
 		assetType := dbtypes.AssetType(updatedAsset.Type)
 		metaArgs := jobs.MetadataArgs{
 			AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
 			ExpectedContentHash: updatedAsset.ContentHash,
 		}
-		if _, err := h.queueClient.Insert(ctx, metaArgs, &river.InsertOpts{Queue: "metadata_asset"}); err != nil {
+		if err := insertReprocessJobTx(ctx, h.queueClient, tx, metaArgs, "metadata_asset"); err != nil {
+			_ = releaseWork()
 			api.GinInternalError(c, err, "Failed to enqueue metadata job")
 			return
 		}
 
 		switch assetType {
 		case dbtypes.AssetTypePhoto:
-			if _, err := h.queueClient.Insert(ctx, jobs.ThumbnailArgs{
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.ThumbnailArgs{
 				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
 				ExpectedContentHash: updatedAsset.ContentHash,
-			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
+			}, "thumbnail_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
 				return
 			}
 		case dbtypes.AssetTypeVideo:
-			if _, err := h.queueClient.Insert(ctx, jobs.ThumbnailArgs{
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.ThumbnailArgs{
 				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
 				ExpectedContentHash: updatedAsset.ContentHash,
-			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
+			}, "thumbnail_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
 				return
 			}
-			if _, err := h.queueClient.Insert(ctx, jobs.TranscodeArgs{
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.TranscodeArgs{
 				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
 				ExpectedContentHash: updatedAsset.ContentHash,
-			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
+			}, "transcode_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue transcode job")
 				return
 			}
 		case dbtypes.AssetTypeAudio:
-			if _, err := h.queueClient.Insert(ctx, jobs.TranscodeArgs{
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.TranscodeArgs{
 				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
 				ExpectedContentHash: updatedAsset.ContentHash,
-			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
+			}, "transcode_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue transcode job")
 				return
 			}
+		}
+		if err := tx.Commit(); err != nil {
+			_ = releaseWork()
+			api.GinInternalError(c, err, "Failed to commit reprocessing jobs")
+			return
+		}
+		if !finishWork() {
+			return
 		}
 
 		log.Printf("Full reprocessing jobs enqueued for asset %s", assetID.String())
@@ -4136,6 +4194,15 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		api.JSONOK(c, response)
 		return
 	} else {
+		if !asset.RepositoryID.Valid {
+			api.GinInternalError(c, errors.New("asset has no repository"), "Failed to get repository")
+			return
+		}
+		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, asset.RepositoryID.UUID.String(), dbtypes.RepositoryActivityProcessing)
+		if err != nil {
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is busy or unavailable")
+			return
+		}
 		// Selective retry - enqueue selective retry job
 		// Create selective retry job payload
 		retryArgs := jobs.AssetRetryPayload{
@@ -4145,11 +4212,14 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		}
 
 		// Enqueue the selective retry job
-		jobResult, err := h.queueClient.Insert(ctx, retryArgs, &river.InsertOpts{
-			Queue: "retry_asset",
-		})
+		jobResult, err := insertSelectiveRetryReceipt(ctx, h.queueClient, retryArgs)
 		if err != nil {
+			_ = releaseWork()
 			api.GinInternalError(c, err, "Failed to enqueue selective retry job")
+			return
+		}
+		if err := releaseWork(); err != nil {
+			api.GinInternalError(c, err, "Failed to finish repository work")
 			return
 		}
 
@@ -4166,6 +4236,22 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		api.JSONOK(c, response)
 		return
 	}
+}
+
+func insertSelectiveRetryReceipt(ctx context.Context, queueClient *river.Client[*sql.Tx], args jobs.AssetRetryPayload) (*rivertype.JobInsertResult, error) {
+	opts := args.InsertOpts()
+	opts.Queue = "retry_asset"
+	return queueClient.Insert(ctx, args, &opts)
+}
+
+func insertReprocessJobTx(ctx context.Context, queueClient *river.Client[*sql.Tx], tx *sql.Tx, args river.JobArgs, queue string) error {
+	opts := river.InsertOpts{Queue: queue}
+	if provider, ok := args.(interface{ InsertOpts() river.InsertOpts }); ok {
+		opts = provider.InsertOpts()
+		opts.Queue = queue
+	}
+	_, err := queueClient.InsertTx(ctx, tx, args, &opts)
+	return err
 }
 
 func isValidReprocessQueue(queue string) bool {

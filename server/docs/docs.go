@@ -1614,6 +1614,23 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.BindRepositoryCloudSourceRequest": {
+                "properties": {
+                    "credential_id": {
+                        "type": "string"
+                    },
+                    "remote_scope": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "credential_id"
+                ],
+                "type": "object"
+            },
             "dto.BrowseItemDTO": {
                 "properties": {
                     "best_ts_ms": {
@@ -2156,6 +2173,52 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.CreateHostActionRequestDTO": {
+                "properties": {
+                    "expected_version": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "expires_in_seconds": {
+                        "example": 600,
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "enum": [
+                            "authorize_storage_location",
+                            "open_repository",
+                            "locate_storage_location",
+                            "locate_repository"
+                        ],
+                        "example": "open_repository",
+                        "type": "string"
+                    },
+                    "name": {
+                        "example": "External Archive",
+                        "type": "string"
+                    },
+                    "purpose": {
+                        "example": "Open an existing photo repository",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "root_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "session_id": {
+                        "example": "web-session-4d4d",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "kind"
+                ],
+                "type": "object"
+            },
             "dto.CreateManualStackRequestDTO": {
                 "properties": {
                     "asset_ids": {
@@ -2174,22 +2237,18 @@ const docTemplate = `{
             },
             "dto.CreateRepositoryRequestDTO": {
                 "properties": {
-                    "cloud_credential_id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    },
-                    "duplicate_handling": {
-                        "enum": [
-                            "rename",
-                            "uuid"
-                        ],
-                        "example": "rename",
+                    "directory_name": {
+                        "description": "DirectoryName is the single direct-child folder segment below the selected\nStorage Location. It is required for regular repositories and omitted for\nthe primary repository, whose folder is always \"primary\".",
+                        "example": "family-photos",
                         "type": "string"
                     },
                     "name": {
-                        "description": "Name is preserved verbatim as the directory name for regular\nrepositories. It accepts Unicode letters/digits, ASCII spaces, hyphens,\nand underscores; leading/trailing spaces are rejected.",
+                        "description": "Name is the mutable repository display name and is independent of its\nstable on-disk folder.",
                         "example": "Family Photos",
                         "type": "string"
+                    },
+                    "risk_confirmation": {
+                        "type": "boolean"
                     },
                     "role": {
                         "enum": [
@@ -2221,12 +2280,6 @@ const docTemplate = `{
             },
             "dto.CreateRepositoryResponseDTO": {
                 "properties": {
-                    "cloud_import_error": {
-                        "type": "string"
-                    },
-                    "cloud_import_run_id": {
-                        "type": "string"
-                    },
                     "repository": {
                         "$ref": "#/components/schemas/dto.RepositoryDTO"
                     },
@@ -3070,7 +3123,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "repository_name": {
-                        "example": "Primary Library",
+                        "example": "Primary Repository",
                         "type": "string"
                     },
                     "video_count": {
@@ -3115,6 +3168,127 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.HostActionConflictDTO": {
+                "properties": {
+                    "allowed_resolutions": {
+                        "example": [
+                            "add_separate"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "risk_warnings": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "root_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "type": {
+                        "example": "repository_identity",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.HostActionDTO": {
+                "properties": {
+                    "actor": {
+                        "example": "web:user:1",
+                        "type": "string"
+                    },
+                    "completed_at": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "error_code": {
+                        "example": "expired",
+                        "type": "string"
+                    },
+                    "error_message": {
+                        "example": "Native host approval expired",
+                        "type": "string"
+                    },
+                    "expected_version": {
+                        "type": "integer"
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "example": "open_repository",
+                        "type": "string"
+                    },
+                    "name": {
+                        "example": "External Archive",
+                        "type": "string"
+                    },
+                    "purpose": {
+                        "example": "Open an existing photo repository",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "request_id": {
+                        "example": "web-host-action-4d4d",
+                        "type": "string"
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/dto.HostActionResultDTO"
+                    },
+                    "root_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "pending",
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.HostActionResultDTO": {
+                "properties": {
+                    "conflict": {
+                        "$ref": "#/components/schemas/dto.HostActionConflictDTO"
+                    },
+                    "name": {
+                        "example": "External Archive",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "root_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.IndexingRepositoryListResponseDTO": {
                 "properties": {
                     "repositories": {
@@ -3129,6 +3303,10 @@ const docTemplate = `{
             },
             "dto.IndexingRepositoryOptionDTO": {
                 "properties": {
+                    "activity": {
+                        "example": "idle",
+                        "type": "string"
+                    },
                     "id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
@@ -3138,7 +3316,7 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "name": {
-                        "example": "Photos Library",
+                        "example": "Family Repository",
                         "type": "string"
                     },
                     "path": {
@@ -3146,13 +3324,18 @@ const docTemplate = `{
                         "example": "/Volumes/Media/Photos",
                         "type": "string"
                     },
+                    "reachability": {
+                        "description": "Reachability lets a selector keep an unreachable repository visible as a\nbrowse filter while refusing it as an upload target. Activity is separate\nso scanning never masks storage availability.",
+                        "example": "active",
+                        "type": "string"
+                    },
                     "role": {
                         "example": "regular",
                         "type": "string"
                     },
-                    "status": {
-                        "description": "Status lets a selector keep an unreachable repository visible as a browse\nfilter while refusing it as an upload target.",
-                        "example": "active",
+                    "root_id": {
+                        "description": "RootID identifies the parent Storage Location so clients can derive an\neffective state with parent reachability taking priority.",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     }
                 },
@@ -3204,6 +3387,62 @@ const docTemplate = `{
                     },
                     "provider": {
                         "example": "openai",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LifecycleAuditEventDTO": {
+                "properties": {
+                    "action": {
+                        "type": "string"
+                    },
+                    "actor": {
+                        "type": "string"
+                    },
+                    "actor_user_id": {
+                        "type": "integer"
+                    },
+                    "confirmation_type": {
+                        "type": "string"
+                    },
+                    "details": {
+                        "type": "object"
+                    },
+                    "event_id": {
+                        "type": "string"
+                    },
+                    "failure_stage": {
+                        "type": "string"
+                    },
+                    "host_instance_id": {
+                        "type": "string"
+                    },
+                    "new_path": {
+                        "type": "string"
+                    },
+                    "occurred_at": {
+                        "type": "string"
+                    },
+                    "old_path": {
+                        "type": "string"
+                    },
+                    "operation_id": {
+                        "type": "string"
+                    },
+                    "request_id": {
+                        "type": "string"
+                    },
+                    "result": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "target_id": {
+                        "type": "string"
+                    },
+                    "target_type": {
                         "type": "string"
                     }
                 },
@@ -3278,6 +3517,18 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.ListLifecycleAuditEventsResponseDTO": {
+                "properties": {
+                    "events": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.LifecycleAuditEventDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.ListPeopleResponseDTO": {
                 "properties": {
                     "limit": {
@@ -3325,6 +3576,18 @@ const docTemplate = `{
                     "repositories": {
                         "items": {
                             "$ref": "#/components/schemas/dto.RepositoryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ListRepositoryCandidatesResponseDTO": {
+                "properties": {
+                    "candidates": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryCandidateDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -3980,6 +4243,30 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.NativeHostCapabilityDTO": {
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.OpenRepositoryCandidateRequestDTO": {
+                "properties": {
+                    "directory_name": {
+                        "description": "DirectoryName is a portable direct-child folder segment below the\nconfigured default Storage Location, never an arbitrary host path.",
+                        "example": "family-archive",
+                        "type": "string"
+                    },
+                    "risk_confirmation": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "directory_name"
+                ],
+                "type": "object"
+            },
             "dto.Option": {
                 "properties": {
                     "label": {
@@ -4561,6 +4848,123 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.RemoveRepositoryRequestDTO": {
+                "properties": {
+                    "confirmation_name": {
+                        "description": "ConfirmationName must exactly match the current repository display name.",
+                        "example": "Family Photos",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "confirmation_name"
+                ],
+                "type": "object"
+            },
+            "dto.RenameRepositoryRequestDTO": {
+                "properties": {
+                    "name": {
+                        "example": "Family Archive",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "type": "object"
+            },
+            "dto.RepositoryCandidateDTO": {
+                "properties": {
+                    "allowed_resolutions": {
+                        "example": [
+                            "update_location",
+                            "add_separate"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "available_bytes": {
+                        "type": "integer"
+                    },
+                    "can_create": {
+                        "type": "boolean"
+                    },
+                    "can_open": {
+                        "type": "boolean"
+                    },
+                    "capacity_known": {
+                        "type": "boolean"
+                    },
+                    "classification": {
+                        "example": "existing_repository",
+                        "type": "string"
+                    },
+                    "directory_name": {
+                        "example": "family-archive",
+                        "type": "string"
+                    },
+                    "filesystem": {
+                        "type": "string"
+                    },
+                    "mount_point": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "example": "Family Archive",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "risk_warnings": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "total_bytes": {
+                        "type": "integer"
+                    },
+                    "writable": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryCloudSourceDTO": {
+                "properties": {
+                    "credential": {
+                        "$ref": "#/components/schemas/dto.CloudCredentialDTO"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "last_import_run_id": {
+                        "type": "string"
+                    },
+                    "latest_run": {
+                        "$ref": "#/components/schemas/dto.CloudImportRunDTO"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "provider": {
+                        "type": "string"
+                    },
+                    "remote_scope": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RepositoryCloudStatusDTO": {
                 "properties": {
                     "credential": {
@@ -4583,6 +4987,13 @@ const docTemplate = `{
                     "provider": {
                         "example": "icloud",
                         "type": "string"
+                    },
+                    "sources": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryCloudSourceDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -4629,6 +5040,10 @@ const docTemplate = `{
             },
             "dto.RepositoryDTO": {
                 "properties": {
+                    "activity": {
+                        "example": "idle",
+                        "type": "string"
+                    },
                     "default_owner_id": {
                         "type": "integer"
                     },
@@ -4651,16 +5066,16 @@ const docTemplate = `{
                         "example": "/data/storage/Family Photos",
                         "type": "string"
                     },
+                    "reachability": {
+                        "example": "active",
+                        "type": "string"
+                    },
                     "role": {
                         "example": "regular",
                         "type": "string"
                     },
                     "root_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    },
-                    "status": {
-                        "example": "active",
                         "type": "string"
                     },
                     "storage_strategy": {
@@ -4680,6 +5095,13 @@ const docTemplate = `{
                         "example": "rename",
                         "type": "string"
                     },
+                    "risk_warnings": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "strategy": {
                         "example": "date",
                         "type": "string"
@@ -4696,8 +5118,74 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.RepositoryRemovalImpactDTO": {
+                "properties": {
+                    "active_task_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "album_count": {
+                        "example": 12,
+                        "type": "integer"
+                    },
+                    "asset_count": {
+                        "example": 1240,
+                        "type": "integer"
+                    },
+                    "catalog_media_bytes": {
+                        "example": 4294967296,
+                        "type": "integer"
+                    },
+                    "cloud_import_count": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "files_preserved": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "private_state_bytes": {
+                        "example": 1048576,
+                        "type": "integer"
+                    },
+                    "private_state_found": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "repository_name": {
+                        "example": "Family Photos",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RepositoryRootDTO": {
                 "properties": {
+                    "active_operation_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "available_bytes": {
+                        "example": 500000000000,
+                        "type": "integer"
+                    },
+                    "can_remove": {
+                        "type": "boolean"
+                    },
+                    "capacity_known": {
+                        "type": "boolean"
+                    },
+                    "files_preserved": {
+                        "type": "boolean"
+                    },
+                    "filesystem": {
+                        "example": "apfs",
+                        "type": "string"
+                    },
                     "id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
@@ -4705,6 +5193,12 @@ const docTemplate = `{
                     "kind": {
                         "example": "external",
                         "type": "string"
+                    },
+                    "mount_fingerprint": {
+                        "type": "string"
+                    },
+                    "mount_fingerprint_changed": {
+                        "type": "boolean"
                     },
                     "name": {
                         "example": "External Archive",
@@ -4714,9 +5208,34 @@ const docTemplate = `{
                         "example": "/Volumes/Photos",
                         "type": "string"
                     },
+                    "registered_mount_fingerprint": {
+                        "type": "string"
+                    },
+                    "removal_blocked_by": {
+                        "example": "registered_repositories",
+                        "type": "string"
+                    },
+                    "repository_count": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "risk_warnings": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "status": {
                         "example": "active",
                         "type": "string"
+                    },
+                    "total_bytes": {
+                        "example": 1000000000000,
+                        "type": "integer"
+                    },
+                    "writable": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -4904,6 +5423,50 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "type": "object"
+            },
+            "dto.ResolveHostActionRequestDTO": {
+                "properties": {
+                    "resolution": {
+                        "enum": [
+                            "update_location",
+                            "add_separate",
+                            "confirm_risk"
+                        ],
+                        "example": "add_separate",
+                        "type": "string"
+                    },
+                    "risk_confirmation": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "resolution"
+                ],
+                "type": "object"
+            },
+            "dto.ResolveRepositoryCandidateRequestDTO": {
+                "properties": {
+                    "directory_name": {
+                        "example": "family-archive",
+                        "type": "string"
+                    },
+                    "resolution": {
+                        "enum": [
+                            "update_location",
+                            "add_separate"
+                        ],
+                        "example": "update_location",
+                        "type": "string"
+                    },
+                    "risk_confirmation": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "directory_name",
+                    "resolution"
+                ],
                 "type": "object"
             },
             "dto.RestoreOperationDTO": {
@@ -5272,6 +5835,15 @@ const docTemplate = `{
                     },
                     "repository_defaults": {
                         "$ref": "#/components/schemas/dto.RepositoryDefaultsDTO"
+                    },
+                    "runtime_reason": {
+                        "example": "storage_recovery_required",
+                        "type": "string"
+                    },
+                    "runtime_state": {
+                        "description": "RuntimeState is independent of bootstrap completion. An initialized\ninstance can be degraded while its default Storage Location is offline.",
+                        "example": "active",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -5512,6 +6084,153 @@ const docTemplate = `{
                 "properties": {
                     "run": {
                         "$ref": "#/components/schemas/dto.CloudImportRunDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StartRepositoryCloudImportRequest": {
+                "properties": {
+                    "credential_id": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageDiagnosticDTO": {
+                "properties": {
+                    "available_bytes": {
+                        "type": "integer"
+                    },
+                    "canonical_path": {
+                        "type": "string"
+                    },
+                    "capacity_known": {
+                        "type": "boolean"
+                    },
+                    "case_behavior_known": {
+                        "type": "boolean"
+                    },
+                    "case_sensitive": {
+                        "type": "boolean"
+                    },
+                    "cloud_sync_provider": {
+                        "type": "string"
+                    },
+                    "device": {
+                        "type": "string"
+                    },
+                    "effective_gid": {
+                        "type": "string"
+                    },
+                    "effective_uid": {
+                        "type": "string"
+                    },
+                    "filesystem": {
+                        "type": "string"
+                    },
+                    "inode": {
+                        "type": "integer"
+                    },
+                    "last_coordination": {
+                        "type": "string"
+                    },
+                    "lock_holder": {
+                        "type": "string"
+                    },
+                    "marker_uuid": {
+                        "type": "string"
+                    },
+                    "mount_fingerprint": {
+                        "type": "string"
+                    },
+                    "mount_fingerprint_changed": {
+                        "type": "boolean"
+                    },
+                    "mount_id": {
+                        "type": "string"
+                    },
+                    "mount_source": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "network_filesystem": {
+                        "type": "boolean"
+                    },
+                    "parent_target_id": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "reachability": {
+                        "type": "string"
+                    },
+                    "registered_mount_fingerprint": {
+                        "type": "string"
+                    },
+                    "removable_likely": {
+                        "type": "boolean"
+                    },
+                    "risk_warnings": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "target_id": {
+                        "type": "string"
+                    },
+                    "target_type": {
+                        "type": "string"
+                    },
+                    "total_bytes": {
+                        "type": "integer"
+                    },
+                    "writable": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageDiagnosticsResponseDTO": {
+                "properties": {
+                    "generated_at": {
+                        "type": "string"
+                    },
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.StorageDiagnosticDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageSupportBundleDTO": {
+                "properties": {
+                    "audit_events": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.LifecycleAuditEventDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "diagnostics": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.StorageDiagnosticDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "generated_at": {
+                        "type": "string"
+                    },
+                    "paths_redacted": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -6263,22 +6982,6 @@ const docTemplate = `{
                         "maximum": 5,
                         "minimum": 0,
                         "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "dto.UpdateRepositoryRequestDTO": {
-                "properties": {
-                    "local_settings": {
-                        "$ref": "#/components/schemas/dto.RepositoryLocalSettings"
-                    },
-                    "name": {
-                        "example": "My Photos",
-                        "type": "string"
-                    },
-                    "storage_strategy": {
-                        "example": "flat",
-                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -7994,7 +8697,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Semantic search unavailable"
+                        "description": "Image Semantic Analysis unavailable"
                     }
                 },
                 "summary": "Query Agent Pin Assets",
@@ -10072,7 +10775,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Semantic search unavailable"
+                        "description": "Image Semantic Analysis unavailable"
                     }
                 },
                 "summary": "Query assets (unified endpoint)",
@@ -10681,7 +11384,7 @@ const docTemplate = `{
                 ]
             },
             "get": {
-                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.",
+                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, BioCLIP Species Recognition predictions, OCR Text Recognition results, Person Recognition results, and captions.",
                 "parameters": [
                     {
                         "description": "Asset ID (UUID format)",
@@ -10730,7 +11433,7 @@ const docTemplate = `{
                         }
                     },
                     {
-                        "description": "Include OCR results",
+                        "description": "Include OCR Text Recognition results",
                         "in": "query",
                         "name": "include_ocr",
                         "schema": {
@@ -10739,7 +11442,7 @@ const docTemplate = `{
                         }
                     },
                     {
-                        "description": "Include face recognition",
+                        "description": "Include Person Recognition results",
                         "in": "query",
                         "name": "include_faces",
                         "schema": {
@@ -13890,7 +14593,7 @@ const docTemplate = `{
         },
         "/api/v1/classifiers/preview": {
             "post": {
-                "description": "Embed positive/negative prompts with semantic and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.",
+                "description": "Embed positive/negative prompts with Image Semantic Analysis and return catalog assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -14524,6 +15227,78 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Get cloud import run",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/cloud/import-runs/{id}/cancel": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Import run UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.CloudImportRunDTO"
+                                }
+                            }
+                        },
+                        "description": "Cancelled run"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Cancel cloud import run",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/cloud/import-runs/{id}/resume": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Import run UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StartCloudImportResponse"
+                                }
+                            }
+                        },
+                        "description": "Resumed import"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Resume cloud import run",
                 "tags": [
                     "cloud"
                 ]
@@ -15503,6 +16278,299 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/host-actions": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/dto.HostActionDTO"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List unfinished native host actions",
+                "tags": [
+                    "host-actions"
+                ]
+            },
+            "post": {
+                "description": "Creates a persistent, expiring task. Filesystem paths and approval nonces never enter this HTTP request or response.",
+                "parameters": [
+                    {
+                        "description": "Stable request identifier",
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CreateHostActionRequestDTO",
+                                        "summary": "request",
+                                        "description": "Native host action"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Native host action",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Request a native host storage action",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/host-actions/native-capability": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.NativeHostCapabilityDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get native host capability",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/host-actions/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Host action ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Cancel native host action",
+                "tags": [
+                    "host-actions"
+                ]
+            },
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Host action ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get native host action",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/host-actions/{id}/resolve": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Host action ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ResolveHostActionRequestDTO",
+                                        "summary": "request",
+                                        "description": "Recovery decision"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Recovery decision",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Resolve native host action conflict",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
         "/api/v1/locations/clusters": {
             "get": {
                 "description": "Return paginated persisted photo location clusters with cached labels when available.",
@@ -16031,7 +17099,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Semantic search unavailable"
+                        "description": "Image Semantic Analysis unavailable"
                     }
                 },
                 "summary": "List person assets",
@@ -16674,7 +17742,7 @@ const docTemplate = `{
         },
         "/api/v1/people/{id}/merge": {
             "post": {
-                "description": "Merge one or more source people into the target person. Assets remain in the library and corrections become manual.",
+                "description": "Merge one or more source people into the target person. Assets remain in the Lumilio catalog and corrections become manual.",
                 "parameters": [
                     {
                         "description": "Target person ID",
@@ -17241,7 +18309,7 @@ const docTemplate = `{
                 ]
             },
             "post": {
-                "description": "Create a repository folder under a registered Storage Location. Empty root_id selects the configured default. If the target already contains a .lumiliorepo file, it is registered instead.",
+                "description": "Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty root_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -17335,7 +18403,185 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/repositories/lifecycle-audit": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Maximum events (1-200)",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ListLifecycleAuditEventsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List repository lifecycle audit events",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/storage-diagnostics": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StorageDiagnosticsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get Storage Location and repository diagnostics",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/storage-support-bundle": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StorageSupportBundleDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Download a path-redacted storage support bundle",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
         "/api/v1/repositories/{id}": {
+            "delete": {
+                "description": "Remove a non-primary repository and its catalog/index/task state after an exact repository-name confirmation. Original media, marker, and private files remain on disk.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RemoveRepositoryRequestDTO",
+                                        "summary": "request",
+                                        "description": "Exact repository-name confirmation"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Exact repository-name confirmation",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository registration removed successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid confirmation"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Primary or busy repository"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Remove repository registration",
+                "tags": [
+                    "repositories"
+                ]
+            },
             "get": {
                 "description": "Return a single repository.",
                 "parameters": [
@@ -17463,6 +18709,25 @@ const docTemplate = `{
                         }
                     }
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.StartRepositoryCloudImportRequest",
+                                        "summary": "request",
+                                        "description": "Cloud source selection"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Cloud source selection"
+                },
                 "responses": {
                     "200": {
                         "content": {
@@ -17513,6 +18778,187 @@ const docTemplate = `{
                 "summary": "Start repository cloud import",
                 "tags": [
                     "cloud"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/cloud/sources": {
+            "post": {
+                "description": "Bind one user-owned credential plus remote scope to an existing repository and start an independent import run.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.BindRepositoryCloudSourceRequest",
+                                        "summary": "request",
+                                        "description": "Cloud source"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Cloud source",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StartCloudImportResponse"
+                                }
+                            }
+                        },
+                        "description": "Source bound and import started"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Bind a cloud source to a repository",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/removal-impact": {
+            "get": {
+                "description": "Return the catalog, album, queued-work, and private-state impact of removing a non-primary repository registration. Files on disk are always preserved.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryRemovalImpactDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository removal impact"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Preview repository removal",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/rename": {
+            "post": {
+                "description": "Change the display name without changing identity, path, storage strategy, duplicate handling, owner, role, or root.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RenameRepositoryRequestDTO",
+                                        "summary": "request",
+                                        "description": "New display name"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "New display name",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Rename repository",
+                "tags": [
+                    "repositories"
                 ]
             }
         },
@@ -17741,6 +19187,184 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/repository-candidates": {
+            "get": {
+                "description": "Returns bounded direct-child facts for standalone and Docker workflows without accepting arbitrary filesystem paths.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ListRepositoryCandidatesResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List repository candidates",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repository-candidates/open": {
+            "post": {
+                "description": "Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.",
+                "parameters": [
+                    {
+                        "description": "Stable request identifier",
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.OpenRepositoryCandidateRequestDTO",
+                                        "summary": "request",
+                                        "description": "Repository candidate"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository candidate",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryConflictDTO"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Open repository candidate",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repository-candidates/resolve": {
+            "post": {
+                "description": "Resolves a same-identity direct child using user-facing decisions; no arbitrary filesystem path is accepted.",
+                "parameters": [
+                    {
+                        "description": "Stable request identifier",
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ResolveRepositoryCandidateRequestDTO",
+                                        "summary": "request",
+                                        "description": "Repository candidate decision"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository candidate decision",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Resolve repository candidate identity",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
         "/api/v1/repository-roots": {
             "get": {
                 "description": "Return registered repository roots with their current reachability. Filesystem paths are admin-only through this route.",
@@ -17762,6 +19386,63 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "List Storage Locations",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repository-roots/{id}": {
+            "delete": {
+                "description": "Remove an empty, idle external Storage Location from Lumilio. The directory, .lumilioroot marker, and every disk file are preserved.",
+                "parameters": [
+                    {
+                        "description": "Storage Location UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                }
+                            }
+                        },
+                        "description": "Storage Location registration removed successfully"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Storage Location not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Default, non-empty, or busy Storage Location"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Remove Storage Location registration",
                 "tags": [
                     "repositories"
                 ]

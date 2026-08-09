@@ -69,7 +69,7 @@ type CloudProvider interface {
 
 	// List returns files changed since the given cursor.
 	// Pass nil cursor to start from the beginning (full listing).
-	List(ctx context.Context, repoID uuid.UUID, cursor *Cursor) (*Page, error)
+	List(ctx context.Context, repoID uuid.UUID, cursor *Cursor, remoteScope map[string]string) (*Page, error)
 
 	// Download streams a remote file to the caller-owned staging handle.
 	// Returns the number of bytes written.

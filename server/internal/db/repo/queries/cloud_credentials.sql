@@ -20,11 +20,12 @@ INSERT INTO cloud_credentials (
 
 -- name: ListCloudCredentials :many
 SELECT * FROM cloud_credentials
+WHERE status <> 'removed'
 ORDER BY created_at DESC;
 
 -- name: ListCloudCredentialsForOwner :many
 SELECT * FROM cloud_credentials
-WHERE owner_id = ?1
+WHERE owner_id = ?1 AND status <> 'removed'
 ORDER BY created_at DESC;
 
 -- name: GetCloudCredential :one
@@ -55,6 +56,17 @@ RETURNING *;
 DELETE FROM cloud_credentials
 WHERE credential_id = ?1;
 
+-- name: RetireCloudCredential :one
+UPDATE cloud_credentials
+SET status = 'removed',
+    secret_ciphertext = NULL,
+    public_config = '{}',
+    artifact_dir = NULL,
+    masked_identity = '',
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE credential_id = ?1
+RETURNING *;
+
 -- name: DisableRepositoryCloudBindingsByCredential :exec
 UPDATE repository_cloud_bindings
 SET enabled = false, updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
@@ -70,19 +82,20 @@ INSERT INTO repository_cloud_bindings (
     credential_id,
     provider,
     owner_id,
+    remote_scope,
     enabled,
     last_import_run_id,
     created_at,
     updated_at
 ) VALUES (
-    ?1, ?2, ?3, ?4, true, NULL,
+    ?1, ?2, ?3, ?4, ?5, true, NULL,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
-ON CONFLICT (repository_id, provider)
+ON CONFLICT (repository_id, credential_id)
 DO UPDATE SET
-    credential_id = ?2,
     owner_id = ?4,
+    remote_scope = ?5,
     enabled = true,
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 RETURNING *;
@@ -91,11 +104,19 @@ RETURNING *;
 SELECT * FROM repository_cloud_bindings
 WHERE repository_id = ?1 AND provider = ?2;
 
+-- name: GetRepositoryCloudBindingByCredential :one
+SELECT * FROM repository_cloud_bindings
+WHERE repository_id = ?1 AND credential_id = ?2;
+
 -- name: GetActiveRepositoryCloudBinding :one
 SELECT * FROM repository_cloud_bindings
 WHERE repository_id = ?1 AND enabled = true
 ORDER BY created_at DESC
 LIMIT 1;
+
+-- name: GetActiveRepositoryCloudBindingByCredential :one
+SELECT * FROM repository_cloud_bindings
+WHERE repository_id = ?1 AND credential_id = ?2 AND enabled = true;
 
 -- name: ListRepositoryCloudBindings :many
 SELECT * FROM repository_cloud_bindings
@@ -105,7 +126,7 @@ ORDER BY created_at DESC;
 -- name: UpdateRepositoryCloudBindingLastRun :one
 UPDATE repository_cloud_bindings
 SET last_import_run_id = ?3, updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE repository_id = ?1 AND provider = ?2
+WHERE repository_id = ?1 AND credential_id = ?2
 RETURNING *;
 
 -- name: CreateCloudImportRun :one
@@ -116,10 +137,11 @@ INSERT INTO cloud_import_runs (
     provider,
     status,
     owner_id,
+    resume_of_run_id,
     created_at,
     updated_at
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6,
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 ) RETURNING *;
@@ -139,7 +161,7 @@ UPDATE cloud_import_runs
 SET status = 'running',
     started_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE run_id = ?1
+WHERE run_id = ?1 AND status = 'queued'
 RETURNING *;
 
 -- name: IncrementCloudImportRunCounts :one
@@ -160,8 +182,33 @@ SET status = ?2,
     error = ?3,
     finished_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE run_id = ?1
+WHERE run_id = ?1 AND status NOT IN ('cancelling', 'cancelled')
 RETURNING *;
+
+-- name: BeginCloudImportCancellation :one
+UPDATE cloud_import_runs
+SET status = 'cancelling',
+    error = NULL,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE run_id = ?1 AND status IN ('queued', 'running')
+RETURNING *;
+
+-- name: FinalizeCloudImportCancellation :one
+UPDATE cloud_import_runs
+SET status = 'cancelled',
+    error = NULL,
+    finished_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE run_id = ?1 AND status = 'cancelling'
+RETURNING *;
+
+-- name: FinalizeStaleCloudImportCancellations :exec
+UPDATE cloud_import_runs
+SET status = 'cancelled',
+    error = NULL,
+    finished_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE status = 'cancelling';
 
 -- name: MarkStaleCloudImportRunsInterrupted :exec
 UPDATE cloud_import_runs

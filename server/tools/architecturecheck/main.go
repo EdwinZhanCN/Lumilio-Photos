@@ -15,10 +15,12 @@ import (
 )
 
 var (
-	queryConstPattern  = regexp.MustCompile("^const [[:alnum:]_]+ = " + string(rune(96)))
-	numberedParameter  = regexp.MustCompile("\\?[[:digit:]]+")
-	rawReference       = regexp.MustCompile("PhotoSpecificMetadata|dbtypes|is_raw.*(metadata|exif)|legacyBrowseStateMigration")
-	stackListExclusion = regexp.MustCompile("useAssetsList\\.ts|schema\\.d\\.ts")
+	queryConstPattern       = regexp.MustCompile("^const [[:alnum:]_]+ = " + string(rune(96)))
+	numberedParameter       = regexp.MustCompile("\\?[[:digit:]]+")
+	rawReference            = regexp.MustCompile("PhotoSpecificMetadata|dbtypes|is_raw.*(metadata|exif)|legacyBrowseStateMigration")
+	stackListExclusion      = regexp.MustCompile("useAssetsList\\.ts|schema\\.d\\.ts")
+	retiredRepositoryTerms  = regexp.MustCompile(`(?i)\bstorage root\b|\blibrary\b|图库|媒体库|存储根目录|存储根|仓库`)
+	retiredCapabilityLabels = regexp.MustCompile(`["'` + "`" + `](Semantic Search|Face Recognition|OCR|Species Recognition|语义搜索|人脸识别|物种识别)["'` + "`" + `]`)
 )
 
 func main() {
@@ -45,6 +47,11 @@ func main() {
 		fail(err)
 	}
 	fmt.Println("Repository path architecture checks passed")
+
+	if err := checkUserFacingTerminology(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("User-facing terminology checks passed")
 }
 
 func fail(err error) {
@@ -281,6 +288,40 @@ func checkDesktopArchitecture(root string) error {
 }
 
 func checkRepositoryPathArchitecture(root string) error {
+	directoryManagerSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/directory_manager.go"))
+	if err != nil {
+		return fmt.Errorf("read DirectoryManager boundary: %w", err)
+	}
+	for _, forbidden := range []string{
+		"CreateTempFile(", "CleanupTempFiles(", "ReadSidecar(", "WriteSidecar(",
+		"RepairStructure(", "MoveToTrash(", "ListTrashFiles(", "RecoverFromTrash(", "PurgeTrash(",
+		"type DefaultDirectoryManager", "func NewDirectoryManager() *",
+	} {
+		if strings.Contains(string(directoryManagerSource), forbidden) {
+			return fmt.Errorf("DirectoryManager exposes forbidden repository write bypass %q; use RepositoryManager/RepositoryFS", forbidden)
+		}
+	}
+	storageBypasses, err := scanGoLines(root, "server/internal/storage", func(relative, line string) bool {
+		if strings.HasSuffix(relative, "_test.go") {
+			return false
+		}
+		trimmed := strings.TrimSpace(line)
+		for _, method := range []string{
+			"CreateTempFile", "CleanupTempFiles", "ReadSidecar", "WriteSidecar",
+			"RepairStructure", "MoveToTrash", "ListTrashFiles", "RecoverFromTrash", "PurgeTrash",
+		} {
+			if strings.HasPrefix(trimmed, "func ") && strings.Contains(trimmed, ") "+method+"(") {
+				return true
+			}
+		}
+		return false
+	})
+	if err != nil {
+		return err
+	}
+	if len(storageBypasses) > 0 {
+		return fmt.Errorf("Repository path architecture check found exported raw-path destructive storage methods:\n%s", strings.Join(storageBypasses, "\n"))
+	}
 	violations, err := scanGoLines(root, "server", func(relative, line string) bool {
 		if strings.HasSuffix(relative, "_test.go") || strings.HasPrefix(relative, "server/internal/storage/") {
 			return false
@@ -303,6 +344,156 @@ func checkRepositoryPathArchitecture(root string) error {
 		)
 	}
 	return nil
+}
+
+func checkUserFacingTerminology(root string) error {
+	paths := []string{
+		"README.md", "README.en.md",
+		"web/src", "desktop/frontend/src",
+		"site/docs/en", "site/docs/zh-cn",
+		"server/internal/api/dto", "server/internal/api/handler", "server/docs",
+	}
+	violations, err := scanTextPaths(root, paths, func(relative, line string) bool {
+		return userFacingTerminologyViolation(relative, line)
+	})
+	if err != nil {
+		return err
+	}
+	if len(violations) > 0 {
+		return fmt.Errorf(
+			"User-facing terminology check found retired Repository/Storage Location or Lumen capability labels:\n%s\nUse Repository/资源库, Storage Location/存储位置, and the canonical capability labels from AGENTS.md.",
+			strings.Join(violations, "\n"),
+		)
+	}
+	return nil
+}
+
+func userFacingTerminologyViolation(relative, line string) bool {
+	if strings.Contains(relative, ".test.") || strings.HasSuffix(relative, "_test.go") {
+		return false
+	}
+	if retiredRepositoryTerms.MatchString(line) && !allowedRepositoryTermContext(relative, line) {
+		return true
+	}
+	if filepath.Ext(relative) != ".md" && retiredCapabilityLabels.MatchString(withoutCanonicalCapabilityLabels(line)) {
+		return true
+	}
+	return filepath.Ext(relative) == ".md" && retiredMarkdownCapabilityLabel(relative, line)
+}
+
+// allowedRepositoryTermContext keeps platform and source-code vocabulary from
+// being confused with the Repository product entity. These are deliberately
+// narrow: adding another exception requires naming the technical context.
+func allowedRepositoryTermContext(relative, line string) bool {
+	lower := strings.ToLower(line)
+	trimmed := strings.TrimSpace(line)
+	if (strings.HasSuffix(relative, ".go") || strings.HasSuffix(relative, ".ts") || strings.HasSuffix(relative, ".tsx")) &&
+		(strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*")) &&
+		!strings.HasPrefix(trimmed, "// @") && !strings.Contains(relative, "schema.d.ts") &&
+		!strings.HasSuffix(relative, "/doc.ts") {
+		return true
+	}
+	if strings.HasSuffix(relative, ".go") && !strings.Contains(line, `"`) && !strings.HasPrefix(trimmed, "// @") {
+		return true
+	}
+	if strings.Contains(lower, "/flows/library/") {
+		return true
+	}
+	for _, allowed := range []string{
+		"~/library/", "/library/application support", "library/application support",
+		"library.sqlite", "library-manifest", "library manifest", "library identity",
+		"source repository", "code repository", "project repository", "git repository",
+		"repository source", "repository checkout", "repository convention", "repository map",
+		"component library", "icon library", "media library api", "photo library api",
+		"代码仓库", "源码仓库", "项目仓库", "git 仓库", "仓库根目录", "跨仓库",
+		"复制仓库中的", "公开仓库", "仓库声明的", "主仓库通过", "仓库约定",
+		"仓库与组件地图", "仓库中的 `", "相邻仓库", "上游仓库", "仓库权威指南",
+	} {
+		if strings.Contains(lower, allowed) {
+			return true
+		}
+	}
+	return false
+}
+
+func retiredMarkdownCapabilityLabel(relative, line string) bool {
+	trimmed := strings.TrimSpace(line)
+	retiredText := withoutCanonicalCapabilityLabels(trimmed)
+	labels := []string{
+		"Semantic Search", "Face Recognition", "OCR", "Species Recognition",
+		"语义搜索", "人脸识别", "物种识别",
+	}
+	for _, label := range labels {
+		if strings.EqualFold(strings.Trim(retiredText, "#*|-：: `\t"), label) {
+			return true
+		}
+		if strings.Contains(retiredText, "| "+label+" |") || strings.Contains(retiredText, "**"+label+"**") {
+			return true
+		}
+	}
+	return false
+}
+
+func withoutCanonicalCapabilityLabels(line string) string {
+	for _, label := range []string{
+		"Image Semantic Analysis", "Person Recognition", "OCR Text Recognition", "BioCLIP Species Recognition",
+		"图像语义分析", "人物识别", "OCR文字识别", "BioCLIP物种识别",
+	} {
+		line = strings.ReplaceAll(line, label, "")
+	}
+	return line
+}
+
+func scanTextPaths(root string, paths []string, match func(relative, line string) bool) ([]string, error) {
+	allowedExtensions := map[string]bool{
+		".go": true, ".ts": true, ".tsx": true, ".json": true,
+		".yaml": true, ".yml": true, ".md": true, ".html": true,
+	}
+	var matches []string
+	for _, relativeRoot := range paths {
+		pathRoot := filepath.Join(root, filepath.FromSlash(relativeRoot))
+		err := filepath.WalkDir(pathRoot, func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				if entry.Name() == "node_modules" || entry.Name() == ".git" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !allowedExtensions[strings.ToLower(filepath.Ext(path))] {
+				return nil
+			}
+			relative, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			relative = filepath.ToSlash(relative)
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			scanner := bufio.NewScanner(file)
+			lineNumber := 0
+			for scanner.Scan() {
+				lineNumber++
+				if match(relative, scanner.Text()) {
+					matches = append(matches, fmt.Sprintf("%s:%d:%s", relative, lineNumber, scanner.Text()))
+				}
+			}
+			scanErr := scanner.Err()
+			closeErr := file.Close()
+			if scanErr != nil {
+				return scanErr
+			}
+			return closeErr
+		})
+		if err != nil {
+			return nil, fmt.Errorf("scan user-facing terminology in %s: %w", relativeRoot, err)
+		}
+	}
+	return matches, nil
 }
 
 func scanGoLines(root, directory string, match func(relative, line string) bool) ([]string, error) {

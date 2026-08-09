@@ -76,7 +76,7 @@ func TestAssetHandlerWriteAssetToZip_UsesOriginalFilenames(t *testing.T) {
 	config := repocfg.NewRepositoryConfig("download test")
 	config.ID = repositoryID.String()
 	require.NoError(t, config.SaveConfigToFile(tempDir))
-	repository := repo.Repository{RepoID: repositoryID, Path: tempDir, Status: dbtypes.RepoStatusActive, Config: *config}
+	repository := repo.Repository{RepoID: repositoryID, Path: tempDir, Reachability: dbtypes.RepositoryReachabilityActive, Config: *config}
 	factory := storage.NewRepositoryFSFactory(nil, nil)
 	firstPath := filepath.Join(tempDir, "first.bin")
 	secondPath := filepath.Join(tempDir, "second.bin")

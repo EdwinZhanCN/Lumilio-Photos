@@ -5,11 +5,13 @@ export type RepositoryNameError =
   | "leadingOrTrailingSpace"
   | "tooManyCharacters"
   | "tooManyBytes"
-  | "unsupportedCharacter";
+  | "controlCharacter";
+export type RepositoryDirectoryNameError = RepositoryNameError | "unsupportedCharacter";
 
 const MAX_REPOSITORY_NAME_CHARACTERS = 80;
 const MAX_REPOSITORY_NAME_BYTES = 240;
 const ALLOWED_REPOSITORY_NAME_CHARACTER = /^[\p{L}\p{Nd} _-]$/u;
+const CONTROL_CHARACTER = /\p{Cc}/u;
 
 export function isStorageStrategy(value?: string): value is StorageStrategy {
   return value === "cas" || value === "date" || value === "flat";
@@ -30,6 +32,15 @@ export function validateRepositoryName(value: string): RepositoryNameError | nul
   if (value.startsWith(" ") || value.endsWith(" ")) {
     return "leadingOrTrailingSpace";
   }
+  if (CONTROL_CHARACTER.test(value)) return "controlCharacter";
+  return null;
+}
+
+export function validateRepositoryDirectoryName(
+  value: string,
+): RepositoryDirectoryNameError | null {
+  const displayNameError = validateRepositoryName(value);
+  if (displayNameError) return displayNameError;
   for (const character of value) {
     if (!ALLOWED_REPOSITORY_NAME_CHARACTER.test(character)) {
       return "unsupportedCharacter";

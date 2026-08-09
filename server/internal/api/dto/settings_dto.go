@@ -41,9 +41,10 @@ type MLSettingsDTO struct {
 }
 
 type RepositoryDefaultsDTO struct {
-	DefaultRoot       string `json:"default_root" example:"/data/storage"`
-	Strategy          string `json:"strategy" example:"date"`
-	DuplicateHandling string `json:"duplicate_handling" example:"rename"`
+	DefaultRoot       string   `json:"default_root" example:"/data/storage"`
+	Strategy          string   `json:"strategy" example:"date"`
+	DuplicateHandling string   `json:"duplicate_handling" example:"rename"`
+	RiskWarnings      []string `json:"risk_warnings,omitempty"`
 }
 
 type UpdateSystemSettingsDTO struct {

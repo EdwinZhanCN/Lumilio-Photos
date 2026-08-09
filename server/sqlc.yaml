@@ -37,8 +37,6 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_scan_runs.authoritative"
                     go_type: { type: "bool" }
-                  - column: "repositories.root_id"
-                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "media_items.repository_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "media_items.primary_asset_id"
@@ -219,6 +217,8 @@ sql:
                     go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
                   - column: "cloud_credentials.public_config"
                     go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "repository_cloud_bindings.remote_scope"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
                   - column: "agent_threads.context_bindings"
                     go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
                   - column: "agent_threads.mention_bindings"
@@ -231,6 +231,12 @@ sql:
                     go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
                   - column: "agent_pending_effects.receipt"
                     go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "lifecycle_operations.payload"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON" }
+                  - column: "lifecycle_operations.result"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON", pointer: true }
+                  - column: "lifecycle_operations.rollback_data"
+                    go_type: { import: "server/internal/db/dbtypes", type: "JSON", pointer: true }
 
                   # Authoritative vector BLOBs.
                   - column: "embeddings.vector"
@@ -245,8 +251,10 @@ sql:
                     go_type: { import: "server/internal/db/dbtypes", type: "Vector" }
 
                   # Preserve existing domain and API-width types.
-                  - column: "repositories.status"
-                    go_type: { import: "server/internal/db/dbtypes", type: "RepoStatus" }
+                  - column: "repositories.reachability"
+                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryReachability" }
+                  - column: "repositories.activity"
+                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryActivity" }
                   - column: "repositories.role"
                     go_type: { import: "server/internal/db/dbtypes", type: "RepoRole" }
                   - column: "repository_roots.kind"

@@ -103,11 +103,11 @@
       },
       "moreActions": "More actions",
       "scan": {
-        "allQueued_one": "Scan queued for {{count}} library.",
-        "allQueued_other": "Scan queued for {{count}} libraries.",
+        "allQueued_one": "Scan queued for {{count}} Repository.",
+        "allQueued_other": "Scan queued for {{count}} Repositories.",
         "currentQueued": "Scan queued for {{name}}.",
         "failed": "Failed to queue scan.",
-        "label": "Scan current library",
+        "label": "Scan current Repository",
         "noRepositories": "No repositories are available to scan.",
         "title": "Scan {{scope}}"
       },
@@ -379,8 +379,8 @@
     "trash": {
       "bulkActions": {
         "restore": {
-          "confirmMessage_one": "This will restore {{count}} asset to the library.",
-          "confirmMessage_other": "This will restore {{count}} assets to the library.",
+          "confirmMessage_one": "This will restore {{count}} asset to the media collection.",
+          "confirmMessage_other": "This will restore {{count}} assets to the media collection.",
           "confirmTitle": "Restore selected assets?",
           "label_one": "Restore {{count}} asset",
           "label_other": "Restore {{count}} assets"
@@ -405,7 +405,7 @@
     "bootstrap": {
       "admin": {
         "submit": "Create admin & continue",
-        "subtitle": "This account can manage the server, libraries, and members.",
+        "subtitle": "This account can manage the Server, Repositories, and members.",
         "title": "Create the administrator"
       },
       "firstRun": "First-run setup",
@@ -565,15 +565,13 @@
     },
     "primaryRepository": {
       "description": "Choose where Lumilio Photos should store the first local repository. Existing settings use this as the default for future repositories too.",
-      "duplicates": "Duplicates",
       "error": "Failed to create the primary repository.",
       "loading": "Checking repository setup...",
       "name": "Name",
-      "nameHint": "Use 1–80 letters, numbers, spaces, hyphens, or underscores. The primary directory remains <root>/primary.",
-      "root": "Storage root",
+      "nameHint": "This display name can be changed later. The primary directory remains <root>/primary.",
+      "root": "Storage Location",
       "rootHint": "Set by server configuration. The primary repository is created at <root>/primary.",
       "statusError": "Unable to load repository defaults.",
-      "strategy": "Storage strategy",
       "submit": "Create repository",
       "title": "Create primary repository"
     },
@@ -626,12 +624,38 @@
       "saving": "Saving…",
       "submit": "Set password and continue",
       "title": "Choose a new password"
+    },
+    "storageRecovery": {
+      "checkAgain": "Check Again",
+      "description": "Restore the configured default Storage Location and its primary folder without changing their marker identities. Other available repositories remain usable.",
+      "title": "Storage recovery is required"
     }
   },
   "bulk": {
     "updateError": "Failed to update items",
     "updateSuccess_one": "Updated {{count}} item.",
     "updateSuccess_other": "Updated {{count}} items."
+  },
+  "cloud": {
+    "sources": {
+      "add": "Connect another source",
+      "album": "Remote album (optional)",
+      "albumHint": "Leave empty for All Photos. The selected album remains fixed for resumed imports.",
+      "albumPlaceholder": "Favorites",
+      "bindFailed": "Unable to connect cloud source.",
+      "bound": "Cloud source connected and its first import started.",
+      "cancel": "Cancel",
+      "connectAndImport": "Connect and import",
+      "credential": "Cloud account",
+      "empty": "No cloud source is connected to this repository.",
+      "failed": "failed",
+      "imported": "imported",
+      "importNow": "Import now",
+      "resume": "Resume",
+      "scope": "Remote scope",
+      "selectCredential": "Select a connected account",
+      "title": "Cloud sources"
+    }
   },
   "cloudProvider": {
     "icloud": {
@@ -674,8 +698,8 @@
       },
       "bulkActions": {
         "removeFromAlbum": {
-          "confirmMessage_one": "{{count}} selected asset will be removed from this album. Original assets remain in the library.",
-          "confirmMessage_other": "{{count}} selected assets will be removed from this album. Original assets remain in the library.",
+          "confirmMessage_one": "{{count}} selected asset will be removed from this album. Original assets remain in their Repository.",
+          "confirmMessage_other": "{{count}} selected assets will be removed from this album. Original assets remain in their Repositories.",
           "confirmTitle": "Remove selected items from this album?",
           "error": "Failed to remove items from album.",
           "label": "Remove from this album",
@@ -708,7 +732,7 @@
       },
       "fields": {
         "bioAlbum": {
-          "hint": "Enable species recognition for photos added to this album.",
+          "hint": "Enable BioCLIP Species Recognition for photos added to this album.",
           "label": "Field guide"
         },
         "cover": {
@@ -731,15 +755,15 @@
     "deleteModal": {
       "confirm": "Delete collections",
       "deleting": "Deleting...",
-      "description_one": "Are you sure you want to delete {{count}} selected album? This only removes the collection. Your photos remain in your library.",
-      "description_other": "Are you sure you want to delete {{count}} selected albums? This only removes the collections. Your photos remain in your library.",
+      "description_one": "Are you sure you want to delete {{count}} selected album? This only removes the collection. Your photos remain in their Repository.",
+      "description_other": "Are you sure you want to delete {{count}} selected albums? This only removes the collections. Your photos remain in their Repositories.",
       "title": "Delete albums"
     },
     "emptyAlbums": "No albums yet.",
     "emptyFolders": "No folders yet.",
     "emptyPeople": "No recognized people yet.",
     "folders": {
-      "empty": "No folders here yet. Uploads are organized automatically by date; folders appear once you add files directly into a repository or scan an existing library.",
+      "empty": "No folders here yet. Uploads are organized automatically by date; folders appear once you add files directly into or scan an existing Repository.",
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
       "root": "Root"
@@ -840,6 +864,7 @@
     "na": "N/A",
     "next": "Next",
     "notAvailable": "N/A",
+    "open": "Open",
     "or": "OR",
     "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
     "previous": "Previous",
@@ -861,12 +886,12 @@
     "confirmTitle": "Move asset to Trash",
     "deleting": "Moving...",
     "error": "Failed to move asset to Trash",
-    "softDeleteNote": "This will move the photo out of the library. The file will not be permanently removed.",
+    "softDeleteNote": "This will move the photo to Trash. The file will not be permanently removed.",
     "success": "Asset moved to Trash",
     "thisAsset": "this photo"
   },
   "duplicates": {
-    "emptyDescription": "Looks like every photo in this library is one of a kind.",
+    "emptyDescription": "Looks like every photo in the selected Repositories is one of a kind.",
     "emptyTitle": "No duplicates to review",
     "filters": {
       "dismissed": "Dismissed",
@@ -898,7 +923,7 @@
       "mixed": "Mixed (exact + similar)",
       "phash": "Visually similar"
     },
-    "noScanYet": "Run a scan to find duplicate photos across your library.",
+    "noScanYet": "Run a scan to find duplicate photos across your Repositories.",
     "pageTitle": "Duplicates",
     "scanError": "Failed to scan: {{message}}",
     "scanSuccess": "Found {{groups}} duplicate sets ({{exact}} exact, {{phash}} similar, {{mixed}} mixed)",
@@ -939,7 +964,7 @@
     "noCover": "No displayable cover",
     "pendingRebuild": "Changes are waiting for an Event rebuild.",
     "rebuild": "Rebuild",
-    "removeConfirmMessage": "The media stays in your library and will be excluded from this Event.",
+    "removeConfirmMessage": "The media stays in its Repository and will be excluded from this Event.",
     "removeConfirmTitle": "Remove selected media?",
     "removeSelected": "Remove from Event",
     "renamePrompt": "Event name",
@@ -1206,80 +1231,216 @@
   "manage": {
     "errorBoundaryMessage": "The manage section failed to load or encountered an error during operation.",
     "errorBoundaryTitle": "Manage Section Error!",
-    "pageTitle": "Manage Libraries",
+    "pageTitle": "Manage Repositories",
     "repositories": {
-      "actionsMenu": "Library actions for {{name}}",
+      "actionsMenu": "Repository actions for {{name}}",
+      "activityIdle": "Idle",
+      "activityImporting": "Importing",
+      "activityPaused": "Paused",
+      "activityProcessing": "Processing",
+      "activityScanning": "Scanning",
       "assetCount": "Assets",
-      "cloudCredentialLabel": "Cloud credential",
-      "cloudCredentialsHintLink": "Settings",
-      "cloudCredentialsHintPrefix": "Need an account?",
-      "cloudCredentialsHintSuffix": ".",
-      "cloudImportCreatePartial": "Library created, but cloud import did not start: {{error}}",
-      "cloudImportCreateSuccess": "Library created. Cloud import has started for {{name}}.",
+      "candidates": {
+        "addSeparateConfirm": "Yes, add as separate repository",
+        "copyAdded": "Separate repository added.",
+        "copyConfirmation": "Add this as a separate repository? Lumilio will create a new identity and isolate copied private state. This is not synchronization or a backup link.",
+        "description": "Choose a direct child of the configured default Storage Location. Arbitrary server paths are not accepted.",
+        "empty": "No direct-child folders were found in the default Storage Location.",
+        "emptyWritable": "Empty and writable",
+        "identityError": "Identity already registered",
+        "invalidMarker": "Invalid repository marker",
+        "mountPoint": "mounted",
+        "nonempty": "Not a repository",
+        "openable": "Ready to open",
+        "opened": "Repository opened and its initial scan was queued.",
+        "openFailed": "Repository could not be opened.",
+        "registered": "Registered",
+        "relocated": "Repository location updated.",
+        "resolveFailed": "Repository decision could not be applied.",
+        "riskConfirmation": "I understand this location may be network-backed, removable, managed by cloud-sync software, mounted differently than when it was registered, or contain files that must be downloaded first.",
+        "title": "Open Existing Repository",
+        "unavailable": "Repository candidates are unavailable.",
+        "unavailableStatus": "Unavailable"
+      },
       "cloudImportFailed": "Failed to start cloud import.",
       "cloudImportStarted": "Cloud import started for {{name}}.",
-      "createAction": "Add library",
-      "createFailed": "Failed to create library.",
+      "cloudRunSummary": "{{imported}} imported · {{failed}} failed",
+      "createAction": "Add repository",
+      "createDirectoryControlCharacter": "The storage folder cannot contain control characters.",
+      "createDirectoryEdgeSpace": "The storage folder cannot start or end with a space.",
+      "createDirectoryHint": "A stable folder directly inside the selected Storage Location.",
+      "createDirectoryLabel": "Storage folder",
+      "createDirectoryPlaceholder": "family-media",
+      "createDirectoryRequired": "Enter a storage folder.",
+      "createDirectoryTooManyBytes": "The storage folder is too long when encoded for the filesystem.",
+      "createDirectoryTooManyCharacters": "The storage folder cannot exceed 80 characters.",
+      "createDirectoryUnsupportedCharacter": "Use only letters, numbers, spaces, hyphens, and underscores.",
+      "createFailed": "Failed to create repository.",
+      "createNameControlCharacter": "The name cannot contain control characters.",
       "createNameEdgeSpace": "The name cannot start or end with a space.",
-      "createNameHint": "Use 1–80 letters, numbers, spaces, hyphens, or underscores. The name is also the directory name.",
-      "createNameLabel": "Library name",
+      "createNameHint": "This display name can be changed later without moving files.",
+      "createNameLabel": "Repository name",
       "createNamePlaceholder": "Family Media",
       "createNameRequired": "Enter a repository name.",
-      "createNameTooManyBytes": "The name is too long when encoded for the filesystem.",
+      "createNameTooManyBytes": "The name cannot exceed 240 UTF-8 bytes.",
       "createNameTooManyCharacters": "The name cannot exceed 80 characters.",
-      "createNameUnsupportedCharacter": "Use only letters, numbers, spaces, hyphens, and underscores.",
-      "createSubmit": "Create library",
+      "createRiskConfirmationDescription": "This target may be removable, network-backed, or managed by cloud-sync software. Confirm that originals are backed up and available offline.",
+      "createRiskConfirmationTitle": "Confirm storage placement risks",
+      "createSubmit": "Create repository",
       "createSuccess": "{{name}} was added.",
-      "createTitle": "Add library",
+      "createTitle": "Add repository",
+      "createWizard": {
+        "advancedFolder": "Advanced: storage folder",
+        "details": "Details",
+        "detailsDescription": "Choose the name shown in Lumilio. The storage folder follows it unless you customize the folder below.",
+        "detailsTitle": "Name the repository",
+        "layout": "Storage layout",
+        "layoutDescription": "This controls the on-disk layout for future imports and cannot be changed after creation.",
+        "layoutTitle": "Choose how new files are placed",
+        "location": "Storage Location",
+        "locationDescription": "Lumilio creates the repository as a direct child of this authorized location.",
+        "locationTitle": "Choose a Storage Location",
+        "progress": "Creation progress",
+        "review": "Review",
+        "reviewDescription": "Confirm the repository identity and its permanent storage layout before creating it.",
+        "reviewTitle": "Review and create",
+        "stepCount": "Step {{current}} of {{total}}"
+      },
       "description": "Connected repositories available for upload, filtering, and file-system scans.",
       "detectStacks": "Detect stacks",
       "detectStacksCompleted_one": "Detected {{count}} stack for {{name}}.",
       "detectStacksCompleted_other": "Detected {{count}} stacks for {{name}}.",
       "detectStacksFailed": "Failed to detect stacks.",
-      "duplicateHandlingHint": "Applied when two imported files resolve to the same name.",
-      "duplicateHandlingLabel": "Filename conflicts",
-      "duplicateHandlingRename": "Keep both (rename)",
-      "duplicateHandlingUuid": "Keep both (unique ID)",
       "duplicateScan": "Scan for duplicates",
       "duplicateScanFailed": "Duplicate scan failed.",
       "empty": "No repositories are available.",
-      "errorBadge": "Needs attention",
+      "hostAction": {
+        "addLocation": "Add Storage Location",
+        "addPurpose": "Choose and authorize a folder for repositories",
+        "addSeparate": "Add as separate repository",
+        "cancelFailed": "The request could not be cancelled.",
+        "completed": "Desktop request completed",
+        "copyConfirmation": "I understand this creates a separate repository identity and isolates copied private state before scanning.",
+        "createFailed": "The Desktop request could not be created.",
+        "desktopApproval": "After you send this request, review it in Desktop and choose the folder on that computer. The Web app never submits a filesystem path.",
+        "ended": "The Desktop request ended before it completed.",
+        "identityConflict": "This identity is already registered",
+        "identityConflictHint": "Choose whether the selected folder is the moved original or an independent copy. No files will be deleted.",
+        "locateLocation": "Reconnect",
+        "locateLocationPurpose": "Choose the current folder for this moved or reconnected Storage Location",
+        "locateRepository": "Locate Repository",
+        "locateRepositoryPurpose": "Choose the current folder for this moved repository",
+        "locationName": "Location name",
+        "locationNamePlaceholder": "External Archive",
+        "openPurpose": "Choose a folder that contains an existing repository",
+        "openRepository": "Open Existing Repository",
+        "requestedBy": "Requested by {{actor}}",
+        "requestLocation": "Request a Storage Location from Desktop",
+        "resolveFailed": "The recovery decision could not be applied.",
+        "send": "Send to Desktop",
+        "stepApprove": "Desktop approval",
+        "stepResult": "Result",
+        "stepSend": "Send request",
+        "unfinished_one": "You have {{count}} unfinished storage request. Resume it here.",
+        "unfinished_other": "You have {{count}} unfinished storage request. Resume it here.",
+        "unknownActor": "Unknown administrator",
+        "updateLocation": "Use as moved original",
+        "waiting": "Waiting for Desktop approval",
+        "waitingHint": "Open Desktop Settings → Storage, review this request, then choose a folder locally."
+      },
+      "identityErrorBadge": "Repository identity mismatch",
       "importFromCloud": "Import from cloud",
-      "noCloudCredentials": "No connected credentials",
+      "lifecycleActive": "Active",
+      "locationEmpty": "No repositories in this Storage Location yet.",
+      "maintenance": "Maintenance",
+      "maintenanceBadge": "Maintenance",
+      "manageCloudSources": "Manage cloud sources",
+      "menuGroupDanger": "Danger zone",
+      "menuGroupMaintenance": "Maintenance",
+      "menuGroupManage": "Manage",
+      "moreCreateOptions": "More ways to add repositories",
       "offlineBadge": "Offline",
-      "policyLegend": "Repository policy",
       "primaryBadge": "Primary",
       "rebuildLocation": "Rebuild location clusters",
       "rebuildLocationQueued": "Location cluster rebuild queued.",
+      "recoveryRequiredBadge": "Recovery required",
+      "removeAction": "Remove from Lumilio",
+      "removeAlbumCount": "Affected albums",
+      "removeAssetCount": "Catalog assets",
+      "removeCatalogBytes": "Cataloged media size",
+      "removeCloudImportCount": "Cloud import receipts",
+      "removeConfirmationLabel": "Type \"{{name}}\" to confirm",
+      "removeFailed": "Could not remove this repository.",
+      "removeImpactFailed": "Could not load removal impact.",
+      "removeSafetyWarning": "Files on disk will be preserved; some metadata in the Lumilio catalog may not be recoverable after reopening this Repository.",
+      "removeSuccess": "Removed \"{{name}}\" from Lumilio. Files on disk were preserved.",
+      "removeTaskCount": "Queued or active tasks",
+      "removeTitle": "Remove from Lumilio",
+      "rename": "Rename repository",
+      "renameFailed": "Repository could not be renamed.",
+      "renameLabel": "Display name",
+      "renameSubmit": "Save name",
+      "renameSuccess": "Renamed repository to \"{{name}}\".",
+      "renameTitle": "Rename repository",
       "rescanRepository": "Rescan",
-      "scanAll": "Scan all libraries",
-      "scanAllQueued_one": "Scan queued for {{count}} library.",
-      "scanAllQueued_other": "Scan queued for {{count}} libraries.",
+      "scanAll": "Scan all repositories",
+      "scanAllQueued_one": "Scan queued for {{count}} repository.",
+      "scanAllQueued_other": "Scan queued for {{count}} repositories.",
       "scanAmbiguousHelp": "No identity guess was made. Remove extra copies or restore a one-to-one layout, then scan again.",
       "scanAuthoritative": "Scan complete",
       "scanCompletedSummary": "{{name}} scan complete: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous, {{deleted}} deleted.",
-      "scanCounts": "{{discovered}} new · {{updated}} updated · {{moved}} moved · {{deferred}} deferred · {{ambiguous}} ambiguous · {{deleted}} deleted",
+      "scanCountAmbiguous": "Ambiguous",
+      "scanCountDeferred": "Deferred",
+      "scanCountDeleted": "Deleted",
+      "scanCountDiscovered": "Discovered",
+      "scanCountMoved": "Moved",
+      "scanCountUpdated": "Updated",
       "scanFailed": "Failed to queue scan.",
       "scanPartial": "Partial scan",
       "scanPartialSummary": "{{name}} scan was partial: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous. Missing files were not confirmed.",
-      "selectCloudCredential": "Select credential",
+      "scanStatusRunning": "A scan is in progress or queued; results will appear here.",
       "sourceCloud": "Cloud",
-      "sourceLabel": "Source",
-      "sourceLocal": "Local",
+      "storageLocationAvailable": "available",
+      "storageLocationCapacity": "{{available}} of {{total}} available",
+      "storageLocationCapacityUnknown": "Capacity unavailable",
       "storageLocationDefault": "Default",
       "storageLocationEmpty": "No writable location",
       "storageLocationError": "Storage Locations are unavailable.",
+      "storageLocationErrorBadge": "Storage Location needs attention",
       "storageLocationHint": "External locations are authorized in the Desktop Control Panel.",
       "storageLocationLabel": "Storage Location",
       "storageLocationLoading": "Loading locations…",
+      "storageLocationMaintenanceBadge": "Storage Location maintenance",
       "storageLocationOffline": "Offline",
-      "storageStrategyCas": "Content addressed",
-      "storageStrategyDate": "By capture date",
-      "storageStrategyFlat": "Single folder",
-      "storageStrategyHint": "Controls where imported originals are placed.",
-      "storageStrategyLabel": "File layout",
-      "title": "Libraries",
-      "unavailable": "Repository options are temporarily unavailable."
+      "storageLocationOfflineBadge": "Storage Location offline",
+      "storageLocationReadOnly": "Read-only",
+      "storageLocationRemove": "Remove",
+      "storageLocationRemoveBlockedDefault": "The default Storage Location cannot be removed.",
+      "storageLocationRemoveBlockedOperation": "Wait for the active storage operation to finish.",
+      "storageLocationRemoveBlockedRepositories": "Remove its repositories from Lumilio first.",
+      "storageLocationRemoveConfirmation": "Remove \"{{name}}\" from Lumilio? Its folder, .lumilioroot marker, and every file on disk will be preserved.",
+      "storageLocationRemoved": "Storage Location removed from Lumilio.",
+      "storageLocationRemoveFailed": "Storage Location could not be removed.",
+      "storageLocationRemoveTitle": "Remove Storage Location",
+      "storageLocationRepositoryCount_one": "{{count}} repository",
+      "storageLocationRepositoryCount_other": "{{count}} repositories",
+      "storageLocationWritable": "Writable",
+      "storageMonitor": "Open storage monitor",
+      "storageStrategy": {
+        "casDescription": "Uses content hashes for deterministic file paths.",
+        "casLabel": "Content addressed",
+        "dateDescription": "Organizes imports as inbox/YYYY/MM/photo.jpg using the UTC import time.",
+        "dateLabel": "By date",
+        "flatDescription": "Keeps imported files together in one directory.",
+        "flatLabel": "Single folder",
+        "immutableHint": "This choice determines the on-disk layout and cannot be changed after creation.",
+        "label": "Storage layout"
+      },
+      "title": "Repositories",
+      "toggleLocationSection": "Toggle the \"{{name}}\" section",
+      "unavailable": "Repository options are temporarily unavailable.",
+      "unlinkedDescription": "Their Storage Location is unknown to Lumilio. Reconnect or locate them from the row actions.",
+      "unlinkedTitle": "Repositories needing attention"
     }
   },
   "map": {
@@ -1318,7 +1479,7 @@
     "queueSummary": {
       "copied": "Copied",
       "copyError": "Copy error",
-      "emptyDescription": "Background processing will appear here when the library has work to do.",
+      "emptyDescription": "Background processing will appear here when Repositories have work to do.",
       "emptyTitle": "Nothing needs attention",
       "errorAttempt": "Attempt {{current}} / {{max}}",
       "errorFallback": "No error message was recorded.",
@@ -1344,8 +1505,8 @@
         "rebuild_location_clusters": "Refresh places",
         "reindex_assets": "Rebuild AI index",
         "retry_asset": "Retry media processing",
-        "scan_repository": "Scan library folder",
-        "schedule_repository_scans": "Schedule library scans",
+        "scan_repository": "Scan Repository folder",
+        "schedule_repository_scans": "Schedule Repository scans",
         "thumbnail_asset": "Build previews",
         "transcode_asset": "Prepare playable media"
       },
@@ -1368,18 +1529,18 @@
           "name": "Classifier matching"
         },
         "default": {
-          "description": "Background work for the media library."
+          "description": "Background work for the media collection."
         },
         "detect_stacks": {
           "description": "Looks for RAW+JPEG and related media stacks.",
           "name": "Stack detection"
         },
         "discover_asset": {
-          "description": "Materializes files found during library scans.",
+          "description": "Materializes files found during Repository scans.",
           "name": "Discovered files"
         },
         "ingest_asset": {
-          "description": "Moves uploaded media into the library safely.",
+          "description": "Moves uploaded media into a Repository safely.",
           "name": "Imports"
         },
         "match_live_photo": {
@@ -1423,8 +1584,8 @@
           "name": "Retries"
         },
         "scan_repository": {
-          "description": "Scans library folders for new, changed, or removed files.",
-          "name": "Library scan"
+          "description": "Scans Repository folders for new, changed, or removed files.",
+          "name": "Repository scan"
         },
         "thumbnail_asset": {
           "description": "Creates previews used throughout the gallery.",
@@ -1444,7 +1605,7 @@
         "settled": "Quiet",
         "working": "Working"
       },
-      "subtitle": "Grouped by the part of the media library pipeline doing the work.",
+      "subtitle": "Grouped by the part of the media pipeline doing the work.",
       "time": {
         "daysAgo_one": "{{count}} day ago",
         "daysAgo_other": "{{count}} days ago",
@@ -1480,15 +1641,72 @@
       "scheduledCount_other": "{{count}} planned",
       "successRate": "{{rate}}% success rate"
     },
+    "storage": {
+      "allHealthy": "All storage targets are healthy",
+      "attentionNeeded_one": "{{count}} targets need attention",
+      "attentionNeeded_other": "{{count}} targets need attention",
+      "auditAction": "Action",
+      "auditActor": "Actor",
+      "auditDescription": "Durable administrative storage actions",
+      "auditEmpty": "No lifecycle actions have been recorded yet.",
+      "auditLoadFailed": "Lifecycle history could not be loaded.",
+      "auditResult": "Result",
+      "auditTarget": "Target",
+      "auditTime": "Time",
+      "auditTitle": "Lifecycle history",
+      "capacityAvailable": "{{available}} available",
+      "capacityHeading": "Capacity",
+      "capacityUnknown": "Capacity unavailable",
+      "capacityUsed": "Used capacity",
+      "caseBehavior": "Case behavior",
+      "caseInsensitive": "Case-insensitive",
+      "caseSensitive": "Case-sensitive",
+      "download": "Download support bundle",
+      "effectiveIdentity": "Effective identity",
+      "emptyDescription": "No registered storage targets are available.",
+      "emptyTitle": "No storage diagnostics",
+      "filesystem": "Filesystem",
+      "loadFailed": "Storage diagnostics could not be loaded.",
+      "lockHolder": "Lock holder",
+      "marker": "Marker identity",
+      "mount": "Mount",
+      "navLabel": "Storage targets",
+      "noRepositories": "No repositories are registered in this location.",
+      "readOnly": "Read-only",
+      "refresh": "Refresh",
+      "repositoriesCount_one": "{{count}} repositories",
+      "repositoriesCount_other": "{{count}} repositories",
+      "riskCloudSync": "Cloud-sync directory",
+      "riskMountChanged": "Mount identity changed",
+      "riskNetwork": "Network filesystem",
+      "riskRemovable": "Removable storage",
+      "risksHeading": "Risks",
+      "statAvailable": "Available",
+      "statOfTotal": "of {{total}} total",
+      "statusActive": "Available",
+      "statUsed": "Used",
+      "statusIdentityError": "Identity mismatch",
+      "statusMaintenance": "Maintenance",
+      "statusOffline": "Offline",
+      "statusRecoveryRequired": "Recovery required",
+      "statusUnknown": "Unknown",
+      "summaryMeta": "{{locations}} locations · {{repositories}} repositories",
+      "technicalDetails": "Technical details",
+      "totalCapacity": "Total {{total}}",
+      "unlinkedTitle": "Repositories without a known location",
+      "updated": "Checked {{time}}"
+    },
     "subtitles": {
       "capabilities": "Runtime ML discovery and LLM agent status",
       "ml": "ML indexing coverage and reindex progress",
-      "queue": "Library imports, previews, AI indexing, and background cleanup at a glance"
+      "queue": "Repository imports, previews, AI indexing, and background cleanup at a glance",
+      "storage": "Storage Location, repository, capacity, mount, and lifecycle health."
     },
     "tabs": {
       "capabilities": "Capabilities",
       "ml": "ML",
-      "queue": "Processing"
+      "queue": "Processing",
+      "storage": "Storage"
     },
     "title": "System Status"
   },
@@ -1510,8 +1728,8 @@
   },
   "notFound": {
     "back": "Go back",
-    "description": "The address may be outdated or mistyped. Your library and photos are still safe.",
-    "home": "Go to library",
+    "description": "The address may be outdated or mistyped. Your Repositories and photos are still safe.",
+    "home": "Go to media",
     "label": "Error 404",
     "title": "This page does not exist"
   },
@@ -1572,7 +1790,7 @@
     "membersCount_other": "{{count}} faces",
     "merge": {
       "confirm": "Merge",
-      "description": "The selected people will be merged into {{name}}. Their photos stay in the library and people filters may change.",
+      "description": "The selected people will be merged into {{name}}. Their photos stay in their Repositories and people filters may change.",
       "error": "Failed to merge people: {{message}}",
       "selectedCount_one": "{{count}} selected",
       "selectedCount_other": "{{count}} selected",
@@ -1594,9 +1812,8 @@
       "searchPlaceholder": "Search people"
     },
     "rebuild": {
-      "action": "Rebuild face recognition",
+      "action": "Rebuild Person Recognition",
       "error": "Failed to rebuild people: {{message}}",
-      "running": "Rebuilding face recognition...",
       "success": "Rebuilt {{clusters}} people clusters from {{faces}} faces ({{noise}} noise)."
     },
     "removeFace": {
@@ -1617,7 +1834,7 @@
     "updateError": "Failed to update rating"
   },
   "rootError": {
-    "description": "Reload the application to recover. Your original photos and local library are not changed by this error.",
+    "description": "Reload the application to recover. Your original photos and Repositories are not changed by this error.",
     "home": "Return home",
     "label": "Application error",
     "reload": "Reload application",
@@ -1723,7 +1940,7 @@
           "label": "Manage Users"
         },
         "view_all_assets": {
-          "description": "Browse all photos and media in the library.",
+          "description": "Browse all photos and media across Repositories.",
           "label": "View All Assets"
         },
         "view_own_assets": {
@@ -1775,14 +1992,14 @@
         "face": "Detect and group recognizable faces.",
         "ocr": "Read visible text inside photos.",
         "semantic": "Analyze visual meaning for similarity retrieval and zero-shot recognition.",
-        "videoSemantic": "Embed sampled frames from videos for text search. Requires semantic search."
+        "videoSemantic": "Embed sampled frames from videos for text search. Requires Image Semantic Analysis."
       },
       "taskNames": {
-        "bioclip": "Field guide",
-        "face": "Face recognition",
-        "ocr": "Text recognition",
-        "semantic": "Semantic analysis",
-        "videoSemantic": "Video semantic search"
+        "bioclip": "BioCLIP Species Recognition",
+        "face": "Person Recognition",
+        "ocr": "OCR Text Recognition",
+        "semantic": "Image Semantic Analysis",
+        "videoSemantic": "Image Semantic Analysis (video)"
       },
       "validate": "Validate connection",
       "validationError": "Failed to validate LLM configuration.",
@@ -1829,7 +2046,7 @@
     "cloud": {
       "addCredential": "Add credential",
       "confirmDisconnect": "Disconnect {{name}}? Active imports will stop. You can reconnect later.",
-      "confirmRemove": "Remove {{name}}? This permanently deletes the credential and session data. Imported photos remain in your library.",
+      "confirmRemove": "Remove {{name}}? This permanently deletes the credential and session data. Imported photos remain in their Repository.",
       "connectCredential": "Connect credential",
       "credentialMeta": "{{provider}} · {{identity}}",
       "disconnect": "Disconnect",
@@ -1911,7 +2128,7 @@
         "createNow": "Back up now",
         "delete": "Delete",
         "deleteFailed": "Delete failed.",
-        "description": "Automatic dumps of the metadata database (albums, people, edits) stored in the library's backups folder. Media files are not included.",
+        "description": "Automatic dumps of the metadata database (albums, people, edits) stored in the Repository backup folder. Media files are not included.",
         "download": "Download",
         "downloadFailed": "Download failed.",
         "empty": "No backups yet.",
@@ -1953,11 +2170,11 @@
       "runtimeInfoTitle": "Runtime configuration",
       "taskAvailability": "Task availability",
       "taskNames": {
-        "bioClipClassify": "BioCLIP classify",
-        "faceDetectAndEmbed": "Face detect & embed",
-        "ocr": "OCR",
-        "semanticImageEmbed": "CLIP image embed",
-        "semanticTextEmbed": "CLIP text embed"
+        "bioClipClassify": "BioCLIP Species Recognition",
+        "faceDetectAndEmbed": "Person Recognition",
+        "ocr": "OCR Text Recognition",
+        "semanticImageEmbed": "Image Semantic Analysis · image task",
+        "semanticTextEmbed": "Image Semantic Analysis · text task"
       },
       "unavailable": "Unavailable",
       "workingRepositoryHint": "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
@@ -2275,7 +2492,7 @@
         "title": "Crop"
       },
       "empty": {
-        "body": "Open a photo from your library to start editing. Your latest work shows up here.",
+        "body": "Open a photo from a Repository to start editing. Your latest work shows up here.",
         "title": "No recent edits yet"
       },
       "frame": {
@@ -2302,7 +2519,7 @@
       "frame": "Frame",
       "text": "Text"
     },
-    "tagline": "Quick, non-destructive edits for photos already in your library.",
+    "tagline": "Quick, non-destructive edits for photos already in a Repository.",
     "text": {
       "add": "Add text",
       "caseLower": "aa",
@@ -2367,7 +2584,7 @@
       "add_files_button": "Add Files",
       "cannot_clear_while_processing": "Cannot clear files while processing",
       "clear_button": "Clear",
-      "default_upload_target_hint": "No working library is selected; uploads will use the primary/default repository.",
+      "default_upload_target_hint": "No working Repository is selected; uploads will use the Primary Repository.",
       "drag_drop_or_click": "Drag & Drop or Click to Upload",
       "no_files_selected_for_upload": "No files selected for upload",
       "no_valid_files_selected": "No valid files selected",
@@ -2391,8 +2608,8 @@
     "UploadProcess": {
       "noResult": "No result returned",
       "processFailed": "Upload process failed",
-      "summaryDuplicates_one": "Uploaded {{count}} file, skipped {{duplicates}} already in your library.",
-      "summaryDuplicates_other": "Uploaded {{count}} files, skipped {{duplicates}} already in your library.",
+      "summaryDuplicates_one": "Uploaded {{count}} file, skipped {{duplicates}} already in the Repository.",
+      "summaryDuplicates_other": "Uploaded {{count}} files, skipped {{duplicates}} already in the Repository.",
       "summaryPartial": "Upload complete: {{succeeded}} succeeded, {{failed}} failed.",
       "summarySuccess_one": "Successfully uploaded {{count}} file.",
       "summarySuccess_other": "Successfully uploaded {{count}} files.",

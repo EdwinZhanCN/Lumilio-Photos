@@ -29,7 +29,7 @@ func (h *SettingsHandler) SetCertificateInfoProvider(provider func() dto.Certifi
 }
 
 // GetRuntimeInfo returns a read-only snapshot of the runtime-immutable
-// configuration (port, storage root, hardware accel, scan schedule, …) for the
+// configuration (port, Storage Location, hardware accel, scan schedule, …) for the
 // Settings → Server tab.
 // @Summary Get runtime info
 // @Description Read-only effective runtime-immutable configuration (changed only via TOML + restart).

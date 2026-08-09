@@ -29,4 +29,4 @@ code-evidence:
 5. 按[首次运行验收](./verify-first-run.md)确认原件、缩略图和队列状态。
 6. 建立[第一份完整备份](./first-backup.md)。
 
-完成这些步骤以后，再接入外置磁盘、云导入、Lumen Intelligence 或 Lumilio Agent。这样一旦出现问题，你能够明确判断问题发生在基本媒体库、存储、后台处理，还是可选能力层。
+完成这些步骤以后，再接入外置磁盘、云导入、Lumen Intelligence 或 Lumilio Agent。这样一旦出现问题，你能够明确判断问题发生在基础照片管理、存储、后台处理，还是可选能力层。

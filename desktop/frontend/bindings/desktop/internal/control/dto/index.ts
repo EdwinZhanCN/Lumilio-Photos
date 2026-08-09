@@ -20,6 +20,7 @@ export type {
     DesktopPreferences,
     DesktopSnapshot,
     Error,
+    HostActionTicket,
     HostSnapshot,
     LumenControlStatus,
     LumenDownloadProgress,

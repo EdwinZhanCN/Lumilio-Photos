@@ -349,13 +349,20 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 	}
 
 	repositoryID := uuid.New()
+	rootID := uuid.New()
 	assetID := uuid.New()
 	mediaItemID := uuid.New()
 	if _, err := database.SQL.ExecContext(ctx, `
+		INSERT INTO repository_roots (root_id, name, path, kind, created_at, updated_at)
+		VALUES (?, 'Test root', '/', 'external', 1, 1)
+	`, rootID); err != nil {
+		t.Fatalf("insert repository root: %v", err)
+	}
+	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO repositories (
-			repo_id, name, path, role, status, created_at, updated_at
-		) VALUES (?, 'Test', '/test', 'regular', 'active', 1, 1)
-	`, repositoryID); err != nil {
+			repo_id, name, path, role, reachability, activity, created_at, updated_at, root_id
+		) VALUES (?, 'Test', '/test', 'regular', 'active', 'idle', 1, 1, ?)
+	`, repositoryID, rootID); err != nil {
 		t.Fatalf("insert repository: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `

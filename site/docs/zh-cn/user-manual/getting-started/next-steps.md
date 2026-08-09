@@ -1,6 +1,6 @@
 ---
 title: "接下来可以做什么"
-description: "在基本媒体库和备份闭环稳定后，按需要逐步启用高级能力。"
+description: "在基础照片管理和备份闭环稳定后，按需要逐步启用高级能力。"
 page_id: "getting-started/next-steps"
 audience: "所有用户"
 platform: "Desktop、Server"
@@ -27,11 +27,11 @@ code-evidence:
 
 ## 接入更多存储
 
-Desktop 可以通过本机目录选择器注册额外存储位置；Docker 当前应通过宿主机挂载规划把物理位置呈现在默认存储根下。先阅读[存储位置与资源库](../admin/storage-and-repositories.md)，避免混淆 `.lumilioroot` 和 `.lumiliorepo`。
+Desktop 可以通过本机目录选择器注册额外存储位置；Docker 当前应通过宿主机挂载规划把物理位置呈现在默认存储位置下。先阅读[存储位置与资源库](../admin/storage-and-repositories.md)，避免混淆 `.lumilioroot` 和 `.lumiliorepo`。
 
 ## 启用智能能力
 
-需要语义搜索、OCR、人物或分类时，再部署[Lumen Intelligence](../use/lumen-intelligence.md)。需要自然语言检索和有确认的整理操作时，再配置[Lumilio Agent](../use/agent.md)。两者都不是基本浏览和原件保存的前提。
+需要图像语义分析、OCR文字识别、人物识别或BioCLIP物种识别时，再部署[Lumen Intelligence](../use/lumen-intelligence.md)。需要自然语言检索和有确认的整理操作时，再配置[Lumilio Agent](../use/agent.md)。两者都不是基本浏览和原件保存的前提。
 
 ## 建立维护节奏
 

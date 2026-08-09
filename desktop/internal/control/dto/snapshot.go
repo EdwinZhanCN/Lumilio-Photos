@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 const SnapshotChangedEvent = "desktop:snapshot-changed"
 
 type DesiredState string
@@ -202,17 +204,41 @@ type LumenLogEntry struct {
 }
 
 type StorageShortcut struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Path    string `json:"path,omitempty"`
-	Kind    string `json:"kind,omitempty"`
-	Status  string `json:"status"`
-	CanOpen bool   `json:"canOpen"`
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	Path                 string `json:"path,omitempty"`
+	Kind                 string `json:"kind,omitempty"`
+	Status               string `json:"status"`
+	CanOpen              bool   `json:"canOpen"`
+	RepositoryCount      int64  `json:"repositoryCount"`
+	ActiveOperationCount int64  `json:"activeOperationCount"`
+	CanRemove            bool   `json:"canRemove"`
+	RemovalBlockedBy     string `json:"removalBlockedBy,omitempty"`
+	FilesPreserved       bool   `json:"filesPreserved"`
+	Writable             bool   `json:"writable"`
+	CapacityKnown        bool   `json:"capacityKnown"`
+	TotalBytes           uint64 `json:"totalBytes,omitempty"`
+	AvailableBytes       uint64 `json:"availableBytes,omitempty"`
+	Filesystem           string `json:"filesystem,omitempty"`
 }
 
 type StorageSummary struct {
 	Version uint64 `json:"version"`
 	Count   int    `json:"count"`
+}
+
+type HostActionTicket struct {
+	ID              string    `json:"id"`
+	RequestID       string    `json:"requestID"`
+	Kind            string    `json:"kind"`
+	Actor           string    `json:"actor"`
+	Purpose         string    `json:"purpose,omitempty"`
+	Name            string    `json:"name,omitempty"`
+	ExpectedVersion uint64    `json:"expectedVersion"`
+	Nonce           string    `json:"nonce"`
+	Status          string    `json:"status"`
+	RiskWarnings    []string  `json:"riskWarnings,omitempty"`
+	ExpiresAt       time.Time `json:"expiresAt"`
 }
 
 type UpdateSnapshot struct {

@@ -26,7 +26,7 @@ func newStagingTestRepository(t *testing.T, strategy, duplicateMode string) (*De
 	if err := config.SaveConfigToFile(root); err != nil {
 		t.Fatal(err)
 	}
-	repository := repo.Repository{RepoID: id, Path: root, Name: "Test", Status: dbtypes.RepoStatusActive}
+	repository := repo.Repository{RepoID: id, Path: root, Name: "Test", Reachability: dbtypes.RepositoryReachabilityActive}
 	return NewStagingManager(NewRepositoryFSFactory(nil, nil)), repository
 }
 

@@ -50,6 +50,15 @@ type SourceMaterializer struct {
 	logger         *zap.Logger
 	auditProvider  logging.RepositoryAuditProvider
 	contentLocks   [256]sync.Mutex
+	capacityGuard  interface {
+		CheckRepositoryWriteCapacity(context.Context, string, uint64) (storage.CapacityDecision, error)
+	}
+}
+
+func (m *SourceMaterializer) SetCapacityGuard(guard interface {
+	CheckRepositoryWriteCapacity(context.Context, string, uint64) (storage.CapacityDecision, error)
+}) {
+	m.capacityGuard = guard
 }
 
 func NewSourceMaterializer(
@@ -80,7 +89,13 @@ func NewSourceMaterializer(
 // MaterializeStaged validates and commits one private-workspace file into
 // Inbox. The prepared asset is the durable claim across the filesystem/SQLite
 // boundary; a retry either resumes from staging or verifies the committed file.
-func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source IngestSource) (*repo.Asset, error) {
+func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source IngestSource) (result *repo.Asset, resultErr error) {
+	prepared := false
+	defer func() {
+		if resultErr != nil {
+			resultErr = WithStagingOwnership(resultErr, prepared)
+		}
+	}()
 	if source.Kind != IngestSourceUpload && source.Kind != IngestSourceCloud {
 		return nil, fmt.Errorf("source %q is not staged ingest", source.Kind)
 	}
@@ -109,6 +124,16 @@ func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source Inges
 		_ = opened.Close()
 		return nil, fmt.Errorf("stat staged file: %w", err)
 	}
+	if m.capacityGuard != nil {
+		size := uint64(0)
+		if infoBefore.Size() > 0 {
+			size = uint64(infoBefore.Size())
+		}
+		if _, err := m.capacityGuard.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), size); err != nil {
+			_ = opened.Close()
+			return nil, fmt.Errorf("repository capacity preflight: %w", err)
+		}
+	}
 	hashes, err := hash.CalculateLayeredBLAKE3Reader(opened, infoBefore.Size())
 	if err != nil {
 		_ = opened.Close()
@@ -135,6 +160,29 @@ func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source Inges
 	if err != nil {
 		return nil, err
 	}
+	if recoverable != nil {
+		previousPath := recoverableStagingPath(recoverable.Status)
+		if previousPath != "" && previousPath != stagingFile.PrivatePath {
+			previous := &storage.StagingFile{
+				ID: path.Base(previousPath), RepositoryID: repository.RepoID,
+				PrivatePath: previousPath, Filename: stagingFile.Filename,
+			}
+			if existing, openErr := m.stagingManager.OpenStagingFile(repository, previous); openErr == nil {
+				_ = existing.Close()
+				if removeErr := m.stagingManager.RemoveStagingFile(repository, stagingFile); removeErr != nil {
+					return nil, fmt.Errorf("remove redundant resumed staging file: %w", removeErr)
+				}
+				stagingFile = previous
+				source.StagingPath = previousPath
+			} else if errors.Is(openErr, fs.ErrNotExist) {
+				if err := m.markAssetPreparedStaging(ctx, recoverable.AssetID, stagingFile.PrivatePath); err != nil {
+					return nil, fmt.Errorf("adopt replacement staging file: %w", err)
+				}
+			} else {
+				return nil, fmt.Errorf("open prepared staging file: %w", openErr)
+			}
+		}
+	}
 	if duplicate != nil {
 		verified, verifyErr := m.verifyAssetFile(ctx, repository, duplicate, hashes.ContentHash, hashes.FileSize)
 		if verifyErr == nil && verified {
@@ -159,6 +207,7 @@ func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source Inges
 			return nil, err
 		}
 	}
+	prepared = true
 
 	observation, exists, err := m.inspectFinal(ctx, repository, targetPath, hashes.FileSize, hashes.ContentHash)
 	if err != nil {
@@ -472,6 +521,13 @@ func (m *SourceMaterializer) markAssetIngestFailure(ctx context.Context, assetID
 		current.Message = "Asset ingestion failed"
 		current.AddError("materialize_asset", detail)
 		current.SetIngestState(phase, code, stagingPath, true)
+		return current, nil
+	})
+}
+
+func (m *SourceMaterializer) markAssetPreparedStaging(ctx context.Context, assetID uuid.UUID, stagingPath string) error {
+	return m.queries.MutateAssetStatus(ctx, assetID, func(current statusdb.AssetStatus) (statusdb.AssetStatus, error) {
+		current.SetIngestState(statusdb.IngestPhasePrepared, "", stagingPath, true)
 		return current, nil
 	})
 }

@@ -25,7 +25,7 @@ func duplicateTestRepository(t *testing.T) (*AssetHandler, repo.Repository) {
 		t.Fatal(err)
 	}
 	factory := storage.NewRepositoryFSFactory(nil, nil)
-	return &AssetHandler{files: factory}, repo.Repository{RepoID: repositoryID, Path: repositoryPath, Status: dbtypes.RepoStatusActive}
+	return &AssetHandler{files: factory}, repo.Repository{RepoID: repositoryID, Path: repositoryPath, Reachability: dbtypes.RepositoryReachabilityActive}
 }
 
 func TestVerifyDuplicateAssetFileRequiresMatchingBytes(t *testing.T) {

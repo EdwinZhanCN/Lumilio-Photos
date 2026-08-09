@@ -48,12 +48,14 @@ type EnqueueResult struct {
 }
 
 type Scanner struct {
-	database *db.DB
-	queries  *repo.Queries
-	queue    *river.Client[*sql.Tx]
-	files    *storage.RepositoryFSFactory
-	cfg      config.RepositoryScanConfig
-	logger   *zap.Logger
+	database         *db.DB
+	queries          *repo.Queries
+	queue            *river.Client[*sql.Tx]
+	files            *storage.RepositoryFSFactory
+	repositories     storage.RepositoryManager
+	cfg              config.RepositoryScanConfig
+	logger           *zap.Logger
+	beforeScanInsert func()
 }
 
 type scanCounters struct {
@@ -113,6 +115,7 @@ func NewScanner(
 	database *db.DB,
 	queue *river.Client[*sql.Tx],
 	files *storage.RepositoryFSFactory,
+	repositories storage.RepositoryManager,
 	cfg config.RepositoryScanConfig,
 	logger *zap.Logger,
 ) *Scanner {
@@ -124,12 +127,13 @@ func NewScanner(
 		queries = database.Queries
 	}
 	return &Scanner{
-		database: database,
-		queries:  queries,
-		queue:    queue,
-		files:    files,
-		cfg:      cfg,
-		logger:   logger.With(zap.String("component", "repository_scanner")),
+		database:     database,
+		queries:      queries,
+		queue:        queue,
+		files:        files,
+		repositories: repositories,
+		cfg:          cfg,
+		logger:       logger.With(zap.String("component", "repository_scanner")),
 	}
 }
 
@@ -146,6 +150,12 @@ func (s *Scanner) ReclaimInterruptedRuns(ctx context.Context) error {
 			zap.String("operation", "repository_scan.reclaim"),
 			zap.Int64("count", reclaimed),
 		)
+	}
+	if _, err := s.queries.ResetRepositoriesByActivity(ctx, repo.ResetRepositoriesByActivityParams{
+		Activity:  dbtypes.RepositoryActivityScanning,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		return fmt.Errorf("reset interrupted repository activity: %w", err)
 	}
 	return nil
 }
@@ -194,16 +204,18 @@ func (s *Scanner) EnqueueAllPeriodicScans(ctx context.Context) {
 }
 
 func (s *Scanner) enqueueScan(ctx context.Context, repositoryID string, mode string, requestedBy string, force bool) (EnqueueResult, error) {
-	if s == nil || s.queue == nil || s.queries == nil {
+	if s == nil || s.queue == nil || s.queries == nil || s.repositories == nil {
 		return EnqueueResult{}, fmt.Errorf("repository scanner queue unavailable")
 	}
 	repositoryUUID, err := parseRepositoryID(repositoryID)
 	if err != nil {
 		return EnqueueResult{}, err
 	}
-	if _, err := s.queries.GetRepository(ctx, repositoryUUID); err != nil {
-		return EnqueueResult{}, fmt.Errorf("get repository: %w", err)
+	_, releaseWork, err := s.repositories.BeginRepositoryWork(ctx, repositoryUUID.String(), dbtypes.RepositoryActivityScanning)
+	if err != nil {
+		return EnqueueResult{}, err
 	}
+	defer releaseWork()
 	mode = normalizeMode(mode)
 	args := jobs.ScanRepositoryArgs{
 		RepositoryID: repositoryID,
@@ -213,9 +225,15 @@ func (s *Scanner) enqueueScan(ctx context.Context, repositoryID string, mode str
 	}
 	opts := args.InsertOpts()
 	opts.Queue = "scan_repository"
+	if s.beforeScanInsert != nil {
+		s.beforeScanInsert()
+	}
 	job, err := s.queue.Insert(ctx, args, &opts)
 	if err != nil {
 		return EnqueueResult{}, fmt.Errorf("enqueue repository scan: %w", err)
+	}
+	if err := releaseWork(); err != nil {
+		return EnqueueResult{}, fmt.Errorf("finish repository scan enqueue: %w", err)
 	}
 	return EnqueueResult{JobID: job.Job.ID, RepositoryID: repositoryID, Mode: mode, Status: ScanStatusQueued}, nil
 }
@@ -232,6 +250,28 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 	if err != nil {
 		return fmt.Errorf("get repository: %w", err)
 	}
+	if _, err := s.queries.BeginRepositoryActivity(ctx, repo.BeginRepositoryActivityParams{
+		RepoID: repositoryID, Activity: dbtypes.RepositoryActivityScanning,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			s.logger.Info("repository scan deferred: repository is unavailable or busy",
+				zap.String("operation", "repository_scan.defer"),
+				zap.String("repository_id", args.RepositoryID),
+			)
+			return fmt.Errorf("%w: repository scan will retry after maintenance", storage.ErrRepositoryBusy)
+		}
+		return fmt.Errorf("enter repository scanning activity: %w", err)
+	}
+	defer func() {
+		if _, finishErr := s.queries.FinishRepositoryActivity(context.Background(), repo.FinishRepositoryActivityParams{
+			RepoID: repositoryID, Activity: dbtypes.RepositoryActivityScanning,
+			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		}); finishErr != nil {
+			s.logger.Error("failed to clear repository scanning activity",
+				zap.String("repository_id", args.RepositoryID), zap.Error(finishErr))
+		}
+	}()
 
 	scanID := uuid.New()
 	startedAt := time.Now().UTC()

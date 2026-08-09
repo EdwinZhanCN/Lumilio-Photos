@@ -13,6 +13,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/rootcfg"
 
 	"github.com/google/uuid"
 )
@@ -40,9 +41,23 @@ func newPersistentSessionFixture(t *testing.T) (*db.DB, repo.Repository, *storag
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
+	rootID := uuid.New()
+	rootConfig := rootcfg.New("upload root")
+	rootConfig.ID = rootID.String()
+	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: "upload root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "upload session", Path: repositoryPath, Config: *repositoryConfig,
-		Role: dbtypes.RepoRoleRegular, Status: dbtypes.RepoStatusActive, CreatedAt: now, UpdatedAt: now,
+		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
+		CreatedAt: now, UpdatedAt: now, RootID: rootID,
 	})
 	if err != nil {
 		t.Fatal(err)

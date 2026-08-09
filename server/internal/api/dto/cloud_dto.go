@@ -122,12 +122,38 @@ type StartCloudImportResponse struct {
 	Run CloudImportRunDTO `json:"run"`
 }
 
+// BindRepositoryCloudSourceRequest binds one credential and provider-specific
+// remote scope to an existing repository.
+type BindRepositoryCloudSourceRequest struct {
+	CredentialID string            `json:"credential_id" binding:"required,uuid"`
+	RemoteScope  map[string]string `json:"remote_scope,omitempty"`
+}
+
+// StartRepositoryCloudImportRequest selects one source when a repository has
+// multiple cloud connections. It may be omitted only for a single source.
+type StartRepositoryCloudImportRequest struct {
+	CredentialID string `json:"credential_id,omitempty" binding:"omitempty,uuid"`
+}
+
+// RepositoryCloudSourceDTO describes one connection independently of all
+// other cloud sources bound to the repository.
+type RepositoryCloudSourceDTO struct {
+	Provider      string             `json:"provider"`
+	OwnerID       int32              `json:"owner_id"`
+	Enabled       bool               `json:"enabled"`
+	RemoteScope   map[string]string  `json:"remote_scope"`
+	Credential    CloudCredentialDTO `json:"credential"`
+	LatestRun     *CloudImportRunDTO `json:"latest_run,omitempty"`
+	LastImportRun string             `json:"last_import_run_id,omitempty"`
+}
+
 // RepositoryCloudStatusDTO describes a repository's cloud binding.
 type RepositoryCloudStatusDTO struct {
-	Provider      string              `json:"provider,omitempty" example:"icloud"`
-	OwnerID       int32               `json:"owner_id,omitempty" example:"123"`
-	Enabled       bool                `json:"enabled" example:"true"`
-	Credential    *CloudCredentialDTO `json:"credential,omitempty"`
-	LatestRun     *CloudImportRunDTO  `json:"latest_run,omitempty"`
-	LastImportRun string              `json:"last_import_run_id,omitempty"`
+	Sources       []RepositoryCloudSourceDTO `json:"sources"`
+	Provider      string                     `json:"provider,omitempty" example:"icloud"`
+	OwnerID       int32                      `json:"owner_id,omitempty" example:"123"`
+	Enabled       bool                       `json:"enabled" example:"true"`
+	Credential    *CloudCredentialDTO        `json:"credential,omitempty"`
+	LatestRun     *CloudImportRunDTO         `json:"latest_run,omitempty"`
+	LastImportRun string                     `json:"last_import_run_id,omitempty"`
 }

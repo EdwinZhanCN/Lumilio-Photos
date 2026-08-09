@@ -41,7 +41,7 @@ media tools, so there is no database service to install. All downloads are on th
 ::: tip Updates
 When a newer release exists, the menu-bar menu shows **Update available** —
 click it to download the new `.dmg`, then replace the app in Applications.
-Your library and database are untouched. During setup (or later in the
+Your Repositories and database are untouched. During setup (or later in the
 control panel) you can set **Download region** to Mainland China so the
 installer is fetched via a GitHub mirror; this is separate from in-app map
 region settings.
@@ -50,7 +50,7 @@ region settings.
 App data (database, secrets, logs) lives under
 `~/Library/Application Support/Lumilio Photos/`. To uninstall, quit from the
 menu bar, delete the app, and delete that folder if you also want the data gone
-(your media library location is separate and is never deleted).
+(your Repository storage is separate and is never deleted).
 
 ## Windows
 
@@ -77,7 +77,7 @@ and its database, and can optionally remove the app data.
 ::: tip Updates
 When a newer release exists, the tray menu shows **Update available** — click
 it to download the new `setup.exe` and run it over the existing install. Your
-library and database are untouched. **Download region** (Mainland China vs
+Repositories and database are untouched. **Download region** (Mainland China vs
 other) controls whether the installer URL uses a GitHub mirror; it is separate
 from in-app map region settings.
 :::

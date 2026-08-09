@@ -190,8 +190,9 @@ type StorageAdapter interface {
 	ListShortcuts(context.Context) ([]dto.StorageShortcut, error)
 	PickLocation(string) (string, error)
 	OpenLocation(context.Context, string) error
-	AddLocation(string, uint64, string, string) (dto.OperationReceipt, error)
-	AttachRepository(string, uint64, string) (dto.OperationReceipt, error)
+	ListHostActions(context.Context) ([]dto.HostActionTicket, error)
+	ApproveHostAction(string, uint64, string, string) (dto.OperationReceipt, error)
+	DeclineHostAction(string) error
 }
 
 type StorageService struct{ Adapter StorageAdapter }
@@ -220,18 +221,25 @@ func (s *StorageService) OpenLocation(id string) error {
 	return s.Adapter.OpenLocation(context.Background(), id)
 }
 
-func (s *StorageService) AddLocation(requestID string, expectedVersion uint64, path, name string) (dto.OperationReceipt, error) {
+func (s *StorageService) ListHostActions() ([]dto.HostActionTicket, error) {
 	if s == nil || s.Adapter == nil {
-		return dto.OperationReceipt{}, operation.NewError(dto.ErrorRepositoryControlUnavailable, "storage control is unavailable")
+		return nil, operation.NewError(dto.ErrorRepositoryControlUnavailable, "storage control is unavailable")
 	}
-	return s.Adapter.AddLocation(requestID, expectedVersion, path, name)
+	return s.Adapter.ListHostActions(context.Background())
 }
 
-func (s *StorageService) AttachRepository(requestID string, expectedVersion uint64, path string) (dto.OperationReceipt, error) {
+func (s *StorageService) ApproveHostAction(requestID string, expectedVersion uint64, actionID, nonce string) (dto.OperationReceipt, error) {
 	if s == nil || s.Adapter == nil {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorRepositoryControlUnavailable, "storage control is unavailable")
 	}
-	return s.Adapter.AttachRepository(requestID, expectedVersion, path)
+	return s.Adapter.ApproveHostAction(requestID, expectedVersion, actionID, nonce)
+}
+
+func (s *StorageService) DeclineHostAction(actionID string) error {
+	if s == nil || s.Adapter == nil {
+		return operation.NewError(dto.ErrorRepositoryControlUnavailable, "storage control is unavailable")
+	}
+	return s.Adapter.DeclineHostAction(actionID)
 }
 
 type LumenAdapter interface {

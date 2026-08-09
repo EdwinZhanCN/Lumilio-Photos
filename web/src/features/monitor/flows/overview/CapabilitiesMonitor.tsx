@@ -48,27 +48,33 @@ export function CapabilitiesMonitor() {
   const mlTasks = [
     {
       key: "clip-image",
-      label: t("settings.serverSettings.taskNames.semanticImageEmbed"),
+      label: t(
+        "settings.serverSettings.taskNames.semanticImageEmbed",
+        "Image Semantic Analysis · image task",
+      ),
       capability: capabilities.ml.tasks.clipImageEmbed,
     },
     {
       key: "clip-text",
-      label: t("settings.serverSettings.taskNames.semanticTextEmbed"),
+      label: t(
+        "settings.serverSettings.taskNames.semanticTextEmbed",
+        "Image Semantic Analysis · text task",
+      ),
       capability: capabilities.ml.tasks.semanticTextEmbed,
     },
     {
       key: "bioclip-classify",
-      label: t("settings.serverSettings.taskNames.bioClipClassify"),
+      label: t("settings.serverSettings.taskNames.bioClipClassify", "BioCLIP Species Recognition"),
       capability: capabilities.ml.tasks.bioClipClassify,
     },
     {
       key: "ocr",
-      label: t("settings.serverSettings.taskNames.ocr"),
+      label: t("settings.serverSettings.taskNames.ocr", "OCR Text Recognition"),
       capability: capabilities.ml.tasks.ocr,
     },
     {
       key: "face",
-      label: t("settings.serverSettings.taskNames.faceDetectAndEmbed"),
+      label: t("settings.serverSettings.taskNames.faceDetectAndEmbed", "Person Recognition"),
       capability: capabilities.ml.tasks.faceDetectAndEmbed,
     },
   ];

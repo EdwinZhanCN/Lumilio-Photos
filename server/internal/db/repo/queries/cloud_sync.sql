@@ -8,6 +8,10 @@ VALUES (?1, ?2, ?3, ?4, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (repository_id, credential_id, provider)
 DO UPDATE SET cursor_value = ?4, updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER);
 
+-- name: DeleteCloudSyncCursorForSource :exec
+DELETE FROM cloud_sync_cursors
+WHERE repository_id = ?1 AND credential_id = ?2 AND provider = ?3;
+
 -- name: GetCloudSyncFile :one
 SELECT etag, local_hash FROM cloud_sync_files
 WHERE repository_id = ?1 AND credential_id = ?2 AND provider = ?3 AND remote_key = ?4;

@@ -129,7 +129,7 @@ const AlbumAssetsContent = () => {
           {
             count: context.affectedAssetCount,
             defaultValue:
-              "{{count}} selected assets will be removed from this album. Original assets remain in the library.",
+              "{{count}} selected assets will be removed from this album. Original assets remain in their Repositories.",
           },
         ),
         disabled: !albumIdNumber,
@@ -178,7 +178,7 @@ const AlbumAssetsContent = () => {
         isBioAlbum && (
           <span className="badge badge-primary gap-1.5">
             <Bird className="size-3.5" />
-            {t("collections.albumDetails.bioClip.badge")}
+            {t("collections.albumDetails.bioClip.badge", "BioCLIP Species Recognition")}
           </span>
         )
       }
@@ -234,8 +234,11 @@ const AlbumAssetsContent = () => {
                 <RefreshCcw className="size-3.5" />
               )}
               {rebuildBioClipMutation.isPending
-                ? t("collections.albumDetails.bioClip.running")
-                : t("collections.albumDetails.bioClip.action")}
+                ? t(
+                    "collections.albumDetails.bioClip.running",
+                    "Running BioCLIP Species Recognition…",
+                  )
+                : t("collections.albumDetails.bioClip.action", "Run BioCLIP Species Recognition")}
             </button>
           )}
         </>

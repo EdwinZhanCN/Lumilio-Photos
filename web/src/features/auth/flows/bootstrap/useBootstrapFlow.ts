@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateRepository, validateRepositoryName } from "@/features/repositories";
+import {
+  useCreateRepository,
+  validateRepositoryName,
+  type RepositoryStorageStrategy,
+} from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
@@ -14,11 +18,13 @@ const FLOW_INDEX: Record<string, number> = {
   recovery: 4,
 };
 
-const isStorageStrategy = (value?: string): value is "cas" | "date" | "flat" =>
-  value === "cas" || value === "date" || value === "flat";
-
-const isDuplicateHandling = (value?: string): value is "rename" | "uuid" =>
-  value === "rename" || value === "uuid";
+export function buildBootstrapPrimaryRepositoryRequest(
+  name: string,
+  storageStrategy: RepositoryStorageStrategy,
+  riskConfirmation?: boolean,
+) {
+  return { name, role: "primary" as const, storageStrategy, riskConfirmation };
+}
 
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -43,38 +49,44 @@ export function useBootstrapFlow() {
   const defaults = setupQuery.data?.repository_defaults;
   const [repoName, setRepoName] = useState("Primary Storage");
   const [repoRoot, setRepoRoot] = useState("");
-  const [strategy, setStrategy] = useState<"cas" | "date" | "flat">("date");
-  const [duplicateHandling, setDuplicateHandling] = useState<"rename" | "uuid">(
-    "rename",
-  );
+  const [storageStrategy, setStorageStrategy] = useState<RepositoryStorageStrategy>("date");
+  const [riskConfirmation, setRiskConfirmation] = useState(false);
+  const placementRisks = defaults?.risk_warnings ?? [];
 
   useEffect(() => {
     if (!defaults) return;
     setRepoRoot((current) => current || defaults.default_root || "");
-    setStrategy(isStorageStrategy(defaults.strategy) ? defaults.strategy : "date");
-    setDuplicateHandling(
-      isDuplicateHandling(defaults.duplicate_handling) ? defaults.duplicate_handling : "rename",
-    );
   }, [defaults]);
 
   const registration = useRegistrationFlow({ onComplete: () => setMfaComplete(true) });
   const current = mfaComplete ? 5 : welcomed ? (FLOW_INDEX[registration.step] ?? 1) : 0;
   const repoNameError = validateRepositoryName(repoName);
   const canSubmitRepo = useMemo(
-    () => repoNameError === null && repoRoot.trim() !== "" && !createRepositoryMutation.isPending,
-    [createRepositoryMutation.isPending, repoNameError, repoRoot],
+    () =>
+      repoNameError === null &&
+      repoRoot.trim() !== "" &&
+      (placementRisks.length === 0 || riskConfirmation) &&
+      !createRepositoryMutation.isPending,
+    [
+      createRepositoryMutation.isPending,
+      placementRisks.length,
+      repoNameError,
+      repoRoot,
+      riskConfirmation,
+    ],
   );
 
   const submitRepo = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmitRepo) return;
 
-    await createRepositoryMutation.createRepository({
-      name: repoName,
-      role: "primary",
-      storageStrategy: strategy,
-      duplicateHandling,
-    });
+    await createRepositoryMutation.createRepository(
+      buildBootstrapPrimaryRepositoryRequest(
+        repoName,
+        storageStrategy,
+        placementRisks.length > 0 ? riskConfirmation : undefined,
+      ),
+    );
     await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
     void navigate("/", { replace: true });
   };
@@ -100,10 +112,11 @@ export function useBootstrapFlow() {
     setRepoName,
     repoNameError,
     repoRoot,
-    strategy,
-    setStrategy,
-    duplicateHandling,
-    setDuplicateHandling,
+    storageStrategy,
+    setStorageStrategy,
+    placementRisks,
+    riskConfirmation,
+    setRiskConfirmation,
     canSubmitRepo,
     submitRepo,
     repoError,

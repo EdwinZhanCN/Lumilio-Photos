@@ -17,6 +17,7 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/rootcfg"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -26,6 +27,17 @@ import (
 
 type metadataNoopWorker struct {
 	river.WorkerDefaults[jobs.MetadataArgs]
+}
+
+type recordingCapacityGuard struct {
+	repositoryID  string
+	expectedBytes uint64
+}
+
+func (g *recordingCapacityGuard) CheckRepositoryWriteCapacity(_ context.Context, repositoryID string, expectedBytes uint64) (storage.CapacityDecision, error) {
+	g.repositoryID = repositoryID
+	g.expectedBytes = expectedBytes
+	return storage.CapacityDecision{Allowed: true}, nil
 }
 
 func (*metadataNoopWorker) Work(context.Context, *river.Job[jobs.MetadataArgs]) error { return nil }
@@ -164,9 +176,23 @@ func TestStagedUploadBindsCommittedFileIndexBeforeReturning(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
+	rootID := uuid.New()
+	rootConfig := rootcfg.New("upload root")
+	rootConfig.ID = rootID.String()
+	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: "upload root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "upload index", Path: repositoryPath, Config: *repositoryConfig,
-		Role: dbtypes.RepoRoleRegular, Status: dbtypes.RepoStatusActive, CreatedAt: now, UpdatedAt: now,
+		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
+		CreatedAt: now, UpdatedAt: now, RootID: rootID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -197,12 +223,17 @@ func TestStagedUploadBindsCommittedFileIndexBeforeReturning(t *testing.T) {
 		logging.NewRepositoryAuditProvider(zap.NewNop(), false),
 		files,
 	)
+	guard := &recordingCapacityGuard{}
+	materializer.SetCapacityGuard(guard)
 	asset, err := materializer.MaterializeStaged(ctx, IngestSource{
 		RepositoryID: repositoryID, Kind: IngestSourceUpload, StagingPath: staged.PrivatePath,
 		OriginalFilename: "upload.jpg", Timestamp: staged.CreatedAt, ContentType: "image/jpeg",
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if guard.repositoryID != repositoryID.String() || guard.expectedBytes != uint64(len(content)) {
+		t.Fatalf("capacity preflight = %s/%d, want %s/%d", guard.repositoryID, guard.expectedBytes, repositoryID, len(content))
 	}
 	if asset.StoragePath == nil {
 		t.Fatal("materialized asset has no repository-relative path")

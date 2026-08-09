@@ -162,7 +162,10 @@ func (l *repositoryAuditLogger) Operation(operation string, fields ...zap.Field)
 		zap.String("operation", strings.TrimSpace(operation)),
 		zap.String("result", "ok"),
 	}, fields...)
-	l.operations.Debug(operation, allFields...)
+	// Successful operations are part of the default audit trail. Verbose mode
+	// may admit additional Debug records from callers, but must never be needed
+	// for the outcome itself to reach operations.log.
+	l.operations.Info(operation, allFields...)
 }
 
 func (l *repositoryAuditLogger) Error(operation string, err error, fields ...zap.Field) {

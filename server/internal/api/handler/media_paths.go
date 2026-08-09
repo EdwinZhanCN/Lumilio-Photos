@@ -49,7 +49,7 @@ func getRepositoryForAsset(ctx context.Context, queries *repo.Queries, asset *re
 	// An unreachable repository must not degrade into a bare I/O error further
 	// down. The UI has to be able to tell "the drive is unplugged" from "the
 	// photo is gone", and only this layer still knows which one it is.
-	if repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError {
+	if repository.Reachability != dbtypes.RepositoryReachabilityActive {
 		return nil, fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
 	}
 	return &repository, nil

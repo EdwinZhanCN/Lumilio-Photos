@@ -6,21 +6,28 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { useRepositoryOptions } from "@/features/repositories";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
+import { LifecycleHistory } from "./LifecycleHistory";
 import { MLMonitor } from "./MLMonitor";
 import { QueueSummaryList } from "./QueueSummaryList";
 import { StatMonitor } from "./StatMonitor";
+import { StorageMonitor } from "./StorageMonitor";
+
+type MonitorView = "queue" | "ml" | "capabilities" | "storage";
 
 export default function MonitorOverview() {
   const { t } = useI18n();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedView = searchParams.get("tab");
-  const view = requestedView === "capabilities" || requestedView === "ml" ? requestedView : "queue";
+  const view: MonitorView =
+    requestedView === "capabilities" || requestedView === "ml" || requestedView === "storage"
+      ? requestedView
+      : "queue";
 
   const [localRepoId, setLocalRepoId] = useState<string | undefined>(undefined);
   const { repositories } = useRepositoryOptions();
 
-  const setView = (nextView: "queue" | "ml" | "capabilities") => {
+  const setView = (nextView: MonitorView) => {
     const params = new URLSearchParams(searchParams);
 
     if (nextView === "queue") {
@@ -52,7 +59,12 @@ export default function MonitorOverview() {
             ? t("monitor.subtitles.queue")
             : view === "ml"
               ? t("monitor.subtitles.ml")
-              : t("monitor.subtitles.capabilities")
+              : view === "capabilities"
+                ? t("monitor.subtitles.capabilities")
+                : t(
+                    "monitor.subtitles.storage",
+                    "Storage Location, repository, capacity, mount, and lifecycle health.",
+                  )
         }
         icon={<Activity className="w-6 h-6 text-primary" />}
         className="flex-wrap gap-y-3"
@@ -76,46 +88,73 @@ export default function MonitorOverview() {
               ))}
             </select>
           )}
-          <div role="tablist" className="tabs tabs-box">
+          <div role="tablist" className="tabs tabs-box tabs-sm" aria-label={t("monitor.title")}>
             <button
+              type="button"
               role="tab"
+              aria-selected={view === "queue"}
               className={`tab ${view === "queue" ? "tab-active" : ""}`}
               onClick={() => setView("queue")}
             >
               {t("monitor.tabs.queue")}
             </button>
             <button
+              type="button"
               role="tab"
+              aria-selected={view === "ml"}
               className={`tab ${view === "ml" ? "tab-active" : ""}`}
               onClick={() => setView("ml")}
             >
               {t("monitor.tabs.ml")}
             </button>
             <button
+              type="button"
               role="tab"
+              aria-selected={view === "capabilities"}
               className={`tab ${view === "capabilities" ? "tab-active" : ""}`}
               onClick={() => setView("capabilities")}
             >
               {t("monitor.tabs.capabilities")}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "storage"}
+              className={`tab ${view === "storage" ? "tab-active" : ""}`}
+              onClick={() => setView("storage")}
+            >
+              {t("monitor.tabs.storage", "Storage")}
             </button>
           </div>
         </div>
       </PageHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="container mx-auto w-full space-y-4 p-4 pb-6">
-          {view === "queue" ? (
-            <>
-              <StatMonitor />
+        {view === "storage" ? (
+          <>
+            {/* 主从区按内容自然增高；Lifecycle 始终排在完整主从区之后 */}
+            <div className="container mx-auto w-full p-4 pb-3">
+              <StorageMonitor />
+            </div>
+            <div className="container mx-auto w-full p-4 pt-0 pb-6">
+              <LifecycleHistory />
+            </div>
+          </>
+        ) : (
+          <div className="container mx-auto w-full space-y-4 p-4 pb-6">
+            {view === "queue" ? (
+              <>
+                <StatMonitor />
 
-              <QueueSummaryList />
-            </>
-          ) : view === "ml" ? (
-            <MLMonitor localRepoId={localRepoId} />
-          ) : (
-            <CapabilitiesMonitor />
-          )}
-        </div>
+                <QueueSummaryList />
+              </>
+            ) : view === "ml" ? (
+              <MLMonitor localRepoId={localRepoId} />
+            ) : (
+              <CapabilitiesMonitor />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

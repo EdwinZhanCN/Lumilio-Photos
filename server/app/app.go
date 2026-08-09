@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"server/internal/cloud"
 	"server/internal/db"
 	dbbackup "server/internal/db/backup"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
 	"server/internal/httporigin"
@@ -335,18 +337,37 @@ func run(
 	// Initialize new repository-based storage system
 	repositoryAccess := storage.NewRepositoryAccessCoordinator()
 	repositoryFiles := storage.NewRepositoryFSFactory(repositoryAccess, queries)
-	repoManager, err := storage.NewRepositoryManager(queries, repositoryLogger, repoAuditProvider, repositoryFiles)
+	repoManager, err := storage.NewRepositoryManager(sqlDB, queries, repositoryLogger, repoAuditProvider, repositoryFiles)
 	if err != nil {
 		return fmt.Errorf("initialize repository manager: %w", err)
 	}
-	defaultRoot, err := repoManager.EnsureDefaultRepositoryRoot(ctx, appConfig.StorageConfig.Path)
+	// Claim every currently reachable portable identity before lifecycle/host
+	// recovery or reconciliation can inspect and mutate its filesystem state.
+	releaseStorageOwnership, err := repoManager.AcquireRuntimeStorageOwnership(ctx)
 	if err != nil {
-		return fmt.Errorf("initialize default storage location: %w", err)
+		return fmt.Errorf("claim portable storage ownership: %w", err)
 	}
-	appLogger.Info("default storage location initialized",
-		zap.String("operation", "repository_root.init"),
-		zap.String("path", defaultRoot.Path),
-	)
+	defer releaseStorageOwnership()
+	if err := repoManager.RecoverLifecycleOperations(ctx); err != nil {
+		return fmt.Errorf("recover storage lifecycle operations: %w", err)
+	}
+	if err := repoManager.RecoverHostActions(ctx); err != nil {
+		return fmt.Errorf("recover native host actions: %w", err)
+	}
+	defaultRoot, degradedStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
+	if err != nil {
+		return err
+	}
+	if degradedStorage {
+		appLogger.Warn("default Storage Location requires recovery; continuing in degraded mode",
+			zap.String("operation", "repository_root.recovery_required"),
+			zap.String("path", appConfig.StorageConfig.Path))
+	} else {
+		appLogger.Info("default storage location initialized",
+			zap.String("operation", "repository_root.init"),
+			zap.String("path", defaultRoot.Path),
+		)
+	}
 	stagingManager := storage.NewStagingManager(repositoryFiles)
 	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
 
@@ -354,14 +375,17 @@ func run(
 	// Re-check every repository's recorded path before anything schedules work
 	// against it. Unreachable repositories become offline rather than failing
 	// mid-scan.
+	if err := repoManager.ReconcileRepositoryRoots(ctx); err != nil {
+		appLogger.Warn("failed to reconcile Storage Locations", zap.Error(err))
+	}
 	if err := repoManager.ReconcileAll(ctx); err != nil {
 		appLogger.Warn("failed to reconcile repositories", zap.Error(err))
 	}
-	if controls.RepositoryManagerReady != nil {
-		controls.RepositoryManagerReady(newRepositoryControl(repoManager))
-		defer controls.RepositoryManagerReady(nil)
+	startStorageReconciler(ctx, repoManager, time.Minute, appLogger)
+	if err := repoManager.ReconcileRepositoryCapacity(ctx); err != nil {
+		appLogger.Warn("failed to reconcile repository capacity", zap.Error(err))
 	}
-
+	go monitorRepositoryCapacity(ctx, repoManager, appLogger.Named("storage_capacity"))
 	workers := river.NewWorkers()
 	queueClient, err := queue.New(sqlDB, workers, logRuntime.RiverLogger())
 	if err != nil {
@@ -453,9 +477,35 @@ func run(
 
 	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
 	sourceMaterializer := sourcing.NewSourceMaterializer(database, stagingManager, queueClient, processorLogger, repoAuditProvider, repositoryFiles)
+	sourceMaterializer.SetCapacityGuard(repoManager)
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, appConfig.Transcode, appConfig.Tools, processorLogger, repoAuditProvider, repositoryFiles)
-	repositoryScanner := scanner.NewScanner(database, queueClient, repositoryFiles, appConfig.RepositoryScan, scannerLogger)
+	assetProcessor := processors.NewAssetProcessor(sqlDB, assetService, queries, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, appConfig.Transcode, appConfig.Tools, processorLogger, repoAuditProvider, repositoryFiles, repoManager)
+	repositoryScanner := scanner.NewScanner(database, queueClient, repositoryFiles, repoManager, appConfig.RepositoryScan, scannerLogger)
+	repoManager.SetInitialScanEnqueuer(func(ctx context.Context, repositoryID string) error {
+		_, err := repositoryScanner.EnqueueManualScan(ctx, repositoryID, "storage_lifecycle", true)
+		return err
+	})
+	if err := repoManager.RetryPendingInitialRepositoryScans(ctx); err != nil {
+		return fmt.Errorf("resume pending initial repository scans: %w", err)
+	}
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if retryErr := repoManager.RetryPendingInitialRepositoryScans(ctx); retryErr != nil {
+					appLogger.Warn("failed to retry pending initial repository scans", zap.Error(retryErr))
+				}
+			}
+		}
+	}()
+	if controls.RepositoryManagerReady != nil {
+		controls.RepositoryManagerReady(newRepositoryControl(repoManager))
+		defer controls.RepositoryManagerReady(nil)
+	}
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
@@ -594,7 +644,7 @@ func run(
 	))
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService, repositoryFiles)
+	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, sqlDB, repoManager, stagingManager, queueClient, settingsService, lumenService, repositoryFiles)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
 	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
@@ -610,7 +660,7 @@ func run(
 	settingsController := handler.NewSettingsHandler(settingsService, backupService, dto.NewRuntimeInfoDTO(appConfig))
 	classifierController := handler.NewClassifierHandler(classifierService)
 	// Initialize Cloud Sync service and handler
-	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, stagingManager, appConfig.Auth.SecretKeyFile, appConfig.StorageConfig.CloudDir(), appLogger.Named("cloud_sync"))
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, stagingManager, repoManager, appConfig.Auth.SecretKeyFile, appConfig.StorageConfig.CloudDir(), appLogger.Named("cloud_sync"))
 	// Reconcile import runs left "running"/"queued" by a previous crash/restart
 	// so repositories are not stuck with an import that never finishes.
 	if err := cloudSyncService.RecoverInterruptedRuns(ctx); err != nil {
@@ -622,7 +672,8 @@ func run(
 		appLogger.Warn("failed to reclaim interrupted repository scan runs", zap.Error(err))
 	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, cloudSyncService)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
+	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandler(eventService, sqlDB, shareLinkService)
 	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries, repositoryFiles)
@@ -651,6 +702,7 @@ func run(
 		classifierController,
 		userController,
 		repositoryScanController,
+		hostActionController,
 		duplicateController,
 		eventController,
 		cloudController,
@@ -774,6 +826,62 @@ func run(
 	}
 	appLogger.Info("shutdown complete", zap.String("operation", "server.shutdown"))
 	return nil
+}
+
+type defaultStorageRuntimeManager interface {
+	EnsureDefaultRepositoryRoot(context.Context, string, ...storage.LifecycleRequest) (*repo.RepositoryRoot, error)
+	ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error)
+}
+
+// ensureDefaultStorageForRuntime distinguishes a first-run initialization
+// failure from a previously registered portable identity that needs recovery.
+// The latter must not prevent the HTTP runtime and unrelated repositories from
+// starting in degraded mode.
+func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (*repo.RepositoryRoot, bool, error) {
+	hostInstanceID, _ := os.Hostname()
+	root, err := manager.EnsureDefaultRepositoryRoot(ctx, path, storage.LifecycleRequest{
+		Actor: "server:config", HostInstanceID: hostInstanceID, ConfirmationType: "portable_identity_match",
+	})
+	if err == nil {
+		return root, false, nil
+	}
+	if !errors.Is(err, storage.ErrRepositoryRootOffline) && !errors.Is(err, storage.ErrRepositoryRootInvalid) {
+		return nil, false, fmt.Errorf("initialize default storage location: %w", err)
+	}
+	roots, listErr := manager.ListRepositoryRoots(ctx)
+	if listErr != nil {
+		return nil, false, fmt.Errorf("verify degraded default Storage Location: %w", listErr)
+	}
+	for i := range roots {
+		if roots[i].Kind == dbtypes.RepositoryRootKindDefault {
+			// A registered default failing at its unchanged configured path is a
+			// recoverable offline/missing-marker condition. A different configured
+			// path is a migration attempt; failure to prove its portable identity
+			// must fail startup so Desktop rolls the runtime intent back.
+			registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(roots[i].Path)
+			configuredPath, configuredPathErr := storage.CanonicalizeRepositoryPath(path)
+			if registeredPathErr != nil || configuredPathErr != nil || registeredPath != configuredPath {
+				return nil, false, fmt.Errorf("validate default storage location migration: %w", err)
+			}
+			return &roots[i], true, nil
+		}
+	}
+	return nil, false, fmt.Errorf("initialize default storage location: %w", err)
+}
+
+func monitorRepositoryCapacity(ctx context.Context, manager *storage.DefaultRepositoryManager, logger *zap.Logger) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := manager.ReconcileRepositoryCapacity(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				logger.Warn("repository capacity monitor failed", zap.Error(err))
+			}
+		}
+	}
 }
 
 func productURL(listen string) string {

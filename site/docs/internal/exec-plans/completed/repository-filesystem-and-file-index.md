@@ -73,7 +73,7 @@ Primary owners: `server/internal/storage`, `server/internal/storage/scanner`,
   identity outside this implementation.
 
 The separate active
-[`storage-location-repository-lifecycle.md`](../active/storage-location-repository-lifecycle.md)
+[`storage-location-repository-lifecycle.md`](storage-location-repository-lifecycle.md)
 continues to own Storage Location authorization, `.lumilioroot`, repository
 attach/relocate/remove semantics, and their management workflows.
 

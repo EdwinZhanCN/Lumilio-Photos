@@ -5,13 +5,14 @@ INSERT INTO repositories (
     path,
     config,
     role,
-    status,
+    reachability,
+    activity,
     default_owner_id,
     created_at,
     updated_at,
     root_id
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
 ) RETURNING *;
 
 -- name: GetRepository :one
@@ -25,7 +26,11 @@ WHERE path = ?1;
 -- name: GetPrimaryRepository :one
 SELECT * FROM repositories
 WHERE role = 'primary'
-  AND status = 'active';
+  AND reachability = 'active';
+
+-- name: GetPrimaryRepositoryRecord :one
+SELECT * FROM repositories
+WHERE role = 'primary';
 
 -- name: GetHostOwnerID :one
 -- The primary repository pins the Host Owner after bootstrap. Before the
@@ -52,15 +57,15 @@ ORDER BY created_at DESC;
 
 -- name: ListActiveRepositories :many
 SELECT * FROM repositories
-WHERE status = 'active'
+WHERE reachability = 'active'
 ORDER BY created_at DESC;
 
 -- name: CountPrimaryRepositories :one
 SELECT COUNT(*) FROM repositories
 WHERE role = 'primary';
 
--- Status is deliberately absent: it is owned by UpdateRepositoryStatus alone.
--- Letting a settings edit write status resurrects a repository that reconcile
+-- Reachability and activity are deliberately absent: their state machines own
+-- those columns. Letting a settings edit write reachability resurrects a repository that reconcile
 -- has marked offline.
 -- name: UpdateRepository :one
 UPDATE repositories
@@ -77,18 +82,97 @@ UPDATE repositories
 SET
     path = ?2,
     root_id = ?3,
-    status = ?4,
+    reachability = ?4,
     updated_at = ?5
 WHERE repo_id = ?1
 RETURNING *;
 
--- name: UpdateRepositoryStatus :one
+-- name: UpdateRepositoryReachability :one
 UPDATE repositories
 SET
-    status = ?2,
+    reachability = ?2,
     updated_at = ?3
 WHERE repo_id = ?1
 RETURNING *;
+
+-- name: UpdateRepositoryActivity :one
+UPDATE repositories
+SET
+    activity = ?2,
+    pause_reason = CASE WHEN ?2 = 'paused' THEN 'manual' ELSE '' END,
+    updated_at = ?3
+WHERE repo_id = ?1
+RETURNING *;
+
+-- name: PauseRepositoryForLowSpace :one
+UPDATE repositories
+SET activity = 'paused',
+    pause_reason = 'low_space',
+    updated_at = ?2
+WHERE repo_id = ?1
+  AND reachability = 'active'
+  AND (activity <> 'paused' OR pause_reason = 'low_space')
+RETURNING *;
+
+-- name: ResumeRepositoryAfterLowSpace :one
+UPDATE repositories
+SET activity = 'idle',
+    pause_reason = '',
+    updated_at = ?2
+WHERE repo_id = ?1
+  AND reachability = 'active'
+  AND activity = 'paused'
+  AND pause_reason = 'low_space'
+RETURNING *;
+
+-- name: BeginRepositoryActivity :one
+UPDATE repositories
+SET
+    activity = ?2,
+    updated_at = ?3
+WHERE repo_id = ?1
+  AND reachability = 'active'
+  AND activity = 'idle'
+RETURNING *;
+
+-- name: BeginRepositoryMaintenance :one
+UPDATE repositories
+SET reachability = 'maintenance',
+    activity = 'paused',
+    pause_reason = 'maintenance',
+    updated_at = ?2
+WHERE repo_id = ?1
+  AND reachability <> 'maintenance'
+  AND activity = 'idle'
+RETURNING *;
+
+-- name: EndRepositoryMaintenance :one
+UPDATE repositories
+SET reachability = ?2,
+    activity = ?3,
+    pause_reason = CASE WHEN ?3 = 'paused' THEN 'manual' ELSE '' END,
+    updated_at = ?4
+WHERE repo_id = ?1
+  AND reachability = 'maintenance'
+  AND activity = 'paused'
+RETURNING *;
+
+-- name: FinishRepositoryActivity :execrows
+UPDATE repositories
+SET
+    activity = 'idle',
+    pause_reason = '',
+    updated_at = ?3
+WHERE repo_id = ?1
+  AND activity = ?2;
+
+-- name: ResetRepositoriesByActivity :execrows
+UPDATE repositories
+SET
+    activity = 'idle',
+    pause_reason = '',
+    updated_at = ?2
+WHERE activity = ?1;
 
 -- name: UpdateRepositoryLastSync :one
 UPDATE repositories
@@ -115,9 +199,9 @@ SELECT EXISTS(
 -- name: CountRepositories :one
 SELECT COUNT(*) FROM repositories;
 
--- name: CountRepositoriesByStatus :one
+-- name: CountRepositoriesByReachability :one
 SELECT COUNT(*) FROM repositories
-WHERE status = ?1;
+WHERE reachability = ?1;
 
 -- name: SetUnownedRepositoryHostOwner :exec
 UPDATE repositories

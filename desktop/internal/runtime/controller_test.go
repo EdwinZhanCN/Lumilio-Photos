@@ -20,7 +20,7 @@ func (fakeRepositoryControl) ListStorageLocations(context.Context) ([]app.Storag
 	return nil, nil
 }
 
-func (fakeRepositoryControl) AddStorageLocation(context.Context, string, string) (app.StorageLocationInfo, []string, error) {
+func (fakeRepositoryControl) AddStorageLocation(context.Context, string, string, string) (app.StorageLocationInfo, []string, error) {
 	return app.StorageLocationInfo{}, nil, nil
 }
 
@@ -34,8 +34,23 @@ func (fakeRepositoryControl) AttachRepository(context.Context, string) (app.Repo
 	return app.RepositoryInfo{}, nil
 }
 
-func (fakeRepositoryControl) ResolveRepositoryConflict(context.Context, string, string, string) (app.RepositoryInfo, error) {
+func (fakeRepositoryControl) ResolveRepositoryConflict(context.Context, string, string, string, ...string) (app.RepositoryInfo, error) {
 	return app.RepositoryInfo{}, nil
+}
+
+func (fakeRepositoryControl) ListPendingHostActions(context.Context) ([]app.HostActionInfo, error) {
+	return nil, nil
+}
+func (fakeRepositoryControl) SetHostActionExpectedVersion(context.Context, string, string, uint64) (app.HostActionInfo, error) {
+	return app.HostActionInfo{}, nil
+}
+
+func (fakeRepositoryControl) ExecuteHostAction(context.Context, string, string, string, string, bool) (app.HostActionInfo, error) {
+	return app.HostActionInfo{}, nil
+}
+
+func (fakeRepositoryControl) CancelHostAction(context.Context, string) (app.HostActionInfo, error) {
+	return app.HostActionInfo{}, nil
 }
 
 type fakeGeneration struct {

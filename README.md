@@ -6,7 +6,7 @@
 
 <img width="128" height="148" alt="流明集标志" src="https://github.com/user-attachments/assets/9e51f2dd-af9c-47da-9232-cff9a6e6bf4f" />
 
-为个人媒体库打造的本地优先照片与视频管理工具。
+为个人照片与视频收藏打造的本地优先管理工具。
 
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
@@ -16,23 +16,23 @@
 </div>
 
 > [!WARNING]
-> 流明集是一款免费、开源且仍在积极开发中的 beta 软件。升级前请备份重要媒体库，并阅读发布说明以了解当前限制。
+> 流明集是一款免费、开源且仍在积极开发中的 beta 软件。升级前请备份重要资源库，并阅读发布说明以了解当前限制。
 
-流明集将原始文件和应用数据保存在你所控制的基础设施上，为大型媒体库提供浏览、导入、整理、搜索和处理的一体化工作空间。AI 辅助功能完全可选；即使没有模型服务或外部 AI 提供商，基础媒体库功能仍可正常使用。
+流明集将原始文件和应用数据保存在你所控制的基础设施上，为大型照片与视频收藏提供浏览、导入、整理、搜索和处理的一体化工作空间。AI 辅助功能完全可选；即使没有模型服务或外部 AI 提供商，基础照片管理功能仍可正常使用。
 
 ## 主要功能
 
-- 本地优先的照片与视频媒体库，以及边界清晰的存储仓库
+- 本地优先的照片与视频管理，以及边界清晰的资源库
 - 相册、人物、地点、堆叠、收藏与重复文件管理
 - 上传、目录扫描、元数据提取、缩略图生成与转码
-- 基于媒体库元数据的搜索与筛选
+- 基于照片与视频元数据的搜索与筛选
 - 通过 Lumen 提供可选的图像语义分析、人物识别、OCR文字识别和BioCLIP物种识别
 - 响应式 Web 界面，以及 macOS 和 Windows 桌面应用
 - 多用户身份验证，并可选启用 MFA 和 Passkey
 
 ## 安装
 
-请根据媒体库的运行环境选择合适的发行方式：
+请根据照片收藏的运行环境选择合适的发行方式：
 
 | 运行环境 | 推荐方式 |
 | --- | --- |
@@ -50,12 +50,15 @@ Docker 交付面向安装了 Docker Engine 与 Compose 2.23.1+ 的 Linux 主机�
 
 ```bash
 curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+mkdir -p ./lumilio/media ./lumilio/app-state
 docker compose up -d
 ```
 
 启动后打开 `http://Linux主机IP:6680`。不需要先购买域名、配置 HTTPS 或生成
 TOML。默认数据目录为 `./lumilio/media` 和 `./lumilio/app-state`，也可以通过
 `LUMILIO_STORAGE` 与 `LUMILIO_STATE` 指定其他位置。
+Compose 使用长语法并设置 `create_host_path: false`；因此自定义目录也必须先创建，
+路径拼写错误会直接失败，不会静默生成一个空目录。
 
 需要 HTTPS 时，可在基础部署完成后使用已有反向代理、
 [`caddy.compose.yml`](deploy/compose/caddy.compose.yml) 或

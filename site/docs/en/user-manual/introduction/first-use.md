@@ -39,7 +39,7 @@ You can skip, but the admin controls the whole Server — skipping means passwor
 
 1. Open **Manage** and confirm the primary repository is available;
 2. Add a few photos and wait for processing;
-3. Open the library and confirm viewing works;
+3. Open the Repository and confirm viewing works;
 4. Create your first database backup (see [Backup and Data Integrity](./integrity)).
 
 ## If it fails

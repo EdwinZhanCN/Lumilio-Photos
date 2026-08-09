@@ -1,9 +1,27 @@
 import type { components } from "@/lib/http-commons/schema";
-import type { RepositoryOption, RepositoryStatus } from "../types";
+import type {
+  RepositoryActivity,
+  RepositoryEffectiveState,
+  RepositoryOption,
+  RepositoryReachability,
+} from "../types";
 
 type RepositoryListResponse = components["schemas"]["dto.IndexingRepositoryListResponseDTO"];
 
-const REPOSITORY_STATUSES: RepositoryStatus[] = ["active", "scanning", "error", "offline"];
+const REPOSITORY_REACHABILITY: RepositoryReachability[] = [
+  "active",
+  "offline",
+  "identity_error",
+  "recovery_required",
+  "maintenance",
+];
+const REPOSITORY_ACTIVITIES: RepositoryActivity[] = [
+  "idle",
+  "scanning",
+  "importing",
+  "processing",
+  "paused",
+];
 
 export function normalizeRepositoryOptions(data?: RepositoryListResponse): RepositoryOption[] {
   return (data?.repositories ?? []).map((repository) => ({
@@ -11,17 +29,35 @@ export function normalizeRepositoryOptions(data?: RepositoryListResponse): Repos
     name: repository.name ?? "",
     path: repository.path ?? "",
     role: repository.role ?? "regular",
-    status: normalizeRepositoryStatus(repository.status),
+    rootId: repository.root_id ?? "",
+    reachability: normalizeRepositoryReachability(repository.reachability),
+    activity: normalizeRepositoryActivity(repository.activity),
     isPrimary: repository.role === "primary" || Boolean(repository.is_primary),
   }));
 }
 
-// An unrecognized status must not read as unreachable: treating a repository as
-// offline blocks uploads into it, so the safe default is "active".
-function normalizeRepositoryStatus(status?: string): RepositoryStatus {
-  return REPOSITORY_STATUSES.find((candidate) => candidate === status) ?? "active";
+// Missing lifecycle state fails closed. A stale or partial response must never
+// turn an unknown storage target into an eligible upload destination.
+function normalizeRepositoryReachability(reachability?: string): RepositoryReachability {
+  return (
+    REPOSITORY_REACHABILITY.find((candidate) => candidate === reachability) ?? "recovery_required"
+  );
+}
+
+function normalizeRepositoryActivity(activity?: string): RepositoryActivity {
+  return REPOSITORY_ACTIVITIES.find((candidate) => candidate === activity) ?? "idle";
 }
 
 export function isRepositoryUnavailable(repository: RepositoryOption): boolean {
-  return repository.status === "offline" || repository.status === "error";
+  return repository.reachability !== "active";
+}
+
+export function getRepositoryEffectiveState(
+  repository: RepositoryOption,
+  rootStatus?: string,
+): RepositoryEffectiveState {
+  if (rootStatus === "offline") return "storage_location_offline";
+  if (rootStatus === "error") return "storage_location_error";
+  if (rootStatus === "maintenance") return "storage_location_maintenance";
+  return repository.reachability;
 }

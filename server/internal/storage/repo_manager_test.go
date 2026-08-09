@@ -12,7 +12,7 @@ import (
 )
 
 func TestValidateRepository(t *testing.T) {
-	manager, _ := NewRepositoryManager(nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
+	manager, _ := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
 
 	t.Run("valid repository", func(t *testing.T) {
 		testDir := t.TempDir()
@@ -65,7 +65,7 @@ func TestValidateRepository(t *testing.T) {
 }
 
 func TestIsNestedRepository(t *testing.T) {
-	manager, _ := NewRepositoryManager(nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
+	manager, _ := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
 	testDir := canonicalTempDir(t)
 
 	// Create parent repository
@@ -98,7 +98,7 @@ func TestIsNestedRepository(t *testing.T) {
 }
 
 func TestRepositoryWorkflow_Integration(t *testing.T) {
-	manager, _ := NewRepositoryManager(nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
+	manager, _ := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil) // Using nil for tests since we're not testing DB operations
 	dirManager := NewDirectoryManager()
 	testRoot := canonicalTempDir(t)
 

@@ -1,5 +1,5 @@
 ---
-title: "语义搜索"
+title: "图像语义分析搜索"
 description: "使用自然语言查找画面内容，并判断语义索引是否完整。"
 page_id: "use/semantic-search"
 audience: "所有用户"
@@ -17,7 +17,7 @@ code-evidence:
 - server/internal/service/embedding_service.go
 -->
 
-# 语义搜索
+# 图像语义分析搜索
 
 语义搜索把文字查询转换为向量，并与已经为媒体生成的图像或视频语义向量比较。它适合“海边日落”“红色汽车”这类画面描述，不保证像文件名或标签筛选一样精确。
 
