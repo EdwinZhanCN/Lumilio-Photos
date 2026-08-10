@@ -298,6 +298,9 @@ func TestRepositoryCandidateSurfacesPlaceholderRiskBeforeOpen(t *testing.T) {
 }
 
 func TestMountInfoContainsPathDecodesEscapedNames(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux mount-info paths are only meaningful on Linux")
+	}
 	mountInfo := "36 25 0:32 / /data/archive\\040disk rw,relatime - ext4 /dev/sda rw\n"
 	matched, err := mountInfoContainsPath(strings.NewReader(mountInfo), "/data/archive disk")
 	if err != nil {

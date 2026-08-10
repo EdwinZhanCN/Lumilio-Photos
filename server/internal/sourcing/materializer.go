@@ -73,9 +73,6 @@ func NewSourceMaterializer(
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
-	}
 	return &SourceMaterializer{
 		database:       database,
 		queries:        database.Queries,
@@ -596,6 +593,9 @@ func (m *SourceMaterializer) enqueuePipelineTx(ctx context.Context, tx *sql.Tx, 
 }
 
 func (m *SourceMaterializer) audit(repositoryPath string) logging.RepositoryAuditLogger {
+	if m.auditProvider == nil {
+		return logging.NoopRepositoryAuditLogger()
+	}
 	return m.auditProvider.ForPath(repositoryPath)
 }
 

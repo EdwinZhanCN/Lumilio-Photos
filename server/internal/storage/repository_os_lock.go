@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 )
+
+const repositoryLockMetadataOffset int64 = 1
 
 var (
 	ErrRepositoryLockUnavailable = errors.New("repository OS lock is unavailable")
@@ -103,11 +106,8 @@ func acquirePathLock(ctx context.Context, lockPath string, exclusive bool) (func
 		_ = file.Close()
 		return nil, fmt.Errorf("%w: encode lock metadata: %v", ErrRepositoryLockUnavailable, err)
 	}
-	if err := file.Truncate(0); err == nil {
-		_, err = file.Seek(0, 0)
-	}
-	if err == nil {
-		_, err = file.Write(encoded)
+	if err := file.Truncate(repositoryLockMetadataOffset); err == nil {
+		_, err = file.WriteAt(encoded, repositoryLockMetadataOffset)
 	}
 	if err == nil {
 		err = file.Sync()
@@ -149,16 +149,27 @@ func InspectRepositoryLock(path, targetType string) (RepositoryLockInfo, error) 
 	} else if !errors.Is(err, ErrRepositoryLockUnavailable) {
 		return RepositoryLockInfo{}, err
 	}
-	if _, err := file.Seek(0, 0); err != nil {
+	if _, err := file.Seek(repositoryLockMetadataOffset, 0); err != nil {
 		return RepositoryLockInfo{}, err
 	}
-	data, err := os.ReadFile(lockPath)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return RepositoryLockInfo{}, err
 	}
 	var metadata repositoryLockMetadata
 	if err := json.Unmarshal(data, &metadata); err != nil {
-		return RepositoryLockInfo{}, fmt.Errorf("decode repository lock metadata: %w", err)
+		// Lock files written before metadata was moved away from the locked
+		// byte remain readable after an upgrade.
+		if _, seekErr := file.Seek(0, 0); seekErr != nil {
+			return RepositoryLockInfo{}, seekErr
+		}
+		legacyData, readErr := io.ReadAll(file)
+		if readErr != nil {
+			return RepositoryLockInfo{}, readErr
+		}
+		if legacyErr := json.Unmarshal(legacyData, &metadata); legacyErr != nil {
+			return RepositoryLockInfo{}, fmt.Errorf("decode repository lock metadata: %w", err)
+		}
 	}
 	return RepositoryLockInfo{Holder: metadata.Holder, AcquiredAt: metadata.AcquiredAt}, nil
 }

@@ -23,12 +23,19 @@ func TestInspectStoragePathReportsPerPathCapacityAndWritability(t *testing.T) {
 	if info.CanonicalPath == "" || info.MountFingerprint == "" {
 		t.Fatalf("diagnostic identity was not resolved: %#v", info)
 	}
-	if info.EffectiveUID == "" || info.EffectiveGID == "" || !info.CaseBehaviorKnown {
+	if (runtime.GOOS == "linux" || runtime.GOOS == "darwin") &&
+		(info.EffectiveUID == "" || info.EffectiveGID == "") {
 		t.Fatalf("diagnostic process/case facts were not resolved: %#v", info)
+	}
+	if !info.CaseBehaviorKnown {
+		t.Fatalf("diagnostic case facts were not resolved: %#v", info)
 	}
 }
 
 func TestFilesystemFromMountInfoPrefersDockerChildMount(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux mount-info paths are only meaningful on Linux")
+	}
 	mountInfo := strings.Join([]string{
 		"20 1 0:20 / / rw,relatime - overlay overlay rw",
 		"21 20 0:21 / /srv/lumilio rw,relatime - ext4 /dev/root rw",

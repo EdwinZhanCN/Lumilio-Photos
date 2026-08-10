@@ -229,9 +229,6 @@ func NewRepositoryManager(
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	if auditProvider == nil {
-		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
-	}
 	if files == nil {
 		files = NewRepositoryFSFactory(nil, queries)
 	}

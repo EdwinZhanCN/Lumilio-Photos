@@ -42,6 +42,7 @@ const StudioEditMvp = lazy(() =>
 const Settings = lazy(() => import("@/features/settings/routes/Settings"));
 const Monitor = lazy(() => import("@/features/monitor/routes/Monitor"));
 const MapView = lazy(() => import("@/features/collections/routes/MapView"));
+const LumilioChatPage = lazy(() => import("@/features/lumilio/routes/LumilioChat"));
 
 export const publicRoutes: RouteDefinition[] = [
   {
@@ -239,5 +240,9 @@ export const appRoutes: RouteDefinition[] = [
     path: "/server-monitor",
     element: <Monitor />,
     requiredRole: "admin",
+  },
+  {
+    path: "/lumilio",
+    element: <LumilioChatPage />,
   },
 ];
