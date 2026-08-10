@@ -391,7 +391,7 @@ func run(
 	if err != nil {
 		return fmt.Errorf("initialize queue: %w", err)
 	}
-	eventService := event.NewService(sqlDB)
+	eventService := event.NewService(sqlDB, queueClient)
 	river.AddWorker[queue.EventRebuildArgs](workers, &queue.EventRebuildWorker{
 		DB: sqlDB, Service: eventService,
 	})
@@ -416,12 +416,13 @@ func run(
 		}
 	}()
 
-	assetService, err := service.NewAssetService(
+	assetService, err := service.NewAssetServiceWithQueue(
 		queries,
 		sqlDB,
 		lumenService,
 		embeddingService,
 		ocrIndex,
+		queueClient,
 		appLogger.Named("asset_service"),
 	)
 	if err != nil {
@@ -430,7 +431,7 @@ func run(
 	locationService := service.NewLocationService(queries, sqlDB, appConfig.Geocoding)
 	speciesReferenceService := service.NewSpeciesReferenceService()
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, sqlDB, indexingLogger, repoAuditProvider, repositoryFiles)
-	stackService := service.NewStackService(queries, sqlDB, appLogger.Named("stack"), repoAuditProvider)
+	stackService := service.NewStackServiceWithQueue(queries, sqlDB, appLogger.Named("stack"), repoAuditProvider, queueClient)
 	duplicateService := service.NewDuplicateService(queries, sqlDB, appLogger.Named("duplicate"), assetService)
 	authService, err := service.NewAuthService(queries, sqlDB, appConfig.Auth, appLogger.Named("auth"), securityLogger)
 	if err != nil {
@@ -450,7 +451,7 @@ func run(
 	// Initialize Agent Service. The ref store is shared between the agent
 	// tool chain and the hydration API handler; its janitor bounds memory
 	// for abandoned sessions.
-	authorizedLibraries := core.NewAuthorizedLibraryFactory(queries, assetService)
+	authorizedLibraries := core.NewAuthorizedLibraryFactory(queries, assetService, sqlDB)
 	refStore := ref.NewPersistentStore(
 		queries,
 		authorizedLibraries,
@@ -675,7 +676,7 @@ func run(
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
-	eventController := handler.NewEventHandler(eventService, sqlDB, shareLinkService)
+	eventController := handler.NewEventHandler(eventService, sqlDB, shareLinkService, queueClient)
 	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries, repositoryFiles)
 
 	// Initialize Swagger docs

@@ -14,9 +14,12 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/event"
 	"server/internal/logging"
+	"server/internal/queue/jobs"
 
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
 
@@ -70,10 +73,15 @@ type stackService struct {
 	pool          *sql.DB
 	logger        *zap.Logger
 	auditProvider logging.RepositoryAuditProvider
+	eventQueue    *river.Client[*sql.Tx]
 }
 
 func NewStackService(queries *repo.Queries, pool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider) StackService {
 	return &stackService{queries: queries, pool: pool, logger: logger, auditProvider: auditProvider}
+}
+
+func NewStackServiceWithQueue(queries *repo.Queries, pool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider, queueClient *river.Client[*sql.Tx]) StackService {
+	return &stackService{queries: queries, pool: pool, logger: logger, auditProvider: auditProvider, eventQueue: queueClient}
 }
 
 const stackMaxTimeGap = 5 * time.Second
@@ -537,6 +545,11 @@ func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey st
 			return err
 		}
 	}
+	if primary.OwnerID != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx, *primary.OwnerID, "logical_media_merged"); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -662,6 +675,11 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 		if err := NormalizePresentationStack(ctx, qtx, existing.StackID); err != nil {
 			return false, err
 		}
+		if cluster.Members[0].OwnerID != nil {
+			if err := s.markEventFactsChangedTx(ctx, tx, *cluster.Members[0].OwnerID, "stack_extended"); err != nil {
+				return false, err
+			}
+		}
 		return false, tx.Commit()
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -700,6 +718,11 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 	}
 	if err := NormalizePresentationStack(ctx, qtx, stackID); err != nil {
 		return false, err
+	}
+	if cluster.Members[0].OwnerID != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx, *cluster.Members[0].OwnerID, "stack_created"); err != nil {
+			return false, err
+		}
 	}
 	return true, tx.Commit()
 }
@@ -763,26 +786,8 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 		return nil, err
 	}
 	if items[0].OwnerID != nil {
-		var rangeStart, rangeEnd sql.NullInt64
-		if err := tx.QueryRowContext(ctx, `
-SELECT min(COALESCE(a.taken_time,a.upload_time,mi.created_at)),
-       max(COALESCE(a.taken_time,a.upload_time,mi.created_at))
-FROM asset_stack_members asm
-JOIN media_items mi ON mi.media_item_id=asm.media_item_id
-LEFT JOIN assets a ON a.asset_id=mi.primary_asset_id
-WHERE asm.stack_id=? AND mi.owner_id=?`, stackID, *items[0].OwnerID).
-			Scan(&rangeStart, &rangeEnd); err != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx, *items[0].OwnerID, "stack_created"); err != nil {
 			return nil, err
-		}
-		if rangeStart.Valid && rangeEnd.Valid {
-			if _, err := tx.ExecContext(ctx, `
-INSERT INTO event_dirty_ranges(
- dirty_range_id,owner_id,range_start,range_end,reason,created_at
-) VALUES(?,?,?,?,?,?)`,
-				uuid.NewString(), *items[0].OwnerID, rangeStart.Int64, rangeEnd.Int64,
-				"stack_created", time.Now().UTC().UnixMicro()); err != nil {
-				return nil, err
-			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -847,11 +852,34 @@ func (s *stackService) RemoveFromStack(ctx context.Context, assetID uuid.UUID) e
 	if err := NormalizePresentationStack(ctx, qtx, membership.StackID); err != nil {
 		return err
 	}
+	var ownerID int32
+	if err := tx.QueryRowContext(ctx, `SELECT owner_id FROM media_items WHERE media_item_id=?`, membership.MediaItemID).Scan(&ownerID); err == nil {
+		if err := s.markEventFactsChangedTx(ctx, tx, ownerID, "stack_member_removed"); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
 func (s *stackService) DeleteStack(ctx context.Context, stackID uuid.UUID) error {
-	return s.queries.DeleteStack(ctx, stackID)
+	var ownerID sql.NullInt64
+	if err := s.pool.QueryRowContext(ctx, `SELECT owner_id FROM asset_stacks WHERE stack_id=?`, stackID).Scan(&ownerID); err != nil {
+		return err
+	}
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := s.queries.WithTx(tx).DeleteStack(ctx, stackID); err != nil {
+		return err
+	}
+	if ownerID.Valid {
+		if err := s.markEventFactsChangedTx(ctx, tx, int32(ownerID.Int64), "stack_deleted"); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUID) error {
@@ -967,6 +995,11 @@ func (s *stackService) matchLivePhotoPair(ctx context.Context, photoID, videoID 
 			return err
 		}
 	}
+	if photoItem.OwnerID != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx, *photoItem.OwnerID, "live_photo_merged"); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -1002,6 +1035,21 @@ func (s *stackService) buildStackInfo(ctx context.Context, stackID uuid.UUID, in
 	}
 	info.MemberCount = int64(len(info.Members))
 	return info, nil
+}
+
+func (s *stackService) markEventFactsChangedTx(ctx context.Context, tx *sql.Tx, ownerID int32, reason string) error {
+	if err := event.MarkEventFactsChangedTx(ctx, tx, ownerID, reason); err != nil {
+		return err
+	}
+	if s.eventQueue == nil {
+		return nil
+	}
+	args := jobs.EventRebuildArgs{OwnerID: ownerID}
+	opts := args.InsertOpts()
+	if _, err := s.eventQueue.InsertTx(ctx, tx, args, &opts); err != nil {
+		return fmt.Errorf("enqueue Event rebuild: %w", err)
+	}
+	return nil
 }
 
 func normalizeLivePhotoContentIdentifier(value string) string {

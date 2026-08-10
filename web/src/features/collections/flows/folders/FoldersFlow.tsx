@@ -8,7 +8,7 @@ import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import RailCard from "../../components/RailCard";
+import RailCard from "@/components/collection/RailCard";
 import { useFolders, type FolderSummary } from "../../api/useFolders";
 import { encodeFolderKey } from "../../model/folderKey";
 import { formatDateRange } from "../../model/formatDateRange";

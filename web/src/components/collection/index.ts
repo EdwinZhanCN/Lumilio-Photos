@@ -3,3 +3,4 @@ export { CollectionTitle } from "./CollectionTitle";
 export { CollectionHero, type CollectionHeroProps } from "./CollectionHero";
 export { LoadMoreButton } from "./LoadMoreButton";
 export { CollectionErrorAlert } from "./CollectionErrorAlert";
+export { default as RailCard, type RailCardProps, type RailCardTone } from "./RailCard";

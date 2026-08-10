@@ -311,6 +311,9 @@
       "iso_prefix": "ISO ",
       "raw_badge": "RAW"
     },
+    "photoPicker": {
+      "confirm": "添加所选项目"
+    },
     "photos": {
       "fullscreen": {
         "fieldGuide": {
@@ -865,7 +868,6 @@
     "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
     "previous": "上一个",
     "remove": "移除",
-    "rename": "重命名",
     "retry": "重试",
     "save": "保存",
     "select": "选择",
@@ -945,29 +947,73 @@
   },
   "events": {
     "addMedia": "添加媒体",
+    "addMediaError": "添加媒体失败：{{message}}",
+    "addMediaPickerTitle": "选择媒体",
+    "addMediaSuccess_other": "已将 {{count}} 项媒体添加到事件",
+    "addSelectedMedia": "添加所选项目",
+    "allTab": "全部",
+    "coverError": "更新事件封面失败：{{message}}",
+    "coverSuccess": "事件封面已更新",
+    "detailCode": "事件 {{id}}",
     "detailError": "无法加载此事件。",
+    "displayableCount_other": "{{count}} 项可用",
+    "edit": {
+      "error": "更新事件失败：{{message}}",
+      "hiddenHint": "从事件列表中隐藏此事件，但不更改其中的媒体或修正记录。",
+      "hiddenLabel": "隐藏",
+      "infoTab": "信息",
+      "nameHint": "名称留空时将使用自动生成的事件标题。",
+      "nameLabel": "名称",
+      "success": "事件已更新",
+      "title": "编辑事件"
+    },
     "emptyDescription": "重新构建以按时间和地点整理媒体。",
-    "emptyTitle": "尚无事件",
+    "emptyTitle": "还没有事件",
     "generatedTitle": "事件",
-    "hide": "隐藏",
-    "hubDescription": "按时间和地点整理媒体",
+    "hiddenBadge": "已隐藏",
     "loadError": "无法加载事件。",
     "mediaCount": "{{count}} 项媒体",
     "merge": "合并",
-    "mergePrompt": "输入要合并到当前活动的活动 ID",
-    "movePrompt": "输入目标活动 ID",
-    "moveSelected": "移动到其他活动",
-    "noCover": "无可显示的封面",
-    "pendingRebuild": "更改正在等待事件重新构建。",
-    "rebuild": "重新构建",
+    "mergeConfirm": "确认合并",
+    "mergeConfirmMessage": "所选事件将并入当前事件，其旧链接会重定向到当前事件。",
+    "mergeDescription": "所选事件将并入 {{name}}。媒体仍保留在各自的资源库中，当前事件将作为目标事件保留。",
+    "mergeError": "合并事件失败：{{message}}",
+    "mergeReview": "检查合并内容",
+    "mergeSelectedCount_other": "已选 {{count}} 个",
+    "mergeSuccess_other": "已合并 {{count}} 个事件",
+    "mergeTitle": "合并事件",
+    "moveConfirm": "移动媒体",
+    "moveDescription_other": "为选中的 {{count}} 项媒体选择目标事件。文件仍保留在各自的资源库中。",
+    "moveError": "移动媒体失败：{{message}}",
+    "moveSelected": "移动到其他事件",
+    "moveSuccess_other": "已将 {{count}} 项媒体移动到所选事件",
+    "moveTitle": "移动到其他事件",
+    "pendingRebuild": "事件识别正在重建，完成后会更新事件。",
+    "picker": {
+      "empty": "没有匹配的事件",
+      "loadError": "无法加载事件。",
+      "searchPlaceholder": "搜索事件"
+    },
+    "rebuild": {
+      "action": "重建事件识别",
+      "error": "重建事件失败：{{message}}",
+      "queued": "事件重建已加入队列（{{run}}）。"
+    },
     "removeConfirmMessage": "媒体仍保留在资源库中，并将从此事件中排除。",
     "removeConfirmTitle": "移除所选媒体？",
+    "removeError": "移除媒体失败：{{message}}",
     "removeSelected": "从事件中移除",
-    "renamePrompt": "事件名称",
+    "removeSuccess_other": "已从事件中移除 {{count}} 项媒体",
     "setCover": "设为封面",
+    "shareError": "分享事件失败。",
+    "shareTooLarge": "超过 5,000 项媒体的事件无法分享。",
     "splitBefore": "在所选媒体前拆分",
+    "splitConfirmMessage": "将从所选媒体开始创建一个新事件，原文件不会改变。",
+    "splitConfirmTitle": "拆分此事件？",
+    "splitError": "拆分事件失败：{{message}}",
+    "splitSuccess": "事件拆分完成",
     "title": "事件",
-    "unhide": "取消隐藏"
+    "visibleTab": "可见"
   },
   "exportModal": {
     "addToAlbum": "加入相册",
@@ -1645,7 +1691,6 @@
       "auditTarget": "目标",
       "auditTime": "时间",
       "auditTitle": "生命周期历史",
-      "capacityAvailable": "可用 {{available}}",
       "capacityHeading": "容量",
       "capacityUnknown": "容量不可用",
       "capacityUsed": "已用容量",
@@ -1665,14 +1710,11 @@
       "noRepositories": "此存储位置中没有已注册的资源库。",
       "readOnly": "只读",
       "refresh": "刷新",
-      "repositoriesCount_other": "{{count}} 个资源库",
       "riskCloudSync": "云同步目录",
       "riskMountChanged": "挂载身份已变化",
       "riskNetwork": "网络文件系统",
       "riskRemovable": "可移动存储",
-      "risksHeading": "风险",
       "statAvailable": "可用",
-      "statOfTotal": "共 {{total}}",
       "statusActive": "可用",
       "statUsed": "已用",
       "statusIdentityError": "身份不匹配",
@@ -2214,6 +2256,7 @@
   "share": {
     "create": {
       "copied": "已复制到剪贴板",
+      "copyError": "无法复制链接。",
       "createdHint": "请立即复制此链接——关闭对话框后将不再显示。",
       "createdTitle": "链接已创建",
       "creating": "创建中…",
@@ -2221,6 +2264,10 @@
       "fields": {
         "allowDownload": {
           "label": "允许下载"
+        },
+        "description": {
+          "label": "描述",
+          "placeholder": "为收到链接的人添加可选说明"
         },
         "expiry": {
           "days_other": "{{count}} 天",

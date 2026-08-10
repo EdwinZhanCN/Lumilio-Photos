@@ -15,7 +15,14 @@ import (
 
 func applyAssetOwnershipScope(c *gin.Context, params service.QueryAssetsParams) service.QueryAssetsParams {
 	user, ok := currentUserFromContext(c)
-	if !ok || service.IsAdminRole(user.Role) {
+	if !ok {
+		return params
+	}
+	// Generic asset browsing is intentionally global for administrators, but
+	// Event membership is an owner-scoped topology. Event routes resolve the
+	// current user's Event identity, so an Event-filtered asset query must carry
+	// that same owner instead of treating nil as an all-owner scope.
+	if service.IsAdminRole(user.Role) && (params.EventID == nil || strings.TrimSpace(*params.EventID) == "") {
 		return params
 	}
 

@@ -13,9 +13,11 @@
  * browser persistence. The public token and optional asset id live in the URL,
  * making direct links and browser navigation authoritative.
  *
- * The raw share token exists only in {@link CreateShareLinkModal}'s local
- * success state. The server stores an HMAC, so an existing link cannot reveal
- * its URL again; a lost link must be revoked and recreated.
+ * The raw share token exists only in {@link ShareLinkCreateModal}'s local
+ * success state. Source-specific wrappers such as {@link CreateShareLinkModal}
+ * supply snapshot creation while sharing one form and result surface. The
+ * server stores an HMAC, so an existing link cannot reveal its URL again; a
+ * lost link must be revoked and recreated.
  *
  * ## Flows
  *
@@ -55,6 +57,7 @@
  * @module
  */
 import type CreateShareLinkModal from "./flows/create/CreateShareLinkModal.tsx";
+import type { ShareLinkCreateModal } from "./flows/create/ShareLinkCreateModal.tsx";
 import type { createShareSelectedBulkAction } from "./flows/create/shareBulkAction.tsx";
 import type SharedLinks from "./flows/manage/SharedLinksFlow.tsx";
 import type PublicShareGrid from "./flows/public/PublicShareGrid.tsx";

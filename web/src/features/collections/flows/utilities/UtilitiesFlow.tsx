@@ -5,7 +5,7 @@ import ErrorFallback from "@/components/ui/ErrorFallback";
 import PageHeader from "@/components/ui/PageHeader";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
-import RailCard from "../../components/RailCard";
+import RailCard from "@/components/collection/RailCard";
 import { useUtilityShortcuts } from "./useUtilityShortcuts";
 
 function UtilitiesContent() {

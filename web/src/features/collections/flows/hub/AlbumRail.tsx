@@ -1,7 +1,7 @@
 import { Album as AlbumIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import Rail from "../../components/Rail";
-import RailCard from "../../components/RailCard";
+import RailCard from "@/components/collection/RailCard";
 import type { AlbumViewModel } from "../../model/album";
 
 type AlbumRailProps = {

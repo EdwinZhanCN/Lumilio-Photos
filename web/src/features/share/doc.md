@@ -12,9 +12,11 @@ Share state is server-owned and read through [useShareLinks](./api/useShareLinks
 browser persistence. The public token and optional asset id live in the URL,
 making direct links and browser navigation authoritative.
 
-The raw share token exists only in [CreateShareLinkModal](./flows/create/CreateShareLinkModal.tsx)'s local
-success state. The server stores an HMAC, so an existing link cannot reveal
-its URL again; a lost link must be revoked and recreated.
+The raw share token exists only in [ShareLinkCreateModal](./flows/create/ShareLinkCreateModal.tsx)'s local
+success state. Source-specific wrappers such as [CreateShareLinkModal](./flows/create/CreateShareLinkModal.tsx)
+supply snapshot creation while sharing one form and result surface. The
+server stores an HMAC, so an existing link cannot reveal its URL again; a
+lost link must be revoked and recreated.
 
 ## Flows
 

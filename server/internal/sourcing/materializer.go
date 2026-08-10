@@ -16,6 +16,7 @@ import (
 	"server/internal/db/dbtypes"
 	statusdb "server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
+	"server/internal/event"
 	"server/internal/logging"
 	"server/internal/queue/jobs"
 	"server/internal/storage"
@@ -424,13 +425,8 @@ func (m *SourceMaterializer) createAssetWithMediaItem(ctx context.Context, param
 		if err != nil || created.OwnerID == nil {
 			return err
 		}
-		capturedAt := created.UploadTime.Time.UTC().UnixMicro()
-		now := time.Now().UTC().UnixMicro()
-		if _, err := tx.ExecContext(ctx, `
-INSERT INTO event_dirty_ranges(
- dirty_range_id,owner_id,range_start,range_end,reason,created_at
-) VALUES(?,?,?,?,?,?)`, uuid.NewString(), *created.OwnerID, capturedAt, capturedAt, "media_item_created", now); err != nil {
-			return fmt.Errorf("mark Event range dirty: %w", err)
+		if err := event.MarkEventFactsChangedTx(ctx, tx, *created.OwnerID, "media_item_created"); err != nil {
+			return err
 		}
 		args := jobs.EventRebuildArgs{OwnerID: *created.OwnerID}
 		opts := args.InsertOpts()

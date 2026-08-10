@@ -42,6 +42,14 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
 - `server/internal/processors`: ingest, metadata, thumbnail, transcode pipeline.
 - `server/internal/queue`: River jobs and workers.
+- Event topology is owner-wide and derived from logical `media_item` facts.
+  `source_revision`/`published_revision` and the shared Event resolver are the
+  lifecycle authority; repository Browse Scope is applied only as a read
+  projection.
+- Owner scope is explicit at topology boundaries: a generic administrator
+  asset browse may omit `OwnerID` to view the whole library, but an
+  owner-scoped topology such as Event must always carry its resolved owner into
+  downstream asset queries. `nil` must never be used to infer an Event owner.
 - `server/internal/storage`: repository layout, staging, scanner, repository config.
 - `server/internal/sourcing`: unified ingest materialization for upload, scan, and cloud flows.
 - `server/internal/db` and `server/migrations`: the single-writer SQLite runtime,

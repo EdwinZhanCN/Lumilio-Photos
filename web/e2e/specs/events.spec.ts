@@ -7,6 +7,7 @@ import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
 type EventList = components["schemas"]["dto.EventListPageDTO"];
 type EventAssets = components["schemas"]["dto.EventAssetsPageDTO"];
+type EventRebuildStatus = components["schemas"]["dto.EventRebuildStatusDTO"];
 type EventMutation = components["schemas"]["dto.EventMutationResponseDTO"];
 type EventShare = components["schemas"]["dto.CreateShareLinkResponseDTO"];
 type PublicShare = components["schemas"]["dto.PublicShareMetadataDTO"];
@@ -80,15 +81,26 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
     }).toPass({ timeout: 60_000 });
   }
 
-  await api("/api/v1/events/rebuild", {
+  const rebuild = await api<{ run_id?: string }>("/api/v1/events/rebuild", {
     method: "POST",
     token: workspace.token,
-    body: JSON.stringify({ dry_run: false }),
+    body: JSON.stringify({}),
   });
-  let eventList = await api<EventList>("/api/v1/events?limit=100", {
-    token: workspace.token,
-  });
-  expect(eventList.events?.length).toBeGreaterThan(0);
+  expect(rebuild.run_id).toBeTruthy();
+  await expect(async () => {
+    const status = await api<EventRebuildStatus>("/api/v1/events/rebuild/status", {
+      token: workspace.token,
+    });
+    expect(status.last_success_run_id).toBe(rebuild.run_id);
+    expect(status.pending).toBe(false);
+  }).toPass({ timeout: 60_000 });
+  let eventList: EventList = { events: [] };
+  await expect(async () => {
+    eventList = await api<EventList>("/api/v1/events?limit=100", {
+      token: workspace.token,
+    });
+    expect(eventList.events?.length).toBeGreaterThan(0);
+  }).toPass({ timeout: 60_000 });
 
   let survivor = eventList.events?.[0]?.event_id;
   if (!survivor) throw new Error("Event rebuild did not return an Event ID");

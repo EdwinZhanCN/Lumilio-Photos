@@ -2750,6 +2750,9 @@ const docTemplate = `{
                     "algorithm_version": {
                         "type": "string"
                     },
+                    "canonical_media_count": {
+                        "type": "integer"
+                    },
                     "cover_asset_id": {
                         "type": "string"
                     },
@@ -2774,6 +2777,9 @@ const docTemplate = `{
                     },
                     "pending_rebuild": {
                         "type": "boolean"
+                    },
+                    "projected_media_count": {
+                        "type": "integer"
                     },
                     "redirected_from": {
                         "type": "string"
@@ -2856,39 +2862,79 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.EventRebuildPreviewDTO": {
+            "dto.EventRebuildAcceptedDTO": {
                 "properties": {
-                    "created": {
+                    "owner_id": {
                         "type": "integer"
                     },
-                    "events": {
+                    "requested_revision": {
                         "type": "integer"
                     },
-                    "members": {
-                        "type": "integer"
-                    },
-                    "redirected": {
-                        "type": "integer"
-                    },
-                    "retained": {
-                        "type": "integer"
+                    "run_id": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
             },
             "dto.EventRebuildRequestDTO": {
                 "properties": {
-                    "dry_run": {
-                        "type": "boolean"
-                    },
-                    "from": {
-                        "type": "string"
-                    },
+                    "owner_id": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventRebuildStateRequestDTO": {
+                "properties": {
                     "owner_id": {
                         "type": "integer"
                     },
-                    "to": {
+                    "paused": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.EventRebuildStatusDTO": {
+                "properties": {
+                    "algorithm_version": {
                         "type": "string"
+                    },
+                    "initialized": {
+                        "type": "boolean"
+                    },
+                    "last_error_code": {
+                        "type": "string"
+                    },
+                    "last_failure_run_id": {
+                        "type": "string"
+                    },
+                    "last_success_run_id": {
+                        "type": "string"
+                    },
+                    "paused": {
+                        "type": "boolean"
+                    },
+                    "pending": {
+                        "type": "boolean"
+                    },
+                    "pending_ranges": {
+                        "type": "integer"
+                    },
+                    "published_revision": {
+                        "type": "integer"
+                    },
+                    "queued_run_id": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "running_run_id": {
+                        "type": "string"
+                    },
+                    "source_revision": {
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -2947,6 +2993,9 @@ const docTemplate = `{
             },
             "dto.EventSummaryDTO": {
                 "properties": {
+                    "canonical_media_count": {
+                        "type": "integer"
+                    },
                     "cover_asset_id": {
                         "type": "string"
                     },
@@ -2967,6 +3016,9 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "media_count": {
+                        "type": "integer"
+                    },
+                    "projected_media_count": {
                         "type": "integer"
                     },
                     "redirected_from": {
@@ -15789,7 +15841,25 @@ const docTemplate = `{
         },
         "/api/v1/events": {
             "get": {
+                "description": "List owner-scoped Events, optionally projecting membership counts and covers to one repository.",
                 "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Include Events hidden from the default grid",
+                        "in": "query",
+                        "name": "include_hidden",
+                        "schema": {
+                            "default": false,
+                            "type": "boolean"
+                        }
+                    },
                     {
                         "description": "Page size",
                         "in": "query",
@@ -15888,18 +15958,78 @@ const docTemplate = `{
                     "required": true
                 },
                 "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventRebuildAcceptedDTO"
+                                }
+                            }
+                        },
+                        "description": "Accepted"
+                    }
+                },
+                "summary": "Rebuild Events",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/rebuild/state": {
+            "patch": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EventRebuildStateRequestDTO",
+                                        "summary": "request",
+                                        "description": "Rebuild state"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Rebuild state",
+                    "required": true
+                },
+                "responses": {
                     "200": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.EventRebuildPreviewDTO"
+                                    "$ref": "#/components/schemas/dto.EventRebuildStatusDTO"
                                 }
                             }
                         },
                         "description": "OK"
                     }
                 },
-                "summary": "Rebuild Events",
+                "summary": "Set Event rebuild state",
+                "tags": [
+                    "events"
+                ]
+            }
+        },
+        "/api/v1/events/rebuild/status": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.EventRebuildStatusDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Event rebuild status",
                 "tags": [
                     "events"
                 ]
@@ -15913,6 +16043,14 @@ const docTemplate = `{
                         "in": "path",
                         "name": "id",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional repository Browse Scope",
+                        "in": "query",
+                        "name": "repository_id",
                         "schema": {
                             "type": "string"
                         }
@@ -15993,6 +16131,14 @@ const docTemplate = `{
                         "in": "path",
                         "name": "id",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional repository Browse Scope",
+                        "in": "query",
+                        "name": "repository_id",
                         "schema": {
                             "type": "string"
                         }

@@ -53,6 +53,7 @@ const (
 
 type EventRebuildArgs struct {
 	OwnerID int32 `json:"ownerId" river:"unique"`
+	Force   bool  `json:"force,omitempty"`
 }
 
 func (EventRebuildArgs) Kind() string { return "rebuild_events" }
@@ -78,7 +79,7 @@ type ScheduleEventRebuildsArgs struct{}
 func (ScheduleEventRebuildsArgs) Kind() string { return "schedule_event_rebuilds" }
 
 func (ScheduleEventRebuildsArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{Queue: "rebuild_events", UniqueOpts: river.UniqueOpts{
+	return river.InsertOpts{Queue: "event_scheduler", UniqueOpts: river.UniqueOpts{
 		ByArgs: true,
 		ByState: []rivertype.JobState{
 			rivertype.JobStateAvailable,

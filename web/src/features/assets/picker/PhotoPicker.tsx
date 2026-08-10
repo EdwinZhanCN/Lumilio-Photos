@@ -1,4 +1,4 @@
-import { Image as ImageIcon } from "lucide-react";
+import { Check, Image as ImageIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useI18n } from "@/lib/i18n";
@@ -11,6 +11,7 @@ import {
   useAssetSelectionActions,
 } from "../flows/browse/selection/useAssetSelection";
 import { resolveBrowseSelectedAssetIds } from "../model/browseItems";
+import type { AssetsBulkActionInput } from "@/lib/assets/bulkActions";
 import {
   pickAssetUserFilter,
   stripConstrainedAssetUserFilter,
@@ -22,7 +23,11 @@ import type { SortByType } from "../types";
 const DEFAULT_LOCKED_FIELDS: readonly AssetUserFilterKey[] = ["type"];
 
 type PhotoPickerContentProps = {
-  onSelect: (id: string) => void;
+  onSelect?: (id: string) => void;
+  onConfirm?: (ids: string[]) => Promise<void> | void;
+  selectionMode: "single" | "multiple";
+  confirmLabel?: string;
+  isConfirming?: boolean;
   title?: string;
   initialFilters: AssetUserFilter;
   lockedFields: readonly AssetUserFilterKey[];
@@ -30,7 +35,13 @@ type PhotoPickerContentProps = {
 
 type PhotoPickerProps = {
   scopeId: string;
-  onSelect: (id: string) => void;
+  onSelect?: (id: string) => void;
+  onConfirm?: (ids: string[]) => Promise<void> | void;
+  selectionMode?: "single" | "multiple";
+  confirmLabel?: string;
+  isConfirming?: boolean;
+  /** Defaults to photos; pass null when the workflow accepts photos and videos. */
+  typeFilter?: "PHOTO" | "VIDEO" | null;
   title?: string;
   initialFilters?: AssetUserFilter;
   lockedFields?: readonly AssetUserFilterKey[];
@@ -38,6 +49,10 @@ type PhotoPickerProps = {
 
 function PhotoPickerContent({
   onSelect,
+  onConfirm,
+  selectionMode,
+  confirmLabel,
+  isConfirming = false,
   title,
   initialFilters,
   lockedFields,
@@ -74,13 +89,40 @@ function PhotoPickerContent({
   }, [clearSelection, constraint, initialFilters, setSelectionEnabled]);
 
   useEffect(() => {
-    if (selection.enabled && selection.selectedCount > 0) {
+    if (selectionMode === "single" && selection.enabled && selection.selectedCount > 0) {
       const id = resolveBrowseSelectedAssetIds(selection.selectedIds, browseItems)[0];
-      if (id) {
+      if (id && onSelect) {
         onSelect(id);
       }
     }
-  }, [browseItems, selection.selectedIds, selection.selectedCount, selection.enabled, onSelect]);
+  }, [
+    browseItems,
+    onSelect,
+    selection.enabled,
+    selection.selectedCount,
+    selection.selectedIds,
+    selectionMode,
+  ]);
+
+  const pickerBulkActions = useMemo<AssetsBulkActionInput | undefined>(() => {
+    if (selectionMode !== "multiple" || !onConfirm) return undefined;
+    return (context) => [
+      {
+        id: "confirm-photo-picker",
+        label: confirmLabel ?? t("assets.photoPicker.confirm", "Add selected"),
+        icon: isConfirming ? (
+          <span className="loading loading-spinner loading-xs" />
+        ) : (
+          <Check className="size-4" />
+        ),
+        disabled: context.selectedAssetIds.length === 0 || isConfirming,
+        onRun: async () => {
+          await onConfirm(context.selectedAssetIds);
+          context.clearSelection();
+        },
+      },
+    ];
+  }, [confirmLabel, isConfirming, onConfirm, selectionMode, t]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-base-100">
@@ -98,6 +140,7 @@ function PhotoPickerContent({
           })
         }
         icon={<ImageIcon className="h-6 w-6 text-primary" />}
+        bulkActions={pickerBulkActions}
         hiddenBulkActions={[
           "set-rating",
           "set-liked",
@@ -128,6 +171,11 @@ function PhotoPickerContent({
 export default function PhotoPicker({
   scopeId,
   onSelect,
+  onConfirm,
+  selectionMode = "single",
+  confirmLabel,
+  isConfirming = false,
+  typeFilter = "PHOTO",
   title,
   initialFilters,
   lockedFields = DEFAULT_LOCKED_FIELDS,
@@ -135,24 +183,31 @@ export default function PhotoPicker({
   const pickerInitialFilters = useMemo<AssetUserFilter>(
     () => ({
       ...initialFilters,
-      type: "PHOTO",
+      type: typeFilter ?? undefined,
     }),
-    [initialFilters],
+    [initialFilters, typeFilter],
   );
   const pickerLockedFields = useMemo<readonly AssetUserFilterKey[]>(
-    () => Array.from(new Set<AssetUserFilterKey>(["type", ...lockedFields])),
-    [lockedFields],
+    () =>
+      typeFilter
+        ? Array.from(new Set<AssetUserFilterKey>(["type", ...lockedFields]))
+        : lockedFields.filter((field) => field !== "type"),
+    [lockedFields, typeFilter],
   );
 
   return (
     <WorkerProvider preload={["justified"]}>
       <AssetBrowserScope
         scopeId={scopeId}
-        defaultSelectionMode="single"
-        initialSelection={{ selectionMode: "single" }}
+        defaultSelectionMode={selectionMode}
+        initialSelection={{ selectionMode }}
       >
         <PhotoPickerContent
           onSelect={onSelect}
+          onConfirm={onConfirm}
+          selectionMode={selectionMode}
+          confirmLabel={confirmLabel}
+          isConfirming={isConfirming}
           title={title}
           initialFilters={pickerInitialFilters}
           lockedFields={pickerLockedFields}

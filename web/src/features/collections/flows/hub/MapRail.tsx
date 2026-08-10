@@ -2,7 +2,7 @@ import { MapIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import Rail from "../../components/Rail";
-import RailCard from "../../components/RailCard";
+import RailCard from "@/components/collection/RailCard";
 import type { CityTripGroup } from "../places/useCityTrips";
 
 type MapRailProps = {

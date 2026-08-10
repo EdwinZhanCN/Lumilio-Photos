@@ -12,6 +12,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
+	"server/internal/queue/jobs"
 	aggregatesearch "server/internal/search"
 	"server/internal/search/bleveocr"
 	"server/internal/utils/geohash"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
 
@@ -288,6 +290,7 @@ type assetService struct {
 	searchAssetsFusedSetFn func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool)
 	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error)
 	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
+	eventQueue             *river.Client[*sql.Tx]
 }
 
 func NewAssetService(
@@ -336,6 +339,29 @@ func NewAssetService(
 		svc.placeRetriever,
 	}, logger.Named("aggregate_search"))
 	return svc, nil
+}
+
+// NewAssetServiceWithQueue is the runtime constructor.  The queue is kept
+// optional so unit tests and embedded callers can still exercise asset CRUD;
+// when present, Event fact invalidation and the deduplicated rebuild enqueue
+// commit in the same SQLite transaction.
+func NewAssetServiceWithQueue(
+	q *repo.Queries,
+	pool *sql.DB,
+	l LumenService,
+	e EmbeddingService,
+	ocrIndex *bleveocr.Index,
+	queueClient *river.Client[*sql.Tx],
+	loggers ...*zap.Logger,
+) (AssetService, error) {
+	created, err := NewAssetService(q, pool, l, e, ocrIndex, loggers...)
+	if err != nil {
+		return nil, err
+	}
+	if concrete, ok := created.(*assetService); ok {
+		concrete.eventQueue = queueClient
+	}
+	return created, nil
 }
 
 // ================================
@@ -526,7 +552,26 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 		GpsGeohash7:          gpsGeohash7,
 	}
 
-	return s.queries.UpdateAssetMetadataWithTakenTime(ctx, params)
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin metadata update transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if err := s.queries.WithTx(tx).UpdateAssetMetadataWithTakenTime(ctx, params); err != nil {
+		return err
+	}
+	if asset.OwnerID != nil {
+		if err := event.MarkEventFactsChangedTx(ctx, tx, *asset.OwnerID, "asset_metadata_changed"); err != nil {
+			return err
+		}
+		if err := s.enqueueEventRebuildTx(ctx, tx, *asset.OwnerID); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit metadata update transaction: %w", err)
+	}
+	return nil
 }
 
 func normalizedGPS(latitude, longitude *float64) (*float64, *float64) {
@@ -579,6 +624,14 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
 		return err
 	}
+	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil && item.OwnerID != nil {
+		if err := event.MarkEventFactsChangedTx(ctx, tx, *item.OwnerID, "asset_trashed"); err != nil {
+			return err
+		}
+		if err := s.enqueueEventRebuildTx(ctx, tx, *item.OwnerID); err != nil {
+			return err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit asset Trash transaction: %w", err)
 	}
@@ -608,8 +661,28 @@ func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
 	if err := enqueueOCRIndexOutbox(ctx, queries, id); err != nil {
 		return err
 	}
+	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil && item.OwnerID != nil {
+		if err := event.MarkEventFactsChangedTx(ctx, tx, *item.OwnerID, "asset_restored"); err != nil {
+			return err
+		}
+		if err := s.enqueueEventRebuildTx(ctx, tx, *item.OwnerID); err != nil {
+			return err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit asset restore transaction: %w", err)
+	}
+	return nil
+}
+
+func (s *assetService) enqueueEventRebuildTx(ctx context.Context, tx *sql.Tx, ownerID int32) error {
+	if s.eventQueue == nil {
+		return nil
+	}
+	args := jobs.EventRebuildArgs{OwnerID: ownerID}
+	opts := args.InsertOpts()
+	if _, err := s.eventQueue.InsertTx(ctx, tx, args, &opts); err != nil {
+		return fmt.Errorf("enqueue Event rebuild: %w", err)
 	}
 	return nil
 }
@@ -1091,6 +1164,11 @@ func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAs
 // can run at all the legacy filename path is the fallback.
 func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error) {
 	params = normalizeSearchAssetsParams(params)
+	var err error
+	params.QueryAssetsParams, err = s.applyEventScope(ctx, params.QueryAssetsParams)
+	if err != nil {
+		return SearchAssetsResult{}, err
+	}
 
 	result := SearchAssetsResult{
 		TopResults:     []repo.Asset{},
@@ -1166,30 +1244,55 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 
 // QueryAssets is the unified method for listing, filtering, and searching assets.
 func (s *assetService) QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
-	if params.EventID != nil {
-		if params.OwnerID == nil {
-			return nil, 0, event.ErrNotFound
-		}
-		resolved, _, err := event.NewResolver(s.pool).OrderedAssets(ctx, *params.OwnerID, *params.EventID, 0)
-		if err != nil {
-			return nil, 0, err
-		}
-		ids := make([]uuid.UUID, 0, len(resolved))
-		for _, item := range resolved {
-			id, err := uuid.Parse(item.AssetID)
-			if err != nil {
-				return nil, 0, fmt.Errorf("parse Event asset ID: %w", err)
-			}
-			ids = append(ids, id)
-		}
-		params.Source = &AssetSetSource{
-			Kind: AssetSetSourceEvent, AssetIDs: ids, PreserveSnapshotOrder: true,
-		}
+	var err error
+	params, err = s.applyEventScope(ctx, params)
+	if err != nil {
+		return nil, 0, err
 	}
 	if params.SearchType == "semantic" && params.Query != "" {
 		return s.queryAssetsAggregate(ctx, params)
 	}
 	return s.queryAssetsUnified(ctx, params)
+}
+
+// applyEventScope resolves the owner-authorized logical Event set once and
+// turns it into the existing asset-set filter used by every browse/search
+// implementation.  This prevents EventID from being silently ignored by a
+// media-item query path while keeping repository_id a read-only projection.
+func (s *assetService) applyEventScope(ctx context.Context, params QueryAssetsParams) (QueryAssetsParams, error) {
+	if params.EventID == nil || strings.TrimSpace(*params.EventID) == "" {
+		return params, nil
+	}
+	if params.OwnerID == nil {
+		return QueryAssetsParams{}, event.ErrNotFound
+	}
+	resolved, _, err := event.NewResolver(s.pool).OrderedAssets(ctx, *params.OwnerID, *params.EventID, 0)
+	if err != nil {
+		return QueryAssetsParams{}, err
+	}
+	ids := make([]uuid.UUID, 0, len(resolved))
+	for _, item := range resolved {
+		id, err := uuid.Parse(item.AssetID)
+		if err != nil {
+			return QueryAssetsParams{}, fmt.Errorf("parse Event asset ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if params.Source != nil {
+		allowed := make(map[uuid.UUID]struct{}, len(ids))
+		for _, id := range ids {
+			allowed[id] = struct{}{}
+		}
+		filtered := make([]uuid.UUID, 0, len(params.Source.AssetIDs))
+		for _, id := range params.Source.AssetIDs {
+			if _, ok := allowed[id]; ok {
+				filtered = append(filtered, id)
+			}
+		}
+		ids = filtered
+	}
+	params.Source = &AssetSetSource{Kind: AssetSetSourceEvent, AssetIDs: ids, PreserveSnapshotOrder: true}
+	return params, nil
 }
 
 func (s *assetService) queryAssetsAggregate(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {

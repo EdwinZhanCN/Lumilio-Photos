@@ -85,7 +85,7 @@ func TestOpenMigrateAndReopenSQLiteCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inspect reopened catalog: %v", err)
 	}
-	if info.ApplicationMigration != 5 || info.RiverMigration == 0 || info.LibraryID == "" {
+	if info.ApplicationMigration != 6 || info.RiverMigration == 0 || info.LibraryID == "" {
 		t.Fatalf("unexpected catalog identity: %+v", info)
 	}
 }

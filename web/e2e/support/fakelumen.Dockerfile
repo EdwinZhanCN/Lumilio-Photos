@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.25.0-trixie AS build
+FROM golang:1.25.12-trixie AS build
 WORKDIR /src
 COPY server/go.mod server/go.sum ./
 RUN go mod download

@@ -38,6 +38,7 @@ describe("RepositoryGrid", () => {
         isLoading={false}
         isError={false}
         isScanning={false}
+        isRebuildingEvents={false}
         isRebuildingPeople={false}
         scanningIds={new Set()}
         detectingIds={new Set()}
@@ -48,6 +49,7 @@ describe("RepositoryGrid", () => {
         onLocationRebuild={noop}
         onCloudImport={noop}
         onScanAll={noop}
+        onRebuildEvents={noop}
         onRebuildPeople={noop}
       />,
     );

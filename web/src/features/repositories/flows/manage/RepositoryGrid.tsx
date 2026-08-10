@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
+  CalendarRange,
   ChevronDown,
   FolderOpen,
   HardDrive,
@@ -33,6 +34,7 @@ export interface RepositoryGridProps {
   isLoading: boolean;
   isError: boolean;
   isScanning: boolean;
+  isRebuildingEvents: boolean;
   isRebuildingPeople: boolean;
   scanningIds: Set<string>;
   detectingIds: Set<string>;
@@ -45,6 +47,7 @@ export interface RepositoryGridProps {
   onLocationRebuild: (repository: RepositoryOption) => void;
   onCloudImport: (repository: RepositoryOption) => void;
   onScanAll: () => void;
+  onRebuildEvents: () => void;
   onRebuildPeople: () => void;
 }
 
@@ -56,6 +59,7 @@ export default function RepositoryGrid({
   isLoading,
   isError,
   isScanning,
+  isRebuildingEvents,
   isRebuildingPeople,
   scanningIds,
   detectingIds,
@@ -68,6 +72,7 @@ export default function RepositoryGrid({
   onLocationRebuild,
   onCloudImport,
   onScanAll,
+  onRebuildEvents,
   onRebuildPeople,
 }: RepositoryGridProps) {
   const { t } = useI18n();
@@ -269,6 +274,16 @@ export default function RepositoryGrid({
                     <ScanFace size={15} />
                   )}
                   {t("people.rebuild.action", "Rebuild Person Recognition")}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={onRebuildEvents} disabled={isRebuildingEvents}>
+                  {isRebuildingEvents ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <CalendarRange size={15} />
+                  )}
+                  {t("events.rebuild.action", "Rebuild Event Recognition")}
                 </button>
               </li>
               <li>

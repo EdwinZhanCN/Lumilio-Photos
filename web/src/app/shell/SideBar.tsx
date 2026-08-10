@@ -12,7 +12,6 @@ import {
   Paintbrush,
   Palette,
   SlidersHorizontal,
-  Sparkles,
   Sun,
   UserRound,
   Users,
@@ -114,16 +113,6 @@ function SideBar() {
           >
             <LibraryBig className="size-5" />
             {t("sidebar.collections")}
-          </Link>
-        </li>
-        <li>
-          <Link
-            to="/lumilio"
-            onClick={closeMobileDrawer}
-            className={location.pathname.startsWith("/lumilio") ? "active" : ""}
-          >
-            <Sparkles className="size-5" />
-            Lumilio Agent
           </Link>
         </li>
         <li>

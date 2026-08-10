@@ -160,8 +160,11 @@ func Reconcile(old []PublishedEvent, segments []Segment, constraints []Constrain
 				target, bestShared, bestScore = segmentIndex, shared, score
 			}
 		}
-		if target < 0 {
-			return ReconcileResult{}, fmt.Errorf("%w: redirect has no allowed target", ErrConstraintConflict)
+		if target < 0 || bestShared == 0 {
+			// The old identity has no factual overlap with the new
+			// topology. It is retired rather than redirected to an
+			// unrelated Event.
+			continue
 		}
 		result.Redirects = append(result.Redirects, Redirect{old[oldIndex].EventID, eventForSegment[target]})
 	}

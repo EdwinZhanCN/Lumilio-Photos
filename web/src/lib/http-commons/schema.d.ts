@@ -7685,10 +7685,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Events */
+        /**
+         * List Events
+         * @description List owner-scoped Events, optionally projecting membership counts and covers to one repository.
+         */
         get: {
             parameters: {
                 query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                    /** @description Include Events hidden from the default grid */
+                    include_hidden?: boolean;
                     /** @description Page size */
                     limit?: number;
                     /** @description Opaque cursor */
@@ -7729,7 +7736,10 @@ export interface paths {
         /** Get Event */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Optional repository Browse Scope */
+                    repository_id?: string;
+                };
                 header?: never;
                 path: {
                     /** @description Event UUID */
@@ -7797,6 +7807,8 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
+                    /** @description Optional repository Browse Scope */
+                    repository_id?: string;
                     /** @description Page size */
                     limit?: number;
                 };
@@ -8105,17 +8117,94 @@ export interface paths {
                 };
             };
             responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRebuildAcceptedDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/rebuild/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Event rebuild state */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Rebuild state */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventRebuildStateRequestDTO"];
+                };
+            };
+            responses: {
                 /** @description OK */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.EventRebuildPreviewDTO"];
+                        "application/json": components["schemas"]["dto.EventRebuildStatusDTO"];
                     };
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/v1/events/rebuild/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event rebuild status */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRebuildStatusDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -14020,6 +14109,7 @@ export interface components {
         };
         "dto.EventDetailDTO": {
             algorithm_version?: string;
+            canonical_media_count?: number;
             cover_asset_id?: string;
             cover_media_item_id?: string;
             displayable_count?: number;
@@ -14029,6 +14119,7 @@ export interface components {
             is_hidden?: boolean;
             media_count?: number;
             pending_rebuild?: boolean;
+            projected_media_count?: number;
             redirected_from?: string;
             start_at?: number;
             timezone?: string;
@@ -14053,18 +14144,32 @@ export interface components {
             is_hidden?: boolean;
             title_override?: string;
         };
-        "dto.EventRebuildPreviewDTO": {
-            created?: number;
-            events?: number;
-            members?: number;
-            redirected?: number;
-            retained?: number;
+        "dto.EventRebuildAcceptedDTO": {
+            owner_id?: number;
+            requested_revision?: number;
+            run_id?: string;
         };
         "dto.EventRebuildRequestDTO": {
-            dry_run?: boolean;
-            from?: string;
             owner_id?: number;
-            to?: string;
+        };
+        "dto.EventRebuildStateRequestDTO": {
+            owner_id?: number;
+            paused?: boolean;
+        };
+        "dto.EventRebuildStatusDTO": {
+            algorithm_version?: string;
+            initialized?: boolean;
+            last_error_code?: string;
+            last_failure_run_id?: string;
+            last_success_run_id?: string;
+            paused?: boolean;
+            pending?: boolean;
+            pending_ranges?: number;
+            published_revision?: number;
+            queued_run_id?: string;
+            revision?: number;
+            running_run_id?: string;
+            source_revision?: number;
         };
         "dto.EventRelationsResponseDTO": {
             complete?: boolean;
@@ -14082,6 +14187,7 @@ export interface components {
             before_media_item_id: string;
         };
         "dto.EventSummaryDTO": {
+            canonical_media_count?: number;
             cover_asset_id?: string;
             cover_media_item_id?: string;
             displayable_count?: number;
@@ -14090,6 +14196,7 @@ export interface components {
             event_id?: string;
             is_hidden?: boolean;
             media_count?: number;
+            projected_media_count?: number;
             redirected_from?: string;
             start_at?: number;
             timezone?: string;

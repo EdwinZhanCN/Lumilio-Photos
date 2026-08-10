@@ -311,6 +311,9 @@
       "iso_prefix": "ISO ",
       "raw_badge": "RAW"
     },
+    "photoPicker": {
+      "confirm": "Add selected"
+    },
     "photos": {
       "fullscreen": {
         "fieldGuide": {
@@ -869,7 +872,6 @@
     "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
     "previous": "Previous",
     "remove": "Remove",
-    "rename": "Rename",
     "retry": "Retry",
     "save": "Save",
     "select": "Select",
@@ -949,29 +951,80 @@
   },
   "events": {
     "addMedia": "Add media",
+    "addMediaError": "Failed to add media: {{message}}",
+    "addMediaPickerTitle": "Choose media",
+    "addMediaSuccess_one": "Added {{count}} items to the Event",
+    "addMediaSuccess_other": "Added {{count}} items to the Event",
+    "addSelectedMedia": "Add selected",
+    "allTab": "All",
+    "coverError": "Failed to update the Event cover: {{message}}",
+    "coverSuccess": "Event cover updated",
+    "detailCode": "EVENT {{id}}",
     "detailError": "This Event could not be loaded.",
+    "displayableCount_one": "{{count}} available",
+    "displayableCount_other": "{{count}} available",
+    "edit": {
+      "error": "Failed to update Event: {{message}}",
+      "hiddenHint": "Hide this Event from Event lists without changing its media or corrections.",
+      "hiddenLabel": "Hidden",
+      "infoTab": "Info",
+      "nameHint": "Leave the name empty to use the automatic Event title.",
+      "nameLabel": "Name",
+      "success": "Event updated",
+      "title": "Edit Event"
+    },
     "emptyDescription": "Rebuild to organize your media by time and place.",
     "emptyTitle": "No Events yet",
     "generatedTitle": "Event",
-    "hide": "Hide",
-    "hubDescription": "Media organized by time and place",
+    "hiddenBadge": "Hidden",
     "loadError": "Events could not be loaded.",
     "mediaCount": "{{count}} media",
     "merge": "Merge",
-    "mergePrompt": "Event ID to merge into this Event",
-    "movePrompt": "Destination Event ID",
+    "mergeConfirm": "Confirm merge",
+    "mergeConfirmMessage": "This will move the selected Events into the current Event and redirect their old links.",
+    "mergeDescription": "Selected Events will be merged into {{name}}. Media stays in its Repositories and this Event remains the destination.",
+    "mergeError": "Failed to merge Events: {{message}}",
+    "mergeReview": "Review merge",
+    "mergeSelectedCount_one": "{{count}} selected",
+    "mergeSelectedCount_other": "{{count}} selected",
+    "mergeSuccess_one": "Merged {{count}} Events",
+    "mergeSuccess_other": "Merged {{count}} Events",
+    "mergeTitle": "Merge Events",
+    "moveConfirm": "Move media",
+    "moveDescription_one": "Choose the destination for {{count}} selected items. The files remain in their Repositories.",
+    "moveDescription_other": "Choose the destination for {{count}} selected items. The files remain in their Repositories.",
+    "moveError": "Failed to move media: {{message}}",
     "moveSelected": "Move to another Event",
-    "noCover": "No displayable cover",
+    "moveSuccess_one": "Moved {{count}} items to the selected Event",
+    "moveSuccess_other": "Moved {{count}} items to the selected Event",
+    "moveTitle": "Move to another Event",
     "pendingRebuild": "Changes are waiting for an Event rebuild.",
-    "rebuild": "Rebuild",
+    "picker": {
+      "empty": "No matching Events",
+      "loadError": "Events could not be loaded.",
+      "searchPlaceholder": "Search Events"
+    },
+    "rebuild": {
+      "action": "Rebuild Event Recognition",
+      "error": "Failed to rebuild Events: {{message}}",
+      "queued": "Event rebuild queued ({{run}})."
+    },
     "removeConfirmMessage": "The media stays in its Repository and will be excluded from this Event.",
     "removeConfirmTitle": "Remove selected media?",
+    "removeError": "Failed to remove media: {{message}}",
     "removeSelected": "Remove from Event",
-    "renamePrompt": "Event name",
+    "removeSuccess_one": "Removed {{count}} items from the Event",
+    "removeSuccess_other": "Removed {{count}} items from the Event",
     "setCover": "Set as cover",
+    "shareError": "Failed to share Event.",
+    "shareTooLarge": "Events with more than 5,000 items cannot be shared.",
     "splitBefore": "Split before selected",
+    "splitConfirmMessage": "A new Event will begin at the selected item. The original files remain unchanged.",
+    "splitConfirmTitle": "Split this Event?",
+    "splitError": "Failed to split Event: {{message}}",
+    "splitSuccess": "Event split completed",
     "title": "Events",
-    "unhide": "Unhide"
+    "visibleTab": "Visible"
   },
   "exportModal": {
     "addToAlbum": "Add to album",
@@ -1654,7 +1707,6 @@
       "auditTarget": "Target",
       "auditTime": "Time",
       "auditTitle": "Lifecycle history",
-      "capacityAvailable": "{{available}} available",
       "capacityHeading": "Capacity",
       "capacityUnknown": "Capacity unavailable",
       "capacityUsed": "Used capacity",
@@ -1674,15 +1726,11 @@
       "noRepositories": "No repositories are registered in this location.",
       "readOnly": "Read-only",
       "refresh": "Refresh",
-      "repositoriesCount_one": "{{count}} repositories",
-      "repositoriesCount_other": "{{count}} repositories",
       "riskCloudSync": "Cloud-sync directory",
       "riskMountChanged": "Mount identity changed",
       "riskNetwork": "Network filesystem",
       "riskRemovable": "Removable storage",
-      "risksHeading": "Risks",
       "statAvailable": "Available",
-      "statOfTotal": "of {{total}} total",
       "statusActive": "Available",
       "statUsed": "Used",
       "statusIdentityError": "Identity mismatch",
@@ -2229,6 +2277,7 @@
   "share": {
     "create": {
       "copied": "Link copied to clipboard.",
+      "copyError": "Could not copy the link.",
       "createdHint": "Copy this link now — it won't be shown again after you close this dialog.",
       "createdTitle": "Link created",
       "creating": "Creating…",
@@ -2236,6 +2285,10 @@
       "fields": {
         "allowDownload": {
           "label": "Allow download"
+        },
+        "description": {
+          "label": "Description",
+          "placeholder": "Add an optional note for the people receiving this link"
         },
         "expiry": {
           "days_one": "{{count}} days",

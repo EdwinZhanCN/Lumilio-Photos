@@ -138,6 +138,11 @@ func browseStackRowID(stackID uuid.UUID) string {
 // items in application code; every other combination is served by the unified
 // SQL queries.
 func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsParams) (BrowseQueryResult, error) {
+	var err error
+	params, err = s.applyEventScope(ctx, params)
+	if err != nil {
+		return BrowseQueryResult{}, err
+	}
 	params.StackMode = normalizeStackMode(params.StackMode)
 	if err := validateBrowseFilter(params); err != nil {
 		return BrowseQueryResult{}, err
@@ -199,6 +204,11 @@ func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsP
 // QueryMediaItems lists matching logical media items with composition facts
 // (one row per media item, no stack collapse).
 func (s *assetService) QueryMediaItems(ctx context.Context, params QueryAssetsParams) ([]BrowseMediaItem, int64, error) {
+	var err error
+	params, err = s.applyEventScope(ctx, params)
+	if err != nil {
+		return nil, 0, err
+	}
 	if err := validateBrowseFilter(params); err != nil {
 		return nil, 0, err
 	}
@@ -223,6 +233,11 @@ func (s *assetService) QueryMediaItems(ctx context.Context, params QueryAssetsPa
 
 // CountMediaItems counts matching logical media items.
 func (s *assetService) CountMediaItems(ctx context.Context, params QueryAssetsParams) (int64, error) {
+	var err error
+	params, err = s.applyEventScope(ctx, params)
+	if err != nil {
+		return 0, err
+	}
 	if err := validateBrowseFilter(params); err != nil {
 		return 0, err
 	}
@@ -235,6 +250,11 @@ func (s *assetService) CountMediaItems(ctx context.Context, params QueryAssetsPa
 
 // CountMediaItemFiles counts the component files of matching media items.
 func (s *assetService) CountMediaItemFiles(ctx context.Context, params QueryAssetsParams) (int64, error) {
+	var err error
+	params, err = s.applyEventScope(ctx, params)
+	if err != nil {
+		return 0, err
+	}
 	if err := validateBrowseFilter(params); err != nil {
 		return 0, err
 	}
@@ -253,6 +273,11 @@ func (s *assetService) CountMediaItemFiles(ctx context.Context, params QueryAsse
 // relevance set), keeping Best Results a literal subset of Results.
 func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAssetsParams) (SearchBrowseResult, error) {
 	params = normalizeSearchAssetsParams(params)
+	var err error
+	params.QueryAssetsParams, err = s.applyEventScope(ctx, params.QueryAssetsParams)
+	if err != nil {
+		return SearchBrowseResult{}, err
+	}
 	if err := validateBrowseFilter(params.QueryAssetsParams); err != nil {
 		return SearchBrowseResult{}, err
 	}

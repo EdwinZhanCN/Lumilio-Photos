@@ -19,12 +19,9 @@ const TONES: Record<RailCardTone, { gradient: string; text: string }> = {
 };
 
 /**
- * The two card shapes used across every Collections rail:
- * - `icon`: a tinted gradient tile with a centered glyph and label —
- *   navigation/action entries (utilities, "open map"). No caption.
- * - `photo`: a square cover image with the caption overlaid at the bottom over a
- *   dark gradient; falls back to a centered glyph when there is no image. The
- *   caption truncates and exposes the full text via a tooltip.
+ * The two card shapes used across Collections surfaces:
+ * - `icon`: a tinted gradient tile with a centered glyph and label.
+ * - `photo`: a square cover image with the caption overlaid at the bottom.
  */
 export type RailCardMedia =
   | { kind: "icon"; icon: LucideIcon; tone?: RailCardTone }
@@ -36,7 +33,7 @@ export type RailCardProps = {
   /** Overlay caption second line — photo cards only; icon cards have no caption. */
   subtitle?: string;
   onClick?: () => void;
-  /** Sizing (e.g. `w-48 shrink-0` in a rail, `w-full` in a grid). */
+  /** Sizing (e.g. `w-48` in a rail, `w-full` in a grid). */
   className?: string;
 };
 
@@ -92,8 +89,6 @@ function PhotoBody({
           {Fallback && <Fallback className="size-12 text-base-content/35" />}
         </div>
       )}
-      {/* The dark gradient backs the caption so white text stays legible over
-          any cover or the light fallback. */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-3 pt-10">
         <p className="truncate text-sm font-bold text-white drop-shadow-sm" title={title}>
           {title}
@@ -108,10 +103,24 @@ function PhotoBody({
   );
 }
 
-/**
- * Shared card for the Collections rails. Layout/width is owned by the caller via
- * `className`; the visual shape is chosen by `media.kind`.
- */
+function RailCardBody({
+  media,
+  title,
+  subtitle,
+}: Pick<RailCardProps, "media" | "title" | "subtitle">) {
+  return media.kind === "icon" ? (
+    <IconBody icon={media.icon} tone={media.tone} title={title} />
+  ) : (
+    <PhotoBody
+      src={media.src}
+      fallbackIcon={media.fallbackIcon}
+      title={title}
+      subtitle={subtitle}
+    />
+  );
+}
+
+/** Shared square card for horizontal rails and collection grids. */
 export default function RailCard({
   media,
   title,
@@ -119,22 +128,19 @@ export default function RailCard({
   onClick,
   className = "",
 }: RailCardProps) {
+  const rootClassName = `group shrink-0 text-left ${onClick ? "cursor-pointer" : ""} ${className}`;
+
+  if (!onClick) {
+    return (
+      <div className={rootClassName}>
+        <RailCardBody media={media} title={title} subtitle={subtitle} />
+      </div>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group shrink-0 cursor-pointer text-left ${className}`}
-    >
-      {media.kind === "icon" ? (
-        <IconBody icon={media.icon} tone={media.tone} title={title} />
-      ) : (
-        <PhotoBody
-          src={media.src}
-          fallbackIcon={media.fallbackIcon}
-          title={title}
-          subtitle={subtitle}
-        />
-      )}
+    <button type="button" onClick={onClick} className={rootClassName}>
+      <RailCardBody media={media} title={title} subtitle={subtitle} />
     </button>
   );
 }
