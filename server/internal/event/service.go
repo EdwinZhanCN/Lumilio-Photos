@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
+	"server/internal/queue/jobs"
 )
 
 var (
@@ -22,13 +24,46 @@ var (
 type Service struct {
 	db       *sql.DB
 	resolver *Resolver
+	queue    *river.Client[*sql.Tx]
 }
 
-func NewService(db *sql.DB) *Service {
-	return &Service{db: db, resolver: NewResolver(db)}
+func NewService(db *sql.DB, queues ...*river.Client[*sql.Tx]) *Service {
+	service := &Service{db: db, resolver: NewResolver(db)}
+	if len(queues) > 0 {
+		service.queue = queues[0]
+	}
+	return service
 }
 
 func (s *Service) Resolver() *Resolver { return s.resolver }
+
+// MarkEventFactsChangedTx is the single factual invalidation boundary for the
+// Event topology.  Callers must invoke it in the same transaction as the
+// media/stack/metadata mutation.  The legacy dirty range is intentionally
+// retained only as a recovery ledger; source_revision is the correctness
+// authority used by workers and readers.
+func MarkEventFactsChangedTx(ctx context.Context, tx *sql.Tx, ownerID int32, reason string) error {
+	now := time.Now().UTC().UnixMicro()
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO event_owner_state(
+ owner_id,active_algorithm_version,initialized_at,revision,source_revision,published_revision,updated_at
+) VALUES(?,?,?,0,1,0,?)
+ON CONFLICT(owner_id) DO UPDATE SET
+ source_revision=event_owner_state.source_revision+1,
+ revision=event_owner_state.revision+1,
+ updated_at=excluded.updated_at`, ownerID, AlgorithmVersion, now, now); err != nil {
+		return fmt.Errorf("advance Event source revision: %w", err)
+	}
+	// A single marker is enough to recover legacy claims and to make old
+	// installations visible to the scheduler.  It is never used as a window.
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO event_dirty_ranges(
+ dirty_range_id,owner_id,range_start,range_end,reason,created_at
+) VALUES(?,?,?,?,?,?)`, uuid.NewString(), ownerID, now, now, reason, now); err != nil {
+		return fmt.Errorf("record Event invalidation: %w", err)
+	}
+	return nil
+}
 
 // InitializeBackfill records events-v1 exactly once per owner and creates a
 // factual initial range only when that owner has candidate media.
@@ -75,15 +110,15 @@ WHERE mi.owner_id=?`, ownerID).Scan(&start, &end); err != nil {
 		}
 		now := time.Now().UTC().UnixMicro()
 		if _, err := tx.ExecContext(ctx, `
-INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,revision,updated_at)
-VALUES(?,?,?,0,?)`, ownerID, AlgorithmVersion, now, now); err != nil {
+INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,revision,source_revision,published_revision,updated_at)
+VALUES(?,?,?,0,1,0,?)`, ownerID, AlgorithmVersion, now, now); err != nil {
 			tx.Rollback()
 			return nil, err
 		}
 		if start.Valid && end.Valid {
 			if _, err := tx.ExecContext(ctx, `
 INSERT INTO event_dirty_ranges(dirty_range_id,owner_id,range_start,range_end,reason,created_at)
-VALUES(?,?,?,?,?,?)`, uuid.NewString(), ownerID, start.Int64, end.Int64, "initial_backfill", now); err != nil {
+				VALUES(?,?,?,?,?,?)`, uuid.NewString(), ownerID, start.Int64, end.Int64, "initial_backfill", now); err != nil {
 				tx.Rollback()
 				return nil, err
 			}
@@ -108,11 +143,15 @@ func (s *Service) RebuildOwner(ctx context.Context, ownerID int32, dryRun bool) 
 	return s.rebuildOwner(ctx, ownerID, dryRun, nil)
 }
 
-func (s *Service) RebuildClaimed(ctx context.Context, ownerID int32, expectedRevision int64) (RebuildPreview, error) {
-	return s.rebuildOwner(ctx, ownerID, false, &expectedRevision)
+func (s *Service) RebuildClaimed(ctx context.Context, ownerID int32, expectedRevision int64, leaseToken string) (RebuildPreview, error) {
+	return s.rebuildOwnerWithLease(ctx, ownerID, false, &expectedRevision, &leaseToken)
 }
 
 func (s *Service) rebuildOwner(ctx context.Context, ownerID int32, dryRun bool, expectedRevision *int64) (RebuildPreview, error) {
+	return s.rebuildOwnerWithLease(ctx, ownerID, dryRun, expectedRevision, nil)
+}
+
+func (s *Service) rebuildOwnerWithLease(ctx context.Context, ownerID int32, dryRun bool, expectedRevision *int64, leaseToken *string) (RebuildPreview, error) {
 	candidates, err := s.loadCandidates(ctx, ownerID)
 	if err != nil {
 		return RebuildPreview{}, err
@@ -147,7 +186,7 @@ func (s *Service) rebuildOwner(ctx context.Context, ownerID int32, dryRun bool, 
 	if dryRun {
 		return preview, nil
 	}
-	if err := s.publish(ctx, ownerID, segments, old, reconciled, expectedRevision); err != nil {
+	if err := s.publish(ctx, ownerID, segments, old, reconciled, expectedRevision, leaseToken); err != nil {
 		return RebuildPreview{}, err
 	}
 	return preview, nil
@@ -285,35 +324,71 @@ ORDER BY e.created_at, e.event_id, emi.position, emi.media_item_id`, ownerID)
 	return result, rows.Err()
 }
 
-func (s *Service) publish(ctx context.Context, ownerID int32, segments []Segment, old []PublishedEvent, result ReconcileResult, expectedRevision *int64) error {
+func (s *Service) publish(ctx context.Context, ownerID int32, segments []Segment, old []PublishedEvent, result ReconcileResult, expectedRevision *int64, leaseToken *string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	now := time.Now().UTC().UnixMicro()
-	if expectedRevision != nil {
-		var revision int64
-		var paused int
-		if err := tx.QueryRowContext(ctx, `
-SELECT revision,automatic_rebuild_paused FROM event_owner_state WHERE owner_id=?`,
-			ownerID).Scan(&revision, &paused); err != nil {
-			return err
-		}
-		if paused != 0 {
-			return ErrPaused
-		}
-		if revision != *expectedRevision {
-			return ErrStaleRevision
-		}
+	var sourceRevision, publishedRevision int64
+	var leaseExpiresAt sql.NullInt64
+	var currentLease sql.NullString
+	var paused int
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,revision,source_revision,published_revision,updated_at)
+VALUES(?,?,?,0,0,0,?) ON CONFLICT(owner_id) DO NOTHING`, ownerID, AlgorithmVersion, now, now); err != nil {
+		return err
 	}
+	if err := tx.QueryRowContext(ctx, `
+SELECT source_revision,published_revision,automatic_rebuild_paused
+	,rebuild_lease_token,rebuild_lease_expires_at
+FROM event_owner_state WHERE owner_id=?`, ownerID).
+		Scan(&sourceRevision, &publishedRevision, &paused, &currentLease, &leaseExpiresAt); err != nil {
+		return err
+	}
+	if paused != 0 {
+		return ErrPaused
+	}
+	if expectedRevision != nil && sourceRevision != *expectedRevision {
+		return ErrStaleRevision
+	}
+	if leaseToken != nil && (!currentLease.Valid || !leaseExpiresAt.Valid || currentLease.String != *leaseToken || leaseExpiresAt.Int64 <= now) {
+		return ErrStaleRevision
+	}
+	if expectedRevision == nil {
+		expectedRevision = &sourceRevision
+	}
+
+	// Remove the old complete membership set before inserting the new one.
+	// event_media_items has a global unique media_item_id index, so an
+	// insert-before-delete publish is not a valid transaction protocol.
+	if _, err := tx.ExecContext(ctx, `
+UPDATE events SET generated_cover_media_item_id=NULL,
+                  cover_override_media_item_id=NULL,
+                  updated_at=?
+WHERE owner_id=? AND status='active'`, now, ownerID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM event_media_items WHERE owner_id=?`, ownerID); err != nil {
+		return err
+	}
+
+	oldByID := make(map[string]PublishedEvent, len(old))
+	for _, previous := range old {
+		oldByID[previous.EventID] = previous
+	}
+	assigned := make(map[string]bool, len(result.Assignments))
+	derivationRunID := uuid.NewString()
+	evidence, _ := json.Marshal(map[string]any{
+		"algorithm_version": AlgorithmVersion,
+		"derivation_run_id": derivationRunID,
+	})
 	for _, assignment := range result.Assignments {
 		segment := segments[assignment.SegmentIndex]
-		if assignment.Reused {
-			if _, err := tx.ExecContext(ctx, `DELETE FROM event_media_items WHERE event_id=? AND owner_id=?`, assignment.EventID, ownerID); err != nil {
-				return err
-			}
-		} else {
+		assigned[assignment.EventID] = true
+		previous, retained := oldByID[assignment.EventID]
+		if !retained {
 			if _, err := tx.ExecContext(ctx, `
 INSERT INTO events(event_id,owner_id,status,start_at,end_at,timezone,is_hidden,algorithm_version,created_at,updated_at)
 VALUES(?,?,'active',?,?,?,?,?, ?,?)`,
@@ -321,13 +396,19 @@ VALUES(?,?,'active',?,?,?,?,?, ?,?)`,
 				nullString(segment.Timezone), false, AlgorithmVersion, now, now); err != nil {
 				return err
 			}
+		} else if _, err := tx.ExecContext(ctx, `
+UPDATE events SET status='active',start_at=?,end_at=?,timezone=?,generated_title=NULL,
+ title_override=?,is_hidden=?,algorithm_version=?,updated_at=?
+WHERE event_id=? AND owner_id=?`,
+			segment.StartAt.UnixMicro(), segment.EndAt.UnixMicro(), nullString(segment.Timezone),
+			previous.TitleOverride, previous.Hidden, AlgorithmVersion, now, assignment.EventID, ownerID); err != nil {
+			return err
 		}
-		evidence, _ := json.Marshal(map[string]any{"algorithm_version": AlgorithmVersion})
 		for position, mediaID := range segment.MediaItemIDs {
 			if _, err := tx.ExecContext(ctx, `
 INSERT INTO event_media_items(event_id,owner_id,media_item_id,position,source,evidence,derivation_run_id,created_at)
 VALUES(?,?,?,?,'automatic',?,?,?)`,
-				assignment.EventID, ownerID, mediaID, position, string(evidence), uuid.NewString(), now); err != nil {
+				assignment.EventID, ownerID, mediaID, position, string(evidence), derivationRunID, now); err != nil {
 				return err
 			}
 		}
@@ -335,26 +416,35 @@ VALUES(?,?,?,?,'automatic',?,?,?)`,
 		if len(segment.MediaItemIDs) > 0 {
 			cover = segment.MediaItemIDs[0]
 		}
+		var coverOverride any
+		if retained && previous.CoverOverrideID != "" && contains(segment.MediaItemIDs, previous.CoverOverrideID) {
+			coverOverride = previous.CoverOverrideID
+		}
 		if _, err := tx.ExecContext(ctx, `
 UPDATE events SET start_at=?,end_at=?,timezone=?,generated_title=NULL,
- generated_cover_media_item_id=?,algorithm_version=?,updated_at=?
+ generated_cover_media_item_id=?,cover_override_media_item_id=?,algorithm_version=?,updated_at=?
 WHERE event_id=? AND owner_id=? AND status='active'`,
 			segment.StartAt.UnixMicro(), segment.EndAt.UnixMicro(), nullString(segment.Timezone),
-			cover, AlgorithmVersion, now, assignment.EventID, ownerID); err != nil {
+			cover, coverOverride, AlgorithmVersion, now, assignment.EventID, ownerID); err != nil {
+			return err
+		}
+	}
+	// Events that no longer have a partition are retired.  A redirect is only
+	// written for an actual overlap; unrelated old identities must not be
+	// redirected to an arbitrary new Event.
+	for _, previous := range old {
+		if assigned[previous.EventID] {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+UPDATE events SET status='retired',generated_cover_media_item_id=NULL,
+ cover_override_media_item_id=NULL,updated_at=?
+WHERE event_id=? AND owner_id=?`, now, previous.EventID, ownerID); err != nil {
 			return err
 		}
 	}
 	for _, redirect := range result.Redirects {
-		if _, err := tx.ExecContext(ctx, `UPDATE event_redirects SET new_event_id=? WHERE owner_id=? AND new_event_id=?`,
-			redirect.NewEventID, ownerID, redirect.OldEventID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM event_media_items WHERE event_id=? AND owner_id=?`, redirect.OldEventID, ownerID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `
-UPDATE events SET generated_cover_media_item_id=NULL,cover_override_media_item_id=NULL,updated_at=?
-WHERE event_id=? AND owner_id=?`, now, redirect.OldEventID, ownerID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM event_redirects WHERE old_event_id=? AND owner_id=?`, redirect.OldEventID, ownerID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE events SET status='redirected',updated_at=? WHERE event_id=? AND owner_id=?`,
@@ -369,30 +459,18 @@ ON CONFLICT(old_event_id) DO UPDATE SET new_event_id=excluded.new_event_id,reaso
 			return err
 		}
 	}
-	var empty int
-	if err := tx.QueryRowContext(ctx, `
-SELECT count(*) FROM events e
-WHERE e.owner_id=? AND e.status='active'
-AND NOT EXISTS(SELECT 1 FROM event_media_items emi WHERE emi.event_id=e.event_id)`, ownerID).Scan(&empty); err != nil {
-		return err
-	}
-	if empty != 0 {
-		return ErrWouldBeEmpty
-	}
 	stateResult, err := tx.ExecContext(ctx, `
-INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,last_full_rebuild_at,revision,updated_at)
-VALUES(?,?,?, ?,1,?)
-ON CONFLICT(owner_id) DO UPDATE SET last_full_rebuild_at=excluded.last_full_rebuild_at,
- revision=event_owner_state.revision+1,updated_at=excluded.updated_at
- WHERE ? IS NULL OR event_owner_state.revision=?`,
-		ownerID, AlgorithmVersion, now, now, now, expectedRevision, expectedRevision)
+UPDATE event_owner_state SET active_algorithm_version=?,last_full_rebuild_at=?,
+ published_revision=?,revision=revision+1,updated_at=?
+WHERE owner_id=? AND source_revision=?
+  AND (? = '' OR (rebuild_lease_token=? AND rebuild_lease_expires_at>?))`,
+		AlgorithmVersion, now, *expectedRevision, now, ownerID, *expectedRevision,
+		leaseTokenValue(leaseToken), leaseTokenValue(leaseToken), now)
 	if err != nil {
 		return err
 	}
-	if expectedRevision != nil {
-		if affected, _ := stateResult.RowsAffected(); affected != 1 {
-			return ErrStaleRevision
-		}
+	if affected, _ := stateResult.RowsAffected(); affected != 1 {
+		return ErrStaleRevision
 	}
 	return tx.Commit()
 }
@@ -402,6 +480,13 @@ func nullString(value string) any {
 		return nil
 	}
 	return value
+}
+
+func leaseTokenValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func (s *Service) Merge(ctx context.Context, ownerID int32, eventIDs []string, survivorID string) (Summary, error) {
@@ -506,7 +591,7 @@ VALUES(?,?,?,'manual_merge',?)`, eventID, ownerID, survivorID, now); err != nil 
 	if err := repairEventTx(ctx, tx, ownerID, survivorID, now); err != nil {
 		return Summary{}, err
 	}
-	if err := markDirtyTx(ctx, tx, ownerID, survivorID, "manual_merge", now); err != nil {
+	if err := s.markDirtyTx(ctx, tx, ownerID, survivorID, "manual_merge", now); err != nil {
 		return Summary{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -592,7 +677,7 @@ INSERT OR IGNORE INTO event_constraints(
 		if err := repairEventTx(ctx, tx, ownerID, pair.eventID, now); err != nil {
 			return Summary{}, err
 		}
-		if err := markDirtyTx(ctx, tx, ownerID, pair.eventID, "manual_split", now); err != nil {
+		if err := s.markDirtyTx(ctx, tx, ownerID, pair.eventID, "manual_split", now); err != nil {
 			return Summary{}, err
 		}
 	}
@@ -635,7 +720,7 @@ INSERT OR IGNORE INTO event_constraints(
 	if err := repairEventTx(ctx, tx, ownerID, eventID, now); err != nil {
 		return Summary{}, err
 	}
-	if err := markDirtyTx(ctx, tx, ownerID, eventID, "member_removed", now); err != nil {
+	if err := s.markDirtyTx(ctx, tx, ownerID, eventID, "member_removed", now); err != nil {
 		return Summary{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -708,7 +793,7 @@ INSERT OR IGNORE INTO event_constraints(
 			if err := repairEventTx(ctx, tx, ownerID, sourceEvent.String, now); err != nil {
 				return Summary{}, err
 			}
-			if err := markDirtyTx(ctx, tx, ownerID, sourceEvent.String, "member_moved", now); err != nil {
+			if err := s.markDirtyTx(ctx, tx, ownerID, sourceEvent.String, "member_moved", now); err != nil {
 				return Summary{}, err
 			}
 		}
@@ -733,7 +818,7 @@ INSERT OR IGNORE INTO event_constraints(
 	if err := repairEventTx(ctx, tx, ownerID, eventID, now); err != nil {
 		return Summary{}, err
 	}
-	if err := markDirtyTx(ctx, tx, ownerID, eventID, "members_added", now); err != nil {
+	if err := s.markDirtyTx(ctx, tx, ownerID, eventID, "members_added", now); err != nil {
 		return Summary{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -762,22 +847,23 @@ WHERE event_id=? AND owner_id=?`, start, end, cover, now, eventID, ownerID)
 	return err
 }
 
-func markDirtyTx(ctx context.Context, tx *sql.Tx, ownerID int32, eventID, reason string, now int64) error {
-	var start, end int64
-	if err := tx.QueryRowContext(ctx, `SELECT start_at,end_at FROM events WHERE event_id=? AND owner_id=?`, eventID, ownerID).Scan(&start, &end); err != nil {
+func (s *Service) markDirtyTx(ctx context.Context, tx *sql.Tx, ownerID int32, eventID, reason string, now int64) error {
+	if err := MarkEventFactsChangedTx(ctx, tx, ownerID, reason); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `
-INSERT INTO event_dirty_ranges(dirty_range_id,owner_id,range_start,range_end,reason,created_at)
-VALUES(?,?,?,?,?,?)`, uuid.NewString(), ownerID, start, end, reason, now); err != nil {
-		return err
+	return s.enqueueRebuildTx(ctx, tx, ownerID)
+}
+
+func (s *Service) enqueueRebuildTx(ctx context.Context, tx *sql.Tx, ownerID int32) error {
+	if s.queue == nil {
+		return nil
 	}
-	_, err := tx.ExecContext(ctx, `
-INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,revision,updated_at)
-VALUES(?,?,?,1,?)
-ON CONFLICT(owner_id) DO UPDATE SET revision=event_owner_state.revision+1,updated_at=excluded.updated_at`,
-		ownerID, AlgorithmVersion, now, now)
-	return err
+	args := jobs.EventRebuildArgs{OwnerID: ownerID}
+	opts := args.InsertOpts()
+	if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
+		return fmt.Errorf("enqueue Event rebuild: %w", err)
+	}
+	return nil
 }
 
 func canonicalPair(left, right string) (string, string) {

@@ -2,8 +2,8 @@ package processors
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"go.uber.org/zap"
@@ -11,6 +11,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
+	"server/internal/storage"
 	"server/internal/utils/imagesource"
 )
 
@@ -20,14 +21,19 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 	defer func() {
 		ap.logger.Debug("thumbnail_task",
 			zap.String("asset_id", args.AssetID.String()),
-			zap.String("type", string(args.AssetType)),
 			zap.Duration("duration", time.Since(start)),
 		)
 	}()
-	asset, repository, err := ap.loadAssetAndRepo(ctx, args.AssetID)
+	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ObservationToken, args.ExpectedContentHash)
 	if err != nil {
+		if errors.Is(err, ErrAssetSourceStale) {
+			return nil
+		}
 		return err
 	}
+	defer source.Close()
+	asset := source.asset
+	assetType := dbtypes.AssetType(asset.Type)
 
 	needsPHashFallback := false
 	if err := ap.runTrackedAssetTask(
@@ -37,30 +43,29 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 		"Generating thumbnails",
 		"Thumbnails generated",
 		func() error {
-			fullPath := filepath.Join(args.RepoPath, args.StoragePath)
-			switch args.AssetType {
+			switch assetType {
 			case dbtypes.AssetTypePhoto:
-				fallback, err := ap.generatePhotoThumbnails(ctx, fullPath, asset.OriginalFilename, repository, asset)
+				fallback, err := ap.generatePhotoThumbnails(ctx, source.localPath, asset.OriginalFilename, source.files, asset)
 				needsPHashFallback = fallback
 				return err
 			case dbtypes.AssetTypeVideo:
-				info, err := ap.getVideoInfo(fullPath)
+				info, err := ap.getVideoInfo(source.localPath)
 				if err != nil {
 					return err
 				}
-				return ap.generateVideoThumbnail(ctx, repository.Path, asset, fullPath, info, ap.transcodeConfig)
+				return ap.generateVideoThumbnail(ctx, source.files, asset, source.localPath, info, ap.transcodeConfig)
 			case dbtypes.AssetTypeAudio:
 				// Optional waveform thumbnail for audio
-				return ap.generateWaveform(ctx, repository.Path, asset, fullPath)
+				return ap.generateWaveform(ctx, source.files, asset, source.localPath)
 			default:
-				return fmt.Errorf("unsupported asset type for thumbnails: %s", args.AssetType)
+				return fmt.Errorf("unsupported asset type for thumbnails: %s", assetType)
 			}
 		},
 	); err != nil {
 		return err
 	}
 
-	if args.AssetType == dbtypes.AssetTypePhoto {
+	if assetType == dbtypes.AssetTypePhoto {
 		if needsPHashFallback {
 			if err := ap.enqueuePHashJob(ctx, args.AssetID); err != nil {
 				return err
@@ -76,12 +81,12 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 }
 
 // generatePhotoThumbnails handles photo thumbnail generation with RAW support.
-func (ap *AssetProcessor) generatePhotoThumbnails(ctx context.Context, fullPath, originalFilename string, repository repo.Repository, asset *repo.Asset) (bool, error) {
+func (ap *AssetProcessor) generatePhotoThumbnails(ctx context.Context, fullPath, originalFilename string, files *storage.RepositoryFS, asset *repo.Asset) (bool, error) {
 	reader, err := imagesource.OpenPhoto(ctx, fullPath, originalFilename)
 	if err != nil {
 		return false, fmt.Errorf("open photo source: %w", err)
 	}
 	defer reader.Close()
 
-	return ap.generateThumbnails(ctx, reader, repository, asset)
+	return ap.generateThumbnails(ctx, reader, files, asset)
 }

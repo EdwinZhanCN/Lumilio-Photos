@@ -112,7 +112,7 @@
         "title": "扫描 {{scope}}"
       },
       "scope": {
-        "title": "图库范围"
+        "title": "资源库范围"
       },
       "selectionMode": {
         "enter": "进入选择模式",
@@ -311,14 +311,17 @@
       "iso_prefix": "ISO ",
       "raw_badge": "RAW"
     },
+    "photoPicker": {
+      "confirm": "添加所选项目"
+    },
     "photos": {
       "fullscreen": {
         "fieldGuide": {
           "button": "生物图鉴",
           "fromINaturalist": "iNaturalist",
-          "loadError": "加载物种识别结果失败",
-          "loading": "正在加载物种识别结果",
-          "noResults": "暂无物种识别结果",
+          "loadError": "加载BioCLIP物种识别结果失败",
+          "loading": "正在加载BioCLIP物种识别结果",
+          "noResults": "暂无BioCLIP物种识别结果",
           "open": "打开生物图鉴",
           "openINaturalist": "在 iNaturalist 打开",
           "openWikipedia": "维基百科",
@@ -341,11 +344,11 @@
       }
     },
     "pin": {
-      "backToLumilio": "返回 Lumilio",
+      "backToLumilio": "返回 Lumilio Agent",
       "count_one": "{{count}} 张照片",
       "count_other": "{{count}} 张照片",
       "defaultTitle": "智能助手结果",
-      "expired": "该结果已过期。请让 Lumilio 重新运行查询。",
+      "expired": "该结果已过期。请让 Lumilio Agent 重新运行查询。",
       "modeFrozen": "已冻结",
       "modeLive": "实时"
     },
@@ -546,7 +549,7 @@
       }
     },
     "passkeyEnvironment": {
-      "disabled": "此 Lumilio 部署已停用 Passkey。",
+      "disabled": "此流明集部署已停用 Passkey。",
       "domainRequired": "通过 HTTPS 使用 Passkey 时需要域名，不能直接使用 IP 地址。",
       "invalidOrigin": "当前浏览器 Origin 无法使用 Passkey。",
       "secureOriginRequired": "Passkey 需要 HTTPS 或 localhost 地址。"
@@ -564,18 +567,16 @@
       "weak": "弱"
     },
     "primaryRepository": {
-      "description": "选择 Lumilio 存放第一个本地仓库的位置。现有设置也会作为后续仓库的默认值。",
-      "duplicates": "重复文件处理",
-      "error": "创建主仓库失败。",
-      "loading": "正在检查仓库设置...",
+      "description": "选择流明集存放第一个本地资源库的位置。现有设置也会作为后续资源库的默认值。",
+      "error": "创建主资源库失败。",
+      "loading": "正在检查资源库设置...",
       "name": "名称",
-      "nameHint": "可使用 1–80 个文字、数字、空格、连字符或下划线。主资源库目录仍固定为 <root>/primary。",
-      "root": "存储根目录",
-      "rootHint": "由服务器配置决定。主仓库会创建在 <root>/primary。",
-      "statusError": "无法加载仓库默认值。",
-      "strategy": "存储策略",
-      "submit": "创建仓库",
-      "title": "创建主仓库"
+      "nameHint": "此显示名称之后仍可修改。主资源库目录仍固定为 <root>/primary。",
+      "root": "存储位置",
+      "rootHint": "由服务器配置决定。主资源库会创建在 <root>/primary。",
+      "statusError": "无法加载资源库默认值。",
+      "submit": "创建资源库",
+      "title": "创建主资源库"
     },
     "register": {
       "confirmPassword": "确认密码",
@@ -626,12 +627,38 @@
       "saving": "正在保存…",
       "submit": "设置密码并继续",
       "title": "设置新密码"
+    },
+    "storageRecovery": {
+      "checkAgain": "重新检查",
+      "description": "请恢复配置的默认存储位置及其中的 primary 目录，且不要更改它们的标记身份。其他可用资源库仍可继续使用。",
+      "title": "需要恢复存储"
     }
   },
   "bulk": {
     "updateError": "更新失败",
     "updateSuccess_one": "已更新 {{count}} 个项目。",
     "updateSuccess_other": "已更新 {{count}} 个项目。"
+  },
+  "cloud": {
+    "sources": {
+      "add": "连接另一个来源",
+      "album": "远端相册（可选）",
+      "albumHint": "留空则导入“所有照片”。恢复导入时会继续使用已选相册。",
+      "albumPlaceholder": "个人收藏",
+      "bindFailed": "无法连接云端来源。",
+      "bound": "已连接云端来源，并开始首次导入。",
+      "cancel": "取消",
+      "connectAndImport": "连接并导入",
+      "credential": "云端账号",
+      "empty": "此资源库尚未连接云端来源。",
+      "failed": "失败",
+      "imported": "已导入",
+      "importNow": "立即导入",
+      "resume": "恢复",
+      "scope": "远端范围",
+      "selectCredential": "选择已连接的账号",
+      "title": "云端来源"
+    }
   },
   "cloudProvider": {
     "icloud": {
@@ -656,7 +683,7 @@
           "com": "全球 iCloud"
         }
       },
-      "securityNote": "Lumilio 仅在认证时使用密码，认证产生的会话将存储在隔离的凭证目录中。",
+      "securityNote": "流明集仅在认证时使用密码，认证产生的会话将存储在隔离的凭证目录中。",
       "title": "iCloud"
     }
   },
@@ -708,7 +735,7 @@
       },
       "fields": {
         "bioAlbum": {
-          "hint": "为加入此相册的照片启用物种识别。",
+          "hint": "为加入此相册的照片启用BioCLIP物种识别。",
           "label": "生物图鉴"
         },
         "cover": {
@@ -739,7 +766,7 @@
     "emptyFolders": "还没有文件夹。",
     "emptyPeople": "还没有识别出人物。",
     "folders": {
-      "empty": "此处暂无文件夹。上传的文件会自动按日期归档；当你直接将文件放入仓库目录或扫描已有素材库后，文件夹才会出现。",
+      "empty": "此处暂无文件夹。上传的文件会自动按日期归档；当你直接将文件放入资源库目录或扫描现有资源库后，文件夹才会出现。",
       "itemCount_other": "{{count}} 项",
       "root": "根目录"
     },
@@ -836,17 +863,18 @@
     "na": "无",
     "next": "下一个",
     "notAvailable": "不可用",
+    "open": "打开",
     "or": "或",
     "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
     "previous": "上一个",
     "remove": "移除",
-    "rename": "重命名",
     "retry": "重试",
     "save": "保存",
     "select": "选择",
     "selected_one": "已选 {{count}} 项",
     "selected_other": "已选 {{count}} 项",
     "share": "分享",
+    "undo": "撤销",
     "uploaded": "上传于",
     "viewAll": "查看全部"
   },
@@ -919,29 +947,73 @@
   },
   "events": {
     "addMedia": "添加媒体",
+    "addMediaError": "添加媒体失败：{{message}}",
+    "addMediaPickerTitle": "选择媒体",
+    "addMediaSuccess_other": "已将 {{count}} 项媒体添加到事件",
+    "addSelectedMedia": "添加所选项目",
+    "allTab": "全部",
+    "coverError": "更新事件封面失败：{{message}}",
+    "coverSuccess": "事件封面已更新",
+    "detailCode": "事件 {{id}}",
     "detailError": "无法加载此事件。",
+    "displayableCount_other": "{{count}} 项可用",
+    "edit": {
+      "error": "更新事件失败：{{message}}",
+      "hiddenHint": "从事件列表中隐藏此事件，但不更改其中的媒体或修正记录。",
+      "hiddenLabel": "隐藏",
+      "infoTab": "信息",
+      "nameHint": "名称留空时将使用自动生成的事件标题。",
+      "nameLabel": "名称",
+      "success": "事件已更新",
+      "title": "编辑事件"
+    },
     "emptyDescription": "重新构建以按时间和地点整理媒体。",
-    "emptyTitle": "尚无事件",
+    "emptyTitle": "还没有事件",
     "generatedTitle": "事件",
-    "hide": "隐藏",
-    "hubDescription": "按时间和地点整理媒体",
+    "hiddenBadge": "已隐藏",
     "loadError": "无法加载事件。",
     "mediaCount": "{{count}} 项媒体",
     "merge": "合并",
-    "mergePrompt": "输入要合并到当前活动的活动 ID",
-    "movePrompt": "输入目标活动 ID",
-    "moveSelected": "移动到其他活动",
-    "noCover": "无可显示的封面",
-    "pendingRebuild": "更改正在等待事件重新构建。",
-    "rebuild": "重新构建",
+    "mergeConfirm": "确认合并",
+    "mergeConfirmMessage": "所选事件将并入当前事件，其旧链接会重定向到当前事件。",
+    "mergeDescription": "所选事件将并入 {{name}}。媒体仍保留在各自的资源库中，当前事件将作为目标事件保留。",
+    "mergeError": "合并事件失败：{{message}}",
+    "mergeReview": "检查合并内容",
+    "mergeSelectedCount_other": "已选 {{count}} 个",
+    "mergeSuccess_other": "已合并 {{count}} 个事件",
+    "mergeTitle": "合并事件",
+    "moveConfirm": "移动媒体",
+    "moveDescription_other": "为选中的 {{count}} 项媒体选择目标事件。文件仍保留在各自的资源库中。",
+    "moveError": "移动媒体失败：{{message}}",
+    "moveSelected": "移动到其他事件",
+    "moveSuccess_other": "已将 {{count}} 项媒体移动到所选事件",
+    "moveTitle": "移动到其他事件",
+    "pendingRebuild": "事件识别正在重建，完成后会更新事件。",
+    "picker": {
+      "empty": "没有匹配的事件",
+      "loadError": "无法加载事件。",
+      "searchPlaceholder": "搜索事件"
+    },
+    "rebuild": {
+      "action": "重建事件识别",
+      "error": "重建事件失败：{{message}}",
+      "queued": "事件重建已加入队列（{{run}}）。"
+    },
     "removeConfirmMessage": "媒体仍保留在资源库中，并将从此事件中排除。",
     "removeConfirmTitle": "移除所选媒体？",
+    "removeError": "移除媒体失败：{{message}}",
     "removeSelected": "从事件中移除",
-    "renamePrompt": "事件名称",
+    "removeSuccess_other": "已从事件中移除 {{count}} 项媒体",
     "setCover": "设为封面",
+    "shareError": "分享事件失败。",
+    "shareTooLarge": "超过 5,000 项媒体的事件无法分享。",
     "splitBefore": "在所选媒体前拆分",
+    "splitConfirmMessage": "将从所选媒体开始创建一个新事件，原文件不会改变。",
+    "splitConfirmTitle": "拆分此事件？",
+    "splitError": "拆分事件失败：{{message}}",
+    "splitSuccess": "事件拆分完成",
     "title": "事件",
-    "unhide": "取消隐藏"
+    "visibleTab": "可见"
   },
   "exportModal": {
     "addToAlbum": "加入相册",
@@ -1023,14 +1095,20 @@
   },
   "lumilio": {
     "agent": {
-      "disabled": "Lumilio Agent 已禁用。请在 设置 > AI 中启用。",
-      "notConfigured": "Lumilio Agent 尚未配置。请在 设置 > AI 中完成 provider、model 与 API key。"
+      "checking": "正在检查 Lumilio Agent 可用性…",
+      "disabled": "Lumilio Agent 已禁用。请在“设置 > AI”中启用。",
+      "notConfigured": "Lumilio Agent 尚未配置。请在“设置 > AI”中完成提供方、模型和 API Key。",
+      "unreachable": "Lumilio Agent 暂时无法连接。请检查 Server 连接后重试。"
     },
     "board": {
-      "empty": "让 Lumilio 帮你找照片，然后把任意结果固定到这里，作为实时小组件。",
+      "deletePending": "小组件已移除。",
+      "desktopSizeOnly": "可在较宽的屏幕上调整卡片尺寸。",
+      "empty": "这里还没有固定内容。请在对话抽屉中向 Lumilio Agent 提问，再把结果固定到看板。",
       "emptyHint": "试试“给我看去年夏天的海滩照片”",
       "emptyTitle": "看板还是空的",
       "interactionHint": "拖拽移动 · 用视图按钮切换展示 · ⋯ 菜单调尺寸",
+      "loadFailed": "无法加载 Lumilio Agent 看板。",
+      "mobileHint": "小屏幕会按单列阅读顺序显示小组件；只有在较大屏幕上调整的布局会被保存。",
       "tidy": "整理",
       "tidyHint": "向上收拢看板",
       "unknownWidget": "未知的小组件类型：{{type}}",
@@ -1040,16 +1118,21 @@
       "confirmation": {
         "addToAlbum_one": "将 {{count}} 张照片加入此相册？",
         "addToAlbum_other": "将 {{count}} 张照片加入此相册？",
-        "approved": "已确认",
+        "applying": "正在应用…",
+        "committed": "已应用",
         "confirm": "确认",
         "createAlbum_one": "创建相册「{{title}}」并加入 {{count}} 张照片？",
         "createAlbum_other": "创建相册「{{title}}」并加入 {{count}} 张照片？",
+        "failed": "操作未应用。",
         "rejected": "已取消",
+        "rejecting": "正在取消…",
+        "retry": "重试",
         "title": "需要确认"
       },
-      "empty": "开始与 Lumilio 对话吧！",
+      "empty": "开始与 Lumilio Agent 对话吧！",
       "newConversation": "新对话",
-      "openAiSettings": "打开 AI 设置"
+      "openAiSettings": "打开 AI 设置",
+      "sessionDisclosure": "本次对话是临时的；固定结果、看板卡片和已完成操作会被保留。"
     },
     "context": {
       "remove": "移除",
@@ -1058,16 +1141,21 @@
     },
     "dock": {
       "busy": "处理中",
+      "checking": "检查中",
       "close": "关闭",
       "collapse": "折叠对话",
       "conversation": "对话",
+      "degraded": "需要处理",
+      "disabled": "已禁用",
       "expand": "展开对话",
+      "notConfigured": "未配置",
       "openBoard": "打开完整面板",
       "ready": "就绪",
       "replyCount_one": "{{count}} 条回复",
       "replyCount_other": "{{count}} 条回复",
       "title": "Lumilio Agent",
       "tokens": "tokens",
+      "unreachable": "不可用",
       "usageHint": "上次模型调用：{{prompt}} 上下文 + {{completion}} 输出 tokens"
     },
     "input": {
@@ -1083,10 +1171,13 @@
       "mention": "提及",
       "navigate": "切换",
       "noResults": "无结果",
+      "partialFailure": "部分引用无法解析。发送前请检查本轮请求范围。",
       "person": "人物",
       "pin": "固定项",
       "quickActions": "快捷操作",
-      "select": "选择"
+      "remove": "移除 {{label}}",
+      "select": "选择",
+      "selected": "已选择：{{label}}"
     },
     "messages": {
       "stopped": "已停止",
@@ -1125,8 +1216,12 @@
       "emptyResult": "没有匹配的照片",
       "resultSet": "结果集"
     },
+    "turnScope": {
+      "label": "请求范围",
+      "mentionDropped": "{{label}} 已不可用，因此没有随本轮请求发送。"
+    },
     "viewer": {
-      "ask": "问 Lumilio 这张照片"
+      "ask": "向 Lumilio Agent 询问这张照片"
     },
     "widgets": {
       "frozen": "已冻结",
@@ -1144,7 +1239,7 @@
       "photos": "张照片",
       "pin": "固定到看板",
       "pinned": "已固定到看板",
-      "resultsTitle": "来自 Lumilio 的照片",
+      "resultsTitle": "Lumilio Agent 找到的照片",
       "stat": {
         "images": "图片",
         "liked": "喜欢",
@@ -1179,73 +1274,211 @@
     "pageTitle": "管理资源库",
     "repositories": {
       "actionsMenu": "{{name}} 的资源库操作",
+      "activityIdle": "空闲",
+      "activityImporting": "正在导入",
+      "activityPaused": "已暂停",
+      "activityProcessing": "正在处理",
+      "activityScanning": "正在扫描",
       "assetCount": "资源数量",
-      "cloudCredentialLabel": "云凭证",
-      "cloudCredentialsHintLink": "设置",
-      "cloudCredentialsHintPrefix": "需要账号？前往",
-      "cloudCredentialsHintSuffix": "。",
-      "cloudImportCreatePartial": "资源库已创建，但云导入未启动：{{error}}",
-      "cloudImportCreateSuccess": "资源库已创建，已为 {{name}} 启动云导入。",
+      "candidates": {
+        "addSeparateConfirm": "是，作为独立资源库添加",
+        "copyAdded": "已添加独立资源库。",
+        "copyConfirmation": "要将其作为独立资源库添加吗？流明集会创建新身份并隔离复制来的私有状态。这不是同步或备份关联。",
+        "description": "选择已配置默认存储位置的直接子目录。不能提交任意服务器路径。",
+        "empty": "默认存储位置中没有直接子文件夹。",
+        "emptyWritable": "空且可写",
+        "identityError": "身份已经注册",
+        "invalidMarker": "资源库标记无效",
+        "mountPoint": "已挂载",
+        "nonempty": "不是资源库",
+        "openable": "可打开",
+        "opened": "资源库已打开，并已排队进行首次扫描。",
+        "openFailed": "无法打开资源库。",
+        "registered": "已注册",
+        "relocated": "已更新资源库位置。",
+        "resolveFailed": "无法应用资源库处理决定。",
+        "riskConfirmation": "我了解此位置可能位于网络、可移动设备或云同步目录中，也可能已挂载为与注册时不同的卷，或包含必须先下载的文件。",
+        "title": "打开现有资源库",
+        "unavailable": "资源库候选目录不可用。",
+        "unavailableStatus": "不可用"
+      },
       "cloudImportFailed": "启动云导入失败。",
       "cloudImportStarted": "已为 {{name}} 启动云导入。",
+      "cloudRunSummary": "已导入 {{imported}} · 失败 {{failed}}",
       "createAction": "添加资源库",
+      "createDirectoryControlCharacter": "存储目录不能包含控制字符。",
+      "createDirectoryEdgeSpace": "存储目录不能以空格开头或结尾。",
+      "createDirectoryHint": "位于所选存储位置内的稳定一级目录。",
+      "createDirectoryLabel": "存储目录",
+      "createDirectoryPlaceholder": "家庭媒体",
+      "createDirectoryRequired": "请输入存储目录。",
+      "createDirectoryTooManyBytes": "存储目录的 UTF-8 编码不能超过 240 字节。",
+      "createDirectoryTooManyCharacters": "存储目录不能超过 80 个字符。",
+      "createDirectoryUnsupportedCharacter": "只能使用文字、数字、空格、连字符和下划线。",
       "createFailed": "创建资源库失败。",
+      "createNameControlCharacter": "资源库名称不能包含控制字符。",
       "createNameEdgeSpace": "名称不能以空格开头或结尾。",
-      "createNameHint": "可使用 1–80 个文字、数字、空格、连字符或下划线；名称也会作为目录名称。",
+      "createNameHint": "修改此显示名称不会移动磁盘中的文件。",
       "createNameLabel": "资源库名称",
       "createNamePlaceholder": "家庭媒体",
       "createNameRequired": "请输入资源库名称。",
       "createNameTooManyBytes": "名称的 UTF-8 编码不能超过 240 字节。",
       "createNameTooManyCharacters": "名称不能超过 80 个字符。",
-      "createNameUnsupportedCharacter": "只能使用文字、数字、空格、连字符和下划线。",
+      "createRiskConfirmationDescription": "此目标可能是可移动存储、网络存储，或由云同步软件管理。请确认原件已有备份并且可离线读取。",
+      "createRiskConfirmationTitle": "确认存储位置风险",
       "createSubmit": "创建资源库",
       "createSuccess": "已添加 {{name}}。",
       "createTitle": "添加资源库",
-      "description": "当前接入的仓库，可用于上传、筛选和文件系统扫描。",
+      "createWizard": {
+        "advancedFolder": "高级设置：存储文件夹",
+        "details": "基本信息",
+        "detailsDescription": "设置 Lumilio 中显示的名称。除非在下方自定义，否则存储文件夹会与名称保持一致。",
+        "detailsTitle": "命名资源库",
+        "layout": "存储布局",
+        "layoutDescription": "此设置决定以后导入文件的磁盘布局，创建后无法修改。",
+        "layoutTitle": "选择新文件的存放方式",
+        "location": "存储位置",
+        "locationDescription": "Lumilio 会在这个已授权位置的直接子目录中创建资源库。",
+        "locationTitle": "选择存储位置",
+        "progress": "创建进度",
+        "review": "确认",
+        "reviewDescription": "创建前请确认资源库身份和永久存储布局。",
+        "reviewTitle": "检查并创建",
+        "stepCount": "第 {{current}} 步，共 {{total}} 步"
+      },
+      "description": "当前接入的资源库，可用于上传、筛选和文件系统扫描。",
       "detectStacks": "检测堆叠",
       "detectStacksCompleted_one": "在 {{name}} 中检测到 {{count}} 个堆叠。",
       "detectStacksCompleted_other": "在 {{name}} 中检测到 {{count}} 个堆叠。",
       "detectStacksFailed": "堆叠检测失败。",
-      "duplicateHandlingHint": "当两个导入文件使用相同文件名时应用此策略。",
-      "duplicateHandlingLabel": "文件名冲突",
-      "duplicateHandlingOverwrite": "覆盖已有文件",
-      "duplicateHandlingRename": "都保留（重命名）",
-      "duplicateHandlingUuid": "都保留（唯一 ID）",
       "duplicateScan": "扫描重复项",
       "duplicateScanFailed": "重复项扫描失败。",
-      "empty": "暂无可用仓库。",
-      "errorBadge": "需要处理",
+      "empty": "暂无可用资源库。",
+      "hostAction": {
+        "addLocation": "添加存储位置",
+        "addPurpose": "选择并授权一个用于存放资源库的文件夹",
+        "addSeparate": "作为独立资源库添加",
+        "cancelFailed": "无法取消请求。",
+        "completed": "Desktop 请求已完成",
+        "copyConfirmation": "我明白这会创建独立的资源库身份，并在扫描前隔离副本中的私有状态。",
+        "createFailed": "无法创建 Desktop 请求。",
+        "desktopApproval": "发送请求后，请在 Desktop 中检查请求，并在该电脑上选择文件夹。Web 应用不会提交文件系统路径。",
+        "ended": "Desktop 请求在完成前已结束。",
+        "identityConflict": "此身份已经注册",
+        "identityConflictHint": "请选择该文件夹是移动后的原件，还是一个独立副本。不会删除任何文件。",
+        "locateLocation": "重新连接存储位置",
+        "locateLocationPurpose": "选择这个已移动或重新连接的存储位置当前所在的目录",
+        "locateRepository": "定位资源库",
+        "locateRepositoryPurpose": "选择这个已移动资源库当前所在的目录",
+        "locationName": "位置名称",
+        "locationNamePlaceholder": "外部归档",
+        "openPurpose": "选择包含现有资源库的文件夹",
+        "openRepository": "打开现有资源库",
+        "requestedBy": "请求者：{{actor}}",
+        "requestLocation": "向 Desktop 请求存储位置",
+        "resolveFailed": "无法应用恢复决定。",
+        "send": "发送到 Desktop",
+        "stepApprove": "Desktop 审批",
+        "stepResult": "结果",
+        "stepSend": "发送请求",
+        "unfinished_other": "你有 {{count}} 个未完成的存储请求，可在此继续。",
+        "unknownActor": "未知管理员",
+        "updateLocation": "作为移动后的原件使用",
+        "waiting": "正在等待 Desktop 批准",
+        "waitingHint": "打开 Desktop 设置 → 存储，在本机检查此请求并选择文件夹。"
+      },
+      "identityErrorBadge": "资源库身份不匹配",
       "importFromCloud": "从云端导入",
-      "noCloudCredentials": "没有已连接凭证",
+      "lifecycleActive": "正常",
+      "locationEmpty": "此存储位置中还没有资源库。",
+      "maintenance": "维护",
+      "maintenanceBadge": "维护中",
+      "manageCloudSources": "管理云端来源",
+      "menuGroupDanger": "危险操作",
+      "menuGroupMaintenance": "维护",
+      "menuGroupManage": "管理",
+      "moreCreateOptions": "更多添加资源库的方式",
       "offlineBadge": "离线",
-      "policyLegend": "资源库策略",
-      "primaryBadge": "主仓库",
+      "primaryBadge": "主资源库",
       "rebuildLocation": "重建位置聚类",
       "rebuildLocationQueued": "位置聚类重建已加入队列。",
+      "recoveryRequiredBadge": "需要恢复",
+      "removeAction": "从流明集中移除",
+      "removeAlbumCount": "受影响的相册",
+      "removeAssetCount": "目录中的资产",
+      "removeCatalogBytes": "目录记录的媒体大小",
+      "removeCloudImportCount": "云导入记录",
+      "removeConfirmationLabel": "输入“{{name}}”以确认",
+      "removeFailed": "无法移除此资源库。",
+      "removeImpactFailed": "无法加载移除影响。",
+      "removeSafetyWarning": "磁盘中的文件将保留；流明集目录中的部分元数据可能无法在重新打开后恢复。",
+      "removeSuccess": "已从流明集中移除“{{name}}”。磁盘中的文件已保留。",
+      "removeTaskCount": "排队中或活动任务",
+      "removeTitle": "从流明集中移除",
+      "rename": "重命名资源库",
+      "renameFailed": "无法重命名资源库。",
+      "renameLabel": "显示名称",
+      "renameSubmit": "保存名称",
+      "renameSuccess": "已将资源库重命名为“{{name}}”。",
+      "renameTitle": "重命名资源库",
       "rescanRepository": "重新扫描",
       "scanAll": "扫描全部资源库",
       "scanAllQueued_one": "已为 {{count}} 个库添加扫描队列。",
       "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
+      "scanAmbiguousHelp": "Lumilio 未猜测文件身份。请移除多余副本或恢复为一一对应的布局，然后再次扫描。",
+      "scanAuthoritative": "扫描完成",
+      "scanCompletedSummary": "{{name}} 扫描完成：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个，删除 {{deleted}} 个。",
+      "scanCountAmbiguous": "歧义",
+      "scanCountDeferred": "暂缓",
+      "scanCountDeleted": "删除",
+      "scanCountDiscovered": "发现",
+      "scanCountMoved": "移动",
+      "scanCountUpdated": "更新",
       "scanFailed": "加入扫描队列失败。",
-      "scanQueued": "已为 {{name}} 加入扫描队列。",
-      "selectCloudCredential": "选择凭证",
+      "scanPartial": "部分扫描",
+      "scanPartialSummary": "{{name}} 本轮扫描不完整：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个。本轮未确认缺失文件。",
+      "scanStatusRunning": "扫描正在进行或已排队，结果会显示在这里。",
       "sourceCloud": "云导入",
-      "sourceLabel": "来源",
-      "sourceLocal": "本地",
+      "storageLocationAvailable": "可用",
+      "storageLocationCapacity": "可用 {{available}}，总计 {{total}}",
+      "storageLocationCapacityUnknown": "容量不可用",
       "storageLocationDefault": "默认",
       "storageLocationEmpty": "没有可写的位置",
       "storageLocationError": "无法获取存储位置。",
+      "storageLocationErrorBadge": "存储位置需要处理",
       "storageLocationHint": "外部位置需要在桌面端控制面板中授权。",
       "storageLocationLabel": "存储位置",
       "storageLocationLoading": "正在加载位置…",
+      "storageLocationMaintenanceBadge": "存储位置维护中",
       "storageLocationOffline": "离线",
-      "storageStrategyCas": "内容寻址",
-      "storageStrategyDate": "按拍摄日期",
-      "storageStrategyFlat": "单一目录",
-      "storageStrategyHint": "控制导入的原始文件存放位置。",
-      "storageStrategyLabel": "文件布局",
+      "storageLocationOfflineBadge": "存储位置离线",
+      "storageLocationReadOnly": "只读",
+      "storageLocationRemove": "移除",
+      "storageLocationRemoveBlockedDefault": "不能移除默认存储位置。",
+      "storageLocationRemoveBlockedOperation": "请等待正在进行的存储操作完成。",
+      "storageLocationRemoveBlockedRepositories": "请先从流明集中移除其中的资源库。",
+      "storageLocationRemoveConfirmation": "从流明集中移除“{{name}}”？其目录、.lumilioroot 标记和磁盘中的全部文件都会保留。",
+      "storageLocationRemoved": "已从流明集中移除存储位置。",
+      "storageLocationRemoveFailed": "无法移除存储位置。",
+      "storageLocationRemoveTitle": "移除存储位置",
+      "storageLocationRepositoryCount_other": "{{count}} 个资源库",
+      "storageLocationWritable": "可写",
+      "storageMonitor": "打开存储监控",
+      "storageStrategy": {
+        "casDescription": "使用内容哈希生成确定的文件路径。",
+        "casLabel": "内容寻址",
+        "dateDescription": "按 UTC 导入时间整理为 inbox/YYYY/MM/照片.jpg。",
+        "dateLabel": "按日期",
+        "flatDescription": "将导入的文件集中保存在单一目录中。",
+        "flatLabel": "单一目录",
+        "immutableHint": "此选项决定磁盘目录布局，资源库创建后无法修改。",
+        "label": "存储布局"
+      },
       "title": "资源库",
-      "unavailable": "仓库选项暂时不可用。"
+      "toggleLocationSection": "展开或收起“{{name}}”分区",
+      "unavailable": "资源库选项暂时不可用。",
+      "unlinkedDescription": "流明集中找不到它们的存储位置。请通过行内操作重新连接或定位。",
+      "unlinkedTitle": "需要处理的资源库"
     }
   },
   "map": {
@@ -1284,7 +1517,7 @@
     "queueSummary": {
       "copied": "已复制",
       "copyError": "复制错误",
-      "emptyDescription": "当图库有后台处理任务时，会显示在这里。",
+      "emptyDescription": "资源库有后台处理任务时，会显示在这里。",
       "emptyTitle": "当前没有需要关注的处理项",
       "errorAttempt": "尝试 {{current}} / {{max}}",
       "errorFallback": "没有记录错误信息。",
@@ -1310,8 +1543,8 @@
         "rebuild_location_clusters": "刷新地点",
         "reindex_assets": "重建 AI 索引",
         "retry_asset": "重试媒体处理",
-        "scan_repository": "扫描图库文件夹",
-        "schedule_repository_scans": "安排图库扫描",
+        "scan_repository": "扫描资源库文件夹",
+        "schedule_repository_scans": "安排资源库扫描",
         "thumbnail_asset": "生成预览图",
         "transcode_asset": "准备可播放媒体"
       },
@@ -1334,18 +1567,18 @@
           "name": "零样本分类"
         },
         "default": {
-          "description": "媒体库的后台处理。"
+          "description": "资源库的后台处理。"
         },
         "detect_stacks": {
           "description": "查找 RAW+JPEG 以及相关媒体堆叠。",
           "name": "堆叠检测"
         },
         "discover_asset": {
-          "description": "整理图库扫描时发现的文件。",
+          "description": "整理资源库扫描时发现的文件。",
           "name": "扫描发现"
         },
         "ingest_asset": {
-          "description": "安全地把上传媒体放入图库。",
+          "description": "安全地把上传媒体放入资源库。",
           "name": "导入"
         },
         "match_live_photo": {
@@ -1358,7 +1591,7 @@
         },
         "process_bioclip": {
           "description": "在启用时添加自然与物种标签。",
-          "name": "BioCLIP 物种识别"
+          "name": "BioCLIP物种识别"
         },
         "process_face": {
           "description": "查找人脸并更新人物分组。",
@@ -1366,7 +1599,7 @@
         },
         "process_ocr": {
           "description": "从图片中提取可搜索文字。",
-          "name": "OCR 文字识别"
+          "name": "OCR文字识别"
         },
         "process_phash": {
           "description": "计算用于重复照片检测的指纹。",
@@ -1389,11 +1622,11 @@
           "name": "重试"
         },
         "scan_repository": {
-          "description": "扫描图库文件夹中的新增、变更或移除文件。",
-          "name": "图库扫描"
+          "description": "扫描资源库文件夹中的新增、变更或移除文件。",
+          "name": "资源库扫描"
         },
         "thumbnail_asset": {
-          "description": "生成图库各处使用的预览图。",
+          "description": "生成媒体界面使用的预览图。",
           "name": "预览图"
         },
         "transcode_asset": {
@@ -1410,7 +1643,7 @@
         "settled": "安静",
         "working": "处理中"
       },
-      "subtitle": "按媒体库后台处理模块聚合。",
+      "subtitle": "按资源库后台处理模块聚合。",
       "time": {
         "daysAgo_one": "{{count}} 天前",
         "daysAgo_other": "{{count}} 天前",
@@ -1446,15 +1679,66 @@
       "scheduledCount_other": "{{count}} 个稍后处理",
       "successRate": "成功率 {{rate}}%"
     },
+    "storage": {
+      "allHealthy": "所有存储目标均正常",
+      "attentionNeeded_other": "{{count}} 个目标需要关注",
+      "auditAction": "操作",
+      "auditActor": "操作者",
+      "auditDescription": "持久保存的存储管理操作",
+      "auditEmpty": "尚未记录生命周期操作。",
+      "auditLoadFailed": "无法加载生命周期历史。",
+      "auditResult": "结果",
+      "auditTarget": "目标",
+      "auditTime": "时间",
+      "auditTitle": "生命周期历史",
+      "capacityHeading": "容量",
+      "capacityUnknown": "容量不可用",
+      "capacityUsed": "已用容量",
+      "caseBehavior": "大小写行为",
+      "caseInsensitive": "不区分大小写",
+      "caseSensitive": "区分大小写",
+      "download": "下载支持包",
+      "effectiveIdentity": "有效身份",
+      "emptyDescription": "当前没有已注册的存储目标。",
+      "emptyTitle": "没有存储诊断信息",
+      "filesystem": "文件系统",
+      "loadFailed": "无法加载存储诊断。",
+      "lockHolder": "锁持有者",
+      "marker": "标记身份",
+      "mount": "挂载",
+      "navLabel": "存储目标",
+      "noRepositories": "此存储位置中没有已注册的资源库。",
+      "readOnly": "只读",
+      "refresh": "刷新",
+      "riskCloudSync": "云同步目录",
+      "riskMountChanged": "挂载身份已变化",
+      "riskNetwork": "网络文件系统",
+      "riskRemovable": "可移动存储",
+      "statAvailable": "可用",
+      "statusActive": "可用",
+      "statUsed": "已用",
+      "statusIdentityError": "身份不匹配",
+      "statusMaintenance": "维护中",
+      "statusOffline": "离线",
+      "statusRecoveryRequired": "需要恢复",
+      "statusUnknown": "未知",
+      "summaryMeta": "{{locations}} 个存储位置 · {{repositories}} 个资源库",
+      "technicalDetails": "技术详情",
+      "totalCapacity": "共 {{total}}",
+      "unlinkedTitle": "所属位置未知的资源库",
+      "updated": "检查于 {{time}}"
+    },
     "subtitles": {
       "capabilities": "ML 服务发现与 LLM Agent 运行状态",
       "ml": "ML 索引覆盖率与回填进度",
-      "queue": "集中查看图库导入、预览图、AI 索引和后台整理进度"
+      "queue": "集中查看资源库导入、预览图、AI 索引和后台整理进度",
+      "storage": "存储位置、资源库、容量、挂载和生命周期状态"
     },
     "tabs": {
       "capabilities": "能力",
       "ml": "ML",
-      "queue": "处理活动"
+      "queue": "处理活动",
+      "storage": "存储"
     },
     "title": "系统状态"
   },
@@ -1469,15 +1753,15 @@
       "title": "消息中心"
     },
     "repository": {
-      "all": "全部仓库",
-      "primary": "主仓库",
-      "unavailable": "仓库选项暂时不可用"
+      "all": "全部资源库",
+      "primary": "主资源库",
+      "unavailable": "资源库选项暂时不可用"
     }
   },
   "notFound": {
     "back": "返回上一页",
-    "description": "地址可能已失效或输入有误。你的图库和照片仍然安全。",
-    "home": "前往图库",
+    "description": "地址可能已失效或输入有误。你的资源库和照片仍然安全。",
+    "home": "前往媒体页",
     "label": "错误 404",
     "title": "此页面不存在"
   },
@@ -1558,7 +1842,6 @@
     "rebuild": {
       "action": "重建人物识别",
       "error": "重建人物失败：{{message}}",
-      "running": "重建人物识别中...",
       "success": "已从 {{faces}} 张脸重建 {{clusters}} 个人物聚类（噪声 {{noise}}）。"
     },
     "removeFace": {
@@ -1578,11 +1861,11 @@
     "updateError": "更新评分失败"
   },
   "rootError": {
-    "description": "请重新加载应用以恢复。此错误不会改动你的原始照片或本地图库。",
+    "description": "请重新加载应用以恢复。此错误不会改动你的原始照片或资源库。",
     "home": "返回首页",
     "label": "应用错误",
     "reload": "重新加载应用",
-    "title": "Lumilio 无法继续运行"
+    "title": "流明集无法继续运行"
   },
   "routes": {
     "collections": "合集",
@@ -1684,7 +1967,7 @@
           "label": "管理用户"
         },
         "view_all_assets": {
-          "description": "浏览图库中的所有照片和媒体。",
+          "description": "浏览所有资源库中的照片和媒体。",
           "label": "查看所有资源"
         },
         "view_own_assets": {
@@ -1708,7 +1991,7 @@
     "ai": "AI",
     "aiSettings": {
       "agentDescription": "配置 Agent 使用的服务端 LLM 提供方和凭据。",
-      "agentEnabledLabel": "启用 AI Agent",
+      "agentEnabledLabel": "启用 Lumilio Agent",
       "agentTitle": "Lumilio Agent",
       "apiKey": "API Key",
       "apiKeyConfigured": "已保存 API Key",
@@ -1716,8 +1999,9 @@
       "baseUrl": "Base URL",
       "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
       "clearStoredKey": "清除已保存的 API Key",
+      "hideApiKey": "隐藏 API Key",
       "loadError": "加载 AI 设置失败。",
-      "mlTitle": "照片智能",
+      "mlTitle": "Lumen Intelligence",
       "modelName": "模型名称",
       "provider": "提供方",
       "providerOptions": {
@@ -1729,6 +2013,7 @@
       },
       "saveError": "保存设置失败。",
       "saveSuccess": "设置已保存。",
+      "showApiKey": "显示 API Key",
       "taskDescriptions": {
         "bioclip": "识别植物、动物等生物主题。",
         "face": "检测并归类可识别的人脸。",
@@ -1737,11 +2022,11 @@
         "videoSemantic": "从视频采样帧并嵌入，用于文本搜索。需要开启图像语义分析。"
       },
       "taskNames": {
-        "bioclip": "BioCLIP 物种识别",
+        "bioclip": "BioCLIP物种识别",
         "face": "人物识别",
-        "ocr": "OCR 文字识别",
+        "ocr": "OCR文字识别",
         "semantic": "图像语义分析",
-        "videoSemantic": "视频语义搜索"
+        "videoSemantic": "图像语义分析（视频）"
       },
       "validate": "验证连接",
       "validationError": "LLM 配置验证失败。",
@@ -1788,7 +2073,7 @@
     "cloud": {
       "addCredential": "添加凭证",
       "confirmDisconnect": "断开 {{name}}？进行中的导入将停止，你可以随时重新连接。",
-      "confirmRemove": "移除 {{name}}？将永久删除凭证和会话数据。已导入的照片保留在你的媒体库中。",
+      "confirmRemove": "移除 {{name}}？将永久删除凭证和会话数据。已导入的照片保留在你的资源库中。",
       "connectCredential": "连接凭证",
       "credentialMeta": "{{provider}} · {{identity}}",
       "disconnect": "断开",
@@ -1842,7 +2127,7 @@
     "pageDescriptions": {
       "ai": "配置模型提供方和机器学习功能。",
       "appearance": "调整语言、地区、主题和布局偏好。",
-      "server": "查看仓库范围、健康检查和运行时详情。"
+      "server": "查看资源库范围、健康检查和运行时详情。"
     },
     "region": "地区",
     "regionOptions": {
@@ -1870,7 +2155,7 @@
         "createNow": "立即备份",
         "delete": "删除",
         "deleteFailed": "删除失败。",
-        "description": "自动备份媒体库元数据数据库（相册、人物和编辑记录），并保存到媒体库的 backups 文件夹。备份不包含媒体文件。",
+        "description": "自动备份资源库元数据数据库（相册、人物和编辑记录），并保存到配置的 backups 文件夹。备份不包含媒体文件。",
         "download": "下载",
         "downloadFailed": "下载失败。",
         "empty": "暂无备份。",
@@ -1878,10 +2163,12 @@
         "intervalHours": "{{hours}} 小时",
         "intervalLabel": "备份间隔",
         "keepLastLabel": "保留最近备份数",
+        "listFailed": "无法加载备份列表。已有备份可能仍然存在；请先重试，再创建或恢复备份。",
         "listTitle": "可用备份",
         "queued": "备份已加入队列，完成后会显示在下方。",
         "refresh": "刷新",
         "restore": "恢复",
+        "restoreDisconnect": "服务器正在重启以应用恢复操作，本页面会自动重新连接。",
         "restoreFailed": "恢复失败，数据库已回滚到之前的状态。",
         "restorePoint": "恢复点",
         "restoring": "正在恢复，完成后应用将重新加载。",
@@ -1910,15 +2197,15 @@
       "runtimeInfoTitle": "运行时配置",
       "taskAvailability": "任务可用性",
       "taskNames": {
-        "bioClipClassify": "BioCLIP 物种识别",
+        "bioClipClassify": "BioCLIP物种识别",
         "faceDetectAndEmbed": "人物识别",
-        "ocr": "OCR 文字识别",
+        "ocr": "OCR文字识别",
         "semanticImageEmbed": "图像语义分析",
         "semanticTextEmbed": "文本语义分析"
       },
       "unavailable": "不可用",
-      "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持仓库过滤时都会默认使用这个范围。",
-      "workingRepositoryUnavailable": "仓库选项暂时不可用。"
+      "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持资源库过滤时都会默认使用这个范围。",
+      "workingRepositoryUnavailable": "资源库选项暂时不可用。"
     },
     "title": "设置",
     "users": {
@@ -1969,6 +2256,7 @@
   "share": {
     "create": {
       "copied": "已复制到剪贴板",
+      "copyError": "无法复制链接。",
       "createdHint": "请立即复制此链接——关闭对话框后将不再显示。",
       "createdTitle": "链接已创建",
       "creating": "创建中…",
@@ -1976,6 +2264,10 @@
       "fields": {
         "allowDownload": {
           "label": "允许下载"
+        },
+        "description": {
+          "label": "描述",
+          "placeholder": "为收到链接的人添加可选说明"
         },
         "expiry": {
           "days_other": "{{count}} 天",
@@ -2230,7 +2522,7 @@
         "title": "裁剪"
       },
       "empty": {
-        "body": "从您的图库中打开一张照片开始编辑。最近的作品会显示在这里。",
+        "body": "从资源库中打开一张照片开始编辑。最近的作品会显示在这里。",
         "title": "暂无最近的编辑"
       },
       "frame": {
@@ -2257,7 +2549,7 @@
       "frame": "边框",
       "text": "文字"
     },
-    "tagline": "对图库中的照片进行快速、无损的编辑。",
+    "tagline": "对资源库中的照片进行快速、无损的编辑。",
     "text": {
       "add": "添加文字",
       "caseLower": "aa",
@@ -2345,7 +2637,7 @@
     "UploadProcess": {
       "noResult": "未返回结果",
       "processFailed": "上传流程失败",
-      "summaryDuplicates_other": "已上传 {{count}} 个文件，跳过 {{duplicates}} 个已在图库中的重复文件。",
+      "summaryDuplicates_other": "已上传 {{count}} 个文件，跳过 {{duplicates}} 个已在资源库中的重复文件。",
       "summaryPartial": "上传完成：成功 {{succeeded}} 个，失败 {{failed}} 个。",
       "summarySuccess_one": "成功上传 {{count}} 个文件。",
       "summarySuccess_other": "成功上传 {{count}} 个文件。",

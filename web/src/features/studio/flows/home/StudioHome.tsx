@@ -65,7 +65,7 @@ export function StudioHome({
       <PageHeader
         title={t("studio.title", { defaultValue: "Studio" })}
         subtitle={t("studio.tagline", {
-          defaultValue: "Quick, non-destructive edits for photos already in your library.",
+          defaultValue: "Quick, non-destructive edits for photos already in your Repositories.",
         })}
         icon={<SlidersHorizontal className="h-6 w-6 text-primary" />}
       >
@@ -109,7 +109,7 @@ export function StudioHome({
               <p className="mt-1 max-w-xs text-xs text-base-content/50">
                 {t("studio.home.empty.body", {
                   defaultValue:
-                    "Open a photo from your library to start editing. Your latest work shows up here.",
+                    "Open a photo from a Repository to start editing. Your latest work shows up here.",
                 })}
               </p>
             </div>

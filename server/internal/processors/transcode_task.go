@@ -2,8 +2,8 @@ package processors
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"path/filepath"
 
 	"server/internal/db/dbtypes"
 	"server/internal/queue/jobs"
@@ -13,10 +13,16 @@ import (
 
 // ProcessTranscodeTask handles video/audio transcoding.
 func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.TranscodeArgs) error {
-	asset, repository, err := ap.loadAssetAndRepo(ctx, args.AssetID)
+	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ObservationToken, args.ExpectedContentHash)
 	if err != nil {
+		if errors.Is(err, ErrAssetSourceStale) {
+			return nil
+		}
 		return err
 	}
+	defer source.Close()
+	asset := source.asset
+	assetType := dbtypes.AssetType(asset.Type)
 
 	return ap.runTrackedAssetTask(
 		ctx,
@@ -25,14 +31,13 @@ func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.Tr
 		"Transcoding asset",
 		"Transcoding completed",
 		func() error {
-			fullPath := filepath.Join(args.RepoPath, args.StoragePath)
-			switch args.AssetType {
+			switch assetType {
 			case dbtypes.AssetTypeVideo:
-				info, err := ap.getVideoInfo(fullPath)
+				info, err := ap.getVideoInfo(source.localPath)
 				if err != nil {
 					return err
 				}
-				if err := ap.transcodeVideoSmart(ctx, repository.Path, asset, fullPath, info, ap.transcodeConfig); err != nil {
+				if err := ap.transcodeVideoSmart(ctx, source.files, source.path, asset, source.localPath, info, ap.transcodeConfig); err != nil {
 					return err
 				}
 				if err := ap.enqueueVideoFramesJob(ctx, asset.AssetID); err != nil {
@@ -45,16 +50,16 @@ func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.Tr
 				}
 				return nil
 			case dbtypes.AssetTypeAudio:
-				info, err := ap.getAudioInfo(fullPath)
+				info, err := ap.getAudioInfo(source.localPath)
 				if err != nil {
 					return err
 				}
-				return ap.transcodeAudioSmart(ctx, repository.Path, asset, fullPath, info)
+				return ap.transcodeAudioSmart(ctx, source.files, source.path, asset, source.localPath, info)
 			case dbtypes.AssetTypePhoto:
 				// No transcode needed for photos
 				return nil
 			default:
-				return fmt.Errorf("unsupported asset type for transcode: %s", args.AssetType)
+				return fmt.Errorf("unsupported asset type for transcode: %s", assetType)
 			}
 		},
 	)

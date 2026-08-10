@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
+import { AlertTriangle, AtSign, Images, WandSparkles } from "lucide-react";
 import { Markdown } from "./markdown/Markdown";
 import { ToolCallBlock } from "./blocks/ToolCallBlock";
 import { ConfirmBlock } from "./blocks/ConfirmBlock";
 import { InlineWidgetCard } from "../../modules/widgets/chrome/InlineWidgetCard";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useI18n } from "@/lib/i18n.tsx";
-import type { Block, ChatMessage, WidgetBlock } from "../../model/chatTypes";
+import type { AgentTurnSnapshot, Block, ChatMessage, WidgetBlock } from "../../model/chatTypes";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -31,11 +32,8 @@ function BlockView({ block, isAnimating = false }: { block: Block; isAnimating?:
   }
 }
 
-/** Renders a chat widget inline and offers pinning it to the board. The widget
- * hydrates from the session ref; the View switcher (in the card footer) lets the
- * user retarget the agent's initial view before pinning. */
 function WidgetBlockView({ block }: { block: WidgetBlock }) {
-  const threadId = useLumilioChatStore((s) => s.threadId);
+  const threadId = useLumilioChatStore((state) => state.threadId);
   if (!threadId) return null;
   return (
     <InlineWidgetCard
@@ -48,37 +46,100 @@ function WidgetBlockView({ block }: { block: WidgetBlock }) {
   );
 }
 
-/** The conversation surface: user messages as right-aligned bubbles,
- * assistant messages as a flat column of typed blocks. */
+function TurnScope({ request }: { request: AgentTurnSnapshot }) {
+  const { t } = useI18n();
+  if (request.mode === "free" && request.context.length === 0 && request.mentions.length === 0) {
+    return null;
+  }
+  return (
+    <div
+      className="mt-1.5 flex max-w-[80%] flex-wrap justify-end gap-1 text-[11px] text-base-content/60"
+      aria-label={t("lumilio.turnScope.label", "Scope sent to Lumilio Agent")}
+    >
+      {request.mode !== "free" && (
+        <span className="badge badge-sm gap-1 border-primary/20 bg-primary/10 text-primary">
+          <WandSparkles size={11} />
+          {t(`lumilio.quickActions.${request.mode}.label`, request.mode)}
+        </span>
+      )}
+      {request.context.map((item) => (
+        <span key={`${item.type}:${item.id}`} className="badge badge-ghost badge-sm gap-1">
+          <Images size={11} />
+          {item.label} · {item.count}
+        </span>
+      ))}
+      {request.mentions.map((mention) => (
+        <span
+          key={`${mention.type}:${mention.id}`}
+          className={`badge badge-sm gap-1 ${
+            mention.status === "dropped"
+              ? "border-error/30 bg-error/10 text-error"
+              : "badge-ghost"
+          }`}
+          title={
+            mention.status === "dropped"
+              ? t("lumilio.turnScope.mentionDropped", {
+                  defaultValue: "This mention was not available to the Agent ({{reason}})",
+                  reason: mention.reason ?? "rejected",
+                })
+              : undefined
+          }
+        >
+          {mention.status === "dropped" ? <AlertTriangle size={11} /> : <AtSign size={11} />}
+          {mention.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The conversation surface: user messages retain an immutable copy of the
+ * mode, media scope, and entity bindings sent with that exact turn. */
 export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
   const { t } = useI18n();
   const endRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollContainer = endRef.current?.closest<HTMLElement>("[data-lumilio-chat-scroll]");
+    if (!scrollContainer) return undefined;
+    const updateFollow = () => {
+      const distance = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
+      followLatestRef.current = distance < 96;
+    };
+    updateFollow();
+    scrollContainer.addEventListener("scroll", updateFollow, { passive: true });
+    return () => scrollContainer.removeEventListener("scroll", updateFollow);
+  }, []);
+
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!followLatestRef.current && last?.role !== "user") return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    endRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
   }, [messages]);
 
   const last = messages[messages.length - 1];
   const showSpinner = isGenerating && last?.role === "assistant" && last.blocks.length === 0;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8 px-4 py-6" aria-live="polite" aria-relevant="additions text">
       {messages.map((message, messageIndex) => {
         if (message.role === "user") {
           const text = message.blocks
             .map((block) => (block.kind === "text" ? block.markdown : ""))
             .join("");
           return (
-            <div key={message.id} className="flex justify-end">
-              <div className="bg-primary text-primary-content rounded-2xl px-4 py-2.5 max-w-[80%] text-sm leading-relaxed whitespace-pre-wrap">
+            <div key={message.id} className="flex flex-col items-end">
+              <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-content">
                 {text}
               </div>
+              {message.request && <TurnScope request={message.request} />}
             </div>
           );
         }
 
         const isLastMessage = messageIndex === messages.length - 1;
-
         return (
           <div key={message.id} className="w-full">
             {message.blocks.map((block) => (
@@ -95,11 +156,10 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
 
       {showSpinner && (
         <div className="flex items-center gap-2 text-sm text-base-content/50">
-          <span className="w-4 h-4 border-2 border-base-content/30 border-t-base-content/60 rounded-full animate-spin" />
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-base-content/30 border-t-base-content/60" />
           <span>{t("lumilio.messages.thinking")}</span>
         </div>
       )}
-
       <div ref={endRef} />
     </div>
   );

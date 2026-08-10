@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -15,6 +13,7 @@ import (
 	"server/internal/logging"
 	"server/internal/queue/jobs"
 	"server/internal/settings"
+	"server/internal/storage"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -97,6 +96,7 @@ type assetIndexingService struct {
 	dbpool          *sql.DB
 	logger          *zap.Logger
 	auditProvider   logging.RepositoryAuditProvider
+	files           *storage.RepositoryFSFactory
 }
 
 type reindexCandidate struct {
@@ -112,6 +112,7 @@ func NewAssetIndexingService(
 	dbpool *sql.DB,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
+	files *storage.RepositoryFSFactory,
 ) AssetIndexingService {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -127,6 +128,7 @@ func NewAssetIndexingService(
 		dbpool:          dbpool,
 		logger:          logger.With(zap.String("component", "indexing")),
 		auditProvider:   auditProvider,
+		files:           files,
 	}
 }
 
@@ -609,10 +611,21 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		repositoryCache[repositoryID] = repository
 	}
 
-	fullPath := filepath.Join(repository.Path, *candidate.asset.StoragePath)
-	if _, err := os.Stat(fullPath); err != nil {
-		return 0, fmt.Errorf("stat asset file: %w", err)
+	repositoryPath, err := storage.ParseUserMediaPath(*candidate.asset.StoragePath)
+	if err != nil {
+		return 0, fmt.Errorf("parse asset file path: %w", err)
 	}
+	repositoryFS, err := s.files.Open(repository)
+	if err != nil {
+		return 0, fmt.Errorf("open repository: %w", err)
+	}
+	opened, err := repositoryFS.OpenMedia(repositoryPath)
+	if err != nil {
+		_ = repositoryFS.Close()
+		return 0, fmt.Errorf("open asset file: %w", err)
+	}
+	_ = opened.Close()
+	_ = repositoryFS.Close()
 
 	queued := 0
 	if candidate.tasks[AssetIndexingTaskSemanticImage] {

@@ -42,6 +42,9 @@ func (streamTestAgentService) CancelRun(context.Context, int32, string, uuid.UUI
 func (streamTestAgentService) FinishRun(_ context.Context, _ int32, _ string, _ uuid.UUID, status string) (string, error) {
 	return status, nil
 }
+func (streamTestAgentService) GetEffectReceipt(context.Context, int32, string, uuid.UUID) (core.EffectReceipt, string, error) {
+	return core.EffectReceipt{}, "", nil
+}
 func (streamTestAgentService) GetAvailableTools() []*schema.ToolInfo { return nil }
 func (streamTestAgentService) GetToolsByMode(string) []*schema.ToolInfo {
 	return nil

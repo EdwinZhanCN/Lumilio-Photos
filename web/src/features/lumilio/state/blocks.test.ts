@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   applyChunk,
+  applyDroppedMentions,
+  applyEffectReceipt,
   applyInterrupt,
   applySideEvent,
   assistantMessage,
   cancelActiveBlocks,
-  resolveConfirm,
+  failConfirm,
+  setConfirmSubmitting,
   userMessage,
 } from "./blocks";
-import type { ChatMessage, SideChannelEvent } from "../model/chatTypes";
+import type { AgentTurnSnapshot, ChatMessage, SideChannelEvent } from "../model/chatTypes";
 
 const conversation = (): ChatMessage[] => [userMessage("hello"), assistantMessage()];
 
@@ -49,9 +52,8 @@ describe("applySideEvent", () => {
       }),
     );
 
-    const blocks = messages[1].blocks;
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({
+    expect(messages[1].blocks).toHaveLength(1);
+    expect(messages[1].blocks[0]).toMatchObject({
       kind: "tool",
       executionId: "exec-1",
       status: "success",
@@ -65,8 +67,7 @@ describe("applySideEvent", () => {
     messages = applyChunk(messages, { output: "Let me search." });
     messages = applySideEvent(messages, toolEvent());
     messages = applyChunk(messages, { output: "Found them." });
-
-    expect(messages[1].blocks.map((b) => b.kind)).toEqual(["text", "tool", "text"]);
+    expect(messages[1].blocks.map((block) => block.kind)).toEqual(["text", "tool", "text"]);
   });
 
   it("appends widget blocks from widget_show events", () => {
@@ -85,7 +86,6 @@ describe("applySideEvent", () => {
         },
       }),
     );
-
     expect(messages[1].blocks[0]).toMatchObject({
       kind: "widget",
       refId: "r5_top24",
@@ -95,21 +95,64 @@ describe("applySideEvent", () => {
   });
 });
 
-describe("interrupts", () => {
+describe("confirmation receipts", () => {
   const interrupt = {
-    InterruptContexts: [{ ID: "int-1", IsRootCause: true }],
+    InterruptContexts: [
+      { ID: "int-1", IsRootCause: true, Info: { effect_id: "effect-1", action: "tag_assets" } },
+    ],
   };
 
-  it("appends a confirm block and resolves it", () => {
-    let messages = conversation();
-    messages = applyInterrupt(messages, interrupt);
-    expect(messages[1].blocks[0]).toMatchObject({ kind: "confirm" });
-
-    messages = resolveConfirm(messages, "approved");
+  it("does not claim success before an authoritative effect receipt", () => {
+    let messages = applyInterrupt(conversation(), interrupt);
+    messages = setConfirmSubmitting(messages, "int-1", true);
     expect(messages[1].blocks[0]).toMatchObject({
       kind: "confirm",
-      resolved: "approved",
+      state: "submitting_approval",
     });
+
+    messages = applyEffectReceipt(messages, {
+      effect_id: "effect-1",
+      tool_name: "tag_assets",
+      status: "committed",
+      count: 2,
+      message: "Applied tag change to 2 assets",
+    });
+    expect(messages[1].blocks[0]).toMatchObject({
+      kind: "confirm",
+      state: "committed",
+      receipt: { effect_id: "effect-1" },
+    });
+  });
+
+  it("keeps a failed confirmation retryable", () => {
+    let messages = applyInterrupt(conversation(), interrupt);
+    messages = setConfirmSubmitting(messages, "int-1", true);
+    messages = failConfirm(messages, "int-1", "network lost");
+    expect(messages[1].blocks[0]).toMatchObject({
+      kind: "confirm",
+      state: "failed",
+      error: "network lost",
+    });
+  });
+});
+
+describe("turn snapshots", () => {
+  it("marks only the exact server-rejected mention", () => {
+    const snapshot: AgentTurnSnapshot = {
+      mode: "review",
+      context: [{ id: "selected", type: "selection", label: "2 selected", count: 2 }],
+      mentions: [
+        { type: "person", id: "1", label: "Ada", status: "accepted" },
+        { type: "person", id: "2", label: "Grace", status: "accepted" },
+      ],
+    };
+    const messages = applyDroppedMentions([userMessage("compare", snapshot), assistantMessage()], [
+      { type: "person", id: "2", label: "Grace", reason: "not_found" },
+    ]);
+    expect(messages[0].request?.mentions).toEqual([
+      { type: "person", id: "1", label: "Ada", status: "accepted" },
+      { type: "person", id: "2", label: "Grace", status: "dropped", reason: "not_found" },
+    ]);
   });
 });
 

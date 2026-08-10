@@ -1,6 +1,6 @@
 import { Copy, Heart, Share2, Tag, Trash2, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import type { RailCardTone } from "../../components/RailCard";
+import type { RailCardTone } from "@/components/collection/RailCard";
 import { getUtilityClassifierTitle, UTILITY_CLASSIFIERS } from "../../model/utilityClassifiers";
 
 export type UtilityShortcut = {

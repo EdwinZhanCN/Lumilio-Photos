@@ -65,6 +65,14 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 		}
 	}
 
+	llmConfigured := systemSettings.LLM.IsConfigured()
+	llmAvailability := "ready"
+	if !systemSettings.LLM.AgentEnabled {
+		llmAvailability = "disabled"
+	} else if !llmConfigured {
+		llmAvailability = "not_configured"
+	}
+
 	response := dto.CapabilitiesResponseDTO{
 		ML: dto.MLCapabilitiesDTO{
 			DiscoveredNodeCount: discoveredNodeCount,
@@ -93,8 +101,9 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 			},
 		},
 		LLM: dto.LLMCapabilitiesDTO{
+			Availability: llmAvailability,
 			AgentEnabled: systemSettings.LLM.AgentEnabled,
-			Configured:   systemSettings.LLM.IsConfigured(),
+			Configured:   llmConfigured,
 			Provider:     systemSettings.LLM.Provider,
 			ModelName:    systemSettings.LLM.ModelName,
 		},

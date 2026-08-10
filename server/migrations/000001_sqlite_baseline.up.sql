@@ -34,7 +34,7 @@ CREATE TABLE registration_sessions (
 CREATE TABLE settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     llm_agent_enabled INTEGER NOT NULL DEFAULT 0 CHECK (llm_agent_enabled IN (0, 1)),
-    llm_provider TEXT NOT NULL DEFAULT 'ark',
+    llm_provider TEXT NOT NULL DEFAULT '' CHECK (llm_provider IN ('', 'ark', 'openai', 'deepseek', 'ollama')),
     llm_model_name TEXT NOT NULL DEFAULT '',
     llm_base_url TEXT NOT NULL DEFAULT '',
     llm_api_key_ciphertext BLOB,
@@ -142,7 +142,7 @@ CREATE TABLE repository_defaults (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     strategy TEXT NOT NULL DEFAULT 'date' CHECK (strategy IN ('date', 'flat', 'cas')),
     duplicate_handling TEXT NOT NULL DEFAULT 'rename'
-        CHECK (duplicate_handling IN ('rename', 'uuid', 'overwrite')),
+        CHECK (duplicate_handling IN ('rename', 'uuid')),
     updated_at INTEGER NOT NULL
 ) STRICT;
 

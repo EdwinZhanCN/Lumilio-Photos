@@ -22,11 +22,9 @@ import (
 //
 // Two rules constrain what it may write:
 //
-//   - It only transitions within {active, offline, error} and never touches
-//     scanning. repositories.status carries two orthogonal axes — activity and
-//     reachability — in one column, so a scan interrupted by a restart would
-//     otherwise be silently reclassified as idle. (Splitting reachability into
-//     its own column is the cleaner fix if this keeps getting in the way.)
+//   - It only updates reachability and never changes repository activity.
+//     A maintenance operation owns the reachability barrier until it commits or
+//     rolls back, so ordinary reconciliation skips that state.
 //   - The on-disk .lumiliorepo is authoritative for repository config; the DB
 //     config column is a cache. Reconcile overwrites the cache from disk, so a
 //     rename made while a repository was detached is not silently reverted.
@@ -50,35 +48,37 @@ func (rm *DefaultRepositoryManager) ReconcileAll(ctx context.Context) error {
 }
 
 func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, current repo.Repository) error {
-	if current.Status == dbtypes.RepoStatusScanning {
+	releaseMutation := rm.acquireRepositoryMutation(current.RepoID)
+	defer releaseMutation()
+	if current.Reachability == dbtypes.RepositoryReachabilityMaintenance {
 		return nil
 	}
 
-	status, config := rm.inspectRepositoryOnDisk(current)
+	reachability, config := rm.inspectRepositoryOnDisk(current)
 
-	if status == dbtypes.RepoStatusActive && config != nil {
+	if reachability == dbtypes.RepositoryReachabilityActive && config != nil {
 		if _, err := rm.refreshRepositoryConfigCache(ctx, current, config); err != nil {
 			return fmt.Errorf("refresh config cache: %w", err)
 		}
 	}
 
-	if current.Status == status {
+	if current.Reachability == reachability {
 		return nil
 	}
 
-	if _, err := rm.queries.UpdateRepositoryStatus(ctx, repo.UpdateRepositoryStatusParams{
-		RepoID:    current.RepoID,
-		Status:    status,
-		UpdatedAt: dbtypes.NewTimestamp(time.Now()),
+	if _, err := rm.queries.UpdateRepositoryReachability(ctx, repo.UpdateRepositoryReachabilityParams{
+		RepoID:       current.RepoID,
+		Reachability: reachability,
+		UpdatedAt:    dbtypes.NewTimestamp(time.Now()),
 	}); err != nil {
-		return fmt.Errorf("update status: %w", err)
+		return fmt.Errorf("update reachability: %w", err)
 	}
 
 	rm.logger.Info("repository reachability changed",
 		zap.String("operation", "repository.reconcile"),
 		zap.String("repository_path", current.Path),
-		zap.String("from", string(current.Status)),
-		zap.String("to", string(status)),
+		zap.String("from", string(current.Reachability)),
+		zap.String("to", string(reachability)),
 	)
 	return nil
 }
@@ -87,21 +87,24 @@ func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, cur
 // path. An unreadable path means offline — the drive is elsewhere, the data is
 // not lost. A readable path holding a different or unparseable identity means
 // error, which needs a human.
-func (rm *DefaultRepositoryManager) inspectRepositoryOnDisk(current repo.Repository) (dbtypes.RepoStatus, *repocfg.RepositoryConfig) {
+func (rm *DefaultRepositoryManager) inspectRepositoryOnDisk(current repo.Repository) (dbtypes.RepositoryReachability, *repocfg.RepositoryConfig) {
 	if _, err := os.Stat(filepath.Join(current.Path, ".lumiliorepo")); err != nil {
-		return dbtypes.RepoStatusOffline, nil
+		if info, pathErr := os.Stat(current.Path); pathErr == nil && info.IsDir() {
+			return dbtypes.RepositoryReachabilityIdentityError, nil
+		}
+		return dbtypes.RepositoryReachabilityOffline, nil
 	}
 
 	config, err := repocfg.LoadConfigFromFile(current.Path)
 	if err != nil {
-		return dbtypes.RepoStatusError, nil
+		return dbtypes.RepositoryReachabilityIdentityError, nil
 	}
 
 	if config.ID != repositoryIDString(current.RepoID) {
-		return dbtypes.RepoStatusError, nil
+		return dbtypes.RepositoryReachabilityIdentityError, nil
 	}
 
-	return dbtypes.RepoStatusActive, config
+	return dbtypes.RepositoryReachabilityActive, config
 }
 
 func repositoryIDString(id uuid.UUID) string {

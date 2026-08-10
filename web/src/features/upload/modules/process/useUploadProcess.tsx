@@ -162,7 +162,7 @@ function showUploadSummary(
       uploaded.length > 0 ? "success" : "info",
       t(
         "upload.UploadProcess.summaryDuplicates",
-        "Uploaded {{count}} files, skipped {{duplicates}} already in your library.",
+        "Uploaded {{count}} files, skipped {{duplicates}} already in the Repository.",
         {
           count: uploaded.length,
           duplicates: duplicates.length,

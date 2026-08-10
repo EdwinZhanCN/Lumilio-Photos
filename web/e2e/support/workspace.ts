@@ -85,6 +85,7 @@ async function ensureWorkerRepository(index: number, token: string) {
     token,
     body: JSON.stringify({
       name,
+      directory_name: name,
       role: "regular",
       storage_strategy: "flat",
       duplicate_handling: "rename",

@@ -3,11 +3,18 @@ package app
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"server/config"
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
+	"server/internal/storage"
+
+	"github.com/google/uuid"
 )
 
 type fakeRiverStopper struct {
@@ -17,6 +24,72 @@ type fakeRiverStopper struct {
 	stopCalls     int
 	forcedCalls   int
 	closeOnForced bool
+}
+
+type fakeDefaultStorageRuntimeManager struct {
+	ensureRoot *repo.RepositoryRoot
+	ensureErr  error
+	roots      []repo.RepositoryRoot
+	listErr    error
+}
+
+func (fake fakeDefaultStorageRuntimeManager) EnsureDefaultRepositoryRoot(context.Context, string, ...storage.LifecycleRequest) (*repo.RepositoryRoot, error) {
+	return fake.ensureRoot, fake.ensureErr
+}
+
+func (fake fakeDefaultStorageRuntimeManager) ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error) {
+	return fake.roots, fake.listErr
+}
+
+func TestDefaultStorageRecoveryKeepsRuntimeStartableInDegradedMode(t *testing.T) {
+	registered := repo.RepositoryRoot{
+		RootID: uuid.New(), Kind: dbtypes.RepositoryRootKindDefault,
+		Status: dbtypes.RepositoryRootStatusOffline, Path: "/missing/default",
+	}
+	root, degraded, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+		ensureErr: storage.ErrRepositoryRootOffline,
+		roots:     []repo.RepositoryRoot{registered},
+	}, registered.Path)
+	if err != nil {
+		t.Fatalf("registered default storage stopped runtime startup: %v", err)
+	}
+	if !degraded || root == nil || root.RootID != registered.RootID {
+		t.Fatalf("degraded result = root %#v degraded %t", root, degraded)
+	}
+
+	_, degraded, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+		ensureErr: storage.ErrRepositoryRootOffline,
+	}, "/fresh/unavailable")
+	if err == nil || degraded {
+		t.Fatalf("fresh initialization failure = %v degraded %t", err, degraded)
+	}
+
+	_, degraded, err = ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+		ensureErr: storage.ErrRepositoryRootInvalid,
+		roots:     []repo.RepositoryRoot{registered},
+	}, "/different/identity")
+	if err == nil || degraded {
+		t.Fatalf("invalid migration target = %v degraded %t", err, degraded)
+	}
+}
+
+func TestDefaultStorageRecoveryCanonicalizesOfflinePathAliases(t *testing.T) {
+	realParent := t.TempDir()
+	aliasParent := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(realParent, aliasParent); err != nil {
+		t.Skipf("filesystem does not permit symlink fixture: %v", err)
+	}
+	registered := repo.RepositoryRoot{
+		RootID: uuid.New(), Kind: dbtypes.RepositoryRootKindDefault,
+		Status: dbtypes.RepositoryRootStatusOffline, Path: filepath.Join(realParent, "offline-default"),
+	}
+	root, degraded, err := ensureDefaultStorageForRuntime(context.Background(), fakeDefaultStorageRuntimeManager{
+		ensureErr: storage.ErrRepositoryRootOffline,
+		roots:     []repo.RepositoryRoot{registered},
+	}, filepath.Join(aliasParent, "offline-default"))
+	if err != nil || !degraded || root == nil || root.RootID != registered.RootID {
+		t.Fatalf("canonical offline alias was not recognized: root=%#v degraded=%t err=%v", root, degraded, err)
+	}
 }
 
 func (fake *fakeRiverStopper) Stop(context.Context) error {

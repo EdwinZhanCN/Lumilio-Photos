@@ -18,6 +18,11 @@ tasks:
     cmds:
       - vp install --frozen-lockfile
 
+  checks:
+    desc: Run documentation site CI checks (bilingual parity, naming, links, presets)
+    cmds:
+      - node scripts/docs-checks.ts
+
   dev:
     desc: Start the VitePress development server
     cmds:

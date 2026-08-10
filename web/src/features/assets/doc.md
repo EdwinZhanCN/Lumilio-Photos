@@ -1,6 +1,6 @@
 # Assets
 
-Assets owns library and Trash browsing, reusable asset-set presentation,
+Assets owns catalog and Trash browsing, reusable asset-set presentation,
 selection, filtering, viewer inspection, and export/bulk asset actions.
 Collection, People, Home, Share, Studio, and Lumilio reuse its reviewed
 public surfaces instead of implementing another gallery or viewer.
@@ -25,7 +25,7 @@ directory contains only migration from the retired persisted browse state.
 flowchart TD
     ROUTES["Assets / Trash / scoped routes"] --> SCOPE["AssetBrowserScope"]
     SCOPE --> BROWSER["AssetBrowser"]
-    BROWSER --> SOURCE["library or pin source"]
+    BROWSER --> SOURCE["catalog or pin source"]
     BROWSER --> GALLERY["Justified / Square gallery"]
     GALLERY --> VIEWER["AssetViewer"]
     VIEWER --> EXPORT["AssetExportDialog"]

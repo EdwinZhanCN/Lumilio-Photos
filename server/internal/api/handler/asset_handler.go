@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"path"
 	"path/filepath"
 	"server/internal/api"
@@ -19,7 +19,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
-	"server/internal/processors"
 	"server/internal/queue/jobs"
 	"server/internal/service"
 	"server/internal/storage"
@@ -50,8 +49,10 @@ type AssetHandler struct {
 	indexingService service.AssetIndexingService
 	stackService    service.StackService
 	queries         *repo.Queries
+	database        *sql.DB
 	repoManager     storage.RepositoryManager
 	stagingManager  storage.StagingManager
+	files           *storage.RepositoryFSFactory
 	queueClient     *river.Client[*sql.Tx]
 	settingsService service.SettingsService
 	runtimeChecker  service.LumenService
@@ -68,15 +69,17 @@ func NewAssetHandler(
 	indexingService service.AssetIndexingService,
 	stackService service.StackService,
 	queries *repo.Queries,
+	database *sql.DB,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[*sql.Tx],
 	settingsService service.SettingsService,
 	runtimeChecker service.LumenService,
+	files *storage.RepositoryFSFactory,
 ) *AssetHandler {
 	memoryMonitor := memory.NewMemoryMonitor()
-	sessionManager := upload.NewSessionManager(30 * time.Minute) // 30 minute timeout
-	chunkMerger := upload.NewChunkMerger(storage.NewDirectoryManager())
+	sessionManager := upload.NewSessionManager(30*time.Minute, queries, files)
+	chunkMerger := upload.NewChunkMerger(stagingManager)
 	// Increased limit to 32 to support HTTP/2 multiplexing for chunked uploads
 	uploadLimiter := make(chan struct{}, 32)
 
@@ -86,8 +89,10 @@ func NewAssetHandler(
 		indexingService: indexingService,
 		stackService:    stackService,
 		queries:         queries,
+		database:        database,
 		repoManager:     repoManager,
 		stagingManager:  stagingManager,
+		files:           files,
 		queueClient:     queueClient,
 		settingsService: settingsService,
 		runtimeChecker:  runtimeChecker,
@@ -138,8 +143,11 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 // currently reachable. Staging a file for a repository that cannot be written is
 // a guaranteed failure later, with a worse error attached.
 func rejectOfflineRepository(repository repo.Repository) error {
-	if repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError {
+	if repository.Reachability != dbtypes.RepositoryReachabilityActive {
 		return fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
+	}
+	if repository.Activity == dbtypes.RepositoryActivityPaused {
+		return fmt.Errorf("%w: %s is paused", storage.ErrRepositoryBusy, repository.Name)
 	}
 	return nil
 }
@@ -153,6 +161,8 @@ func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 		api.GinNotFound(c, err, "Repository not found")
 	case errors.Is(err, storage.ErrRepositoryOffline):
 		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is unavailable")
+	case errors.Is(err, storage.ErrRepositoryBusy):
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository writes are paused")
 	default:
 		api.GinBadRequest(c, err, "Please specify a repository_id or create a repository first")
 	}
@@ -208,48 +218,60 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		h.respondRepositoryError(c, err)
 		return
 	}
+	if _, err := h.repoManager.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), uint64(max(header.Size, 0))); err != nil {
+		h.respondCapacityError(c, err)
+		return
+	}
 
 	// Create staging file in repository
-	stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
+	stagingFile, stagingWriter, err := h.stagingManager.CreateStagingFile(repository, header.Filename)
 	if err != nil {
 		log.Printf("Failed to create staging file: %v", err)
 		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 
-	// Write uploaded content to staging file
-	osFile, err := os.Create(stagingFile.Path)
+	_, err = io.Copy(stagingWriter, file)
 	if err != nil {
-		log.Printf("Failed to open staging file: %v", err)
-		api.GinInternalError(c, err, "Upload failed")
-		return
-	}
-
-	_, err = io.Copy(osFile, file)
-	osFile.Close()
-	if err != nil {
+		_ = stagingWriter.Close()
 		log.Printf("Failed to copy file to staging: %v", err)
-		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "copy upload data to staging")
+		h.handleUploadFailureFile(repository, stagingFile, "copy upload data to staging")
 		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 
-	hashResult, err := hash.CalculateLayeredBLAKE3(stagingFile.Path)
+	if err := stagingWriter.Sync(); err != nil {
+		_ = stagingWriter.Close()
+		h.handleUploadFailureFile(repository, stagingFile, "sync upload staging file")
+		api.GinInternalError(c, err, "Upload failed")
+		return
+	}
+	stagingInfo, err := stagingWriter.Stat()
+	if err != nil {
+		_ = stagingWriter.Close()
+		h.handleUploadFailureFile(repository, stagingFile, "stat upload staging file")
+		api.GinInternalError(c, err, "Upload failed")
+		return
+	}
+	hashResult, err := hash.CalculateLayeredBLAKE3Reader(stagingWriter, stagingInfo.Size())
+	closeErr := stagingWriter.Close()
+	err = errors.Join(err, closeErr)
 	if err != nil {
 		log.Printf("Failed to calculate authoritative hash: %v", err)
-		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "calculate upload hash")
+		h.handleUploadFailureFile(repository, stagingFile, "calculate upload hash")
 		api.GinInternalError(c, err, "Failed to calculate file hash")
 		return
 	}
 	duplicate, err := h.findDuplicateByHash(ctx, hashResult.ContentHash, hashResult.FileSize, repository.RepoID)
 	if err != nil {
-		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "check duplicate content")
+		h.handleUploadFailureFile(repository, stagingFile, "check duplicate content")
 		api.GinInternalError(c, err, "Failed to check for duplicate content")
 		return
 	}
 	if duplicate != nil {
-		verified, verifyErr := verifyDuplicateAssetFile(
-			repository.Path,
+		verified, verifyErr := h.verifyDuplicateAssetFile(
+			ctx,
+			repository,
 			duplicate,
 			hashResult.ContentHash,
 			hashResult.FileSize,
@@ -257,7 +279,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		if verifyErr != nil {
 			log.Printf("Existing duplicate asset %s could not be verified: %v", duplicate.assetID, verifyErr)
 		} else if verified {
-			h.removeUploadTempFile(stagingFile.Path)
+			_ = h.stagingManager.RemoveStagingFile(repository, stagingFile)
 			api.JSONOK(c, dto.UploadResponseDTO{Status: uploadStatusDuplicate, FileName: header.Filename, Size: header.Size, ContentHash: hashResult.ContentHash, Message: "File already exists in repository"})
 			return
 		}
@@ -272,10 +294,10 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		userID = "anonymous"
 	}
 
-	payload := processors.AssetPayload{
+	payload := jobs.IngestAssetArgs{
 		ContentHash:      hashResult.ContentHash,
 		QuickFingerprint: valueOrEmpty(hashResult.QuickFingerprint),
-		StagedPath:       stagingFile.Path,
+		StagedPath:       stagingFile.PrivatePath,
 		UserID:           userID,
 		Timestamp:        time.Now(),
 		ContentType:      validationResult.MimeType,
@@ -283,26 +305,17 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		RepositoryID:     repository.RepoID.String(),
 	}
 
-	jobInsetResult, err := h.queueClient.Insert(ctx, jobs.IngestAssetArgs{
-		ContentHash:      payload.ContentHash,
-		QuickFingerprint: payload.QuickFingerprint,
-		StagedPath:       payload.StagedPath,
-		UserID:           payload.UserID,
-		Timestamp:        payload.Timestamp,
-		ContentType:      payload.ContentType,
-		FileName:         payload.FileName,
-		RepositoryID:     payload.RepositoryID,
-	}, &river.InsertOpts{Queue: "ingest_asset"})
+	jobInsetResult, err := h.queueClient.Insert(ctx, payload, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
 		log.Printf("Failed to enqueue task: %v", err)
-		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "enqueue ingest task")
+		h.handleUploadFailureFile(repository, stagingFile, "enqueue ingest task")
 		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 	if jobInsetResult == nil || jobInsetResult.Job == nil {
 		log.Printf("Failed to enqueue task: empty result")
-		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "enqueue ingest task returned empty result")
+		h.handleUploadFailureFile(repository, stagingFile, "enqueue ingest task returned empty result")
 		api.GinInternalError(c, fmt.Errorf("enqueue failed"), "Upload failed")
 		return
 	}
@@ -378,7 +391,6 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		info        *upload.FileFieldInfo
 		filename    string
 		contentType string
-		chunkInfos  []upload.ChunkInfo
 	}
 
 	sessions := make(map[string]*sessionState)
@@ -436,10 +448,10 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 				api.GinBadRequest(c, errors.New("upload session must be created first"), "Unknown upload session")
 				return
 			}
-			h.sessionManager.CreateSession(fileInfo.SessionID, filename, 0, fileInfo.TotalChunks, contentType, repository.Path, userID)
+			h.sessionManager.CreateSession(fileInfo.SessionID, filename, 0, fileInfo.TotalChunks, contentType, repository.RepoID.String(), userID)
 		}
 		session, _ := h.sessionManager.GetSession(fileInfo.SessionID)
-		if session.UserID != userID || session.RepositoryID != repository.Path || session.TotalChunks != fileInfo.TotalChunks || session.Filename != filepath.Base(filename) {
+		if session.UserID != userID || session.RepositoryID != repository.RepoID.String() || session.TotalChunks != fileInfo.TotalChunks || session.Filename != path.Base(strings.ReplaceAll(filename, `\`, "/")) {
 			part.Close()
 			api.GinBadRequest(c, errors.New("upload session metadata mismatch"), "Invalid upload session")
 			return
@@ -469,41 +481,28 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			targetName = fmt.Sprintf("chunk_%s_%d", fileInfo.SessionID, fileInfo.ChunkIndex)
 		}
 
-		stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, targetName)
+		stagingFile, dst, err := h.stagingManager.CreateStagingFile(repository, targetName)
 		if err != nil {
 			part.Close()
 			api.GinInternalError(c, err, "Failed to create staging file")
 			return
 		}
 
-		dst, err := os.Create(stagingFile.Path)
-		if err != nil {
-			part.Close()
-			h.handleUploadFailureFile(repository.Path, stagingFile.Path, targetName, "open batch staging file")
-			api.GinInternalError(c, err, "Failed to open staging file")
-			return
-		}
-
 		written, err := io.CopyBuffer(dst, part, buf)
-		dst.Close()
+		closeErr := dst.Close()
+		err = errors.Join(err, closeErr)
 		part.Close()
 		if err != nil {
-			h.handleUploadFailureFile(repository.Path, stagingFile.Path, targetName, "save batch upload data")
+			h.handleUploadFailureFile(repository, stagingFile, "save batch upload data")
 			api.GinInternalError(c, err, "Failed to save upload data")
 			return
 		}
 
-		if !h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written, stagingFile.Path) {
+		if !h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written, stagingFile.PrivatePath) {
 			api.GinInternalError(c, errors.New("failed to persist upload session"), "Failed to save upload progress")
 			return
 		}
 
-		state.chunkInfos = append(state.chunkInfos, upload.ChunkInfo{
-			SessionID:  fileInfo.SessionID,
-			ChunkIndex: fileInfo.ChunkIndex,
-			FilePath:   stagingFile.Path,
-			Size:       written,
-		})
 	}
 
 	if len(sessions) == 0 {
@@ -514,16 +513,31 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	var results []dto.BatchUploadResultDTO
 
 	for sessionID, state := range sessions {
+		session, ok := h.sessionManager.GetSession(sessionID)
+		if !ok {
+			continue
+		}
+		allChunks := make([]upload.ChunkInfo, 0, len(session.ReceivedChunks))
+		for _, index := range session.ReceivedChunks {
+			allChunks = append(allChunks, upload.ChunkInfo{
+				SessionID: sessionID, ChunkIndex: index, PrivatePath: session.ChunkFiles[index], Size: session.ChunkSizes[index],
+			})
+		}
 		if state.info.Type == "single" {
-			session, _ := h.sessionManager.GetSession(sessionID)
+			if len(allChunks) != 1 {
+				continue
+			}
 			header := &multipart.FileHeader{
 				Filename: state.filename,
-				Size:     state.chunkInfos[0].Size,
+				Size:     allChunks[0].Size,
 				Header:   map[string][]string{},
 			}
 			header.Header.Set("Content-Type", state.contentType)
 
-			result, err := h.processCompletedUpload(ctx, header, session, repository, state.chunkInfos[0].FilePath)
+			chunk := allChunks[0]
+			result, err := h.processCompletedUpload(ctx, header, session, repository, &storage.StagingFile{
+				ID: sessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath, Filename: state.filename,
+			})
 			if err != nil {
 				errMsg := err.Error()
 				results = append(results, dto.BatchUploadResultDTO{
@@ -541,7 +555,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 
-		h.chunkMerger.AddChunks(sessionID, state.chunkInfos)
+		h.chunkMerger.AddChunks(sessionID, allChunks)
 
 		if !h.sessionManager.IsSessionComplete(sessionID) {
 			progress, _ := h.sessionManager.GetSessionProgress(sessionID)
@@ -558,11 +572,11 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}
 
 		h.sessionManager.UpdateSessionStatus(sessionID, "merging")
-		mergeResult, err := h.chunkMerger.MergeChunks(sessionID, state.info.TotalChunks, repository.Path)
+		mergeResult, err := h.chunkMerger.MergeChunks(repository, sessionID, state.info.TotalChunks, state.filename)
 		if err != nil {
 			errMsg := err.Error()
 			h.sessionManager.SetSessionError(sessionID, errMsg)
-			h.chunkMerger.CleanupChunks(sessionID)
+			h.chunkMerger.CleanupChunks(repository, sessionID)
 			results = append(results, dto.BatchUploadResultDTO{
 				Success:   false,
 				SessionID: sessionID,
@@ -579,15 +593,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}
 		header.Header.Set("Content-Type", state.contentType)
 
-		session, _ := h.sessionManager.GetSession(sessionID)
-		result, err := h.processCompletedUpload(ctx, header, session, repository, mergeResult.MergedFilePath)
+		result, err := h.processCompletedUpload(ctx, header, session, repository, mergeResult.StagingFile)
 
-		h.chunkMerger.CleanupChunks(sessionID)
+		h.chunkMerger.CleanupChunks(repository, sessionID)
 
 		if err != nil {
-			if mergeResult.MergedFilePath != "" {
-				h.chunkMerger.CleanupMergedFile(mergeResult.MergedFilePath)
-			}
+			_ = h.stagingManager.RemoveStagingFile(repository, mergeResult.StagingFile)
 			errMsg := err.Error()
 			h.sessionManager.SetSessionError(sessionID, errMsg)
 			results = append(results, dto.BatchUploadResultDTO{
@@ -782,20 +793,35 @@ func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 		h.respondRepositoryError(c, err)
 		return
 	}
+	if _, err := h.repoManager.CheckRepositoryWriteCapacity(c.Request.Context(), repository.RepoID.String(), uint64(req.TotalSize)); err != nil {
+		h.respondCapacityError(c, err)
+		return
+	}
 	userID := "anonymous"
 	if id, ok := c.Get("user_id"); ok {
 		userID = fmt.Sprintf("%d", id)
 	}
-	session := h.sessionManager.CreateSession(req.SessionID, filepath.Base(req.Filename), req.TotalSize, req.TotalChunks, req.ContentType, repository.Path, userID)
+	session := h.sessionManager.CreateSession(req.SessionID, filepath.Base(req.Filename), req.TotalSize, req.TotalChunks, req.ContentType, repository.RepoID.String(), userID)
 	if req.ClientFingerprint != "" {
 		h.sessionManager.SetSessionFingerprint(session.SessionID, req.ClientFingerprint)
 	}
 	chunks := make([]upload.ChunkInfo, 0, len(session.ReceivedChunks))
 	for _, index := range session.ReceivedChunks {
-		chunks = append(chunks, upload.ChunkInfo{SessionID: session.SessionID, ChunkIndex: index, FilePath: session.ChunkFiles[index], Size: session.ChunkSizes[index]})
+		chunks = append(chunks, upload.ChunkInfo{SessionID: session.SessionID, ChunkIndex: index, PrivatePath: session.ChunkFiles[index], Size: session.ChunkSizes[index]})
 	}
 	h.chunkMerger.AddChunks(session.SessionID, chunks)
 	api.JSONOK(c, dto.UploadSessionResponseDTO{SessionID: session.SessionID, Status: session.Status, TotalChunks: session.TotalChunks, ReceivedChunks: session.ReceivedChunks, BytesReceived: session.BytesReceived, TaskID: session.TaskID})
+}
+
+func (h *AssetHandler) respondCapacityError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, storage.ErrRepositoryReadOnly):
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository storage is read-only")
+	case errors.Is(err, storage.ErrInsufficientSpace):
+		api.GinError(c, http.StatusInsufficientStorage, err, http.StatusInsufficientStorage, "Repository does not have enough free space for this write and its safety margin; work was paused")
+	default:
+		api.GinInternalError(c, err, "Repository capacity could not be verified")
+	}
 }
 
 // GetUploadProgress returns upload progress for sessions
@@ -1039,7 +1065,7 @@ func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.Uploa
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.
+// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, BioCLIP Species Recognition predictions, OCR Text Recognition results, Person Recognition results, and captions.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -1048,8 +1074,8 @@ func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.Uploa
 // @Param include_tags query bool false "Include tags" default(true)
 // @Param include_albums query bool false "Include albums" default(true)
 // @Param include_species query bool false "Include species predictions" default(true)
-// @Param include_ocr query bool false "Include OCR results" default(false)
-// @Param include_faces query bool false "Include face recognition" default(false)
+// @Param include_ocr query bool false "Include OCR Text Recognition results" default(false)
+// @Param include_faces query bool false "Include Person Recognition results" default(false)
 // @Success 200 {object} dto.AssetDetailDTO "Asset details with optional relationships"
 // @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
 // @Failure 404 {object} api.ErrorResponse "Asset not found"
@@ -1155,17 +1181,14 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 		return
 	}
 
-	repoPath, err := h.resolveAssetRepoPath(c.Request.Context(), asset)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
-		return
-	}
-
-	dirManager := h.repoManager.GetDirectoryManager()
 	sidecar := h.defaultSidecarForAsset(id, asset)
 	exists := false
 
-	content, err := dirManager.ReadSidecar(repoPath, id.String())
+	if !asset.RepositoryID.Valid {
+		api.GinInternalError(c, errors.New("asset has no repository"), "Failed to resolve asset sidecar")
+		return
+	}
+	content, err := h.repoManager.ReadRepositorySidecar(c.Request.Context(), asset.RepositoryID.UUID.String(), id.String())
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to read asset sidecar")
 		return
@@ -1227,20 +1250,17 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 	sidecar.Source = h.sidecarSourceForAsset(asset)
 	sidecar.UpdatedAt = time.Now().UTC()
 
-	repoPath, err := h.resolveAssetRepoPath(c.Request.Context(), asset)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
-		return
-	}
-
 	content, err := json.MarshalIndent(sidecar, "", "  ")
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to encode asset sidecar")
 		return
 	}
 
-	dirManager := h.repoManager.GetDirectoryManager()
-	if err := dirManager.WriteSidecar(repoPath, id.String(), content); err != nil {
+	if !asset.RepositoryID.Valid {
+		api.GinInternalError(c, errors.New("asset has no repository"), "Failed to resolve asset sidecar")
+		return
+	}
+	if err := h.repoManager.WriteRepositorySidecar(c.Request.Context(), asset.RepositoryID.UUID.String(), id.String(), content); err != nil {
 		api.GinInternalError(c, err, "Failed to save asset sidecar")
 		return
 	}
@@ -1305,16 +1325,20 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	fullPath := h.resolveRepositoryPath(repository.Path, thumbnail.StoragePath)
-
-	// Get file info for proper cache control
-	fileInfo, err := os.Stat(fullPath)
+	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, thumbnail.StoragePath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			api.GinNotFound(c, err, "Thumbnail file not found")
 			return
 		}
-		log.Printf("Failed to get file info for %s: %v", fullPath, err)
+		log.Printf("Failed to open thumbnail: %v", err)
+		api.GinInternalError(c, err, "Failed to access thumbnail file")
+		return
+	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		_ = repositoryFS.Close()
 		api.GinInternalError(c, err, "Failed to access thumbnail file")
 		return
 	}
@@ -1332,14 +1356,14 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 
 	// Check conditional request
 	if match := c.GetHeader("If-None-Match"); match == etag {
+		_ = file.Close()
+		_ = repositoryFS.Close()
 		log.Printf("Request for asset %s thumbnail (%s) - 304 Not Modified (ETag: %s)", assetID.String(), size, etag)
 		c.Status(http.StatusNotModified)
 		return
 	}
 
-	log.Printf("Request for asset %s thumbnail (%s), serving file: %s (ETag: %s)", assetID.String(), size, fullPath, etag)
-
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, thumbnail.StoragePath)
 }
 
 // GetOriginalFile serves the original file content by asset ID
@@ -1380,12 +1404,13 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to access repository")
 		return
 	}
-	fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
-
-	// Check if file exists
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		log.Printf("Original file not found at path: %s", fullPath)
-		api.GinNotFound(c, err, "Original file not found")
+	repositoryFS, file, err := openRepositoryMedia(h.files, *repository, *asset.StoragePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			api.GinNotFound(c, err, "Original file not found")
+			return
+		}
+		api.GinInternalError(c, err, "Failed to access original file")
 		return
 	}
 
@@ -1394,8 +1419,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	c.Header("Content-Type", asset.MimeType)
 	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", asset.OriginalFilename))
 
-	// Serve the file
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
 }
 
 // clampedIntQuery parses an integer query parameter, returning def when absent
@@ -1469,10 +1493,24 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to access repository")
 		return
 	}
-	fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
-
-	if _, statErr := os.Stat(fullPath); os.IsNotExist(statErr) {
-		api.GinNotFound(c, statErr, "Original file not found")
+	repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
+	if err != nil {
+		api.GinInternalError(c, err, "Invalid original file path")
+		return
+	}
+	repositoryFS, err := h.files.Open(*repository)
+	if err != nil {
+		respondRepositoryResolveError(c, err, "Failed to access repository")
+		return
+	}
+	defer repositoryFS.Close()
+	fullPath, err := repositoryFS.LocalMediaPath(repositoryPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			api.GinNotFound(c, err, "Original file not found")
+			return
+		}
+		api.GinInternalError(c, err, "Failed to access original file")
 		return
 	}
 
@@ -1574,25 +1612,33 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 			return
 		}
 
-		fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
-		fileInfo, err := os.Stat(fullPath)
+		repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
 		if err != nil {
-			if os.IsNotExist(err) {
-				log.Printf("Original file not found at path: %s", fullPath)
+			api.GinInternalError(c, err, "Invalid original file path")
+			return
+		}
+		repositoryFS, err := h.files.Open(*repository)
+		if err != nil {
+			respondRepositoryResolveError(c, err, "Failed to access repository")
+			return
+		}
+		opened, err := repositoryFS.OpenMedia(repositoryPath)
+		if err != nil {
+			_ = repositoryFS.Close()
+			if errors.Is(err, fs.ErrNotExist) {
 				api.GinNotFound(c, err, "Original file not found")
-				return
+			} else {
+				api.GinInternalError(c, err, "Failed to access original file")
 			}
-			api.GinInternalError(c, err, "Failed to access original file")
 			return
 		}
-		if fileInfo.IsDir() {
-			api.GinNotFound(c, fmt.Errorf("original file path is a directory"), "Original file not found")
-			return
-		}
+		_ = opened.Close()
+		_ = repositoryFS.Close()
 
 		files = append(files, assetDownloadFile{
-			asset: *asset,
-			path:  fullPath,
+			asset:      *asset,
+			repository: *repository,
+			path:       repositoryPath,
 		})
 	}
 
@@ -1605,7 +1651,7 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 	zipWriter := zip.NewWriter(c.Writer)
 	archiveNames := make(map[string]int, len(files))
 	for _, file := range files {
-		if err := writeAssetToZip(zipWriter, archiveNames, file); err != nil {
+		if err := writeAssetToZip(h.files, zipWriter, archiveNames, file); err != nil {
 			log.Printf("Failed to write asset to zip: %v", err)
 			_ = zipWriter.Close()
 			return
@@ -1661,31 +1707,14 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to access repository")
 		return
 	}
-	repoPath := repository.Path
-
-	// Construct web video file path in .lumilio/assets/videos/web/
-	var fullPath string
-	webVersionExists := false
-
-	if asset.ContentHash != "" {
-		webVideoFilename := fmt.Sprintf("%s_web.mp4", asset.ContentHash)
-		webVideoPath := filepath.Join(storage.DefaultStructure.VideosDir, "web", webVideoFilename)
-		fullPath = filepath.Join(repoPath, webVideoPath)
-
-		if _, err := os.Stat(fullPath); err == nil {
-			webVersionExists = true
-		}
-	}
-
-	// Check if web version exists, fallback to original
-	if !webVersionExists {
-		// Fallback to original file
-		fullPath = h.resolveRepositoryPath(repoPath, *asset.StoragePath)
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			log.Printf("Video file not found at path: %s", fullPath)
+	repositoryFS, file, err := openWebOrOriginal(h.files, *repository, asset, "videos", "_web.mp4")
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			api.GinNotFound(c, err, "Video file not found")
-			return
+		} else {
+			api.GinInternalError(c, err, "Failed to access video file")
 		}
+		return
 	}
 
 	// Set appropriate headers for video streaming
@@ -1693,8 +1722,7 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	c.Header("Content-Type", "video/mp4")
 	c.Header("Accept-Ranges", "bytes") // Enable range requests for video seeking
 
-	// Serve the file
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
 }
 
 // GetWebAudio serves the web-optimized audio version by asset ID
@@ -1741,31 +1769,14 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to access repository")
 		return
 	}
-	repoPath := repository.Path
-
-	// Construct web audio file path in .lumilio/assets/audios/web/
-	var fullPath string
-	webVersionExists := false
-
-	if asset.ContentHash != "" {
-		webAudioFilename := fmt.Sprintf("%s_web.mp3", asset.ContentHash)
-		webAudioPath := filepath.Join(storage.DefaultStructure.AudiosDir, "web", webAudioFilename)
-		fullPath = filepath.Join(repoPath, webAudioPath)
-
-		if _, err := os.Stat(fullPath); err == nil {
-			webVersionExists = true
-		}
-	}
-
-	// Check if web version exists, fallback to original
-	if !webVersionExists {
-		// Fallback to original file
-		fullPath = h.resolveRepositoryPath(repoPath, *asset.StoragePath)
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			log.Printf("Audio file not found at path: %s", fullPath)
+	repositoryFS, file, err := openWebOrOriginal(h.files, *repository, asset, "audios", "_web.mp3")
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			api.GinNotFound(c, err, "Audio file not found")
-			return
+		} else {
+			api.GinInternalError(c, err, "Failed to access audio file")
 		}
+		return
 	}
 
 	// Set appropriate headers for audio streaming
@@ -1774,8 +1785,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	c.Header("Vary", "Accept-Encoding")
 	c.Header("Accept-Ranges", "bytes") // Enable range requests for audio seeking
 
-	// Serve the file
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
 }
 
 // UpdateAsset updates asset metadata
@@ -2101,11 +2111,13 @@ func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository, includ
 			continue
 		}
 		item := dto.IndexingRepositoryOptionDTO{
-			ID:        repository.RepoID.String(),
-			Name:      repository.Name,
-			Role:      string(repository.Role),
-			Status:    string(repository.Status),
-			IsPrimary: repository.Role == dbtypes.RepoRolePrimary,
+			ID:           repository.RepoID.String(),
+			Name:         repository.Name,
+			Role:         string(repository.Role),
+			RootID:       repository.RootID.String(),
+			Reachability: string(repository.Reachability),
+			Activity:     string(repository.Activity),
+			IsPrimary:    repository.Role == dbtypes.RepoRolePrimary,
 		}
 		if includePath {
 			item.Path = repository.Path
@@ -2472,7 +2484,7 @@ func toSearchDebugItemDTOs(debug []service.SearchDebugItem) []dto.SearchDebugIte
 // @Param data body dto.AssetQueryRequestDTO true "Query parameters"
 // @Success 200 {object} dto.QueryAssetsResponseDTO "Assets queried successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 503 {object} api.ErrorResponse "Semantic search unavailable"
+// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/list [post]
 func (h *AssetHandler) QueryAssets(c *gin.Context) {
@@ -2517,7 +2529,7 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		}
 		// Check for semantic search unavailable error
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
+			api.GinError(c, 503, err, 503, "Image Semantic Analysis is currently unavailable")
 			return
 		}
 		log.Printf("Failed to query assets: %v", err)
@@ -3668,9 +3680,6 @@ func (h *AssetHandler) StartCleanupTasks(ctx context.Context) {
 func (h *AssetHandler) cleanupOrphanedChunks() {
 	log.Println("🔍 Starting orphaned chunk cleanup...")
 
-	// Get staging manager from repository manager
-	stagingManager := h.repoManager.GetStagingManager()
-
 	// Get all active session IDs
 	activeSessions := h.sessionManager.GetAllSessions()
 	activeSessionIDs := make(map[string]bool)
@@ -3706,11 +3715,11 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 			for _, repo := range repositories {
 				// An offline repository has no reachable staging directory;
 				// walking it only produces I/O errors and false failure counts.
-				if repo.Status == dbtypes.RepoStatusOffline || repo.Status == dbtypes.RepoStatusError {
+				if repo.Reachability != dbtypes.RepositoryReachabilityActive {
 					continue
 				}
 				// Use staging manager's cleanup function with short max age (1 hour)
-				err := stagingManager.CleanupStaging(repo.Path, time.Hour)
+				err := h.stagingManager.CleanupStaging(*repo, time.Hour)
 				if err != nil {
 					log.Printf("❌ Failed to cleanup staging for repository %s: %v", repo.Name, err)
 					errorCount++
@@ -3721,17 +3730,16 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 		}
 	} else {
 		// Cleanup for specific repositories with active sessions
-		for _, repoPath := range repositoryIDs {
-			// Use GetRepositoryByPath since RepositoryID in session stores the path, not UUID
-			repo, err := h.repoManager.GetRepositoryByPath(repoPath)
+		for _, repositoryID := range repositoryIDs {
+			repo, err := h.repoManager.GetRepository(repositoryID)
 			if err != nil {
-				log.Printf("❌ Failed to get repository with path %s: %v", repoPath, err)
+				log.Printf("❌ Failed to get repository %s: %v", repositoryID, err)
 				errorCount++
 				continue
 			}
 
 			// Use staging manager's cleanup function with short max age (1 hour)
-			err = stagingManager.CleanupStaging(repo.Path, time.Hour)
+			err = h.stagingManager.CleanupStaging(*repo, time.Hour)
 			if err != nil {
 				log.Printf("❌ Failed to cleanup staging for repository %s: %v", repo.Name, err)
 				errorCount++
@@ -3795,54 +3803,13 @@ func (h *AssetHandler) defaultSidecarForAsset(assetID uuid.UUID, asset *repo.Ass
 	}
 }
 
-func (h *AssetHandler) resolveRepositoryPath(repositoryPath string, storagePath string) string {
-	return resolveRepositoryPath(repositoryPath, storagePath)
-}
-
-func (h *AssetHandler) handleUploadFailureFile(repoPath, filePath, filename, reason string) {
-	if strings.TrimSpace(filePath) == "" {
+func (h *AssetHandler) handleUploadFailureFile(repository repo.Repository, stagingFile *storage.StagingFile, reason string) {
+	if stagingFile == nil || strings.TrimSpace(stagingFile.PrivatePath) == "" {
 		return
 	}
-
-	if h.isStagingIncomingPath(repoPath, filePath) {
-		stagingFile := &storage.StagingFile{
-			ID:        filepath.Base(filePath),
-			RepoPath:  repoPath,
-			Path:      filePath,
-			Filename:  filename,
-			CreatedAt: time.Now(),
-		}
-		if err := h.stagingManager.MoveStagingToFailed(stagingFile); err != nil {
-			log.Printf("Failed to move upload file to failed dir (%s): %v", reason, err)
-		}
-		return
+	if err := h.stagingManager.MoveStagingToFailed(repository, stagingFile); err != nil {
+		log.Printf("Failed to quarantine upload file %s (%s): %v", stagingFile.PrivatePath, reason, err)
 	}
-
-	h.removeUploadTempFile(filePath)
-}
-
-func (h *AssetHandler) removeUploadTempFile(filePath string) {
-	if strings.TrimSpace(filePath) == "" {
-		return
-	}
-	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
-		log.Printf("Failed to remove temporary upload file %s: %v", filePath, err)
-	}
-}
-
-func (h *AssetHandler) isStagingIncomingPath(repoPath string, filePath string) bool {
-	repoAbs, repoErr := filepath.Abs(repoPath)
-	pathAbs, pathErr := filepath.Abs(filePath)
-	if repoErr != nil || pathErr != nil {
-		return false
-	}
-
-	incomingDir := filepath.Join(repoAbs, storage.DefaultStructure.IncomingDir)
-	rel, err := filepath.Rel(incomingDir, pathAbs)
-	if err != nil || rel == "." {
-		return err == nil && rel == "."
-	}
-	return !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".."
 }
 
 // stringPtr returns a pointer to a string
@@ -3857,323 +3824,48 @@ func valueOrEmpty(value *string) string {
 	return *value
 }
 
-// groupFilesBySession groups uploaded files by their session ID
-func (h *AssetHandler) groupFilesBySession(formFiles map[string][]*multipart.FileHeader) map[string]map[string]*multipart.FileHeader {
-	sessionGroups := make(map[string]map[string]*multipart.FileHeader)
-
-	for fieldName, headers := range formFiles {
-		if len(headers) == 0 {
-			continue
-		}
-
-		log.Printf("Processing field: %s with %d headers", fieldName, len(headers))
-		fileInfo, err := upload.ParseFileField(fieldName)
-		if err != nil {
-			log.Printf("Invalid field name format: %s - %v", fieldName, err)
-			continue
-		}
-		log.Printf("Parsed field: type=%s, session=%s, chunk_index=%d, total_chunks=%d",
-			fileInfo.Type, fileInfo.SessionID, fileInfo.ChunkIndex, fileInfo.TotalChunks)
-
-		if sessionGroups[fileInfo.SessionID] == nil {
-			sessionGroups[fileInfo.SessionID] = make(map[string]*multipart.FileHeader)
-		}
-		sessionGroups[fileInfo.SessionID][fieldName] = headers[0]
-		log.Printf("Added field to session group: %s", fileInfo.SessionID)
-	}
-
-	return sessionGroups
-}
-
-// processUploadSession processes a complete upload session (single file or chunks)
-func (h *AssetHandler) processUploadSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, repository repo.Repository, userID string) (*dto.BatchUploadResultDTO, error) {
-	// Get first file to determine session type
-	var firstFileInfo *upload.FileFieldInfo
-	for fieldName := range files {
-		log.Printf("processUploadSession: examining field %s", fieldName)
-		fileInfo, err := upload.ParseFileField(fieldName)
-		if err != nil {
-			log.Printf("processUploadSession: failed to parse field %s: %v", fieldName, err)
-			return nil, err
-		}
-		firstFileInfo = fileInfo
-		log.Printf("processUploadSession: first file info - type=%s, session=%s, chunks=%d/%d",
-			fileInfo.Type, fileInfo.SessionID, fileInfo.ChunkIndex, fileInfo.TotalChunks)
-		break
-	}
-
-	if firstFileInfo == nil {
-		return nil, errors.New("no valid files in session")
-	}
-
-	// Check memory availability for large files
-	if firstFileInfo.Type == "chunk" {
-		totalSize := int64(0)
-		for _, header := range files {
-			totalSize += header.Size
-		}
-
-		canAccept, reason := h.memoryMonitor.CanAcceptNewUpload(totalSize)
-		if !canAccept {
-			return nil, fmt.Errorf("insufficient system memory: %s", reason)
-		}
-	}
-
-	// Process based on session type
-	if firstFileInfo.Type == "single" {
-		log.Printf("processUploadSession: processing as single file session")
-		// Get the single file header
-		var header *multipart.FileHeader
-		for _, h := range files {
-			header = h
-			break
-		}
-		return h.processSingleFileSession(ctx, header, repository, userID)
-	} else {
-		log.Printf("processUploadSession: processing as chunked file session with %d total chunks", firstFileInfo.TotalChunks)
-		return h.processChunkedFileSession(ctx, sessionID, files, firstFileInfo.TotalChunks, repository, userID)
-	}
-}
-
-// processSingleFileSession processes a single file upload
-func (h *AssetHandler) processSingleFileSession(ctx context.Context, header *multipart.FileHeader, repository repo.Repository, userID string) (*dto.BatchUploadResultDTO, error) {
-	// Validate file type
-	contentType := header.Header.Get("Content-Type")
-	validationResult := filevalidator.ValidateFile(header.Filename, contentType)
-	if !validationResult.Valid {
-		return nil, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)
-	}
-
-	// Create session for tracking
-	session := h.sessionManager.CreateSession("", header.Filename, header.Size, 1, contentType, repository.Path, userID)
-	h.sessionManager.UpdateSessionStatus(session.SessionID, "uploading")
-
-	// Process the single file
-	return h.processCompletedUpload(ctx, header, session, repository, "")
-}
-
-// processChunkedFileSession processes a chunked file upload session
-func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, totalChunks int, repository repo.Repository, userID string) (*dto.BatchUploadResultDTO, error) {
-	// Get filename from first chunk
-	var filename string
-	for _, header := range files {
-		filename = header.Filename
-		break
-	}
-
-	// Calculate total size
-	totalSize := int64(0)
-	for _, header := range files {
-		totalSize += header.Size
-	}
-
-	// Validate file type using first chunk
-	var firstHeader *multipart.FileHeader
-	for _, header := range files {
-		firstHeader = header
-		break
-	}
-	contentType := firstHeader.Header.Get("Content-Type")
-	validationResult := filevalidator.ValidateFile(filename, contentType)
-	if !validationResult.Valid {
-		return nil, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)
-	}
-
-	session, exists := h.sessionManager.GetSession(sessionID)
-	if !exists {
-		log.Printf("processChunkedFileSession: creating new session %s", sessionID)
-		// Pass the client-provided sessionID to create the session
-		session = h.sessionManager.CreateSession(sessionID, filename, totalSize, totalChunks, contentType, repository.Path, userID)
-	} else {
-		log.Printf("processChunkedFileSession: using existing session %s", sessionID)
-	}
-
-	// Save all chunks to staging directory and add to chunk merger
-	log.Printf("processChunkedFileSession: saving %d chunks to staging", len(files))
-	chunkInfos := make([]upload.ChunkInfo, 0, len(files))
-	for fieldName, header := range files {
-		log.Printf("processChunkedFileSession: preparing chunk from field %s", fieldName)
-		fileInfo, _ := upload.ParseFileField(fieldName)
-
-		// Save chunk to temporary file
-		tempFile, err := h.stagingManager.CreateStagingFile(repository.Path, fmt.Sprintf("chunk_%s_%d", sessionID, fileInfo.ChunkIndex))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create chunk file: %w", err)
-		}
-		log.Printf("Chunk %d saved to: %s", fileInfo.ChunkIndex, tempFile.Path)
-
-		file, err := header.Open()
-		if err != nil {
-			log.Printf("processChunkedFileSession: failed to open chunk %d: %v", fileInfo.ChunkIndex, err)
-			return nil, fmt.Errorf("failed to open chunk: %w", err)
-		}
-
-		osFile, err := os.Create(tempFile.Path)
-		if err != nil {
-			log.Printf("processChunkedFileSession: failed to create chunk file %s: %v", tempFile.Path, err)
-			file.Close()
-			return nil, fmt.Errorf("failed to create chunk file: %w", err)
-		}
-
-		bytesCopied, err := io.Copy(osFile, file)
-		osFile.Close()
-		file.Close()
-		if err != nil {
-			log.Printf("processChunkedFileSession: failed to save chunk %d: %v", fileInfo.ChunkIndex, err)
-			return nil, fmt.Errorf("failed to save chunk: %w", err)
-		}
-		log.Printf("processChunkedFileSession: saved chunk %d, copied %d bytes to %s", fileInfo.ChunkIndex, bytesCopied, tempFile.Path)
-
-		chunkInfos = append(chunkInfos, upload.ChunkInfo{
-			SessionID:  sessionID,
-			ChunkIndex: fileInfo.ChunkIndex,
-			FilePath:   tempFile.Path,
-			Size:       header.Size,
-		})
-		h.sessionManager.UpdateSessionChunk(sessionID, fileInfo.ChunkIndex, bytesCopied, tempFile.Path)
-	}
-
-	// Add chunks to chunk merger for tracking across requests
-	h.chunkMerger.AddChunks(sessionID, chunkInfos)
-
-	// Check if all chunks are received
-	log.Printf("processChunkedFileSession: checking if session %s is complete", sessionID)
-	isComplete := h.sessionManager.IsSessionComplete(sessionID)
-	log.Printf("processChunkedFileSession: session complete status=%v", isComplete)
-
-	if !isComplete {
-		// Not all chunks received yet, return progress
-		progress, exists := h.sessionManager.GetSessionProgress(sessionID)
-		log.Printf("processChunkedFileSession: progress=%f, exists=%v", progress, exists)
-		status := "uploading"
-		message := fmt.Sprintf("Upload in progress: %.1f%% complete", progress*100)
-		log.Printf("processChunkedFileSession: returning progress: %s", message)
-
-		result := &dto.BatchUploadResultDTO{
-			Success:   true,
-			SessionID: sessionID,
-			FileName:  filename,
-			Status:    &status,
-			Message:   &message,
-		}
-		log.Printf("processChunkedFileSession: returning progress result: %+v", result)
-		return result, nil
-	}
-
-	// All chunks received, merge and process
-	log.Printf("processChunkedFileSession: all chunks received, starting merge")
-	h.sessionManager.UpdateSessionStatus(sessionID, "merging")
-
-	// Merge all chunks using the chunk merger's stored chunks
-	mergeResult, err := h.chunkMerger.MergeChunks(sessionID, totalChunks, repository.Path)
-	if err != nil {
-		h.sessionManager.SetSessionError(sessionID, err.Error())
-		// Cleanup chunk files
-		h.chunkMerger.CleanupChunks(sessionID)
-		return nil, fmt.Errorf("failed to merge chunks: %w", err)
-	}
-	log.Printf("Chunks merged to: %s (size: %d)", mergeResult.MergedFilePath, mergeResult.TotalSize)
-
-	// Create a mock header for the merged file
-	mergedHeader := &multipart.FileHeader{
-		Filename: filename,
-		Size:     mergeResult.TotalSize,
-		Header:   map[string][]string{},
-	}
-	mergedHeader.Header.Set("Content-Type", contentType)
-
-	// Process the merged file
-	log.Printf("Starting processCompletedUpload for merged file: %s", mergeResult.MergedFilePath)
-	result, processErr := h.processCompletedUpload(ctx, mergedHeader, session, repository, mergeResult.MergedFilePath)
-
-	// Cleanup chunk files regardless of processing result
-	h.chunkMerger.CleanupChunks(sessionID)
-
-	if processErr != nil {
-		// Cleanup merged file only if processing failed
-		if mergeResult.MergedFilePath != "" {
-			h.chunkMerger.CleanupMergedFile(mergeResult.MergedFilePath)
-		}
-		h.sessionManager.SetSessionError(sessionID, processErr.Error())
-		return nil, processErr
-	}
-
-	h.sessionManager.UpdateSessionStatus(sessionID, "completed")
-	return result, nil
-}
-
 // processCompletedUpload processes a completed upload (single file or merged chunks)
-func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multipart.FileHeader, session *upload.UploadSession, repository repo.Repository, mergedFilePath string) (*dto.BatchUploadResultDTO, error) {
-	var stagingFilePath string
-	log.Printf("processCompletedUpload: mergedFilePath=%s, filename=%s", mergedFilePath, header.Filename)
-
-	if mergedFilePath != "" {
-		// Use the merged file path for chunked uploads
-		stagingFilePath = mergedFilePath
-		log.Printf("Using merged file path for chunked upload: %s", stagingFilePath)
-	} else {
-		// Create staging file for single file uploads
-		stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create staging file: %w", err)
-		}
-		stagingFilePath = stagingFile.Path
-		log.Printf("Created staging file for single upload: %s", stagingFilePath)
-
-		// Copy single file to staging
-		file, err := header.Open()
-		if err != nil {
-			return nil, fmt.Errorf("failed to open file: %w", err)
-		}
-		defer file.Close()
-
-		osFile, err := os.Create(stagingFilePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open staging file: %w", err)
-		}
-		defer osFile.Close()
-
-		_, err = io.Copy(osFile, file)
-		if err != nil {
-			h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "copy completed upload to staging")
-			return nil, fmt.Errorf("failed to copy file to staging: %w", err)
-		}
+func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multipart.FileHeader, session *upload.UploadSession, repository repo.Repository, stagingFile *storage.StagingFile) (*dto.BatchUploadResultDTO, error) {
+	if stagingFile == nil {
+		return nil, errors.New("completed upload has no staging file")
 	}
-
-	log.Printf("Calculating authoritative hash for file: %s", stagingFilePath)
-	hashResult, err := hash.CalculateLayeredBLAKE3(stagingFilePath)
+	opened, err := h.stagingManager.OpenStagingFile(repository, stagingFile)
 	if err != nil {
-		log.Printf("Failed to calculate hash for %s: %v", stagingFilePath, err)
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "calculate completed upload hash")
+		return nil, err
+	}
+	info, err := opened.Stat()
+	if err != nil {
+		_ = opened.Close()
+		return nil, err
+	}
+	hashResult, err := hash.CalculateLayeredBLAKE3Reader(opened, info.Size())
+	err = errors.Join(err, opened.Close())
+	if err != nil {
+		h.handleUploadFailureFile(repository, stagingFile, "calculate completed upload hash")
 		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
 	}
 	finalHash := hashResult.ContentHash
-	log.Printf("Calculated full content hash for %s: %s", header.Filename, finalHash)
 
 	validationResult := filevalidator.ValidateFile(header.Filename, session.ContentType)
 	if !validationResult.Valid {
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "validate completed upload")
+		h.handleUploadFailureFile(repository, stagingFile, "validate completed upload")
 		return nil, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)
 	}
 	finalContentType := validationResult.MimeType
-	log.Printf("Completed upload resolved canonical MIME %s for %s", finalContentType, header.Filename)
 
-	// Instant upload: identical content already in the repository, so drop the
-	// staged bytes instead of ingesting a second copy.
-	duplicate, err := h.findDuplicateByHash(ctx, finalHash, header.Size, repository.RepoID)
+	duplicate, err := h.findDuplicateByHash(ctx, finalHash, hashResult.FileSize, repository.RepoID)
 	if err != nil {
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "check duplicate content before enqueue")
+		h.handleUploadFailureFile(repository, stagingFile, "check duplicate content before enqueue")
 		return nil, fmt.Errorf("failed to check for duplicate content: %w", err)
 	}
 
 	if duplicate != nil {
-		verified, verifyErr := verifyDuplicateAssetFile(repository.Path, duplicate, finalHash, header.Size)
+		verified, verifyErr := h.verifyDuplicateAssetFile(ctx, repository, duplicate, finalHash, hashResult.FileSize)
 		if verifyErr != nil {
 			log.Printf("Existing duplicate asset %s could not be verified: %v", duplicate.assetID, verifyErr)
 		} else if verified {
-			log.Printf("Duplicate upload skipped: %s matches asset %s (hash %s)", header.Filename, duplicate.assetID, finalHash)
-			h.removeUploadTempFile(stagingFilePath)
-			size := header.Size
+			_ = h.stagingManager.RemoveStagingFile(repository, stagingFile)
+			size := hashResult.FileSize
 			status := uploadStatusDuplicate
 			message := "File already exists in repository"
 			return &dto.BatchUploadResultDTO{
@@ -4188,12 +3880,10 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		}
 	}
 
-	// Enqueue for processing
-	log.Printf("Enqueuing processing job for file: %s (hash: %s)", stagingFilePath, finalHash)
 	jobResult, err := h.queueClient.Insert(ctx, jobs.IngestAssetArgs{
 		ContentHash:      finalHash,
 		QuickFingerprint: valueOrEmpty(hashResult.QuickFingerprint),
-		StagedPath:       stagingFilePath,
+		StagedPath:       stagingFile.PrivatePath,
 		UserID:           session.UserID,
 		Timestamp:        time.Now(),
 		ContentType:      finalContentType,
@@ -4202,22 +3892,19 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "enqueue ingest task")
+		h.handleUploadFailureFile(repository, stagingFile, "enqueue ingest task")
 		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
 
 	if jobResult == nil || jobResult.Job == nil {
-		log.Printf("Failed to enqueue task: empty result for file: %s", stagingFilePath)
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "enqueue ingest task returned empty result")
+		h.handleUploadFailureFile(repository, stagingFile, "enqueue ingest task returned empty result")
 		return nil, errors.New("failed to enqueue task: empty result")
 	}
 
 	taskID := jobResult.Job.ID
 	status := "processing"
-	size := header.Size
+	size := hashResult.FileSize
 	message := fmt.Sprintf("File uploaded with verified content hash and queued for processing in repository '%s'", repository.Name)
-
-	log.Printf("Task %d enqueued for processing file %s in repository %s (staged path: %s)", taskID, header.Filename, repository.Name, stagingFilePath)
 
 	return &dto.BatchUploadResultDTO{
 		Success:     true,
@@ -4264,28 +3951,21 @@ func (h *AssetHandler) findDuplicateByHash(ctx context.Context, contentHash stri
 	return nil, nil
 }
 
-func verifyDuplicateAssetFile(repositoryPath string, duplicate *duplicateAsset, expectedHash string, expectedSize int64) (bool, error) {
+func (h *AssetHandler) verifyDuplicateAssetFile(ctx context.Context, repository repo.Repository, duplicate *duplicateAsset, expectedHash string, expectedSize int64) (bool, error) {
 	if duplicate == nil || duplicate.storagePath == nil || strings.TrimSpace(*duplicate.storagePath) == "" {
 		return false, nil
 	}
-	if storage.IsRootedPath(*duplicate.storagePath) {
-		return false, errors.New("duplicate asset storage path is rooted or volume-qualified")
-	}
-	normalized := strings.ReplaceAll(*duplicate.storagePath, `\`, "/")
-	root, err := filepath.Abs(filepath.Clean(repositoryPath))
+	repositoryPath, err := storage.ParseUserMediaPath(*duplicate.storagePath)
 	if err != nil {
-		return false, fmt.Errorf("resolve repository root: %w", err)
+		return false, err
 	}
-	target := filepath.Join(root, filepath.Clean(filepath.FromSlash(normalized)))
-	relative, err := filepath.Rel(root, target)
+	repositoryFS, err := h.files.Open(repository)
 	if err != nil {
-		return false, fmt.Errorf("check duplicate asset containment: %w", err)
+		return false, err
 	}
-	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return false, errors.New("duplicate asset storage path escapes repository")
-	}
-	info, err := os.Stat(target)
-	if errors.Is(err, os.ErrNotExist) {
+	defer repositoryFS.Close()
+	info, err := repositoryFS.StatMedia(repositoryPath)
+	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil
 	}
 	if err != nil {
@@ -4294,26 +3974,11 @@ func verifyDuplicateAssetFile(repositoryPath string, duplicate *duplicateAsset, 
 	if !info.Mode().IsRegular() || info.Size() != expectedSize {
 		return false, nil
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return false, fmt.Errorf("resolve repository symlinks: %w", err)
-	}
-	resolvedTarget, err := filepath.EvalSymlinks(target)
-	if err != nil {
-		return false, fmt.Errorf("resolve duplicate asset symlinks: %w", err)
-	}
-	resolvedRelative, err := filepath.Rel(resolvedRoot, resolvedTarget)
-	if err != nil {
-		return false, fmt.Errorf("check duplicate symlink containment: %w", err)
-	}
-	if resolvedRelative == ".." || strings.HasPrefix(resolvedRelative, ".."+string(filepath.Separator)) {
-		return false, errors.New("duplicate asset symlink escapes repository")
-	}
-	actualHash, err := hash.CalculateBLAKE3(target)
+	observation, err := repositoryFS.InspectMedia(ctx, repositoryPath, storage.HashFull)
 	if err != nil {
 		return false, fmt.Errorf("hash duplicate asset file: %w", err)
 	}
-	return strings.EqualFold(actualHash, expectedHash), nil
+	return observation.ContentHash != nil && strings.EqualFold(*observation.ContentHash, expectedHash), nil
 }
 
 // ReprocessAsset reprocesses a failed or warning asset
@@ -4389,97 +4054,131 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 
 	// Determine retry strategy
 	if len(req.Tasks) == 0 || req.ForceFullRetry {
-		// Full retry - reset status and enqueue full processing job
-		updatedAsset, err := h.queries.ResetAssetStatusForRetry(ctx, assetID)
-		if err != nil {
-			api.GinInternalError(c, err, "Failed to reset asset status")
-			return
-		}
-
-		// Get repository information
-		if !updatedAsset.RepositoryID.Valid {
+		// Validate the current source before entering the short persistent
+		// repository work gate. Status reset and every enqueue then happen while
+		// removal/maintenance is excluded.
+		if !asset.RepositoryID.Valid {
 			api.GinInternalError(c, errors.New("asset has no repository"), "Failed to get repository")
 			return
 		}
-		repository, err := h.queries.GetRepository(ctx, updatedAsset.RepositoryID.UUID)
+		repository, err := h.queries.GetRepository(ctx, asset.RepositoryID.UUID)
 		if err != nil {
 			api.GinInternalError(c, err, "Failed to get repository")
 			return
 		}
 
 		// Check if storage path exists
-		if updatedAsset.StoragePath == nil || *updatedAsset.StoragePath == "" {
+		if asset.StoragePath == nil || *asset.StoragePath == "" {
 			api.GinBadRequest(c, errors.New("asset has no storage path"), "Asset has no storage path")
 			return
 		}
 
-		// Resolve the full path to the asset file
-		assetPath := filepath.Join(repository.Path, *updatedAsset.StoragePath)
-
-		// Check if the file exists
-		if _, err := os.Stat(assetPath); os.IsNotExist(err) {
-			api.GinNotFound(c, err, "Asset file not found")
+		repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid asset storage path")
+			return
+		}
+		indexed, err := h.queries.GetRepositoryFileIndexEntry(ctx, repo.GetRepositoryFileIndexEntryParams{
+			RepositoryID: repository.RepoID, StoragePath: repositoryPath.String(),
+		})
+		if err != nil || !indexed.AssetID.Valid || indexed.AssetID.UUID != asset.AssetID || indexed.State != "present" {
+			api.GinNotFound(c, err, "Asset file is not currently indexed")
+			return
+		}
+		repositoryFS, err := h.files.Open(repository)
+		if err != nil {
+			api.GinInternalError(c, err, "Repository is unavailable")
+			return
+		}
+		observation, inspectErr := repositoryFS.InspectMedia(ctx, repositoryPath, storage.HashNone)
+		closeErr := repositoryFS.Close()
+		if err := errors.Join(inspectErr, closeErr); err != nil || observation.ObservationToken != indexed.ObservationToken {
+			api.GinNotFound(c, err, "Asset file is no longer current")
 			return
 		}
 
-		// Create a new processing job
-		storagePath := *updatedAsset.StoragePath
-		assetType := dbtypes.AssetType(updatedAsset.Type)
-
-		metaArgs := jobs.MetadataArgs{
-			AssetID:          updatedAsset.AssetID,
-			RepoPath:         repository.Path,
-			StoragePath:      storagePath,
-			AssetType:        assetType,
-			OriginalFilename: updatedAsset.OriginalFilename,
-			FileSize:         updatedAsset.FileSize,
-			MimeType:         updatedAsset.MimeType,
+		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, repository.RepoID.String(), dbtypes.RepositoryActivityProcessing)
+		if err != nil {
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is busy or unavailable")
+			return
 		}
-		if _, err := h.queueClient.Insert(ctx, metaArgs, &river.InsertOpts{Queue: "metadata_asset"}); err != nil {
+		finishWork := func() bool {
+			if releaseErr := releaseWork(); releaseErr != nil {
+				api.GinInternalError(c, releaseErr, "Failed to finish repository work")
+				return false
+			}
+			return true
+		}
+		tx, err := h.database.BeginTx(ctx, nil)
+		if err != nil {
+			_ = releaseWork()
+			api.GinInternalError(c, err, "Failed to begin reprocessing transaction")
+			return
+		}
+		defer tx.Rollback()
+		txQueries := h.queries.WithTx(tx)
+		updatedAsset, err := txQueries.ResetAssetStatusForRetry(ctx, assetID)
+		if err != nil {
+			_ = releaseWork()
+			api.GinInternalError(c, err, "Failed to reset asset status")
+			return
+		}
+
+		assetType := dbtypes.AssetType(updatedAsset.Type)
+		metaArgs := jobs.MetadataArgs{
+			AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
+			ExpectedContentHash: updatedAsset.ContentHash,
+		}
+		if err := insertReprocessJobTx(ctx, h.queueClient, tx, metaArgs, "metadata_asset"); err != nil {
+			_ = releaseWork()
 			api.GinInternalError(c, err, "Failed to enqueue metadata job")
 			return
 		}
 
 		switch assetType {
 		case dbtypes.AssetTypePhoto:
-			if _, err := h.queueClient.Insert(ctx, jobs.ThumbnailArgs{
-				AssetID:     updatedAsset.AssetID,
-				RepoPath:    repository.Path,
-				StoragePath: storagePath,
-				AssetType:   assetType,
-			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.ThumbnailArgs{
+				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
+				ExpectedContentHash: updatedAsset.ContentHash,
+			}, "thumbnail_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
 				return
 			}
 		case dbtypes.AssetTypeVideo:
-			if _, err := h.queueClient.Insert(ctx, jobs.ThumbnailArgs{
-				AssetID:     updatedAsset.AssetID,
-				RepoPath:    repository.Path,
-				StoragePath: storagePath,
-				AssetType:   assetType,
-			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.ThumbnailArgs{
+				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
+				ExpectedContentHash: updatedAsset.ContentHash,
+			}, "thumbnail_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
 				return
 			}
-			if _, err := h.queueClient.Insert(ctx, jobs.TranscodeArgs{
-				AssetID:     updatedAsset.AssetID,
-				RepoPath:    repository.Path,
-				StoragePath: storagePath,
-				AssetType:   assetType,
-			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.TranscodeArgs{
+				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
+				ExpectedContentHash: updatedAsset.ContentHash,
+			}, "transcode_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue transcode job")
 				return
 			}
 		case dbtypes.AssetTypeAudio:
-			if _, err := h.queueClient.Insert(ctx, jobs.TranscodeArgs{
-				AssetID:     updatedAsset.AssetID,
-				RepoPath:    repository.Path,
-				StoragePath: storagePath,
-				AssetType:   assetType,
-			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
+			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.TranscodeArgs{
+				AssetID: updatedAsset.AssetID, ObservationToken: observation.ObservationToken,
+				ExpectedContentHash: updatedAsset.ContentHash,
+			}, "transcode_asset"); err != nil {
+				_ = releaseWork()
 				api.GinInternalError(c, err, "Failed to enqueue transcode job")
 				return
 			}
+		}
+		if err := tx.Commit(); err != nil {
+			_ = releaseWork()
+			api.GinInternalError(c, err, "Failed to commit reprocessing jobs")
+			return
+		}
+		if !finishWork() {
+			return
 		}
 
 		log.Printf("Full reprocessing jobs enqueued for asset %s", assetID.String())
@@ -4495,6 +4194,15 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		api.JSONOK(c, response)
 		return
 	} else {
+		if !asset.RepositoryID.Valid {
+			api.GinInternalError(c, errors.New("asset has no repository"), "Failed to get repository")
+			return
+		}
+		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, asset.RepositoryID.UUID.String(), dbtypes.RepositoryActivityProcessing)
+		if err != nil {
+			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is busy or unavailable")
+			return
+		}
 		// Selective retry - enqueue selective retry job
 		// Create selective retry job payload
 		retryArgs := jobs.AssetRetryPayload{
@@ -4504,11 +4212,14 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		}
 
 		// Enqueue the selective retry job
-		jobResult, err := h.queueClient.Insert(ctx, retryArgs, &river.InsertOpts{
-			Queue: "retry_asset",
-		})
+		jobResult, err := insertSelectiveRetryReceipt(ctx, h.queueClient, retryArgs)
 		if err != nil {
+			_ = releaseWork()
 			api.GinInternalError(c, err, "Failed to enqueue selective retry job")
+			return
+		}
+		if err := releaseWork(); err != nil {
+			api.GinInternalError(c, err, "Failed to finish repository work")
 			return
 		}
 
@@ -4525,6 +4236,22 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		api.JSONOK(c, response)
 		return
 	}
+}
+
+func insertSelectiveRetryReceipt(ctx context.Context, queueClient *river.Client[*sql.Tx], args jobs.AssetRetryPayload) (*rivertype.JobInsertResult, error) {
+	opts := args.InsertOpts()
+	opts.Queue = "retry_asset"
+	return queueClient.Insert(ctx, args, &opts)
+}
+
+func insertReprocessJobTx(ctx context.Context, queueClient *river.Client[*sql.Tx], tx *sql.Tx, args river.JobArgs, queue string) error {
+	opts := river.InsertOpts{Queue: queue}
+	if provider, ok := args.(interface{ InsertOpts() river.InsertOpts }); ok {
+		opts = provider.InsertOpts()
+		opts.Queue = queue
+	}
+	_, err := queueClient.InsertTx(ctx, tx, args, &opts)
+	return err
 }
 
 func isValidReprocessQueue(queue string) bool {

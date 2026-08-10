@@ -2,7 +2,7 @@ import { UserRound } from "lucide-react";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n.tsx";
 import Rail from "../../components/Rail";
-import RailCard from "../../components/RailCard";
+import RailCard from "@/components/collection/RailCard";
 import type { PersonSummaryList } from "@/features/people";
 
 type PeopleRailProps = {

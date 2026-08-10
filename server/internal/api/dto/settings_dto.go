@@ -41,9 +41,10 @@ type MLSettingsDTO struct {
 }
 
 type RepositoryDefaultsDTO struct {
-	DefaultRoot       string `json:"default_root" example:"/data/storage"`
-	Strategy          string `json:"strategy" example:"date"`
-	DuplicateHandling string `json:"duplicate_handling" example:"rename"`
+	DefaultRoot       string   `json:"default_root" example:"/data/storage"`
+	Strategy          string   `json:"strategy" example:"date"`
+	DuplicateHandling string   `json:"duplicate_handling" example:"rename"`
+	RiskWarnings      []string `json:"risk_warnings,omitempty"`
 }
 
 type UpdateSystemSettingsDTO struct {
@@ -60,7 +61,7 @@ type UpdateBackupSettingsDTO struct {
 
 type UpdateLLMSettingsDTO struct {
 	AgentEnabled *bool   `json:"agent_enabled,omitempty"`
-	Provider     *string `json:"provider,omitempty" binding:"omitempty,oneof=ark openai deepseek ollama"`
+	Provider     *string `json:"provider,omitempty" binding:"omitempty,oneof=none ark openai deepseek ollama"`
 	ModelName    *string `json:"model_name,omitempty"`
 	BaseURL      *string `json:"base_url,omitempty"`
 	APIKey       *string `json:"api_key,omitempty"`
@@ -77,8 +78,26 @@ type UpdateMLSettingsDTO struct {
 	VideoSceneThreshold       *float64 `json:"video_scene_threshold,omitempty" binding:"omitempty,min=0.05,max=0.95"`
 }
 
+type ValidateLLMSettingsRequestDTO struct {
+	Provider        string `json:"provider" binding:"required,oneof=ark openai deepseek ollama" example:"openai"`
+	ModelName       string `json:"model_name" binding:"required" example:"gpt-4.1-mini"`
+	BaseURL         string `json:"base_url,omitempty" example:"https://api.openai.com/v1"`
+	APIKey          string `json:"api_key,omitempty"`
+	UseStoredAPIKey bool   `json:"use_stored_api_key,omitempty"`
+}
+
 type ValidateLLMSettingsResponseDTO struct {
 	Valid bool `json:"valid"`
+}
+
+func (dto ValidateLLMSettingsRequestDTO) ToServiceInput() service.ValidateLLMDraftInput {
+	return service.ValidateLLMDraftInput{
+		Provider:        dto.Provider,
+		ModelName:       dto.ModelName,
+		BaseURL:         dto.BaseURL,
+		APIKey:          dto.APIKey,
+		UseStoredAPIKey: dto.UseStoredAPIKey,
+	}
 }
 
 // RuntimeInfoDTO is a read-only snapshot of the runtime-immutable configuration

@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import Rail from "../../components/Rail";
-import RailCard from "../../components/RailCard";
+import RailCard from "@/components/collection/RailCard";
 import { useUtilityShortcuts } from "../utilities/useUtilityShortcuts";
 
 /**

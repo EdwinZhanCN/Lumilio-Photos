@@ -3,14 +3,13 @@ package queue
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/riverqueue/river"
 
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/storage"
 	"server/internal/utils/phash"
 )
 
@@ -24,6 +23,7 @@ type ProcessPHashWorker struct {
 
 	Queries          *repo.Queries
 	EmbeddingService service.EmbeddingService
+	Files            *storage.RepositoryFSFactory
 }
 
 func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHashArgs]) error {
@@ -48,8 +48,19 @@ func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHa
 		return fmt.Errorf("get small thumbnail: %w", err)
 	}
 
-	thumbnailPath := filepath.Join(repository.Path, filepath.FromSlash(thumbnail.StoragePath))
-	file, err := os.Open(thumbnailPath)
+	thumbnailPath, err := storage.ParsePrivateRepositoryPath(thumbnail.StoragePath)
+	if err != nil {
+		return err
+	}
+	if err := validateThumbnailContent(asset, "small", thumbnailPath); err != nil {
+		return err
+	}
+	repositoryFS, err := w.Files.Open(repository)
+	if err != nil {
+		return err
+	}
+	defer repositoryFS.Close()
+	file, err := repositoryFS.OpenPrivate(thumbnailPath)
 	if err != nil {
 		return fmt.Errorf("open small thumbnail: %w", err)
 	}

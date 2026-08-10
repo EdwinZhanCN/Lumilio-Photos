@@ -19,7 +19,7 @@ SET
     finished_at = ?2,
     error = ?3
 WHERE scan_id = ?1
-RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
+RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error, moved_count, deferred_count, ambiguous_count, authoritative, partial_reason
 `
 
 type CancelRepositoryScanRunParams struct {
@@ -44,6 +44,11 @@ func (q *Queries) CancelRepositoryScanRun(ctx context.Context, arg CancelReposit
 		&i.DeletedCount,
 		&i.SkippedCount,
 		&i.Error,
+		&i.MovedCount,
+		&i.DeferredCount,
+		&i.AmbiguousCount,
+		&i.Authoritative,
+		&i.PartialReason,
 	)
 	return i, err
 }
@@ -57,9 +62,14 @@ SET
     updated_count = ?4,
     deleted_count = ?5,
     skipped_count = ?6,
+    moved_count = ?7,
+    deferred_count = ?8,
+    ambiguous_count = ?9,
+    authoritative = ?10,
+    partial_reason = ?11,
     error = NULL
 WHERE scan_id = ?1
-RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
+RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error, moved_count, deferred_count, ambiguous_count, authoritative, partial_reason
 `
 
 type CompleteRepositoryScanRunParams struct {
@@ -69,6 +79,11 @@ type CompleteRepositoryScanRunParams struct {
 	UpdatedCount    int64             `db:"updated_count" json:"updated_count"`
 	DeletedCount    int64             `db:"deleted_count" json:"deleted_count"`
 	SkippedCount    int64             `db:"skipped_count" json:"skipped_count"`
+	MovedCount      int64             `db:"moved_count" json:"moved_count"`
+	DeferredCount   int64             `db:"deferred_count" json:"deferred_count"`
+	AmbiguousCount  int64             `db:"ambiguous_count" json:"ambiguous_count"`
+	Authoritative   bool              `db:"authoritative" json:"authoritative"`
+	PartialReason   *string           `db:"partial_reason" json:"partial_reason"`
 }
 
 func (q *Queries) CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error) {
@@ -79,6 +94,11 @@ func (q *Queries) CompleteRepositoryScanRun(ctx context.Context, arg CompleteRep
 		arg.UpdatedCount,
 		arg.DeletedCount,
 		arg.SkippedCount,
+		arg.MovedCount,
+		arg.DeferredCount,
+		arg.AmbiguousCount,
+		arg.Authoritative,
+		arg.PartialReason,
 	)
 	var i RepositoryScanRun
 	err := row.Scan(
@@ -94,6 +114,11 @@ func (q *Queries) CompleteRepositoryScanRun(ctx context.Context, arg CompleteRep
 		&i.DeletedCount,
 		&i.SkippedCount,
 		&i.Error,
+		&i.MovedCount,
+		&i.DeferredCount,
+		&i.AmbiguousCount,
+		&i.Authoritative,
+		&i.PartialReason,
 	)
 	return i, err
 }
@@ -108,7 +133,7 @@ INSERT INTO repository_scan_runs (
     started_at
 ) VALUES (
     ?1, ?2, ?3, ?4, ?5, ?6
-) RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
+) RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error, moved_count, deferred_count, ambiguous_count, authoritative, partial_reason
 `
 
 type CreateRepositoryScanRunParams struct {
@@ -143,6 +168,11 @@ func (q *Queries) CreateRepositoryScanRun(ctx context.Context, arg CreateReposit
 		&i.DeletedCount,
 		&i.SkippedCount,
 		&i.Error,
+		&i.MovedCount,
+		&i.DeferredCount,
+		&i.AmbiguousCount,
+		&i.Authoritative,
+		&i.PartialReason,
 	)
 	return i, err
 }
@@ -156,9 +186,14 @@ SET
     updated_count = ?4,
     deleted_count = ?5,
     skipped_count = ?6,
-    error = ?7
+    moved_count = ?7,
+    deferred_count = ?8,
+    ambiguous_count = ?9,
+    authoritative = ?10,
+    partial_reason = ?11,
+    error = ?12
 WHERE scan_id = ?1
-RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error
+RETURNING scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error, moved_count, deferred_count, ambiguous_count, authoritative, partial_reason
 `
 
 type FailRepositoryScanRunParams struct {
@@ -168,6 +203,11 @@ type FailRepositoryScanRunParams struct {
 	UpdatedCount    int64             `db:"updated_count" json:"updated_count"`
 	DeletedCount    int64             `db:"deleted_count" json:"deleted_count"`
 	SkippedCount    int64             `db:"skipped_count" json:"skipped_count"`
+	MovedCount      int64             `db:"moved_count" json:"moved_count"`
+	DeferredCount   int64             `db:"deferred_count" json:"deferred_count"`
+	AmbiguousCount  int64             `db:"ambiguous_count" json:"ambiguous_count"`
+	Authoritative   bool              `db:"authoritative" json:"authoritative"`
+	PartialReason   *string           `db:"partial_reason" json:"partial_reason"`
 	Error           *string           `db:"error" json:"error"`
 }
 
@@ -179,6 +219,11 @@ func (q *Queries) FailRepositoryScanRun(ctx context.Context, arg FailRepositoryS
 		arg.UpdatedCount,
 		arg.DeletedCount,
 		arg.SkippedCount,
+		arg.MovedCount,
+		arg.DeferredCount,
+		arg.AmbiguousCount,
+		arg.Authoritative,
+		arg.PartialReason,
 		arg.Error,
 	)
 	var i RepositoryScanRun
@@ -195,12 +240,17 @@ func (q *Queries) FailRepositoryScanRun(ctx context.Context, arg FailRepositoryS
 		&i.DeletedCount,
 		&i.SkippedCount,
 		&i.Error,
+		&i.MovedCount,
+		&i.DeferredCount,
+		&i.AmbiguousCount,
+		&i.Authoritative,
+		&i.PartialReason,
 	)
 	return i, err
 }
 
 const getLatestRepositoryScanRun = `-- name: GetLatestRepositoryScanRun :one
-SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error FROM repository_scan_runs
+SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error, moved_count, deferred_count, ambiguous_count, authoritative, partial_reason FROM repository_scan_runs
 WHERE repository_id = ?1
 ORDER BY started_at DESC
 LIMIT 1
@@ -222,12 +272,17 @@ func (q *Queries) GetLatestRepositoryScanRun(ctx context.Context, repositoryID u
 		&i.DeletedCount,
 		&i.SkippedCount,
 		&i.Error,
+		&i.MovedCount,
+		&i.DeferredCount,
+		&i.AmbiguousCount,
+		&i.Authoritative,
+		&i.PartialReason,
 	)
 	return i, err
 }
 
 const getRepositoryScanRun = `-- name: GetRepositoryScanRun :one
-SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error FROM repository_scan_runs
+SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error, moved_count, deferred_count, ambiguous_count, authoritative, partial_reason FROM repository_scan_runs
 WHERE scan_id = ?1
 `
 
@@ -247,12 +302,17 @@ func (q *Queries) GetRepositoryScanRun(ctx context.Context, scanID uuid.UUID) (R
 		&i.DeletedCount,
 		&i.SkippedCount,
 		&i.Error,
+		&i.MovedCount,
+		&i.DeferredCount,
+		&i.AmbiguousCount,
+		&i.Authoritative,
+		&i.PartialReason,
 	)
 	return i, err
 }
 
 const listRepositoryScanRuns = `-- name: ListRepositoryScanRuns :many
-SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error FROM repository_scan_runs
+SELECT scan_id, repository_id, mode, requested_by, status, started_at, finished_at, discovered_count, updated_count, deleted_count, skipped_count, error, moved_count, deferred_count, ambiguous_count, authoritative, partial_reason FROM repository_scan_runs
 WHERE repository_id = ?1
 ORDER BY started_at DESC
 LIMIT ?2 OFFSET ?3
@@ -286,6 +346,11 @@ func (q *Queries) ListRepositoryScanRuns(ctx context.Context, arg ListRepository
 			&i.DeletedCount,
 			&i.SkippedCount,
 			&i.Error,
+			&i.MovedCount,
+			&i.DeferredCount,
+			&i.AmbiguousCount,
+			&i.Authoritative,
+			&i.PartialReason,
 		); err != nil {
 			return nil, err
 		}

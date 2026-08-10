@@ -1,15 +1,34 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
+import type { RepositoryStorageStrategy } from "../components/StorageStrategyPicker";
 
-type CreateRepositoryInput = {
+export type CreateRepositoryInput = {
   name: string;
+  directoryName?: string;
   rootId?: string;
-  cloudCredentialId?: string;
   role?: "primary" | "regular";
-  storageStrategy?: "cas" | "date" | "flat";
-  duplicateHandling?: "overwrite" | "rename" | "uuid";
+  storageStrategy: RepositoryStorageStrategy;
+  riskConfirmation?: boolean;
 };
+
+export function buildCreateRepositoryRequestBody({
+  name,
+  directoryName,
+  rootId,
+  role,
+  storageStrategy,
+  riskConfirmation,
+}: CreateRepositoryInput) {
+  return {
+    name,
+    directory_name: directoryName,
+    root_id: rootId,
+    role,
+    storage_strategy: storageStrategy,
+    risk_confirmation: riskConfirmation,
+  };
+}
 
 export function useCreateRepository() {
   const queryClient = useQueryClient();
@@ -18,21 +37,21 @@ export function useCreateRepository() {
   const createRepository = useCallback(
     async ({
       name,
+      directoryName,
       rootId,
-      cloudCredentialId,
       role,
       storageStrategy,
-      duplicateHandling,
+      riskConfirmation,
     }: CreateRepositoryInput) => {
       const response = await mutation.mutateAsync({
-        body: {
+        body: buildCreateRepositoryRequestBody({
           name,
-          root_id: rootId,
-          cloud_credential_id: cloudCredentialId,
+          directoryName,
+          rootId,
           role,
-          storage_strategy: storageStrategy,
-          duplicate_handling: duplicateHandling,
-        },
+          storageStrategy,
+          riskConfirmation,
+        }),
       });
 
       await Promise.all([

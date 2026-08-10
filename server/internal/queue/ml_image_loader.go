@@ -2,13 +2,14 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"path"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
+	"server/internal/storage"
 	"server/internal/utils/imagesource"
 
 	"github.com/google/uuid"
@@ -18,12 +19,15 @@ type MLImageLoader interface {
 	LoadMLImage(ctx context.Context, assetID uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error)
 }
 
+var ErrDerivedAssetStale = errors.New("derived asset does not match current content")
+
 type DBMLImageLoader struct {
 	Queries *repo.Queries
+	Files   *storage.RepositoryFSFactory
 }
 
-func NewDBMLImageLoader(queries *repo.Queries) *DBMLImageLoader {
-	return &DBMLImageLoader{Queries: queries}
+func NewDBMLImageLoader(queries *repo.Queries, files *storage.RepositoryFSFactory) *DBMLImageLoader {
+	return &DBMLImageLoader{Queries: queries, Files: files}
 }
 
 func mlThumbnailSize(purpose imagesource.Purpose) string {
@@ -73,8 +77,19 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 		return nil, fmt.Errorf("get %s thumbnail: %w", thumbnailSize, err)
 	}
 
-	thumbnailPath := filepath.Join(repository.Path, filepath.FromSlash(thumbnail.StoragePath))
-	file, err := os.Open(thumbnailPath)
+	thumbnailPath, err := storage.ParsePrivateRepositoryPath(thumbnail.StoragePath)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateThumbnailContent(asset, thumbnailSize, thumbnailPath); err != nil {
+		return nil, err
+	}
+	repositoryFS, err := l.Files.Open(repository)
+	if err != nil {
+		return nil, err
+	}
+	defer repositoryFS.Close()
+	file, err := repositoryFS.OpenPrivate(thumbnailPath)
 	if err != nil {
 		return nil, fmt.Errorf("open %s thumbnail: %w", thumbnailSize, err)
 	}
@@ -86,4 +101,12 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 	}
 
 	return imageData, nil
+}
+
+func validateThumbnailContent(asset repo.Asset, size string, thumbnailPath storage.RepositoryPath) error {
+	expected := fmt.Sprintf("%s_%s.webp", asset.ContentHash, size)
+	if asset.ContentHash == "" || path.Base(thumbnailPath.String()) != expected {
+		return fmt.Errorf("%w: asset=%s size=%s", ErrDerivedAssetStale, asset.AssetID, size)
+	}
+	return nil
 }

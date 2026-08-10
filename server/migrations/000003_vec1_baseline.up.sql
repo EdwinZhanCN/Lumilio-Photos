@@ -34,7 +34,7 @@ CREATE TABLE registration_sessions (
 CREATE TABLE settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     llm_agent_enabled INTEGER NOT NULL DEFAULT 0 CHECK (llm_agent_enabled IN (0, 1)),
-    llm_provider TEXT NOT NULL DEFAULT 'ark',
+    llm_provider TEXT NOT NULL DEFAULT '' CHECK (llm_provider IN ('', 'ark', 'openai', 'deepseek', 'ollama')),
     llm_model_name TEXT NOT NULL DEFAULT '',
     llm_base_url TEXT NOT NULL DEFAULT '',
     llm_api_key_ciphertext BLOB,
@@ -119,7 +119,9 @@ CREATE TABLE repository_roots (
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
     kind TEXT NOT NULL CHECK (kind IN ('default', 'external')),
-    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'offline', 'error')),
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'offline', 'error', 'maintenance')),
+    mount_fingerprint TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 ) STRICT;
@@ -129,24 +131,122 @@ CREATE TABLE repositories (
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
     config TEXT CHECK (config IS NULL OR json_valid(config)),
-    status TEXT NOT NULL DEFAULT 'active',
+    reachability TEXT NOT NULL DEFAULT 'active'
+        CHECK (reachability IN ('active', 'offline', 'identity_error', 'recovery_required', 'maintenance')),
+    activity TEXT NOT NULL DEFAULT 'idle'
+        CHECK (activity IN ('idle', 'scanning', 'importing', 'processing', 'paused')),
+    pause_reason TEXT NOT NULL DEFAULT ''
+        CHECK (pause_reason IN ('', 'low_space', 'maintenance', 'manual')),
     last_sync INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     default_owner_id INTEGER REFERENCES users(user_id),
     role TEXT NOT NULL DEFAULT 'regular' CHECK (role IN ('primary', 'regular')),
-    root_id TEXT REFERENCES repository_roots(root_id) ON DELETE SET NULL
+    root_id TEXT NOT NULL REFERENCES repository_roots(root_id) ON DELETE RESTRICT
 ) STRICT;
 
 CREATE TABLE repository_defaults (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     strategy TEXT NOT NULL DEFAULT 'date' CHECK (strategy IN ('date', 'flat', 'cas')),
     duplicate_handling TEXT NOT NULL DEFAULT 'rename'
-        CHECK (duplicate_handling IN ('rename', 'uuid', 'overwrite')),
+        CHECK (duplicate_handling IN ('rename', 'uuid')),
     updated_at INTEGER NOT NULL
 ) STRICT;
 
 INSERT INTO repository_defaults (id, updated_at) VALUES (1, 0);
+
+CREATE TABLE lifecycle_operations (
+    operation_id TEXT PRIMARY KEY
+        CHECK (operation_id = lower(operation_id) AND length(operation_id) = 36),
+    request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) BETWEEN 1 AND 200),
+    kind TEXT NOT NULL CHECK (kind IN (
+        'create_repository',
+        'create_storage_location',
+        'open_repository',
+        'register_repository_copy',
+        'switch_default_storage_location',
+        'relocate_storage_location',
+        'rename_repository'
+    )),
+    payload_hash TEXT NOT NULL CHECK (length(payload_hash) = 64),
+    payload TEXT NOT NULL CHECK (json_valid(payload)),
+    actor TEXT NOT NULL CHECK (length(actor) BETWEEN 1 AND 200),
+    actor_user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    host_instance_id TEXT NOT NULL DEFAULT '',
+    target_type TEXT NOT NULL CHECK (target_type IN ('repository', 'storage_location', 'runtime_config')),
+    target_id TEXT,
+    phase TEXT NOT NULL CHECK (phase IN (
+        'prepared',
+        'filesystem_applied',
+        'catalog_committed',
+        'rollback_required',
+        'completed',
+        'failed'
+    )),
+    status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'rolled_back')),
+    result TEXT CHECK (result IS NULL OR json_valid(result)),
+    rollback_data TEXT CHECK (rollback_data IS NULL OR json_valid(rollback_data)),
+    error TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    completed_at INTEGER
+) STRICT;
+
+-- Durable, queryable administrator audit history. Unlike repository-local
+-- diagnostic logs this table remains available when a Storage Location is
+-- offline and records both successful and failed lifecycle decisions.
+CREATE TABLE lifecycle_audit_events (
+    event_id TEXT PRIMARY KEY
+        CHECK (event_id = lower(event_id) AND length(event_id) = 36),
+    occurred_at INTEGER NOT NULL,
+    actor TEXT NOT NULL CHECK (length(actor) BETWEEN 1 AND 200),
+    actor_user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    host_instance_id TEXT NOT NULL DEFAULT '',
+    request_id TEXT NOT NULL DEFAULT '',
+    operation_id TEXT,
+    action TEXT NOT NULL CHECK (length(action) BETWEEN 1 AND 100),
+    target_type TEXT NOT NULL CHECK (target_type IN ('repository', 'storage_location', 'runtime_config')),
+    target_id TEXT,
+    source TEXT NOT NULL CHECK (source IN ('web', 'desktop_host', 'server', 'recovery', 'test')),
+    confirmation_type TEXT NOT NULL DEFAULT 'none',
+    old_path TEXT,
+    new_path TEXT,
+    result TEXT NOT NULL CHECK (result IN ('succeeded', 'failed', 'rejected', 'recovered')),
+    failure_stage TEXT,
+    details TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(details))
+) STRICT;
+
+CREATE TABLE host_actions (
+    action_id TEXT PRIMARY KEY
+        CHECK (action_id = lower(action_id) AND length(action_id) = 36),
+    request_id TEXT NOT NULL UNIQUE CHECK (length(request_id) BETWEEN 1 AND 200),
+    request_hash TEXT NOT NULL CHECK (length(request_hash) = 64),
+    kind TEXT NOT NULL CHECK (kind IN (
+        'authorize_storage_location',
+        'open_repository',
+        'locate_storage_location',
+        'locate_repository'
+    )),
+    actor TEXT NOT NULL CHECK (length(actor) BETWEEN 1 AND 200),
+    actor_user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    host_instance_id TEXT NOT NULL DEFAULT '',
+    session_id TEXT NOT NULL DEFAULT '',
+    request_summary TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(request_summary)),
+    expected_version INTEGER NOT NULL DEFAULT 0 CHECK (expected_version >= 0),
+    nonce TEXT NOT NULL CHECK (length(nonce) >= 32),
+    status TEXT NOT NULL CHECK (status IN (
+        'pending', 'running', 'needs_decision', 'succeeded',
+        'failed', 'cancelled', 'expired'
+    )),
+    selected_path TEXT,
+    result TEXT CHECK (result IS NULL OR json_valid(result)),
+    error_code TEXT,
+    error_message TEXT,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    completed_at INTEGER
+) STRICT;
 
 CREATE TABLE assets (
     asset_id TEXT PRIMARY KEY CHECK (asset_id = lower(asset_id) AND length(asset_id) = 36),
@@ -170,7 +270,7 @@ CREATE TABLE assets (
     specific_metadata TEXT CHECK (specific_metadata IS NULL OR json_valid(specific_metadata)),
     rating INTEGER,
     liked INTEGER NOT NULL DEFAULT 0 CHECK (liked IN (0, 1)),
-    repository_id TEXT REFERENCES repositories(repo_id),
+    repository_id TEXT REFERENCES repositories(repo_id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT '{"state":"processing","message":"Pending processing"}' CHECK (json_valid(status)),
     updated_at INTEGER NOT NULL,
     gps_latitude REAL CHECK (gps_latitude IS NULL OR gps_latitude BETWEEN -90 AND 90),
@@ -244,7 +344,7 @@ CREATE TABLE album_assets (
 CREATE TABLE media_items (
     media_item_id TEXT PRIMARY KEY CHECK (media_item_id = lower(media_item_id) AND length(media_item_id) = 36),
     owner_id INTEGER REFERENCES users(user_id),
-    repository_id TEXT REFERENCES repositories(repo_id),
+    repository_id TEXT REFERENCES repositories(repo_id) ON DELETE CASCADE,
     media_kind TEXT NOT NULL DEFAULT 'photo' CHECK (media_kind IN ('photo', 'video', 'audio', 'live_photo')),
     primary_asset_id TEXT REFERENCES assets(asset_id) ON DELETE SET NULL,
     group_key TEXT,
@@ -268,7 +368,7 @@ CREATE TABLE media_item_assets (
 CREATE TABLE asset_stacks (
     stack_id TEXT PRIMARY KEY CHECK (stack_id = lower(stack_id) AND length(stack_id) = 36),
     owner_id INTEGER REFERENCES users(user_id),
-    repository_id TEXT REFERENCES repositories(repo_id),
+    repository_id TEXT REFERENCES repositories(repo_id) ON DELETE CASCADE,
     stack_kind TEXT NOT NULL DEFAULT 'manual' CHECK (stack_kind IN ('manual', 'burst')),
     cover_media_item_id TEXT REFERENCES media_items(media_item_id) ON DELETE SET NULL,
     group_key TEXT,
@@ -613,7 +713,9 @@ CREATE TABLE cloud_import_runs (
     credential_id TEXT NOT NULL REFERENCES cloud_credentials(credential_id) ON DELETE RESTRICT,
     owner_id INTEGER NOT NULL REFERENCES users(user_id),
     provider TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'queued',
+    status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'cancelling', 'completed', 'failed', 'interrupted', 'cancelled')),
+    resume_of_run_id TEXT REFERENCES cloud_import_runs(run_id) ON DELETE SET NULL,
     total_seen INTEGER NOT NULL DEFAULT 0,
     downloaded_count INTEGER NOT NULL DEFAULT 0,
     imported_count INTEGER NOT NULL DEFAULT 0,
@@ -652,11 +754,12 @@ CREATE TABLE repository_cloud_bindings (
     credential_id TEXT NOT NULL REFERENCES cloud_credentials(credential_id) ON DELETE RESTRICT,
     owner_id INTEGER NOT NULL REFERENCES users(user_id),
     provider TEXT NOT NULL,
+    remote_scope TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(remote_scope)),
     enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
     last_import_run_id TEXT REFERENCES cloud_import_runs(run_id) ON DELETE SET NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    PRIMARY KEY (repository_id, provider)
+    PRIMARY KEY (repository_id, credential_id)
 ) STRICT;
 
 CREATE TABLE share_links (
@@ -764,8 +867,15 @@ CREATE INDEX repositories_root_id_idx ON repositories (root_id);
 CREATE INDEX idx_repositories_default_owner ON repositories (default_owner_id);
 CREATE INDEX idx_repositories_path ON repositories (path);
 CREATE INDEX idx_repositories_role ON repositories (role);
-CREATE INDEX idx_repositories_status ON repositories (status);
+CREATE INDEX idx_repositories_reachability ON repositories (reachability);
+CREATE INDEX idx_repositories_activity ON repositories (activity);
 CREATE UNIQUE INDEX repositories_one_primary_idx ON repositories (role) WHERE role = 'primary';
+CREATE INDEX lifecycle_operations_status_idx ON lifecycle_operations (status, updated_at);
+CREATE INDEX lifecycle_operations_target_idx ON lifecycle_operations (target_type, target_id, status);
+CREATE INDEX lifecycle_audit_events_time_idx ON lifecycle_audit_events (occurred_at DESC, event_id DESC);
+CREATE INDEX lifecycle_audit_events_target_idx ON lifecycle_audit_events (target_type, target_id, occurred_at DESC);
+CREATE INDEX host_actions_pending_idx ON host_actions (status, expires_at, created_at);
+CREATE INDEX host_actions_actor_idx ON host_actions (actor_user_id, created_at DESC);
 
 CREATE INDEX idx_asset_tags_tag_source_asset ON asset_tags (tag_id, source, asset_id);
 CREATE INDEX idx_assets_camera_model_active
@@ -1127,4 +1237,4 @@ GROUP BY
     asm.position,
     s.stack_kind;
 
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;

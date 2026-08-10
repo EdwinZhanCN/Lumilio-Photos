@@ -70,6 +70,7 @@ func TestPeopleHandlerListPeople(t *testing.T) {
 		},
 		nil,
 		nil,
+		nil,
 	)
 
 	recorder := httptest.NewRecorder()
@@ -112,6 +113,7 @@ func TestPeopleHandlerRebuildPeople(t *testing.T) {
 				}, nil
 			},
 		},
+		nil,
 		nil,
 		nil,
 	)
@@ -164,6 +166,7 @@ func TestPeopleHandlerUpdatePerson(t *testing.T) {
 		},
 		nil,
 		nil,
+		nil,
 	)
 
 	body, err := json.Marshal(dto.UpdatePersonRequestDTO{Name: "  Grace  "})
@@ -214,6 +217,7 @@ func TestPeopleHandlerListPersonAssetsInjectsPersonScope(t *testing.T) {
 				}, nil
 			},
 		},
+		nil,
 		nil,
 		nil,
 	)
@@ -288,6 +292,7 @@ func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(
 		},
 		nil,
 		nil,
+		nil,
 	)
 
 	body, err := json.Marshal(dto.AssetQueryRequestDTO{
@@ -346,6 +351,7 @@ func TestPeopleHandlerListPersonAssets_InvalidStackModeReturnsBadRequest(t *test
 				}, nil
 			},
 		},
+		nil,
 		nil,
 		nil,
 	)

@@ -16,12 +16,12 @@ export function RootErrorFallback({ error, resetErrorBoundary }: FallbackProps):
             {t("rootError.label", "Application error")}
           </p>
           <h1 id="root-error-title" className="text-3xl font-bold sm:text-4xl">
-            {t("rootError.title", "Lumilio could not continue")}
+            {t("rootError.title", "Lumilio Photos could not continue")}
           </h1>
           <p className="mt-4 text-base-content/70">
             {t(
               "rootError.description",
-              "Reload the application to recover. Your original photos and local library are not changed by this error.",
+              "Reload the application to recover. Your original photos and repositories are not changed by this error.",
             )}
           </p>
           {message && (

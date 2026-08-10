@@ -5,10 +5,38 @@ package sourcing
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// StagingMaterializationError records whether the materializer established a
+// durable prepared-asset claim before failing. Sources may clean unclaimed
+// staging, but must preserve prepared staging for deterministic resume.
+type StagingMaterializationError struct {
+	Err      error
+	Prepared bool
+}
+
+func (e *StagingMaterializationError) Error() string { return e.Err.Error() }
+func (e *StagingMaterializationError) Unwrap() error { return e.Err }
+
+func WithStagingOwnership(err error, prepared bool) error {
+	if err == nil {
+		return nil
+	}
+	var existing *StagingMaterializationError
+	if errors.As(err, &existing) {
+		return err
+	}
+	return &StagingMaterializationError{Err: err, Prepared: prepared}
+}
+
+func StagingIsPrepared(err error) bool {
+	var ownership *StagingMaterializationError
+	return errors.As(err, &ownership) && ownership.Prepared
+}
 
 // IngestSourceKind identifies the origin of an asset being ingested.
 type IngestSourceKind string
@@ -23,14 +51,10 @@ const (
 // The SourceMaterializer consumes these to validate, materialize, and
 // enqueue into the asset ingest pipeline.
 type IngestSource struct {
-	RepositoryID uuid.UUID
-	OwnerID      *int32 // nullable; when nil the materializer falls back to repository default
-	Kind         IngestSourceKind
-	// SkipCommit skips staging→inbox commit. When true, SourcePath is treated
-	// as the final repo-relative storage path (files already in-place, like
-	// cloud provider downloads landing directly in cloud/).
-	SkipCommit              bool
-	SourcePath              string // staging path (upload/cloud) or repo-relative path (scan)
+	RepositoryID            uuid.UUID
+	OwnerID                 *int32 // nullable; when nil the materializer falls back to repository default
+	Kind                    IngestSourceKind
+	StagingPath             string // private repository-relative path under .lumilio/
 	OriginalFilename        string
 	Size                    int64   // optional hint; the materializer always stats the file for the authoritative size
 	ContentHash             *string // authoritative full hash for trusted in-place sources
@@ -41,15 +65,14 @@ type IngestSource struct {
 	Metadata                map[string]any // source-specific metadata (e.g. cloud object key, upload session ID)
 }
 
-// AssetSource produces IngestSource candidates from a specific origin.
-// Each source type (upload handler, scanner, cloud sync provider, bulk importer)
-// implements this interface so the materializer can consume them uniformly.
+// AssetSource produces IngestSource candidates from a specific origin. The
+// callback is synchronous so a source advances durable cursors only after the
+// materializer has accepted each candidate.
 type AssetSource interface {
 	// Kind returns the source kind identifier.
 	Kind() IngestSourceKind
 
-	// Discover sends discovered asset candidates to the returned channel.
-	// The source must close the channel when discovery is complete.
-	// The caller is responsible for cancelling ctx to stop discovery early.
-	Discover(ctx context.Context) (<-chan IngestSource, error)
+	// ForEach visits candidates in source order. Returning an error prevents
+	// cursor advancement for the containing source page.
+	ForEach(ctx context.Context, consume func(IngestSource) error) error
 }

@@ -1,7 +1,15 @@
 ---
-title: Lumen AI 指南已移动
+title: "页面已迁移：Lumen Intelligence"
+description: "旧文档地址兼容页。"
+page_id: "legacy-introduction-lumen"
+search: false
+outline: false
+baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
+last_verified: "2026-08-06"
 ---
 
-# Lumen AI 指南已移动
+# 页面已迁移
 
-请阅读 [Lumen AI](../features/lumen-ai)。Lumen AI 是本地优先的可选增强；关闭后仍可管理媒体。
+这条旧地址保留用于兼容已有书签。权威内容已经合并到[Lumen Intelligence](../use/lumen-intelligence.md)。
+
+请不要在此页面继续维护第二份正文。

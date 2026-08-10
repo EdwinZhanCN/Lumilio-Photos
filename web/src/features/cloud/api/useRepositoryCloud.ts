@@ -17,8 +17,15 @@ export function useRepositoryCloudStatus(repositoryId: string, enabled = true) {
       // Only poll while an import is actively in progress; otherwise fetch once.
       // Avoids every repository card hammering this endpoint every 5s forever.
       refetchInterval: (query) => {
-        const status = query.state.data?.latest_run?.status;
-        return status === "running" || status === "queued" ? 5000 : false;
+        const sources = query.state.data?.sources ?? [];
+        return sources.some(
+          (source) =>
+            source.latest_run?.status === "running" ||
+            source.latest_run?.status === "queued" ||
+            source.latest_run?.status === "cancelling",
+        )
+          ? 5000
+          : false;
       },
       staleTime: 2000,
     },
@@ -35,6 +42,45 @@ export function useStartRepositoryCloudImport() {
           queryKey: ["get", "/api/v1/repositories/{id}/cloud"],
         });
       }
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+      });
+    },
+  });
+}
+
+export function useBindRepositoryCloudSource() {
+  const queryClient = useQueryClient();
+  return $api.useMutation("post", "/api/v1/repositories/{id}/cloud/sources", {
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/repositories/{id}/cloud"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+      });
+    },
+  });
+}
+
+export function useCancelCloudImport() {
+  const queryClient = useQueryClient();
+  return $api.useMutation("post", "/api/v1/cloud/import-runs/{id}/cancel", {
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/repositories/{id}/cloud"],
+      });
+    },
+  });
+}
+
+export function useResumeCloudImport() {
+  const queryClient = useQueryClient();
+  return $api.useMutation("post", "/api/v1/cloud/import-runs/{id}/resume", {
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/repositories/{id}/cloud"],
+      });
       void queryClient.invalidateQueries({
         queryKey: ["get", "/api/v1/assets/indexing/repositories"],
       });

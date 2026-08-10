@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"server/internal/storage/rootcfg"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 var (
@@ -33,6 +35,7 @@ type RepositoryRootConflictError struct {
 	RootID         string
 	RegisteredPath string
 	RequestedPath  string
+	Actions        []string
 }
 
 func (e *RepositoryRootConflictError) Error() string {
@@ -40,106 +43,288 @@ func (e *RepositoryRootConflictError) Error() string {
 }
 
 // EnsureDefaultRepositoryRoot initializes or reopens the configured default
-// Storage Location. A pre-migration database row is associated after the marker
-// is created, while an existing marker remains disk-authoritative for identity.
-func (rm *DefaultRepositoryManager) EnsureDefaultRepositoryRoot(ctx context.Context, path string) (*repo.RepositoryRoot, error) {
+// Storage Location. The marker remains disk-authoritative for identity.
+func (rm *DefaultRepositoryManager) EnsureDefaultRepositoryRoot(ctx context.Context, path string, requests ...LifecycleRequest) (*repo.RepositoryRoot, error) {
 	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
 		return nil, fmt.Errorf("canonicalize default storage location: %w", err)
 	}
-	if err := os.MkdirAll(cleanPath, 0o755); err != nil {
-		return nil, fmt.Errorf("create default storage location: %w", err)
-	}
-	if repocfg.IsRepositoryRoot(cleanPath) {
-		return nil, fmt.Errorf("%w: a repository cannot also be a storage location", ErrRepositoryRootInvalid)
-	}
-
 	existingDefault, defaultErr := rm.queries.GetDefaultRepositoryRoot(ctx)
 	if defaultErr != nil && !errors.Is(defaultErr, sql.ErrNoRows) {
 		return nil, fmt.Errorf("load default storage location: %w", defaultErr)
 	}
 	if defaultErr == nil && existingDefault.Path != cleanPath {
-		return nil, fmt.Errorf("%w: default Storage Location is registered at %s, not %s", ErrRepositoryRootInvalid, existingDefault.Path, cleanPath)
+		request := LifecycleRequest{Actor: "server:config", ConfirmationType: "portable_identity_match"}
+		if len(requests) > 0 {
+			request = requests[0]
+		}
+		return rm.switchDefaultRepositoryRoot(ctx, existingDefault, cleanPath, request)
+	}
+	if defaultErr == nil {
+		info, statErr := os.Stat(cleanPath)
+		if errors.Is(statErr, os.ErrNotExist) {
+			return nil, fmt.Errorf("%w: registered default Storage Location is missing at %s", ErrRepositoryRootOffline, cleanPath)
+		}
+		if statErr != nil || !info.IsDir() {
+			return nil, fmt.Errorf("%w: registered default Storage Location is unavailable at %s", ErrRepositoryRootOffline, cleanPath)
+		}
+		if !rootcfg.Exists(cleanPath) {
+			return nil, fmt.Errorf("%w: registered default Storage Location marker is missing at %s", ErrRepositoryRootInvalid, cleanPath)
+		}
+	} else if err := os.MkdirAll(cleanPath, 0o755); err != nil {
+		return nil, fmt.Errorf("create default storage location: %w", err)
+	}
+	if err := rm.claimRuntimeStoragePath(ctx, "root", cleanPath); err != nil {
+		return nil, err
+	}
+	if repocfg.IsRepositoryRoot(cleanPath) {
+		return nil, fmt.Errorf("%w: a repository cannot also be a storage location", ErrRepositoryRootInvalid)
 	}
 
-	config, createdMarker, err := loadOrCreateRootConfig(cleanPath, "Default storage", func() *rootcfg.RootConfig {
-		if defaultErr == nil {
-			return &rootcfg.RootConfig{
-				Version:   rootcfg.CurrentVersion,
-				ID:        existingDefault.RootID.String(),
-				Name:      existingDefault.Name,
-				CreatedAt: existingDefault.CreatedAt.Time,
-			}
-		}
-		return rootcfg.New("Default storage")
-	})
-	if err != nil {
+	createdMarker := defaultErr != nil && !rootcfg.Exists(cleanPath)
+	var config *rootcfg.RootConfig
+	if createdMarker {
+		config = rootcfg.New("Default storage")
+	} else if config, err = rootcfg.Load(cleanPath); err != nil {
 		return nil, err
 	}
 	if defaultErr == nil && config.ID != existingDefault.RootID.String() {
 		return nil, fmt.Errorf("%w: configured default path contains a different .lumilioroot identity", ErrRepositoryRootInvalid)
 	}
 
+	targetID := config.ID
+	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
+		RequestID: "ensure-default:" + uuid.NewSHA1(uuid.NameSpaceURL, []byte(cleanPath)).String(),
+		Kind:      lifecycleKindCreateStorageLocation,
+		Payload: createStorageLocationOperationPayload{
+			Path: cleanPath, Name: config.Name, Kind: dbtypes.RepositoryRootKindDefault,
+		},
+		Actor:        "server:bootstrap",
+		TargetType:   "storage_location",
+		TargetID:     &targetID,
+		RollbackData: createStorageLocationRollbackData{Path: cleanPath},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if replay {
+		if err := lifecycleReplayError(operation); err != nil {
+			return nil, err
+		}
+		registered, err := rm.queries.GetDefaultRepositoryRoot(ctx)
+		if err != nil {
+			return nil, err
+		}
+		diskConfig, err := rootcfg.Load(cleanPath)
+		if err != nil || diskConfig.ID != registered.RootID.String() {
+			return nil, fmt.Errorf("%w: default Storage Location identity is invalid", ErrRepositoryRootInvalid)
+		}
+		return &registered, nil
+	}
+	rollback := createStorageLocationRollbackData{Path: cleanPath, MarkerCreated: createdMarker}
+	if createdMarker {
+		if err := config.Save(cleanPath); err != nil {
+			_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err,
+				createStorageLocationRollbackData{Path: cleanPath})
+			return nil, err
+		}
+		if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseFilesystemApplied, rollback); err != nil {
+			_ = os.Remove(filepath.Join(cleanPath, rootcfg.FileName))
+			_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err,
+				createStorageLocationRollbackData{Path: cleanPath})
+			return nil, err
+		}
+	}
 	registered, err := rm.registerRepositoryRoot(ctx, cleanPath, config, dbtypes.RepositoryRootKindDefault, false)
 	if err != nil {
 		if createdMarker {
 			_ = os.Remove(filepath.Join(cleanPath, rootcfg.FileName))
 		}
+		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err,
+			createStorageLocationRollbackData{Path: cleanPath})
 		return nil, err
 	}
-	if err := rm.associateRepositoriesUnderRoot(ctx, *registered); err != nil {
-		return nil, err
+	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseCatalogCommitted, rollback); err != nil {
+		return nil, fmt.Errorf("default Storage Location registered but journal commit phase failed: %w", err)
+	}
+	if err := rm.completeLifecycleOperation(ctx, operation.OperationID,
+		createStorageLocationOperationResult{RootID: registered.RootID.String()}); err != nil {
+		return nil, fmt.Errorf("default Storage Location registered but journal completion failed: %w", err)
 	}
 	return registered, nil
+}
+
+func (rm *DefaultRepositoryManager) switchDefaultRepositoryRoot(
+	ctx context.Context,
+	existing repo.RepositoryRoot,
+	newPath string,
+	request LifecycleRequest,
+) (*repo.RepositoryRoot, error) {
+	requestID := "switch-default:" + existing.RootID.String() + ":" + uuid.NewSHA1(uuid.NameSpaceURL, []byte(newPath)).String()
+	if strings.TrimSpace(request.RequestID) != "" {
+		requestID = request.RequestID
+	}
+	actor := strings.TrimSpace(request.Actor)
+	if actor == "" {
+		actor = "server:config"
+	}
+	confirmation := strings.TrimSpace(request.ConfirmationType)
+	if confirmation == "" {
+		confirmation = "portable_identity_match"
+	}
+	repositories, err := rm.queries.ListRepositories(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("inspect default Storage Location switch impact: %w", err)
+	}
+	var repositoryCount int64
+	for _, repository := range repositories {
+		if repository.RootID == existing.RootID {
+			repositoryCount++
+		}
+	}
+	targetID := existing.RootID.String()
+	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
+		RequestID: requestID, Kind: lifecycleKindSwitchDefaultStorage,
+		Payload: switchDefaultStorageOperationPayload{
+			RootID: existing.RootID.String(), OldPath: existing.Path, NewPath: newPath,
+			ConfirmationType: confirmation, RepositoryCount: repositoryCount,
+		},
+		Actor: actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
+		TargetType: "storage_location", TargetID: &targetID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if replay {
+		if err := lifecycleReplayError(operation); err != nil {
+			return nil, err
+		}
+		root, err := rm.queries.GetRepositoryRoot(ctx, existing.RootID)
+		if err != nil {
+			return nil, err
+		}
+		return &root, nil
+	}
+	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseFilesystemApplied, nil); err != nil {
+		return nil, err
+	}
+	root, err := rm.relocateRepositoryRoot(ctx, existing.RootID.String(), newPath, true)
+	if err != nil {
+		_ = rm.failLifecycleOperation(ctx, operation.OperationID, false, err, nil)
+		return nil, err
+	}
+	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseCatalogCommitted, nil); err != nil {
+		return nil, err
+	}
+	if err := rm.completeLifecycleOperation(ctx, operation.OperationID,
+		switchDefaultStorageOperationResult{
+			RootID: root.RootID.String(), RepositoryCount: repositoryCount, FilesPreserved: true,
+		}); err != nil {
+		return nil, err
+	}
+	return root, nil
 }
 
 // AddRepositoryRoot registers a native-host-authorized directory as an
 // external Storage Location. The directory must already exist; the server never
 // turns a missing mount path into a new directory.
-func (rm *DefaultRepositoryManager) AddRepositoryRoot(ctx context.Context, path, name string) (*repo.RepositoryRoot, error) {
+func (rm *DefaultRepositoryManager) AddRepositoryRoot(ctx context.Context, path, name string, requests ...LifecycleRequest) (*repo.RepositoryRoot, error) {
 	cleanPath, err := rm.validateRepositoryRootPath(path)
 	if err != nil {
 		return nil, err
 	}
-
-	if existing, err := rm.queries.GetRepositoryRootByPath(ctx, cleanPath); err == nil {
-		config, loadErr := rootcfg.Load(cleanPath)
-		if loadErr != nil {
-			return nil, loadErr
-		}
-		if config.ID != existing.RootID.String() {
-			return nil, fmt.Errorf("%w: database and .lumilioroot identities differ", ErrRepositoryRootInvalid)
-		}
-		if err := rm.associateRepositoriesUnderRoot(ctx, existing); err != nil {
-			return nil, err
-		}
-		return &existing, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("find storage location by path: %w", err)
-	}
-
-	if err := rm.rejectOverlappingRepositoryRoot(ctx, cleanPath); err != nil {
+	if err := rm.claimRuntimeStoragePath(ctx, "root", cleanPath); err != nil {
 		return nil, err
 	}
 	rootName := strings.TrimSpace(name)
 	if rootName == "" {
 		rootName = filepath.Base(cleanPath)
 	}
-	config, createdMarker, err := loadOrCreateRootConfig(cleanPath, rootName, func() *rootcfg.RootConfig {
-		return rootcfg.New(rootName)
+	createdMarker := !rootcfg.Exists(cleanPath)
+	var config *rootcfg.RootConfig
+	if createdMarker {
+		config = rootcfg.New(rootName)
+	} else if config, err = rootcfg.Load(cleanPath); err != nil {
+		return nil, err
+	}
+	targetID := config.ID
+	request := LifecycleRequest{}
+	if len(requests) > 0 {
+		request = requests[0]
+	}
+	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
+		RequestID: request.RequestID, Kind: lifecycleKindCreateStorageLocation,
+		Payload: createStorageLocationOperationPayload{
+			Path: cleanPath, Name: rootName, Kind: dbtypes.RepositoryRootKindExternal,
+		},
+		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID, TargetType: "storage_location", TargetID: &targetID,
+		RollbackData: createStorageLocationRollbackData{Path: cleanPath},
 	})
 	if err != nil {
 		return nil, err
+	}
+	if replay {
+		if err := lifecycleReplayError(operation); err != nil {
+			return nil, err
+		}
+		if operation.TargetID == nil {
+			return nil, fmt.Errorf("%w: completed Storage Location operation has no target", ErrLifecycleRecoveryRequired)
+		}
+		rootID, err := uuid.Parse(*operation.TargetID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: completed Storage Location operation has an invalid target", ErrLifecycleRecoveryRequired)
+		}
+		root, err := rm.queries.GetRepositoryRoot(ctx, rootID)
+		if err != nil {
+			return nil, fmt.Errorf("load completed Storage Location result: %w", err)
+		}
+		return &root, nil
+	}
+	failPrepared := func(cause error, markerCreated bool) (*repo.RepositoryRoot, error) {
+		rollback := createStorageLocationRollbackData{Path: cleanPath, MarkerCreated: markerCreated}
+		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, cause, rollback)
+		return nil, cause
+	}
+
+	if existing, err := rm.queries.GetRepositoryRootByPath(ctx, cleanPath); err == nil {
+		if config.ID != existing.RootID.String() {
+			return failPrepared(fmt.Errorf("%w: database and .lumilioroot identities differ", ErrRepositoryRootInvalid), false)
+		}
+		if err := rm.completeLifecycleOperation(ctx, operation.OperationID,
+			createStorageLocationOperationResult{RootID: existing.RootID.String()}); err != nil {
+			return nil, err
+		}
+		return &existing, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return failPrepared(fmt.Errorf("find storage location by path: %w", err), false)
+	}
+	if err := rm.rejectOverlappingRepositoryRoot(ctx, cleanPath); err != nil {
+		return failPrepared(err, false)
+	}
+	if createdMarker {
+		if err := config.Save(cleanPath); err != nil {
+			return failPrepared(err, false)
+		}
+		rollback := createStorageLocationRollbackData{Path: cleanPath, MarkerCreated: true}
+		if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseFilesystemApplied, rollback); err != nil {
+			_ = os.Remove(filepath.Join(cleanPath, rootcfg.FileName))
+			return failPrepared(err, false)
+		}
 	}
 	registered, err := rm.registerRepositoryRoot(ctx, cleanPath, config, dbtypes.RepositoryRootKindExternal, false)
 	if err != nil {
 		if createdMarker {
 			_ = os.Remove(filepath.Join(cleanPath, rootcfg.FileName))
 		}
-		return nil, err
+		return failPrepared(err, false)
 	}
-	if err := rm.associateRepositoriesUnderRoot(ctx, *registered); err != nil {
-		return nil, err
+	rollback := createStorageLocationRollbackData{Path: cleanPath, MarkerCreated: createdMarker}
+	if err := rm.updateLifecycleOperationPhase(ctx, operation.OperationID, lifecyclePhaseCatalogCommitted, rollback); err != nil {
+		return nil, fmt.Errorf("Storage Location registered but journal commit phase failed: %w", err)
+	}
+	if err := rm.completeLifecycleOperation(ctx, operation.OperationID,
+		createStorageLocationOperationResult{RootID: registered.RootID.String()}); err != nil {
+		return nil, fmt.Errorf("Storage Location registered but journal completion failed: %w", err)
 	}
 	return registered, nil
 }
@@ -147,7 +332,7 @@ func (rm *DefaultRepositoryManager) AddRepositoryRoot(ctx context.Context, path,
 // RelocateRepositoryRoot reconnects an existing external Storage Location at
 // a new native-host-authorized path. The marker at the requested path must
 // carry the registered identity; this never rewrites or guesses identity.
-func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, id, path string) (*repo.RepositoryRoot, error) {
+func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, id, path string, requests ...LifecycleRequest) (*repo.RepositoryRoot, error) {
 	rootID, err := uuid.Parse(strings.TrimSpace(id))
 	if err != nil {
 		return nil, fmt.Errorf("invalid storage location id: %w", err)
@@ -156,7 +341,63 @@ func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	if registered.Kind != dbtypes.RepositoryRootKindExternal {
+	cleanPath, err := CanonicalizeRepositoryPath(path)
+	if err != nil {
+		return nil, err
+	}
+	targetID := rootID.String()
+	request := firstLifecycleRequest(requests)
+	oldPath := registered.Path
+	if requestID := strings.TrimSpace(request.RequestID); requestID != "" {
+		if existing, lookupErr := rm.queries.GetLifecycleOperationByRequestID(ctx, requestID); lookupErr == nil {
+			var existingPayload switchDefaultStorageOperationPayload
+			if existing.Kind != lifecycleKindRelocateStorage || json.Unmarshal(existing.Payload, &existingPayload) != nil ||
+				existingPayload.RootID != rootID.String() || existingPayload.NewPath != cleanPath {
+				return nil, ErrLifecycleRequestConflict
+			}
+			oldPath = existingPayload.OldPath
+		} else if !errors.Is(lookupErr, sql.ErrNoRows) {
+			return nil, fmt.Errorf("find Storage Location relocate request: %w", lookupErr)
+		}
+	}
+	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
+		RequestID: request.RequestID,
+		Kind:      lifecycleKindRelocateStorage,
+		Payload:   switchDefaultStorageOperationPayload{RootID: rootID.String(), OldPath: oldPath, NewPath: cleanPath},
+		Actor:     request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID,
+		TargetType: "storage_location", TargetID: &targetID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if replay {
+		if err := lifecycleReplayError(operation); err != nil {
+			return nil, err
+		}
+		root, err := rm.queries.GetRepositoryRoot(ctx, rootID)
+		return &root, err
+	}
+	root, err := rm.relocateRepositoryRoot(ctx, id, cleanPath, false)
+	if err != nil {
+		_ = rm.failLifecycleOperation(ctx, operation.OperationID, false, err, nil)
+		return nil, err
+	}
+	if err := rm.completeLifecycleOperation(ctx, operation.OperationID, createStorageLocationOperationResult{RootID: rootID.String()}); err != nil {
+		return nil, err
+	}
+	return root, nil
+}
+
+func (rm *DefaultRepositoryManager) relocateRepositoryRoot(ctx context.Context, id, path string, allowDefault bool) (*repo.RepositoryRoot, error) {
+	rootID, err := uuid.Parse(strings.TrimSpace(id))
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage location id: %w", err)
+	}
+	registered, err := rm.queries.GetRepositoryRoot(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	if registered.Kind != dbtypes.RepositoryRootKindExternal && !allowDefault {
 		return nil, ErrRepositoryRootNotRemovable
 	}
 
@@ -171,21 +412,43 @@ func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, 
 	if config.ID != rootID.String() {
 		return nil, fmt.Errorf("%w: selected directory has a different .lumilioroot identity", ErrRepositoryRootInvalid)
 	}
+	if registered.Path != cleanPath {
+		if originalConfig, originalErr := rootcfg.Load(registered.Path); originalErr == nil && originalConfig.ID == rootID.String() {
+			return nil, &RepositoryRootConflictError{
+				RootID: rootID.String(), RegisteredPath: registered.Path, RequestedPath: cleanPath,
+				Actions: []string{},
+			}
+		}
+	}
+	if err := rm.claimRuntimeStoragePath(ctx, "root", cleanPath); err != nil {
+		return nil, err
+	}
 	if err := rm.rejectOverlappingRepositoryRootExcept(ctx, cleanPath, rootID); err != nil {
 		return nil, err
 	}
+	if rm.database == nil {
+		return nil, errors.New("repository catalog transaction is unavailable")
+	}
+	coordinator := rm.files.AccessCoordinator()
+	releaseRoot, err := coordinator.AcquireRootMutationContext(ctx, rootID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
+	}
+	defer releaseRoot()
 
 	type repositoryMove struct {
-		id   string
-		path string
+		repository repo.Repository
+		path       string
+		config     *repocfg.RepositoryConfig
 	}
 	repositories, err := rm.queries.ListRepositories(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list repositories for storage location relocate: %w", err)
 	}
 	moves := make([]repositoryMove, 0)
+	repositoryIDs := make([]uuid.UUID, 0)
 	for _, repository := range repositories {
-		if !repository.RootID.Valid || repository.RootID.UUID != rootID {
+		if repository.RootID != rootID {
 			continue
 		}
 		requestedRepositoryPath, moveErr := relocatedRepositoryPath(registered.Path, cleanPath, repository.Path)
@@ -204,26 +467,119 @@ func (rm *DefaultRepositoryManager) RelocateRepositoryRoot(ctx context.Context, 
 		} else if findErr != nil && !errors.Is(findErr, sql.ErrNoRows) {
 			return nil, fmt.Errorf("check repository destination: %w", findErr)
 		}
-		moves = append(moves, repositoryMove{id: repositoryConfig.ID, path: requestedRepositoryPath})
+		moves = append(moves, repositoryMove{
+			repository: repository,
+			path:       requestedRepositoryPath,
+			config:     repositoryConfig,
+		})
+		if err := rm.claimRuntimeStoragePath(ctx, "repository", requestedRepositoryPath); err != nil {
+			return nil, err
+		}
+		repositoryIDs = append(repositoryIDs, repository.RepoID)
 	}
 
-	// Move child repository rows first. If one update fails, the root still
-	// points at its previous path and a retry can resume; successfully moved rows
-	// are temporarily detached and re-associated below. Moving the root row first
-	// would lose the old prefix needed to recover from a partial failure.
+	releaseRepositories, err := coordinator.AcquireMutationsContext(ctx, repositoryIDs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: child repository is busy: %v", ErrRepositoryBusy, err)
+	}
+	defer releaseRepositories()
+
+	// Commit the maintenance barrier before changing any paths. HTTP reads and
+	// every BeginRepositoryActivity caller can now observe/refuse this root and
+	// its children, instead of maintenance existing only inside the final tx.
+	maintenanceTx, err := rm.database.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin Storage Location maintenance: %w", err)
+	}
+	maintenanceQueries := rm.queries.WithTx(maintenanceTx)
+	now := dbtypes.NewTimestamp(time.Now().UTC())
+	if _, err := maintenanceQueries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
+		RootID: rootID, Name: registered.Name,
+		Status: dbtypes.RepositoryRootStatusMaintenance, UpdatedAt: now,
+	}); err != nil {
+		_ = maintenanceTx.Rollback()
+		return nil, fmt.Errorf("enter Storage Location maintenance: %w", err)
+	}
 	for _, move := range moves {
-		if _, err := rm.RelocateRepository(ctx, move.id, move.path); err != nil {
-			return nil, fmt.Errorf("relocate repository with Storage Location: %w", err)
+		if _, err := maintenanceQueries.BeginRepositoryMaintenance(ctx, repo.BeginRepositoryMaintenanceParams{
+			RepoID: move.repository.RepoID, UpdatedAt: now,
+		}); err != nil {
+			_ = maintenanceTx.Rollback()
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, fmt.Errorf("%w: child repository %s has active work", ErrRepositoryBusy, move.repository.Name)
+			}
+			return nil, fmt.Errorf("enter child repository maintenance: %w", err)
 		}
 	}
-	root, err := rm.registerRepositoryRoot(ctx, cleanPath, config, dbtypes.RepositoryRootKindExternal, true)
+	if err := maintenanceTx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit Storage Location maintenance: %w", err)
+	}
+	maintenanceCommitted := true
+	defer func() {
+		if !maintenanceCommitted {
+			return
+		}
+		background := context.Background()
+		restoreNow := dbtypes.NewTimestamp(time.Now().UTC())
+		_, _ = rm.queries.UpdateRepositoryRootFromDisk(background, repo.UpdateRepositoryRootFromDiskParams{
+			RootID: rootID, Name: registered.Name, Status: registered.Status, UpdatedAt: restoreNow,
+		})
+		for _, move := range moves {
+			_, _ = rm.queries.EndRepositoryMaintenance(background, repo.EndRepositoryMaintenanceParams{
+				RepoID: move.repository.RepoID, Reachability: move.repository.Reachability,
+				Activity: move.repository.Activity, UpdatedAt: restoreNow,
+			})
+		}
+	}()
+
+	tx, err := rm.database.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("begin Storage Location relocate: %w", err)
 	}
-	if err := rm.associateRepositoriesUnderRoot(ctx, *root); err != nil {
-		return nil, err
+	defer func() { _ = tx.Rollback() }()
+	queries := rm.queries.WithTx(tx)
+	now = dbtypes.NewTimestamp(time.Now().UTC())
+	for _, move := range moves {
+		updated, updateErr := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
+			RepoID: move.repository.RepoID, Path: move.path, RootID: rootID,
+			Reachability: dbtypes.RepositoryReachabilityMaintenance, UpdatedAt: now,
+		})
+		if updateErr != nil {
+			return nil, fmt.Errorf("relocate repository with Storage Location: %w", updateErr)
+		}
+		if _, updateErr := queries.UpdateRepository(ctx, repo.UpdateRepositoryParams{
+			RepoID: updated.RepoID, Name: move.config.Name, Config: *move.config,
+			DefaultOwnerID: updated.DefaultOwnerID, UpdatedAt: now,
+		}); updateErr != nil {
+			return nil, fmt.Errorf("refresh relocated repository config: %w", updateErr)
+		}
+		if _, updateErr := queries.EndRepositoryMaintenance(ctx, repo.EndRepositoryMaintenanceParams{
+			RepoID: updated.RepoID, Reachability: dbtypes.RepositoryReachabilityActive,
+			Activity: dbtypes.RepositoryActivityIdle, UpdatedAt: now,
+		}); updateErr != nil {
+			return nil, fmt.Errorf("leave relocated repository maintenance: %w", updateErr)
+		}
 	}
-	return root, nil
+	root, err := queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: config.Name, Path: cleanPath,
+		Kind: registered.Kind, Status: dbtypes.RepositoryRootStatusActive,
+		MountFingerprint: InspectStoragePath(cleanPath).MountFingerprint,
+		CreatedAt:        registered.CreatedAt, UpdatedAt: now,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("relocate Storage Location row: %w", err)
+	}
+	root, err = queries.UpdateRepositoryRootMountFingerprint(ctx, repo.UpdateRepositoryRootMountFingerprintParams{
+		RootID: rootID, MountFingerprint: InspectStoragePath(cleanPath).MountFingerprint, UpdatedAt: now,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("record relocated Storage Location mount fingerprint: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit Storage Location relocate: %w", err)
+	}
+	maintenanceCommitted = false
+	return &root, nil
 }
 
 func (rm *DefaultRepositoryManager) validateRepositoryRootPath(path string) (string, error) {
@@ -255,21 +611,6 @@ func (rm *DefaultRepositoryManager) validateRepositoryRootPath(path string) (str
 	return cleanPath, nil
 }
 
-func loadOrCreateRootConfig(path, name string, create func() *rootcfg.RootConfig) (*rootcfg.RootConfig, bool, error) {
-	if rootcfg.Exists(path) {
-		config, err := rootcfg.Load(path)
-		return config, false, err
-	}
-	config := create()
-	if strings.TrimSpace(config.Name) == "" {
-		config.Name = strings.TrimSpace(name)
-	}
-	if err := config.Save(path); err != nil {
-		return nil, false, err
-	}
-	return config, true, nil
-}
-
 func (rm *DefaultRepositoryManager) registerRepositoryRoot(
 	ctx context.Context,
 	path string,
@@ -283,10 +624,15 @@ func (rm *DefaultRepositoryManager) registerRepositoryRoot(
 	}
 	if registered, err := rm.queries.GetRepositoryRoot(ctx, rootID); err == nil {
 		if registered.Path != path && !allowMove {
+			actions := []string{"relocate"}
+			if marker, markerErr := rootcfg.Load(registered.Path); markerErr == nil && marker.ID == config.ID {
+				actions = nil
+			}
 			return nil, &RepositoryRootConflictError{
 				RootID:         config.ID,
 				RegisteredPath: registered.Path,
 				RequestedPath:  path,
+				Actions:        actions,
 			}
 		}
 	} else if !errors.Is(err, sql.ErrNoRows) {
@@ -299,13 +645,14 @@ func (rm *DefaultRepositoryManager) registerRepositoryRoot(
 		createdAt = now
 	}
 	registered, err := rm.queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID:    rootID,
-		Name:      config.Name,
-		Path:      path,
-		Kind:      kind,
-		Status:    dbtypes.RepositoryRootStatusActive,
-		CreatedAt: dbtypes.NewTimestamp(createdAt),
-		UpdatedAt: dbtypes.NewTimestamp(now),
+		RootID:           rootID,
+		Name:             config.Name,
+		Path:             path,
+		Kind:             kind,
+		Status:           dbtypes.RepositoryRootStatusActive,
+		MountFingerprint: InspectStoragePath(path).MountFingerprint,
+		CreatedAt:        dbtypes.NewTimestamp(createdAt),
+		UpdatedAt:        dbtypes.NewTimestamp(now),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register storage location: %w", err)
@@ -332,6 +679,9 @@ func (rm *DefaultRepositoryManager) ReconcileRepositoryRoots(ctx context.Context
 		return fmt.Errorf("list storage locations for reconcile: %w", err)
 	}
 	for _, root := range roots {
+		if root.Status == dbtypes.RepositoryRootStatusMaintenance {
+			continue
+		}
 		status := dbtypes.RepositoryRootStatusActive
 		name := root.Name
 		if info, statErr := os.Stat(root.Path); statErr != nil || !info.IsDir() {
@@ -368,7 +718,43 @@ func (rm *DefaultRepositoryManager) GetRepositoryRoot(ctx context.Context, id st
 	return &root, nil
 }
 
-func (rm *DefaultRepositoryManager) DeleteRepositoryRoot(ctx context.Context, id string) error {
+func (rm *DefaultRepositoryManager) PreviewRepositoryRootRemoval(ctx context.Context, id string) (RepositoryRootRemovalImpact, error) {
+	rootID, err := uuid.Parse(strings.TrimSpace(id))
+	if err != nil {
+		return RepositoryRootRemovalImpact{}, fmt.Errorf("invalid storage location id: %w", err)
+	}
+	root, err := rm.queries.GetRepositoryRoot(ctx, rootID)
+	if err != nil {
+		return RepositoryRootRemovalImpact{}, err
+	}
+	impact := RepositoryRootRemovalImpact{
+		RootID: root.RootID.String(), RootName: root.Name, Kind: root.Kind, FilesPreserved: true,
+	}
+	if err := rm.database.QueryRowContext(ctx,
+		"SELECT count(*) FROM repositories WHERE root_id = ?", rootID,
+	).Scan(&impact.RepositoryCount); err != nil {
+		return RepositoryRootRemovalImpact{}, fmt.Errorf("count Storage Location repositories: %w", err)
+	}
+	if err := rm.database.QueryRowContext(ctx, `
+		SELECT count(*) FROM lifecycle_operations
+		WHERE target_type = 'storage_location' AND target_id = ? AND status = 'running'
+	`, rootID.String()).Scan(&impact.ActiveOperationCount); err != nil {
+		return RepositoryRootRemovalImpact{}, fmt.Errorf("count Storage Location operations: %w", err)
+	}
+	switch {
+	case root.Kind != dbtypes.RepositoryRootKindExternal:
+		impact.BlockingReason = "default_storage_location"
+	case impact.RepositoryCount != 0:
+		impact.BlockingReason = "registered_repositories"
+	case impact.ActiveOperationCount != 0:
+		impact.BlockingReason = "active_operation"
+	default:
+		impact.CanRemove = true
+	}
+	return impact, nil
+}
+
+func (rm *DefaultRepositoryManager) DeleteRepositoryRoot(ctx context.Context, id string, requests ...LifecycleRequest) error {
 	rootID, err := uuid.Parse(strings.TrimSpace(id))
 	if err != nil {
 		return fmt.Errorf("invalid storage location id: %w", err)
@@ -380,13 +766,53 @@ func (rm *DefaultRepositoryManager) DeleteRepositoryRoot(ctx context.Context, id
 	if root.Kind != dbtypes.RepositoryRootKindExternal {
 		return ErrRepositoryRootNotRemovable
 	}
-	deleted, err := rm.queries.DeleteExternalRepositoryRoot(ctx, rootID)
+	coordinator := rm.files.AccessCoordinator()
+	releaseRoot, err := coordinator.AcquireRootMutationContext(ctx, rootID)
+	if err != nil {
+		return fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
+	}
+	defer releaseRoot()
+	impact, err := rm.PreviewRepositoryRootRemoval(ctx, id)
+	if err != nil {
+		return err
+	}
+	if impact.RepositoryCount != 0 {
+		return ErrRepositoryRootInUse
+	}
+	if impact.ActiveOperationCount != 0 {
+		return fmt.Errorf("%w: Storage Location has an active lifecycle operation", ErrRepositoryBusy)
+	}
+	tx, err := rm.database.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin Storage Location removal: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	queries := rm.queries.WithTx(tx)
+	deleted, err := queries.DeleteExternalRepositoryRoot(ctx, rootID)
 	if err != nil {
 		return fmt.Errorf("remove storage location: %w", err)
 	}
 	if deleted == 0 {
 		return ErrRepositoryRootInUse
 	}
+	request := firstLifecycleRequest(requests)
+	if _, err := recordLifecycleAuditWithQueries(ctx, queries, LifecycleAuditInput{
+		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID, RequestID: request.RequestID,
+		Action: "remove_storage_location", TargetType: "storage_location", TargetID: id,
+		Source: auditSourceForActor(request.Actor), ConfirmationType: "summary",
+		OldPath: root.Path, Result: AuditResultSucceeded,
+		Details: map[string]any{"storage_location_name": root.Name, "files_preserved": true},
+	}); err != nil {
+		return fmt.Errorf("audit Storage Location removal: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit Storage Location removal: %w", err)
+	}
+	rm.repoAudit(root.Path).Operation("repository_root.remove",
+		zap.String("storage_location_id", root.RootID.String()),
+		zap.String("storage_location_name", root.Name),
+		zap.String("preserved_path", root.Path),
+	)
 	return nil
 }
 
@@ -418,37 +844,58 @@ func (rm *DefaultRepositoryManager) resolveRepositoryRootForCreate(ctx context.C
 	return &root, nil
 }
 
-func (rm *DefaultRepositoryManager) associateRepositoriesUnderRoot(ctx context.Context, root repo.RepositoryRoot) error {
-	repositories, err := rm.queries.ListRepositories(ctx)
-	if err != nil {
-		return fmt.Errorf("list repositories for storage location association: %w", err)
-	}
-	for _, repository := range repositories {
-		if repository.RootID.Valid || !pathIsStrictlyInside(root.Path, repository.Path) {
-			continue
-		}
-		if _, err := rm.queries.SetRepositoryRoot(ctx, repo.SetRepositoryRootParams{
-			RepoID:    repository.RepoID,
-			RootID:    uuid.NullUUID{UUID: root.RootID, Valid: true},
-			UpdatedAt: dbtypes.NewTimestamp(time.Now()),
-		}); err != nil {
-			return fmt.Errorf("associate repository %s with storage location: %w", repository.Path, err)
-		}
-	}
-	return nil
-}
-
-func (rm *DefaultRepositoryManager) repositoryRootIDForPath(ctx context.Context, path string) (uuid.NullUUID, error) {
+func (rm *DefaultRepositoryManager) repositoryRootIDForPath(ctx context.Context, path string) (uuid.UUID, error) {
 	roots, err := rm.queries.ListRepositoryRoots(ctx)
 	if err != nil {
-		return uuid.NullUUID{}, fmt.Errorf("list storage locations for repository association: %w", err)
+		return uuid.Nil, fmt.Errorf("list storage locations for repository association: %w", err)
 	}
 	for _, root := range roots {
-		if root.Status == dbtypes.RepositoryRootStatusActive && pathIsStrictlyInside(root.Path, path) {
-			return uuid.NullUUID{UUID: root.RootID, Valid: true}, nil
+		if !pathIsDirectChild(root.Path, path) {
+			continue
 		}
+		if root.Status != dbtypes.RepositoryRootStatusActive {
+			return uuid.Nil, fmt.Errorf("%w: %s", ErrRepositoryRootOffline, root.Path)
+		}
+		config, loadErr := rootcfg.Load(root.Path)
+		if loadErr != nil || config.ID != root.RootID.String() {
+			return uuid.Nil, fmt.Errorf("%w: %s", ErrRepositoryRootInvalid, root.Path)
+		}
+		return root.RootID, nil
 	}
-	return uuid.NullUUID{}, nil
+	return uuid.Nil, fmt.Errorf(
+		"%w: repository %s must be a direct child of an active registered Storage Location",
+		ErrPathNotAllowed,
+		path,
+	)
+}
+
+func (rm *DefaultRepositoryManager) resolveRepositoryAssociation(ctx context.Context, path string, requested []uuid.UUID) (uuid.UUID, error) {
+	if len(requested) == 0 {
+		return rm.repositoryRootIDForPath(ctx, path)
+	}
+	if len(requested) != 1 {
+		return uuid.Nil, fmt.Errorf("%w: exactly one Storage Location is required", ErrPathNotAllowed)
+	}
+	root, err := rm.queries.GetRepositoryRoot(ctx, requested[0])
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("load repository Storage Location: %w", err)
+	}
+	if !pathIsDirectChild(root.Path, path) {
+		return uuid.Nil, fmt.Errorf(
+			"%w: repository %s must be a direct child of Storage Location %s",
+			ErrPathNotAllowed,
+			path,
+			root.Path,
+		)
+	}
+	if root.Status != dbtypes.RepositoryRootStatusActive {
+		return uuid.Nil, fmt.Errorf("%w: %s", ErrRepositoryRootOffline, root.Path)
+	}
+	config, err := rootcfg.Load(root.Path)
+	if err != nil || config.ID != root.RootID.String() {
+		return uuid.Nil, fmt.Errorf("%w: %s", ErrRepositoryRootInvalid, root.Path)
+	}
+	return root.RootID, nil
 }
 
 func (rm *DefaultRepositoryManager) rejectOverlappingRepositoryRoot(ctx context.Context, requested string) error {
@@ -479,10 +926,20 @@ func pathIsStrictlyInside(root, path string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
+func pathIsDirectChild(root, path string) bool {
+	relative, err := filepath.Rel(root, path)
+	if err != nil || relative == "." || filepath.IsAbs(relative) {
+		return false
+	}
+	return relative != ".." &&
+		!strings.HasPrefix(relative, ".."+string(filepath.Separator)) &&
+		filepath.Dir(relative) == "."
+}
+
 func relocatedRepositoryPath(oldRoot, newRoot, repositoryPath string) (string, error) {
 	relative, err := filepath.Rel(oldRoot, repositoryPath)
-	if err != nil || relative == "." || filepath.IsAbs(relative) || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("%w: repository %s is outside its registered Storage Location", ErrRepositoryRootInvalid, repositoryPath)
+	if err != nil || !pathIsDirectChild(oldRoot, repositoryPath) {
+		return "", fmt.Errorf("%w: repository %s is not a direct child of its registered Storage Location", ErrRepositoryRootInvalid, repositoryPath)
 	}
 	return filepath.Join(newRoot, relative), nil
 }

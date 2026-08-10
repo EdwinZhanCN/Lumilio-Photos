@@ -20,13 +20,13 @@ export default function NotFound(): React.ReactNode {
           <p className="mt-4 text-base-content/70">
             {t(
               "notFound.description",
-              "The address may be outdated or mistyped. Your library and photos are still safe.",
+              "The address may be outdated or mistyped. Your repositories and photos are still safe.",
             )}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link className="btn btn-primary" to="/">
               <Home className="size-4" aria-hidden="true" />
-              {t("notFound.home", "Go to library")}
+              {t("notFound.home", "Go to media")}
             </Link>
             <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="size-4" aria-hidden="true" />

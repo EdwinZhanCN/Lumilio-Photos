@@ -1,7 +1,15 @@
 ---
-title: Lumilio Agent 入口已移动
+title: "页面已迁移：认识流明集"
+description: "旧文档地址兼容页。"
+page_id: "legacy-features-lumilio"
+search: false
+outline: false
+baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
+last_verified: "2026-08-06"
 ---
 
-# Lumilio Agent 入口已移动
+# 页面已迁移
 
-Agent 的入口、上下文引用、看板和确认边界已经统一写在 [Lumilio Agent](./agent)。本页保留为旧链接兼容入口。
+这条旧地址保留用于兼容已有书签。权威内容已经合并到[认识流明集](../getting-started/about.md)。
+
+请不要在此页面继续维护第二份正文。

@@ -61,6 +61,17 @@ func (s *bootstrapService) IsReady(ctx context.Context) (bool, error) {
 }
 
 func (s *bootstrapService) Reconcile(ctx context.Context) (string, error) {
+	state, err := s.queries.GetSystemState(ctx)
+	if err != nil {
+		return "", fmt.Errorf("get system state: %w", err)
+	}
+	// Setup completion is a durable fact. Runtime storage availability is
+	// reported separately and must never send an established instance back
+	// through owner registration or primary-repository setup.
+	if state.BootstrapPhase == BootstrapPhaseReady {
+		return BootstrapPhaseReady, nil
+	}
+
 	phase, err := s.compute(ctx)
 	if err != nil {
 		return "", err

@@ -179,7 +179,7 @@ max_entries = 10000
 hardware_accel = "auto"
 
 [lumen]
-# Whether to look for external Lumen ML nodes at all. ML stays optional;
+# Whether to look for external Lumen Intelligence nodes at all. ML stays optional;
 # false keeps the deployment entirely local.
 discovery_enabled = true
 

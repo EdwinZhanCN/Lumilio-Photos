@@ -19,24 +19,29 @@ media tools, so there is no database service to install. All downloads are on th
 
 1. Download the `.dmg` from the latest release, open it, and drag
    **Lumilio Photos** into **Applications**.
-2. Launch it. The app is not notarized yet, so macOS shows a Gatekeeper prompt
+2. Verify the download first: run `shasum -a 256 Lumilio-Photos-<version>-macos-arm64.dmg`
+   and compare the output with the SHA-256 checksum published on the release page.
+   If they do not match, stop, delete the file, and download again from the official release.
+3. Launch it. The app is not notarized yet, so macOS shows a Gatekeeper prompt
    the first time: open **System Settings → Privacy & Security** and click
-   **Open Anyway** (once).
-3. Lumilio Photos lives in the **menu bar** (no Dock icon). On first run a
+   **Open Anyway** (once). Only do this for the single downloaded file that came
+   from the project's GitHub Releases and matched the checksum — do not lower
+   your system-wide security settings.
+4. Lumilio Photos lives in the **menu bar** (no Dock icon). On first run a
    setup window shows the machine-local default media location, download
    region, and open-source terms. External Storage Locations can be authorized
    later in the Desktop Control Panel; the database and credentials remain on
    the local disk.
-4. The app initializes its private database, then opens your default browser at
+5. The app initializes its private database, then opens your default browser at
    `http://localhost:6680`.
-5. In the browser, the first-run wizard creates your **admin account**
+6. In the browser, the first-run wizard creates your **admin account**
    (password now; adding an authenticator app, passkey, and recovery codes is
    offered right after and can be skipped).
 
 ::: tip Updates
 When a newer release exists, the menu-bar menu shows **Update available** —
 click it to download the new `.dmg`, then replace the app in Applications.
-Your library and database are untouched. During setup (or later in the
+Your Repositories and database are untouched. During setup (or later in the
 control panel) you can set **Download region** to Mainland China so the
 installer is fetched via a GitHub mirror; this is separate from in-app map
 region settings.
@@ -45,13 +50,19 @@ region settings.
 App data (database, secrets, logs) lives under
 `~/Library/Application Support/Lumilio Photos/`. To uninstall, quit from the
 menu bar, delete the app, and delete that folder if you also want the data gone
-(your media library location is separate and is never deleted).
+(your Repository storage is separate and is never deleted).
 
 ## Windows
 
 1. Download `Lumilio-Photos-<version>-windows-amd64-setup.exe` from the latest
-   release and run it. SmartScreen may warn about an unknown publisher —
-   choose **More info → Run anyway**.
+   release. Verify it first with
+   `Get-FileHash -Algorithm SHA256 .\Lumilio-Photos-<version>-windows-amd64-setup.exe`
+   and compare the output with the SHA-256 checksum on the release page; if they
+   do not match, delete the file and download again from the official release.
+   SmartScreen may warn about an unknown publisher — confirm the file is from
+   the project's GitHub Releases and matched the checksum, then choose
+   **More info → Run anyway**. Only do this for the single verified file, and do
+   not lower system-wide security settings.
 2. The installer is **per-user** (no administrator prompt), creates Start Menu
    shortcuts, and installs the Microsoft Edge WebView2 runtime automatically if
    it is missing (needed by the first-run setup window).
@@ -66,7 +77,7 @@ and its database, and can optionally remove the app data.
 ::: tip Updates
 When a newer release exists, the tray menu shows **Update available** — click
 it to download the new `setup.exe` and run it over the existing install. Your
-library and database are untouched. **Download region** (Mainland China vs
+Repositories and database are untouched. **Download region** (Mainland China vs
 other) controls whether the installer URL uses a GitHub mirror; it is separate
 from in-app map region settings.
 :::
@@ -132,6 +143,6 @@ is downloaded until you enable it.
 - **Another machine:** use `lumen-cli` to run a native Hub that advertises over
   LAN mDNS.
 - **Linux server or NAS:** choose and download a complete CPU, Vulkan, or CUDA
-  host-network Compose from the [Lumen AI guide](../features/lumen-ai). Once the
+  host-network Compose from the [Lumen Intelligence guide](../features/lumen-intelligence). Once the
   Hub is healthy, Lumilio Photos discovers it automatically; no server manifest
   edit or static address is required.

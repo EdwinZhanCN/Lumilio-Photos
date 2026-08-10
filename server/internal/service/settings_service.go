@@ -43,17 +43,17 @@ func (s LLMSettings) EffectiveProvider() string {
 }
 
 func (s LLMSettings) IsConfigured() bool {
-	modelName := strings.TrimSpace(s.ModelName)
-	if modelName == "" {
+	provider := s.EffectiveProvider()
+	if !settings.IsSupportedLLMProvider(provider) || strings.TrimSpace(s.ModelName) == "" {
 		return false
 	}
-
-	switch s.EffectiveProvider() {
-	case "ollama":
+	if provider == "ollama" {
 		return strings.TrimSpace(s.BaseURL) != ""
-	default:
-		return s.APIKeyConfigured
 	}
+	if provider == "deepseek" && strings.TrimSpace(s.BaseURL) == "" {
+		return false
+	}
+	return s.APIKeyConfigured
 }
 
 type MLSettings struct {
@@ -88,6 +88,14 @@ type UpdateLLMSettingsInput struct {
 	APIKey       *string
 }
 
+type ValidateLLMDraftInput struct {
+	Provider        string
+	ModelName       string
+	BaseURL         string
+	APIKey          string
+	UseStoredAPIKey bool
+}
+
 type UpdateMLSettingsInput struct {
 	SemanticEnabled           *bool
 	BioCLIPEnabled            *bool
@@ -107,7 +115,7 @@ type SettingsService interface {
 	GetMLConfig(ctx context.Context) (settings.ML, error)
 	GetBackupConfig(ctx context.Context) (settings.Backup, error)
 	GetEffectiveMLConfig(ctx context.Context) (settings.ML, error)
-	ValidateLLMSettings(ctx context.Context) error
+	ValidateLLMDraft(ctx context.Context, input ValidateLLMDraftInput) error
 }
 
 type settingsService struct {
@@ -184,7 +192,19 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 			params.LlmAgentEnabled = *input.LLM.AgentEnabled
 		}
 		if input.LLM.Provider != nil {
-			params.LlmProvider = normalizeStoredLLMProvider(*input.LLM.Provider)
+			rawProvider := strings.ToLower(strings.TrimSpace(*input.LLM.Provider))
+			if rawProvider != "none" && !settings.IsSupportedLLMProvider(rawProvider) {
+				return SystemSettings{}, fmt.Errorf("unsupported llm provider %q", rawProvider)
+			}
+			previousProvider := params.LlmProvider
+			params.LlmProvider = normalizeStoredLLMProvider(rawProvider)
+			// Credentials are bound to the explicitly selected provider. Reusing a
+			// secret after the provider changes is an invisible and usually invalid
+			// state transition, so require an explicit replacement instead.
+			if params.LlmProvider != previousProvider && input.LLM.APIKey == nil {
+				params.LlmApiKeyCiphertext = nil
+				params.LlmApiKeyConfigured = false
+			}
 		}
 		if input.LLM.ModelName != nil {
 			params.LlmModelName = strings.TrimSpace(*input.LLM.ModelName)
@@ -205,6 +225,13 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 				params.LlmApiKeyCiphertext = ciphertext
 				params.LlmApiKeyConfigured = true
 			}
+		}
+		if params.LlmProvider == "" {
+			params.LlmAgentEnabled = false
+			params.LlmModelName = ""
+			params.LlmBaseUrl = ""
+			params.LlmApiKeyCiphertext = nil
+			params.LlmApiKeyConfigured = false
 		}
 	}
 
@@ -245,6 +272,17 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		if input.Backup.KeepLast != nil {
 			params.BackupKeepLast = int64(clampInt32(*input.Backup.KeepLast, 1, 365))
 		}
+	}
+
+	candidateLLM := LLMSettings{
+		AgentEnabled:     params.LlmAgentEnabled,
+		Provider:         params.LlmProvider,
+		ModelName:        params.LlmModelName,
+		BaseURL:          params.LlmBaseUrl,
+		APIKeyConfigured: params.LlmApiKeyConfigured,
+	}
+	if candidateLLM.AgentEnabled && !candidateLLM.IsConfigured() {
+		return SystemSettings{}, errors.New("cannot enable Lumilio Agent until an explicit provider, model, and credential have been configured")
 	}
 
 	updated, err := s.queries.UpsertSettings(ctx, params)
@@ -313,19 +351,30 @@ func (s *settingsService) GetBackupConfig(ctx context.Context) (settings.Backup,
 	}, nil
 }
 
-func (s *settingsService) ValidateLLMSettings(ctx context.Context) error {
-	cfg, err := s.GetLLMConfig(ctx)
-	if err != nil {
-		return err
+func (s *settingsService) ValidateLLMDraft(ctx context.Context, input ValidateLLMDraftInput) error {
+	cfg := settings.LLM{
+		Provider:  settings.NormalizeLLMProvider(input.Provider),
+		ModelName: strings.TrimSpace(input.ModelName),
+		BaseURL:   strings.TrimSpace(input.BaseURL),
+		APIKey:    strings.TrimSpace(input.APIKey),
+	}
+	if input.UseStoredAPIKey {
+		stored, err := s.GetLLMConfig(ctx)
+		if err != nil {
+			return err
+		}
+		if stored.EffectiveProvider() != cfg.EffectiveProvider() || strings.TrimSpace(stored.APIKey) == "" {
+			return errors.New("the stored API key does not belong to the selected provider")
+		}
+		cfg.APIKey = stored.APIKey
 	}
 
 	validateCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	if err := llm.ValidateChatModel(validateCtx, cfg); err != nil {
-		return fmt.Errorf("validate llm settings: %w", err)
+		return fmt.Errorf("validate llm draft: %w", err)
 	}
-
 	return nil
 }
 
@@ -438,18 +487,11 @@ func clampFloat64(v, lo, hi float64) float64 {
 }
 
 func normalizeStoredLLMProvider(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "openai":
-		return "openai"
-	case "deepseek":
-		return "deepseek"
-	case "ollama":
-		return "ollama"
-	case "ark":
-		return "ark"
-	default:
-		return "ark"
+	provider := settings.NormalizeLLMProvider(raw)
+	if !settings.IsSupportedLLMProvider(provider) {
+		return ""
 	}
+	return provider
 }
 
 func (s *settingsService) encryptionKey() ([]byte, error) {

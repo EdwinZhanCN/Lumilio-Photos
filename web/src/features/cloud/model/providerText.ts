@@ -20,7 +20,7 @@ export function createProviderTextResolver(t: TFunction): ProviderTextResolver {
     ),
     "cloudProvider.icloud.securityNote": t(
       "cloudProvider.icloud.securityNote",
-      "Lumilio uses the password only during authentication and stores the resulting session in an isolated credential directory.",
+      "Lumilio Photos uses the password only during authentication and stores the resulting session in an isolated credential directory.",
     ),
     "cloudProvider.icloud.field.username": t(
       "cloudProvider.icloud.field.username",

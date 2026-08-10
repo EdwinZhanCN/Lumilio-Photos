@@ -4,10 +4,9 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,11 +29,12 @@ type ShareLinkHandler struct {
 	service      service.ShareLinkService
 	assetService service.AssetService
 	queries      *repo.Queries
+	files        *storage.RepositoryFSFactory
 }
 
 // NewShareLinkHandler constructs the share link handler.
-func NewShareLinkHandler(shareService service.ShareLinkService, assetService service.AssetService, queries *repo.Queries) *ShareLinkHandler {
-	return &ShareLinkHandler{service: shareService, assetService: assetService, queries: queries}
+func NewShareLinkHandler(shareService service.ShareLinkService, assetService service.AssetService, queries *repo.Queries, files *storage.RepositoryFSFactory) *ShareLinkHandler {
+	return &ShareLinkHandler{service: shareService, assetService: assetService, queries: queries, files: files}
 }
 
 // --- Authenticated (owner) endpoints -------------------------------------
@@ -438,9 +438,8 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	fullPath := resolveRepositoryPath(repository.Path, thumbnail.StoragePath)
-
-	if _, err := os.Stat(fullPath); err != nil {
+	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, thumbnail.StoragePath)
+	if err != nil {
 		api.GinNotFound(c, err, "Thumbnail file not found")
 		return
 	}
@@ -448,7 +447,7 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 	// Short private caching only: this is a token-gated asset, not a
 	// permanently public URL, so it must never be cached at a shared proxy.
 	c.Header("Cache-Control", "private, max-age=300")
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, thumbnail.StoragePath)
 }
 
 // GetPublicShareWebVideo serves a share asset's web-optimized video, falling
@@ -463,7 +462,7 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 // @Failure 404 {object} api.ErrorResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/web-video [get]
 func (h *ShareLinkHandler) GetPublicShareWebVideo(c *gin.Context) {
-	h.servePublicShareWebMedia(c, "VIDEO", storage.DefaultStructure.VideosDir, "_web.mp4", "video/mp4", "Video file not found")
+	h.servePublicShareWebMedia(c, "VIDEO", "videos", "_web.mp4", "video/mp4", "Video file not found")
 }
 
 // GetPublicShareWebAudio serves a share asset's web-optimized audio, falling
@@ -478,12 +477,12 @@ func (h *ShareLinkHandler) GetPublicShareWebVideo(c *gin.Context) {
 // @Failure 404 {object} api.ErrorResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/web-audio [get]
 func (h *ShareLinkHandler) GetPublicShareWebAudio(c *gin.Context) {
-	h.servePublicShareWebMedia(c, "AUDIO", storage.DefaultStructure.AudiosDir, "_web.mp3", "audio/mpeg", "Audio file not found")
+	h.servePublicShareWebMedia(c, "AUDIO", "audios", "_web.mp3", "audio/mpeg", "Audio file not found")
 }
 
 // servePublicShareWebMedia mirrors AssetHandler's GetWebVideo/GetWebAudio web
 // version + fallback-to-original logic, scoped to a share's asset set.
-func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, webVersionDir, webSuffix, contentType, notFoundMessage string) {
+func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, derivedKind, webSuffix, contentType, notFoundMessage string) {
 	link, ok := h.resolvePublicShare(c)
 	if !ok {
 		return
@@ -507,26 +506,20 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, w
 		return
 	}
 
-	fullPath := ""
-	if asset.ContentHash != "" {
-		webFilename := asset.ContentHash + webSuffix
-		candidate := filepath.Join(repository.Path, webVersionDir, "web", webFilename)
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			fullPath = candidate
+	repositoryFS, file, err := openWebOrOriginal(h.files, *repository, asset, derivedKind, webSuffix)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			api.GinNotFound(c, err, notFoundMessage)
+		} else {
+			api.GinInternalError(c, err, "Failed to access repository file")
 		}
-	}
-	if fullPath == "" {
-		fullPath = resolveRepositoryPath(repository.Path, *asset.StoragePath)
-		if _, statErr := os.Stat(fullPath); os.IsNotExist(statErr) {
-			api.GinNotFound(c, statErr, notFoundMessage)
-			return
-		}
+		return
 	}
 
 	c.Header("Cache-Control", "private, max-age=300")
 	c.Header("Content-Type", contentType)
 	c.Header("Accept-Ranges", "bytes")
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
 }
 
 // GetPublicShareOriginal serves a share asset's original file. Requires the
@@ -564,16 +557,20 @@ func (h *ShareLinkHandler) GetPublicShareOriginal(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to access repository")
 		return
 	}
-	fullPath := resolveRepositoryPath(repository.Path, *asset.StoragePath)
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		api.GinNotFound(c, err, "Original file not found")
+	repositoryFS, file, err := openRepositoryMedia(h.files, *repository, *asset.StoragePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			api.GinNotFound(c, err, "Original file not found")
+		} else {
+			api.GinInternalError(c, err, "Failed to access original file")
+		}
 		return
 	}
 
 	c.Header("Cache-Control", "private, max-age=0, no-store")
 	c.Header("Content-Type", asset.MimeType)
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", asset.OriginalFilename))
-	c.File(fullPath)
+	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
 }
 
 // DownloadPublicShare serves the share's assets (or a requested subset) as a
@@ -630,11 +627,22 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 		if err != nil {
 			continue
 		}
-		fullPath := resolveRepositoryPath(repository.Path, *asset.StoragePath)
-		if info, statErr := os.Stat(fullPath); statErr != nil || info.IsDir() {
+		repositoryPath, parseErr := storage.ParseUserMediaPath(*asset.StoragePath)
+		if parseErr != nil {
 			continue
 		}
-		files = append(files, assetDownloadFile{asset: *asset, path: fullPath})
+		repositoryFS, openErr := h.files.Open(*repository)
+		if openErr != nil {
+			continue
+		}
+		opened, openErr := repositoryFS.OpenMedia(repositoryPath)
+		if openErr != nil {
+			_ = repositoryFS.Close()
+			continue
+		}
+		_ = opened.Close()
+		_ = repositoryFS.Close()
+		files = append(files, assetDownloadFile{asset: *asset, repository: *repository, path: repositoryPath})
 	}
 
 	if len(files) == 0 {
@@ -651,7 +659,7 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 	zipWriter := zip.NewWriter(c.Writer)
 	archiveNames := make(map[string]int, len(files))
 	for _, file := range files {
-		if err := writeAssetToZip(zipWriter, archiveNames, file); err != nil {
+		if err := writeAssetToZip(h.files, zipWriter, archiveNames, file); err != nil {
 			log.Printf("Failed to write share asset to zip: %v", err)
 			_ = zipWriter.Close()
 			return

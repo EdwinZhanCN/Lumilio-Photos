@@ -68,17 +68,13 @@ func newProviderChatModel(ctx context.Context, cfg settings.LLM) (model.ToolCall
 			Model:   modelName,
 		})
 	default:
-		return ark.NewChatModel(ctx, &ark.ChatModelConfig{
-			APIKey:  apiKey,
-			Model:   modelName,
-			BaseURL: baseURL,
-		})
+		return nil, errors.New("unsupported or missing llm provider")
 	}
 }
 
 func ValidateChatModel(ctx context.Context, cfg settings.LLM) error {
-	if !cfg.IsConfigured() {
-		return errors.New("llm settings are incomplete")
+	if err := cfg.ValidateConfiguration(); err != nil {
+		return err
 	}
 
 	chatModel, err := NewChatModel(ctx, cfg)

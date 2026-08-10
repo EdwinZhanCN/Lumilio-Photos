@@ -3,7 +3,7 @@ package dto
 import "server/internal/service"
 
 // ClassifierPreviewRequestDTO is an ad-hoc zero-shot classifier evaluated live
-// over the library, used to tune prompts and thresholds before saving.
+// over catalog assets, used to tune prompts and thresholds before saving.
 type ClassifierPreviewRequestDTO struct {
 	PositivePrompts []string `json:"positive_prompts" binding:"required,min=1,dive,required"`
 	NegativePrompts []string `json:"negative_prompts"`

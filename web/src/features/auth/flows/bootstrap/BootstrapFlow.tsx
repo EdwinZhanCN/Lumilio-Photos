@@ -15,8 +15,8 @@ import {
   Users,
   User,
 } from "lucide-react";
-import { isDuplicateHandling, isStorageStrategy } from "@/features/repositories";
 import { SUPPORTED_LANGUAGES } from "@/lib/i18n.tsx";
+import { StorageRiskConfirmation, StorageStrategyPicker } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
   PASSWORD_HINT,
@@ -85,10 +85,11 @@ const BootstrapFlow: React.FC = () => {
     setRepoName,
     repoNameError,
     repoRoot,
-    strategy,
-    setStrategy,
-    duplicateHandling,
-    setDuplicateHandling,
+    storageStrategy,
+    setStorageStrategy,
+    placementRisks,
+    riskConfirmation,
+    setRiskConfirmation,
     canSubmitRepo,
     submitRepo,
     repoError,
@@ -295,7 +296,7 @@ const BootstrapFlow: React.FC = () => {
                     defaultValue: "Create the administrator",
                   })}
                   sub={t("auth.bootstrap.admin.subtitle", {
-                    defaultValue: "This account can manage the server, libraries, and members.",
+                    defaultValue: "This account can manage the server, Repositories, and members.",
                   })}
                 />
                 <form className="mt-5 flex flex-col gap-4" onSubmit={handleStartRegistration}>
@@ -457,7 +458,7 @@ const BootstrapFlow: React.FC = () => {
                   })}
                   sub={t("auth.bootstrap.repository.subtitle", {
                     defaultValue:
-                      "Choose where Lumilio stores media. This becomes the default for future repositories.",
+                      "Choose where Lumilio Photos stores media. This becomes the default for future repositories.",
                   })}
                 />
 
@@ -472,7 +473,7 @@ const BootstrapFlow: React.FC = () => {
                     label={t("auth.primaryRepository.name", { defaultValue: "Name" })}
                     hint={t(
                       "auth.primaryRepository.nameHint",
-                      "Use 1–80 letters, numbers, spaces, hyphens, or underscores. The primary directory remains <root>/primary.",
+                      "This display name can be changed later. The primary directory remains <root>/primary.",
                     )}
                     error={
                       repoName.length > 0 && repoNameError
@@ -492,7 +493,7 @@ const BootstrapFlow: React.FC = () => {
                   </Field>
 
                   <Field
-                    label={t("auth.primaryRepository.root", { defaultValue: "Storage root" })}
+                    label={t("auth.primaryRepository.root", { defaultValue: "Storage Location" })}
                     hint={t("auth.primaryRepository.rootHint", {
                       defaultValue:
                         "Set by server configuration. The primary repository is created at <root>/primary.",
@@ -508,44 +509,19 @@ const BootstrapFlow: React.FC = () => {
                     />
                   </Field>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-base-content/70">
-                        {t("auth.primaryRepository.strategy", { defaultValue: "Storage strategy" })}
-                      </span>
-                      <select
-                        className="select select-bordered select-sm w-full"
-                        value={strategy}
-                        onChange={(e) => {
-                          if (isStorageStrategy(e.target.value)) setStrategy(e.target.value);
-                        }}
-                        disabled={isCreatingRepository}
-                      >
-                        <option value="date">date</option>
-                        <option value="flat">flat</option>
-                        <option value="cas">cas</option>
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-base-content/70">
-                        {t("auth.primaryRepository.duplicates", { defaultValue: "Duplicates" })}
-                      </span>
-                      <select
-                        className="select select-bordered select-sm w-full"
-                        value={duplicateHandling}
-                        onChange={(e) => {
-                          if (isDuplicateHandling(e.target.value)) {
-                            setDuplicateHandling(e.target.value);
-                          }
-                        }}
-                        disabled={isCreatingRepository}
-                      >
-                        <option value="rename">rename</option>
-                        <option value="uuid">uuid</option>
-                        <option value="overwrite">overwrite</option>
-                      </select>
-                    </label>
-                  </div>
+                  <StorageStrategyPicker
+                    value={storageStrategy}
+                    onChange={setStorageStrategy}
+                    disabled={isCreatingRepository}
+                    idPrefix="bootstrap-primary"
+                  />
+
+                  <StorageRiskConfirmation
+                    warnings={placementRisks}
+                    checked={riskConfirmation}
+                    onChange={setRiskConfirmation}
+                    disabled={isCreatingRepository}
+                  />
 
                   <Btn
                     type="submit"

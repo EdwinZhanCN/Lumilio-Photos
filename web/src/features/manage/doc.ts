@@ -2,7 +2,7 @@
  * # Manage
  *
  * Manage owns the authenticated `/manage` operations surface. It composes
- * upload intake with repository- and library-maintenance commands; durable
+ * upload intake with Repository and catalog maintenance commands; durable
  * upload, repository, cloud, people, and duplicate state remains in those
  * domain features.
  *
@@ -23,18 +23,18 @@
  *     PAGE --> PANEL["RepositoryMaintenancePanel"]
  *     PANEL --> GRID["RepositoryGrid"]
  *     PANEL --> SCAN["scan / stack detection"]
- *     PANEL --> LIBRARY["duplicates / people / locations"]
+ *     PANEL --> CATALOG["duplicates / people / locations"]
  *     PANEL --> CLOUD["cloud import"]
  * ```
  *
  * {@link Manage} composes the upload editor and
  * {@link RepositoryMaintenancePanel}. The panel supplies commands to the
- * repository-owned {@link RepositoryGrid}; cards do not import maintenance
+ * repository-owned {@link RepositoryGrid}; rows do not import maintenance
  * domains themselves. Upload target choice remains inside
  * {@link UnifiedUploadSection}.
  *
  * Repository scans, stack detection, duplicate detection, location rebuild,
- * and cloud import are repository-scoped. People clustering is library-wide
+ * and cloud import are Repository-scoped. People clustering is catalog-wide
  * because identities can span repositories. Keeping these commands on Manage
  * prevents gallery pages from hiding expensive operational work.
  *
@@ -47,7 +47,7 @@
  * {@link useStartRepositoryCloudImport} remain public commands of their owning
  * features.
  *
- * Repository cards use the typed asset-list count and
+ * Repository rows use the typed asset-list count and
  * {@link useRepositoryCloudStatus}. A mutation acknowledgement may represent
  * queued background work; completion-aware hooks own any necessary polling and
  * invalidation rather than Manage copying job state.

@@ -15,6 +15,7 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage"
 	"server/internal/utils/exif"
 	"server/internal/utils/sysproc"
 )
@@ -30,13 +31,7 @@ type AudioInfo struct {
 }
 
 // extractAudioMetadata updates the asset with ffprobe/EXIF-derived metadata.
-func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
-	file, err := os.Open(audioPath)
-	if err != nil {
-		return fmt.Errorf("open audio file: %w", err)
-	}
-	defer file.Close()
-
+func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.Asset, reader io.Reader, audioInfo *AudioInfo) error {
 	config := &exif.Config{
 		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
 		MaxFileSize:  2 * 1024 * 1024 * 1024, // 2GB
@@ -49,7 +44,7 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 	defer extractor.Close()
 
 	req := &exif.StreamingExtractRequest{
-		Reader:    file,
+		Reader:    reader,
 		AssetType: dbtypes.AssetTypeAudio,
 		Filename:  asset.OriginalFilename,
 		Size:      asset.FileSize,
@@ -87,9 +82,9 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 }
 
 // transcodeAudioSmart applies a best-effort, resource-aware transcoding strategy.
-func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, repoPath string, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
+func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
 	if strings.ToLower(audioInfo.Format) == "mp3" && audioInfo.Bitrate >= 128 && audioInfo.Bitrate <= 320 {
-		return ap.copyAudioForWeb(ctx, repoPath, asset, audioPath, "web")
+		return copyAudioForWeb(files, sourcePath, asset, "web")
 	}
 
 	outputPath, err := ap.transcodeAudioToMP3(ctx, audioPath, audioInfo)
@@ -98,7 +93,7 @@ func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, repoPath stri
 	}
 	defer os.Remove(outputPath)
 
-	return ap.saveTranscodedAudio(ctx, repoPath, asset, outputPath, "web")
+	return ap.saveTranscodedAudio(files, asset, outputPath, "web")
 }
 
 // transcodeAudioToMP3 runs ffmpeg to produce an MP3 at a reasonable bitrate.
@@ -135,29 +130,29 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 }
 
 // copyAudioForWeb saves the provided audio file as the web version.
-func (ap *AssetProcessor) copyAudioForWeb(ctx context.Context, repoPath string, asset *repo.Asset, audioPath, version string) error {
-	audioFile, err := os.Open(audioPath)
+func copyAudioForWeb(files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, version string) error {
+	audioFile, err := files.OpenMedia(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open audio file: %w", err)
 	}
 	defer audioFile.Close()
 
-	return ap.assetService.SaveAudioVersion(ctx, repoPath, audioFile, asset, version)
+	return saveAudioVersion(files, audioFile, asset, version)
 }
 
 // saveTranscodedAudio saves a transcoded output as the web version.
-func (ap *AssetProcessor) saveTranscodedAudio(ctx context.Context, repoPath string, asset *repo.Asset, outputPath, version string) error {
+func (ap *AssetProcessor) saveTranscodedAudio(files *storage.RepositoryFS, asset *repo.Asset, outputPath, version string) error {
 	transcodedFile, err := os.Open(outputPath)
 	if err != nil {
 		return fmt.Errorf("open transcoded file: %w", err)
 	}
 	defer transcodedFile.Close()
 
-	return ap.assetService.SaveAudioVersion(ctx, repoPath, transcodedFile, asset, version)
+	return saveAudioVersion(files, transcodedFile, asset, version)
 }
 
 // generateWaveform produces a waveform thumbnail image (best-effort; non-fatal).
-func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string, asset *repo.Asset, audioPath string) error {
+func (ap *AssetProcessor) generateWaveform(ctx context.Context, files *storage.RepositoryFS, asset *repo.Asset, audioPath string) error {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID))
 	defer os.Remove(outputPath)
 
@@ -187,7 +182,7 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 		return nil // optional: ignore errors
 	}
 
-	return ap.assetService.SaveNewThumbnail(ctx, repoPath, buf, asset, "waveform")
+	return ap.saveThumbnail(ctx, files, buf, asset, "waveform")
 }
 
 // getAudioInfo probes the audio using ffprobe to collect duration, bitrate, codec, and format.

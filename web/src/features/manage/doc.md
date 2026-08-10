@@ -1,7 +1,7 @@
 # Manage
 
 Manage owns the authenticated `/manage` operations surface. It composes
-upload intake with repository- and library-maintenance commands; durable
+upload intake with Repository and catalog maintenance commands; durable
 upload, repository, cloud, people, and duplicate state remains in those
 domain features.
 
@@ -22,18 +22,18 @@ flowchart TD
     PAGE --> PANEL["RepositoryMaintenancePanel"]
     PANEL --> GRID["RepositoryGrid"]
     PANEL --> SCAN["scan / stack detection"]
-    PANEL --> LIBRARY["duplicates / people / locations"]
+    PANEL --> CATALOG["duplicates / people / locations"]
     PANEL --> CLOUD["cloud import"]
 ```
 
 [Manage](./flows/overview/ManageFlow.tsx) composes the upload editor and
 [RepositoryMaintenancePanel](./flows/overview/RepositoryMaintenancePanel.tsx). The panel supplies commands to the
-repository-owned [RepositoryGrid](../repositories/index.ts); cards do not import maintenance
+repository-owned [RepositoryGrid](../repositories/index.ts); rows do not import maintenance
 domains themselves. Upload target choice remains inside
 [UnifiedUploadSection](../upload/index.ts).
 
 Repository scans, stack detection, duplicate detection, location rebuild,
-and cloud import are repository-scoped. People clustering is library-wide
+and cloud import are Repository-scoped. People clustering is catalog-wide
 because identities can span repositories. Keeping these commands on Manage
 prevents gallery pages from hiding expensive operational work.
 
@@ -46,7 +46,7 @@ Repository lists come from [useRepositoryOptions](../repositories/index.ts).
 [useStartRepositoryCloudImport](../cloud/index.ts) remain public commands of their owning
 features.
 
-Repository cards use the typed asset-list count and
+Repository rows use the typed asset-list count and
 [useRepositoryCloudStatus](../cloud/index.ts). A mutation acknowledgement may represent
 queued background work; completion-aware hooks own any necessary polling and
 invalidation rather than Manage copying job state.

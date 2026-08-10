@@ -15,7 +15,7 @@ import (
 
 func reconcileTestManager(t *testing.T) *DefaultRepositoryManager {
 	t.Helper()
-	manager, err := NewRepositoryManager(nil, zap.NewNop(), nil)
+	manager, err := NewRepositoryManager(nil, nil, zap.NewNop(), nil, nil)
 	if err != nil {
 		t.Fatalf("NewRepositoryManager: %v", err)
 	}
@@ -35,9 +35,9 @@ func writeRepositoryAt(t *testing.T, path string, id uuid.UUID) repo.Repository 
 		t.Fatalf("save config: %v", err)
 	}
 	return repo.Repository{
-		RepoID: id,
-		Path:   path,
-		Status: dbtypes.RepoStatusActive,
+		RepoID:       id,
+		Path:         path,
+		Reachability: dbtypes.RepositoryReachabilityActive,
 	}
 }
 
@@ -48,7 +48,7 @@ func TestInspectRepositoryOnDiskReportsActiveWhenIDMatches(t *testing.T) {
 
 	status, config := manager.inspectRepositoryOnDisk(row)
 
-	if status != dbtypes.RepoStatusActive {
+	if status != dbtypes.RepositoryReachabilityActive {
 		t.Fatalf("status = %q, want active", status)
 	}
 	if config == nil || config.ID != id.String() {
@@ -61,14 +61,14 @@ func TestInspectRepositoryOnDiskReportsOfflineWhenPathMissing(t *testing.T) {
 	manager := reconcileTestManager(t)
 	id := uuid.New()
 	row := repo.Repository{
-		RepoID: id,
-		Path:   filepath.Join(canonicalTempDir(t), "unplugged", "library"),
-		Status: dbtypes.RepoStatusActive,
+		RepoID:       id,
+		Path:         filepath.Join(canonicalTempDir(t), "unplugged", "library"),
+		Reachability: dbtypes.RepositoryReachabilityActive,
 	}
 
 	status, config := manager.inspectRepositoryOnDisk(row)
 
-	if status != dbtypes.RepoStatusOffline {
+	if status != dbtypes.RepositoryReachabilityOffline {
 		t.Fatalf("status = %q, want offline", status)
 	}
 	if config != nil {
@@ -85,8 +85,8 @@ func TestInspectRepositoryOnDiskReportsErrorWhenIDDiffers(t *testing.T) {
 
 	status, config := manager.inspectRepositoryOnDisk(row)
 
-	if status != dbtypes.RepoStatusError {
-		t.Fatalf("status = %q, want error", status)
+	if status != dbtypes.RepositoryReachabilityIdentityError {
+		t.Fatalf("status = %q, want identity_error", status)
 	}
 	if config != nil {
 		t.Fatal("mismatched repository must not refresh the config cache")
@@ -103,15 +103,15 @@ func TestInspectRepositoryOnDiskReportsErrorWhenConfigUnparseable(t *testing.T) 
 		t.Fatalf("write config: %v", err)
 	}
 	row := repo.Repository{
-		RepoID: uuid.New(),
-		Path:   dir,
-		Status: dbtypes.RepoStatusActive,
+		RepoID:       uuid.New(),
+		Path:         dir,
+		Reachability: dbtypes.RepositoryReachabilityActive,
 	}
 
 	status, _ := manager.inspectRepositoryOnDisk(row)
 
-	if status != dbtypes.RepoStatusError {
-		t.Fatalf("status = %q, want error", status)
+	if status != dbtypes.RepositoryReachabilityIdentityError {
+		t.Fatalf("status = %q, want identity_error", status)
 	}
 }
 
@@ -121,31 +121,31 @@ func TestInspectRepositoryOnDiskRecoversFromOffline(t *testing.T) {
 	id := uuid.New()
 	path := filepath.Join(canonicalTempDir(t), "library")
 	row := repo.Repository{
-		RepoID: id,
-		Path:   path,
-		Status: dbtypes.RepoStatusOffline,
+		RepoID:       id,
+		Path:         path,
+		Reachability: dbtypes.RepositoryReachabilityOffline,
 	}
 
-	if status, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepoStatusOffline {
+	if status, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepositoryReachabilityOffline {
 		t.Fatalf("status = %q, want offline before remount", status)
 	}
 
 	writeRepositoryAt(t, path, id)
 
-	if status, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepoStatusActive {
+	if status, _ := manager.inspectRepositoryOnDisk(row); status != dbtypes.RepositoryReachabilityActive {
 		t.Fatalf("status = %q, want active after remount", status)
 	}
 }
 
-// reconcileRepository must leave a scanning repository alone: status carries
-// both activity and reachability, so reclassifying it would silently cancel a
-// scan that a restart interrupted.
-func TestReconcileRepositorySkipsScanning(t *testing.T) {
+// A lifecycle operation owns maintenance until its journal commits or rolls
+// back, so ordinary reachability reconciliation must not clear the barrier.
+func TestReconcileRepositorySkipsMaintenance(t *testing.T) {
 	manager := reconcileTestManager(t)
 	row := repo.Repository{
-		RepoID: uuid.New(),
-		Path:   filepath.Join(canonicalTempDir(t), "gone"),
-		Status: dbtypes.RepoStatusScanning,
+		RepoID:       uuid.New(),
+		Path:         filepath.Join(canonicalTempDir(t), "gone"),
+		Reachability: dbtypes.RepositoryReachabilityMaintenance,
+		Activity:     dbtypes.RepositoryActivityPaused,
 	}
 
 	// queries is nil, so any attempt to write would panic.

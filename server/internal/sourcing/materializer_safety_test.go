@@ -16,263 +16,214 @@ import (
 	"server/internal/logging"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
-	"server/internal/utils/file"
-	"server/internal/utils/hash"
+	"server/internal/storage/rootcfg"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-type failingStagingManager struct {
+type failingCommitStagingManager struct {
+	storage.StagingManager
 	commitErr     error
 	quarantineErr error
-	installTarget bool
 }
 
-func (*failingStagingManager) CreateStagingFile(string, string) (*storage.StagingFile, error) {
-	return nil, errors.New("unused")
-}
-
-func (manager *failingStagingManager) CommitStagingFile(stagingFile *storage.StagingFile, finalPath string) error {
-	if manager.installTarget {
-		target := filepath.Join(stagingFile.RepoPath, filepath.FromSlash(finalPath))
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			return errors.Join(manager.commitErr, err)
-		}
-		if err := os.Link(stagingFile.Path, target); err != nil {
-			return errors.Join(manager.commitErr, err)
-		}
-	}
+func (manager *failingCommitStagingManager) CommitStagingFile(repo.Repository, *storage.StagingFile, string) error {
 	return manager.commitErr
 }
 
-func (*failingStagingManager) CommitStagingFileToInbox(*storage.StagingFile, string) (string, error) {
-	return "", errors.New("unused")
-}
-
-func (*failingStagingManager) ResolveInboxPath(string, string, string) (string, error) {
-	return "inbox/original.jpg", nil
-}
-
-func (manager *failingStagingManager) MoveStagingToFailed(*storage.StagingFile) error {
+func (manager *failingCommitStagingManager) MoveStagingToFailed(repo.Repository, *storage.StagingFile) error {
 	return manager.quarantineErr
 }
 
-func (*failingStagingManager) CleanupStaging(string, time.Duration) error {
-	return nil
-}
-
-func TestResolveInPlaceSourceRejectsRepositoryEscape(t *testing.T) {
-	repositoryPath := t.TempDir()
-	outsidePath := filepath.Join(t.TempDir(), "outside.jpg")
-	if err := os.WriteFile(outsidePath, []byte("outside"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, sourcePath := range []string{
-		"../outside.jpg",
-		`..\outside.jpg`,
-		"/absolute.jpg",
-		`C:\absolute.jpg`,
-		`C:drive-relative.jpg`,
-	} {
-		t.Run(sourcePath, func(t *testing.T) {
-			if _, _, err := resolveInPlaceSource(repositoryPath, sourcePath); err == nil {
-				t.Fatalf("resolveInPlaceSource(%q) accepted an escaping path", sourcePath)
-			}
-		})
-	}
-
-	linkPath := filepath.Join(repositoryPath, "outside-link.jpg")
-	if err := os.Symlink(outsidePath, linkPath); err != nil {
-		t.Skipf("create symlink: %v", err)
-	}
-	if _, _, err := resolveInPlaceSource(repositoryPath, "outside-link.jpg"); err == nil {
-		t.Fatal("resolveInPlaceSource accepted a symlink escaping the repository")
-	}
-}
-
-func TestResolveInPlaceSourceAllowsContainedFileAndSymlink(t *testing.T) {
-	repositoryPath := t.TempDir()
-	filePath := filepath.Join(repositoryPath, "photos", "inside.jpg")
-	if err := os.MkdirAll(filepath.Dir(filePath), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filePath, []byte("inside"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	storagePath, fullPath, err := resolveInPlaceSource(repositoryPath, "photos/inside.jpg")
+func TestStagingHandleAcceptsOnlyPrivateRelativePath(t *testing.T) {
+	repositoryID := uuid.New()
+	valid, err := stagingHandle(repositoryID, IngestSource{
+		StagingPath:      ".lumilio/staging/incoming/upload.jpg",
+		OriginalFilename: "upload.jpg",
+		Timestamp:        time.Now(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if storagePath != "photos/inside.jpg" || fullPath != filePath {
-		t.Fatalf("resolved path = %q/%q", storagePath, fullPath)
+	if valid.RepositoryID != repositoryID || valid.PrivatePath != ".lumilio/staging/incoming/upload.jpg" {
+		t.Fatalf("unexpected staging handle: %+v", valid)
 	}
-
-	linkPath := filepath.Join(repositoryPath, "inside-link.jpg")
-	if err := os.Symlink(filePath, linkPath); err != nil {
-		t.Skipf("create symlink: %v", err)
-	}
-	if _, _, err := resolveInPlaceSource(repositoryPath, "inside-link.jpg"); err != nil {
-		t.Fatalf("contained symlink rejected: %v", err)
-	}
-}
-
-func TestExistingFinalMustMatchBeforeStagingRemoval(t *testing.T) {
-	root := t.TempDir()
-	finalPath := filepath.Join(root, "final.jpg")
-	stagingPath := filepath.Join(root, "staging.jpg")
-	content := []byte("same original bytes")
-	if err := os.WriteFile(finalPath, content, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(stagingPath, content, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	contentHash, err := hash.CalculateBLAKE3(stagingPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := verifyFinalAndRemoveStaging(stagingPath, finalPath, contentHash, int64(len(content))); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(stagingPath); !os.IsNotExist(err) {
-		t.Fatalf("verified duplicate staging file remains: %v", err)
-	}
-
-	conflictPath := filepath.Join(root, "conflict-staging.jpg")
-	conflictContent := []byte("different original")
-	if err := os.WriteFile(conflictPath, conflictContent, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	conflictHash, err := hash.CalculateBLAKE3(conflictPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := verifyFinalAndRemoveStaging(conflictPath, finalPath, conflictHash, int64(len(conflictContent))); err == nil {
-		t.Fatal("content conflict unexpectedly succeeded")
-	}
-	for _, path := range []string{finalPath, conflictPath} {
-		if _, err := os.Stat(path); err != nil {
-			t.Fatalf("conflict removed %s: %v", path, err)
+	for _, candidate := range []string{"/tmp/upload.jpg", "../upload.jpg", "inbox/upload.jpg"} {
+		if _, err := stagingHandle(repositoryID, IngestSource{StagingPath: candidate, OriginalFilename: "upload.jpg"}); err == nil {
+			t.Fatalf("accepted invalid staging path %q", candidate)
 		}
 	}
 }
 
-func TestRecoverableStagingStateDoesNotDependOnMessage(t *testing.T) {
-	status := statusdb.NewTrackedProcessingStatus("copy changed by localization", pipelineTaskNames(dbtypes.AssetTypePhoto))
+func TestRecoverableStagingStateUsesStructuredFields(t *testing.T) {
+	status := statusdb.NewTrackedProcessingStatus("localized message", pipelineTaskNames(dbtypes.AssetTypePhoto))
 	status.SetIngestState(statusdb.IngestPhasePrepared, "", ".lumilio/staging/incoming/file.jpg", true)
 	statusJSON, err := status.ToJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !isRecoverableStagingAsset(&repo.Asset{Status: statusJSON}) {
+	asset := &repo.Asset{Status: statusJSON}
+	if !isRecoverableStagingAsset(asset) {
 		t.Fatal("structured prepared state was not recoverable")
+	}
+	if got := recoverableStagingPath(statusJSON); got != ".lumilio/staging/incoming/file.jpg" {
+		t.Fatalf("recovery path = %q", got)
 	}
 }
 
-func TestCommitAndQuarantineFailureReturnsErrorAndPreservesSource(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	catalogDir := t.TempDir()
-	if err := os.Chmod(catalogDir, 0o700); err != nil {
+func TestCommitAndQuarantineFailurePreservesRecoverableEvidence(t *testing.T) {
+	ctx := context.Background()
+	catalogDirectory := t.TempDir()
+	if err := os.Chmod(catalogDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := db.Open(ctx, config.DatabaseConfig{
-		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
-	})
+	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer catalog.Close(context.Background())
+	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
 	if err := catalog.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	repositoryPath := t.TempDir()
 	repositoryID := uuid.New()
-	repositoryConfig := repocfg.DefaultRepositoryConfig()
+	repositoryPath := t.TempDir()
+	repositoryConfig := repocfg.NewRepositoryConfig("failure evidence")
 	repositoryConfig.ID = repositoryID.String()
-	repositoryConfig.Name = "Safety"
-	repositoryConfig.CreatedAt = time.Now().UTC()
+	if err := repositoryConfig.SaveConfigToFile(repositoryPath); err != nil {
+		t.Fatal(err)
+	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
+	rootID := uuid.New()
+	rootConfig := rootcfg.New("failure root")
+	rootConfig.ID = rootID.String()
+	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: "failure root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
-		RepoID:    repositoryID,
-		Name:      "Safety",
-		Path:      repositoryPath,
-		Config:    *repositoryConfig,
-		Role:      dbtypes.RepoRolePrimary,
-		Status:    dbtypes.RepoStatusActive,
-		CreatedAt: now,
-		UpdatedAt: now,
+		RepoID: repositoryID, Name: "failure evidence", Path: repositoryPath, Config: *repositoryConfig,
+		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
+		CreatedAt: now, UpdatedAt: now, RootID: rootID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	stagingPath := filepath.Join(repositoryPath, ".lumilio", "staging", "incoming", "original.jpg")
-	if err := os.MkdirAll(filepath.Dir(stagingPath), 0o700); err != nil {
+	files := storage.NewRepositoryFSFactory(nil, catalog.Queries)
+	actualStaging := storage.NewStagingManager(files)
+	staged, opened, err := actualStaging.CreateStagingFile(repository, "original.jpg")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(stagingPath, []byte("only original media"), 0o600); err != nil {
+	if _, err := opened.WriteString("only original media"); err != nil {
 		t.Fatal(err)
 	}
-
+	if err := opened.Close(); err != nil {
+		t.Fatal(err)
+	}
 	commitErr := errors.New("simulated commit failure")
-	manager := &failingStagingManager{
-		commitErr:     commitErr,
-		quarantineErr: errors.New("simulated quarantine failure"),
-		installTarget: true,
+	staging := &failingCommitStagingManager{
+		StagingManager: actualStaging,
+		commitErr:      commitErr,
+		quarantineErr:  errors.New("simulated quarantine failure"),
 	}
 	materializer := NewSourceMaterializer(
-		catalog,
-		manager,
-		nil,
-		zap.NewNop(),
-		logging.NewRepositoryAuditProvider(zap.NewNop(), false),
+		catalog, staging, newTestPipelineClient(t, catalog), zap.NewNop(),
+		logging.NewRepositoryAuditProvider(zap.NewNop(), false), files,
 	)
-	asset, err := materializer.materializeFromStaging(
-		ctx,
-		IngestSource{
-			RepositoryID:     repositoryID,
-			Kind:             IngestSourceUpload,
-			SourcePath:       stagingPath,
-			OriginalFilename: "original.jpg",
-			Timestamp:        time.Now().UTC(),
-			ContentType:      "image/jpeg",
-		},
-		repository,
-		&file.ValidationResult{
-			Valid:     true,
-			AssetType: dbtypes.AssetTypePhoto,
-			MimeType:  "image/jpeg",
-		},
-	)
-	if asset != nil || err == nil || !errors.Is(err, commitErr) {
-		t.Fatalf("materializeFromStaging = %+v/%v", asset, err)
+	asset, err := materializer.MaterializeStaged(ctx, IngestSource{
+		RepositoryID: repositoryID, Kind: IngestSourceUpload, StagingPath: staged.PrivatePath,
+		OriginalFilename: "original.jpg", Timestamp: staged.CreatedAt, ContentType: "image/jpeg",
+	})
+	if asset != nil || !errors.Is(err, commitErr) {
+		t.Fatalf("materialize = %+v/%v", asset, err)
 	}
-	if _, err := os.Stat(stagingPath); err != nil {
-		t.Fatalf("unique staging source was not preserved: %v", err)
+	if !StagingIsPrepared(err) {
+		t.Fatalf("prepared commit failure did not transfer staging ownership: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(repositoryPath, "inbox", "original.jpg")); err != nil {
-		t.Fatalf("partial commit target was not retained: %v", err)
+	repositoryFS, err := files.Open(repository)
+	if err != nil {
+		t.Fatal(err)
 	}
+	privatePath, _ := storage.ParsePrivateRepositoryPath(staged.PrivatePath)
+	if _, err := repositoryFS.StatPrivate(privatePath); err != nil {
+		t.Fatalf("staging evidence was lost: %v", err)
+	}
+	_ = repositoryFS.Close()
 
-	hashResult, err := hash.CalculateLayeredBLAKE3(stagingPath)
+	assets, err := catalog.Queries.ListAssetsByRepositoryAny(ctx, uuid.NullUUID{UUID: repositoryID, Valid: true})
+	if err != nil || len(assets) != 1 {
+		t.Fatalf("recoverable assets = %d/%v", len(assets), err)
+	}
+	status, err := statusdb.FromJSON(assets[0].Status)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := materializer.findExistingContent(ctx, repositoryID, hashResult.ContentHash, int64(len("only original media")))
-	if err != nil || prepared == nil {
-		t.Fatalf("load recoverable asset = %+v/%v", prepared, err)
+	if status.Ingest == nil || status.Ingest.Phase != statusdb.IngestPhaseCommitFailed || !status.Ingest.Recoverable || status.Ingest.StagingPath != staged.PrivatePath {
+		t.Fatalf("recoverable status = %+v", status.Ingest)
 	}
-	status, err := statusdb.FromJSON(prepared.Status)
+	restarted := NewSourceMaterializer(
+		catalog, actualStaging, newTestPipelineClient(t, catalog), zap.NewNop(),
+		logging.NewRepositoryAuditProvider(zap.NewNop(), false), files,
+	)
+	redundant, redundantWriter, err := actualStaging.CreateStagingFile(repository, "original.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Ingest == nil ||
-		status.Ingest.Phase != statusdb.IngestPhaseCommitFailed ||
-		status.Ingest.Code != ingestCodeCommitFailed ||
-		!status.Ingest.Recoverable {
-		t.Fatalf("recoverable ingest status = %+v", status.Ingest)
+	if _, err := redundantWriter.WriteString("only original media"); err != nil {
+		t.Fatal(err)
+	}
+	if err := redundantWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := restarted.MaterializeStaged(ctx, IngestSource{
+		RepositoryID: repositoryID, Kind: IngestSourceCloud, StagingPath: redundant.PrivatePath,
+		OriginalFilename: "original.jpg", Timestamp: redundant.CreatedAt, ContentType: "image/jpeg",
+	})
+	if err != nil {
+		t.Fatalf("recover prepared ingest after restart: %v", err)
+	}
+	if recovered.AssetID != assets[0].AssetID {
+		t.Fatalf("recovery replaced asset %s with %s", assets[0].AssetID, recovered.AssetID)
+	}
+	redundantPath, _ := storage.ParsePrivateRepositoryPath(redundant.PrivatePath)
+	repositoryFS, err = files.Open(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repositoryFS.StatPrivate(redundantPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("resume left redundant staging file: %v", err)
+	}
+	_ = repositoryFS.Close()
+	assets, err = catalog.Queries.ListAssetsByRepositoryAny(ctx, uuid.NullUUID{UUID: repositoryID, Valid: true})
+	if err != nil || len(assets) != 1 {
+		t.Fatalf("resume created duplicate assets = %d/%v", len(assets), err)
+	}
+	indexed, err := catalog.Queries.GetRepositoryFileIndexEntry(ctx, repo.GetRepositoryFileIndexEntryParams{
+		RepositoryID: repositoryID, StoragePath: *recovered.StoragePath,
+	})
+	if err != nil || !indexed.AssetID.Valid || indexed.AssetID.UUID != recovered.AssetID {
+		t.Fatalf("recovered index binding = %+v/%v", indexed, err)
+	}
+}
+
+func TestMaterializerReportsUnclaimedStagingBeforePreparation(t *testing.T) {
+	materializer := &SourceMaterializer{}
+	_, err := materializer.MaterializeStaged(context.Background(), IngestSource{
+		Kind: IngestSourceCloud, OriginalFilename: "malware.exe", ContentType: "application/octet-stream",
+	})
+	if err == nil {
+		t.Fatal("invalid cloud candidate unexpectedly materialized")
+	}
+	var ownership *StagingMaterializationError
+	if !errors.As(err, &ownership) || ownership.Prepared {
+		t.Fatalf("preparation ownership = %#v, error = %v", ownership, err)
 	}
 }

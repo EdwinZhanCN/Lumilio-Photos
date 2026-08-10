@@ -10,6 +10,7 @@ import (
 	"server/internal/agent/ref"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/event"
 	"server/internal/search"
 
 	"github.com/google/uuid"
@@ -21,14 +22,23 @@ import (
 type AuthorizedLibraryFactory struct {
 	queries *repo.Queries
 	search  RetrieverSearch
+	pool    *sql.DB
 }
 
-func NewAuthorizedLibraryFactory(queries *repo.Queries, search RetrieverSearch) *AuthorizedLibraryFactory {
-	return &AuthorizedLibraryFactory{queries: queries, search: search}
+func NewAuthorizedLibraryFactory(queries *repo.Queries, search RetrieverSearch, pools ...*sql.DB) *AuthorizedLibraryFactory {
+	var pool *sql.DB
+	if len(pools) > 0 {
+		pool = pools[0]
+	}
+	return &AuthorizedLibraryFactory{queries: queries, search: search, pool: pool}
 }
 
 func (f *AuthorizedLibraryFactory) ForUser(userID int32) *AuthorizedLibrary {
-	return &AuthorizedLibrary{userID: userID, queries: f.queries, search: f.search}
+	var resolver *event.Resolver
+	if f.pool != nil {
+		resolver = event.NewResolver(f.pool)
+	}
+	return &AuthorizedLibrary{userID: userID, queries: f.queries, search: f.search, resolver: resolver}
 }
 
 func (f *AuthorizedLibraryFactory) AuthorizeAssetIDs(ctx context.Context, userID int32, ids []uuid.UUID) ([]uuid.UUID, error) {
@@ -38,9 +48,10 @@ func (f *AuthorizedLibraryFactory) AuthorizeAssetIDs(ctx context.Context, userID
 // AuthorizedLibrary is a user-bound facade over every read path used by the
 // Agent, ref hydration, injection, and live-pin replay.
 type AuthorizedLibrary struct {
-	userID  int32
-	queries *repo.Queries
-	search  RetrieverSearch
+	userID   int32
+	queries  *repo.Queries
+	search   RetrieverSearch
+	resolver *event.Resolver
 }
 
 func (l *AuthorizedLibrary) UserID() int32 { return l.userID }
@@ -105,26 +116,16 @@ func (l *AuthorizedLibrary) FilterAssetIDs(ctx context.Context, params repo.GetM
 }
 
 func (l *AuthorizedLibrary) EventAssetIDs(ctx context.Context, eventID string, limit int64) ([]uuid.UUID, error) {
-	rows, err := l.queries.GetEventAssetIDsForAgent(ctx, repo.GetEventAssetIDsForAgentParams{
-		EventID: eventID, OwnerID: l.userID, Limit: limit,
-	})
+	if l.resolver == nil {
+		return nil, errors.New("Event resolver unavailable")
+	}
+	assets, _, err := l.resolver.OrderedAssets(ctx, l.userID, eventID, int(limit))
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]uuid.UUID, 0, len(rows))
-	for _, value := range rows {
-		var raw string
-		switch id := value.(type) {
-		case string:
-			raw = id
-		case []byte:
-			raw = string(id)
-		case nil:
-			continue
-		default:
-			return nil, fmt.Errorf("unexpected Event asset ID type %T", value)
-		}
-		id, err := uuid.Parse(raw)
+	ids := make([]uuid.UUID, 0, len(assets))
+	for _, asset := range assets {
+		id, err := uuid.Parse(asset.AssetID)
 		if err != nil {
 			return nil, err
 		}

@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, type ReactNode } from "react";
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
 import AssetsTrash from "@/features/assets/routes/AssetsTrash";
@@ -28,6 +28,12 @@ import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
 import BootstrapWizard from "@/features/auth/routes/BootstrapWizard.tsx";
 import { Navigate } from "react-router-dom";
 
+type RouteDefinition = {
+  path: string;
+  element: ReactNode;
+  requiredRole?: "admin";
+};
+
 const StudioEditMvp = lazy(() =>
   import("@/features/studio/routes/StudioEditMvp").then((module) => ({
     default: module.StudioEditMvp,
@@ -38,7 +44,7 @@ const Monitor = lazy(() => import("@/features/monitor/routes/Monitor"));
 const MapView = lazy(() => import("@/features/collections/routes/MapView"));
 const LumilioChatPage = lazy(() => import("@/features/lumilio/routes/LumilioChat"));
 
-export const publicRoutes = [
+export const publicRoutes: RouteDefinition[] = [
   {
     path: "/login",
     element: <LoginPage />,
@@ -56,7 +62,7 @@ export const publicRoutes = [
 // shareRoutes are rendered outside BootstrapGate (see AppRouter.tsx) so a
 // recipient hitting a public share link is never redirected through
 // first-run setup or forced to authenticate.
-export const shareRoutes = [
+export const shareRoutes: RouteDefinition[] = [
   {
     path: "/s/:token",
     element: <PublicShare />,
@@ -67,7 +73,7 @@ export const shareRoutes = [
   },
 ];
 
-export const bootstrapRoutes = [
+export const bootstrapRoutes: RouteDefinition[] = [
   {
     path: "/bootstrap",
     element: <BootstrapWizard />,
@@ -78,7 +84,7 @@ export const bootstrapRoutes = [
   },
 ];
 
-export const protectedStandaloneRoutes = [
+export const protectedStandaloneRoutes: RouteDefinition[] = [
   {
     path: "/mfa",
     element: <MFAPage />,
@@ -89,7 +95,7 @@ export const protectedStandaloneRoutes = [
   },
 ];
 
-export const appRoutes = [
+export const appRoutes: RouteDefinition[] = [
   {
     path: "/",
     element: <Home />,
@@ -233,6 +239,7 @@ export const appRoutes = [
   {
     path: "/server-monitor",
     element: <Monitor />,
+    requiredRole: "admin",
   },
   {
     path: "/lumilio",

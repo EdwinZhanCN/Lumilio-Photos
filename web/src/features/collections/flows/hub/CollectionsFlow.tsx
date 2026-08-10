@@ -16,8 +16,10 @@ import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionErrorAlert } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useEvents } from "@/features/events";
 import { usePeople } from "@/features/people";
 import AlbumRail from "./AlbumRail";
+import EventRail from "./EventRail";
 import FoldersRail from "./FoldersRail";
 import MapRail from "./MapRail";
 import PeopleRail from "./PeopleRail";
@@ -50,8 +52,10 @@ function CollectionsContent() {
     limit: 18,
     repositoryId: scopedRepositoryId,
   });
+  const eventsQuery = useEvents();
 
   const albums = data?.pages.flatMap((page) => page.albums) ?? [];
+  const events = eventsQuery.data?.pages.flatMap((page) => page.events ?? []) ?? [];
   const { trips, isLoading: isTripsLoading } = useCityTrips({ repositoryId: scopedRepositoryId });
   const { data: foldersData, isPending: isFoldersLoading } = useFolders(scopedRepositoryId, "");
   const folders = foldersData?.folders ?? [];
@@ -67,28 +71,31 @@ function CollectionsContent() {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">
         <div className="space-y-6">
-          <section className="card card-border bg-base-100">
-            <div className="card-body flex-row items-center justify-between gap-4">
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex items-center gap-3">
-                <div className="rounded-box bg-base-200 p-3">
-                  <CalendarRange className="size-5" />
+                <div className="rounded-2xl bg-base-200 p-3 text-primary">
+                  <Album className="size-5" strokeWidth={1.75} />
                 </div>
-                <div>
-                  <h2 className="card-title">{t("events.title", "Events")}</h2>
-                  <p className="text-sm text-base-content/60">
-                    {t("events.hubDescription", "Media organized by time and place")}
-                  </p>
-                </div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
+                  {t("collections.sections.albums")}
+                </h2>
               </div>
               <button
                 type="button"
-                className="btn btn-sm"
-                onClick={() => navigate("/collections/events")}
+                className="btn btn-ghost btn-sm rounded-full"
+                onClick={() => navigate("/collections/albums")}
               >
                 {t("common.viewAll")}
                 <ArrowRight className="size-4" />
               </button>
             </div>
+
+            <AlbumRail
+              albums={albums.slice(0, 12)}
+              loading={isAlbumsLoading}
+              onAlbumClick={(album) => navigate(`/collections/${album.id}`)}
+            />
           </section>
           {isAlbumsError && (
             <CollectionErrorAlert
@@ -99,6 +106,36 @@ function CollectionsContent() {
             />
           )}
 
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-base-200 p-3 text-primary">
+                  <Users className="size-5" strokeWidth={1.75} />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
+                  {t("collections.sections.people")}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm rounded-full"
+                onClick={() => navigate("/collections/people")}
+              >
+                {t("common.viewAll")}
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+
+            <PeopleRail
+              people={people}
+              loading={isPeopleLoading}
+              repositoryId={scopedRepositoryId}
+              onPersonClick={(person) => {
+                if (!person?.person_id) return;
+                void navigate(`/people/${person.person_id}`);
+              }}
+            />
+          </section>
           {isPeopleError && (
             <CollectionErrorAlert
               message={t("collections.messages.loadPeopleError", {
@@ -107,29 +144,6 @@ function CollectionsContent() {
               })}
             />
           )}
-
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-base-200 p-3 text-primary">
-                  <Wrench className="size-5" strokeWidth={1.75} />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
-                  {t("collections.sections.utilities")}
-                </h2>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm rounded-full"
-                onClick={() => navigate("/collections/utilities")}
-              >
-                {t("common.viewAll")}
-                <ArrowRight className="size-4" />
-              </button>
-            </div>
-
-            <UtilitiesRail />
-          </section>
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -167,59 +181,31 @@ function CollectionsContent() {
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-base-200 p-3 text-primary">
-                  <Album className="size-5" strokeWidth={1.75} />
+                  <CalendarRange className="size-5" strokeWidth={1.75} />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black tracking-tight">
-                  {t("collections.sections.albums")}
+                  {t("events.title", "Events")}
                 </h2>
               </div>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm rounded-full"
-                onClick={() => navigate("/collections/albums")}
+                onClick={() => navigate("/collections/events")}
               >
                 {t("common.viewAll")}
                 <ArrowRight className="size-4" />
               </button>
             </div>
 
-            <AlbumRail
-              albums={albums.slice(0, 12)}
-              loading={isAlbumsLoading}
-              onAlbumClick={(album) => navigate(`/collections/${album.id}`)}
+            <EventRail
+              events={events.slice(0, 12)}
+              loading={eventsQuery.isPending}
+              onEventClick={(event) => navigate(`/collections/events/${event.event_id}`)}
             />
           </section>
-
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-base-200 p-3 text-primary">
-                  <Users className="size-5" strokeWidth={1.75} />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
-                  {t("collections.sections.people")}
-                </h2>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm rounded-full"
-                onClick={() => navigate("/collections/people")}
-              >
-                {t("common.viewAll")}
-                <ArrowRight className="size-4" />
-              </button>
-            </div>
-
-            <PeopleRail
-              people={people}
-              loading={isPeopleLoading}
-              repositoryId={scopedRepositoryId}
-              onPersonClick={(person) => {
-                if (!person?.person_id) return;
-                void navigate(`/people/${person.person_id}`);
-              }}
-            />
-          </section>
+          {eventsQuery.isError && (
+            <CollectionErrorAlert message={t("events.loadError", "Events could not be loaded.")} />
+          )}
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -253,6 +239,29 @@ function CollectionsContent() {
                 )
               }
             />
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-base-200 p-3 text-primary">
+                  <Wrench className="size-5" strokeWidth={1.75} />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
+                  {t("collections.sections.utilities")}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm rounded-full"
+                onClick={() => navigate("/collections/utilities")}
+              >
+                {t("common.viewAll")}
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+
+            <UtilitiesRail />
           </section>
         </div>
       </div>

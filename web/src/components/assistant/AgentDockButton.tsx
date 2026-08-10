@@ -10,7 +10,7 @@ export function AgentDockButton({ className }: AgentDockButtonProps) {
   const { t } = useI18n();
   const setCollapsed = useDockStore((s) => s.setCollapsed);
   const isGenerating = useDockStore((s) => s.isGenerating);
-  const label = t("lumilio.viewer.ask", "Ask Lumilio about this photo");
+  const label = t("lumilio.viewer.ask", "Ask Lumilio Agent about this photo");
 
   return (
     <button

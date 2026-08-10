@@ -80,7 +80,7 @@ function getPermissionDescription(key: string, t: ReturnType<typeof useI18n>["t"
       defaultValue: "Modify global application settings.",
     }),
     view_all_assets: t("settings.account.permissions.view_all_assets.description", {
-      defaultValue: "Browse all photos and media in the library.",
+      defaultValue: "Browse all photos and media across Repositories.",
     }),
     manage_all_assets: t("settings.account.permissions.manage_all_assets.description", {
       defaultValue: "Edit, delete, and modify metadata for any asset.",

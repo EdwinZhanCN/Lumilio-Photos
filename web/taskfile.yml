@@ -122,6 +122,14 @@ tasks:
       - task: e2e:seed:video-semantic
       - vp run e2e:test --grep @video-regression --workers=1
 
+  test:agent-trust:
+    desc: Run the deterministic Lumilio Agent trust-contract regression
+    env:
+      CI: "1"
+    cmds:
+      - task: e2e:seed
+      - vp run e2e:test --grep @agent-trust --workers=1
+
   test:backup-recovery:
     desc: Run the database backup and recovery regression
     env:

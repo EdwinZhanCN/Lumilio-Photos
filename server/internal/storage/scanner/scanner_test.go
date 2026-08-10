@@ -1,100 +1,104 @@
 package scanner
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
+
+	"server/internal/db/repo"
+	"server/internal/storage"
+
+	"github.com/google/uuid"
 )
 
-func TestShouldScanPathFiltersWorkspace(t *testing.T) {
-	tests := map[string]bool{
-		"album/photo.jpg":           true,
-		"album/clip.mp4":            true,
-		".lumilio/assets/photo.jpg": false,
-		"inbox/photo.jpg":           false,
-		"../escape/photo.jpg":       false,
-		"/absolute/photo.jpg":       false,
-		"album/document.txt":        false,
-		"album/sub/../photo.jpg":    true,
-		".lumilio":                  false,
-		"inbox":                     false,
-		"album/.hidden/photo.jpg":   true,
+func TestMatchMovesRequiresOneToOneFullContentMatch(t *testing.T) {
+	t.Parallel()
+
+	asset := repo.Asset{
+		AssetID:     uuid.New(),
+		FileSize:    128,
+		ContentHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	}
+	missingPath := mustRepositoryPath(t, "inbox/old.jpg")
+	newPath := mustRepositoryPath(t, "Trips/new.jpg")
+	contentHash := asset.ContentHash
+	missing := map[string]missingCandidate{
+		missingPath.String(): {
+			storagePath: missingPath.String(),
+			path:        missingPath,
+			asset:       &asset,
+		},
+	}
+	newFiles := map[string]observedCandidate{
+		newPath.String(): {
+			observation: storage.FileObservation{
+				RepositoryID: uuid.New(),
+				Path:         newPath,
+				Size:         asset.FileSize,
+				ContentHash:  &contentHash,
+			},
+		},
 	}
 
-	for path, want := range tests {
-		t.Run(path, func(t *testing.T) {
-			_, got := ShouldScanPath(path)
-			if got != want {
-				t.Fatalf("ShouldScanPath(%q) = %v, want %v", path, got, want)
-			}
-		})
+	moves, ambiguousOld, ambiguousNew := matchMoves(missing, newFiles)
+	if len(moves) != 1 || moves[0].oldPath != missingPath.String() || moves[0].newPath != newPath.String() {
+		t.Fatalf("unexpected move decisions: %#v", moves)
+	}
+	if len(ambiguousOld) != 0 || len(ambiguousNew) != 0 {
+		t.Fatalf("one-to-one match became ambiguous: old=%v new=%v", ambiguousOld, ambiguousNew)
 	}
 }
 
-func TestWalkRepositorySkipsExcludedAndUnsettledFiles(t *testing.T) {
-	root := t.TempDir()
-	writeFile := func(rel string, modTime time.Time) {
-		path := filepath.Join(root, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			t.Fatalf("mkdir: %v", err)
-		}
-		if err := os.WriteFile(path, []byte("data"), 0644); err != nil {
-			t.Fatalf("write file: %v", err)
-		}
-		if err := os.Chtimes(path, modTime, modTime); err != nil {
-			t.Fatalf("chtimes: %v", err)
-		}
+func TestMatchMovesDefersWholeDuplicateGroup(t *testing.T) {
+	t.Parallel()
+
+	contentHash := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	asset := repo.Asset{AssetID: uuid.New(), FileSize: 256, ContentHash: contentHash}
+	oldPath := mustRepositoryPath(t, "inbox/old.jpg")
+	firstNew := mustRepositoryPath(t, "Trips/one.jpg")
+	secondNew := mustRepositoryPath(t, "Trips/two.jpg")
+	missing := map[string]missingCandidate{
+		oldPath.String(): {storagePath: oldPath.String(), path: oldPath, asset: &asset},
+	}
+	newFiles := map[string]observedCandidate{
+		firstNew.String(): {
+			observation: storage.FileObservation{Path: firstNew, Size: 256, ContentHash: &contentHash},
+		},
+		secondNew.String(): {
+			observation: storage.FileObservation{Path: secondNew, Size: 256, ContentHash: &contentHash},
+		},
 	}
 
-	old := time.Now().Add(-10 * time.Minute)
-	writeFile("album/photo.jpg", old)
-	writeFile(".lumilio/assets/thumb.jpg", old)
-	writeFile("inbox/upload.jpg", old)
-	writeFile("album/recent.jpg", time.Now())
-	writeFile("album/readme.txt", old)
-
-	result, err := walkRepository(root, 5*time.Second)
-	if err != nil {
-		t.Fatalf("walk repository: %v", err)
+	moves, ambiguousOld, ambiguousNew := matchMoves(missing, newFiles)
+	if len(moves) != 0 {
+		t.Fatalf("ambiguous group produced move: %#v", moves)
 	}
-	if _, ok := result.entries["album/photo.jpg"]; !ok {
-		t.Fatalf("expected album/photo.jpg to be scanned, got %#v", result.entries)
-	}
-	if len(result.entries) != 1 {
-		t.Fatalf("expected only one scanned entry, got %#v", result.entries)
-	}
-	if _, ok := result.deferredPaths["album/recent.jpg"]; !ok {
-		t.Fatalf("expected unsettled file to be deferred, got %#v", result.deferredPaths)
-	}
-	if !result.deleteSafe {
-		t.Fatalf("expected unsettled files to keep delete reconciliation safe")
-	}
-	if result.skipped == 0 {
-		t.Fatalf("expected skipped files to be counted")
+	oldGroup := ambiguousOld[oldPath.String()]
+	if oldGroup == "" || ambiguousNew[firstNew.String()] != oldGroup || ambiguousNew[secondNew.String()] != oldGroup {
+		t.Fatalf("group was not deferred together: old=%v new=%v", ambiguousOld, ambiguousNew)
 	}
 }
 
-func TestWalkRepositoryCanIncludeUnsettledFiles(t *testing.T) {
-	root := t.TempDir()
-	for _, rel := range []string{"photo-1.jpg", "nested/photo-2.jpg"} {
-		path := filepath.Join(root, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			t.Fatalf("mkdir: %v", err)
-		}
-		if err := os.WriteFile(path, []byte("data"), 0644); err != nil {
-			t.Fatalf("write file: %v", err)
-		}
+func TestMatchMovesDoesNotTreatExistingOldPathAsCandidate(t *testing.T) {
+	t.Parallel()
+
+	contentHash := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	newPath := mustRepositoryPath(t, "Trips/copy.jpg")
+	newFiles := map[string]observedCandidate{
+		newPath.String(): {
+			observation: storage.FileObservation{Path: newPath, Size: 512, ContentHash: &contentHash},
+		},
 	}
 
-	result, err := walkRepository(root, 0)
+	moves, ambiguousOld, ambiguousNew := matchMoves(nil, newFiles)
+	if len(moves) != 0 || len(ambiguousOld) != 0 || len(ambiguousNew) != 0 {
+		t.Fatalf("copy candidate was consumed: moves=%v old=%v new=%v", moves, ambiguousOld, ambiguousNew)
+	}
+}
+
+func mustRepositoryPath(t *testing.T, value string) storage.RepositoryPath {
+	t.Helper()
+	parsed, err := storage.ParseUserMediaPath(value)
 	if err != nil {
-		t.Fatalf("walk repository: %v", err)
+		t.Fatal(err)
 	}
-	if result.skipped != 0 {
-		t.Fatalf("expected no skipped files, got %d", result.skipped)
-	}
-	if len(result.entries) != 2 {
-		t.Fatalf("expected two scanned entries, got %#v", result.entries)
-	}
+	return parsed
 }

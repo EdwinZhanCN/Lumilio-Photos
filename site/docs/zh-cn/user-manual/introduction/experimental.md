@@ -1,9 +1,15 @@
 ---
-title: 测试版与可选功能
+title: "页面已迁移：当前限制"
+description: "旧文档地址兼容页。"
+page_id: "legacy-introduction-experimental"
+search: false
+outline: false
+baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
+last_verified: "2026-08-06"
 ---
 
-# 测试版与可选功能
+# 页面已迁移
 
-Lumilio Photos 目前仍是测试版。重要媒体应保留独立且经过恢复验证的备份。
+这条旧地址保留用于兼容已有书签。权威内容已经合并到[当前限制](../reference/known-limitations.md)。
 
-基础的导入、浏览、相册、标签和分享不依赖 AI。需要了解模型下载、资源占用与能力状态时，请阅读 [Lumen AI](../features/lumen-ai)；需要了解对话式整理时，请阅读 [Lumilio Agent](../features/agent)。
+请不要在此页面继续维护第二份正文。

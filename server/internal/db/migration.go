@@ -27,7 +27,7 @@ const migrationTable = "lumilio_schema_migrations"
 // other generation are rejected outright: experimental catalogs are never
 // upgraded in place.
 const (
-	schemaGeneration                 = 4
+	schemaGeneration                 = 5
 	currentGenerationBaselineVersion = 3
 )
 
@@ -168,7 +168,7 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 
 // currentGenerationMigrations excludes destructive baselines from older
 // experimental generations. Those files remain embedded and immutable for
-// auditability, but a fresh generation-4 catalog starts directly at migration
+// auditability, but a fresh generation-5 catalog starts directly at migration
 // 000003 and therefore never needs the sqlite-vec module referenced by 000001.
 func currentGenerationMigrations(all []embeddedMigration) ([]embeddedMigration, error) {
 	var current []embeddedMigration

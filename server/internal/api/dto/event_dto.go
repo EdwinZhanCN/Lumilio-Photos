@@ -14,6 +14,8 @@ type EventSummaryDTO struct {
 	IsHidden         bool    `json:"is_hidden"`
 	MediaCount       int     `json:"media_count"`
 	DisplayableCount int     `json:"displayable_count"`
+	CanonicalCount   int     `json:"canonical_media_count"`
+	ProjectedCount   int     `json:"projected_media_count"`
 }
 
 type EventDetailDTO struct {
@@ -53,26 +55,29 @@ type EventMutationResponseDTO struct {
 }
 
 type EventRebuildRequestDTO struct {
-	From    *string `json:"from"`
-	To      *string `json:"to"`
-	DryRun  bool    `json:"dry_run"`
-	OwnerID *int32  `json:"owner_id"`
+	OwnerID *int32 `json:"owner_id"`
 }
 
-type EventRebuildPreviewDTO struct {
-	Retained   int `json:"retained"`
-	Created    int `json:"created"`
-	Redirected int `json:"redirected"`
-	Events     int `json:"events"`
-	Members    int `json:"members"`
+type EventRebuildAcceptedDTO struct {
+	RunID             string `json:"run_id"`
+	OwnerID           int32  `json:"owner_id"`
+	RequestedRevision int64  `json:"requested_revision"`
 }
 
 type EventRebuildStatusDTO struct {
-	Initialized      bool   `json:"initialized"`
-	AlgorithmVersion string `json:"algorithm_version"`
-	Paused           bool   `json:"paused"`
-	Revision         int64  `json:"revision"`
-	PendingRanges    int    `json:"pending_ranges"`
+	Initialized       bool   `json:"initialized"`
+	AlgorithmVersion  string `json:"algorithm_version"`
+	Paused            bool   `json:"paused"`
+	Revision          int64  `json:"revision"`
+	SourceRevision    int64  `json:"source_revision"`
+	PublishedRevision int64  `json:"published_revision"`
+	PendingRanges     int    `json:"pending_ranges"`
+	Pending           bool   `json:"pending"`
+	QueuedRunID       string `json:"queued_run_id,omitempty"`
+	RunningRunID      string `json:"running_run_id,omitempty"`
+	LastSuccessRunID  string `json:"last_success_run_id,omitempty"`
+	LastFailureRunID  string `json:"last_failure_run_id,omitempty"`
+	LastErrorCode     string `json:"last_error_code,omitempty"`
 }
 
 type EventRebuildStateRequestDTO struct {

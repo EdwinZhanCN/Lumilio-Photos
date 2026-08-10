@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useStartRepositoryCloudImport } from "@/features/cloud";
 import { useDetectDuplicates } from "@/features/collections";
+import { useEventRebuild, useEventRebuildStatus } from "@/features/events";
 import { useRebuildPeopleClusters } from "@/features/people";
 import {
   getRepositoryDisplayName,
@@ -30,6 +31,12 @@ export default function RepositoryMaintenancePanel() {
   // People span repositories, so the rebuild is a library-wide job: no
   // per-repository target here on purpose.
   const { rebuildPeople, isRebuilding: isRebuildingPeople } = useRebuildPeopleClusters();
+  // Events share the same user-owned topology as people, so this maintenance
+  // action also intentionally rebuilds across every repository.
+  const { rebuild: rebuildEvents, isRebuilding: isRebuildingEvents } = useEventRebuild();
+  // Keep the maintenance surface truthful while an asynchronous owner-wide
+  // rebuild is queued or running. The status hook stops polling when settled.
+  useEventRebuildStatus();
 
   const repositoryIds = useMemo(
     () => repositories.map((repository) => repository.id).filter(Boolean),
@@ -39,12 +46,29 @@ export default function RepositoryMaintenancePanel() {
   const handleScanRepository = useCallback(
     async (repository: RepositoryOption) => {
       try {
-        await scanRepository(repository.id);
+        const result = await scanRepository(repository.id);
+        const summaryValues = {
+          name: getRepositoryDisplayName(repository, t),
+          discovered: result.discovered_count ?? 0,
+          updated: result.updated_count ?? 0,
+          moved: result.moved_count ?? 0,
+          deferred: result.deferred_count ?? 0,
+          ambiguous: result.ambiguous_count ?? 0,
+          deleted: result.deleted_count ?? 0,
+        };
         showMessage(
-          "success",
-          t("manage.repositories.scanQueued", {
-            name: getRepositoryDisplayName(repository, t),
-          }),
+          result.authoritative ? "success" : "info",
+          result.authoritative
+            ? t(
+                "manage.repositories.scanCompletedSummary",
+                "{{name}} scan complete: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous, {{deleted}} deleted.",
+                summaryValues,
+              )
+            : t(
+                "manage.repositories.scanPartialSummary",
+                "{{name}} scan was partial: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous. Missing files were not confirmed.",
+                summaryValues,
+              ),
         );
       } catch (error) {
         showMessage(
@@ -180,6 +204,25 @@ export default function RepositoryMaintenancePanel() {
     }
   }, [rebuildPeople, showMessage, t]);
 
+  const handleRebuildEvents = useCallback(async () => {
+    try {
+      const result = await rebuildEvents();
+      showMessage(
+        "success",
+        t("events.rebuild.queued", "Event rebuild queued ({{run}}).", {
+          run: result?.run_id?.slice(0, 8) ?? "pending",
+        }),
+      );
+    } catch (error) {
+      showMessage(
+        "error",
+        t("events.rebuild.error", "Failed to rebuild Events: {{message}}", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }, [rebuildEvents, showMessage, t]);
+
   const handleScanAll = useCallback(async () => {
     try {
       await scanRepositories(repositoryIds);
@@ -204,6 +247,7 @@ export default function RepositoryMaintenancePanel() {
       isLoading={repositoriesQuery.isLoading}
       isError={repositoriesQuery.isError}
       isScanning={isScanning}
+      isRebuildingEvents={isRebuildingEvents}
       isRebuildingPeople={isRebuildingPeople}
       scanningIds={scanningIds}
       detectingIds={detectingIds}
@@ -216,6 +260,7 @@ export default function RepositoryMaintenancePanel() {
       onLocationRebuild={handleLocationRebuild}
       onCloudImport={handleCloudImport}
       onScanAll={handleScanAll}
+      onRebuildEvents={handleRebuildEvents}
       onRebuildPeople={handleRebuildPeople}
     />
   );

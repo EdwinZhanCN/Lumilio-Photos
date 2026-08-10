@@ -2,7 +2,6 @@ package processors
 
 import (
 	"database/sql"
-	"time"
 
 	"server/config"
 	"server/internal/db/repo"
@@ -15,41 +14,30 @@ import (
 	"go.uber.org/zap"
 )
 
-// AssetPayload matches the ingest-stage payload fields (kept for compatibility with task workers).
-type AssetPayload struct {
-	ContentHash      string    `json:"contentHash" river:"unique"`
-	QuickFingerprint string    `json:"quickFingerprint,omitempty"`
-	StagedPath       string    `json:"stagedPath"`
-	UserID           string    `json:"userId" river:"unique"`
-	Timestamp        time.Time `json:"timestamp"`
-	ContentType      string    `json:"contentType,omitempty"`
-	FileName         string    `json:"fileName,omitempty"`
-	RepositoryID     string    `json:"repositoryId,omitempty"` // Repository UUID
-}
-
 // AssetProcessor holds shared dependencies for per-task processors.
 type AssetProcessor struct {
-	assetService     service.AssetService
-	queries          *repo.Queries
-	repoManager      storage.RepositoryManager
-	stagingManager   storage.StagingManager
-	materializer     *sourcing.SourceMaterializer
-	queueClient      *river.Client[*sql.Tx]
-	settingsService  service.SettingsService
-	embeddingService service.EmbeddingService
-	lumenService     service.LumenService
-	transcodeConfig  config.TranscodeConfig
-	toolsConfig      config.ToolsConfig
-	logger           *zap.Logger
-	auditProvider    logging.RepositoryAuditProvider
+	database          *sql.DB
+	assetService      service.AssetService
+	queries           *repo.Queries
+	files             *storage.RepositoryFSFactory
+	repositories      storage.RepositoryManager
+	materializer      *sourcing.SourceMaterializer
+	queueClient       *river.Client[*sql.Tx]
+	settingsService   service.SettingsService
+	embeddingService  service.EmbeddingService
+	lumenService      service.LumenService
+	transcodeConfig   config.TranscodeConfig
+	toolsConfig       config.ToolsConfig
+	logger            *zap.Logger
+	auditProvider     logging.RepositoryAuditProvider
+	beforeRetryInsert func(queue string) error
 }
 
 // NewAssetProcessor constructs the processor with required dependencies.
 func NewAssetProcessor(
+	database *sql.DB,
 	assetService service.AssetService,
 	queries *repo.Queries,
-	repoManager storage.RepositoryManager,
-	stagingManager storage.StagingManager,
 	materializer *sourcing.SourceMaterializer,
 	queueClient *river.Client[*sql.Tx],
 	settingsService service.SettingsService,
@@ -59,6 +47,8 @@ func NewAssetProcessor(
 	toolsConfig config.ToolsConfig,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
+	files *storage.RepositoryFSFactory,
+	repositories storage.RepositoryManager,
 ) *AssetProcessor {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -67,10 +57,11 @@ func NewAssetProcessor(
 		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
 	return &AssetProcessor{
+		database:         database,
 		assetService:     assetService,
 		queries:          queries,
-		repoManager:      repoManager,
-		stagingManager:   stagingManager,
+		files:            files,
+		repositories:     repositories,
 		materializer:     materializer,
 		queueClient:      queueClient,
 		settingsService:  settingsService,

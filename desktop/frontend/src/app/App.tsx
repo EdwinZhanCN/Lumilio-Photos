@@ -4,7 +4,6 @@ import {
   Check,
   Download,
   FolderOpen,
-  FolderPlus,
   HardDrive,
   RefreshCw,
   RotateCcw,
@@ -13,7 +12,15 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   DesktopService,
@@ -29,8 +36,11 @@ import {
   RuntimePhase,
   type DesktopPreferences,
   type DesktopSnapshot,
+  type HostActionTicket,
   type LumenLogEntry,
   type LumenSnapshot,
+  type OperationReceipt,
+  type OperationSnapshot,
   type ProcessPresentation,
   type RuntimeConfigSettings,
   type StorageShortcut,
@@ -81,6 +91,91 @@ const dockRoutes = [
 ] as const;
 
 type MainRoute = (typeof dockRoutes)[number]["route"];
+
+interface TrackedOperationOptions {
+  onSucceeded?: () => void;
+  onFailed?: (message: string) => void;
+}
+
+/** Desktop service methods acknowledge an operation before their actor work is
+ * complete. This hook makes the shared operation registry, rather than the RPC
+ * return, authoritative for button success and failure. */
+function useTrackedOperation(
+  operations: OperationSnapshot[] | null | undefined,
+  options: TrackedOperationOptions = {},
+) {
+  const [operationID, setOperationID] = useState<string | null>(null);
+  const [state, setState] = useState<ButtonState>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const optionsRef = useRef(options);
+  const resetTimer = useRef<number | null>(null);
+  optionsRef.current = options;
+
+  useEffect(
+    () => () => {
+      if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!operationID) return;
+    const operation = operations?.find((item) => item.operationID === operationID);
+    if (!operation) return;
+    if (operation.state === "accepted" || operation.state === "running") {
+      setState("loading");
+      return;
+    }
+    if (operation.state === "succeeded") {
+      setOperationID(null);
+      setError(null);
+      setState("success");
+      optionsRef.current.onSucceeded?.();
+      resetTimer.current = window.setTimeout(() => {
+        setState("idle");
+        resetTimer.current = null;
+      }, 1200);
+      return;
+    }
+    if (operation.state === "failed" || operation.state === "cancelled") {
+      const message = operation.error?.message || `Desktop operation ${operation.state}.`;
+      setOperationID(null);
+      setError(message);
+      setState("error");
+      optionsRef.current.onFailed?.(message);
+    }
+  }, [operationID, operations]);
+
+  const begin = () => {
+    if (resetTimer.current !== null) {
+      window.clearTimeout(resetTimer.current);
+      resetTimer.current = null;
+    }
+    setOperationID(null);
+    setError(null);
+    setState("loading");
+  };
+
+  const track = (receipt: OperationReceipt) => {
+    setOperationID(receipt.operationID);
+  };
+
+  const reject = (reason: unknown) => {
+    const message = errorMessage(reason);
+    setOperationID(null);
+    setError(message);
+    setState("error");
+    optionsRef.current.onFailed?.(message);
+  };
+
+  const reset = () => {
+    setOperationID(null);
+    setError(null);
+    setState("idle");
+  };
+
+  return { state, error, begin, track, reject, reset };
+}
 
 export function App() {
   const { t } = useTranslation();
@@ -145,18 +240,17 @@ export function App() {
   const activeRoute = normalizeRoute(route);
 
   return (
-    <div className={`desktop-shell${theme === "dark" ? " dark" : ""}${onboarding ? " onboarding-shell" : ""}`}>
+    <div
+      className={`desktop-shell${theme === "dark" ? " dark" : ""}${onboarding ? " onboarding-shell" : ""}`}
+    >
       {!onboarding ? (
         <header className="window-header">
           <button className="brand" type="button" onClick={() => navigate("/general")}>
             <img src={appIconURL} alt="" className="brand-icon" />
-            <span>Lumilio</span>
+            <span>{t("product.compactName", "Lumilio Photos")}</span>
           </button>
           <div className="header-actions">
-            <AnimatedBadge
-              status={presentationStatus(snapshot.runtime.presentation)}
-              size="sm"
-            >
+            <AnimatedBadge status={presentationStatus(snapshot.runtime.presentation)} size="sm">
               {snapshot.runtime.presentation.label}
             </AnimatedBadge>
             <Button
@@ -205,7 +299,9 @@ export function App() {
         </AnimatePresence>
       </main>
 
-      {!onboarding && !recovery && !setupRequired ? <AppDock route={activeRoute} navigate={navigate} draft={draft} resolvedTheme={theme} /> : null}
+      {!onboarding && !recovery && !setupRequired ? (
+        <AppDock route={activeRoute} navigate={navigate} draft={draft} resolvedTheme={theme} />
+      ) : null}
       <AnimatedToastStack
         toasts={toasts}
         onDismiss={dismissToast}
@@ -221,7 +317,11 @@ function LoadingScreen() {
   const { t } = useTranslation();
   return (
     <main className="boot-screen">
-      <img src={appIconURL} alt="Lumilio Photos" className="boot-icon" />
+      <img
+        src={appIconURL}
+        alt={t("product.compactName", "Lumilio Photos")}
+        className="boot-icon"
+      />
       <Loader variant="ascii-braille" size={22} label={t("loading.loadingState")} />
       <span>{t("loading.opening")}</span>
     </main>
@@ -235,7 +335,7 @@ function SetupRequiredPage({ onStart }: { onStart: () => void }) {
       <header className="bootstrap-header">
         <div className="bootstrap-brand">
           <img src={appIconURL} alt="" className="bootstrap-icon" />
-          <span>Lumilio Photos</span>
+          <span>{t("product.compactName", "Lumilio Photos")}</span>
         </div>
       </header>
       <div className="bootstrap-slide">
@@ -244,7 +344,10 @@ function SetupRequiredPage({ onStart }: { onStart: () => void }) {
           description={t("setupRequired.description")}
         />
         <SettingsSection title={t("setupRequired.nextStep")}>
-          <SettingRow title={t("setupRequired.finishSetup")} description={t("setupRequired.minutes")}>
+          <SettingRow
+            title={t("setupRequired.finishSetup")}
+            description={t("setupRequired.minutes")}
+          >
             <Button onClick={onStart}>{t("setupRequired.backToSetup")}</Button>
           </SettingRow>
         </SettingsSection>
@@ -274,7 +377,8 @@ function AppDock({
       : t("general.themeLight");
   const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
   const cancelDisabled = draft.phase === "saving";
-  const saveDisabled = draft.phase === "preparing" || draft.phase === "saving" || draft.validation?.valid === false;
+  const saveDisabled =
+    draft.phase === "preparing" || draft.phase === "saving" || draft.validation?.valid === false;
   return (
     <nav className="dock-position" aria-label={t("dock.label")}>
       <Dock>
@@ -355,7 +459,11 @@ function Onboarding({
   if (!draft.runtime || !draft.preferences) {
     return (
       <div className="bootstrap-loading">
-        <img src={appIconURL} alt="Lumilio Photos" className="bootstrap-icon" />
+        <img
+          src={appIconURL}
+          alt={t("product.compactName", "Lumilio Photos")}
+          className="bootstrap-icon"
+        />
         <Loader variant="ascii-braille" size={24} label={t("onboarding.preparing")} />
         <span>{t("onboarding.preparingDescription")}</span>
       </div>
@@ -368,17 +476,22 @@ function Onboarding({
   const busy = draft.phase === "preparing" || draft.phase === "saving";
 
   return (
-    <section className="bootstrap" aria-label={t("onboarding.ariaLabel", "Lumilio Desktop setup")}>
+    <section
+      className="bootstrap"
+      aria-label={t("onboarding.ariaLabel", "Lumilio Photos Desktop setup")}
+    >
       <header className="bootstrap-header">
         <div className="bootstrap-brand">
           <img src={appIconURL} alt="" className="bootstrap-icon" />
-          <span>Lumilio Photos</span>
+          <span>{t("product.compactName", "Lumilio Photos")}</span>
         </div>
         <span>{t("onboarding.step", { current: step + 1, total })}</span>
       </header>
 
       <div className="bootstrap-progress" aria-hidden>
-        {Array.from({ length: total }, (_, index) => <i key={index} className={index <= step ? "active" : ""} />)}
+        {Array.from({ length: total }, (_, index) => (
+          <i key={index} className={index <= step ? "active" : ""} />
+        ))}
       </div>
 
       <AnimatePresence mode="wait" initial={false}>
@@ -392,22 +505,49 @@ function Onboarding({
         >
           {step === 0 ? (
             <>
-              <PageHeading title={t("onboarding.generalTitle")} description={t("onboarding.generalDescription")} />
+              <PageHeading
+                title={t("onboarding.generalTitle")}
+                description={t("onboarding.generalDescription")}
+              />
               <SettingsSection title={t("onboarding.desktop")}>
-                <SettingRow title={t("onboarding.language")} description={t("onboarding.languageDescription")}>
-                  <LanguageSelect preferences={draft.preferences} update={draft.updatePreference} disabled={busy} />
+                <SettingRow
+                  title={t("onboarding.language")}
+                  description={t("onboarding.languageDescription")}
+                >
+                  <LanguageSelect
+                    preferences={draft.preferences}
+                    update={draft.updatePreference}
+                    disabled={busy}
+                  />
                 </SettingRow>
-                <SettingRow title={t("onboarding.region")} description={t("onboarding.regionDescription")}>
-                  <RegionSelect preferences={draft.preferences} update={draft.updatePreference} disabled={busy} />
+                <SettingRow
+                  title={t("onboarding.region")}
+                  description={t("onboarding.regionDescription")}
+                >
+                  <RegionSelect
+                    preferences={draft.preferences}
+                    update={draft.updatePreference}
+                    disabled={busy}
+                  />
                 </SettingRow>
               </SettingsSection>
             </>
           ) : step === 1 ? (
             <>
-              <PageHeading title={t("onboarding.storageTitle")} description={t("onboarding.storageDescription")} />
+              <PageHeading
+                title={t("onboarding.storageTitle")}
+                description={t("onboarding.storageDescription")}
+              />
               <SettingsSection title={t("onboarding.storage")}>
-                <SettingRow title={t("onboarding.storageLocation")} description={draft.runtime.storagePath}>
-                  <Button variant="secondary" disabled={busy} onClick={() => void draft.chooseDefaultStorage()}>
+                <SettingRow
+                  title={t("onboarding.storageLocation")}
+                  description={draft.runtime.storagePath}
+                >
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void draft.chooseDefaultStorage()}
+                  >
                     <FolderOpen className="size-4" /> {t("common.choose")}
                   </Button>
                 </SettingRow>
@@ -415,31 +555,61 @@ function Onboarding({
             </>
           ) : step === 2 ? (
             <>
-              <PageHeading title={t("onboarding.networkTitle")} description={t("onboarding.networkDescription")} />
+              <PageHeading
+                title={t("onboarding.networkTitle")}
+                description={t("onboarding.networkDescription")}
+              />
               <SettingsSection title={t("onboarding.server")}>
-                <SettingRow title={t("onboarding.networkAccess")} description={t("onboarding.networkRecommended")}>
-                  <NetworkSelect settings={draft.runtime} update={draft.updateRuntime} disabled={busy} />
+                <SettingRow
+                  title={t("onboarding.networkAccess")}
+                  description={t("onboarding.networkRecommended")}
+                >
+                  <NetworkSelect
+                    settings={draft.runtime}
+                    update={draft.updateRuntime}
+                    disabled={busy}
+                  />
                 </SettingRow>
               </SettingsSection>
             </>
           ) : (
             <>
-              <PageHeading title={t("onboarding.readyTitle")} description={t("onboarding.readyDescription")} />
+              <PageHeading
+                title={t("onboarding.readyTitle")}
+                description={t("onboarding.readyDescription")}
+              />
               <SettingsSection title={t("onboarding.summary")}>
-                <SettingRow title={t("onboarding.storageLocation")} description={draft.runtime.storagePath}>
+                <SettingRow
+                  title={t("onboarding.storageLocation")}
+                  description={draft.runtime.storagePath}
+                >
                   <span className="setting-value">{t("onboarding.selected")}</span>
                 </SettingRow>
-                <SettingRow title={t("onboarding.networkAccess")} description={networkLabel(draft.runtime.networkMode, t)}>
+                <SettingRow
+                  title={t("onboarding.networkAccess")}
+                  description={networkLabel(draft.runtime.networkMode, t)}
+                >
                   <span className="setting-value">{t("onboarding.configured")}</span>
                 </SettingRow>
-                <SettingRow title={t("onboarding.lumenAI")} description={snapshot.lumen.installerAvailable && snapshot.lumen.processAvailable ? t("onboarding.lumenAvailable") : t("onboarding.lumenNotIncluded")}>
+                <SettingRow
+                  title={t("onboarding.lumenAI")}
+                  description={
+                    snapshot.lumen.installerAvailable && snapshot.lumen.processAvailable
+                      ? t("onboarding.lumenAvailable")
+                      : t("onboarding.lumenNotIncluded")
+                  }
+                >
                   <AnimatedBadge status="neutral" size="sm">
-                    {snapshot.lumen.installerAvailable && snapshot.lumen.processAvailable ? t("onboarding.optional") : t("onboarding.unavailable")}
+                    {snapshot.lumen.installerAvailable && snapshot.lumen.processAvailable
+                      ? t("onboarding.optional")
+                      : t("onboarding.unavailable")}
                   </AnimatedBadge>
                 </SettingRow>
               </SettingsSection>
               {draft.phase === "error" && draft.error ? (
-                <InlineNotice tone="danger" title={t("onboarding.setupFailed")}>{draft.error}</InlineNotice>
+                <InlineNotice tone="danger" title={t("onboarding.setupFailed")}>
+                  {draft.error}
+                </InlineNotice>
               ) : null}
             </>
           )}
@@ -447,15 +617,25 @@ function Onboarding({
       </AnimatePresence>
 
       <footer className="bootstrap-actions">
-        <Button variant="ghost" disabled={step === 0 || busy} onClick={() => setStep((current) => current - 1)}>
+        <Button
+          variant="ghost"
+          disabled={step === 0 || busy}
+          onClick={() => setStep((current) => current - 1)}
+        >
           {t("common.back")}
         </Button>
         {step < total - 1 ? (
-          <Button disabled={busy || (step === 1 && !draft.runtime.storagePath)} onClick={() => setStep((current) => current + 1)}>
+          <Button
+            disabled={busy || (step === 1 && !draft.runtime.storagePath)}
+            onClick={() => setStep((current) => current + 1)}
+          >
             {t("common.continue")}
           </Button>
         ) : (
-          <Button disabled={busy || draft.validation?.valid === false} onClick={() => void finish()}>
+          <Button
+            disabled={busy || draft.validation?.valid === false}
+            onClick={() => void finish()}
+          >
             {draft.phase === "saving" ? t("common.finishing") : t("onboarding.finishSetup")}
           </Button>
         )}
@@ -473,15 +653,30 @@ function GeneralPanel({ draft }: { draft: SettingsDraftController }) {
       <PageHeading title={t("general.title")} description={t("general.description")} />
       <SettingsSection title={t("general.display")}>
         <SettingRow title={t("general.language")} description={t("general.languageDescription")}>
-          <LanguageSelect preferences={draft.preferences} update={draft.updatePreference} disabled={busy} />
+          <LanguageSelect
+            preferences={draft.preferences}
+            update={draft.updatePreference}
+            disabled={busy}
+          />
         </SettingRow>
         <SettingRow title={t("general.region")} description={t("general.regionDescription")}>
-          <RegionSelect preferences={draft.preferences} update={draft.updatePreference} disabled={busy} />
+          <RegionSelect
+            preferences={draft.preferences}
+            update={draft.updatePreference}
+            disabled={busy}
+          />
         </SettingRow>
         <SettingRow title={t("general.theme")} description={t("general.themeDescription")}>
-          <ThemeStatusControl preferences={draft.preferences} update={draft.updatePreference} disabled={busy} />
+          <ThemeStatusControl
+            preferences={draft.preferences}
+            update={draft.updatePreference}
+            disabled={busy}
+          />
         </SettingRow>
-        <SettingRow title={t("general.openOnLaunch")} description={t("general.openOnLaunchDescription")}>
+        <SettingRow
+          title={t("general.openOnLaunch")}
+          description={t("general.openOnLaunchDescription")}
+        >
           <Switch
             checked={draft.preferences.openProductOnLaunch}
             onCheckedChange={(value) => draft.updatePreference("openProductOnLaunch", value)}
@@ -505,25 +700,26 @@ function ServerPanel({
 }) {
   const { t } = useTranslation();
   const runtime = snapshot.runtime;
-  const [actionState, setActionState] = useState<ButtonState>("idle");
-  const [actionError, setActionError] = useState<string | null>(null);
+  const operation = useTrackedOperation(snapshot.operations, {
+    onFailed: (message) =>
+      showToast({ title: t("server.actionFailed"), description: message, status: "error" }),
+  });
+  const actionState = operation.state;
+  const actionError = operation.error;
 
   const invoke = async (action: "start" | "stop" | "restart" | "retry") => {
-    setActionState("loading");
-    setActionError(null);
+    operation.begin();
     const requestID = `runtime-${crypto.randomUUID()}`;
     try {
-      if (action === "start") await RuntimeService.Start(requestID, runtime.version);
-      else if (action === "stop") await RuntimeService.Stop(requestID, runtime.version);
-      else if (action === "restart") await RuntimeService.Restart(requestID, runtime.version);
-      else await RuntimeService.RetryCleanup(requestID, runtime.version);
-      setActionState("success");
-      window.setTimeout(() => setActionState("idle"), 1200);
+      let receipt: OperationReceipt;
+      if (action === "start") receipt = await RuntimeService.Start(requestID, runtime.version);
+      else if (action === "stop") receipt = await RuntimeService.Stop(requestID, runtime.version);
+      else if (action === "restart")
+        receipt = await RuntimeService.Restart(requestID, runtime.version);
+      else receipt = await RuntimeService.RetryCleanup(requestID, runtime.version);
+      operation.track(receipt);
     } catch (reason: unknown) {
-      const message = errorMessage(reason);
-      setActionState("error");
-      setActionError(message);
-      showToast({ title: t("server.actionFailed"), description: message, status: "error" });
+      operation.reject(reason);
     }
   };
 
@@ -537,16 +733,27 @@ function ServerPanel({
               {runtime.presentation.label}
             </AnimatedBadge>
             {runtime.capabilities.canStartRuntime ? (
-              <Button variant="secondary" size="sm" disabled={actionState === "loading"} onClick={() => void invoke("start")}>{t("common.start")}</Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={actionState === "loading"}
+                onClick={() => void invoke("start")}
+              >
+                {t("common.start")}
+              </Button>
             ) : null}
             {runtime.capabilities.canStopRuntime || runtime.capabilities.canRetryCleanupRuntime ? (
               <Button
                 variant="secondary"
                 size="sm"
                 disabled={actionState === "loading"}
-                onClick={() => void invoke(runtime.capabilities.canRetryCleanupRuntime ? "retry" : "stop")}
+                onClick={() =>
+                  void invoke(runtime.capabilities.canRetryCleanupRuntime ? "retry" : "stop")
+                }
               >
-                {runtime.capabilities.canRetryCleanupRuntime ? t("common.retryCleanup") : t("common.stop")}
+                {runtime.capabilities.canRetryCleanupRuntime
+                  ? t("common.retryCleanup")
+                  : t("common.stop")}
               </Button>
             ) : null}
             {runtime.capabilities.canRestartRuntime ? (
@@ -567,13 +774,17 @@ function ServerPanel({
       </SettingsSection>
 
       {actionError ? (
-        <ActionNotice component={t("dock.server")} message={actionError} actionLabel={t("common.retry")} onAction={() => void invoke("start")} />
+        <ActionNotice component={t("dock.server")} message={actionError} />
       ) : runtime.phase === RuntimePhase.RuntimeFailed ? (
         <ActionNotice
           component={t("dock.server")}
           message={t("server.failedMessage")}
-          actionLabel={runtime.capabilities.canRetryCleanupRuntime ? t("common.retryCleanup") : undefined}
-          onAction={runtime.capabilities.canRetryCleanupRuntime ? () => void invoke("retry") : undefined}
+          actionLabel={
+            runtime.capabilities.canRetryCleanupRuntime ? t("common.retryCleanup") : undefined
+          }
+          onAction={
+            runtime.capabilities.canRetryCleanupRuntime ? () => void invoke("retry") : undefined
+          }
         />
       ) : null}
 
@@ -584,7 +795,9 @@ function ServerPanel({
           updateSetting={draft.updateRuntime}
           showToast={showToast}
         />
-      ) : <SettingsLoading label={t("server.loadingSettings")} />}
+      ) : (
+        <SettingsLoading label={t("server.loadingSettings")} />
+      )}
     </>
   );
 }
@@ -600,71 +813,199 @@ function StoragePanel({
 }) {
   const { t } = useTranslation();
   const [items, setItems] = useState<StorageShortcut[]>([]);
-  const [state, setState] = useState<ButtonState>("idle");
+  const [hostActions, setHostActions] = useState<HostActionTicket[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hostActionError, setHostActionError] = useState<string | null>(null);
+  const [decliningActionID, setDecliningActionID] = useState<string | null>(null);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setLoadError(null);
       setItems((await StorageService.ListShortcuts()) || []);
     } catch (reason: unknown) {
       setLoadError(errorMessage(reason));
     }
-  };
+  }, []);
+  const refreshHostActions = useCallback(async () => {
+    try {
+      setHostActionError(null);
+      setHostActions((await StorageService.ListHostActions()) || []);
+    } catch (reason: unknown) {
+      setHostActionError(errorMessage(reason));
+    }
+  }, []);
+  const hostOperation = useTrackedOperation(snapshot.operations, {
+    onSucceeded: () => {
+      void refresh();
+      void refreshHostActions();
+    },
+    onFailed: (message) =>
+      showToast({
+        title: t("storage.hostActionFailed", "Request could not be completed"),
+        description: message,
+        status: "error",
+      }),
+  });
 
   useEffect(() => {
     void refresh();
-  }, [snapshot.storage.version, snapshot.runtime.phase]);
+    void refreshHostActions();
+    if (snapshot.runtime.phase !== RuntimePhase.RuntimeRunning) return undefined;
+    const timer = window.setInterval(() => void refreshHostActions(), 3000);
+    return () => window.clearInterval(timer);
+  }, [refresh, refreshHostActions, snapshot.storage.version, snapshot.runtime.phase]);
 
-  const addLocation = async () => {
-    setState("loading");
+  const approveHostAction = async (action: HostActionTicket) => {
+    hostOperation.begin();
     try {
-      const path = await StorageService.PickLocation(t("storage.addLocationDialogTitle", "Add a Lumilio storage location"));
-      if (!path) {
-        setState("idle");
-        return;
-      }
-      await StorageService.AddLocation(`storage-${crypto.randomUUID()}`, snapshot.storage.version, path, "");
-      setState("success");
-      window.setTimeout(() => setState("idle"), 1200);
+      const receipt = await StorageService.ApproveHostAction(
+        `host-action-${crypto.randomUUID()}`,
+        snapshot.storage.version,
+        action.id,
+        action.nonce,
+      );
+      hostOperation.track(receipt);
     } catch (reason: unknown) {
-      setState("error");
-      showToast({ title: t("storage.addFailed"), description: errorMessage(reason), status: "error" });
+      hostOperation.reject(reason);
+    }
+  };
+
+  const declineHostAction = async (action: HostActionTicket) => {
+    setDecliningActionID(action.id);
+    try {
+      await StorageService.DeclineHostAction(action.id);
+      await refreshHostActions();
+    } catch (reason: unknown) {
+      const message = errorMessage(reason);
+      setHostActionError(message);
+      showToast({
+        title: t("storage.hostActionDeclineFailed", "Request could not be declined"),
+        description: message,
+        status: "error",
+      });
+    } finally {
+      setDecliningActionID(null);
     }
   };
 
   const configuredPath = draft.runtime?.storagePath || "";
-  const defaultLocation = items.find((item) => item.kind === "default")
-    || items.find((item) => configuredPath !== "" && item.path === configuredPath);
+  const defaultLocation =
+    items.find((item) => item.kind === "default") ||
+    items.find((item) => configuredPath !== "" && item.path === configuredPath);
   const additional = items.filter((item) => item.id !== defaultLocation?.id);
 
   return (
     <>
-      <PageHeading
-        title={t("storage.title")}
-        description={t("storage.description")}
-        action={
-          <StatefulButton
-            state={state}
-            loadingText={t("storage.choosing")}
-            successText={t("storage.added")}
-            icon={<FolderPlus className="size-4" />}
-            disabled={snapshot.runtime.phase !== RuntimePhase.RuntimeRunning}
-            onClick={() => void addLocation()}
-          >
-            {t("storage.addLocation")}
-          </StatefulButton>
-        }
-      />
+      <PageHeading title={t("storage.title")} description={t("storage.description")} />
 
       {loadError ? (
-        <ActionNotice component={t("dock.storage")} message={loadError} actionLabel={t("common.retry")} onAction={() => void refresh()} />
+        <ActionNotice
+          component={t("dock.storage")}
+          message={loadError}
+          actionLabel={t("common.retry")}
+          onAction={() => void refresh()}
+        />
       ) : null}
+
+      <SettingsSection title={t("storage.webRequests", "Requests from Web")}>
+        {hostActionError ? (
+          <ActionNotice
+            component={t("storage.webRequests", "Requests from Web")}
+            message={hostActionError}
+            actionLabel={t("common.retry")}
+            onAction={() => void refreshHostActions()}
+          />
+        ) : null}
+        {hostActions.length ? (
+          hostActions.map((action) => (
+            <SettingRow
+              key={action.id}
+              title={hostActionLabel(action.kind, t)}
+              description={t(
+                "storage.hostActionRequestedBy",
+                "{{purpose}} · Requested by {{actor}}",
+                {
+                  purpose:
+                    action.purpose ||
+                    t(
+                      "storage.hostActionDescription",
+                      "A signed-in administrator requested access to a folder on this computer.",
+                    ),
+                  actor: action.actor,
+                },
+              )}
+            >
+              {action.status === "needs_decision" && action.riskWarnings?.length ? (
+                <div className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-warning-content">
+                  <strong>
+                    {t(
+                      "storage.hostActionRiskTitle",
+                      "Confirm storage risks before continuing",
+                    )}
+                  </strong>
+                  <div className="mt-1">
+                    {action.riskWarnings.map((warning) => hostActionRiskLabel(warning, t)).join(" · ")}
+                  </div>
+                </div>
+              ) : null}
+              <RowActions>
+                <span className="setting-value">
+                  {t("storage.hostActionExpires", "Expires {{time}}", {
+                    time: new Date(action.expiresAt).toLocaleTimeString(),
+                  })}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={decliningActionID === action.id || hostOperation.state === "loading"}
+                  onClick={() => void declineHostAction(action)}
+                >
+                  <X className="size-3.5" /> {t("common.decline", "Decline")}
+                </Button>
+                <StatefulButton
+                  variant="secondary"
+                  size="sm"
+                  state={hostOperation.state}
+                  loadingText={
+                    action.status === "needs_decision"
+                      ? t("storage.hostActionConfirmingRisk", "Confirming risks")
+                      : t("storage.hostActionChoosing", "Choosing folder")
+                  }
+                  successText={t("storage.hostActionApproved", "Approved")}
+                  icon={<FolderOpen className="size-3.5" />}
+                  disabled={decliningActionID !== null}
+                  onClick={() => void approveHostAction(action)}
+                >
+                  {action.status === "needs_decision"
+                    ? t("storage.confirmRiskAndContinue", "Confirm risks and continue")
+                    : t("storage.reviewAndChoose", "Review and choose folder")}
+                </StatefulButton>
+              </RowActions>
+            </SettingRow>
+          ))
+        ) : (
+          <div className="empty-state compact-empty-state">
+            <div>
+              <strong>{t("storage.noWebRequests", "No pending Web requests")}</strong>
+              <span>
+                {t(
+                  "storage.noWebRequestsHint",
+                  "Native folder requests from the Web app will appear here for local approval.",
+                )}
+              </span>
+            </div>
+          </div>
+        )}
+      </SettingsSection>
 
       <SettingsSection title={t("storage.defaultLocation")}>
         <SettingRow
           title={t("storage.defaultLocation")}
-          description={defaultLocation?.path || configuredPath || t("storage.noDefault")}
+          description={
+            defaultLocation
+              ? storageLocationDescription(defaultLocation, t)
+              : configuredPath || t("storage.noDefault")
+          }
         >
           <Button
             variant="secondary"
@@ -674,21 +1015,46 @@ function StoragePanel({
           >
             <FolderOpen className="size-3.5" /> {t("common.open")}
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={draft.phase === "preparing" || draft.phase === "saving"}
+            onClick={() => void draft.chooseDefaultStorage()}
+          >
+            {t("storage.locateDefaultLocation", "Locate Default Storage Location")}
+          </Button>
         </SettingRow>
       </SettingsSection>
 
       <SettingsSection title={t("storage.additional")}>
-        {additional.length ? additional.map((item) => (
-          <SettingRow key={item.id} title={item.name || t("storage.location")} description={item.path || item.status}>
-            <Button variant="secondary" size="sm" disabled={!item.canOpen} onClick={() => void StorageService.OpenLocation(item.id)}>
-              <FolderOpen className="size-3.5" /> {t("common.open")}
-            </Button>
-          </SettingRow>
-        )) : (
+        {additional.length ? (
+          additional.map((item) => (
+            <SettingRow
+              key={item.id}
+              title={item.name || t("storage.location")}
+              description={storageLocationDescription(item, t)}
+            >
+              <RowActions>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={!item.canOpen}
+                  onClick={() => void StorageService.OpenLocation(item.id)}
+                >
+                  <FolderOpen className="size-3.5" /> {t("common.open")}
+                </Button>
+              </RowActions>
+            </SettingRow>
+          ))
+        ) : (
           <div className="empty-state compact-empty-state">
             <div>
               <strong>{t("storage.noAdditional")}</strong>
-              <span>{snapshot.runtime.phase === RuntimePhase.RuntimeRunning ? t("storage.noAdditionalHint") : t("storage.startServerHint")}</span>
+              <span>
+                {snapshot.runtime.phase === RuntimePhase.RuntimeRunning
+                  ? t("storage.noAdditionalHint")
+                  : t("storage.startServerHint")}
+              </span>
             </div>
           </div>
         )}
@@ -697,19 +1063,46 @@ function StoragePanel({
   );
 }
 
-function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showToast: (input: ToastInput) => string }) {
+function LumenPanel({
+  snapshot,
+  showToast,
+}: {
+  snapshot: DesktopSnapshot;
+  showToast: (input: ToastInput) => string;
+}) {
   const { t } = useTranslation();
   const lumen = snapshot.lumen;
-  const [state, setState] = useState<ButtonState>("idle");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState(lumen.profile || lumen.availableProfiles?.[0] || "");
-  const [selectedPreset, setSelectedPreset] = useState(lumen.preset || lumen.availablePresets?.[0] || "");
+  const [inputError, setInputError] = useState<string | null>(null);
+  const operation = useTrackedOperation(snapshot.operations, {
+    onFailed: (message) =>
+      showToast({ title: t("lumen.actionFailed"), description: message, status: "error" }),
+  });
+  const state = operation.state;
+  const actionError = operation.error ?? inputError;
+  const [selectedProfile, setSelectedProfile] = useState(
+    lumen.profile || lumen.availableProfiles?.[0] || "",
+  );
+  const [selectedPreset, setSelectedPreset] = useState(
+    lumen.preset || lumen.availablePresets?.[0] || "",
+  );
   const [selectedCacheDir, setSelectedCacheDir] = useState(lumen.cacheDir || "");
   const [logLevel, setLogLevel] = useState("INFO");
   const [logs, setLogs] = useState<LumenLogEntry[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
   const releaseReady = lumen.installerAvailable && lumen.processAvailable;
+
+  useEffect(() => {
+    setSelectedProfile(lumen.profile || lumen.availableProfiles?.[0] || "");
+    setSelectedPreset(lumen.preset || lumen.availablePresets?.[0] || "");
+    setSelectedCacheDir(lumen.cacheDir || "");
+  }, [
+    lumen.cacheDir,
+    lumen.preset,
+    lumen.profile,
+    lumen.availablePresets,
+    lumen.availableProfiles,
+  ]);
 
   const loadLogs = useCallback(async () => {
     if (lumen.processPhase !== LumenProcessPhase.LumenRunning || !lumen.control.connected) {
@@ -740,44 +1133,58 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
   }, [loadLogs, lumen.control.connected, lumen.processPhase]);
 
   const invoke = async (action: "install" | "start" | "stop" | "restart" | "retry") => {
-    setState("loading");
-    setActionError(null);
+    operation.begin();
+    setInputError(null);
     const requestID = `lumen-${crypto.randomUUID()}`;
     try {
-      if (action === "install") await LumenService.Install(requestID, lumen.version, selectedProfile, selectedPreset, selectedCacheDir);
-      else if (action === "start") await LumenService.Start(requestID, lumen.version);
-      else if (action === "stop") await LumenService.Stop(requestID, lumen.version);
-      else if (action === "restart") await LumenService.Restart(requestID, lumen.version);
-      else await LumenService.RetryCleanup(requestID, lumen.version);
-      setState("success");
-      window.setTimeout(() => setState("idle"), 1200);
+      let receipt: OperationReceipt;
+      if (action === "install")
+        receipt = await LumenService.Install(
+          requestID,
+          lumen.version,
+          selectedProfile,
+          selectedPreset,
+          selectedCacheDir,
+        );
+      else if (action === "start") receipt = await LumenService.Start(requestID, lumen.version);
+      else if (action === "stop") receipt = await LumenService.Stop(requestID, lumen.version);
+      else if (action === "restart") receipt = await LumenService.Restart(requestID, lumen.version);
+      else receipt = await LumenService.RetryCleanup(requestID, lumen.version);
+      operation.track(receipt);
     } catch (reason: unknown) {
-      const message = errorMessage(reason);
-      setState("error");
-      setActionError(message);
-      showToast({ title: t("lumen.actionFailed"), description: message, status: "error" });
+      operation.reject(reason);
     }
   };
 
-  const setupMutable = lumen.installPhase === LumenInstallPhase.LumenAbsent || lumen.installPhase === LumenInstallPhase.LumenInstallFailed;
-  const canInstall = lumen.installerAvailable
-    && Boolean(selectedProfile)
-    && Boolean(selectedPreset)
-    && Boolean(selectedCacheDir)
-    && setupMutable;
-  const canChooseSetup = setupMutable && state !== "loading";
+  const installed = lumen.installPhase === LumenInstallPhase.LumenInstalled;
+  const setupChanged = selectedPreset !== lumen.preset || selectedCacheDir !== lumen.cacheDir;
+  const canSubmitSetup =
+    lumen.installerAvailable &&
+    Boolean(selectedProfile) &&
+    Boolean(selectedPreset) &&
+    Boolean(selectedCacheDir) &&
+    state !== "loading" &&
+    (!installed || setupChanged);
+  const canChooseIntent = state !== "loading";
+  const canChooseProfile = !installed && canChooseIntent;
 
   const chooseCacheDirectory = async () => {
     try {
-      const path = await LumenService.PickCacheDirectory(t("lumen.chooseCacheDirectory", "Choose the Lumen model cache directory"));
+      const path = await LumenService.PickCacheDirectory(
+        t("lumen.chooseCacheDirectory", "Choose the Lumen model cache directory"),
+      );
       if (path) {
         setSelectedCacheDir(path);
-        setActionError(null);
+        setInputError(null);
       }
     } catch (reason: unknown) {
       const message = errorMessage(reason);
-      setActionError(message);
-      showToast({ title: t("lumen.cachePickFailed", "Cache directory could not be selected"), description: message, status: "error" });
+      setInputError(message);
+      showToast({
+        title: t("lumen.cachePickFailed", "Cache directory could not be selected"),
+        description: message,
+        status: "error",
+      });
     }
   };
 
@@ -802,7 +1209,10 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
           title="Lumen Hub"
           description={releaseReady ? t("lumen.releaseReady") : t("lumen.notIncluded")}
         >
-          <AnimatedBadge status={releaseReady ? presentationStatus(lumen.presentation) : "neutral"} size="sm">
+          <AnimatedBadge
+            status={releaseReady ? presentationStatus(lumen.presentation) : "neutral"}
+            size="sm"
+          >
             {releaseReady ? lumen.presentation.label : t("onboarding.unavailable")}
           </AnimatedBadge>
         </SettingRow>
@@ -817,59 +1227,147 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
               "Choose a runtime preset exposed by the pinned Lumen Hub release.",
             )}
           >
-            <Select value={selectedPreset} onValueChange={setSelectedPreset} disabled={!canChooseSetup} className="w-80 max-w-full">
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={selectedPreset}
+              onValueChange={setSelectedPreset}
+              disabled={!canChooseIntent}
+              className="w-80 max-w-full"
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {(lumen.availablePresets ?? []).map((preset) => (
-                  <SelectItem key={preset} value={preset}>{presetLabel(preset)}</SelectItem>
+                  <SelectItem key={preset} value={preset}>
+                    {presetLabel(preset)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </SettingRow>
           <SettingRow
             title={t("lumen.backend", "Backend")}
-            description={t("lumen.backendDescription", "Backend determines which platform-specific Lumen Hub package is downloaded.")}
+            description={t(
+              "lumen.backendDescription",
+              "Backend determines which platform-specific Lumen Hub package is downloaded.",
+            )}
           >
-            <Select value={selectedProfile} onValueChange={setSelectedProfile} disabled={!canChooseSetup} className="w-80 max-w-full">
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={selectedProfile}
+              onValueChange={setSelectedProfile}
+              disabled={!canChooseProfile}
+              className="w-80 max-w-full"
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {(lumen.availableProfiles ?? []).map((profile) => (
-                  <SelectItem key={profile} value={profile}>{backendLabel(profile)} · {profile}</SelectItem>
+                  <SelectItem key={profile} value={profile}>
+                    {backendLabel(profile)} · {profile}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </SettingRow>
           <SettingRow
             title={t("lumen.cacheDirectory", "Model cache")}
-            description={selectedCacheDir || t("lumen.cacheDirectoryDescription", "Choose where Lumen stores downloaded models.")}
+            description={
+              selectedCacheDir ||
+              t("lumen.cacheDirectoryDescription", "Choose where Lumen stores downloaded models.")
+            }
           >
-            <Button variant="secondary" size="sm" disabled={!canChooseSetup} onClick={() => void chooseCacheDirectory()}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!canChooseIntent}
+              onClick={() => void chooseCacheDirectory()}
+            >
               <FolderOpen className="size-3.5" /> {t("common.choose")}
             </Button>
           </SettingRow>
-          <SettingRow title={t("lumen.installation")} description={selectedProfile ? `${t("lumen.profile")}: ${selectedProfile}` : t("lumen.noProfile")}>
+          <SettingRow
+            title={installed ? t("lumen.reconfigure", "Reconfigure") : t("lumen.installation")}
+            description={
+              installed
+                ? lumen.processPhase === LumenProcessPhase.LumenRunning
+                  ? t(
+                      "lumen.reconfigureRunning",
+                      "The new preset and cache are validated first, then applied with a controlled restart. The previous setup is restored if startup fails.",
+                    )
+                  : t(
+                      "lumen.reconfigureStopped",
+                      "The new preset and cache are validated before they replace the current setup.",
+                    )
+                : selectedProfile
+                  ? `${t("lumen.profile")}: ${selectedProfile}`
+                  : t("lumen.noProfile")
+            }
+          >
             <StatefulButton
               variant="secondary"
               size="sm"
               state={state}
-              disabled={!canInstall}
-              loadingText={t("lumen.installing")}
-              successText={t("lumen.installed")}
+              disabled={!canSubmitSetup}
+              loadingText={
+                installed
+                  ? t("lumen.applyingConfiguration", "Applying configuration")
+                  : t("lumen.installing")
+              }
+              successText={
+                installed
+                  ? t("lumen.configurationApplied", "Configuration applied")
+                  : t("lumen.installed")
+              }
               onClick={() => void invoke("install")}
             >
-              {t("lumen.install")}
+              {installed
+                ? t("lumen.applyConfiguration", "Apply configuration")
+                : t("lumen.install")}
             </StatefulButton>
           </SettingRow>
-          <SettingRow title={t("lumen.processStatus")} description={`${t("lumen.desiredState")}: ${lumen.desiredState || "disabled"}.`}>
+          <SettingRow
+            title={t("lumen.processStatus")}
+            description={`${t("lumen.desiredState")}: ${lumen.desiredState || "disabled"}.`}
+          >
             <RowActions>
-              <AnimatedBadge status={presentationStatus(lumen.presentation)} size="sm">{lumen.presentation.label}</AnimatedBadge>
-              {lumen.capabilities.canStartLumen ? <Button variant="secondary" size="sm" onClick={() => void invoke("start")}>{t("common.start")}</Button> : null}
-              {lumen.capabilities.canStopLumen || lumen.capabilities.canRetryCleanupLumen ? (
-                <Button variant="secondary" size="sm" onClick={() => void invoke(lumen.capabilities.canRetryCleanupLumen ? "retry" : "stop")}>
-                  {lumen.capabilities.canRetryCleanupLumen ? t("common.retryCleanup") : t("common.stop")}
+              <AnimatedBadge status={presentationStatus(lumen.presentation)} size="sm">
+                {lumen.presentation.label}
+              </AnimatedBadge>
+              {lumen.capabilities.canStartLumen ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={state === "loading"}
+                  onClick={() => void invoke("start")}
+                >
+                  {t("common.start")}
                 </Button>
               ) : null}
-              {lumen.capabilities.canRestartLumen ? <Button variant="secondary" size="sm" onClick={() => void invoke("restart")}>{t("common.restart")}</Button> : null}
+              {lumen.capabilities.canStopLumen || lumen.capabilities.canRetryCleanupLumen ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={state === "loading"}
+                  onClick={() =>
+                    void invoke(lumen.capabilities.canRetryCleanupLumen ? "retry" : "stop")
+                  }
+                >
+                  {lumen.capabilities.canRetryCleanupLumen
+                    ? t("common.retryCleanup")
+                    : t("common.stop")}
+                </Button>
+              ) : null}
+              {lumen.capabilities.canRestartLumen ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={state === "loading"}
+                  onClick={() => void invoke("restart")}
+                >
+                  {t("common.restart")}
+                </Button>
+              ) : null}
             </RowActions>
           </SettingRow>
         </SettingsSection>
@@ -882,23 +1380,44 @@ function LumenPanel({ snapshot, showToast }: { snapshot: DesktopSnapshot; showTo
       {releaseReady && lumen.installPhase === LumenInstallPhase.LumenInstalled ? (
         <SettingsSection
           title={t("lumen.logs", "Control logs")}
-          description={t("lumen.logsDescription", "Structured logs from Lumen Control. The view refreshes every five seconds while Hub is running.")}
+          description={t(
+            "lumen.logsDescription",
+            "Structured logs from Lumen Control. The view refreshes every five seconds while Hub is running.",
+          )}
         >
           <div className="lumen-log-toolbar">
-            <Select value={logLevel} onValueChange={setLogLevel} disabled={!lumen.control.connected} className="compact-select">
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={logLevel}
+              onValueChange={setLogLevel}
+              disabled={!lumen.control.connected}
+              className="compact-select"
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] as const).map((level) => (
-                  <SelectItem key={level} value={level}>{level}</SelectItem>
+                  <SelectItem key={level} value={level}>
+                    {level}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="secondary" size="sm" disabled={!lumen.control.connected || logsLoading} onClick={() => void loadLogs()}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!lumen.control.connected || logsLoading}
+              onClick={() => void loadLogs()}
+            >
               <RefreshCw className={logsLoading ? "size-3.5 animate-spin" : "size-3.5"} />
               {t("common.refresh", "Refresh")}
             </Button>
           </div>
-          {logsError ? <InlineNotice tone="danger" title={t("lumen.logsUnavailable", "Logs unavailable")}>{logsError}</InlineNotice> : null}
+          {logsError ? (
+            <InlineNotice tone="danger" title={t("lumen.logsUnavailable", "Logs unavailable")}>
+              {logsError}
+            </InlineNotice>
+          ) : null}
           <LumenLogViewer logs={logs} connected={lumen.control.connected} loading={logsLoading} />
         </SettingsSection>
       ) : null}
@@ -927,76 +1446,187 @@ function LumenControlPanel({ lumen }: { lumen: LumenSnapshot }) {
   return (
     <SettingsSection
       title={t("lumen.controlStatus", "Control status")}
-      description={t("lumen.controlDescription", "Live lifecycle and model state reported by lumen.control.v1.")}
+      description={t(
+        "lumen.controlDescription",
+        "Live lifecycle and model state reported by lumen.control.v1.",
+      )}
     >
       <div className="lumen-control-summary">
         <div>
           <span className="lumen-control-kicker">{t("lumen.inference", "Inference")}</span>
-          <strong>{control.inferenceReady ? t("lumen.ready", "Ready") : control.connected ? t("lumen.preparing", "Preparing") : t("lumen.disconnected", "Disconnected")}</strong>
+          <strong>
+            {control.inferenceReady
+              ? t("lumen.ready", "Ready")
+              : control.connected
+                ? t("lumen.preparing", "Preparing")
+                : t("lumen.disconnected", "Disconnected")}
+          </strong>
         </div>
-        <AnimatedBadge status={controlPhaseStatus(control.phase)} size="sm">{controlPhaseLabel(control.phase, t)}</AnimatedBadge>
+        <AnimatedBadge status={controlPhaseStatus(control.phase)} size="sm">
+          {controlPhaseLabel(control.phase, t)}
+        </AnimatedBadge>
         <dl className="lumen-control-meta">
-          <div><dt>{t("lumen.version", "Version")}</dt><dd>{control.version || "—"}</dd></div>
-          <div><dt>{t("lumen.backend", "Backend")}</dt><dd>{control.backend || "—"}</dd></div>
-          <div><dt>{t("lumen.sequence", "Sequence")}</dt><dd>{control.sequence || "—"}</dd></div>
+          <div>
+            <dt>{t("lumen.version", "Version")}</dt>
+            <dd>{control.version || "—"}</dd>
+          </div>
+          <div>
+            <dt>{t("lumen.backend", "Backend")}</dt>
+            <dd>{control.backend || "—"}</dd>
+          </div>
+          <div>
+            <dt>{t("lumen.sequence", "Sequence")}</dt>
+            <dd>{control.sequence || "—"}</dd>
+          </div>
         </dl>
       </div>
 
       {control.connected ? (
-        <ol className="lumen-phase-track" aria-label={t("lumen.lifecycle", "Lumen startup lifecycle")}>
+        <ol
+          className="lumen-phase-track"
+          aria-label={t("lumen.lifecycle", "Lumen startup lifecycle")}
+        >
           {lumenPhaseOrder.map((phase, index) => (
-            <li key={phase} className={index < currentIndex ? "complete" : index === currentIndex ? "current" : undefined} aria-current={index === currentIndex ? "step" : undefined}>
+            <li
+              key={phase}
+              className={
+                index < currentIndex ? "complete" : index === currentIndex ? "current" : undefined
+              }
+              aria-current={index === currentIndex ? "step" : undefined}
+            >
               <span aria-hidden />
               <small>{controlPhaseLabel(phase, t)}</small>
             </li>
           ))}
         </ol>
       ) : (
-        <InlineNotice title={t("lumen.controlWaiting", "Waiting for Control")}>{t("lumen.controlWaitingDescription", "Start Lumen Hub to connect to its local control plane.")}</InlineNotice>
+        <InlineNotice title={t("lumen.controlWaiting", "Waiting for Control")}>
+          {t(
+            "lumen.controlWaitingDescription",
+            "Start Lumen Hub to connect to its local control plane.",
+          )}
+        </InlineNotice>
       )}
 
       {control.download ? (
-        <div className="lumen-download" aria-label={t("lumen.downloadProgress", "Model download progress")}>
+        <div
+          className="lumen-download"
+          aria-label={t("lumen.downloadProgress", "Model download progress")}
+        >
           <div className="lumen-download-heading">
-            <div><strong>{control.download.model || t("lumen.model", "Model")}</strong><span>{control.download.file || t("lumen.preparingDownload", "Preparing download")}</span></div>
-            <span className="tabular-value">{downloadPercent === null ? t("lumen.downloading", "Downloading") : `${downloadPercent.toFixed(1)}%`}</span>
+            <div>
+              <strong>{control.download.model || t("lumen.model", "Model")}</strong>
+              <span>
+                {control.download.file || t("lumen.preparingDownload", "Preparing download")}
+              </span>
+            </div>
+            <span className="tabular-value">
+              {downloadPercent === null
+                ? t("lumen.downloading", "Downloading")
+                : `${downloadPercent.toFixed(1)}%`}
+            </span>
           </div>
-          <progress value={control.download.bytesDone} max={control.download.bytesTotal || undefined} />
+          <progress
+            value={control.download.bytesDone}
+            max={control.download.bytesTotal || undefined}
+          />
           <div className="lumen-download-meta">
-            <span>{formatBytes(control.download.bytesDone)}{control.download.bytesTotal ? ` / ${formatBytes(control.download.bytesTotal)}` : ""}</span>
-            <span>{t("lumen.filesProgress", "Files {{done}} / {{total}}", { done: control.download.filesDone, total: control.download.filesTotal })}</span>
+            <span>
+              {formatBytes(control.download.bytesDone)}
+              {control.download.bytesTotal ? ` / ${formatBytes(control.download.bytesTotal)}` : ""}
+            </span>
+            <span>
+              {t("lumen.filesProgress", "Files {{done}} / {{total}}", {
+                done: control.download.filesDone,
+                total: control.download.filesTotal,
+              })}
+            </span>
           </div>
         </div>
       ) : null}
 
-      {control.error ? <InlineNotice tone="danger" title={t("lumen.controlFailed", "Lumen startup failed")}>{control.error.message}</InlineNotice> : null}
+      {control.error ? (
+        <InlineNotice tone="danger" title={t("lumen.controlFailed", "Lumen startup failed")}>
+          {control.error.message}
+        </InlineNotice>
+      ) : null}
 
       <div className="lumen-services">
-        <div className="lumen-subheading"><h3>{t("lumen.services", "AI services")}</h3><span>{t("lumen.servicesReported", "{{count}} reported", { count: control.services?.length ?? 0 })}</span></div>
-        {control.services?.length ? control.services.map((service) => (
-          <div className="lumen-service-row" key={service.service}>
-            <div><strong>{serviceDisplayName(service.service)}</strong>{service.error ? <span>{service.error.message}</span> : null}</div>
-            <AnimatedBadge status={controlPhaseStatus(service.phase)} size="sm">{controlPhaseLabel(service.phase, t)}</AnimatedBadge>
-          </div>
-        )) : <p className="lumen-empty-copy">{control.connected ? t("lumen.servicesPending", "Service states will appear after model construction.") : t("lumen.servicesOffline", "No service state is available while Hub is stopped.")}</p>}
+        <div className="lumen-subheading">
+          <h3>{t("lumen.services", "AI services")}</h3>
+          <span>
+            {t("lumen.servicesReported", "{{count}} reported", {
+              count: control.services?.length ?? 0,
+            })}
+          </span>
+        </div>
+        {control.services?.length ? (
+          control.services.map((service) => (
+            <div className="lumen-service-row" key={service.service}>
+              <div>
+                <strong>{serviceDisplayName(service.service)}</strong>
+                {service.error ? <span>{service.error.message}</span> : null}
+              </div>
+              <AnimatedBadge status={controlPhaseStatus(service.phase)} size="sm">
+                {controlPhaseLabel(service.phase, t)}
+              </AnimatedBadge>
+            </div>
+          ))
+        ) : (
+          <p className="lumen-empty-copy">
+            {control.connected
+              ? t("lumen.servicesPending", "Service states will appear after model construction.")
+              : t("lumen.servicesOffline", "No service state is available while Hub is stopped.")}
+          </p>
+        )}
       </div>
     </SettingsSection>
   );
 }
 
-function LumenLogViewer({ logs, connected, loading }: { logs: LumenLogEntry[]; connected: boolean; loading: boolean }) {
+function LumenLogViewer({
+  logs,
+  connected,
+  loading,
+}: {
+  logs: LumenLogEntry[];
+  connected: boolean;
+  loading: boolean;
+}) {
   const { t } = useTranslation();
-  if (!connected) return <p className="lumen-empty-copy lumen-log-empty">{t("lumen.logsOffline", "Start Lumen Hub to read Control logs.")}</p>;
-  if (!logs.length && loading) return <p className="lumen-empty-copy lumen-log-empty">{t("lumen.logsLoading", "Reading Control logs…")}</p>;
-  if (!logs.length) return <p className="lumen-empty-copy lumen-log-empty">{t("lumen.logsEmpty", "No log entries match this level.")}</p>;
+  if (!connected)
+    return (
+      <p className="lumen-empty-copy lumen-log-empty">
+        {t("lumen.logsOffline", "Start Lumen Hub to read Control logs.")}
+      </p>
+    );
+  if (!logs.length && loading)
+    return (
+      <p className="lumen-empty-copy lumen-log-empty">
+        {t("lumen.logsLoading", "Reading Control logs…")}
+      </p>
+    );
+  if (!logs.length)
+    return (
+      <p className="lumen-empty-copy lumen-log-empty">
+        {t("lumen.logsEmpty", "No log entries match this level.")}
+      </p>
+    );
   return (
     <div className="lumen-log-view" role="log" aria-label={t("lumen.logs", "Control logs")}>
       {logs.map((entry, index) => (
-        <div className="lumen-log-line" key={`${entry.timeUnixMS}-${index}`} data-level={entry.level}>
+        <div
+          className="lumen-log-line"
+          key={`${entry.timeUnixMS}-${index}`}
+          data-level={entry.level}
+        >
           <time>{formatLogTime(entry.timeUnixMS)}</time>
           <span className="lumen-log-level">{entry.level}</span>
           <span className="lumen-log-target">{entry.target}</span>
-          <span className="lumen-log-message">{entry.message}{formatLogFields(entry.fields)}</span>
+          <span className="lumen-log-message">
+            {entry.message}
+            {formatLogFields(entry.fields)}
+          </span>
         </div>
       ))}
     </div>
@@ -1006,13 +1636,18 @@ function LumenLogViewer({ logs, connected, loading }: { logs: LumenLogEntry[]; c
 function controlPhaseStatus(phase: LumenControlPhase): AnimatedBadgeStatus {
   if (phase === LumenControlPhase.LumenControlReady) return "success";
   if (phase === LumenControlPhase.LumenControlFailed) return "danger";
-  if (phase === LumenControlPhase.LumenControlUnspecified || phase === LumenControlPhase.LumenControlStopping) return "neutral";
+  if (
+    phase === LumenControlPhase.LumenControlUnspecified ||
+    phase === LumenControlPhase.LumenControlStopping
+  )
+    return "neutral";
   return "warning";
 }
 
 function controlPhaseLabel(phase: LumenControlPhase, t: ReturnType<typeof useTranslation>["t"]) {
   if (phase === LumenControlPhase.LumenControlStarting) return t("lumen.phaseStarting", "Starting");
-  if (phase === LumenControlPhase.LumenControlDownloading) return t("lumen.phaseDownloading", "Downloading");
+  if (phase === LumenControlPhase.LumenControlDownloading)
+    return t("lumen.phaseDownloading", "Downloading");
   if (phase === LumenControlPhase.LumenControlLoading) return t("lumen.phaseLoading", "Loading");
   if (phase === LumenControlPhase.LumenControlWarmup) return t("lumen.phaseWarmup", "Warmup");
   if (phase === LumenControlPhase.LumenControlReady) return t("lumen.phaseReady", "Ready");
@@ -1022,7 +1657,14 @@ function controlPhaseLabel(phase: LumenControlPhase, t: ReturnType<typeof useTra
 }
 
 function serviceDisplayName(service: string) {
-  const names: Record<string, string> = { siglip: "SigLIP", face: "InsightFace", insightface: "InsightFace", ocr: "PP-OCR", ppocr: "PP-OCR", bioclip: "BioCLIP" };
+  const names: Record<string, string> = {
+    siglip: "SigLIP",
+    face: "InsightFace",
+    insightface: "InsightFace",
+    ocr: "PP-OCR",
+    ppocr: "PP-OCR",
+    bioclip: "BioCLIP",
+  };
   return names[service] || service;
 }
 
@@ -1035,7 +1677,12 @@ function formatBytes(bytes: number) {
 
 function formatLogTime(unixMS: number) {
   if (!unixMS) return "--:--:--";
-  return new Date(unixMS).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return new Date(unixMS).toLocaleTimeString([], {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function formatLogFields(fields: LumenLogEntry["fields"]) {
@@ -1054,20 +1701,24 @@ function UpdatesPanel({
 }) {
   const { t } = useTranslation();
   const update = snapshot.update;
-  const [state, setState] = useState<ButtonState>("idle");
+  const operation = useTrackedOperation(snapshot.operations, {
+    onFailed: (message) =>
+      showToast({ title: t("updates.actionFailed"), description: message, status: "error" }),
+  });
+  const state = operation.state;
 
   const invoke = async (action: "check" | "download" | "apply") => {
-    setState("loading");
+    operation.begin();
     const requestID = `update-${crypto.randomUUID()}`;
     try {
-      if (action === "check") await UpdateService.Check(requestID, update.version);
-      else if (action === "download") await UpdateService.Download(requestID, update.version);
-      else await UpdateService.RestartAndApply(requestID, update.version);
-      setState("success");
-      window.setTimeout(() => setState("idle"), 1200);
+      let receipt: OperationReceipt;
+      if (action === "check") receipt = await UpdateService.Check(requestID, update.version);
+      else if (action === "download")
+        receipt = await UpdateService.Download(requestID, update.version);
+      else receipt = await UpdateService.RestartAndApply(requestID, update.version);
+      operation.track(receipt);
     } catch (reason: unknown) {
-      setState("error");
-      showToast({ title: t("updates.actionFailed"), description: errorMessage(reason), status: "error" });
+      operation.reject(reason);
     }
   };
 
@@ -1075,8 +1726,13 @@ function UpdatesPanel({
     <>
       <PageHeading title={t("dock.updates")} description={t("updates.description")} />
       <SettingsSection title={t("dock.updates")}>
-        <SettingRow title={t("updates.currentVersion")} description={t("updates.currentVersionDescription")}>
-          <span className="setting-value tabular-value">{update.currentVersion || t("common.unknown")}</span>
+        <SettingRow
+          title={t("updates.currentVersion")}
+          description={t("updates.currentVersionDescription")}
+        >
+          <span className="setting-value tabular-value">
+            {update.currentVersion || t("common.unknown")}
+          </span>
         </SettingRow>
         <SettingRow title={t("updates.channel")} description={t("updates.channelDescription")}>
           {draft.preferences ? (
@@ -1086,17 +1742,23 @@ function UpdatesPanel({
               disabled={draft.phase === "saving"}
               className="compact-select"
             >
-              <SelectTrigger><SelectValue placeholder={t("updates.channel")} /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder={t("updates.channel")} />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="stable">{t("updates.stable")}</SelectItem>
                 <SelectItem value="beta">{t("updates.beta")}</SelectItem>
               </SelectContent>
             </Select>
-          ) : <span className="setting-value">{t("common.loadingEllipsis")}</span>}
+          ) : (
+            <span className="setting-value">{t("common.loadingEllipsis")}</span>
+          )}
         </SettingRow>
         <SettingRow
           title={t("updates.checkTitle")}
-          description={update.providerAvailable ? t("updates.checkDescription") : t("updates.noProvider")}
+          description={
+            update.providerAvailable ? t("updates.checkDescription") : t("updates.noProvider")
+          }
         >
           <StatefulButton
             variant="secondary"
@@ -1112,10 +1774,28 @@ function UpdatesPanel({
           </StatefulButton>
         </SettingRow>
         {update.availableVersion ? (
-          <SettingRow title={t("updates.available")} description={t("updates.availableDescription", { version: update.availableVersion })}>
+          <SettingRow
+            title={t("updates.available")}
+            description={t("updates.availableDescription", { version: update.availableVersion })}
+          >
             <RowActions>
-              <Button variant="secondary" size="sm" disabled={state === "loading"} onClick={() => void invoke("download")}>{t("updates.download")}</Button>
-              {update.canApply ? <Button size="sm" disabled={state === "loading"} onClick={() => void invoke("apply")}>{t("updates.restartInstall")}</Button> : null}
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={state === "loading"}
+                onClick={() => void invoke("download")}
+              >
+                {t("updates.download")}
+              </Button>
+              {update.canApply ? (
+                <Button
+                  size="sm"
+                  disabled={state === "loading"}
+                  onClick={() => void invoke("apply")}
+                >
+                  {t("updates.restartInstall")}
+                </Button>
+              ) : null}
             </RowActions>
           </SettingRow>
         ) : null}
@@ -1143,8 +1823,15 @@ function LanguageSelect({
 }) {
   const { t } = useTranslation();
   return (
-    <Select value={preferences.locale} onValueChange={(value) => update("locale", value)} disabled={disabled} className="compact-select">
-      <SelectTrigger><SelectValue placeholder={t("general.language")} /></SelectTrigger>
+    <Select
+      value={preferences.locale}
+      onValueChange={(value) => update("locale", value)}
+      disabled={disabled}
+      className="compact-select"
+    >
+      <SelectTrigger>
+        <SelectValue placeholder={t("general.language")} />
+      </SelectTrigger>
       <SelectContent>
         <SelectItem value="en">English</SelectItem>
         <SelectItem value="zh-CN">简体中文</SelectItem>
@@ -1164,7 +1851,11 @@ function ThemeStatusControl({
 }) {
   const { t } = useTranslation();
   const system = !preferences.theme || preferences.theme === "system";
-  const currentLabel = system ? t("general.themeSystem") : preferences.theme === "dark" ? t("general.themeDark") : t("general.themeLight");
+  const currentLabel = system
+    ? t("general.themeSystem")
+    : preferences.theme === "dark"
+      ? t("general.themeDark")
+      : t("general.themeLight");
   return (
     <div className="flex items-center justify-end gap-2">
       <span className="setting-value">{currentLabel}</span>
@@ -1193,8 +1884,15 @@ function RegionSelect({
 }) {
   const { t } = useTranslation();
   return (
-    <Select value={preferences.region} onValueChange={(value) => update("region", value)} disabled={disabled} className="compact-select">
-      <SelectTrigger><SelectValue placeholder={t("general.region")} /></SelectTrigger>
+    <Select
+      value={preferences.region}
+      onValueChange={(value) => update("region", value)}
+      disabled={disabled}
+      className="compact-select"
+    >
+      <SelectTrigger>
+        <SelectValue placeholder={t("general.region")} />
+      </SelectTrigger>
       <SelectContent>
         <SelectItem value="global">{t("region.global")}</SelectItem>
         <SelectItem value="china">{t("region.china")}</SelectItem>
@@ -1214,8 +1912,15 @@ function NetworkSelect({
 }) {
   const { t } = useTranslation();
   return (
-    <Select value={settings.networkMode} onValueChange={(value) => update("networkMode", value)} disabled={disabled} className="compact-select">
-      <SelectTrigger><SelectValue placeholder={t("network.access")} /></SelectTrigger>
+    <Select
+      value={settings.networkMode}
+      onValueChange={(value) => update("networkMode", value)}
+      disabled={disabled}
+      className="compact-select"
+    >
+      <SelectTrigger>
+        <SelectValue placeholder={t("network.access")} />
+      </SelectTrigger>
       <SelectContent>
         <SelectItem value="local">{t("network.local")}</SelectItem>
         <SelectItem value="lan">{t("network.lan")}</SelectItem>
@@ -1242,7 +1947,11 @@ function ActionNotice({
         <strong>{t("actionNotice.needsAttention", { component })}</strong>
         <span>{message}</span>
       </div>
-      {actionLabel && onAction ? <Button variant="secondary" size="sm" onClick={onAction}>{actionLabel}</Button> : null}
+      {actionLabel && onAction ? (
+        <Button variant="secondary" size="sm" onClick={onAction}>
+          {actionLabel}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -1267,27 +1976,45 @@ function RecoveryPage({
   navigate: (route: string) => void;
 }) {
   const { t } = useTranslation();
-  const [state, setState] = useState<ButtonState>("idle");
+  const operation = useTrackedOperation(snapshot.operations, {
+    onSucceeded: () => navigate("/server"),
+    onFailed: (message) =>
+      showToast({ title: t("recovery.failed"), description: message, status: "error" }),
+  });
+  const state = operation.state;
   const restore = async () => {
-    setState("loading");
+    operation.begin();
     try {
-      await RuntimeService.RestoreLastKnownGood(`recovery-${crypto.randomUUID()}`, snapshot.runtime.version);
-      setState("success");
-      navigate("/server");
+      const receipt = await RuntimeService.RestoreLastKnownGood(
+        `recovery-${crypto.randomUUID()}`,
+        snapshot.runtime.version,
+      );
+      operation.track(receipt);
     } catch (reason: unknown) {
-      setState("error");
-      showToast({ title: t("recovery.failed"), description: errorMessage(reason), status: "error" });
+      operation.reject(reason);
     }
   };
   return (
     <div className="recovery-page">
-      <div className="recovery-icon"><RotateCcw className="size-5" /></div>
-      <PageHeading title={t("recovery.title")} description={snapshot.host.recovery?.message || t("recovery.description")} />
+      <div className="recovery-icon">
+        <RotateCcw className="size-5" />
+      </div>
+      <PageHeading
+        title={t("recovery.title")}
+        description={snapshot.host.recovery?.message || t("recovery.description")}
+      />
       <div className="recovery-actions">
-        <StatefulButton state={state} loadingText={t("recovery.restoring")} successText={t("recovery.restored")} onClick={() => void restore()}>
+        <StatefulButton
+          state={state}
+          loadingText={t("recovery.restoring")}
+          successText={t("recovery.restored")}
+          onClick={() => void restore()}
+        >
           {t("recovery.restore")}
         </StatefulButton>
-        <Button variant="secondary" onClick={() => navigate("/server")}>{t("recovery.reviewSettings")}</Button>
+        <Button variant="secondary" onClick={() => navigate("/server")}>
+          {t("recovery.reviewSettings")}
+        </Button>
       </div>
     </div>
   );
@@ -1297,7 +2024,9 @@ function RecoveryFallback({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
     <main className="boot-screen recovery-fallback dark">
-      <div className="recovery-icon"><RotateCcw className="size-5" /></div>
+      <div className="recovery-icon">
+        <RotateCcw className="size-5" />
+      </div>
       <h1>{t("recovery.fallbackTitle")}</h1>
       <p>{message}</p>
       <Button onClick={() => window.location.reload()}>{t("recovery.tryAgain")}</Button>
@@ -1314,6 +2043,68 @@ function presentationStatus(presentation: ProcessPresentation): AnimatedBadgeSta
   if (presentation.color === "yellow") return "warning";
   if (presentation.color === "red") return "danger";
   return "neutral";
+}
+
+function hostActionLabel(kind: string, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (kind === "authorize_storage_location") {
+    return t("storage.hostActionAddLocation", "Add Storage Location");
+  }
+  if (kind === "open_repository") {
+    return t("storage.hostActionOpenRepository", "Open Existing Repository");
+  }
+  if (kind === "locate_storage_location") {
+    return t("storage.hostActionLocateLocation", "Locate Storage Location");
+  }
+  if (kind === "locate_repository") {
+    return t("storage.hostActionLocateRepository", "Locate Repository");
+  }
+  return t("storage.hostAction", "Storage request");
+}
+
+function hostActionRiskLabel(
+  warning: string,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  if (warning === "network_filesystem") return t("storage.riskNetwork", "Network filesystem");
+  if (warning === "removable_storage") return t("storage.riskRemovable", "Removable storage");
+  if (warning === "cloud_sync_directory")
+    return t("storage.riskCloudSync", "Cloud-sync managed folder");
+  if (warning === "mount_fingerprint_changed")
+    return t("storage.riskMountChanged", "Mounted filesystem changed");
+  if (warning === "unavailable_cloud_placeholder")
+    return t("storage.riskPlaceholder", "Files must be downloaded first");
+  return warning;
+}
+
+function storageLocationDescription(
+  item: StorageShortcut,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  const details = [item.path || item.status];
+  details.push(
+    item.writable ? t("storage.writable", "Writable") : t("storage.readOnly", "Read-only"),
+  );
+  if (item.capacityKnown) {
+    details.push(
+      t("storage.capacityAvailable", "{{available}} of {{total}} available", {
+        available: formatStorageBytes(item.availableBytes ?? 0),
+        total: formatStorageBytes(item.totalBytes ?? 0),
+      }),
+    );
+  } else {
+    details.push(t("storage.capacityUnknown", "Capacity unavailable"));
+  }
+  details.push(
+    t("storage.repositoryCount", "{{count}} repositories", { count: item.repositoryCount }),
+  );
+  return details.join(" · ");
+}
+
+function formatStorageBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** unit).toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
 function normalizeRoute(route: string): MainRoute {

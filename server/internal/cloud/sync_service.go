@@ -3,10 +3,10 @@ package cloud
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -15,9 +15,11 @@ import (
 	"go.uber.org/zap"
 
 	"server/internal/cloud/icloud"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/secretbox"
 	"server/internal/sourcing"
+	"server/internal/storage"
 )
 
 const (
@@ -25,6 +27,7 @@ const (
 	CredentialStatusPendingChallenge = "pending_challenge"
 	CredentialStatusDisabled         = "disabled"
 	CredentialStatusError            = "error"
+	CredentialStatusRemoved          = "removed"
 
 	ImportRunStatusQueued      = "queued"
 	ImportRunStatusRunning     = "running"
@@ -67,19 +70,31 @@ type VerifyCredentialChallengeInput struct {
 
 // StartRepositoryImportInput identifies a repository import request.
 type StartRepositoryImportInput struct {
-	RepositoryID uuid.UUID
-	Access       CredentialAccess
+	RepositoryID  uuid.UUID
+	CredentialID  uuid.UUID
+	ResumeOfRunID *string
+	Access        CredentialAccess
 }
 
 // BindRepositoryCredentialInput binds a repo to a credential and starts import.
 type BindRepositoryCredentialInput struct {
 	RepositoryID uuid.UUID
 	CredentialID uuid.UUID
+	RemoteScope  map[string]string
 	Access       CredentialAccess
+}
+
+// RepositoryCloudSource describes one independently resumable source bound to
+// a repository. Multiple credentials from the same provider remain distinct.
+type RepositoryCloudSource struct {
+	Binding    repo.RepositoryCloudBinding
+	Credential repo.CloudCredential
+	LatestRun  *repo.CloudImportRun
 }
 
 // RepositoryCloudStatus describes a repository's cloud binding and latest run.
 type RepositoryCloudStatus struct {
+	Sources    []RepositoryCloudSource
 	Binding    *repo.RepositoryCloudBinding
 	Credential *repo.CloudCredential
 	LatestRun  *repo.CloudImportRun
@@ -98,6 +113,8 @@ type CloudSyncService interface {
 	StartRepositoryImport(ctx context.Context, input StartRepositoryImportInput) (uuid.UUID, error)
 	GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID, access CredentialAccess) (RepositoryCloudStatus, error)
 	GetImportRun(ctx context.Context, runID uuid.UUID, access CredentialAccess) (repo.CloudImportRun, error)
+	CancelImportRun(ctx context.Context, runID uuid.UUID, access CredentialAccess) (repo.CloudImportRun, error)
+	ResumeImportRun(ctx context.Context, runID uuid.UUID, access CredentialAccess) (uuid.UUID, error)
 	RecoverInterruptedRuns(ctx context.Context) error
 	ProviderTitle(provider ProviderKind) string
 }
@@ -126,14 +143,17 @@ type activeImport struct {
 	repoID       uuid.UUID
 	credentialID uuid.UUID
 	cancel       context.CancelFunc
+	done         chan struct{}
 }
 
 type cloudSyncService struct {
-	queries      *repo.Queries
-	materializer *sourcing.SourceMaterializer
-	logger       *zap.Logger
-	registry     *ProviderRegistry
-	secretBox    *secretbox.Box
+	queries       *repo.Queries
+	materializer  *sourcing.SourceMaterializer
+	staging       storage.StagingManager
+	logger        *zap.Logger
+	registry      *ProviderRegistry
+	secretBox     *secretbox.Box
+	capacityGuard RepositoryCapacityGuard
 
 	mu            sync.Mutex
 	pendingAuth   map[uuid.UUID]pendingCredentialAuth
@@ -144,6 +164,8 @@ type cloudSyncService struct {
 func NewCloudSyncService(
 	queries *repo.Queries,
 	materializer *sourcing.SourceMaterializer,
+	staging storage.StagingManager,
+	capacityGuard RepositoryCapacityGuard,
 	secretKeyPath string,
 	cloudStateDir string,
 	logger *zap.Logger,
@@ -159,9 +181,11 @@ func NewCloudSyncService(
 	return &cloudSyncService{
 		queries:       queries,
 		materializer:  materializer,
+		staging:       staging,
 		logger:        scopedLogger,
 		registry:      NewDefaultProviderRegistry(cloudStateDir),
 		secretBox:     box,
+		capacityGuard: capacityGuard,
 		pendingAuth:   make(map[uuid.UUID]pendingCredentialAuth),
 		activeImports: make(map[uuid.UUID]*activeImport),
 	}
@@ -170,7 +194,17 @@ func NewCloudSyncService(
 // RecoverInterruptedRuns flags any import run left in queued/running (e.g. by a
 // crash or restart) as interrupted.
 func (s *cloudSyncService) RecoverInterruptedRuns(ctx context.Context) error {
-	return s.queries.MarkStaleCloudImportRunsInterrupted(ctx)
+	if err := s.queries.FinalizeStaleCloudImportCancellations(ctx); err != nil {
+		return err
+	}
+	if err := s.queries.MarkStaleCloudImportRunsInterrupted(ctx); err != nil {
+		return err
+	}
+	_, err := s.queries.ResetRepositoriesByActivity(ctx, repo.ResetRepositoriesByActivityParams{
+		Activity:  dbtypes.RepositoryActivityImporting,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	})
+	return err
 }
 
 func (s *cloudSyncService) ListProviders(ctx context.Context) ([]ProviderDescriptor, error) {
@@ -407,8 +441,11 @@ func (s *cloudSyncService) RemoveCredential(ctx context.Context, credentialID uu
 		s.logger.Warn("failed to disable bindings on credential removal", zap.Error(err))
 	}
 
-	if err := s.queries.DeleteCloudCredential(ctx, credentialID); err != nil {
-		return fmt.Errorf("delete credential: %w", err)
+	// Import receipts and source history retain a foreign key to the credential.
+	// Retire secrets and identity in place rather than destroying that durable
+	// provenance or making cancellation race a DELETE RESTRICT failure.
+	if _, err := s.queries.RetireCloudCredential(ctx, credentialID); err != nil {
+		return fmt.Errorf("retire credential: %w", err)
 	}
 
 	if dir := stringPtrValue(credential.ArtifactDir); dir != "" {
@@ -444,23 +481,47 @@ func (s *cloudSyncService) BindRepositoryCredentialAndStartImport(ctx context.Co
 		return uuid.Nil, err
 	}
 
+	remoteScope, err := marshalRemoteScope(input.RemoteScope)
+	if err != nil {
+		return uuid.Nil, err
+	}
 	if _, err := s.queries.UpsertRepositoryCloudBinding(ctx, repo.UpsertRepositoryCloudBindingParams{
 		RepositoryID: input.RepositoryID,
 		CredentialID: input.CredentialID,
 		Provider:     credential.Provider,
 		OwnerID:      credential.OwnerID,
+		RemoteScope:  remoteScope,
+	}); err != nil {
+		return uuid.Nil, err
+	}
+	// Binding is the explicit scope-change boundary. Restart provider paging so
+	// a newly selected scope cannot inherit a cursor from a different album.
+	if err := s.queries.DeleteCloudSyncCursorForSource(ctx, repo.DeleteCloudSyncCursorForSourceParams{
+		RepositoryID: input.RepositoryID,
+		CredentialID: input.CredentialID,
+		Provider:     credential.Provider,
 	}); err != nil {
 		return uuid.Nil, err
 	}
 
 	return s.StartRepositoryImport(ctx, StartRepositoryImportInput{
 		RepositoryID: input.RepositoryID,
+		CredentialID: input.CredentialID,
 		Access:       input.Access,
 	})
 }
 
 func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input StartRepositoryImportInput) (uuid.UUID, error) {
-	binding, err := s.queries.GetActiveRepositoryCloudBinding(ctx, input.RepositoryID)
+	var binding repo.RepositoryCloudBinding
+	var err error
+	if input.CredentialID != uuid.Nil {
+		binding, err = s.queries.GetActiveRepositoryCloudBindingByCredential(ctx, repo.GetActiveRepositoryCloudBindingByCredentialParams{
+			RepositoryID: input.RepositoryID,
+			CredentialID: input.CredentialID,
+		})
+	} else {
+		binding, err = s.queries.GetActiveRepositoryCloudBinding(ctx, input.RepositoryID)
+	}
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -490,17 +551,35 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 			return uuid.Nil, fmt.Errorf("an import is already running for this repository")
 		}
 	}
-	entry := &activeImport{repoID: input.RepositoryID, credentialID: binding.CredentialID}
+	entry := &activeImport{repoID: input.RepositoryID, credentialID: binding.CredentialID, done: make(chan struct{})}
 	s.activeImports[runID] = entry
 	s.mu.Unlock()
 
+	if _, err := s.queries.BeginRepositoryActivity(ctx, repo.BeginRepositoryActivityParams{
+		RepoID: input.RepositoryID, Activity: dbtypes.RepositoryActivityImporting,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		s.finishActiveImport(runID)
+		return uuid.Nil, fmt.Errorf("repository is unavailable or busy: %w", err)
+	}
+	releaseActivity := true
+	defer func() {
+		if releaseActivity {
+			_, _ = s.queries.FinishRepositoryActivity(context.Background(), repo.FinishRepositoryActivityParams{
+				RepoID: input.RepositoryID, Activity: dbtypes.RepositoryActivityImporting,
+				UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+			})
+		}
+	}()
+
 	run, err := s.queries.CreateCloudImportRun(ctx, repo.CreateCloudImportRunParams{
-		RunID:        runID,
-		RepositoryID: input.RepositoryID,
-		CredentialID: binding.CredentialID,
-		Provider:     credential.Provider,
-		Status:       ImportRunStatusQueued,
-		OwnerID:      binding.OwnerID,
+		RunID:         runID,
+		RepositoryID:  input.RepositoryID,
+		CredentialID:  binding.CredentialID,
+		Provider:      credential.Provider,
+		Status:        ImportRunStatusQueued,
+		OwnerID:       binding.OwnerID,
+		ResumeOfRunID: input.ResumeOfRunID,
 	})
 	if err != nil {
 		s.finishActiveImport(runID)
@@ -508,7 +587,7 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 	}
 	if _, err := s.queries.UpdateRepositoryCloudBindingLastRun(ctx, repo.UpdateRepositoryCloudBindingLastRunParams{
 		RepositoryID:    input.RepositoryID,
-		Provider:        credential.Provider,
+		CredentialID:    binding.CredentialID,
 		LastImportRunID: uuid.NullUUID{UUID: run.RunID, Valid: true},
 	}); err != nil {
 		s.finishActiveImport(runID)
@@ -521,6 +600,7 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 	s.mu.Unlock()
 
 	go s.runImport(runCtx, run, credential, binding.OwnerID)
+	releaseActivity = false
 	return run.RunID, nil
 }
 
@@ -529,6 +609,7 @@ func (s *cloudSyncService) finishActiveImport(runID uuid.UUID) {
 	entry, ok := s.activeImports[runID]
 	if ok {
 		delete(s.activeImports, runID)
+		close(entry.done)
 	}
 	s.mu.Unlock()
 	if ok && entry.cancel != nil {
@@ -537,33 +618,36 @@ func (s *cloudSyncService) finishActiveImport(runID uuid.UUID) {
 }
 
 func (s *cloudSyncService) GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID, access CredentialAccess) (RepositoryCloudStatus, error) {
-	binding, err := s.queries.GetActiveRepositoryCloudBinding(ctx, repositoryID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return RepositoryCloudStatus{}, nil
-		}
-		return RepositoryCloudStatus{}, err
-	}
-	if !access.IsAdmin && binding.OwnerID != access.UserID {
-		return RepositoryCloudStatus{}, ErrCredentialAccessDenied
-	}
-
-	credential, err := s.queries.GetCloudCredential(ctx, binding.CredentialID)
+	bindings, err := s.queries.ListRepositoryCloudBindings(ctx, repositoryID)
 	if err != nil {
 		return RepositoryCloudStatus{}, err
 	}
-
-	status := RepositoryCloudStatus{
-		Binding:    &binding,
-		Credential: &credential,
-	}
-	if binding.LastImportRunID.Valid {
-		run, err := s.queries.GetCloudImportRun(ctx, binding.LastImportRunID.UUID)
-		if err == nil {
-			status.LatestRun = &run
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return RepositoryCloudStatus{}, err
+	status := RepositoryCloudStatus{Sources: make([]RepositoryCloudSource, 0, len(bindings))}
+	for i := range bindings {
+		binding := bindings[i]
+		if !access.IsAdmin && binding.OwnerID != access.UserID {
+			continue
 		}
+		credential, credentialErr := s.queries.GetCloudCredential(ctx, binding.CredentialID)
+		if credentialErr != nil {
+			return RepositoryCloudStatus{}, credentialErr
+		}
+		source := RepositoryCloudSource{Binding: binding, Credential: credential}
+		if binding.LastImportRunID.Valid {
+			run, runErr := s.queries.GetCloudImportRun(ctx, binding.LastImportRunID.UUID)
+			if runErr == nil {
+				source.LatestRun = &run
+			} else if !errors.Is(runErr, sql.ErrNoRows) {
+				return RepositoryCloudStatus{}, runErr
+			}
+		}
+		status.Sources = append(status.Sources, source)
+	}
+	if len(status.Sources) > 0 {
+		first := &status.Sources[0]
+		status.Binding = &first.Binding
+		status.Credential = &first.Credential
+		status.LatestRun = first.LatestRun
 	}
 	return status, nil
 }
@@ -579,6 +663,90 @@ func (s *cloudSyncService) GetImportRun(ctx context.Context, runID uuid.UUID, ac
 	return run, nil
 }
 
+func (s *cloudSyncService) CancelImportRun(ctx context.Context, runID uuid.UUID, access CredentialAccess) (repo.CloudImportRun, error) {
+	run, err := s.GetImportRun(ctx, runID, access)
+	if err != nil {
+		return repo.CloudImportRun{}, err
+	}
+	if run.Status == "cancelled" {
+		return run, nil
+	}
+	if run.Status != ImportRunStatusQueued && run.Status != ImportRunStatusRunning && run.Status != "cancelling" {
+		return repo.CloudImportRun{}, fmt.Errorf("cloud import run is not cancellable")
+	}
+	if run.Status != "cancelling" {
+		run, err = s.queries.BeginCloudImportCancellation(ctx, runID)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return repo.CloudImportRun{}, err
+			}
+			run, err = s.GetImportRun(ctx, runID, access)
+			if err != nil {
+				return repo.CloudImportRun{}, err
+			}
+			if run.Status == "cancelled" {
+				return run, nil
+			}
+			if run.Status != "cancelling" {
+				return repo.CloudImportRun{}, fmt.Errorf("cloud import run is not cancellable")
+			}
+		}
+	}
+	s.mu.Lock()
+	active := s.activeImports[runID]
+	s.mu.Unlock()
+	if active != nil && active.cancel != nil {
+		active.cancel()
+	}
+	if active != nil {
+		select {
+		case <-active.done:
+		case <-ctx.Done():
+			return run, fmt.Errorf("cloud import cancellation is still draining: %w", ctx.Err())
+		}
+	}
+	cancelled, err := s.queries.FinalizeCloudImportCancellation(ctx, runID)
+	if errors.Is(err, sql.ErrNoRows) {
+		current, readErr := s.GetImportRun(ctx, runID, access)
+		if readErr == nil && current.Status == "cancelled" {
+			return current, nil
+		}
+	}
+	return cancelled, err
+}
+
+func (s *cloudSyncService) ResumeImportRun(ctx context.Context, runID uuid.UUID, access CredentialAccess) (uuid.UUID, error) {
+	previous, err := s.GetImportRun(ctx, runID, access)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	switch previous.Status {
+	case ImportRunStatusInterrupted, ImportRunStatusFailed, "cancelled":
+	default:
+		return uuid.Nil, fmt.Errorf("cloud import run is not resumable")
+	}
+	// A durable terminal receipt can be visible just before the previous worker
+	// releases its RepositoryFS/activity lease. Never race the resumed run across
+	// that cleanup boundary.
+	s.mu.Lock()
+	active := s.activeImports[runID]
+	s.mu.Unlock()
+	if active != nil {
+		select {
+		case <-active.done:
+		case <-ctx.Done():
+			return uuid.Nil, fmt.Errorf("previous cloud import is still draining: %w", ctx.Err())
+		}
+	}
+	resumeOf := previous.RunID.String()
+	return s.StartRepositoryImport(ctx, StartRepositoryImportInput{
+		RepositoryID:  previous.RepositoryID,
+		CredentialID:  previous.CredentialID,
+		ResumeOfRunID: &resumeOf,
+		Access:        access,
+	})
+}
+
 func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRun, credential repo.CloudCredential, ownerID int32) {
 	runID := run.RunID
 	repositoryID := run.RepositoryID
@@ -586,6 +754,14 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 	defer s.finishActiveImport(runID)
 
 	bookkeeping := context.Background()
+	defer func() {
+		if _, err := s.queries.FinishRepositoryActivity(bookkeeping, repo.FinishRepositoryActivityParams{
+			RepoID: repositoryID, Activity: dbtypes.RepositoryActivityImporting,
+			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		}); err != nil {
+			s.logger.Error("failed to clear repository importing activity", zap.String("repository_id", repositoryID.String()), zap.Error(err))
+		}
+	}()
 	if _, err := s.queries.MarkCloudImportRunStarted(bookkeeping, runID); err != nil {
 		s.logger.Error("failed to mark cloud import started", zap.String("run_id", runID.String()), zap.Error(err))
 		return
@@ -601,7 +777,7 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 			RunID:  runID,
 			Status: status,
 			Error:  errorText,
-		}); finishErr != nil {
+		}); finishErr != nil && !errors.Is(finishErr, sql.ErrNoRows) {
 			s.logger.Error("failed to finish cloud import run", zap.String("run_id", runID.String()), zap.Error(finishErr))
 		}
 	}
@@ -677,17 +853,24 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 		finish(ImportRunStatusFailed, fmt.Errorf("get repository: %w", err))
 		return
 	}
-	stagingDir := filepath.Join(repository.Path, ".lumilio", "staging", "incoming")
-
+	binding, err := s.queries.GetRepositoryCloudBindingByCredential(ctx, repo.GetRepositoryCloudBindingByCredentialParams{
+		RepositoryID: repositoryID,
+		CredentialID: credentialID,
+	})
+	if err != nil {
+		finish(ImportRunStatusFailed, fmt.Errorf("get cloud source binding: %w", err))
+		return
+	}
 	stateStore := NewSQLiteSyncStateStore(s.queries, credentialID)
 	source := NewCloudImportSource(CloudImportSourceConfig{
-		Provider:   provider,
-		State:      stateStore,
-		StagingDir: stagingDir,
-		RepoID:     repositoryID,
-		OwnerID:    &ownerID,
-		OnProgress: progress,
-		Logger:     s.logger,
+		Provider:      provider,
+		State:         stateStore,
+		Repository:    repository,
+		Staging:       s.staging,
+		OwnerID:       &ownerID,
+		OnProgress:    progress,
+		RemoteScope:   unmarshalRemoteScope(binding.RemoteScope),
+		CapacityGuard: s.capacityGuard,
 	})
 	consumer := NewCloudSyncConsumer(source, s.materializer, stateStore, progress, s.logger)
 
@@ -710,6 +893,28 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 	default:
 		finish(ImportRunStatusCompleted, nil)
 	}
+}
+
+func marshalRemoteScope(scope map[string]string) (dbtypes.JSON, error) {
+	if scope == nil {
+		scope = map[string]string{}
+	}
+	encoded, err := json.Marshal(scope)
+	if err != nil {
+		return nil, fmt.Errorf("encode cloud remote scope: %w", err)
+	}
+	return dbtypes.JSON(encoded), nil
+}
+
+func unmarshalRemoteScope(encoded dbtypes.JSON) map[string]string {
+	if len(encoded) == 0 {
+		return nil
+	}
+	var scope map[string]string
+	if err := json.Unmarshal(encoded, &scope); err != nil {
+		return nil
+	}
+	return scope
 }
 
 func (s *cloudSyncService) upsertCredentialForAuth(

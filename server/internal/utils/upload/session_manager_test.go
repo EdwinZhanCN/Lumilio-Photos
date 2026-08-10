@@ -1,61 +1,131 @@
 package upload
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"server/config"
+	"server/internal/db"
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
+	"server/internal/storage"
+	"server/internal/storage/repocfg"
+	"server/internal/storage/rootcfg"
+
 	"github.com/google/uuid"
 )
 
-func TestSessionManagerRestoresPersistedChunks(t *testing.T) {
-	repoPath := t.TempDir()
+func newPersistentSessionFixture(t *testing.T) (*db.DB, repo.Repository, *storage.RepositoryFSFactory, *storage.DefaultStagingManager) {
+	t.Helper()
+	ctx := context.Background()
+	catalogDirectory := t.TempDir()
+	if err := os.Chmod(catalogDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: filepath.Join(catalogDirectory, "catalog.sqlite3")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
+	if err := catalog.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	repositoryID := uuid.New()
+	repositoryPath := t.TempDir()
+	repositoryConfig := repocfg.NewRepositoryConfig("upload session")
+	repositoryConfig.ID = repositoryID.String()
+	if err := repositoryConfig.SaveConfigToFile(repositoryPath); err != nil {
+		t.Fatal(err)
+	}
+	now := dbtypes.NewTimestamp(time.Now().UTC())
+	rootID := uuid.New()
+	rootConfig := rootcfg.New("upload root")
+	rootConfig.ID = rootID.String()
+	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
+		RootID: rootID, Name: "upload root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
+		RepoID: repositoryID, Name: "upload session", Path: repositoryPath, Config: *repositoryConfig,
+		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
+		CreatedAt: now, UpdatedAt: now, RootID: rootID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := storage.NewRepositoryFSFactory(nil, catalog.Queries)
+	return catalog, repository, files, storage.NewStagingManager(files)
+}
+
+func TestSessionManagerTracksPrivateChunks(t *testing.T) {
+	manager := NewSessionManager(time.Hour, nil, nil)
 	sessionID := uuid.NewString()
-	chunkPath := filepath.Join(repoPath, ".lumilio", "staging", "incoming", "chunk-0")
-	if err := os.MkdirAll(filepath.Dir(chunkPath), 0o700); err != nil {
-		t.Fatal(err)
+	manager.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", uuid.NewString(), "user")
+	if !manager.UpdateSessionChunk(sessionID, 0, 5, ".lumilio/staging/incoming/chunk-0") {
+		t.Fatal("failed to record private chunk")
 	}
-	if err := os.WriteFile(chunkPath, []byte("chunk"), 0o600); err != nil {
-		t.Fatal(err)
+	if manager.UpdateSessionChunk(sessionID, 1, 5, "/tmp/chunk-1") {
+		t.Fatal("accepted absolute chunk path")
 	}
-
-	first := NewSessionManager(time.Hour)
-	first.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repoPath, "user")
-	if !first.UpdateSessionChunk(sessionID, 0, 5, chunkPath) {
-		t.Fatal("failed to persist chunk")
-	}
-
-	restarted := NewSessionManager(time.Hour)
-	session := restarted.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repoPath, "user")
-	if len(session.ReceivedChunks) != 1 || session.ReceivedChunks[0] != 0 {
-		t.Fatalf("unexpected restored chunks: %v", session.ReceivedChunks)
-	}
-	if session.BytesReceived != 5 || session.ChunkFiles[0] != chunkPath {
-		t.Fatalf("unexpected restored session: %#v", session)
+	session, ok := manager.GetSession(sessionID)
+	if !ok || len(session.ReceivedChunks) != 1 || session.BytesReceived != 5 {
+		t.Fatalf("unexpected session: %#v", session)
 	}
 }
 
-func TestSessionManagerDropsMissingPersistedChunk(t *testing.T) {
-	repoPath := t.TempDir()
-	sessionID := uuid.NewString()
-	chunkPath := filepath.Join(repoPath, ".lumilio", "staging", "incoming", "chunk-0")
-	if err := os.MkdirAll(filepath.Dir(chunkPath), 0o700); err != nil {
+func TestSessionManagerProgressAndExpiry(t *testing.T) {
+	manager := NewSessionManager(time.Nanosecond, nil, nil)
+	session := manager.CreateSession("", "photo.jpg", 5, 1, "image/jpeg", uuid.NewString(), "user")
+	if progress, ok := manager.GetSessionProgress(session.SessionID); !ok || progress != 0 {
+		t.Fatalf("progress = %v/%v", progress, ok)
+	}
+	time.Sleep(time.Millisecond)
+	if removed := manager.CleanupExpiredSessions(); removed != 1 {
+		t.Fatalf("removed = %d", removed)
+	}
+}
+
+func TestSessionManagerRestoresOnlyExistingPrivateChunks(t *testing.T) {
+	catalog, repository, files, staging := newPersistentSessionFixture(t)
+	chunk, opened, err := staging.CreateStagingFile(repository, "chunk-0")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(chunkPath, []byte("chunk"), 0o600); err != nil {
+	if _, err := opened.WriteString("chunk"); err != nil {
 		t.Fatal(err)
 	}
-	manager := NewSessionManager(time.Hour)
-	manager.CreateSession(sessionID, "photo.jpg", 5, 1, "image/jpeg", repoPath, "user")
-	manager.UpdateSessionChunk(sessionID, 0, 5, chunkPath)
-	if err := os.Remove(chunkPath); err != nil {
+	if err := opened.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	restarted := NewSessionManager(time.Hour)
-	session := restarted.CreateSession(sessionID, "photo.jpg", 5, 1, "image/jpeg", repoPath, "user")
-	if len(session.ReceivedChunks) != 0 || session.BytesReceived != 0 {
-		t.Fatalf("missing chunk was restored: %#v", session)
+	sessionID := uuid.NewString()
+	first := NewSessionManager(time.Hour, catalog.Queries, files)
+	first.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
+	if !first.UpdateSessionChunk(sessionID, 0, 5, chunk.PrivatePath) {
+		t.Fatal("persist chunk")
+	}
+
+	restarted := NewSessionManager(time.Hour, catalog.Queries, files)
+	restored := restarted.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
+	if len(restored.ReceivedChunks) != 1 || restored.ReceivedChunks[0] != 0 || restored.BytesReceived != 5 || restored.ChunkFiles[0] != chunk.PrivatePath {
+		t.Fatalf("restored session = %#v", restored)
+	}
+
+	if err := staging.RemoveStagingFile(repository, chunk); err != nil {
+		t.Fatal(err)
+	}
+	restarted = NewSessionManager(time.Hour, catalog.Queries, files)
+	restored = restarted.CreateSession(sessionID, "photo.jpg", 10, 2, "image/jpeg", repository.RepoID.String(), "user")
+	if len(restored.ReceivedChunks) != 0 || restored.BytesReceived != 0 {
+		t.Fatalf("missing chunk was restored: %#v", restored)
 	}
 }

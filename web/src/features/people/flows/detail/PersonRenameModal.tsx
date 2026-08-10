@@ -217,7 +217,7 @@ export function PersonRenameModal({
                 <p className="text-xs leading-5 text-base-content/65">
                   {t(
                     "people.merge.description",
-                    "The selected people will be merged into {{name}}. Their photos stay in the library and people filters may change.",
+                    "The selected people will be merged into {{name}}. Their photos stay in their Repositories and people filters may change.",
                     { name: person?.name || t("people.unnamed", "Unnamed") },
                   )}
                 </p>

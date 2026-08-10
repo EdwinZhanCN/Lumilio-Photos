@@ -8,7 +8,10 @@
 // can share these types without an import cycle. It depends on nothing internal.
 package settings
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // LLM holds the effective LLM settings, including the plaintext API key needed
 // to construct a chat model. The API surface never exposes the key directly;
@@ -21,24 +24,50 @@ type LLM struct {
 	BaseURL      string
 }
 
-func (c LLM) EffectiveProvider() string {
-	provider := strings.ToLower(strings.TrimSpace(c.Provider))
-	if provider == "" {
-		return "ark"
+func NormalizeLLMProvider(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+func IsSupportedLLMProvider(provider string) bool {
+	switch NormalizeLLMProvider(provider) {
+	case "ark", "openai", "deepseek", "ollama":
+		return true
+	default:
+		return false
 	}
-	return provider
+}
+
+func (c LLM) EffectiveProvider() string {
+	return NormalizeLLMProvider(c.Provider)
+}
+
+func (c LLM) ValidateConfiguration() error {
+	provider := c.EffectiveProvider()
+	if !IsSupportedLLMProvider(provider) {
+		if provider == "" {
+			return fmt.Errorf("llm provider is required")
+		}
+		return fmt.Errorf("unsupported llm provider %q", provider)
+	}
+	if strings.TrimSpace(c.ModelName) == "" {
+		return fmt.Errorf("llm model name is required")
+	}
+	if provider == "ollama" || provider == "deepseek" {
+		if strings.TrimSpace(c.BaseURL) == "" {
+			return fmt.Errorf("%s base URL is required", provider)
+		}
+		if provider == "ollama" {
+			return nil
+		}
+	}
+	if strings.TrimSpace(c.APIKey) == "" {
+		return fmt.Errorf("llm API key is required for provider %q", provider)
+	}
+	return nil
 }
 
 func (c LLM) IsConfigured() bool {
-	if strings.TrimSpace(c.ModelName) == "" {
-		return false
-	}
-	switch c.EffectiveProvider() {
-	case "ollama":
-		return strings.TrimSpace(c.BaseURL) != ""
-	default:
-		return strings.TrimSpace(c.APIKey) != ""
-	}
+	return c.ValidateConfiguration() == nil
 }
 
 // ML holds the runtime ML task toggles and video-semantic sampling knobs.

@@ -18,7 +18,12 @@ flowchart TD
 
 [EventsIndexFlow](./flows/index/EventsIndexFlow.tsx) presents stable Event summaries and cursor paging.
 [EventDetailFlow](./flows/detail/EventDetailFlow.tsx) composes the public Assets browser with an
-owner-scoped `event_id` constraint.
+owner-scoped `event_id` constraint. [EventHero](./flows/detail/components/EventHero.tsx) owns the collection
+presentation and entry points into focused edit, share, and add-media
+dialogs. [EventEditModal](./flows/detail/components/EventEditModal.tsx) keeps metadata and merge correction together,
+using [EventPicker](./flows/detail/components/EventPicker.tsx) instead of exposing internal Event IDs.
+[useEventBulkActions](./flows/detail/useEventBulkActions.tsx) owns selection-derived cover, split, move,
+remove, and snapshot-share workflows outside the route component.
 
 ## Data
 

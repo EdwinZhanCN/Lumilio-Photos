@@ -171,6 +171,7 @@ type AgentControllerInterface interface {
 	Chat(c *gin.Context)            // POST /agent/chat - Chat with agent via SSE
 	ResumeChat(c *gin.Context)      // POST /agent/chat/resume - Resume an interrupted agent execution
 	CancelChat(c *gin.Context)      // POST /agent/chat/cancel - Cancel one exact run
+	GetEffectStatus(c *gin.Context) // GET /agent/effects/:id - Reconcile one durable effect receipt
 	GetTools(c *gin.Context)        // GET /agent/tools - Get available tools
 	GetRef(c *gin.Context)          // GET /agent/refs/:id - Get ref metadata with facets
 	GetRefAssets(c *gin.Context)    // GET /agent/refs/:id/assets - Hydrate a ref page in snapshot order
@@ -200,6 +201,8 @@ type SettingsControllerInterface interface {
 	DownloadBackup(c *gin.Context)
 	DeleteBackup(c *gin.Context)
 	RestoreBackup(c *gin.Context)
+	GetRestoreOperation(c *gin.Context)
+	GetLatestRestoreOperation(c *gin.Context)
 }
 
 type ClassifierControllerInterface interface {
@@ -216,14 +219,31 @@ type UserControllerInterface interface {
 
 type RepositoryScanControllerInterface interface {
 	CreateRepository(c *gin.Context)
+	ListRepositoryCandidates(c *gin.Context)
+	OpenRepositoryCandidate(c *gin.Context)
+	ResolveRepositoryCandidate(c *gin.Context)
 	ListRepositoryRoots(c *gin.Context)
+	ListLifecycleAudit(c *gin.Context)
+	GetStorageDiagnostics(c *gin.Context)
+	DownloadStorageSupportBundle(c *gin.Context)
+	DeleteRepositoryRoot(c *gin.Context)
 	ListRepositories(c *gin.Context)
 	GetRepository(c *gin.Context)
-	UpdateRepository(c *gin.Context)
+	GetRepositoryRemovalImpact(c *gin.Context)
+	RenameRepository(c *gin.Context)
 	DeleteRepository(c *gin.Context)
 	QueueRepositoryScan(c *gin.Context)
 	GetLatestRepositoryScan(c *gin.Context)
 	ListRepositoryScans(c *gin.Context)
+}
+
+type HostActionControllerInterface interface {
+	GetNativeHostCapability(c *gin.Context)
+	ListHostActions(c *gin.Context)
+	CreateHostAction(c *gin.Context)
+	GetHostAction(c *gin.Context)
+	ResolveHostAction(c *gin.Context)
+	CancelHostAction(c *gin.Context)
 }
 
 // DuplicateControllerInterface defines the Utilities Rail "Duplicates" endpoints.
@@ -264,8 +284,11 @@ type CloudControllerInterface interface {
 	ReconnectCredential(c *gin.Context)           // POST   /cloud/credentials/:id/reconnect
 	RemoveCredential(c *gin.Context)              // DELETE /cloud/credentials/:id
 	StartRepositoryImport(c *gin.Context)         // POST   /repositories/:id/cloud/import
+	BindRepositoryCloudSource(c *gin.Context)     // POST   /repositories/:id/cloud/sources
 	GetRepositoryCloudStatus(c *gin.Context)      // GET   /repositories/:id/cloud
 	GetImportRun(c *gin.Context)                  // GET    /cloud/import-runs/:id
+	CancelImportRun(c *gin.Context)               // POST   /cloud/import-runs/:id/cancel
+	ResumeImportRun(c *gin.Context)               // POST   /cloud/import-runs/:id/resume
 	TriggerSync(c *gin.Context)                   // POST   /cloud/sync (deprecated)
 }
 
@@ -309,6 +332,7 @@ func NewRouter(
 	classifierController ClassifierControllerInterface,
 	userController UserControllerInterface,
 	repositoryScanController RepositoryScanControllerInterface,
+	hostActionController HostActionControllerInterface,
 	duplicateController DuplicateControllerInterface,
 	eventController EventControllerInterface,
 	cloudController CloudControllerInterface,
@@ -370,6 +394,8 @@ func NewRouter(
 			settings.GET("/backups/:name/download", settingsController.DownloadBackup)
 			settings.DELETE("/backups/:name", settingsController.DeleteBackup)
 			settings.POST("/backups/:name/restore", settingsController.RestoreBackup)
+			settings.GET("/backup-restores/latest", settingsController.GetLatestRestoreOperation)
+			settings.GET("/backup-restores/:id", settingsController.GetRestoreOperation)
 		}
 
 		classifiers := v1.Group("/classifiers")
@@ -419,14 +445,17 @@ func NewRouter(
 		repositories.Use(authController.AuthMiddleware(), authController.RequireAdmin())
 		{
 			repositories.GET("", appInitializedMiddleware, repositoryScanController.ListRepositories)
+			repositories.GET("/lifecycle-audit", appInitializedMiddleware, repositoryScanController.ListLifecycleAudit)
+			repositories.GET("/storage-diagnostics", appInitializedMiddleware, repositoryScanController.GetStorageDiagnostics)
+			repositories.GET("/storage-support-bundle", appInitializedMiddleware, repositoryScanController.DownloadStorageSupportBundle)
 			repositories.POST("", repositoryScanController.CreateRepository)
 			repositories.GET("/:id", appInitializedMiddleware, repositoryScanController.GetRepository)
-			// Repository mutation is intentionally disabled in the public API.
-			// Keep the handlers available until the future lifecycle design can
-			// define safe rename/detach semantics for Desktop and Server.
-			// repositories.PATCH("/:id", appInitializedMiddleware, repositoryScanController.UpdateRepository)
-			// repositories.DELETE("/:id", appInitializedMiddleware, repositoryScanController.DeleteRepository)
+			repositories.GET("/:id/removal-impact", appInitializedMiddleware, repositoryScanController.GetRepositoryRemovalImpact)
+			repositories.POST("/:id/rename", appInitializedMiddleware, repositoryScanController.RenameRepository)
+			repositories.DELETE("/:id", appInitializedMiddleware, repositoryScanController.DeleteRepository)
+			// Rename remains disabled until its marker/config transaction is journaled.
 			repositories.GET("/:id/cloud", appInitializedMiddleware, cloudController.GetRepositoryCloudStatus)
+			repositories.POST("/:id/cloud/sources", appInitializedMiddleware, cloudController.BindRepositoryCloudSource)
 			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
 			repositories.POST("/:id/scan", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
@@ -438,6 +467,26 @@ func NewRouter(
 		repositoryRoots.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
 			repositoryRoots.GET("", repositoryScanController.ListRepositoryRoots)
+			repositoryRoots.DELETE("/:id", repositoryScanController.DeleteRepositoryRoot)
+		}
+
+		repositoryCandidates := v1.Group("/repository-candidates")
+		repositoryCandidates.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
+		{
+			repositoryCandidates.GET("", repositoryScanController.ListRepositoryCandidates)
+			repositoryCandidates.POST("/open", repositoryScanController.OpenRepositoryCandidate)
+			repositoryCandidates.POST("/resolve", repositoryScanController.ResolveRepositoryCandidate)
+		}
+
+		hostActions := v1.Group("/host-actions")
+		hostActions.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
+		{
+			hostActions.GET("/native-capability", hostActionController.GetNativeHostCapability)
+			hostActions.GET("", hostActionController.ListHostActions)
+			hostActions.POST("", hostActionController.CreateHostAction)
+			hostActions.GET("/:id", hostActionController.GetHostAction)
+			hostActions.POST("/:id/resolve", hostActionController.ResolveHostAction)
+			hostActions.DELETE("/:id", hostActionController.CancelHostAction)
 		}
 
 		locations := v1.Group("/locations")
@@ -607,6 +656,8 @@ func NewRouter(
 			cloud.POST("/credentials/:id/reconnect", cloudController.ReconnectCredential)
 			cloud.DELETE("/credentials/:id", cloudController.RemoveCredential)
 			cloud.GET("/import-runs/:id", cloudController.GetImportRun)
+			cloud.POST("/import-runs/:id/cancel", cloudController.CancelImportRun)
+			cloud.POST("/import-runs/:id/resume", cloudController.ResumeImportRun)
 			cloud.POST("/sync", cloudController.TriggerSync)
 		}
 
@@ -632,14 +683,15 @@ func NewRouter(
 			stats.GET("/available-years", statsController.GetAvailableYears)
 		}
 
-		// Agent routes - authentication required: refs are scoped to the
-		// requesting user (INV-4), so an anonymous agent session is meaningless.
+		// Lumilio Agent execution requires a configured provider, but its durable
+		// control plane must remain usable when inference is disabled or degraded.
+		// Users can still cancel a run, reconcile an effect receipt, and open pins
+		// or refs without the availability middleware blocking recovery.
 		agent := v1.Group("/agent")
-		agent.Use(appInitializedMiddleware, agentAvailabilityMiddleware, authController.AuthMiddleware())
+		agent.Use(appInitializedMiddleware, authController.AuthMiddleware())
 		{
-			agent.POST("/chat", agentController.Chat)
-			agent.POST("/chat/resume", agentController.ResumeChat)
 			agent.POST("/chat/cancel", agentController.CancelChat)
+			agent.GET("/effects/:id", agentController.GetEffectStatus)
 			agent.GET("/tools", agentController.GetTools)
 			agent.GET("/refs/:id", agentController.GetRef)
 			agent.GET("/refs/:id/assets", agentController.GetRefAssets)
@@ -652,6 +704,13 @@ func NewRouter(
 			agent.PATCH("/pins/layout", agentController.UpdatePinLayout)
 			agent.PATCH("/pins/:id", agentController.UpdatePin)
 			agent.DELETE("/pins/:id", agentController.DeletePin)
+		}
+
+		agentRuntime := v1.Group("/agent")
+		agentRuntime.Use(appInitializedMiddleware, authController.AuthMiddleware(), agentAvailabilityMiddleware)
+		{
+			agentRuntime.POST("/chat", agentController.Chat)
+			agentRuntime.POST("/chat/resume", agentController.ResumeChat)
 		}
 
 		// Share link routes: owner-scoped management, authenticated.

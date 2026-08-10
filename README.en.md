@@ -6,7 +6,7 @@
 
 <img width="128" height="148" alt="Lumilio Photos logo" src="https://github.com/user-attachments/assets/9e51f2dd-af9c-47da-9232-cff9a6e6bf4f" />
 
-Local-first photo and video management for your own library.
+Local-first photo and video management for your own Repositories.
 
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
@@ -16,16 +16,16 @@ Local-first photo and video management for your own library.
 </div>
 
 > [!WARNING]
-> Lumilio Photos is free, open-source beta software under active development. Back up important libraries before upgrading and review the release notes for known limitations.
+> Lumilio Photos is free, open-source beta software under active development. Back up important Repositories before upgrading and review the release notes for known limitations.
 
-Lumilio Photos keeps your originals and application data on infrastructure you control. It provides one workspace for browsing, importing, organizing, searching, and processing large media libraries. AI-assisted features are optional: the core library remains usable without a model server or external AI provider.
+Lumilio Photos keeps your originals and application data on infrastructure you control. It provides one workspace for browsing, importing, organizing, searching, and processing media across Repositories. AI-assisted features are optional: core media management remains usable without a model server or external AI provider.
 
 ## Features
 
-- Local-first photo and video library with explicit storage repositories
+- Local-first photo and video management with explicit Repositories
 - Albums, people, places, stacks, favorites, and duplicate management
 - Upload, folder scanning, metadata extraction, thumbnails, and transcoding
-- Search and filters across library metadata
+- Search and filters across Repository metadata
 - Optional Image Semantic Analysis, Person Recognition, OCR Text Recognition,
   BioCLIP Species Recognition,
   and classification through Lumen
@@ -34,7 +34,7 @@ Lumilio Photos keeps your originals and application data on infrastructure you c
 
 ## Install
 
-Choose the distribution that matches where the library will run:
+Choose the distribution that matches where Lumilio will run:
 
 | Environment | Recommended method |
 | --- | --- |
@@ -53,6 +53,7 @@ configuration:
 
 ```bash
 curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+mkdir -p ./lumilio/media ./lumilio/app-state
 docker compose up -d
 ```
 
@@ -60,7 +61,10 @@ Open `http://<Linux-host-IP>:6680`. Optional
 [`caddy.compose.yml`](deploy/compose/caddy.compose.yml) and
 [`acme.compose.yml`](deploy/compose/acme.compose.yml) add HTTPS. Read the
 [installation guide](site/docs/en/user-manual/introduction/installation.md)
-for persistent paths and advanced deployment options.
+for persistent paths and advanced deployment options. The Compose files use
+long bind-mount syntax with `create_host_path: false`, so custom source
+directories must exist and a mistyped path fails instead of silently creating
+an empty directory.
 
 ## Contributing
 

@@ -8,8 +8,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-
-	"github.com/google/uuid"
 )
 
 type hostOwnerRepositoryManagerStub struct {
@@ -17,20 +15,30 @@ type hostOwnerRepositoryManagerStub struct {
 	hostOwnerID      *int32
 	attachedOwnerID  *int32
 	registeredCopyID *int32
+	attachedRequest  storage.LifecycleRequest
+	copyRequest      storage.LifecycleRequest
 }
 
 func (s *hostOwnerRepositoryManagerStub) HostOwnerID(context.Context) (*int32, error) {
 	return s.hostOwnerID, nil
 }
 
-func (s *hostOwnerRepositoryManagerStub) AddRepository(_ string, ownerID *int32, _ dbtypes.RepoRole, _ ...uuid.UUID) (*repo.Repository, error) {
+func (s *hostOwnerRepositoryManagerStub) OpenRepository(_ context.Context, _ string, ownerID *int32, _ dbtypes.RepoRole, request storage.LifecycleRequest) (*repo.Repository, error) {
 	s.attachedOwnerID = ownerID
-	return &repo.Repository{Name: "Archive", Status: dbtypes.RepoStatusActive}, nil
+	s.attachedRequest = request
+	return &repo.Repository{Name: "Archive", Reachability: dbtypes.RepositoryReachabilityActive}, nil
 }
 
-func (s *hostOwnerRepositoryManagerStub) RegisterRepositoryCopy(_ context.Context, _ string, ownerID *int32, _ dbtypes.RepoRole) (*repo.Repository, error) {
+func (s *hostOwnerRepositoryManagerStub) RegisterRepositoryCopy(_ context.Context, _ string, ownerID *int32, _ dbtypes.RepoRole, requests ...storage.LifecycleRequest) (*repo.Repository, error) {
 	s.registeredCopyID = ownerID
-	return &repo.Repository{Name: "Archive copy", Status: dbtypes.RepoStatusActive}, nil
+	if len(requests) > 0 {
+		s.copyRequest = requests[0]
+	}
+	return &repo.Repository{Name: "Archive copy", Reachability: dbtypes.RepositoryReachabilityActive}, nil
+}
+
+func (s *hostOwnerRepositoryManagerStub) ScheduleInitialRepositoryScan(context.Context, string) error {
+	return nil
 }
 
 func TestRepositoryControlAttachUsesHostOwner(t *testing.T) {
@@ -44,6 +52,11 @@ func TestRepositoryControlAttachUsesHostOwner(t *testing.T) {
 	if manager.attachedOwnerID == nil || *manager.attachedOwnerID != hostOwnerID {
 		t.Fatalf("attached owner = %v, want Host Owner %d", manager.attachedOwnerID, hostOwnerID)
 	}
+	if manager.attachedRequest.RequestID == "" || manager.attachedRequest.HostInstanceID == "" ||
+		manager.attachedRequest.Actor != "desktop_host:"+manager.attachedRequest.HostInstanceID ||
+		manager.attachedRequest.ConfirmationType != "native_directory_selection" {
+		t.Fatalf("attach lifecycle request = %#v", manager.attachedRequest)
+	}
 }
 
 func TestRepositoryControlCopyUsesHostOwner(t *testing.T) {
@@ -56,6 +69,11 @@ func TestRepositoryControlCopyUsesHostOwner(t *testing.T) {
 	}
 	if manager.registeredCopyID == nil || *manager.registeredCopyID != hostOwnerID {
 		t.Fatalf("copy owner = %v, want Host Owner %d", manager.registeredCopyID, hostOwnerID)
+	}
+	if manager.copyRequest.RequestID == "" || manager.copyRequest.HostInstanceID == "" ||
+		manager.copyRequest.Actor != "desktop_host:"+manager.copyRequest.HostInstanceID ||
+		manager.copyRequest.ConfirmationType != "independent_identity" || !manager.copyRequest.RiskConfirmation {
+		t.Fatalf("copy lifecycle request = %#v", manager.copyRequest)
 	}
 }
 

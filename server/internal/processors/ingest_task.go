@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"server/internal/db/repo"
+	"server/internal/queue/jobs"
 	"server/internal/sourcing"
 	"server/internal/utils/hash"
 )
@@ -16,7 +17,7 @@ import (
 // IngestAsset converts an upload payload into an IngestSource and delegates to the
 // SourceMaterializer for validation, staging→inbox commit, asset creation, and pipeline enqueuing.
 // Audit logging is handled by the materializer.
-func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*repo.Asset, error) {
+func (ap *AssetProcessor) IngestAsset(ctx context.Context, task jobs.IngestAssetArgs) (*repo.Asset, error) {
 	start := time.Now()
 	defer func() {
 		ap.logger.Debug("ingest_task",
@@ -58,11 +59,11 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		quickFingerprintVersion = &version
 	}
 
-	return ap.materializer.Materialize(ctx, sourcing.IngestSource{
+	return ap.materializer.MaterializeStaged(ctx, sourcing.IngestSource{
 		RepositoryID:            repoUUID,
 		OwnerID:                 ownerIDPtr,
 		Kind:                    sourcing.IngestSourceUpload,
-		SourcePath:              task.StagedPath,
+		StagingPath:             task.StagedPath,
 		OriginalFilename:        task.FileName,
 		ContentHash:             contentHash,
 		QuickFingerprint:        quickFingerprint,

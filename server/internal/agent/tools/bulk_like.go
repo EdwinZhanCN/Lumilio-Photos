@@ -30,10 +30,11 @@ type BulkLikeOutput struct {
 }
 
 type BulkLikeConfirmationInfo struct {
-	Action string `json:"action"`
-	RefID  string `json:"ref_id"`
-	Count  int    `json:"count"`
-	Liked  bool   `json:"liked"`
+	EffectID string `json:"effect_id"`
+	Action   string `json:"action"`
+	RefID    string `json:"ref_id"`
+	Count    int    `json:"count"`
+	Liked    bool   `json:"liked"`
 }
 
 type bulkLikeInterruptState struct {
@@ -68,8 +69,13 @@ func RegisterBulkLike() {
 					return &BulkLikeOutput{Error: ref.Internal("effect identity")}, nil
 				}
 				if !approved {
-					_ = deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID)
 					message := "Like change was not applied: the user declined."
+					if err := deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID); err != nil {
+						refErr := ref.Internal("bulk like rejection")
+						sendError(deps, info.Name, execID, start, refErr)
+						return &BulkLikeOutput{Error: refErr}, nil
+					}
+					sendEffectReceipt(deps, info.Name, execID, rejectedEffectReceipt(state.EffectID, info.Name, state.Count, message))
 					sendSuccess(deps, info.Name, execID, start, message, nil)
 					return &BulkLikeOutput{Message: message}, nil
 				}
@@ -81,6 +87,7 @@ func RegisterBulkLike() {
 					return &BulkLikeOutput{Error: refErr}, nil
 				}
 				message := committedReceiptMessage(receipt)
+				sendEffectReceipt(deps, info.Name, execID, receipt)
 				sendSuccess(deps, info.Name, execID, start, message, &core.DataPayload{RefID: state.RefID, Count: receipt.Count})
 				return &BulkLikeOutput{Message: message, Count: receipt.Count, AlreadyCommitted: receipt.AlreadyCommitted}, nil
 			}
@@ -107,7 +114,7 @@ func RegisterBulkLike() {
 				return &BulkLikeOutput{Error: refErr}, nil
 			}
 			return nil, compose.StatefulInterrupt(ctx,
-				&BulkLikeConfirmationInfo{Action: info.Name, RefID: r.ID, Count: r.Count(), Liked: input.Liked},
+				&BulkLikeConfirmationInfo{EffectID: effectID.String(), Action: info.Name, RefID: r.ID, Count: r.Count(), Liked: input.Liked},
 				&bulkLikeInterruptState{EffectID: effectID.String(), RefID: r.ID, Count: r.Count()},
 			)
 		})

@@ -57,7 +57,7 @@ func (rc RepositoryConfig) Value() (driver.Value, error) {
 // LocalSettings configures repository-specific behavior
 type LocalSettings struct {
 	// HandleDuplicateFilenames how to handle files with same name
-	// "rename" = add (1), (2) suffix, "uuid" = add UUID, "overwrite" = replace existing
+	// "rename" = add (1), (2) suffix; "uuid" = add a unique suffix. Existing originals are never replaced.
 	HandleDuplicateFilenames string `yaml:"handle_duplicate_filenames" json:"handle_duplicate_filenames"`
 }
 
@@ -128,12 +128,17 @@ func LoadConfigFromFile(repoPath string) (*RepositoryConfig, error) {
 		return nil, fmt.Errorf("failed to read repository config: %w", err)
 	}
 
+	return ParseConfig(data)
+}
+
+// ParseConfig parses and validates .lumiliorepo contents read through a
+// repository-scoped filesystem capability.
+func ParseConfig(data []byte) (*RepositoryConfig, error) {
 	var config RepositoryConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse repository config: %w", err)
 	}
 
-	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid repository configuration: %w", err)
 	}
@@ -189,12 +194,11 @@ func (rc *RepositoryConfig) Validate() error {
 
 	// Validate duplicate handling strategy
 	validDuplicateStrategies := map[string]bool{
-		"rename":    true,
-		"uuid":      true,
-		"overwrite": true,
+		"rename": true,
+		"uuid":   true,
 	}
 	if !validDuplicateStrategies[rc.LocalSettings.HandleDuplicateFilenames] {
-		return fmt.Errorf("invalid handle_duplicate_filenames '%s', must be one of: rename, uuid, overwrite", rc.LocalSettings.HandleDuplicateFilenames)
+		return fmt.Errorf("invalid handle_duplicate_filenames '%s', must be one of: rename, uuid", rc.LocalSettings.HandleDuplicateFilenames)
 	}
 
 	return nil

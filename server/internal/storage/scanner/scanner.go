@@ -2,24 +2,24 @@ package scanner
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
+	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"server/config"
+	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/storage"
-	"server/internal/storage/repocfg"
-	"server/internal/utils/file"
-	"server/internal/utils/hash"
+	hashutil "server/internal/utils/hash"
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
@@ -33,6 +33,11 @@ const (
 	ScanStatusCompleted = "completed"
 	ScanStatusFailed    = "failed"
 	ScanStatusCancelled = "cancelled"
+
+	indexStatePresent   = "present"
+	indexStateMissing   = "missing"
+	indexStateAmbiguous = "ambiguous"
+	indexStateDeferred  = "deferred"
 )
 
 type EnqueueResult struct {
@@ -43,54 +48,95 @@ type EnqueueResult struct {
 }
 
 type Scanner struct {
-	queries *repo.Queries
-	queue   *river.Client[*sql.Tx]
-	cfg     config.RepositoryScanConfig
-	logger  *zap.Logger
-}
-
-type diskEntry struct {
-	StoragePath string
-	Filename    string
-	Size        int64
-	MTime       time.Time
-}
-
-type walkResult struct {
-	entries       map[string]diskEntry
-	deferredPaths map[string]struct{}
-	skipped       int64
-	deleteSafe    bool
-	partialReason string
+	database         *db.DB
+	queries          *repo.Queries
+	queue            *river.Client[*sql.Tx]
+	files            *storage.RepositoryFSFactory
+	repositories     storage.RepositoryManager
+	cfg              config.RepositoryScanConfig
+	logger           *zap.Logger
+	beforeScanInsert func()
 }
 
 type scanCounters struct {
-	discovered int64
-	updated    int64
-	deleted    int64
-	skipped    int64
+	discovered    int64
+	updated       int64
+	moved         int64
+	deleted       int64
+	skipped       int64
+	deferred      int64
+	ambiguous     int64
+	authoritative bool
+	partialReason string
 }
 
-type assetFingerprint struct {
-	hash string
-	size int64
+type observedCandidate struct {
+	observation storage.FileObservation
+	index       *repo.RepositoryFileIndex
+	asset       *repo.Asset
 }
 
-func NewScanner(queries *repo.Queries, queue *river.Client[*sql.Tx], cfg config.RepositoryScanConfig, logger *zap.Logger) *Scanner {
+type missingCandidate struct {
+	storagePath string
+	path        storage.RepositoryPath
+	index       *repo.RepositoryFileIndex
+	asset       *repo.Asset
+}
+
+type moveDecision struct {
+	oldPath string
+	newPath string
+	asset   *repo.Asset
+	newFile storage.FileObservation
+}
+
+type indexUpsert struct {
+	observation          storage.FileObservation
+	assetID              uuid.NullUUID
+	state                string
+	firstSeenScanID      uuid.UUID
+	missingSinceScanID   uuid.NullUUID
+	missingConfirmations int64
+	ambiguityGroup       *string
+	reason               *string
+	inspectionError      *string
+}
+
+type indexStateUpdate struct {
+	state                string
+	missingSinceScanID   uuid.NullUUID
+	missingConfirmations int64
+	ambiguityGroup       *string
+	reason               *string
+	inspectionError      *string
+}
+
+func NewScanner(
+	database *db.DB,
+	queue *river.Client[*sql.Tx],
+	files *storage.RepositoryFSFactory,
+	repositories storage.RepositoryManager,
+	cfg config.RepositoryScanConfig,
+	logger *zap.Logger,
+) *Scanner {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
+	var queries *repo.Queries
+	if database != nil {
+		queries = database.Queries
+	}
 	return &Scanner{
-		queries: queries,
-		queue:   queue,
-		cfg:     cfg,
-		logger:  logger.With(zap.String("component", "repository_scanner")),
+		database:     database,
+		queries:      queries,
+		queue:        queue,
+		files:        files,
+		repositories: repositories,
+		cfg:          cfg,
+		logger:       logger.With(zap.String("component", "repository_scanner")),
 	}
 }
 
-// ReclaimInterruptedRuns marks scan runs left "running" by a previous process
-// (e.g. a crash or restart) as failed, so the one-running-per-repository index
-// does not permanently block future scans. Call once at startup.
 func (s *Scanner) ReclaimInterruptedRuns(ctx context.Context) error {
 	if s == nil || s.queries == nil {
 		return nil
@@ -105,6 +151,12 @@ func (s *Scanner) ReclaimInterruptedRuns(ctx context.Context) error {
 			zap.Int64("count", reclaimed),
 		)
 	}
+	if _, err := s.queries.ResetRepositoriesByActivity(ctx, repo.ResetRepositoriesByActivityParams{
+		Activity:  dbtypes.RepositoryActivityScanning,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		return fmt.Errorf("reset interrupted repository activity: %w", err)
+	}
 	return nil
 }
 
@@ -116,8 +168,6 @@ func (s *Scanner) EnqueuePeriodicScan(ctx context.Context, repositoryID string) 
 	return s.enqueueScan(ctx, repositoryID, jobs.RepositoryScanModePeriodic, "", false)
 }
 
-// EnqueueAllPeriodicScans lists all active repositories and enqueues a
-// periodic scan job for each, respecting MaxConcurrentRepos concurrency.
 func (s *Scanner) EnqueueAllPeriodicScans(ctx context.Context) {
 	repositories, err := s.queries.ListActiveRepositories(ctx)
 	if err != nil {
@@ -154,70 +204,90 @@ func (s *Scanner) EnqueueAllPeriodicScans(ctx context.Context) {
 }
 
 func (s *Scanner) enqueueScan(ctx context.Context, repositoryID string, mode string, requestedBy string, force bool) (EnqueueResult, error) {
-	if s == nil || s.queue == nil {
+	if s == nil || s.queue == nil || s.queries == nil || s.repositories == nil {
 		return EnqueueResult{}, fmt.Errorf("repository scanner queue unavailable")
 	}
-	repoID, err := parseRepositoryID(repositoryID)
+	repositoryUUID, err := parseRepositoryID(repositoryID)
 	if err != nil {
 		return EnqueueResult{}, err
 	}
-	if _, err := s.queries.GetRepository(ctx, repoID); err != nil {
-		return EnqueueResult{}, fmt.Errorf("get repository: %w", err)
+	_, releaseWork, err := s.repositories.BeginRepositoryWork(ctx, repositoryUUID.String(), dbtypes.RepositoryActivityScanning)
+	if err != nil {
+		return EnqueueResult{}, err
 	}
+	defer releaseWork()
 	mode = normalizeMode(mode)
-	job, err := s.queue.Insert(ctx, jobs.ScanRepositoryArgs{
+	args := jobs.ScanRepositoryArgs{
 		RepositoryID: repositoryID,
 		Mode:         mode,
 		RequestedBy:  requestedBy,
 		Force:        force,
-	}, &river.InsertOpts{Queue: "scan_repository"})
+	}
+	opts := args.InsertOpts()
+	opts.Queue = "scan_repository"
+	if s.beforeScanInsert != nil {
+		s.beforeScanInsert()
+	}
+	job, err := s.queue.Insert(ctx, args, &opts)
 	if err != nil {
 		return EnqueueResult{}, fmt.Errorf("enqueue repository scan: %w", err)
 	}
-	return EnqueueResult{
-		JobID:        job.Job.ID,
-		RepositoryID: repositoryID,
-		Mode:         mode,
-		Status:       ScanStatusQueued,
-	}, nil
+	if err := releaseWork(); err != nil {
+		return EnqueueResult{}, fmt.Errorf("finish repository scan enqueue: %w", err)
+	}
+	return EnqueueResult{JobID: job.Job.ID, RepositoryID: repositoryID, Mode: mode, Status: ScanStatusQueued}, nil
 }
 
 func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepositoryArgs) error {
-	if s == nil || s.queries == nil || s.queue == nil {
+	if s == nil || s.database == nil || s.queries == nil || s.queue == nil || s.files == nil {
 		return fmt.Errorf("repository scanner unavailable")
 	}
-	repoID, err := parseRepositoryID(args.RepositoryID)
+	repositoryID, err := parseRepositoryID(args.RepositoryID)
 	if err != nil {
 		return err
 	}
-	repository, err := s.queries.GetRepository(ctx, repoID)
+	repository, err := s.queries.GetRepository(ctx, repositoryID)
 	if err != nil {
 		return fmt.Errorf("get repository: %w", err)
 	}
-	if !isScannableRepositoryRoot(repository.Path) {
-		return fmt.Errorf("repository path is not a scannable repository root: %s", repository.Path)
+	if _, err := s.queries.BeginRepositoryActivity(ctx, repo.BeginRepositoryActivityParams{
+		RepoID: repositoryID, Activity: dbtypes.RepositoryActivityScanning,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			s.logger.Info("repository scan deferred: repository is unavailable or busy",
+				zap.String("operation", "repository_scan.defer"),
+				zap.String("repository_id", args.RepositoryID),
+			)
+			return fmt.Errorf("%w: repository scan will retry after maintenance", storage.ErrRepositoryBusy)
+		}
+		return fmt.Errorf("enter repository scanning activity: %w", err)
 	}
+	defer func() {
+		if _, finishErr := s.queries.FinishRepositoryActivity(context.Background(), repo.FinishRepositoryActivityParams{
+			RepoID: repositoryID, Activity: dbtypes.RepositoryActivityScanning,
+			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		}); finishErr != nil {
+			s.logger.Error("failed to clear repository scanning activity",
+				zap.String("repository_id", args.RepositoryID), zap.Error(finishErr))
+		}
+	}()
 
 	scanID := uuid.New()
-	now := time.Now().UTC()
+	startedAt := time.Now().UTC()
 	requestedBy := strings.TrimSpace(args.RequestedBy)
 	var requestedByPtr *string
 	if requestedBy != "" {
 		requestedByPtr = &requestedBy
 	}
-	// The repository_scan_runs_one_running partial unique index guarantees at most
-	// one running scan per repository: a concurrent attempt fails here with a
-	// unique violation and is skipped (no row created), replacing the previous
-	// racy create-then-count-then-cancel guard.
-	scanRun, err := s.queries.CreateRepositoryScanRun(ctx, repo.CreateRepositoryScanRunParams{
+	if _, err := s.queries.CreateRepositoryScanRun(ctx, repo.CreateRepositoryScanRunParams{
 		ScanID:       scanID,
 		RepositoryID: repository.RepoID,
 		Mode:         normalizeMode(args.Mode),
 		RequestedBy:  requestedByPtr,
 		Status:       ScanStatusRunning,
-		StartedAt:    dbtypes.NewTimestamp(now),
-	})
-	if err != nil {
+		StartedAt:    dbtypes.NewTimestamp(startedAt),
+	}); err != nil {
 		if isUniqueConstraintViolation(err) {
 			s.logger.Info("repository scan skipped: another scan is already running",
 				zap.String("operation", "repository_scan.skip"),
@@ -228,9 +298,9 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		return fmt.Errorf("create scan run: %w", err)
 	}
 
-	counters, scanErr := s.scanRepository(ctx, repository, normalizeMode(args.Mode), args.Force)
-	finishedAt := dbtypes.NewTimestamp(time.Now())
+	counters, scanRun, scanErr := s.scanRepository(ctx, repository, scanID, startedAt, args.Force)
 	if scanErr != nil {
+		finishedAt := dbtypes.NewTimestamp(time.Now().UTC())
 		_, failErr := s.queries.FailRepositoryScanRun(ctx, repo.FailRepositoryScanRunParams{
 			ScanID:          scanID,
 			FinishedAt:      finishedAt,
@@ -238,6 +308,11 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 			UpdatedCount:    counters.updated,
 			DeletedCount:    counters.deleted,
 			SkippedCount:    counters.skipped,
+			MovedCount:      counters.moved,
+			DeferredCount:   counters.deferred,
+			AmbiguousCount:  counters.ambiguous,
+			Authoritative:   counters.authoritative,
+			PartialReason:   optionalString(counters.partialReason),
 			Error:           stringPtr(scanErr.Error()),
 		})
 		if failErr != nil {
@@ -246,23 +321,10 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		return scanErr
 	}
 
-	completed, err := s.queries.CompleteRepositoryScanRun(ctx, repo.CompleteRepositoryScanRunParams{
-		ScanID:          scanID,
-		FinishedAt:      finishedAt,
-		DiscoveredCount: counters.discovered,
-		UpdatedCount:    counters.updated,
-		DeletedCount:    counters.deleted,
-		SkippedCount:    counters.skipped,
-	})
-	if err != nil {
-		return fmt.Errorf("complete scan run: %w", err)
-	}
-	scanRun = completed
-
 	if _, err := s.queries.UpdateRepositoryLastSync(ctx, repo.UpdateRepositoryLastSyncParams{
 		RepoID:    repository.RepoID,
-		LastSync:  finishedAt,
-		UpdatedAt: finishedAt,
+		LastSync:  scanRun.FinishedAt,
+		UpdatedAt: scanRun.FinishedAt,
 	}); err != nil {
 		s.logger.Warn("failed to update repository last sync",
 			zap.String("repository_id", args.RepositoryID),
@@ -275,25 +337,25 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		zap.String("scan_id", scanRun.ScanID.String()),
 		zap.Int64("discovered", counters.discovered),
 		zap.Int64("updated", counters.updated),
+		zap.Int64("moved", counters.moved),
 		zap.Int64("deleted", counters.deleted),
-		zap.Int64("skipped", counters.skipped),
+		zap.Int64("deferred", counters.deferred),
+		zap.Int64("ambiguous", counters.ambiguous),
+		zap.Bool("authoritative", counters.authoritative),
 	)
-
-	// Stack detection is enqueued per asset when metadata extraction completes;
-	// there is nothing to schedule at scan end.
 	return nil
 }
 
 func (s *Scanner) GetLatestScanRun(ctx context.Context, repositoryID string) (repo.RepositoryScanRun, error) {
-	repoID, err := parseRepositoryID(repositoryID)
+	repositoryUUID, err := parseRepositoryID(repositoryID)
 	if err != nil {
 		return repo.RepositoryScanRun{}, err
 	}
-	return s.queries.GetLatestRepositoryScanRun(ctx, repoID)
+	return s.queries.GetLatestRepositoryScanRun(ctx, repositoryUUID)
 }
 
 func (s *Scanner) ListScanRuns(ctx context.Context, repositoryID string, limit, offset int32) ([]repo.RepositoryScanRun, error) {
-	repoID, err := parseRepositoryID(repositoryID)
+	repositoryUUID, err := parseRepositoryID(repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -304,245 +366,640 @@ func (s *Scanner) ListScanRuns(ctx context.Context, repositoryID string, limit, 
 		offset = 0
 	}
 	return s.queries.ListRepositoryScanRuns(ctx, repo.ListRepositoryScanRunsParams{
-		RepositoryID: repoID,
+		RepositoryID: repositoryUUID,
 		Limit:        int64(limit),
 		Offset:       int64(offset),
 	})
 }
 
-func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository, mode string, force bool) (scanCounters, error) {
+func (s *Scanner) scanRepository(
+	ctx context.Context,
+	repository repo.Repository,
+	scanID uuid.UUID,
+	startedAt time.Time,
+	force bool,
+) (scanCounters, repo.RepositoryScanRun, error) {
+	counters := scanCounters{authoritative: true}
+	repositoryFS, err := s.files.Open(repository)
+	if err != nil {
+		counters.authoritative = false
+		counters.partialReason = err.Error()
+		return counters, repo.RepositoryScanRun{}, err
+	}
+	defer repositoryFS.Close()
+
 	settle := time.Duration(s.cfg.SettleSeconds) * time.Second
-	if force || normalizeMode(mode) == jobs.RepositoryScanModeManual {
-		settle = 0
+	walk, err := repositoryFS.WalkUserMedia(ctx, storage.WalkOptions{
+		ScanID: scanID,
+		Settle: settle,
+		Now:    startedAt,
+	})
+	counters.skipped = walk.Skipped
+	counters.authoritative = walk.Authoritative && len(walk.DeferredPaths) == 0
+	counters.partialReason = walk.PartialReason
+	if len(walk.DeferredPaths) > 0 {
+		counters.partialReason = firstReason(counters.partialReason, "one or more supported media files are still settling")
 	}
-
-	walk, err := walkRepository(repository.Path, settle)
-	counters := scanCounters{skipped: walk.skipped}
 	if err != nil {
-		return counters, err
+		return counters, repo.RepositoryScanRun{}, err
 	}
 
-	repositoryID := uuid.NullUUID{UUID: repository.RepoID, Valid: true}
-	dbAssets, err := s.queries.ListAssetsByRepositoryAny(ctx, repositoryID)
+	indexRows, err := s.queries.ListRepositoryFileIndex(ctx, repository.RepoID)
 	if err != nil {
-		return counters, fmt.Errorf("list repository assets: %w", err)
+		return counters, repo.RepositoryScanRun{}, fmt.Errorf("list repository file index: %w", err)
 	}
-	dbByPath := make(map[string]repo.Asset, len(dbAssets))
-	for _, asset := range dbAssets {
-		if asset.StoragePath == nil {
-			continue
-		}
-		cleaned, ok := CleanWorkspacePath(*asset.StoragePath)
-		if !ok || IsExcludedWorkspacePath(cleaned) {
-			continue
-		}
-		dbByPath[cleaned] = asset
+	assets, err := s.queries.ListAssetsByRepositoryAny(ctx, uuid.NullUUID{UUID: repository.RepoID, Valid: true})
+	if err != nil {
+		return counters, repo.RepositoryScanRun{}, fmt.Errorf("list repository assets: %w", err)
+	}
+	claims, err := s.queries.ListRecoverableIngestClaims(ctx, uuid.NullUUID{UUID: repository.RepoID, Valid: true})
+	if err != nil {
+		return counters, repo.RepositoryScanRun{}, fmt.Errorf("list recoverable ingest claims: %w", err)
 	}
 
-	batch := s.newDiscoverBatcher(ctx)
-
-	newEntries := make(map[string]diskEntry)
-	for storagePath, entry := range walk.entries {
-		if ctx.Err() != nil {
-			return counters, ctx.Err()
+	indexByPath := make(map[string]*repo.RepositoryFileIndex, len(indexRows))
+	for i := range indexRows {
+		indexByPath[indexRows[i].StoragePath] = &indexRows[i]
+	}
+	assetByPath := make(map[string]*repo.Asset, len(assets))
+	for i := range assets {
+		if assets[i].StoragePath != nil {
+			assetByPath[*assets[i].StoragePath] = &assets[i]
 		}
-		asset, exists := dbByPath[storagePath]
-		if !exists {
-			newEntries[storagePath] = entry
-			continue
+	}
+	claimedPaths := make(map[string]struct{}, len(claims)*2)
+	for _, claim := range claims {
+		if claim.StoragePath != nil {
+			claimedPaths[*claim.StoragePath] = struct{}{}
 		}
-		delete(dbByPath, storagePath)
+		if claim.StagingPath != "" {
+			claimedPaths[claim.StagingPath] = struct{}{}
+		}
+	}
+	deferredPaths := make(map[string]struct{}, len(walk.DeferredPaths))
+	for _, deferredPath := range walk.DeferredPaths {
+		deferredPaths[deferredPath.String()] = struct{}{}
+	}
 
-		if force || isSoftDeleted(asset) || asset.FileSize != entry.Size || fileMTimeIsNewerThanAsset(entry.MTime, asset) {
-			if err := batch.add(repository.RepoID, entry, jobs.DiscoverOperationUpsert); err != nil {
-				return counters, err
+	upserts := make(map[string]indexUpsert, len(walk.Observations))
+	stateUpdates := make(map[string]indexStateUpdate)
+	newCandidates := make(map[string]observedCandidate)
+	discoveryJobs := make(map[string]jobs.DiscoverAssetArgs)
+	observedPaths := make(map[string]struct{}, len(walk.Observations))
+
+	for _, observation := range walk.Observations {
+		storagePath := observation.Path.String()
+		observedPaths[storagePath] = struct{}{}
+		indexed := indexByPath[storagePath]
+		asset := assetByPath[storagePath]
+		if _, claimed := claimedPaths[storagePath]; claimed {
+			counters.deferred++
+			if indexed != nil {
+				reason := "recoverable ingest owns this path"
+				stateUpdates[storagePath] = deferredState(reason, "")
 			}
-			counters.updated++
+			continue
+		}
+
+		fastUnchanged := !force && indexed != nil && asset != nil && !asset.IsDeleted &&
+			indexed.AssetID.Valid && indexed.AssetID.UUID == asset.AssetID &&
+			indexed.State == indexStatePresent && indexed.ObservationToken == observation.ObservationToken
+		if fastUnchanged {
+			upserts[storagePath] = observationUpsert(scanID, observation, indexed, asset.AssetID, indexStatePresent)
+			continue
+		}
+
+		hashed, inspectErr := inspectWithContent(ctx, repositoryFS, observation.Path, observation.Size)
+		if inspectErr != nil {
+			counters.authoritative = false
+			counters.partialReason = firstReason(counters.partialReason, inspectErr.Error())
+			counters.deferred++
+			reason := "stable content inspection failed"
+			detail := inspectErr.Error()
+			mutation := observationUpsert(scanID, observation, indexed, assetID(asset), indexStateDeferred)
+			mutation.reason = &reason
+			mutation.inspectionError = &detail
+			upserts[storagePath] = mutation
+			continue
+		}
+		hashed.ScanID = scanID
+		if err := repositoryFS.Revalidate(ctx, hashed); err != nil {
+			counters.authoritative = false
+			counters.partialReason = firstReason(counters.partialReason, err.Error())
+			counters.deferred++
+			reason := "file changed after content inspection"
+			detail := err.Error()
+			mutation := observationUpsert(scanID, observation, indexed, assetID(asset), indexStateDeferred)
+			mutation.reason = &reason
+			mutation.inspectionError = &detail
+			upserts[storagePath] = mutation
+			continue
+		}
+
+		if asset != nil {
+			upserts[storagePath] = observationUpsert(scanID, hashed, indexed, asset.AssetID, indexStatePresent)
+			contentChanged := hashed.ContentHash == nil || asset.ContentHash != *hashed.ContentHash || asset.FileSize != hashed.Size
+			if force || asset.IsDeleted || contentChanged {
+				discoveryJobs[storagePath] = discoverArgs(repository.RepoID, scanID, hashed)
+				counters.updated++
+			}
+			continue
+		}
+
+		upserts[storagePath] = observationUpsert(scanID, hashed, indexed, uuid.Nil, indexStatePresent)
+		newCandidates[storagePath] = observedCandidate{observation: hashed, index: indexed}
+	}
+
+	for storagePath := range deferredPaths {
+		if indexed := indexByPath[storagePath]; indexed != nil {
+			reason := "file is still settling"
+			stateUpdates[storagePath] = deferredState(reason, "")
+			counters.deferred++
+		}
+	}
+	for storagePath := range claimedPaths {
+		if _, observed := observedPaths[storagePath]; observed {
+			continue
+		}
+		if indexed := indexByPath[storagePath]; indexed != nil {
+			reason := "recoverable ingest owns this path"
+			stateUpdates[storagePath] = deferredState(reason, "")
 		}
 	}
 
-	moved, err := s.reconcileMovedEntries(ctx, repository, newEntries, dbByPath)
-	if err != nil {
-		return counters, err
+	missing := make(map[string]missingCandidate)
+	for i := range assets {
+		asset := &assets[i]
+		if asset.IsDeleted || asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+			continue
+		}
+		storagePath := *asset.StoragePath
+		if _, present := observedPaths[storagePath]; present {
+			continue
+		}
+		if _, protected := deferredPaths[storagePath]; protected {
+			continue
+		}
+		if _, claimed := claimedPaths[storagePath]; claimed {
+			continue
+		}
+		parsed, parseErr := storage.ParseUserMediaPath(storagePath)
+		if parseErr != nil {
+			counters.deferred++
+			counters.authoritative = false
+			counters.partialReason = firstReason(counters.partialReason, fmt.Sprintf("asset %s has invalid storage path", asset.AssetID))
+			continue
+		}
+		missing[storagePath] = missingCandidate{
+			storagePath: storagePath,
+			path:        parsed,
+			index:       indexByPath[storagePath],
+			asset:       asset,
+		}
 	}
-	counters.updated += moved
 
-	for _, entry := range newEntries {
-		if ctx.Err() != nil {
-			return counters, ctx.Err()
+	// A destructive or identity-changing decision must prove that every old
+	// path is still absent after traversal.
+	for storagePath, candidate := range missing {
+		// On a case-insensitive filesystem the old spelling still opens after a
+		// case-only rename. The newly walked path is the absence proof in that
+		// one special case; move matching below still requires full BLAKE3.
+		if hasCaseOnlyMoveCandidate(candidate, newCandidates) {
+			continue
 		}
-		if err := batch.add(repository.RepoID, entry, jobs.DiscoverOperationUpsert); err != nil {
-			return counters, err
+		_, inspectErr := repositoryFS.InspectMedia(ctx, candidate.path, storage.HashNone)
+		switch {
+		case inspectErr == nil:
+			delete(missing, storagePath)
+			counters.authoritative = false
+			counters.partialReason = firstReason(counters.partialReason, "a previously walked path changed before reconciliation")
+			if candidate.index != nil {
+				stateUpdates[storagePath] = deferredState("path reappeared during reconciliation", "")
+			}
+		case errors.Is(inspectErr, fs.ErrNotExist):
+			// A missing child path is the expected result. Repository identity is
+			// verified again immediately before commit below.
+		default:
+			delete(missing, storagePath)
+			counters.authoritative = false
+			counters.partialReason = firstReason(counters.partialReason, inspectErr.Error())
+			if candidate.index != nil {
+				stateUpdates[storagePath] = deferredState("old path could not be revalidated", inspectErr.Error())
+			}
 		}
+	}
+
+	moves, ambiguousOld, ambiguousNew := matchMoves(missing, newCandidates)
+	for _, move := range moves {
+		delete(discoveryJobs, move.newPath)
+		mutation := upserts[move.newPath]
+		mutation.assetID = uuid.NullUUID{UUID: move.asset.AssetID, Valid: true}
+		mutation.state = indexStatePresent
+		mutation.reason = nil
+		upserts[move.newPath] = mutation
+		delete(stateUpdates, move.oldPath)
+		counters.moved++
+	}
+	for oldPath, group := range ambiguousOld {
+		candidate := missing[oldPath]
+		reason := "multiple full-content matches; no identity guess was made"
+		if candidate.index == nil {
+			upserts[oldPath] = bootstrapAssetUpsert(scanID, candidate, indexStateAmbiguous, group, reason)
+		} else {
+			stateUpdates[oldPath] = indexStateUpdate{
+				state: indexStateAmbiguous, ambiguityGroup: &group, reason: &reason,
+			}
+		}
+		counters.ambiguous++
+	}
+	for newPath, group := range ambiguousNew {
+		delete(discoveryJobs, newPath)
+		mutation := upserts[newPath]
+		reason := "multiple full-content matches; no identity guess was made"
+		mutation.state = indexStateAmbiguous
+		mutation.ambiguityGroup = &group
+		mutation.reason = &reason
+		upserts[newPath] = mutation
+		counters.ambiguous++
+	}
+
+	for storagePath, candidate := range newCandidates {
+		if _, moved := moveDestination(moves, storagePath); moved {
+			continue
+		}
+		if _, ambiguous := ambiguousNew[storagePath]; ambiguous {
+			continue
+		}
+		discoveryJobs[storagePath] = discoverArgs(repository.RepoID, scanID, candidate.observation)
 		counters.discovered++
 	}
 
-	if !walk.deleteSafe {
-		s.logger.Warn("repository scan skipped delete reconciliation after partial walk",
-			zap.String("repository_id", repository.RepoID.String()),
-			zap.String("repository_path", repository.Path),
-			zap.String("reason", walk.partialReason),
-		)
-		if err := batch.flush(); err != nil {
-			return counters, err
-		}
-		return counters, nil
+	moveOldPaths := make(map[string]struct{}, len(moves))
+	for _, move := range moves {
+		moveOldPaths[move.oldPath] = struct{}{}
 	}
-
-	for storagePath, asset := range dbByPath {
-		if ctx.Err() != nil {
-			return counters, ctx.Err()
-		}
-		if _, deferred := walk.deferredPaths[storagePath]; deferred {
+	deleteAssets := make(map[string]uuid.UUID)
+	for storagePath, candidate := range missing {
+		if _, moved := moveOldPaths[storagePath]; moved {
 			continue
 		}
-		if isSoftDeleted(asset) {
+		if _, ambiguous := ambiguousOld[storagePath]; ambiguous {
 			continue
 		}
-		entry := diskEntry{
-			StoragePath: storagePath,
-			Filename:    filepath.Base(storagePath),
-		}
-		if err := batch.add(repository.RepoID, entry, jobs.DiscoverOperationDelete); err != nil {
-			return counters, err
-		}
-		counters.deleted++
-	}
-
-	if err := batch.flush(); err != nil {
-		return counters, err
-	}
-	return counters, nil
-}
-
-func (s *Scanner) reconcileMovedEntries(
-	ctx context.Context,
-	repository repo.Repository,
-	newEntries map[string]diskEntry,
-	missingAssets map[string]repo.Asset,
-) (int64, error) {
-	if len(newEntries) == 0 || len(missingAssets) == 0 {
-		return 0, nil
-	}
-
-	candidates := make(map[assetFingerprint][]string)
-	candidateSizes := make(map[int64]struct{})
-	for storagePath, asset := range missingAssets {
-		if isSoftDeleted(asset) || strings.TrimSpace(asset.ContentHash) == "" {
+		if !counters.authoritative {
+			if candidate.index != nil {
+				stateUpdates[storagePath] = deferredState("scan was not authoritative for absence", counters.partialReason)
+			}
 			continue
 		}
-		key := assetFingerprint{hash: asset.ContentHash, size: asset.FileSize}
-		candidates[key] = append(candidates[key], storagePath)
-		candidateSizes[asset.FileSize] = struct{}{}
-	}
-	if len(candidates) == 0 {
-		return 0, nil
-	}
-
-	var moved int64
-	for storagePath, entry := range newEntries {
-		if ctx.Err() != nil {
-			return moved, ctx.Err()
+		confirmed, confirmErr := s.isSecondConsecutiveAbsence(ctx, candidate.index, startedAt, settle)
+		if confirmErr != nil {
+			return counters, repo.RepositoryScanRun{}, confirmErr
 		}
-		if _, ok := candidateSizes[entry.Size]; !ok {
+		if confirmed {
+			deleteAssets[storagePath] = candidate.asset.AssetID
+			stateUpdates[storagePath] = indexStateUpdate{
+				state:                indexStateMissing,
+				missingSinceScanID:   candidate.index.MissingSinceScanID,
+				missingConfirmations: 2,
+			}
+			counters.deleted++
 			continue
 		}
-
-		fullPath := filepath.Join(repository.Path, filepath.FromSlash(entry.StoragePath))
-		hashResult, err := hash.CalculateFileHash(fullPath, hash.AlgorithmBLAKE3, false)
-		if err != nil {
-			s.logger.Warn("failed to hash potential moved asset",
-				zap.String("repository_id", repository.RepoID.String()),
-				zap.String("storage_path", entry.StoragePath),
-				zap.Error(err),
-			)
-			continue
+		reason := "first authoritative absence"
+		if candidate.index == nil {
+			upserts[storagePath] = bootstrapAssetUpsert(scanID, candidate, indexStateMissing, "", reason)
+		} else {
+			stateUpdates[storagePath] = indexStateUpdate{
+				state:                indexStateMissing,
+				missingSinceScanID:   uuid.NullUUID{UUID: scanID, Valid: true},
+				missingConfirmations: 1,
+				reason:               &reason,
+			}
 		}
-
-		key := assetFingerprint{hash: hashResult.Hash, size: entry.Size}
-		paths := candidates[key]
-		if len(paths) != 1 {
-			continue
-		}
-
-		oldPath := paths[0]
-		asset, ok := missingAssets[oldPath]
-		if !ok {
-			continue
-		}
-
-		if _, err := s.queries.MoveAssetWithinRepository(ctx, repo.MoveAssetWithinRepositoryParams{
-			AssetID:          asset.AssetID,
-			RepositoryID:     uuid.NullUUID{UUID: repository.RepoID, Valid: true},
-			StoragePath:      &entry.StoragePath,
-			OriginalFilename: entry.Filename,
-		}); err != nil {
-			return moved, fmt.Errorf("move discovered asset %s to %s: %w", oldPath, storagePath, err)
-		}
-
-		delete(newEntries, storagePath)
-		delete(missingAssets, oldPath)
-		delete(candidates, key)
-		moved++
-
-		s.logger.Debug("repository scan reconciled moved asset",
-			zap.String("repository_id", repository.RepoID.String()),
-			zap.String("asset_id", asset.AssetID.String()),
-			zap.String("old_storage_path", oldPath),
-			zap.String("new_storage_path", storagePath),
-		)
 	}
 
-	return moved, nil
-}
-
-// discoverBatcher accumulates discover_asset jobs and inserts them in batches of
-// cfg.BatchSize via River's InsertMany, instead of one insert per file.
-type discoverBatcher struct {
-	queue     *river.Client[*sql.Tx]
-	ctx       context.Context
-	batchSize int
-	pending   []river.InsertManyParams
-}
-
-func (s *Scanner) newDiscoverBatcher(ctx context.Context) *discoverBatcher {
-	return &discoverBatcher{queue: s.queue, ctx: ctx, batchSize: s.cfg.BatchSize}
-}
-
-func (b *discoverBatcher) add(repositoryID uuid.UUID, entry diskEntry, operation string) error {
-	args := jobs.DiscoverAssetArgs{
-		RepositoryID: repositoryID.String(),
-		RelativePath: filepath.ToSlash(entry.StoragePath),
-		Operation:    operation,
-		FileName:     entry.Filename,
-		DetectedAt:   time.Now().UTC(),
+	if err := repositoryFS.VerifyIdentity(); err != nil {
+		counters.authoritative = false
+		counters.partialReason = firstReason(counters.partialReason, err.Error())
+		return counters, repo.RepositoryScanRun{}, err
 	}
-	if operation == jobs.DiscoverOperationUpsert {
-		if mediaInfo, err := file.ResolveMedia(entry.Filename); err == nil {
-			args.ContentType = mediaInfo.MimeType
+	for _, move := range moves {
+		if err := repositoryFS.Revalidate(ctx, move.newFile); err != nil {
+			counters.authoritative = false
+			counters.partialReason = firstReason(counters.partialReason, err.Error())
+			return counters, repo.RepositoryScanRun{}, err
 		}
-		args.FileSize = entry.Size
 	}
 
-	b.pending = append(b.pending, river.InsertManyParams{
-		Args:       args,
-		InsertOpts: &river.InsertOpts{Queue: "discover_asset"},
+	var completed repo.RepositoryScanRun
+	finishedAt := dbtypes.NewTimestamp(time.Now().UTC())
+	err = s.database.WithTx(ctx, func(tx *sql.Tx, queries *repo.Queries) error {
+		for _, storagePath := range sortedKeys(upserts) {
+			if _, err := queries.UpsertRepositoryFileObservation(ctx, upsertParams(repository.RepoID, upserts[storagePath], finishedAt)); err != nil {
+				return fmt.Errorf("upsert file index %s: %w", storagePath, err)
+			}
+		}
+		for _, storagePath := range sortedKeys(stateUpdates) {
+			state := stateUpdates[storagePath]
+			if _, err := queries.UpdateRepositoryFileIndexState(ctx, repo.UpdateRepositoryFileIndexStateParams{
+				State:                state.state,
+				MissingSinceScanID:   state.missingSinceScanID,
+				MissingConfirmations: state.missingConfirmations,
+				AmbiguityGroup:       state.ambiguityGroup,
+				ReconciliationReason: state.reason,
+				LastInspectionError:  state.inspectionError,
+				UpdatedAt:            finishedAt,
+				RepositoryID:         repository.RepoID,
+				StoragePath:          storagePath,
+			}); err != nil {
+				return fmt.Errorf("update file index state %s: %w", storagePath, err)
+			}
+		}
+		sort.Slice(moves, func(i, j int) bool {
+			if moves[i].oldPath == moves[j].oldPath {
+				return moves[i].newPath < moves[j].newPath
+			}
+			return moves[i].oldPath < moves[j].oldPath
+		})
+		for _, move := range moves {
+			newPath := move.newPath
+			if _, err := queries.MoveAssetWithinRepository(ctx, repo.MoveAssetWithinRepositoryParams{
+				StoragePath:      &newPath,
+				OriginalFilename: path.Base(newPath),
+				AssetID:          move.asset.AssetID,
+				RepositoryID:     uuid.NullUUID{UUID: repository.RepoID, Valid: true},
+			}); err != nil {
+				return fmt.Errorf("move asset %s from %s to %s: %w", move.asset.AssetID, move.oldPath, move.newPath, err)
+			}
+			if err := queries.DeleteRepositoryFileIndexEntry(ctx, repo.DeleteRepositoryFileIndexEntryParams{
+				RepositoryID: repository.RepoID,
+				StoragePath:  move.oldPath,
+			}); err != nil {
+				return fmt.Errorf("remove moved file index source %s: %w", move.oldPath, err)
+			}
+		}
+		for _, storagePath := range sortedKeys(deleteAssets) {
+			if err := queries.DeleteAsset(ctx, deleteAssets[storagePath]); err != nil {
+				return fmt.Errorf("soft-delete asset at %s: %w", storagePath, err)
+			}
+		}
+		for _, storagePath := range sortedKeys(discoveryJobs) {
+			args := discoveryJobs[storagePath]
+			opts := args.InsertOpts()
+			opts.Queue = "discover_asset"
+			if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
+				return fmt.Errorf("enqueue discovery for %s: %w", storagePath, err)
+			}
+		}
+		var completeErr error
+		completed, completeErr = queries.CompleteRepositoryScanRun(ctx, repo.CompleteRepositoryScanRunParams{
+			ScanID:          scanID,
+			FinishedAt:      finishedAt,
+			DiscoveredCount: counters.discovered,
+			UpdatedCount:    counters.updated,
+			DeletedCount:    counters.deleted,
+			SkippedCount:    counters.skipped,
+			MovedCount:      counters.moved,
+			DeferredCount:   counters.deferred,
+			AmbiguousCount:  counters.ambiguous,
+			Authoritative:   counters.authoritative,
+			PartialReason:   optionalString(counters.partialReason),
+		})
+		return completeErr
 	})
-	if len(b.pending) >= b.batchSize {
-		return b.flush()
+	if err != nil {
+		return counters, repo.RepositoryScanRun{}, fmt.Errorf("commit repository reconciliation: %w", err)
 	}
-	return nil
+	return counters, completed, nil
 }
 
-func (b *discoverBatcher) flush() error {
-	if len(b.pending) == 0 {
+func hasCaseOnlyMoveCandidate(missing missingCandidate, newFiles map[string]observedCandidate) bool {
+	matches := 0
+	for newPath, candidate := range newFiles {
+		if newPath == missing.storagePath || !strings.EqualFold(newPath, missing.storagePath) ||
+			candidate.observation.ContentHash == nil || candidate.observation.Size != missing.asset.FileSize ||
+			!strings.EqualFold(*candidate.observation.ContentHash, missing.asset.ContentHash) {
+			continue
+		}
+		matches++
+	}
+	return matches == 1
+}
+
+func inspectWithContent(ctx context.Context, repositoryFS *storage.RepositoryFS, repositoryPath storage.RepositoryPath, size int64) (storage.FileObservation, error) {
+	mode := storage.HashFull
+	if size > hashutil.QuickHashThreshold {
+		mode = storage.HashQuickAndFull
+	}
+	return repositoryFS.InspectMedia(ctx, repositoryPath, mode)
+}
+
+func (s *Scanner) isSecondConsecutiveAbsence(ctx context.Context, indexed *repo.RepositoryFileIndex, now time.Time, settle time.Duration) (bool, error) {
+	if indexed == nil || indexed.State != indexStateMissing || indexed.MissingConfirmations != 1 || !indexed.MissingSinceScanID.Valid {
+		return false, nil
+	}
+	run, err := s.queries.GetRepositoryScanRun(ctx, indexed.MissingSinceScanID.UUID)
+	if err != nil {
+		return false, fmt.Errorf("load first absence scan: %w", err)
+	}
+	return now.Sub(run.StartedAt.Time) >= settle, nil
+}
+
+func matchMoves(missing map[string]missingCandidate, newFiles map[string]observedCandidate) ([]moveDecision, map[string]string, map[string]string) {
+	type contentKey struct {
+		size int64
+		hash string
+	}
+	oldGroups := make(map[contentKey][]missingCandidate)
+	newGroups := make(map[contentKey][]observedCandidate)
+	for _, candidate := range missing {
+		contentHash := strings.ToLower(strings.TrimSpace(candidate.asset.ContentHash))
+		if contentHash == "" {
+			continue
+		}
+		oldGroups[contentKey{size: candidate.asset.FileSize, hash: contentHash}] = append(oldGroups[contentKey{size: candidate.asset.FileSize, hash: contentHash}], candidate)
+	}
+	for _, candidate := range newFiles {
+		if candidate.observation.ContentHash == nil {
+			continue
+		}
+		key := contentKey{size: candidate.observation.Size, hash: strings.ToLower(*candidate.observation.ContentHash)}
+		newGroups[key] = append(newGroups[key], candidate)
+	}
+
+	var moves []moveDecision
+	ambiguousOld := make(map[string]string)
+	ambiguousNew := make(map[string]string)
+	for key, oldCandidates := range oldGroups {
+		newCandidates := newGroups[key]
+		if len(newCandidates) == 0 {
+			continue
+		}
+		if len(oldCandidates) == 1 && len(newCandidates) == 1 {
+			moves = append(moves, moveDecision{
+				oldPath: oldCandidates[0].storagePath,
+				newPath: newCandidates[0].observation.Path.String(),
+				asset:   oldCandidates[0].asset,
+				newFile: newCandidates[0].observation,
+			})
+			continue
+		}
+		oldPaths := make([]string, 0, len(oldCandidates))
+		newPaths := make([]string, 0, len(newCandidates))
+		for _, candidate := range oldCandidates {
+			oldPaths = append(oldPaths, candidate.storagePath)
+		}
+		for _, candidate := range newCandidates {
+			newPaths = append(newPaths, candidate.observation.Path.String())
+		}
+		group := ambiguityGroupID(key.hash, oldPaths, newPaths)
+		for _, oldPath := range oldPaths {
+			ambiguousOld[oldPath] = group
+		}
+		for _, newPath := range newPaths {
+			ambiguousNew[newPath] = group
+		}
+	}
+	return moves, ambiguousOld, ambiguousNew
+}
+
+func ambiguityGroupID(contentHash string, oldPaths, newPaths []string) string {
+	sort.Strings(oldPaths)
+	sort.Strings(newPaths)
+	value := strings.Join([]string{contentHash, strings.Join(oldPaths, "\x00"), strings.Join(newPaths, "\x00")}, "\x01")
+	digest := sha256.Sum256([]byte(value))
+	return fmt.Sprintf("amb-v1:%x", digest[:])
+}
+
+func observationUpsert(scanID uuid.UUID, observation storage.FileObservation, indexed *repo.RepositoryFileIndex, assetUUID uuid.UUID, state string) indexUpsert {
+	firstSeen := scanID
+	if indexed != nil && indexed.FirstSeenScanID.Valid {
+		firstSeen = indexed.FirstSeenScanID.UUID
+	}
+	return indexUpsert{
+		observation:     observation,
+		assetID:         nullableUUID(assetUUID),
+		state:           state,
+		firstSeenScanID: firstSeen,
+	}
+}
+
+func bootstrapAssetUpsert(scanID uuid.UUID, candidate missingCandidate, state, ambiguityGroup, reason string) indexUpsert {
+	contentHash := strings.ToLower(strings.TrimSpace(candidate.asset.ContentHash))
+	observation := storage.FileObservation{
+		RepositoryID:     candidate.asset.RepositoryID.UUID,
+		Path:             candidate.path,
+		EntryKind:        storage.EntryKindRegular,
+		Size:             candidate.asset.FileSize,
+		ObservationToken: "asset-bootstrap-v1:" + candidate.asset.AssetID.String(),
+		ContentHash:      optionalString(contentHash),
+		ScanID:           scanID,
+	}
+	mutation := indexUpsert{
+		observation:     observation,
+		assetID:         uuid.NullUUID{UUID: candidate.asset.AssetID, Valid: true},
+		state:           state,
+		firstSeenScanID: scanID,
+		reason:          &reason,
+	}
+	if state == indexStateMissing {
+		mutation.missingSinceScanID = uuid.NullUUID{UUID: scanID, Valid: true}
+		mutation.missingConfirmations = 1
+	}
+	if ambiguityGroup != "" {
+		mutation.ambiguityGroup = &ambiguityGroup
+	}
+	return mutation
+}
+
+func upsertParams(repositoryID uuid.UUID, mutation indexUpsert, updatedAt dbtypes.Timestamp) repo.UpsertRepositoryFileObservationParams {
+	observation := mutation.observation
+	return repo.UpsertRepositoryFileObservationParams{
+		RepositoryID:            repositoryID,
+		StoragePath:             observation.Path.String(),
+		AssetID:                 mutation.assetID,
+		EntryKind:               string(observation.EntryKind),
+		FileSize:                observation.Size,
+		ModifiedAtNs:            observation.ModTimeNS,
+		ChangedAtNs:             observation.ChangeTimeNS,
+		FileIdentityKind:        observation.FileIdentityKind,
+		FileIdentityValue:       observation.FileIdentity,
+		ObservationToken:        observation.ObservationToken,
+		QuickFingerprint:        observation.QuickFingerprint,
+		QuickFingerprintVersion: observation.QuickFingerprintVer,
+		ContentHash:             observation.ContentHash,
+		State:                   mutation.state,
+		FirstSeenScanID:         uuid.NullUUID{UUID: mutation.firstSeenScanID, Valid: true},
+		LastSeenScanID:          uuid.NullUUID{UUID: observation.ScanID, Valid: true},
+		MissingSinceScanID:      mutation.missingSinceScanID,
+		MissingConfirmations:    mutation.missingConfirmations,
+		AmbiguityGroup:          mutation.ambiguityGroup,
+		ReconciliationReason:    mutation.reason,
+		LastInspectionError:     mutation.inspectionError,
+		UpdatedAt:               updatedAt,
+	}
+}
+
+func deferredState(reason, detail string) indexStateUpdate {
+	return indexStateUpdate{
+		state:           indexStateDeferred,
+		reason:          optionalString(reason),
+		inspectionError: optionalString(detail),
+	}
+}
+
+func discoverArgs(repositoryID, scanID uuid.UUID, observation storage.FileObservation) jobs.DiscoverAssetArgs {
+	return jobs.DiscoverAssetArgs{
+		RepositoryID:     repositoryID,
+		StoragePath:      observation.Path.String(),
+		ScanID:           scanID,
+		ObservationToken: observation.ObservationToken,
+	}
+}
+
+func moveDestination(moves []moveDecision, storagePath string) (moveDecision, bool) {
+	for _, move := range moves {
+		if move.newPath == storagePath {
+			return move, true
+		}
+	}
+	return moveDecision{}, false
+}
+
+func assetID(asset *repo.Asset) uuid.UUID {
+	if asset == nil {
+		return uuid.Nil
+	}
+	return asset.AssetID
+}
+
+func nullableUUID(value uuid.UUID) uuid.NullUUID {
+	return uuid.NullUUID{UUID: value, Valid: value != uuid.Nil}
+}
+
+func sortedKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func optionalString(value string) *string {
+	if strings.TrimSpace(value) == "" {
 		return nil
 	}
-	if _, err := b.queue.InsertMany(b.ctx, b.pending); err != nil {
-		return fmt.Errorf("enqueue discover batch: %w", err)
+	copy := value
+	return &copy
+}
+
+func firstReason(current, next string) string {
+	if current != "" {
+		return current
 	}
-	b.pending = b.pending[:0]
-	return nil
+	return next
 }
 
 func isUniqueConstraintViolation(err error) bool {
@@ -554,161 +1011,19 @@ func isUniqueConstraintViolation(err error) bool {
 	return false
 }
 
-func walkRepository(repoPath string, settle time.Duration) (walkResult, error) {
-	result := walkResult{
-		entries:       make(map[string]diskEntry),
-		deferredPaths: make(map[string]struct{}),
-		deleteSafe:    true,
-	}
-	now := time.Now()
-
-	err := filepath.WalkDir(repoPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			result.skipped++
-			result.deleteSafe = false
-			if result.partialReason == "" {
-				result.partialReason = err.Error()
-			}
-			return nil
-		}
-		if path == repoPath {
-			return nil
-		}
-
-		rel, err := filepath.Rel(repoPath, path)
-		if err != nil {
-			result.skipped++
-			result.deleteSafe = false
-			if result.partialReason == "" {
-				result.partialReason = err.Error()
-			}
-			return nil
-		}
-		rel = filepath.ToSlash(rel)
-
-		if d.IsDir() {
-			if IsExcludedWorkspacePath(rel) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		cleaned, ok := ShouldScanPath(rel)
-		if !ok {
-			result.skipped++
-			return nil
-		}
-
-		info, infoErr := d.Info()
-		if infoErr != nil || info.IsDir() || !info.Mode().IsRegular() {
-			result.skipped++
-			if infoErr != nil {
-				result.deleteSafe = false
-				if result.partialReason == "" {
-					result.partialReason = infoErr.Error()
-				}
-			}
-			return nil
-		}
-		if settle > 0 && now.Sub(info.ModTime()) < settle {
-			result.skipped++
-			result.deferredPaths[cleaned] = struct{}{}
-			return nil
-		}
-
-		result.entries[cleaned] = diskEntry{
-			StoragePath: cleaned,
-			Filename:    filepath.Base(cleaned),
-			Size:        info.Size(),
-			MTime:       info.ModTime().UTC(),
-		}
-		return nil
-	})
+func parseRepositoryID(id string) (uuid.UUID, error) {
+	parsed, err := uuid.Parse(strings.TrimSpace(id))
 	if err != nil {
-		return result, err
-	}
-	return result, nil
-}
-
-func ShouldScanPath(path string) (string, bool) {
-	cleaned, ok := CleanWorkspacePath(path)
-	if !ok || IsExcludedWorkspacePath(cleaned) {
-		return "", false
-	}
-	if !file.IsSupportedExtension(filepath.Ext(cleaned)) {
-		return "", false
-	}
-	return cleaned, true
-}
-
-func CleanWorkspacePath(path string) (string, bool) {
-	if strings.TrimSpace(path) == "" {
-		return "", false
-	}
-	clean := filepath.Clean(filepath.FromSlash(path))
-	if clean == "." || storage.IsRootedPath(clean) {
-		return "", false
-	}
-	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return "", false
-	}
-	return filepath.ToSlash(clean), true
-}
-
-func IsExcludedWorkspacePath(path string) bool {
-	normalized := filepath.ToSlash(strings.TrimSpace(path))
-	if normalized == "" {
-		return true
-	}
-	if normalized == storage.DefaultStructure.SystemDir || strings.HasPrefix(normalized, storage.DefaultStructure.SystemDir+"/") {
-		return true
-	}
-	if normalized == storage.DefaultStructure.InboxDir || strings.HasPrefix(normalized, storage.DefaultStructure.InboxDir+"/") {
-		return true
-	}
-	return false
-}
-
-func fileMTimeIsNewerThanAsset(mtime time.Time, asset repo.Asset) bool {
-	if !asset.UpdatedAt.Valid {
-		return true
-	}
-	return mtime.After(asset.UpdatedAt.Time.Add(time.Second))
-}
-
-func isSoftDeleted(asset repo.Asset) bool {
-	return asset.IsDeleted
-}
-
-func isScannableRepositoryRoot(repoPath string) bool {
-	cleaned := strings.TrimSpace(repoPath)
-	if cleaned == "" {
-		return false
-	}
-	info, err := os.Stat(cleaned)
-	if err != nil || !info.IsDir() {
-		return false
-	}
-	return repocfg.IsRepositoryRoot(cleaned)
-}
-
-func parseRepositoryID(repositoryID string) (uuid.UUID, error) {
-	parsed, err := uuid.Parse(strings.TrimSpace(repositoryID))
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("invalid repository id: %w", err)
+		return uuid.Nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
 	return parsed, nil
 }
 
 func normalizeMode(mode string) string {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case jobs.RepositoryScanModeManual:
-		return jobs.RepositoryScanModeManual
-	default:
+	if strings.EqualFold(strings.TrimSpace(mode), jobs.RepositoryScanModePeriodic) {
 		return jobs.RepositoryScanModePeriodic
 	}
+	return jobs.RepositoryScanModeManual
 }
 
-func stringPtr(value string) *string {
-	return &value
-}
+func stringPtr(value string) *string { return &value }

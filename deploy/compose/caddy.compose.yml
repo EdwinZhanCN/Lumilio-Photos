@@ -10,8 +10,16 @@ services:
         network_mode: host
         command: ["server", "--config", "/app/config/docker-caddy.toml"]
         volumes:
-            - ${LUMILIO_STORAGE:-./lumilio/media}:/data/storage
-            - ${LUMILIO_STATE:-./lumilio/app-state}:/data/app-state
+            - type: bind
+              source: ${LUMILIO_STORAGE:-./lumilio/media}
+              target: /data/storage
+              bind:
+                  create_host_path: false
+            - type: bind
+              source: ${LUMILIO_STATE:-./lumilio/app-state}
+              target: /data/app-state
+              bind:
+                  create_host_path: false
         healthcheck:
             test: ["CMD", "server", "config", "healthcheck", "--config", "/app/config/docker-caddy.toml"]
             interval: 10s

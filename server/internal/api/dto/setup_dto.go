@@ -7,6 +7,10 @@ type SetupStatusDTO struct {
 	Initialized                  bool `json:"initialized"`
 	AdminInitialized             bool `json:"admin_initialized"`
 	PrimaryRepositoryInitialized bool `json:"primary_repository_initialized"`
+	// RuntimeState is independent of bootstrap completion. An initialized
+	// instance can be degraded while its default Storage Location is offline.
+	RuntimeState  string `json:"runtime_state" example:"active"`
+	RuntimeReason string `json:"runtime_reason,omitempty" example:"storage_recovery_required"`
 	// NextRegistrationRole is the role the next /auth/register will assign
 	// ("admin" while no admin exists yet, "user" afterwards). Folds the former
 	// /auth/bootstrap-status semantics into the unified setup status.
@@ -20,6 +24,8 @@ func ToSetupStatusDTO(status service.SetupStatus) SetupStatusDTO {
 		Initialized:                  status.Initialized,
 		AdminInitialized:             status.AdminInitialized,
 		PrimaryRepositoryInitialized: status.PrimaryRepositoryInitialized,
+		RuntimeState:                 status.RuntimeState,
+		RuntimeReason:                status.RuntimeReason,
 		NextRegistrationRole:         status.NextRegistrationRole,
 	}
 	if status.RepositoryDefaults != nil {
@@ -27,6 +33,7 @@ func ToSetupStatusDTO(status service.SetupStatus) SetupStatusDTO {
 			DefaultRoot:       status.RepositoryDefaults.DefaultRoot,
 			Strategy:          status.RepositoryDefaults.Strategy,
 			DuplicateHandling: status.RepositoryDefaults.DuplicateHandling,
+			RiskWarnings:      status.RepositoryDefaults.RiskWarnings,
 		}
 	}
 	return result

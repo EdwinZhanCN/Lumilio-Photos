@@ -62,6 +62,8 @@ type SetupStore interface {
 	SaveSetup(context.Context, string, string) error
 }
 
+type SetupValidator func(context.Context, string, string) error
+
 type MemorySetupStore struct {
 	Preset   string
 	CacheDir string
@@ -105,6 +107,7 @@ type Options struct {
 	Factory         Factory
 	Installer       Installer
 	SetupStore      SetupStore
+	ValidateSetup   SetupValidator
 	Installed       bool
 	InstalledVer    string
 	Profile         string
@@ -122,6 +125,7 @@ type commandKind string
 
 const (
 	commandInstall      commandKind = "install"
+	commandConfigure    commandKind = "configure"
 	commandStart        commandKind = "start"
 	commandStop         commandKind = "stop"
 	commandQuiesce      commandKind = "quiesce"
@@ -141,13 +145,14 @@ type command struct {
 type resultKind string
 
 const (
-	resultInstalled resultKind = "installed"
-	resultStarted   resultKind = "started"
-	resultStopped   resultKind = "stopped"
-	resultFailed    resultKind = "failed"
-	resultExited    resultKind = "exited"
-	resultStable    resultKind = "stable"
-	resultStatus    resultKind = "status"
+	resultInstalled  resultKind = "installed"
+	resultConfigured resultKind = "configured"
+	resultStarted    resultKind = "started"
+	resultStopped    resultKind = "stopped"
+	resultFailed     resultKind = "failed"
+	resultExited     resultKind = "exited"
+	resultStable     resultKind = "stable"
+	resultStatus     resultKind = "status"
 )
 
 type workerResult struct {
@@ -202,16 +207,17 @@ type ownedProcess struct {
 }
 
 type Controller struct {
-	store       *state.Store
-	operations  *operation.Registry
-	desired     DesiredStateStore
-	factory     Factory
-	installer   Installer
-	setupStore  SetupStore
-	readyBudget time.Duration
-	stopBudget  time.Duration
-	commands    chan command
-	quiesce     chan command
+	store         *state.Store
+	operations    *operation.Registry
+	desired       DesiredStateStore
+	factory       Factory
+	installer     Installer
+	setupStore    SetupStore
+	validateSetup SetupValidator
+	readyBudget   time.Duration
+	stopBudget    time.Duration
+	commands      chan command
+	quiesce       chan command
 
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -270,7 +276,7 @@ func NewController(options Options) *Controller {
 	controller := &Controller{
 		store: options.Store, operations: options.Operations, desired: options.Desired,
 		factory: options.Factory, installer: options.Installer, setupStore: options.SetupStore,
-		readyBudget: options.ReadyBudget, stopBudget: options.StopBudget,
+		validateSetup: options.ValidateSetup, readyBudget: options.ReadyBudget, stopBudget: options.StopBudget,
 		commands: make(chan command, options.CommandCapacity), quiesce: make(chan command, 1), done: make(chan struct{}),
 		installed: options.Installed, version: options.InstalledVer, profile: options.Profile, preset: options.Preset, cacheDir: options.CacheDir, endpoint: options.Endpoint,
 	}
@@ -404,6 +410,12 @@ func (c *Controller) Install(requestID string, expectedVersion uint64, profile, 
 	if err != nil {
 		return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "Lumen cache directory must be an available non-root directory")
 	}
+	if snapshot.InstallPhase == dto.LumenInstalled {
+		if profile != snapshot.Profile {
+			return dto.OperationReceipt{}, operation.NewError(dto.ErrorInvalidArgument, "the installed Lumen release profile cannot be changed in place")
+		}
+		return c.submit(command{kind: commandConfigure, profile: profile, preset: preset, cacheDir: canonical}, requestID, expectedVersion)
+	}
 	return c.submit(command{kind: commandInstall, profile: profile, preset: preset, cacheDir: canonical}, requestID, expectedVersion)
 }
 
@@ -530,7 +542,7 @@ func (c *Controller) beginCommand(item command, process *ownedProcess, active **
 	_ = c.operations.MarkRunning(item.receipt.OperationID)
 	c.syncOperations()
 	previous := c.store.Get().Lumen
-	if item.kind == commandStart || item.kind == commandRestart {
+	if item.kind == commandStart || item.kind == commandRestart || item.kind == commandConfigure {
 		item.generationID = c.sequence.Add(1)
 	}
 	if item.kind == commandQuiesce {
@@ -545,7 +557,7 @@ func (c *Controller) beginCommand(item command, process *ownedProcess, active **
 	}
 	if process != nil {
 		switch item.kind {
-		case commandStop, commandQuiesce, commandRetryCleanup, commandRestart:
+		case commandStop, commandQuiesce, commandRetryCleanup, commandRestart, commandConfigure:
 			c.commit(func(snapshot *dto.LumenSnapshot) { snapshot.ProcessPhase = dto.LumenStopping })
 		}
 	} else if item.kind == commandStart {
@@ -581,12 +593,6 @@ func (c *Controller) worker(item command, process *ownedProcess, results chan<- 
 		if profile == "" {
 			profile = snapshot.Profile
 		}
-		if err := c.setupStore.SaveSetup(workerCtx, item.preset, item.cacheDir); err != nil {
-			result.kind = resultFailed
-			result.err = fmt.Errorf("persist Lumen setup: %w", err)
-			results <- result
-			return
-		}
 		version, err := c.installer.Install(workerCtx, profile)
 		if err != nil {
 			result.kind = resultFailed
@@ -594,7 +600,23 @@ func (c *Controller) worker(item command, process *ownedProcess, results chan<- 
 			results <- result
 			return
 		}
+		if c.validateSetup != nil {
+			if err := c.validateSetup(workerCtx, item.preset, item.cacheDir); err != nil {
+				result.kind = resultFailed
+				result.err = fmt.Errorf("validate installed Lumen setup: %w", err)
+				results <- result
+				return
+			}
+		}
+		if err := c.setupStore.SaveSetup(workerCtx, item.preset, item.cacheDir); err != nil {
+			result.kind = resultFailed
+			result.err = fmt.Errorf("persist Lumen setup: %w", err)
+			results <- result
+			return
+		}
 		result.kind, result.version, result.profile, result.preset, result.cacheDir = resultInstalled, version, profile, item.preset, item.cacheDir
+	case commandConfigure:
+		result = c.configureWorker(result, process, item, previous, workerCtx)
 	case commandStart:
 		if snapshot.InstallPhase != dto.LumenInstalled {
 			result.kind = resultFailed
@@ -652,6 +674,89 @@ func (c *Controller) worker(item command, process *ownedProcess, results chan<- 
 	}
 	result.cancelled = workerCtx.Err() != nil && item.kind != commandQuiesce
 	results <- result
+}
+
+func (c *Controller) configureWorker(result workerResult, process *ownedProcess, item command, snapshot dto.LumenSnapshot, workerCtx context.Context) workerResult {
+	result.profile, result.preset, result.cacheDir = snapshot.Profile, item.preset, item.cacheDir
+	if item.preset == snapshot.Preset && item.cacheDir == snapshot.CacheDir {
+		result.kind = resultConfigured
+		result.process = process
+		return result
+	}
+	if c.validateSetup != nil {
+		if err := c.validateSetup(workerCtx, item.preset, item.cacheDir); err != nil {
+			result.kind, result.err, result.preserve = resultFailed, fmt.Errorf("validate Lumen setup: %w", err), true
+			result.process = process
+			return result
+		}
+	}
+
+	wasRunning := process != nil && snapshot.ProcessPhase == dto.LumenRunning && snapshot.DesiredState == dto.DesiredRunning
+	if !wasRunning {
+		if process != nil || snapshot.ProcessPhase != dto.LumenStopped {
+			result.kind, result.err, result.ownership = resultFailed, operation.NewError(dto.ErrorOperationConflict, "Lumen configuration can only change while stopped or running normally"), process != nil
+			return result
+		}
+		if err := c.setupStore.SaveSetup(workerCtx, item.preset, item.cacheDir); err != nil {
+			result.kind, result.err, result.preserve = resultFailed, fmt.Errorf("persist Lumen setup: %w", err), true
+			return result
+		}
+		result.kind = resultConfigured
+		return result
+	}
+
+	process.stopping.Store(true)
+	if process.Cancel != nil {
+		process.Cancel()
+	}
+	if !waitCompletion(process.completion, c.stopBudget) {
+		result.kind, result.err, result.ownership = resultFailed, operation.NewError(dto.ErrorStopTimeout, "Lumen process tree did not stop before reconfiguration"), true
+		result.process = process
+		return result
+	}
+
+	if err := c.setupStore.SaveSetup(workerCtx, item.preset, item.cacheDir); err != nil {
+		return c.restorePreviousSetup(result, snapshot, fmt.Errorf("persist Lumen setup: %w", err), workerCtx)
+	}
+
+	started := c.startWorker(result, item.generationID, snapshot.Profile, workerCtx)
+	if started.kind == resultStarted {
+		started.kind = resultConfigured
+		started.preset = item.preset
+		started.cacheDir = item.cacheDir
+		return started
+	}
+	if started.process != nil && started.ownership {
+		started.process.stopping.Store(true)
+		if started.process.Cancel != nil {
+			started.process.Cancel()
+		}
+		_ = waitCompletion(started.process.completion, c.stopBudget)
+	}
+	return c.restorePreviousSetup(result, snapshot, fmt.Errorf("start reconfigured Lumen: %w", started.err), workerCtx)
+}
+
+func (c *Controller) restorePreviousSetup(result workerResult, previous dto.LumenSnapshot, cause error, workerCtx context.Context) workerResult {
+	if err := c.setupStore.SaveSetup(workerCtx, previous.Preset, previous.CacheDir); err != nil {
+		result.kind = resultFailed
+		result.err = fmt.Errorf("%v; restore previous Lumen setup: %w", cause, err)
+		return result
+	}
+	rollback := c.startWorker(result, c.sequence.Add(1), previous.Profile, workerCtx)
+	if rollback.kind != resultStarted {
+		result.kind = resultFailed
+		result.err = fmt.Errorf("%v; restart previous Lumen setup: %w", cause, rollback.err)
+		result.process = rollback.process
+		result.ownership = rollback.ownership
+		return result
+	}
+	rollback.kind = resultFailed
+	rollback.err = cause
+	rollback.preserve = true
+	rollback.profile = previous.Profile
+	rollback.preset = previous.Preset
+	rollback.cacheDir = previous.CacheDir
+	return rollback
 }
 
 func (c *Controller) startWorker(result workerResult, id uint64, profile string, workerCtx context.Context) workerResult {
@@ -749,6 +854,32 @@ func (c *Controller) handleResult(result workerResult, process **ownedProcess, r
 			snapshot.CacheDir = result.cacheDir
 			snapshot.Version++
 		})
+	case resultConfigured:
+		previousProcess := *process
+		*process = result.process
+		c.mu.Lock()
+		c.preset, c.cacheDir = result.preset, result.cacheDir
+		c.mu.Unlock()
+		_ = c.operations.Succeed(result.operationID)
+		c.commit(func(snapshot *dto.LumenSnapshot) {
+			snapshot.Preset = result.preset
+			snapshot.CacheDir = result.cacheDir
+			if result.process == nil {
+				snapshot.ProcessPhase = dto.LumenStopped
+				snapshot.Ownership = dto.OwnershipNone
+			} else {
+				snapshot.ProcessPhase = dto.LumenRunning
+				snapshot.Ownership = dto.OwnershipHeld
+				snapshot.Control = dto.LumenControlStatus{Phase: dto.LumenControlStarting}
+			}
+			snapshot.RecoveryCause = ""
+			snapshot.Version++
+		})
+		if result.process != nil && previousProcess != result.process {
+			c.watch(result.process, results)
+			c.resetRetryAfterStable(result.process, results)
+			c.watchControlStatus(result.process, results)
+		}
 	case resultStarted:
 		*process = result.process
 		_ = c.operations.Succeed(result.operationID)
@@ -820,6 +951,12 @@ func (c *Controller) handleResult(result workerResult, process **ownedProcess, r
 		}
 	case resultFailed:
 		if result.preserve {
+			if result.process != nil && *process != result.process {
+				*process = result.process
+				c.watch(result.process, results)
+				c.resetRetryAfterStable(result.process, results)
+				c.watchControlStatus(result.process, results)
+			}
 			c.commit(func(snapshot *dto.LumenSnapshot) {
 				*snapshot = result.previous
 				snapshot.Version++

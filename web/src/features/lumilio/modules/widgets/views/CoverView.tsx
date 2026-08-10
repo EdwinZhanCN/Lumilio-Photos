@@ -14,7 +14,7 @@ export function CoverView({ data, size, source }: ViewBodyProps) {
   const { assets, isLoading } = useWidgetAssetsPreview(source, 1);
   const cover = assets[0];
 
-  const heading = data.title ?? t("lumilio.widgets.resultsTitle", "Photos from Lumilio");
+  const heading = data.title ?? t("lumilio.widgets.resultsTitle", "Photos from Lumilio Agent");
   const facets = data.facets;
   const date = dateRangeLabel(facets?.date_range);
   const place = facets?.top_places?.[0]?.name;

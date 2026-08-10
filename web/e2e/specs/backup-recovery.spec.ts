@@ -26,6 +26,20 @@ type RepositoryList = {
   repositories?: Repository[];
 };
 
+type RestoreOperation = {
+  id: string;
+  status:
+    | "staged"
+    | "restart_requested"
+    | "installing"
+    | "verifying"
+    | "completed"
+    | "rolling_back"
+    | "rolled_back"
+    | "failed";
+  message: string;
+};
+
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const compose = [
   "compose",
@@ -49,6 +63,7 @@ async function createRepository(token: string, name: string): Promise<Repository
     token,
     body: JSON.stringify({
       name,
+      directory_name: name,
       role: "regular",
       storage_strategy: "flat",
       duplicate_handling: "rename",
@@ -137,7 +152,7 @@ function installCorruptBackupFixture(): string {
   return name;
 }
 
-async function restoreFromRow(page: Page, row: Locator, expectedStatus: number) {
+async function restoreFromRow(page: Page, row: Locator): Promise<string> {
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -157,7 +172,79 @@ async function restoreFromRow(page: Page, row: Locator, expectedStatus: number) 
     })
     .click();
   const response = await responsePromise;
-  expect(response.status()).toBe(expectedStatus);
+  expect(response.status()).toBe(202);
+  const operation = (await response.json()) as RestoreOperation;
+  expect(operation.id).toBeTruthy();
+  return operation.id;
+}
+
+async function rejectRestoreFromRow(page: Page, row: Locator): Promise<void> {
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname.endsWith("/restore"),
+    { timeout: 120_000 },
+  );
+  await row
+    .getByRole("button", {
+      name: t("settings.serverSettings.backup.restore"),
+      exact: true,
+    })
+    .click();
+  await row
+    .getByRole("button", {
+      name: t("settings.serverSettings.backup.confirmYes"),
+      exact: true,
+    })
+    .click();
+  const response = await responsePromise;
+  expect(response.status()).toBe(500);
+}
+
+async function readRestoreOperation(
+  token: string,
+  operationID: string,
+): Promise<RestoreOperation | null> {
+  try {
+    return await api<RestoreOperation>(
+      `/api/v1/settings/backup-restores/${encodeURIComponent(operationID)}`,
+      { token },
+    );
+  } catch {
+    // The active HTTP generation disappears while the catalog is swapped. A
+    // transport failure is an expected intermediate state, not a terminal one.
+    return null;
+  }
+}
+
+async function waitForRestoreTerminal(
+  token: string,
+  operationID: string,
+): Promise<RestoreOperation> {
+  let terminal: RestoreOperation | null = null;
+  await expect
+    .poll(
+      async () => {
+        const operation = await readRestoreOperation(token, operationID);
+        if (
+          operation &&
+          (operation.status === "completed" ||
+            operation.status === "rolled_back" ||
+            operation.status === "failed")
+        ) {
+          terminal = operation;
+        }
+        return terminal?.status;
+      },
+      {
+        message: `restore operation ${operationID} should reach a terminal receipt`,
+        timeout: 90_000,
+        intervals: [500, 1_000, 2_000, 3_000],
+      },
+    )
+    .toBeTruthy();
+  if (!terminal) throw new Error(`restore operation ${operationID} never became terminal`);
+  return terminal;
 }
 
 test("@backup-recovery admin UI proves backup, download, restore, and rollback", async ({
@@ -227,7 +314,9 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
   );
   expect(await repositoryExists(workspace.token, afterBackup.id)).toBe(true);
 
-  await restoreFromRow(page, routineRow, 200);
+  const successfulOperationID = await restoreFromRow(page, routineRow);
+  const successfulOperation = await waitForRestoreTerminal(workspace.token, successfulOperationID);
+  expect(successfulOperation.status).toBe("completed");
   await expect
     .poll(() => repositoryPresence(workspace.token, afterBackup.id), {
       message: "successful restore should remove data created after the dump",
@@ -254,13 +343,8 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
     .click();
   const corruptRow = backupRow(page, corruptName);
   await expect(corruptRow).toBeVisible();
-  await restoreFromRow(page, corruptRow, 500);
-
-  await expect(
-    page.getByText(t("settings.serverSettings.backup.restoreFailed"), {
-      exact: true,
-    }),
-  ).toBeVisible();
+  await rejectRestoreFromRow(page, corruptRow);
+  await expect(page.getByText("Restore could not be staged", { exact: true })).toBeVisible();
   await expect
     .poll(() => repositoryPresence(workspace.token, rollbackProof.id), {
       message: "failed restore should preserve the pre-restore public state",

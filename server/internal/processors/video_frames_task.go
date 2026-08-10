@@ -52,13 +52,22 @@ func (ap *AssetProcessor) ProcessVideoFramesTask(ctx context.Context, args jobs.
 		return fmt.Errorf("asset content hash is required")
 	}
 
-	webPath := webVideoPath(repository.Path, asset.ContentHash)
-	if _, err := os.Stat(webPath); err != nil {
+	repositoryFS, err := ap.files.Open(repository)
+	if err != nil {
+		return err
+	}
+	defer repositoryFS.Close()
+	privatePath, err := derivedPath("videos", "web", fmt.Sprintf("%s_web.mp4", asset.ContentHash))
+	if err != nil {
+		return err
+	}
+	webPath, err := repositoryFS.LocalPrivatePath(privatePath)
+	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// Transcode may still be in flight on a retry race; snooze briefly.
 			return river.JobSnooze(30 * time.Second)
 		}
-		return fmt.Errorf("stat web video: %w", err)
+		return fmt.Errorf("open web video: %w", err)
 	}
 
 	durationSec := 0.0

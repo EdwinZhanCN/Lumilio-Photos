@@ -1,13 +1,13 @@
 # Monitor
 
 Monitor owns the admin-only `/server-monitor` operational dashboard for
-River queues, ML indexing coverage, rebuild commands, and runtime
-capabilities. It observes and triggers backend work but does not define task
-enablement, queue semantics, or repository configuration.
+River queues, ML indexing coverage, rebuild commands, runtime capabilities,
+and hierarchical storage health. It observes and triggers backend work but
+does not define task enablement, queue semantics, or repository configuration.
 
 ## State
 
-[MonitorOverview](./flows/overview/MonitorOverview.tsx) keeps the selected queue/ML/capabilities tab in the
+[MonitorOverview](./flows/overview/MonitorOverview.tsx) keeps the selected queue/ML/capabilities/storage tab in the
 `tab` URL parameter. The ML view's optional repository scope is local to the
 route and is not persisted as browse or upload preference.
 [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) keeps only expanded rows and transient copied status;
@@ -21,10 +21,12 @@ The route checks the authenticated user before monitor queries render.
 ```mermaid
 flowchart TD
     ROUTE["/server-monitor"] --> ADMIN["admin gate"]
-    ADMIN --> TABS["queue / ML / capabilities"]
+    ADMIN --> TABS["queue / ML / capabilities / storage"]
     TABS --> QUEUE["StatMonitor + QueueSummaryList"]
     TABS --> ML["MLMonitor"]
     TABS --> CAP["CapabilitiesMonitor"]
+    TABS --> STORAGE["StorageMonitor"]
+    STORAGE --> HISTORY["LifecycleHistory"]
     ML --> REPOSITORY["optional repository scope"]
     ML --> REBUILD["task rebuild"]
 ```
@@ -32,7 +34,11 @@ flowchart TD
 [StatMonitor](./flows/overview/StatMonitor.tsx) and [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) form the queue view.
 [MLMonitor](./flows/overview/MLMonitor.tsx) combines coverage, repository options, and one confirmed
 rebuild command. [CapabilitiesMonitor](./flows/overview/CapabilitiesMonitor.tsx) is display-only; durable ML and
-agent settings stay in Settings.
+agent settings stay in Settings. [StorageMonitor](./flows/overview/StorageMonitor.tsx) groups repositories
+below their owning Storage Locations and exposes capacity, mount, risk, and
+redacted support-bundle diagnostics in a fixed-height master-detail pane
+whose tree and detail column scroll independently.
+[LifecycleHistory](./flows/overview/LifecycleHistory.tsx) renders the durable lifecycle audit below the pane.
 
 ## Data
 

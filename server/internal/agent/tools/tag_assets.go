@@ -32,11 +32,12 @@ type TagAssetsOutput struct {
 }
 
 type TagConfirmationInfo struct {
-	Action string   `json:"action"`
-	RefID  string   `json:"ref_id"`
-	Count  int      `json:"count"`
-	Mode   string   `json:"mode"`
-	Tags   []string `json:"tags"`
+	EffectID string   `json:"effect_id"`
+	Action   string   `json:"action"`
+	RefID    string   `json:"ref_id"`
+	Count    int      `json:"count"`
+	Mode     string   `json:"mode"`
+	Tags     []string `json:"tags"`
 }
 
 type tagInterruptState struct {
@@ -70,8 +71,13 @@ func RegisterTagAssets() {
 					return &TagAssetsOutput{Error: ref.Internal("effect identity")}, nil
 				}
 				if !resumeApproved(ctx) {
-					_ = deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID)
 					message := "Tag change was not applied: the user declined."
+					if err := deps.Effects.Reject(ctx, deps.UserID, deps.ThreadID, effectID); err != nil {
+						refErr := ref.Internal("tag rejection")
+						sendError(deps, info.Name, execID, start, refErr)
+						return &TagAssetsOutput{Error: refErr}, nil
+					}
+					sendEffectReceipt(deps, info.Name, execID, rejectedEffectReceipt(state.EffectID, info.Name, state.Count, message))
 					sendSuccess(deps, info.Name, execID, start, message, nil)
 					return &TagAssetsOutput{Summary: message}, nil
 				}
@@ -83,6 +89,7 @@ func RegisterTagAssets() {
 					return &TagAssetsOutput{Error: refErr}, nil
 				}
 				message := committedReceiptMessage(receipt)
+				sendEffectReceipt(deps, info.Name, execID, receipt)
 				sendSuccess(deps, info.Name, execID, start, message, &core.DataPayload{RefID: state.RefID, Count: receipt.Count})
 				return &TagAssetsOutput{RefID: state.RefID, Count: receipt.Count, Summary: message, AlreadyCommitted: receipt.AlreadyCommitted}, nil
 			}
@@ -124,7 +131,7 @@ func RegisterTagAssets() {
 				return &TagAssetsOutput{Error: refErr}, nil
 			}
 			return nil, compose.StatefulInterrupt(ctx,
-				&TagConfirmationInfo{Action: info.Name, RefID: r.ID, Count: r.Count(), Mode: mode, Tags: tagNames},
+				&TagConfirmationInfo{EffectID: effectID.String(), Action: info.Name, RefID: r.ID, Count: r.Count(), Mode: mode, Tags: tagNames},
 				&tagInterruptState{EffectID: effectID.String(), RefID: r.ID, Count: r.Count()},
 			)
 		})

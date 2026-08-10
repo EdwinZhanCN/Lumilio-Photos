@@ -30,7 +30,7 @@ func (q *Queries) DeleteExternalRepositoryRoot(ctx context.Context, rootID uuid.
 }
 
 const getDefaultRepositoryRoot = `-- name: GetDefaultRepositoryRoot :one
-SELECT root_id, name, path, kind, status, created_at, updated_at FROM repository_roots
+SELECT root_id, name, path, kind, status, mount_fingerprint, created_at, updated_at FROM repository_roots
 WHERE kind = 'default'
 `
 
@@ -43,6 +43,7 @@ func (q *Queries) GetDefaultRepositoryRoot(ctx context.Context) (RepositoryRoot,
 		&i.Path,
 		&i.Kind,
 		&i.Status,
+		&i.MountFingerprint,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -50,7 +51,7 @@ func (q *Queries) GetDefaultRepositoryRoot(ctx context.Context) (RepositoryRoot,
 }
 
 const getRepositoryRoot = `-- name: GetRepositoryRoot :one
-SELECT root_id, name, path, kind, status, created_at, updated_at FROM repository_roots
+SELECT root_id, name, path, kind, status, mount_fingerprint, created_at, updated_at FROM repository_roots
 WHERE root_id = ?1
 `
 
@@ -63,6 +64,7 @@ func (q *Queries) GetRepositoryRoot(ctx context.Context, rootID uuid.UUID) (Repo
 		&i.Path,
 		&i.Kind,
 		&i.Status,
+		&i.MountFingerprint,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -70,7 +72,7 @@ func (q *Queries) GetRepositoryRoot(ctx context.Context, rootID uuid.UUID) (Repo
 }
 
 const getRepositoryRootByPath = `-- name: GetRepositoryRootByPath :one
-SELECT root_id, name, path, kind, status, created_at, updated_at FROM repository_roots
+SELECT root_id, name, path, kind, status, mount_fingerprint, created_at, updated_at FROM repository_roots
 WHERE path = ?1
 `
 
@@ -83,6 +85,7 @@ func (q *Queries) GetRepositoryRootByPath(ctx context.Context, path string) (Rep
 		&i.Path,
 		&i.Kind,
 		&i.Status,
+		&i.MountFingerprint,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -90,7 +93,7 @@ func (q *Queries) GetRepositoryRootByPath(ctx context.Context, path string) (Rep
 }
 
 const listRepositoryRoots = `-- name: ListRepositoryRoots :many
-SELECT root_id, name, path, kind, status, created_at, updated_at FROM repository_roots
+SELECT root_id, name, path, kind, status, mount_fingerprint, created_at, updated_at FROM repository_roots
 ORDER BY kind ASC, created_at ASC
 `
 
@@ -109,6 +112,7 @@ func (q *Queries) ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, er
 			&i.Path,
 			&i.Kind,
 			&i.Status,
+			&i.MountFingerprint,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -125,38 +129,6 @@ func (q *Queries) ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, er
 	return items, nil
 }
 
-const setRepositoryRoot = `-- name: SetRepositoryRoot :one
-UPDATE repositories
-SET root_id = ?2, updated_at = ?3
-WHERE repo_id = ?1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id, role, root_id
-`
-
-type SetRepositoryRootParams struct {
-	RepoID    uuid.UUID         `db:"repo_id" json:"repo_id"`
-	RootID    uuid.NullUUID     `db:"root_id" json:"root_id"`
-	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-}
-
-func (q *Queries) SetRepositoryRoot(ctx context.Context, arg SetRepositoryRootParams) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, setRepositoryRoot, arg.RepoID, arg.RootID, arg.UpdatedAt)
-	var i Repository
-	err := row.Scan(
-		&i.RepoID,
-		&i.Name,
-		&i.Path,
-		&i.Config,
-		&i.Status,
-		&i.LastSync,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DefaultOwnerID,
-		&i.Role,
-		&i.RootID,
-	)
-	return i, err
-}
-
 const updateRepositoryRootFromDisk = `-- name: UpdateRepositoryRootFromDisk :one
 UPDATE repository_roots
 SET
@@ -164,7 +136,7 @@ SET
     status = ?3,
     updated_at = ?4
 WHERE root_id = ?1
-RETURNING root_id, name, path, kind, status, created_at, updated_at
+RETURNING root_id, name, path, kind, status, mount_fingerprint, created_at, updated_at
 `
 
 type UpdateRepositoryRootFromDiskParams struct {
@@ -188,6 +160,36 @@ func (q *Queries) UpdateRepositoryRootFromDisk(ctx context.Context, arg UpdateRe
 		&i.Path,
 		&i.Kind,
 		&i.Status,
+		&i.MountFingerprint,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateRepositoryRootMountFingerprint = `-- name: UpdateRepositoryRootMountFingerprint :one
+UPDATE repository_roots
+SET mount_fingerprint = ?2, updated_at = ?3
+WHERE root_id = ?1
+RETURNING root_id, name, path, kind, status, mount_fingerprint, created_at, updated_at
+`
+
+type UpdateRepositoryRootMountFingerprintParams struct {
+	RootID           uuid.UUID         `db:"root_id" json:"root_id"`
+	MountFingerprint string            `db:"mount_fingerprint" json:"mount_fingerprint"`
+	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateRepositoryRootMountFingerprint(ctx context.Context, arg UpdateRepositoryRootMountFingerprintParams) (RepositoryRoot, error) {
+	row := q.db.QueryRowContext(ctx, updateRepositoryRootMountFingerprint, arg.RootID, arg.MountFingerprint, arg.UpdatedAt)
+	var i RepositoryRoot
+	err := row.Scan(
+		&i.RootID,
+		&i.Name,
+		&i.Path,
+		&i.Kind,
+		&i.Status,
+		&i.MountFingerprint,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -201,28 +203,34 @@ INSERT INTO repository_roots (
     path,
     kind,
     status,
+    mount_fingerprint,
     created_at,
     updated_at
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6, ?7
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
 )
 ON CONFLICT (root_id) DO UPDATE SET
     name = EXCLUDED.name,
     path = EXCLUDED.path,
     kind = EXCLUDED.kind,
     status = EXCLUDED.status,
+    mount_fingerprint = CASE
+        WHEN repository_roots.mount_fingerprint = '' THEN EXCLUDED.mount_fingerprint
+        ELSE repository_roots.mount_fingerprint
+    END,
     updated_at = EXCLUDED.updated_at
-RETURNING root_id, name, path, kind, status, created_at, updated_at
+RETURNING root_id, name, path, kind, status, mount_fingerprint, created_at, updated_at
 `
 
 type UpsertRepositoryRootParams struct {
-	RootID    uuid.UUID                    `db:"root_id" json:"root_id"`
-	Name      string                       `db:"name" json:"name"`
-	Path      string                       `db:"path" json:"path"`
-	Kind      dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
-	Status    dbtypes.RepositoryRootStatus `db:"status" json:"status"`
-	CreatedAt dbtypes.Timestamp            `db:"created_at" json:"created_at"`
-	UpdatedAt dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
+	RootID           uuid.UUID                    `db:"root_id" json:"root_id"`
+	Name             string                       `db:"name" json:"name"`
+	Path             string                       `db:"path" json:"path"`
+	Kind             dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
+	Status           dbtypes.RepositoryRootStatus `db:"status" json:"status"`
+	MountFingerprint string                       `db:"mount_fingerprint" json:"mount_fingerprint"`
+	CreatedAt        dbtypes.Timestamp            `db:"created_at" json:"created_at"`
+	UpdatedAt        dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpsertRepositoryRoot(ctx context.Context, arg UpsertRepositoryRootParams) (RepositoryRoot, error) {
@@ -232,6 +240,7 @@ func (q *Queries) UpsertRepositoryRoot(ctx context.Context, arg UpsertRepository
 		arg.Path,
 		arg.Kind,
 		arg.Status,
+		arg.MountFingerprint,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -242,6 +251,7 @@ func (q *Queries) UpsertRepositoryRoot(ctx context.Context, arg UpsertRepository
 		&i.Path,
 		&i.Kind,
 		&i.Status,
+		&i.MountFingerprint,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

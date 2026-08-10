@@ -42,6 +42,14 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
 - `server/internal/processors`: ingest, metadata, thumbnail, transcode pipeline.
 - `server/internal/queue`: River jobs and workers.
+- Event topology is owner-wide and derived from logical `media_item` facts.
+  `source_revision`/`published_revision` and the shared Event resolver are the
+  lifecycle authority; repository Browse Scope is applied only as a read
+  projection.
+- Owner scope is explicit at topology boundaries: a generic administrator
+  asset browse may omit `OwnerID` to view the whole library, but an
+  owner-scoped topology such as Event must always carry its resolved owner into
+  downstream asset queries. `nil` must never be used to infer an Event owner.
 - `server/internal/storage`: repository layout, staging, scanner, repository config.
 - `server/internal/sourcing`: unified ingest materialization for upload, scan, and cloud flows.
 - `server/internal/db` and `server/migrations`: the single-writer SQLite runtime,
@@ -100,4 +108,12 @@ useful; implementation plans belong in `exec-plans/`.
 - The SQLite catalog, cloud sessions, secrets, logs, and database backups are app-private state and
   must be configured outside `storage.path`. Repository staging remains inside
   its repository under `.lumilio/staging`.
+- Registered repository I/O is rooted by `internal/storage.RepositoryFS` and
+  serialized against repository relocation/removal. Durable asset and job paths
+  are canonical repository-relative values; native codecs receive absolute
+  filenames only through the explicit local-path adapter.
+- The application SQLite catalog owns the rebuildable `repository_file_index`.
+  Scans include `inbox/`, exclude `.lumilio/`, preserve asset identity only for
+  unique full-BLAKE3 move matches, and require two authoritative absences before
+  soft deletion.
 - ML/Lumen paths should degrade when features are disabled; media management should remain usable without external ML.

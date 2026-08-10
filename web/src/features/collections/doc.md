@@ -1,6 +1,6 @@
 # Collections
 
-Collections owns grouped ways of browsing the library: albums, places and
+Collections owns grouped ways of browsing the catalog: albums, places and
 derived trips, people entry surfaces, folders, tags, Liked, duplicate review,
 shared-link navigation, and classifier views. Person identity correction
 remains in People; asset presentation remains in Assets.

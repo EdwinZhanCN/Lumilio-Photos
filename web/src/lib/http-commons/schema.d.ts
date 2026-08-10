@@ -298,6 +298,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/effects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Effect Status */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Thread that owns the effect */
+                    thread_id: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Effect ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["handler.AgentEffectStatusResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/pins": {
         parameters: {
             query?: never;
@@ -703,7 +772,7 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
-                /** @description Semantic search unavailable */
+                /** @description Image Semantic Analysis unavailable */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -1819,7 +1888,7 @@ export interface paths {
         };
         /**
          * Get asset by ID
-         * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.
+         * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, BioCLIP Species Recognition predictions, OCR Text Recognition results, Person Recognition results, and captions.
          */
         get: {
             parameters: {
@@ -1832,9 +1901,9 @@ export interface paths {
                     include_albums?: boolean;
                     /** @description Include species predictions */
                     include_species?: boolean;
-                    /** @description Include OCR results */
+                    /** @description Include OCR Text Recognition results */
                     include_ocr?: boolean;
-                    /** @description Include face recognition */
+                    /** @description Include Person Recognition results */
                     include_faces?: boolean;
                 };
                 header?: never;
@@ -4397,7 +4466,7 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
-                /** @description Semantic search unavailable */
+                /** @description Image Semantic Analysis unavailable */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -6447,7 +6516,7 @@ export interface paths {
         put?: never;
         /**
          * Preview a zero-shot classifier
-         * @description Embed positive/negative prompts with semantic and return library assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.
+         * @description Embed positive/negative prompts with Image Semantic Analysis and return catalog assets whose contrastive score exceeds the threshold. Used to tune prompts and thresholds before persisting a smart album. Requires the semantic embedding pipeline and a reachable semantic text-embed task.
          */
         post: {
             parameters: {
@@ -7037,6 +7106,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cloud/import-runs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel cloud import run */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Import run UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cancelled run */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.CloudImportRunDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cloud/import-runs/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume cloud import run */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Import run UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Resumed import */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StartCloudImportResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cloud/providers": {
         parameters: {
             query?: never;
@@ -7538,10 +7685,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Events */
+        /**
+         * List Events
+         * @description List owner-scoped Events, optionally projecting membership counts and covers to one repository.
+         */
         get: {
             parameters: {
                 query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                    /** @description Include Events hidden from the default grid */
+                    include_hidden?: boolean;
                     /** @description Page size */
                     limit?: number;
                     /** @description Opaque cursor */
@@ -7582,7 +7736,10 @@ export interface paths {
         /** Get Event */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Optional repository Browse Scope */
+                    repository_id?: string;
+                };
                 header?: never;
                 path: {
                     /** @description Event UUID */
@@ -7650,6 +7807,8 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
+                    /** @description Optional repository Browse Scope */
+                    repository_id?: string;
                     /** @description Page size */
                     limit?: number;
                 };
@@ -7958,17 +8117,94 @@ export interface paths {
                 };
             };
             responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRebuildAcceptedDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/rebuild/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Event rebuild state */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Rebuild state */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.EventRebuildStateRequestDTO"];
+                };
+            };
+            responses: {
                 /** @description OK */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.EventRebuildPreviewDTO"];
+                        "application/json": components["schemas"]["dto.EventRebuildStatusDTO"];
                     };
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/v1/events/rebuild/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event rebuild status */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.EventRebuildStatusDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8006,6 +8242,269 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["handler.HealthResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List unfinished native host actions */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Request a native host storage action
+         * @description Creates a persistent, expiring task. Filesystem paths and approval nonces never enter this HTTP request or response.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Stable request identifier */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Native host action */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.CreateHostActionRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-actions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get native host action */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Host action ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Cancel native host action */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Host action ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-actions/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve native host action conflict */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Host action ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Recovery decision */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.ResolveHostActionRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-actions/native-capability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get native host capability */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.NativeHostCapabilityDTO"];
                     };
                 };
             };
@@ -8412,7 +8911,7 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
-                /** @description Semantic search unavailable */
+                /** @description Image Semantic Analysis unavailable */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -8998,7 +9497,7 @@ export interface paths {
         put?: never;
         /**
          * Merge people
-         * @description Merge one or more source people into the target person. Assets remain in the library and corrections become manual.
+         * @description Merge one or more source people into the target person. Assets remain in the Lumilio catalog and corrections become manual.
          */
         post: {
             parameters: {
@@ -9611,7 +10110,7 @@ export interface paths {
         put?: never;
         /**
          * Create repository
-         * @description Create a repository folder under a registered Storage Location. Empty root_id selects the configured default. If the target already contains a .lumiliorepo file, it is registered instead.
+         * @description Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty root_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.
          */
         post: {
             parameters: {
@@ -9734,7 +10233,65 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove repository registration
+         * @description Remove a non-primary repository and its catalog/index/task state after an exact repository-name confirmation. Original media, marker, and private files remain on disk.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Exact repository-name confirmation */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.RemoveRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Repository registration removed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Invalid confirmation */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Repository not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Primary or busy repository */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -9832,7 +10389,12 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            /** @description Cloud source selection */
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.StartRepositoryCloudImportRequest"];
+                };
+            };
             responses: {
                 /** @description Import started */
                 200: {
@@ -9863,6 +10425,169 @@ export interface paths {
                 };
                 /** @description Internal server error */
                 500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/cloud/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bind a cloud source to a repository
+         * @description Bind one user-owned credential plus remote scope to an existing repository and start an independent import run.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Cloud source */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.BindRepositoryCloudSourceRequest"];
+                };
+            };
+            responses: {
+                /** @description Source bound and import started */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StartCloudImportResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/removal-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview repository removal
+         * @description Return the catalog, album, queued-work, and private-state impact of removing a non-primary repository registration. Files on disk are always preserved.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository removal impact */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryRemovalImpactDTO"];
+                    };
+                };
+                /** @description Repository not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename repository
+         * @description Change the display name without changing identity, path, storage strategy, duplicate handling, owner, role, or root.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description New display name */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.RenameRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -10092,6 +10817,288 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories/lifecycle-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List repository lifecycle audit events */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum events (1-200) */
+                    limit?: number;
+                    /** @description Pagination offset */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ListLifecycleAuditEventsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/storage-diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Storage Location and repository diagnostics */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageDiagnosticsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/storage-support-bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a path-redacted storage support bundle */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageSupportBundleDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repository-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List repository candidates
+         * @description Returns bounded direct-child facts for standalone and Docker workflows without accepting arbitrary filesystem paths.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ListRepositoryCandidatesResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repository-candidates/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open repository candidate
+         * @description Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Stable request identifier */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository candidate */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.OpenRepositoryCandidateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryConflictDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repository-candidates/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve repository candidate identity
+         * @description Resolves a same-identity direct child using user-facing decisions; no arbitrary filesystem path is accepted.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Stable request identifier */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository candidate decision */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.ResolveRepositoryCandidateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repository-roots": {
         parameters: {
             query?: never;
@@ -10119,6 +11126,201 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["dto.ListRepositoryRootsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repository-roots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Storage Location registration
+         * @description Remove an empty, idle external Storage Location from Lumilio. The directory, .lumilioroot marker, and every disk file are preserved.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Storage Location UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Storage Location registration removed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+                /** @description Storage Location not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Default, non-empty, or busy Storage Location */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/backup-restores/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get database restore operation
+         * @description Return the latest durable phase for an accepted restore operation, including completion or successful rollback after a runtime restart.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Restore operation ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Restore operation */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RestoreOperationDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Restore operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Restore operation could not be read */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/backup-restores/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get latest database restore operation
+         * @description Return the latest durable restore receipt, if one exists.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Latest restore operation */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RestoreOperationDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description No restore operation exists */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Restore operation could not be read */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
             };
@@ -10378,7 +11580,7 @@ export interface paths {
         put?: never;
         /**
          * Restore a database backup
-         * @description Restore the named SQLite snapshot. A restore point of the current database is taken first; on failure the database is rolled back automatically. Synchronous — the response arrives when the restore has finished.
+         * @description Validate and stage the named SQLite snapshot. The accepted operation continues across a runtime restart; poll the returned operation ID for completion or rollback.
          */
         post: {
             parameters: {
@@ -10392,13 +11594,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Backup restored */
-                200: {
+                /** @description Restore accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
+                        "application/json": components["schemas"]["dto.RestoreOperationDTO"];
                     };
                 };
                 /** @description Invalid backup name */
@@ -10428,7 +11630,7 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
-                /** @description Restore failed (database rolled back) */
+                /** @description Restore could not be staged */
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -10619,8 +11821,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Validate LLM settings
-         * @description Validate the persisted LLM configuration by issuing a lightweight test request.
+         * Validate an LLM settings draft
+         * @description Validate the supplied provider/model draft without saving it or returning secret material.
          */
         post: {
             parameters: {
@@ -10629,13 +11831,14 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
+            /** @description LLM settings draft */
+            requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["dto.ValidateLLMSettingsRequestDTO"];
                 };
             };
             responses: {
-                /** @description LLM settings validated successfully */
+                /** @description LLM settings draft validated successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10655,15 +11858,6 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -11884,6 +13078,15 @@ export interface components {
             /** @example Operation completed successfully */
             message?: string;
         };
+        "core.EffectReceipt": {
+            album_id?: number;
+            already_committed?: boolean;
+            count?: number;
+            effect_id?: string;
+            message?: string;
+            status?: string;
+            tool_name?: string;
+        };
         /** @enum {string} */
         "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
         "dbtypes.AudioSpecificMetadata": {
@@ -12454,6 +13657,12 @@ export interface components {
             success?: boolean;
             task_id?: number;
         };
+        "dto.BindRepositoryCloudSourceRequest": {
+            credential_id: string;
+            remote_scope?: {
+                [key: string]: string;
+            };
+        };
         "dto.BrowseItemDTO": {
             /** @example 12500 */
             best_ts_ms?: number;
@@ -12659,6 +13868,27 @@ export interface components {
             challenge?: components["schemas"]["dto.CloudAuthChallengeDTO"];
             credential?: components["schemas"]["dto.CloudCredentialDTO"];
         };
+        "dto.CreateHostActionRequestDTO": {
+            /** @example 0 */
+            expected_version?: number;
+            /** @example 600 */
+            expires_in_seconds?: number;
+            /**
+             * @example open_repository
+             * @enum {string}
+             */
+            kind: "authorize_storage_location" | "open_repository" | "locate_storage_location" | "locate_repository";
+            /** @example External Archive */
+            name?: string;
+            /** @example Open an existing photo repository */
+            purpose?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            root_id?: string;
+            /** @example web-session-4d4d */
+            session_id?: string;
+        };
         "dto.CreateManualStackRequestDTO": {
             /**
              * @example [
@@ -12669,20 +13899,20 @@ export interface components {
             asset_ids?: string[];
         };
         "dto.CreateRepositoryRequestDTO": {
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            cloud_credential_id?: string;
             /**
-             * @example rename
-             * @enum {string}
+             * @description DirectoryName is the single direct-child folder segment below the selected
+             *     Storage Location. It is required for regular repositories and omitted for
+             *     the primary repository, whose folder is always "primary".
+             * @example family-photos
              */
-            duplicate_handling?: "rename" | "uuid" | "overwrite";
+            directory_name?: string;
             /**
-             * @description Name is preserved verbatim as the directory name for regular
-             *     repositories. It accepts Unicode letters/digits, ASCII spaces, hyphens,
-             *     and underscores; leading/trailing spaces are rejected.
+             * @description Name is the mutable repository display name and is independent of its
+             *     stable on-disk folder.
              * @example Family Photos
              */
             name: string;
+            risk_confirmation?: boolean;
             /**
              * @example regular
              * @enum {string}
@@ -12701,8 +13931,6 @@ export interface components {
             storage_strategy?: "date" | "flat" | "cas";
         };
         "dto.CreateRepositoryResponseDTO": {
-            cloud_import_error?: string;
-            cloud_import_run_id?: string;
             repository?: components["schemas"]["dto.RepositoryDTO"];
             /**
              * @description Warnings are non-fatal notes about the chosen location, such as it being
@@ -12881,6 +14109,7 @@ export interface components {
         };
         "dto.EventDetailDTO": {
             algorithm_version?: string;
+            canonical_media_count?: number;
             cover_asset_id?: string;
             cover_media_item_id?: string;
             displayable_count?: number;
@@ -12890,6 +14119,7 @@ export interface components {
             is_hidden?: boolean;
             media_count?: number;
             pending_rebuild?: boolean;
+            projected_media_count?: number;
             redirected_from?: string;
             start_at?: number;
             timezone?: string;
@@ -12914,18 +14144,32 @@ export interface components {
             is_hidden?: boolean;
             title_override?: string;
         };
-        "dto.EventRebuildPreviewDTO": {
-            created?: number;
-            events?: number;
-            members?: number;
-            redirected?: number;
-            retained?: number;
+        "dto.EventRebuildAcceptedDTO": {
+            owner_id?: number;
+            requested_revision?: number;
+            run_id?: string;
         };
         "dto.EventRebuildRequestDTO": {
-            dry_run?: boolean;
-            from?: string;
             owner_id?: number;
-            to?: string;
+        };
+        "dto.EventRebuildStateRequestDTO": {
+            owner_id?: number;
+            paused?: boolean;
+        };
+        "dto.EventRebuildStatusDTO": {
+            algorithm_version?: string;
+            initialized?: boolean;
+            last_error_code?: string;
+            last_failure_run_id?: string;
+            last_success_run_id?: string;
+            paused?: boolean;
+            pending?: boolean;
+            pending_ranges?: number;
+            published_revision?: number;
+            queued_run_id?: string;
+            revision?: number;
+            running_run_id?: string;
+            source_revision?: number;
         };
         "dto.EventRelationsResponseDTO": {
             complete?: boolean;
@@ -12943,6 +14187,7 @@ export interface components {
             before_media_item_id: string;
         };
         "dto.EventSummaryDTO": {
+            canonical_media_count?: number;
             cover_asset_id?: string;
             cover_media_item_id?: string;
             displayable_count?: number;
@@ -12951,6 +14196,7 @@ export interface components {
             event_id?: string;
             is_hidden?: boolean;
             media_count?: number;
+            projected_media_count?: number;
             redirected_from?: string;
             start_at?: number;
             timezone?: string;
@@ -13012,7 +14258,7 @@ export interface components {
             photo_count?: number;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
-            /** @example Primary Library */
+            /** @example Primary Repository */
             repository_name?: string;
             /** @example 18 */
             video_count?: number;
@@ -13029,15 +14275,71 @@ export interface components {
             updated_at?: string;
             user_id?: number;
         };
+        "dto.HostActionConflictDTO": {
+            /**
+             * @example [
+             *       "add_separate"
+             *     ]
+             */
+            allowed_resolutions?: string[];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            risk_warnings?: string[];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            root_id?: string;
+            /** @example repository_identity */
+            type?: string;
+        };
+        "dto.HostActionDTO": {
+            /** @example web:user:1 */
+            actor?: string;
+            completed_at?: string;
+            created_at?: string;
+            /** @example expired */
+            error_code?: string;
+            /** @example Native host approval expired */
+            error_message?: string;
+            expected_version?: number;
+            expires_at?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example open_repository */
+            kind?: string;
+            /** @example External Archive */
+            name?: string;
+            /** @example Open an existing photo repository */
+            purpose?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example web-host-action-4d4d */
+            request_id?: string;
+            result?: components["schemas"]["dto.HostActionResultDTO"];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            root_id?: string;
+            /** @example pending */
+            status?: string;
+            updated_at?: string;
+        };
+        "dto.HostActionResultDTO": {
+            conflict?: components["schemas"]["dto.HostActionConflictDTO"];
+            /** @example External Archive */
+            name?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            root_id?: string;
+        };
         "dto.IndexingRepositoryListResponseDTO": {
             repositories?: components["schemas"]["dto.IndexingRepositoryOptionDTO"][];
         };
         "dto.IndexingRepositoryOptionDTO": {
+            /** @example idle */
+            activity?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
             /** @example false */
             is_primary?: boolean;
-            /** @example Photos Library */
+            /** @example Family Repository */
             name?: string;
             /**
              * @description Path is only populated for admin callers; repository filesystem
@@ -13045,17 +14347,29 @@ export interface components {
              * @example /Volumes/Media/Photos
              */
             path?: string;
+            /**
+             * @description Reachability lets a selector keep an unreachable repository visible as a
+             *     browse filter while refusing it as an upload target. Activity is separate
+             *     so scanning never masks storage availability.
+             * @example active
+             */
+            reachability?: string;
             /** @example regular */
             role?: string;
             /**
-             * @description Status lets a selector keep an unreachable repository visible as a browse
-             *     filter while refusing it as an upload target.
-             * @example active
+             * @description RootID identifies the parent Storage Location so clients can derive an
+             *     effective state with parent reachability taking priority.
+             * @example 550e8400-e29b-41d4-a716-446655440000
              */
-            status?: string;
+            root_id?: string;
         };
         "dto.LLMCapabilitiesDTO": {
             agent_enabled?: boolean;
+            /**
+             * @example ready
+             * @enum {string}
+             */
+            availability?: "disabled" | "not_configured" | "ready";
             configured?: boolean;
             /** @example gpt-4.1-mini */
             model_name?: string;
@@ -13071,6 +14385,25 @@ export interface components {
             model_name?: string;
             /** @example openai */
             provider?: string;
+        };
+        "dto.LifecycleAuditEventDTO": {
+            action?: string;
+            actor?: string;
+            actor_user_id?: number;
+            confirmation_type?: string;
+            details?: Record<string, never>;
+            event_id?: string;
+            failure_stage?: string;
+            host_instance_id?: string;
+            new_path?: string;
+            occurred_at?: string;
+            old_path?: string;
+            operation_id?: string;
+            request_id?: string;
+            result?: string;
+            source?: string;
+            target_id?: string;
+            target_type?: string;
         };
         "dto.ListAlbumsResponseDTO": {
             albums?: components["schemas"]["dto.GetAlbumResponseDTO"][];
@@ -13093,6 +14426,9 @@ export interface components {
             /** @example 7 */
             total?: number;
         };
+        "dto.ListLifecycleAuditEventsResponseDTO": {
+            events?: components["schemas"]["dto.LifecycleAuditEventDTO"][];
+        };
         "dto.ListPeopleResponseDTO": {
             limit?: number;
             offset?: number;
@@ -13107,6 +14443,9 @@ export interface components {
         };
         "dto.ListRepositoriesResponseDTO": {
             repositories?: components["schemas"]["dto.RepositoryDTO"][];
+        };
+        "dto.ListRepositoryCandidatesResponseDTO": {
+            candidates?: components["schemas"]["dto.RepositoryCandidateDTO"][];
         };
         "dto.ListRepositoryRootsResponseDTO": {
             roots?: components["schemas"]["dto.RepositoryRootDTO"][];
@@ -13356,6 +14695,18 @@ export interface components {
         "dto.MoveFaceRequestDTO": {
             target_person_id: number;
         };
+        "dto.NativeHostCapabilityDTO": {
+            available?: boolean;
+        };
+        "dto.OpenRepositoryCandidateRequestDTO": {
+            /**
+             * @description DirectoryName is a portable direct-child folder segment below the
+             *     configured default Storage Location, never an arbitrary host path.
+             * @example family-archive
+             */
+            directory_name: string;
+            risk_confirmation?: boolean;
+        };
         "dto.Option": {
             /** @example Global */
             label?: string;
@@ -13575,6 +14926,54 @@ export interface components {
             password: string;
             username: string;
         };
+        "dto.RemoveRepositoryRequestDTO": {
+            /**
+             * @description ConfirmationName must exactly match the current repository display name.
+             * @example Family Photos
+             */
+            confirmation_name: string;
+        };
+        "dto.RenameRepositoryRequestDTO": {
+            /** @example Family Archive */
+            name: string;
+        };
+        "dto.RepositoryCandidateDTO": {
+            /**
+             * @example [
+             *       "update_location",
+             *       "add_separate"
+             *     ]
+             */
+            allowed_resolutions?: string[];
+            available_bytes?: number;
+            can_create?: boolean;
+            can_open?: boolean;
+            capacity_known?: boolean;
+            /** @example existing_repository */
+            classification?: string;
+            /** @example family-archive */
+            directory_name?: string;
+            filesystem?: string;
+            mount_point?: boolean;
+            /** @example Family Archive */
+            name?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            risk_warnings?: string[];
+            total_bytes?: number;
+            writable?: boolean;
+        };
+        "dto.RepositoryCloudSourceDTO": {
+            credential?: components["schemas"]["dto.CloudCredentialDTO"];
+            enabled?: boolean;
+            last_import_run_id?: string;
+            latest_run?: components["schemas"]["dto.CloudImportRunDTO"];
+            owner_id?: number;
+            provider?: string;
+            remote_scope?: {
+                [key: string]: string;
+            };
+        };
         "dto.RepositoryCloudStatusDTO": {
             credential?: components["schemas"]["dto.CloudCredentialDTO"];
             /** @example true */
@@ -13585,6 +14984,7 @@ export interface components {
             owner_id?: number;
             /** @example icloud */
             provider?: string;
+            sources?: components["schemas"]["dto.RepositoryCloudSourceDTO"][];
         };
         "dto.RepositoryConflictDTO": {
             /**
@@ -13608,6 +15008,8 @@ export interface components {
             requested_path?: string;
         };
         "dto.RepositoryDTO": {
+            /** @example idle */
+            activity?: string;
             default_owner_id?: number;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
@@ -13618,12 +15020,12 @@ export interface components {
             name?: string;
             /** @example /data/storage/Family Photos */
             path?: string;
+            /** @example active */
+            reachability?: string;
             /** @example regular */
             role?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             root_id?: string;
-            /** @example active */
-            status?: string;
             /** @example date */
             storage_strategy?: string;
         };
@@ -13632,6 +15034,7 @@ export interface components {
             default_root?: string;
             /** @example rename */
             duplicate_handling?: string;
+            risk_warnings?: string[];
             /** @example date */
             strategy?: string;
         };
@@ -13639,17 +15042,59 @@ export interface components {
             /** @example uuid */
             handle_duplicate_filenames?: string;
         };
+        "dto.RepositoryRemovalImpactDTO": {
+            /** @example 0 */
+            active_task_count?: number;
+            /** @example 12 */
+            album_count?: number;
+            /** @example 1240 */
+            asset_count?: number;
+            /** @example 4294967296 */
+            catalog_media_bytes?: number;
+            /** @example 2 */
+            cloud_import_count?: number;
+            /** @example true */
+            files_preserved?: boolean;
+            /** @example 1048576 */
+            private_state_bytes?: number;
+            /** @example true */
+            private_state_found?: boolean;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example Family Photos */
+            repository_name?: string;
+        };
         "dto.RepositoryRootDTO": {
+            /** @example 0 */
+            active_operation_count?: number;
+            /** @example 500000000000 */
+            available_bytes?: number;
+            can_remove?: boolean;
+            capacity_known?: boolean;
+            files_preserved?: boolean;
+            /** @example apfs */
+            filesystem?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
             /** @example external */
             kind?: string;
+            mount_fingerprint?: string;
+            mount_fingerprint_changed?: boolean;
             /** @example External Archive */
             name?: string;
             /** @example /Volumes/Photos */
             path?: string;
+            registered_mount_fingerprint?: string;
+            /** @example registered_repositories */
+            removal_blocked_by?: string;
+            /** @example 2 */
+            repository_count?: number;
+            risk_warnings?: string[];
             /** @example active */
             status?: string;
+            /** @example 1000000000000 */
+            total_bytes?: number;
+            writable?: boolean;
         };
         "dto.RepositoryScanQueuedDTO": {
             /** @example 12345 */
@@ -13666,6 +15111,12 @@ export interface components {
             force?: boolean;
         };
         "dto.RepositoryScanRunDTO": {
+            /** @example 0 */
+            ambiguous_count?: number;
+            /** @example true */
+            authoritative?: boolean;
+            /** @example 1 */
+            deferred_count?: number;
             /** @example 1 */
             deleted_count?: number;
             /** @example 10 */
@@ -13674,6 +15125,9 @@ export interface components {
             finished_at?: string;
             /** @example manual */
             mode?: string;
+            /** @example 1 */
+            moved_count?: number;
+            partial_reason?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example edwin */
@@ -13729,6 +15183,38 @@ export interface components {
             cleared_passkeys?: boolean;
             cleared_totp?: boolean;
             temporary_password?: string;
+        };
+        "dto.ResolveHostActionRequestDTO": {
+            /**
+             * @example add_separate
+             * @enum {string}
+             */
+            resolution: "update_location" | "add_separate" | "confirm_risk";
+            risk_confirmation?: boolean;
+        };
+        "dto.ResolveRepositoryCandidateRequestDTO": {
+            /** @example family-archive */
+            directory_name: string;
+            /**
+             * @example update_location
+             * @enum {string}
+             */
+            resolution: "update_location" | "add_separate";
+            risk_confirmation?: boolean;
+        };
+        "dto.RestoreOperationDTO": {
+            /** @example 20260711T020000.000000Z-library.sqlite3 */
+            backup_name?: string;
+            completed_at?: string;
+            error_code?: string;
+            /** @example d62cbbf3-f564-458b-86ca-0f6d10fcd8d4 */
+            id?: string;
+            message?: string;
+            requested_at?: string;
+            restore_point?: string;
+            /** @enum {string} */
+            status?: "staged" | "restart_requested" | "installing" | "verifying" | "completed" | "rolling_back" | "rolled_back" | "failed";
+            updated_at?: string;
         };
         "dto.RuntimeInfoDTO": {
             acme_certificate_expires_at?: string;
@@ -13861,6 +15347,14 @@ export interface components {
             next_registration_role?: string;
             primary_repository_initialized?: boolean;
             repository_defaults?: components["schemas"]["dto.RepositoryDefaultsDTO"];
+            /** @example storage_recovery_required */
+            runtime_reason?: string;
+            /**
+             * @description RuntimeState is independent of bootstrap completion. An initialized
+             *     instance can be degraded while its default Storage Location is offline.
+             * @example active
+             */
+            runtime_state?: string;
         };
         "dto.ShareLinkDTO": {
             allow_download?: boolean;
@@ -13963,6 +15457,51 @@ export interface components {
         };
         "dto.StartCloudImportResponse": {
             run?: components["schemas"]["dto.CloudImportRunDTO"];
+        };
+        "dto.StartRepositoryCloudImportRequest": {
+            credential_id?: string;
+        };
+        "dto.StorageDiagnosticDTO": {
+            available_bytes?: number;
+            canonical_path?: string;
+            capacity_known?: boolean;
+            case_behavior_known?: boolean;
+            case_sensitive?: boolean;
+            cloud_sync_provider?: string;
+            device?: string;
+            effective_gid?: string;
+            effective_uid?: string;
+            filesystem?: string;
+            inode?: number;
+            last_coordination?: string;
+            lock_holder?: string;
+            marker_uuid?: string;
+            mount_fingerprint?: string;
+            mount_fingerprint_changed?: boolean;
+            mount_id?: string;
+            mount_source?: string;
+            name?: string;
+            network_filesystem?: boolean;
+            parent_target_id?: string;
+            path?: string;
+            reachability?: string;
+            registered_mount_fingerprint?: string;
+            removable_likely?: boolean;
+            risk_warnings?: string[];
+            target_id?: string;
+            target_type?: string;
+            total_bytes?: number;
+            writable?: boolean;
+        };
+        "dto.StorageDiagnosticsResponseDTO": {
+            generated_at?: string;
+            items?: components["schemas"]["dto.StorageDiagnosticDTO"][];
+        };
+        "dto.StorageSupportBundleDTO": {
+            audit_events?: components["schemas"]["dto.LifecycleAuditEventDTO"][];
+            diagnostics?: components["schemas"]["dto.StorageDiagnosticDTO"][];
+            generated_at?: string;
+            paths_redacted?: boolean;
         };
         "dto.StudioCanvasBackgroundDTO": {
             /** @example 180 */
@@ -14242,7 +15781,7 @@ export interface components {
             base_url?: string;
             model_name?: string;
             /** @enum {string} */
-            provider?: "ark" | "openai" | "deepseek" | "ollama";
+            provider?: "none" | "ark" | "openai" | "deepseek" | "ollama";
         };
         "dto.UpdateLikeRequestDTO": {
             /** @example true */
@@ -14276,13 +15815,6 @@ export interface components {
         "dto.UpdateRatingRequestDTO": {
             /** @example 5 */
             rating?: number;
-        };
-        "dto.UpdateRepositoryRequestDTO": {
-            local_settings?: components["schemas"]["dto.RepositoryLocalSettings"];
-            /** @example My Photos */
-            name?: string;
-            /** @example flat */
-            storage_strategy?: string;
         };
         "dto.UpdateShareLinkRequestDTO": {
             allow_download?: boolean;
@@ -14395,6 +15927,19 @@ export interface components {
             user_id?: number;
             username?: string;
         };
+        "dto.ValidateLLMSettingsRequestDTO": {
+            api_key?: string;
+            /** @example https://api.openai.com/v1 */
+            base_url?: string;
+            /** @example gpt-4.1-mini */
+            model_name: string;
+            /**
+             * @example openai
+             * @enum {string}
+             */
+            provider: "ark" | "openai" | "deepseek" | "ollama";
+            use_stored_api_key?: boolean;
+        };
         "dto.ValidateLLMSettingsResponseDTO": {
             valid?: boolean;
         };
@@ -14445,6 +15990,12 @@ export interface components {
             mode: "free" | "review" | "organize" | "analyze" | "curate";
             query: string;
             thread_id?: string;
+        };
+        "handler.AgentEffectStatusResponse": {
+            effect_id?: string;
+            receipt?: components["schemas"]["core.EffectReceipt"];
+            /** @enum {string} */
+            status?: "pending" | "committed" | "rejected" | "cancelled" | "failed";
         };
         "handler.AgentResumeRequest": {
             targets: {

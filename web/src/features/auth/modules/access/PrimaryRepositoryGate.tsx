@@ -1,11 +1,12 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import { FolderPlus, HardDrive } from "lucide-react";
+import { AlertTriangle, FolderPlus, HardDrive, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  isDuplicateHandling,
-  isStorageStrategy,
+  StorageStrategyPicker,
+  StorageRiskConfirmation,
   useCreateRepository,
   validateRepositoryName,
+  type RepositoryStorageStrategy,
 } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
@@ -29,24 +30,23 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   const primaryReady = setupQuery.data?.primary_repository_initialized ?? false;
   const [name, setName] = useState("Primary Storage");
   const [root, setRoot] = useState("");
-  const [strategy, setStrategy] = useState<"cas" | "date" | "flat">("date");
-  const [duplicateHandling, setDuplicateHandling] = useState<"overwrite" | "rename" | "uuid">(
-    "rename",
-  );
+  const [storageStrategy, setStorageStrategy] = useState<RepositoryStorageStrategy>("date");
+  const [riskConfirmation, setRiskConfirmation] = useState(false);
+  const placementRisks = defaults?.risk_warnings ?? [];
 
   useEffect(() => {
     if (!defaults) return;
     setRoot((current) => current || defaults.default_root || "");
-    setStrategy(isStorageStrategy(defaults.strategy) ? defaults.strategy : "date");
-    setDuplicateHandling(
-      isDuplicateHandling(defaults.duplicate_handling) ? defaults.duplicate_handling : "rename",
-    );
   }, [defaults]);
 
   const nameError = validateRepositoryName(name);
   const canSubmit = useMemo(
-    () => nameError === null && root.trim() !== "" && !createMutation.isPending,
-    [createMutation.isPending, nameError, root],
+    () =>
+      nameError === null &&
+      root.trim() !== "" &&
+      (placementRisks.length === 0 || riskConfirmation) &&
+      !createMutation.isPending,
+    [createMutation.isPending, nameError, placementRisks.length, riskConfirmation, root],
   );
 
   if (setupQuery.isLoading) {
@@ -65,6 +65,40 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   if (primaryReady) {
+    if (setupQuery.data?.runtime_state === "degraded") {
+      return (
+        <>
+          <div
+            role="alert"
+            className="alert alert-warning rounded-none border-x-0 border-t-0 px-4 py-3"
+          >
+            <AlertTriangle className="size-5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <strong>{t("auth.storageRecovery.title", "Storage recovery is required")}</strong>
+              <p className="mt-0.5 text-sm">
+                {t(
+                  "auth.storageRecovery.description",
+                  "Restore the configured default Storage Location and its primary folder without changing their marker identities. Other available repositories remain usable.",
+                )}
+              </p>
+              {defaults?.default_root ? (
+                <code className="mt-1 block truncate text-xs">{defaults.default_root}/primary</code>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost gap-2"
+              onClick={() => void setupQuery.refetch()}
+              disabled={setupQuery.isFetching}
+            >
+              <RefreshCw className={`size-4 ${setupQuery.isFetching ? "animate-spin" : ""}`} />
+              {t("auth.storageRecovery.checkAgain", "Check Again")}
+            </button>
+          </div>
+          {children}
+        </>
+      );
+    }
     return <>{children}</>;
   }
 
@@ -74,8 +108,8 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
     await createMutation.createRepository({
       name,
       role: "primary",
-      storageStrategy: strategy,
-      duplicateHandling,
+      storageStrategy,
+      riskConfirmation: placementRisks.length > 0 ? riskConfirmation : undefined,
     });
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: setupStatusQueryKey }),
@@ -108,7 +142,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
             <p className="mt-1 text-sm text-base-content/70">
               {t("auth.primaryRepository.description", {
                 defaultValue:
-                  "Choose where Lumilio should store the first local repository. Existing settings use this as the default for future repositories too.",
+                  "Choose where Lumilio Photos should store the first local repository. Existing settings use this as the default for future repositories too.",
               })}
             </p>
           </div>
@@ -151,7 +185,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
                 ? repositoryNameErrorMessage(nameError, t)
                 : t(
                     "auth.primaryRepository.nameHint",
-                    "Use 1–80 letters, numbers, spaces, hyphens, or underscores. The primary directory remains <root>/primary.",
+                    "This display name can be changed later. The primary directory remains <root>/primary.",
                   )}
             </span>
           </div>
@@ -159,7 +193,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
           <label className="form-control">
             <span className="label-text mb-1 font-medium">
               {t("auth.primaryRepository.root", {
-                defaultValue: "Storage root",
+                defaultValue: "Storage Location",
               })}
             </span>
             <input
@@ -176,45 +210,19 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
             </span>
           </label>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="form-control">
-              <span className="label-text mb-1 font-medium">
-                {t("auth.primaryRepository.strategy", { defaultValue: "Storage strategy" })}
-              </span>
-              <select
-                className="select select-bordered w-full"
-                value={strategy}
-                onChange={(event) => {
-                  if (isStorageStrategy(event.target.value)) setStrategy(event.target.value);
-                }}
-                disabled={createMutation.isPending}
-              >
-                <option value="date">date</option>
-                <option value="flat">flat</option>
-                <option value="cas">cas</option>
-              </select>
-            </label>
+          <StorageStrategyPicker
+            value={storageStrategy}
+            onChange={setStorageStrategy}
+            disabled={createMutation.isPending}
+            idPrefix="primary-gate"
+          />
 
-            <label className="form-control">
-              <span className="label-text mb-1 font-medium">
-                {t("auth.primaryRepository.duplicates", { defaultValue: "Duplicates" })}
-              </span>
-              <select
-                className="select select-bordered w-full"
-                value={duplicateHandling}
-                onChange={(event) => {
-                  if (isDuplicateHandling(event.target.value)) {
-                    setDuplicateHandling(event.target.value);
-                  }
-                }}
-                disabled={createMutation.isPending}
-              >
-                <option value="rename">rename</option>
-                <option value="uuid">uuid</option>
-                <option value="overwrite">overwrite</option>
-              </select>
-            </label>
-          </div>
+          <StorageRiskConfirmation
+            warnings={placementRisks}
+            checked={riskConfirmation}
+            onChange={setRiskConfirmation}
+            disabled={createMutation.isPending}
+          />
 
           <div className="flex justify-end pt-2">
             <button type="submit" className="btn btn-primary gap-2" disabled={!canSubmit}>

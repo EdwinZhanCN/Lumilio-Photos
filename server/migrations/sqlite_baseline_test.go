@@ -47,8 +47,8 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&userVersion); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if userVersion != 4 {
-		t.Fatalf("baseline user_version = %d, want 4", userVersion)
+	if userVersion != 5 {
+		t.Fatalf("baseline user_version = %d, want 5", userVersion)
 	}
 
 	var browseFactColumns int
@@ -88,6 +88,23 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 
 	insertVectorFixtures(t, ctx, database)
 	insertFTSFixture(t, ctx, database)
+
+	assertRejected(t, database, `
+		INSERT INTO repositories (repo_id, name, path, created_at, updated_at)
+		VALUES ('00000000-0000-0000-0000-000000000099', 'orphan', '/orphan', 1, 1)
+	`)
+	assertRejected(t, database, `
+		UPDATE repositories SET reachability = 'error'
+		WHERE repo_id = '00000000-0000-0000-0000-000000000002'
+	`)
+	assertRejected(t, database, `
+		UPDATE repositories SET activity = 'active'
+		WHERE repo_id = '00000000-0000-0000-0000-000000000002'
+	`)
+	assertRejected(t, database, `
+		DELETE FROM repository_roots
+		WHERE root_id = '00000000-0000-0000-0000-000000000001'
+	`)
 
 	var foreignKeyFailures int
 	rows, err := database.QueryContext(ctx, "PRAGMA foreign_key_check")
@@ -255,6 +272,8 @@ var applicationTables = []string{
 	"repository_roots",
 	"repositories",
 	"repository_defaults",
+	"lifecycle_operations",
+	"host_actions",
 	"assets",
 	"repository_scan_runs",
 	"tags",

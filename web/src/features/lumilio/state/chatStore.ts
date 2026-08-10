@@ -1,17 +1,39 @@
 import { create } from "zustand";
-import { cancelAgentRun, streamAgent, type AgentStreamCallbacks } from "../api/agentStream";
-import type { AgentMode, AgentRunStatus, ChatMessage, TokenUsageInfo } from "../model/chatTypes";
+import {
+  cancelAgentRun,
+  getAgentEffectStatus,
+  streamAgent,
+  type AgentStreamCallbacks,
+} from "../api/agentStream";
+import type {
+  AgentMode,
+  AgentRunStatus,
+  AgentTurnSnapshot,
+  ChatMessage,
+  TokenUsageInfo,
+} from "../model/chatTypes";
 import type { MentionPayload } from "../modules/mentions/mentionSources";
 import type { ContextContribution } from "@/lib/assistant";
 import {
   applyChunk,
+  applyDroppedMentions,
+  applyEffectReceipt,
   applyInterrupt,
   applySideEvent,
   assistantMessage,
   cancelActiveBlocks,
-  resolveConfirm,
+  confirmationEffectID,
+  failConfirm,
+  removeTrailingEmptyAssistant,
+  setConfirmSubmitting,
   userMessage,
 } from "./blocks";
+
+interface PendingConfirmation {
+  interruptId: string;
+  effectId?: string;
+  approved: boolean;
+}
 
 /** Feature-local interactive chat state (Zustand per project convention);
  * server state (tools list, ref hydration) lives in TanStack Query. */
@@ -21,10 +43,9 @@ interface LumilioChatStore {
   messages: ChatMessage[];
   isGenerating: boolean;
   isStopping: boolean;
-  /** Set while an interrupt awaits the user's confirm/cancel. */
   awaitingConfirmation: boolean;
+  pendingConfirmation: PendingConfirmation | null;
   connectionError: string | null;
-  /** Last model call's token accounting; promptTokens ≈ current context size. */
   usage: TokenUsageInfo | null;
 
   sendMessage: (
@@ -44,6 +65,35 @@ interface LumilioChatStore {
 let activeStreamController: AbortController | null = null;
 let clearAfterStop = false;
 
+const confirmationFor = (messages: ChatMessage[], interruptId: string) => {
+  for (const message of messages) {
+    for (const block of message.blocks) {
+      if (
+        block.kind === "confirm" &&
+        block.interrupt.InterruptContexts.some((context) => context.ID === interruptId)
+      ) {
+        return block;
+      }
+    }
+  }
+  return undefined;
+};
+
+const requestSnapshot = (
+  mode: AgentMode,
+  context: ContextContribution[],
+  mentions: MentionPayload[],
+): AgentTurnSnapshot => ({
+  mode,
+  context: context.map((item) => ({
+    id: item.id,
+    type: item.type,
+    label: item.label,
+    count: item.assetIds.length,
+  })),
+  mentions: mentions.map((mention) => ({ ...mention, status: "accepted" })),
+});
+
 export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
   const clearConversation = () => {
     clearAfterStop = false;
@@ -54,19 +104,67 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
       isGenerating: false,
       isStopping: false,
       awaitingConfirmation: false,
+      pendingConfirmation: null,
       connectionError: null,
       usage: null,
     });
   };
 
+  const reconcilePendingConfirmation = async (fallbackMessage: string): Promise<boolean> => {
+    const pending = get().pendingConfirmation;
+    const threadId = get().threadId;
+    if (!pending || !threadId || !pending.effectId) return false;
+
+    let lastError = fallbackMessage;
+    for (const delayMs of [0, 150, 400]) {
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      try {
+        const status = await getAgentEffectStatus(threadId, pending.effectId);
+        if (status.receipt) {
+          set((state) => ({
+            messages: applyEffectReceipt(state.messages, status.receipt!),
+            pendingConfirmation: null,
+            awaitingConfirmation: false,
+            isGenerating: false,
+            isStopping: false,
+            connectionError: null,
+          }));
+          return true;
+        }
+        if (["cancelled", "failed"].includes(status.status)) {
+          lastError = `The server reports this action as ${status.status}. You can retry safely.`;
+          break;
+        }
+      } catch (error) {
+        lastError = (error as Error).message || fallbackMessage;
+      }
+    }
+
+    const current = get().pendingConfirmation;
+    if (current?.interruptId === pending.interruptId) {
+      set((state) => ({
+        messages: removeTrailingEmptyAssistant(
+          failConfirm(state.messages, pending.interruptId, lastError),
+        ),
+        pendingConfirmation: null,
+        awaitingConfirmation: true,
+        isGenerating: false,
+        isStopping: false,
+      }));
+    }
+    return false;
+  };
+
   const callbacksFor = (controller: AbortController): AgentStreamCallbacks => {
     const isCurrent = () => activeStreamController === controller;
     return {
-      onSessionInfo: (threadId, runId) => {
+      onSessionInfo: (threadId, runId, droppedMentions) => {
         if (!isCurrent()) return;
-        set({ threadId, activeRunId: runId });
-        // Stop can be pressed before session_info arrives. Keep the stream
-        // open until the exact run id exists, then cancel server-side first.
+        set((state) => ({
+          threadId,
+          activeRunId: runId,
+          messages: applyDroppedMentions(state.messages, droppedMentions),
+        }));
         if (get().isStopping) void get().stopGeneration();
       },
       onRunStatus: (runId, status: AgentRunStatus) => {
@@ -95,16 +193,19 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
             messages: cancelActiveBlocks(state.messages),
             activeRunId: null,
             awaitingConfirmation: false,
+            pendingConfirmation: null,
             isGenerating: false,
             isStopping: false,
           }));
           return;
         }
+        // A resume is not successful merely because the run reached a terminal
+        // transport state. The effect receipt is the confirmation authority.
         set({
           activeRunId: null,
-          awaitingConfirmation: false,
           isGenerating: false,
           isStopping: false,
+          awaitingConfirmation: Boolean(get().pendingConfirmation),
         });
       },
       onChunk: (chunk) => {
@@ -115,6 +216,18 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         if (!isCurrent()) return;
         if (event.type === "token_usage") {
           if (event.usage) set({ usage: event.usage });
+          return;
+        }
+        if (event.type === "effect_receipt" && event.receipt) {
+          const receipt = event.receipt;
+          set((state) => {
+            const matchesPending = state.pendingConfirmation?.effectId === receipt.effect_id;
+            return {
+              messages: applyEffectReceipt(state.messages, receipt),
+              pendingConfirmation: matchesPending ? null : state.pendingConfirmation,
+              awaitingConfirmation: matchesPending ? false : state.awaitingConfirmation,
+            };
+          });
           return;
         }
         set((state) => ({ messages: applySideEvent(state.messages, event) }));
@@ -132,13 +245,17 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         if (!isCurrent()) return;
         set((state) => ({
           activeRunId: state.awaitingConfirmation ? state.activeRunId : null,
-          isGenerating: false,
+          isGenerating: Boolean(state.pendingConfirmation),
           isStopping: false,
         }));
       },
       onError: (message) => {
         if (!isCurrent()) return;
         clearAfterStop = false;
+        if (get().pendingConfirmation) {
+          set({ activeRunId: null, connectionError: message, isGenerating: true, isStopping: false });
+          return;
+        }
         set({
           activeRunId: null,
           connectionError: message,
@@ -157,6 +274,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
     isGenerating: false,
     isStopping: false,
     awaitingConfirmation: false,
+    pendingConfirmation: null,
     connectionError: null,
     usage: null,
 
@@ -164,23 +282,19 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
       const trimmed = query.trim();
       if (!trimmed || get().isGenerating || get().awaitingConfirmation) return;
 
+      const context = options?.context ?? [];
+      const mentions = options?.mentions ?? [];
+      const mode = options?.mode ?? "free";
       set((state) => ({
-        messages: [...state.messages, userMessage(trimmed), assistantMessage()],
+        messages: [
+          ...state.messages,
+          userMessage(trimmed, requestSnapshot(mode, context, mentions)),
+          assistantMessage(),
+        ],
         activeRunId: null,
         isGenerating: true,
         isStopping: false,
         connectionError: null,
-      }));
-
-      const contextPayload = options?.context?.map((item) => ({
-        type: item.type,
-        asset_ids: item.assetIds,
-        label: item.label,
-      }));
-      const mentionsPayload = options?.mentions?.map((mention) => ({
-        type: mention.type,
-        id: mention.id,
-        label: mention.label,
       }));
 
       const controller = new AbortController();
@@ -192,35 +306,55 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
           {
             query: trimmed,
             thread_id: get().threadId ?? "",
-            mode: options?.mode ?? "free",
-            ...(contextPayload?.length ? { context: contextPayload } : {}),
-            ...(mentionsPayload?.length ? { mentions: mentionsPayload } : {}),
+            mode,
+            ...(context.length
+              ? {
+                  context: context.map((item) => ({
+                    type: item.type,
+                    asset_ids: item.assetIds,
+                    label: item.label,
+                  })),
+                }
+              : {}),
+            ...(mentions.length
+              ? {
+                  mentions: mentions.map((mention) => ({
+                    type: mention.type,
+                    id: mention.id,
+                    label: mention.label,
+                  })),
+                }
+              : {}),
           },
           callbacksFor(controller),
           controller.signal,
         );
       } catch (error) {
-        if (!controller.signal.aborted) {
-          callbacksFor(controller).onError((error as Error).message);
-        }
+        if (!controller.signal.aborted) callbacksFor(controller).onError((error as Error).message);
       } finally {
         if (activeStreamController === controller) activeStreamController = null;
       }
     },
 
     confirmInterrupt: async (interruptId, approved) => {
-      const threadId = get().threadId;
-      if (!threadId || get().isGenerating) return;
+      const state = get();
+      if (!state.threadId || state.isGenerating || state.pendingConfirmation) return;
+      const confirm = confirmationFor(state.messages, interruptId);
+      if (!confirm || !["pending", "failed"].includes(confirm.state)) return;
 
-      set((state) => ({
+      const pending: PendingConfirmation = {
+        interruptId,
+        effectId: confirmationEffectID(confirm.interrupt),
+        approved,
+      };
+      set((current) => ({
         messages: [
-          ...resolveConfirm(state.messages, approved ? "approved" : "rejected"),
+          ...setConfirmSubmitting(current.messages, interruptId, approved),
           assistantMessage(),
         ],
-        // The previous awaiting run is terminal as soon as Resume begins. A
-        // Stop pressed before new session_info must wait for the new run id.
         activeRunId: null,
         awaitingConfirmation: false,
+        pendingConfirmation: pending,
         isGenerating: true,
         isStopping: false,
         connectionError: null,
@@ -229,19 +363,23 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
       const controller = new AbortController();
       activeStreamController?.abort();
       activeStreamController = controller;
+      let reconciliationMessage =
+        "The confirmation stream ended without a receipt. Lumilio Agent will verify the effect before allowing a retry.";
       try {
         await streamAgent(
           "/api/v1/agent/chat/resume",
-          { thread_id: threadId, targets: { [interruptId]: { approved } } },
+          { thread_id: state.threadId, targets: { [interruptId]: { approved } } },
           callbacksFor(controller),
           controller.signal,
         );
       } catch (error) {
-        if (!controller.signal.aborted) {
-          callbacksFor(controller).onError((error as Error).message);
-        }
+        reconciliationMessage = (error as Error).message || reconciliationMessage;
+        if (!controller.signal.aborted) callbacksFor(controller).onError(reconciliationMessage);
       } finally {
         if (activeStreamController === controller) activeStreamController = null;
+      }
+      if (!controller.signal.aborted && get().pendingConfirmation?.interruptId === interruptId) {
+        await reconcilePendingConfirmation(reconciliationMessage);
       }
     },
 
@@ -257,14 +395,13 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         const result = await cancelAgentRun({ thread_id: threadId, run_id: activeRunId });
         const stopped = result.status === "cancel_requested" || result.status === "cancelled";
         const controller = activeStreamController;
-        // The server has accepted (or already resolved) the exact run before
-        // the local transport is closed.
         controller?.abort();
         if (activeStreamController === controller) activeStreamController = null;
         set((state) => ({
           messages: stopped ? cancelActiveBlocks(state.messages) : state.messages,
           activeRunId: null,
           awaitingConfirmation: false,
+          pendingConfirmation: null,
           isGenerating: false,
           isStopping: false,
         }));

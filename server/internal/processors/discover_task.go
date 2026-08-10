@@ -3,102 +3,22 @@ package processors
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
 
-	"github.com/google/uuid"
-	"go.uber.org/zap"
-
-	"server/internal/db/repo"
 	"server/internal/queue/jobs"
-	"server/internal/sourcing"
-	"server/internal/storage"
 )
 
-// ProcessDiscoveredAsset ingests files discovered by repository tree monitoring.
-// Delete operations are handled directly; upsert operations delegate to the SourceMaterializer.
+// ProcessDiscoveredAsset delegates one generation-bound file-index candidate
+// to the SourceMaterializer. Deletion and move decisions are owned by Scanner.
 func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.DiscoverAssetArgs) error {
-	repoUUID, err := uuid.Parse(strings.TrimSpace(args.RepositoryID))
-	if err != nil {
-		return fmt.Errorf("invalid repository id: %w", err)
+	if ap == nil || ap.materializer == nil {
+		return fmt.Errorf("discovery materializer unavailable")
 	}
-
-	storagePath, err := sanitizeDiscoveredPath(args.RelativePath)
-	if err != nil {
-		return err
-	}
-	operation := normalizeDiscoverOperation(args.Operation)
-
-	if operation == jobs.DiscoverOperationDelete {
-		_, err = ap.queries.SoftDeleteAssetByRepositoryAndStoragePath(ctx, repo.SoftDeleteAssetByRepositoryAndStoragePathParams{
-			RepositoryID: uuid.NullUUID{UUID: repoUUID, Valid: true},
-			StoragePath:  &storagePath,
-		})
-		if err != nil {
-			return fmt.Errorf("soft delete discovered asset (%s): %w", storagePath, err)
-		}
-		repository, repoErr := ap.queries.GetRepository(ctx, repoUUID)
-		if repoErr == nil {
-			ap.repoAudit(repository.Path).Operation("asset.discover.delete",
-				zap.String("repository_id", args.RepositoryID),
-				zap.String("storage_path", storagePath),
-			)
-		}
-		return nil
-	}
-
-	// Upsert: delegate to the materializer (file validation, hash, create-or-update, pipeline)
-	filename := strings.TrimSpace(args.FileName)
-	if filename == "" {
-		filename = filepath.Base(storagePath)
-	}
-
-	_, err = ap.materializer.Materialize(ctx, sourcing.IngestSource{
-		RepositoryID:     repoUUID,
-		Kind:             sourcing.IngestSourceScan,
-		SourcePath:       storagePath, // repo-relative path
-		OriginalFilename: filename,
-		ContentType:      args.ContentType,
-		Timestamp:        args.DetectedAt,
-	})
+	_, err := ap.materializer.MaterializeDiscovered(
+		ctx,
+		args.RepositoryID,
+		args.StoragePath,
+		args.ScanID,
+		args.ObservationToken,
+	)
 	return err
-}
-
-func normalizeDiscoverOperation(raw string) string {
-	normalized := strings.ToLower(strings.TrimSpace(raw))
-	switch normalized {
-	case "", jobs.DiscoverOperationUpsert:
-		return jobs.DiscoverOperationUpsert
-	case jobs.DiscoverOperationDelete:
-		return jobs.DiscoverOperationDelete
-	default:
-		return jobs.DiscoverOperationUpsert
-	}
-}
-
-func sanitizeDiscoveredPath(path string) (string, error) {
-	raw := strings.TrimSpace(path)
-	if raw == "" {
-		return "", fmt.Errorf("empty discovered path")
-	}
-
-	clean := filepath.Clean(filepath.FromSlash(raw))
-	if storage.IsRootedPath(clean) || clean == "." || clean == ".." {
-		return "", fmt.Errorf("invalid discovered relative path: %s", path)
-	}
-	if strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("discovered path escapes repository: %s", path)
-	}
-
-	normalized := filepath.ToSlash(clean)
-
-	// Discovery only operates in user workspace, excluding internal system/upload areas.
-	if normalized == ".lumilio" || strings.HasPrefix(normalized, ".lumilio/") {
-		return "", fmt.Errorf("discovered path under system directory is not allowed: %s", path)
-	}
-	if normalized == "inbox" || strings.HasPrefix(normalized, "inbox/") {
-		return "", fmt.Errorf("discovered path under inbox is not allowed: %s", path)
-	}
-
-	return normalized, nil
 }

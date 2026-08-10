@@ -1,20 +1,41 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { ArrowUpRight, Bird, Bot, Network, ScanFace, ScanSearch, ScanText, Sparkles } from '@lucide/vue'
 
 const activeAgent = ref(0)
 const activeSearch = ref(0)
+const agentFailed = ref(false)
+const searchFailed = ref(false)
+const reduceMotion = ref(false)
+
+let motionQuery: MediaQueryList | null = null
+let motionListener: ((event: MediaQueryListEvent) => void) | null = null
+
+onMounted(() => {
+  motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  reduceMotion.value = motionQuery.matches
+  motionListener = (event) => {
+    reduceMotion.value = event.matches
+  }
+  motionQuery.addEventListener('change', motionListener)
+})
+
+onBeforeUnmount(() => {
+  if (motionQuery && motionListener) {
+    motionQuery.removeEventListener('change', motionListener)
+  }
+})
 
 const agentClips = [
-  { src: '/videos/landing/agent-organize.webm', label: '整理：按主题归拢与建册' },
-  { src: '/videos/landing/agent-curate-multistep.webm', label: '精选：多步筛选与排序' },
-  { src: '/videos/landing/agent-in-context-multistep.webm', label: '就地整理：结合上下文的多步操作' },
+  { src: '/videos/landing/agent-organize.webm', poster: '/images/landing/product-agent-confirm.png', label: '整理：按主题归拢与建册' },
+  { src: '/videos/landing/agent-curate-multistep.webm', poster: '/images/landing/product-agent-confirm.png', label: '精选：多步筛选与排序' },
+  { src: '/videos/landing/agent-in-context-multistep.webm', poster: '/images/landing/product-agent-confirm.png', label: '就地整理：结合上下文的多步操作' },
 ]
 
 const searchClips = [
-  { src: '/videos/landing/search-semantic-easy.webm', label: '语义检索：一句话找到画面' },
-  { src: '/videos/landing/search-semantic-multilingual.webm', label: '多语言：中英混合查询' },
-  { src: '/videos/landing/search-semantic-hard.webm', label: '复杂语义：细粒度场景召回' },
+  { src: '/videos/landing/search-semantic-easy.webm', poster: '/images/landing/product-search.png', label: '语义检索：一句话找到画面' },
+  { src: '/videos/landing/search-semantic-multilingual.webm', poster: '/images/landing/product-search.png', label: '多语言：中英混合查询' },
+  { src: '/videos/landing/search-semantic-hard.webm', poster: '/images/landing/product-search.png', label: '复杂语义：细粒度场景召回' },
 ]
 </script>
 
@@ -41,15 +62,23 @@ const searchClips = [
       <div class="agent-proof">
         <div class="capability-stage">
           <video
+            v-if="!agentFailed"
             :key="`agent-${activeAgent}`"
             :src="agentClips[activeAgent].src"
+            :poster="agentClips[activeAgent].poster"
             :aria-label="agentClips[activeAgent].label"
-            autoplay
+            :autoplay="!reduceMotion"
+            :controls="reduceMotion"
             loop
             muted
             playsinline
             preload="metadata"
+            @error="agentFailed = true"
           ></video>
+          <div v-else class="video-fallback" role="img" :aria-label="agentClips[activeAgent].label">
+            <Bot :size="26" :stroke-width="1.35" />
+            <span>{{ agentClips[activeAgent].label }}</span>
+          </div>
         </div>
         <div class="capability-pager">
           <span class="capability-caption">{{ agentClips[activeAgent].label }}</span>
@@ -86,15 +115,23 @@ const searchClips = [
       <div class="search-shot">
         <div class="capability-stage">
           <video
+            v-if="!searchFailed"
             :key="`search-${activeSearch}`"
             :src="searchClips[activeSearch].src"
+            :poster="searchClips[activeSearch].poster"
             :aria-label="searchClips[activeSearch].label"
-            autoplay
+            :autoplay="!reduceMotion"
+            :controls="reduceMotion"
             loop
             muted
             playsinline
             preload="metadata"
+            @error="searchFailed = true"
           ></video>
+          <div v-else class="video-fallback" role="img" :aria-label="searchClips[activeSearch].label">
+            <ScanSearch :size="26" :stroke-width="1.35" />
+            <span>{{ searchClips[activeSearch].label }}</span>
+          </div>
         </div>
         <div class="capability-pager">
           <span class="capability-caption">{{ searchClips[activeSearch].label }}</span>
@@ -338,6 +375,8 @@ const searchClips = [
   object-fit: cover;
   object-position: center;
 }
+.video-fallback { display: grid; width: 100%; min-height: 100%; place-items: center; gap: 10px; padding: 28px 18px; color: #b9b5ac; font-size: 12px; line-height: 1.5; text-align: center; }
+.video-fallback svg { flex: 0 0 auto; }
 
 .capability-pager {
   display: flex;

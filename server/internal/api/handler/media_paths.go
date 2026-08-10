@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -24,8 +26,9 @@ import (
 // AssetHandler's authenticated bulk download and ShareLinkHandler's public
 // share download.
 type assetDownloadFile struct {
-	asset repo.Asset
-	path  string
+	asset      repo.Asset
+	repository repo.Repository
+	path       storage.RepositoryPath
 }
 
 // getRepositoryForAsset resolves the repository row an asset belongs to.
@@ -46,7 +49,7 @@ func getRepositoryForAsset(ctx context.Context, queries *repo.Queries, asset *re
 	// An unreachable repository must not degrade into a bare I/O error further
 	// down. The UI has to be able to tell "the drive is unplugged" from "the
 	// photo is gone", and only this layer still knows which one it is.
-	if repository.Status == dbtypes.RepoStatusOffline || repository.Status == dbtypes.RepoStatusError {
+	if repository.Reachability != dbtypes.RepositoryReachabilityActive {
 		return nil, fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
 	}
 	return &repository, nil
@@ -68,20 +71,97 @@ func respondRepositoryResolveError(c *gin.Context, err error, message string) {
 	api.GinInternalError(c, err, message)
 }
 
-// resolveRepositoryPath joins a repository root with an asset's stored path,
-// respecting already-absolute storage paths unchanged.
-func resolveRepositoryPath(repositoryPath string, storagePath string) string {
-	trimmed := strings.TrimSpace(storagePath)
-	if filepath.IsAbs(trimmed) {
-		return trimmed
+func openRepositoryMedia(factory *storage.RepositoryFSFactory, repository repo.Repository, rawPath string) (*storage.RepositoryFS, *os.File, error) {
+	repositoryPath, err := storage.ParseUserMediaPath(strings.TrimSpace(rawPath))
+	if err != nil {
+		return nil, nil, err
 	}
-	return filepath.Join(repositoryPath, trimmed)
+	repositoryFS, err := factory.Open(repository)
+	if err != nil {
+		return nil, nil, err
+	}
+	file, err := repositoryFS.OpenMedia(repositoryPath)
+	if err != nil {
+		_ = repositoryFS.Close()
+		return nil, nil, err
+	}
+	return repositoryFS, file, nil
+}
+
+func openRepositoryPrivate(factory *storage.RepositoryFSFactory, repository repo.Repository, rawPath string) (*storage.RepositoryFS, *os.File, error) {
+	repositoryPath, err := storage.ParsePrivateRepositoryPath(strings.TrimSpace(rawPath))
+	if err != nil {
+		return nil, nil, err
+	}
+	repositoryFS, err := factory.Open(repository)
+	if err != nil {
+		return nil, nil, err
+	}
+	file, err := repositoryFS.OpenPrivate(repositoryPath)
+	if err != nil {
+		_ = repositoryFS.Close()
+		return nil, nil, err
+	}
+	return repositoryFS, file, nil
+}
+
+func serveRepositoryFile(c *gin.Context, repositoryFS *storage.RepositoryFS, file *os.File, filename string) {
+	defer repositoryFS.Close()
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to access repository file")
+		return
+	}
+	http.ServeContent(c.Writer, c.Request, filename, info.ModTime(), file)
+}
+
+func openWebOrOriginal(factory *storage.RepositoryFSFactory, repository repo.Repository, asset *repo.Asset, kind, suffix string) (*storage.RepositoryFS, *os.File, error) {
+	repositoryFS, err := factory.Open(repository)
+	if err != nil {
+		return nil, nil, err
+	}
+	if asset.ContentHash != "" {
+		privatePath, parseErr := storage.ParsePrivateRepositoryPath(path.Join(".lumilio/assets", kind, "web", asset.ContentHash+suffix))
+		if parseErr != nil {
+			_ = repositoryFS.Close()
+			return nil, nil, parseErr
+		}
+		file, openErr := repositoryFS.OpenPrivate(privatePath)
+		if openErr == nil {
+			return repositoryFS, file, nil
+		}
+		if !errors.Is(openErr, fs.ErrNotExist) {
+			_ = repositoryFS.Close()
+			return nil, nil, openErr
+		}
+	}
+	if asset.StoragePath == nil {
+		_ = repositoryFS.Close()
+		return nil, nil, fs.ErrNotExist
+	}
+	mediaPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
+	if err != nil {
+		_ = repositoryFS.Close()
+		return nil, nil, err
+	}
+	file, err := repositoryFS.OpenMedia(mediaPath)
+	if err != nil {
+		_ = repositoryFS.Close()
+		return nil, nil, err
+	}
+	return repositoryFS, file, nil
 }
 
 // writeAssetToZip streams one asset's original file into an open zip writer,
 // deduping archive entry names via uniqueZipArchiveName.
-func writeAssetToZip(zipWriter *zip.Writer, archiveNames map[string]int, file assetDownloadFile) error {
-	source, err := os.Open(file.path)
+func writeAssetToZip(factory *storage.RepositoryFSFactory, zipWriter *zip.Writer, archiveNames map[string]int, file assetDownloadFile) error {
+	repositoryFS, err := factory.Open(file.repository)
+	if err != nil {
+		return err
+	}
+	defer repositoryFS.Close()
+	source, err := repositoryFS.OpenMedia(file.path)
 	if err != nil {
 		return err
 	}

@@ -156,6 +156,20 @@ may manage every credential while regular users can only access their own.
 Owner identity is instance-local database policy rather than portable
 `.lumiliorepo` metadata.
 
+All runtime access inside a registered repository goes through the shared
+`internal/storage.RepositoryFS` factory. It verifies the catalog UUID against
+`.lumiliorepo`, holds a lifecycle read lease, and owns canonical user/private
+path parsing. `assets.storage_path`, ingest recovery paths, and River asset-job
+payloads never contain repository root paths. Native media tools use the
+documented RepositoryFS local-path adapter immediately before invocation.
+
+`repository_file_index` is rebuildable SQLite state, not product identity.
+Repository scans enumerate the full user tree including `inbox/`, skip only
+application-private `.lumilio/`, and bind observations to Assets transactionally
+with River work. A move requires a unique full-BLAKE3 match; ambiguous groups
+remain unchanged, and soft deletion needs two consecutive authoritative
+absences separated by the configured settle interval.
+
 ## Database And API Contracts
 
 - `github.com/mattn/go-sqlite3` is the only database driver. `internal/db.Open`
@@ -167,13 +181,16 @@ Owner identity is instance-local database policy rather than portable
   business state plus `InsertTx` jobs in one short `database/sql` transaction.
 - Migration `000004_media_semantic_events` adds stable Events, membership,
   correction constraints, one-hop redirects, factual dirty ranges, and
-  per-owner rebuild state without changing schema generation 4. The
-  `rebuild_events` River queue is single-worker; owner jobs deduplicate only in
-  non-running states so one follower can collect changes made during compute.
+  per-owner rebuild state. Migration `000006_event_convergence` adds the
+  owner-wide source/published revision pair, renewable rebuild leases, persisted
+  rebuild runs, and the terminal `retired` state. The `event_scheduler` queue
+  discovers pending owners while `rebuild_events` runs owner jobs concurrently;
+  River uniqueness leaves at most one queued/running follower per owner.
 - Event reads, browse filters, shares, relations, and Agent refs resolve through
-  the same owner-scoped Event service. Event shares and Agent refs materialize
-  immutable displayable-asset snapshots; automatic membership uses no ML/AI
-  signal.
+  the same owner-aware Event resolver. Repository filtering is a read-only
+  Browse Scope projection over canonical logical-media membership. Event shares
+  and Agent refs materialize immutable displayable-asset snapshots; automatic
+  membership uses no ML/AI signal.
 - A running catalog must never be opened or copied through a host/container
   mount with another SQLite process. Host and container VFS locking is not a
   supported coordination boundary; use the application Online Backup flow, or

@@ -2,15 +2,11 @@
 import { computed, reactive, ref } from 'vue'
 import { Check, Clipboard, Download, ServerCog } from '@lucide/vue'
 
-import cpuComposeSource from '../../../../deploy/compose/lumen-cpu.compose.yml?raw'
-import cudaComposeSource from '../../../../deploy/compose/lumen-cuda.compose.yml?raw'
-import vulkanComposeSource from '../../../../deploy/compose/lumen-vulkan.compose.yml?raw'
-
 type Backend = 'cpu' | 'vulkan' | 'cuda'
 type Region = 'other' | 'cn'
 type Preset = 'minimal' | 'basic' | 'brave' | 'custom'
 type Service = 'siglip' | 'face' | 'ocr' | 'bioclip'
-type CopyTarget = 'compose' | 'command'
+type CopyTarget = 'env' | 'command'
 
 const props = withDefaults(defineProps<{ lang?: 'zh-CN' | 'en' }>(), {
   lang: 'zh-CN',
@@ -18,16 +14,16 @@ const props = withDefaults(defineProps<{ lang?: 'zh-CN' | 'en' }>(), {
 
 const messages = {
   'zh-CN': {
-    eyebrow: 'Lumen Hub · Docker Compose',
-    title: '生成可以直接导入的部署文件',
-    intro: '四步完成硬件、下载地区和模型能力选择；结果直接写入 Compose，不需要再创建 .env 或修改 YAML。',
+    eyebrow: 'Lumen Hub · Docker 向导',
+    title: '生成 canonical 环境变量与启动命令',
+    intro: '向导只输出薄 intent（LUMEN_* 环境变量）和启动命令；完整的运行时配置由 Lumen Hub 在容器启动时渲染并校验。',
     steps: ['计算硬件', '下载地区', '模型能力', '确认部署'],
     step: '步骤',
     hardwareTitle: 'Lumen Hub 将运行在哪种硬件上？',
     hardwareIntro: '这里选择的是计算设备，不一定是保存媒体的 NAS。',
     recommended: '不确定就选它',
     requirements: '主机要求',
-    included: 'Compose 已包含',
+    included: '命令已包含',
     toolkit: '安装 NVIDIA Container Toolkit',
     regionTitle: '模型从哪个下载源获取？',
     regionIntro: '这只影响模型下载地址，不改变界面语言和媒体位置。',
@@ -44,27 +40,29 @@ const messages = {
     fixedModel: '固定模型',
     semanticModel: '语义模型',
     speciesCatalog: '物种目录',
-    reviewTitle: '确认后下载一个文件',
-    reviewIntro: 'NAS 用户把文件导入容器管理器；命令行用户可以直接使用下方启动命令。',
+    reviewTitle: '确认后下载 .env 并运行',
+    reviewIntro: '下载向导生成的 lumen.env，再复制并运行下面的启动命令。',
     summaryHardware: '计算后端',
     summaryRegion: '下载地区',
     summaryPreset: '能力方案',
     summaryServices: '启用能力',
     summaryResources: '资源参考',
-    summaryEnvironment: '写入 Compose 的配置',
+    summaryEnvironment: 'canonical 环境变量（薄 intent）',
     custom: '自定义',
     noServices: '尚未选择',
-    download: '下载 Compose',
-    copyCompose: '复制 Compose',
-    copiedCompose: 'Compose 已复制',
+    download: '下载 lumen.env',
+    copyEnv: '复制 .env',
+    copiedEnv: '.env 已复制',
     copyCommand: '复制启动命令',
     copiedCommand: '命令已复制',
     copyFailed: '浏览器未允许复制，请展开配置后手动复制。',
-    preview: '查看完整 Compose',
+    preview: '查看完整 .env',
     back: '上一步',
     next: '下一步',
-    networkContract: '生成文件使用 Linux host network，以保留 Lumen 的局域网 mDNS 自动发现。Hub 变为 healthy 后，Lumilio Photos 会自动连接，不需要静态地址。',
+    networkContract: '启动命令使用 Linux host network，以保留 Lumen 的局域网 mDNS 自动发现。Hub 变为 healthy 后，Lumilio Photos 会自动连接，不需要静态地址。',
     firstStart: '第一次启动会下载所选模型。在下载、加载和预热完成前，容器保持 starting 属于正常现象。',
+    envNote: 'LUMEN_* 变量是部署意图，不是完整配置：Lumen Hub 在容器启动时用它们渲染并校验完整配置，非法组合会在下载模型前失败。',
+    composeDefault: '只想用默认能力时不需要本向导：发行 Compose 文件（lumen-cpu / lumen-vulkan / lumen-cuda）已经内置 basic 预设与 other 地区，直接 `docker compose -f <文件> up -d --wait` 即可。',
     customResource: (disk: string) => `模型磁盘约 ${disk} GB；内存取决于所选组合`,
     backends: {
       cpu: {
@@ -79,14 +77,14 @@ const messages = {
         badge: 'Vulkan',
         summary: '使用支持 Vulkan 1.3 的核显或独立显卡加速。',
         requirement: 'Linux amd64；主机存在 /dev/dri 且驱动支持 Vulkan 1.3',
-        included: 'Vulkan 镜像、/dev/dri 映射、host network',
+        included: 'Vulkan 镜像、--device /dev/dri、host network',
       },
       cuda: {
         title: 'NVIDIA GPU',
         badge: 'CUDA',
         summary: '面向独立计算主机或 GPU 服务器的 NVIDIA 加速。',
         requirement: 'Linux amd64；NVIDIA 驱动与 Container Toolkit',
-        included: 'CUDA 镜像、gpus: all、host network',
+        included: 'CUDA 镜像、--gpus all、host network',
       },
     },
     presets: {
@@ -112,23 +110,23 @@ const messages = {
       },
     },
     services: {
-      siglip: { title: '图像语义分析', summary: '支持自然语言搜索和相似媒体分析', env: 'siglip' },
-      face: { title: '人物识别', summary: '人脸检测、特征与聚类', env: 'face' },
-      ocr: { title: 'OCR文字识别', summary: '识别图片、截图和文档文字', env: 'ocr' },
-      bioclip: { title: 'BioCLIP物种识别', summary: '植物、动物和自然观察分类', env: 'bioclip' },
+      siglip: { title: '图像语义分析', summary: '支持自然语言搜索和相似媒体分析' },
+      face: { title: '人物识别', summary: '人脸检测、特征与聚类' },
+      ocr: { title: 'OCR文字识别', summary: '识别图片、截图和文档文字' },
+      bioclip: { title: 'BioCLIP物种识别', summary: '植物、动物和自然观察分类' },
     },
   },
   en: {
-    eyebrow: 'Lumen Hub · Docker Compose',
-    title: 'Create a deployment file that is ready to import',
-    intro: 'Choose hardware, download region, and model capabilities in four steps. The result is embedded in Compose—no .env or YAML editing.',
+    eyebrow: 'Lumen Hub · Docker wizard',
+    title: 'Generate canonical environment variables and a start command',
+    intro: 'The wizard outputs only the thin intent (LUMEN_* environment variables) and a start command. Lumen Hub renders and validates the complete runtime configuration when the container starts.',
     steps: ['Hardware', 'Download region', 'Model capabilities', 'Review'],
     step: 'Step',
     hardwareTitle: 'Which hardware will run Lumen Hub?',
     hardwareIntro: 'This is the compute node. It does not have to be the NAS that stores your media.',
     recommended: 'Choose this if unsure',
     requirements: 'Host requirements',
-    included: 'Already included',
+    included: 'Already included in the command',
     toolkit: 'Install NVIDIA Container Toolkit',
     regionTitle: 'Where should models be downloaded from?',
     regionIntro: 'This only changes model download routing, not the UI language or media location.',
@@ -145,27 +143,29 @@ const messages = {
     fixedModel: 'Fixed model',
     semanticModel: 'Semantic model',
     speciesCatalog: 'Species catalog',
-    reviewTitle: 'Review and download one file',
-    reviewIntro: 'Import it in a NAS container manager, or use the command below on a Linux host.',
+    reviewTitle: 'Review, download the .env, and run',
+    reviewIntro: 'Download the generated lumen.env, then copy and run the start command below.',
     summaryHardware: 'Compute backend',
     summaryRegion: 'Download region',
     summaryPreset: 'Capability plan',
     summaryServices: 'Enabled capabilities',
     summaryResources: 'Resource guidance',
-    summaryEnvironment: 'Configuration embedded in Compose',
+    summaryEnvironment: 'Canonical environment variables (thin intent)',
     custom: 'Custom',
     noServices: 'None selected',
-    download: 'Download Compose',
-    copyCompose: 'Copy Compose',
-    copiedCompose: 'Compose copied',
+    download: 'Download lumen.env',
+    copyEnv: 'Copy .env',
+    copiedEnv: '.env copied',
     copyCommand: 'Copy start command',
     copiedCommand: 'Command copied',
     copyFailed: 'Clipboard access was denied. Expand the configuration and copy it manually.',
-    preview: 'View complete Compose',
+    preview: 'View complete .env',
     back: 'Back',
     next: 'Continue',
-    networkContract: 'The generated file uses Linux host networking to preserve Lumen mDNS discovery. Once the Hub is healthy, Lumilio Photos connects automatically without a static address.',
+    networkContract: 'The start command uses Linux host networking to preserve Lumen mDNS discovery. Once the Hub is healthy, Lumilio Photos connects automatically without a static address.',
     firstStart: 'The first start downloads the selected models. The container normally remains starting until download, loading, and warmup finish.',
+    envNote: 'LUMEN_* variables are deployment intent, not a complete configuration: Lumen Hub renders and validates the full configuration at container startup, and invalid combinations fail before model download.',
+    composeDefault: 'You do not need this wizard for the default capabilities: the published Compose files (lumen-cpu / lumen-vulkan / lumen-cuda) already embed the basic preset and the other region. Run `docker compose -f <file> up -d --wait` directly.',
     customResource: (disk: string) => `About ${disk} GB of model storage; memory depends on the selected combination`,
     backends: {
       cpu: {
@@ -180,14 +180,14 @@ const messages = {
         badge: 'Vulkan',
         summary: 'Accelerate with an integrated or discrete GPU that supports Vulkan 1.3.',
         requirement: 'Linux amd64; /dev/dri and a Vulkan 1.3-capable host driver',
-        included: 'Vulkan image, /dev/dri mapping, host networking',
+        included: 'Vulkan image, --device /dev/dri, host networking',
       },
       cuda: {
         title: 'NVIDIA GPU',
         badge: 'CUDA',
         summary: 'NVIDIA acceleration for a dedicated compute node or GPU server.',
         requirement: 'Linux amd64; NVIDIA driver and Container Toolkit',
-        included: 'CUDA image, gpus: all, host networking',
+        included: 'CUDA image, --gpus all, host networking',
       },
     },
     presets: {
@@ -198,7 +198,7 @@ const messages = {
       },
       basic: {
         title: 'Basic',
-        summary: 'All four Lumen capabilities',
+        summary: 'All four Lumen Intelligence capabilities',
         resource: '6 GB RAM · 3 GB GPU/unified memory · about 6 GB disk',
       },
       brave: {
@@ -213,22 +213,22 @@ const messages = {
       },
     },
     services: {
-      siglip: { title: 'Image Semantic Analysis', summary: 'Natural-language search and similar-media analysis', env: 'siglip' },
-      face: { title: 'Person Recognition', summary: 'Face detection, embeddings, and clustering', env: 'face' },
-      ocr: { title: 'OCR Text Recognition', summary: 'Recognize text in images, screenshots, and documents', env: 'ocr' },
-      bioclip: { title: 'BioCLIP Species Recognition', summary: 'Classify plants, animals, and nature observations', env: 'bioclip' },
+      siglip: { title: 'Image Semantic Analysis', summary: 'Natural-language search and similar-media analysis' },
+      face: { title: 'Person Recognition', summary: 'Face detection, embeddings, and clustering' },
+      ocr: { title: 'OCR Text Recognition', summary: 'Recognize text in images, screenshots, and documents' },
+      bioclip: { title: 'BioCLIP Species Recognition', summary: 'Classify plants, animals, and nature observations' },
     },
   },
 } as const
 
-const composeSources: Record<Backend, string> = {
-  cpu: cpuComposeSource,
-  vulkan: vulkanComposeSource,
-  cuda: cudaComposeSource,
-}
 const backendOrder: Backend[] = ['cpu', 'vulkan', 'cuda']
 const presetOrder: Preset[] = ['minimal', 'basic', 'brave', 'custom']
 const serviceOrder: Service[] = ['siglip', 'face', 'ocr', 'bioclip']
+const imageTag: Record<Backend, string> = {
+  cpu: 'ghcr.io/edwinzhancn/lumen-hub:cpu',
+  vulkan: 'ghcr.io/edwinzhancn/lumen-hub:vulkan',
+  cuda: 'ghcr.io/edwinzhancn/lumen-hub:cuda',
+}
 
 const currentStep = ref(1)
 const maxVisitedStep = ref(1)
@@ -257,32 +257,29 @@ const customValid = computed(
   () => selectedPreset.value !== 'custom' || selectedServices.value.length > 0,
 )
 
-const environmentEntries = computed<[string, string][]>(() => {
-  const entries: [string, string][] = [
-    ['LUMEN_REGION', selectedRegion.value],
-    ['LUMEN_PRESET', selectedPreset.value],
-  ]
+// Canonical thin intent: only the variables the Hub renderer understands.
+// LUMEN_FACE_MODEL / LUMEN_OCR_MODEL are fixed by the Hub and are not accepted
+// as Docker intent, so they are never emitted.
+const envFileContent = computed(() => {
+  const lines: string[] = [`LUMEN_REGION=${selectedRegion.value}`, `LUMEN_PRESET=${selectedPreset.value}`]
 
-  if (selectedPreset.value !== 'custom') return entries
-
-  entries.push(['LUMEN_SERVICES', selectedServices.value.join(',')])
-  if (customServices.siglip) entries.push(['LUMEN_SIGLIP_MODEL', siglipModel.value])
-  if (customServices.face) entries.push(['LUMEN_FACE_MODEL', 'antelopev2'])
-  if (customServices.ocr) entries.push(['LUMEN_OCR_MODEL', 'pp-ocrv6-small'])
-  if (customServices.bioclip) {
-    entries.push(['LUMEN_BIOCLIP_MODEL', 'bioclip-2'])
-    entries.push(['LUMEN_BIOCLIP_DATASET', bioclipDataset.value])
+  if (selectedPreset.value === 'custom') {
+    lines.push(`LUMEN_SERVICES=${selectedServices.value.join(',')}`)
+    if (customServices.siglip) lines.push(`LUMEN_SIGLIP_MODEL=${siglipModel.value}`)
+    if (customServices.bioclip) lines.push(`LUMEN_BIOCLIP_DATASET=${bioclipDataset.value}`)
   }
-  return entries
+  return `${lines.join('\n')}\n`
 })
 
-const composeYAML = computed(() =>
-  replaceEnvironmentBlock(composeSources[selectedBackend.value], environmentEntries.value),
-)
-const fileName = computed(() => `lumen-${selectedBackend.value}.compose.yml`)
-const startCommand = computed(
-  () => `docker compose -f ${fileName.value} up -d --wait`,
-)
+const runCommand = computed(() => {
+  const flags = ['-d', '--name lumen-hub', '--network host']
+  if (selectedBackend.value === 'vulkan') flags.push('--device /dev/dri')
+  if (selectedBackend.value === 'cuda') flags.push('--gpus all')
+  flags.push('-v lumen-models:/models', '--env-file lumen.env')
+  return `docker run ${flags.join(' ')} ${imageTag[selectedBackend.value]}`
+})
+
+const envFileName = 'lumen.env'
 const selectedServiceLabels = computed(() =>
   selectedServices.value.map((service) => t.value.services[service].title).join('、'),
 )
@@ -302,26 +299,6 @@ const customDiskEstimate = computed(() => {
   if (customServices.bioclip) disk += bioclipDataset.value === 'TreeOfLife200M' ? 5.5 : 3.8
   return Math.max(disk, 0).toFixed(1)
 })
-
-function replaceEnvironmentBlock(source: string, entries: [string, string][]) {
-  const normalized = `${source.trimEnd()}\n`
-  const marker = '        environment:\n'
-  const start = normalized.indexOf(marker)
-  if (start === -1) return normalized
-
-  const valueStart = start + marker.length
-  const lines = normalized.slice(valueStart).split('\n')
-  let consumed = 0
-  for (const line of lines) {
-    if (!line.startsWith('            LUMEN_')) break
-    consumed += line.length + 1
-  }
-
-  const block = `${marker}${entries
-    .map(([name, value]) => `            ${name}: ${JSON.stringify(value)}`)
-    .join('\n')}\n`
-  return normalized.slice(0, start) + block + normalized.slice(valueStart + consumed)
-}
 
 function goToStep(step: number) {
   if (step < 1 || step > maxVisitedStep.value) return
@@ -347,7 +324,7 @@ function toggleService(service: Service) {
 }
 
 async function copyText(target: CopyTarget) {
-  const value = target === 'compose' ? composeYAML.value : startCommand.value
+  const value = target === 'env' ? envFileContent.value : runCommand.value
   try {
     await navigator.clipboard.writeText(value)
     copyState.value = target
@@ -359,13 +336,13 @@ async function copyText(target: CopyTarget) {
   }
 }
 
-function downloadCompose() {
+function downloadEnv() {
   if (!customValid.value) return
-  const blob = new Blob([composeYAML.value], { type: 'application/yaml;charset=utf-8' })
+  const blob = new Blob([envFileContent.value], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = fileName.value
+  anchor.download = envFileName
   anchor.click()
   URL.revokeObjectURL(url)
 }
@@ -563,7 +540,7 @@ function downloadCompose() {
 
           <div class="environment-summary">
             <strong>{{ t.summaryEnvironment }}</strong>
-            <code v-for="([name, value]) in environmentEntries" :key="name">{{ name }}={{ value }}</code>
+            <code v-for="line in envFileContent.trim().split('\n')" :key="line">{{ line }}</code>
           </div>
         </div>
 
@@ -571,15 +548,15 @@ function downloadCompose() {
         <p class="first-start">{{ t.firstStart }}</p>
 
         <div class="download-actions">
-          <button type="button" class="download" @click="downloadCompose"><Download :size="18" /> {{ t.download }}</button>
-          <button type="button" @click="copyText('compose')">
-            <Check v-if="copyState === 'compose'" :size="17" /><Clipboard v-else :size="17" />
-            {{ copyState === 'compose' ? t.copiedCompose : t.copyCompose }}
+          <button type="button" class="download" @click="downloadEnv"><Download :size="18" /> {{ t.download }}</button>
+          <button type="button" @click="copyText('env')">
+            <Check v-if="copyState === 'env'" :size="17" /><Clipboard v-else :size="17" />
+            {{ copyState === 'env' ? t.copiedEnv : t.copyEnv }}
           </button>
         </div>
 
         <div class="command-row">
-          <code>{{ startCommand }}</code>
+          <code>{{ runCommand }}</code>
           <button type="button" @click="copyText('command')">
             <Check v-if="copyState === 'command'" :size="16" /><Clipboard v-else :size="16" />
             {{ copyState === 'command' ? t.copiedCommand : t.copyCommand }}
@@ -588,9 +565,12 @@ function downloadCompose() {
         <p v-if="copyState === 'error'" class="validation-error" role="status">{{ t.copyFailed }}</p>
 
         <details class="compose-preview">
-          <summary>{{ t.preview }} · {{ fileName }}</summary>
-          <pre><code>{{ composeYAML }}</code></pre>
+          <summary>{{ t.preview }} · {{ envFileName }}</summary>
+          <pre><code>{{ envFileContent }}</code></pre>
         </details>
+
+        <p class="env-note">{{ t.envNote }}</p>
+        <p class="compose-default">{{ t.composeDefault }}</p>
       </section>
     </div>
 
@@ -669,9 +649,11 @@ function downloadCompose() {
 .environment-summary { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .environment-summary strong { margin-bottom: 3px; font-size: 12px; }
 .environment-summary code { overflow-wrap: anywhere; color: var(--vp-c-text-2); font-size: 10px; }
-.network-contract, .first-start { margin: 14px 0 0; padding: 12px 14px; color: var(--vp-c-text-2); background: var(--vp-c-bg-soft); font-size: 12px; line-height: 1.5; }
+.network-contract, .first-start, .env-note, .compose-default { margin: 14px 0 0; padding: 12px 14px; color: var(--vp-c-text-2); background: var(--vp-c-bg-soft); font-size: 12px; line-height: 1.5; }
 .network-contract { border-left: 3px solid var(--vp-c-brand-1); }
 .first-start { margin-top: 8px; }
+.env-note { margin-top: 8px; border-left: 3px solid var(--vp-c-brand-1); }
+.compose-default { margin-top: 8px; }
 .download-actions { display: flex; gap: 9px; margin-top: 16px; }
 .download-actions button, .command-row button, .wizard-footer button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--vp-c-divider); border-radius: 8px; padding: 9px 13px; color: var(--vp-c-text-1); background: var(--vp-c-bg); font-size: 13px; font-weight: 700; cursor: pointer; }
 .download-actions .download, .wizard-footer .next { border-color: var(--vp-c-brand-1); color: var(--vp-c-bg); background: var(--vp-c-brand-1); }
