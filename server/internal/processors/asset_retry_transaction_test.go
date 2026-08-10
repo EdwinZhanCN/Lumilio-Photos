@@ -14,6 +14,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
+	"server/internal/settings"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/rootcfg"
 
@@ -105,7 +106,7 @@ func TestSelectiveRetryStatusAndJobsAreAtomicAndIdempotent(t *testing.T) {
 		}); err != nil {
 			return err
 		}
-		if err := processor.enqueueRetryTasks(ctx, tx, &asset, dbtypes.AssetTypePhoto, tasks, "observation"); err != nil {
+		if err := processor.enqueueRetryTasks(ctx, tx, &asset, dbtypes.AssetTypePhoto, tasks, "observation", settings.ML{}); err != nil {
 			return err
 		}
 		return tx.Commit()

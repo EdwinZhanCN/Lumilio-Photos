@@ -13,6 +13,7 @@ import (
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
+	"server/internal/settings"
 )
 
 // ProcessRetryTask is the entry point for the retry worker. It handles AssetRetryPayload.
@@ -37,12 +38,6 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	if !asset.RepositoryID.Valid || ap.repositories == nil {
 		return fmt.Errorf("asset retry repository gate unavailable")
 	}
-	_, releaseWork, err := ap.repositories.BeginRepositoryWork(ctx, asset.RepositoryID.UUID.String(), dbtypes.RepositoryActivityProcessing)
-	if err != nil {
-		return err
-	}
-	defer releaseWork()
-
 	// Parse current status
 	var currentStatus status.AssetStatus
 	if len(asset.Status) > 0 {
@@ -56,7 +51,20 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	if err != nil {
 		return err
 	}
-	defer source.Close()
+	observationToken := source.observation.ObservationToken
+	if err := source.Close(); err != nil {
+		return fmt.Errorf("close asset source: %w", err)
+	}
+
+	// The source resolver holds a repository read lease while it validates the
+	// current file. Acquire the mutation lease only after that handle is closed;
+	// taking the leases in the opposite order self-deadlocks on the same
+	// repository.
+	_, releaseWork, err := ap.repositories.BeginRepositoryWork(ctx, asset.RepositoryID.UUID.String(), dbtypes.RepositoryActivityProcessing)
+	if err != nil {
+		return err
+	}
+	defer releaseWork()
 
 	// Determine which tasks to retry
 	tasksToRetry := retryTasks
@@ -67,6 +75,20 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 
 	if len(tasksToRetry) == 0 {
 		return fmt.Errorf("no failed tasks to retry")
+	}
+
+	assetType := dbtypes.AssetType(asset.Type)
+	var mlConfig settings.ML
+	needsMLConfig := (assetType == dbtypes.AssetTypePhoto && retryTasksContainML(tasksToRetry)) ||
+		(assetType == dbtypes.AssetTypeVideo && containsRetryTask(tasksToRetry, "process_video_frames"))
+	if needsMLConfig {
+		if ap.settingsService == nil {
+			return fmt.Errorf("retry ML settings service unavailable")
+		}
+		mlConfig, err = ap.settingsService.GetEffectiveMLConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("load ML settings: %w", err)
+		}
 	}
 
 	tx, err := ap.database.BeginTx(ctx, nil)
@@ -87,9 +109,8 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	}
 
 	// Re-enqueue tasks based on failed task names (using queue names as canonical task names)
-	assetType := dbtypes.AssetType(asset.Type)
 	log.Printf("Retrying %d tasks for %s asset %s: %v", len(tasksToRetry), assetType, asset.AssetID.String(), tasksToRetry)
-	if err := ap.enqueueRetryTasks(ctx, tx, &asset, assetType, tasksToRetry, source.observation.ObservationToken); err != nil {
+	if err := ap.enqueueRetryTasks(ctx, tx, &asset, assetType, tasksToRetry, observationToken, mlConfig); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -107,6 +128,7 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	assetType dbtypes.AssetType,
 	tasksToRetry []string,
 	observationToken string,
+	mlConfig settings.ML,
 ) error {
 	// Build queue set from task/queue names (they are the same in our bijection)
 	queueSet := make(map[string]bool)
@@ -188,24 +210,20 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	if assetType == dbtypes.AssetTypePhoto {
 		// Check each ML task queue name
 		if queueSet["process_semantic"] || queueSet["process_bioclip"] || queueSet["process_ocr"] || queueSet["process_face"] {
-			err := ap.retryMLJobs(ctx, tx, asset, queueSet)
+			err := ap.retryMLJobs(ctx, tx, asset, queueSet, mlConfig)
 			if err != nil {
 				return fmt.Errorf("enqueue ML retry: %w", err)
 			}
 		}
 	}
 	if assetType == dbtypes.AssetTypeVideo && queueSet["process_video_frames"] {
-		mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
-		if err != nil {
-			return fmt.Errorf("load ML settings: %w", err)
-		}
 		if mlConfig.SemanticEnabled && mlConfig.VideoSemanticEnabled {
-			err = ap.insertRetryJob(ctx, tx, jobs.ProcessVideoFramesArgs{
+			err := ap.insertRetryJob(ctx, tx, jobs.ProcessVideoFramesArgs{
 				AssetID: asset.AssetID, PreprocessVersion: jobs.MLPreprocessVersionV1,
 			}, "process_video_frames")
-		}
-		if err != nil {
-			return fmt.Errorf("enqueue process_video_frames retry: %w", err)
+			if err != nil {
+				return fmt.Errorf("enqueue process_video_frames retry: %w", err)
+			}
 		}
 	}
 
@@ -214,12 +232,8 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 }
 
 // retryMLJobs re-enqueues specific ML pointer jobs that failed.
-func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *repo.Asset, taskSet map[string]bool) error {
-	mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("load ML settings: %w", err)
-	}
-
+func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *repo.Asset, taskSet map[string]bool, mlConfig settings.ML) error {
+	var err error
 	if taskSet["process_semantic"] && mlConfig.SemanticEnabled {
 		err = ap.insertRetryJob(ctx, tx, jobs.ProcessSemanticArgs{
 			AssetID:           asset.AssetID,
@@ -261,6 +275,22 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *re
 	}
 
 	return nil
+}
+
+func containsRetryTask(tasks []string, task string) bool {
+	for _, candidate := range tasks {
+		if candidate == task {
+			return true
+		}
+	}
+	return false
+}
+
+func retryTasksContainML(tasks []string) bool {
+	return containsRetryTask(tasks, "process_semantic") ||
+		containsRetryTask(tasks, "process_bioclip") ||
+		containsRetryTask(tasks, "process_ocr") ||
+		containsRetryTask(tasks, "process_face")
 }
 
 func (ap *AssetProcessor) insertRetryJob(ctx context.Context, tx *sql.Tx, args river.JobArgs, queue string) error {
