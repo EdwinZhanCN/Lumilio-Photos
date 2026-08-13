@@ -114,10 +114,13 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
     />
   ) : null;
 
+  // A backdrop filter on every absolutely positioned tile corrupts Chromium's
+  // painting when this gallery scrolls inside a transformed modal: thumbnail
+  // and header layers disappear while the filter layers remain visible.
   const selectionOverlay = isSelectionMode && (
     <div className="absolute right-3 top-3">
       <div
-        className={`flex size-8 items-center justify-center rounded-full border backdrop-blur-md transition-all duration-200 ${
+        className={`flex size-8 items-center justify-center rounded-full border transition-colors duration-200 ${
           isSelected
             ? "border-primary/70 bg-primary text-primary-content shadow-lg shadow-primary/25"
             : "border-white/30 bg-black/35 text-white/75 shadow-lg shadow-black/20"
