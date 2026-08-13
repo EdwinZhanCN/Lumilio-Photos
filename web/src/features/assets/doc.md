@@ -34,7 +34,7 @@ flowchart TD
 ```
 
 [Assets](./flows/library/AssetsFlow.tsx) and [AssetsTrash](./flows/trash/AssetsTrashFlow.tsx) are thin route flows over
-[AssetBrowser](./flows/browse/AssetBrowser.tsx); album, person, folder, tag, trip, classifier, and pin
+[AssetBrowser](./flows/browse/AssetBrowser.tsx); album, person, folder, tag, classifier, and pin
 surfaces pass a constraint or source instead. [JustifiedGallery](./flows/browse/gallery/JustifiedGallery/JustifiedGallery.tsx) and
 [SquareGallery](./flows/browse/gallery/SquareGallery/SquareGallery.tsx) share the same browse model and virtualize the mounted
 viewport. [AssetViewer](./flows/viewer/AssetViewer.tsx) keeps the logical primary as the carousel item

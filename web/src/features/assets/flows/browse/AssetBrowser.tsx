@@ -37,7 +37,7 @@ export type AssetBrowserProps = {
    * from the saved agent result (pin) instead of the normal browse view. */
   pinId?: string;
   /** Custom banner rendered between the header and the gallery (album info,
-   * person cover, trip map, etc.). Lets scoped collections reuse this page
+   * person cover, Event cover, etc.). Lets scoped collections reuse this page
    * instead of hand-rolling header + carousel + search. */
   hero?: ReactNode;
   /** Whether scoped search (FAB + search view) is available. Off for views

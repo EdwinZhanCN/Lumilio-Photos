@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * The big primary title used by collection detail heroes (album / trip /
+ * The big primary title used by collection detail heroes (album / Event /
  * person), with an optional mono "code" badge and a trailing slot for extra
  * badges or actions. Standardizes the `text-4xl font-black text-primary` look
  * that was copy-pasted across the detail routes.

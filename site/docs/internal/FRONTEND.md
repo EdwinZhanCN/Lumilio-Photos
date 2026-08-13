@@ -201,7 +201,7 @@ Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll
 
 - Home and library: `/`, `/assets/*`.
 - Collections: `/collections`, albums, places/map, people, folders, tags, liked, trash, shared links, and utility/classifier views.
-- Entity detail: album, trip, folder, tag, person, and asset routes with optional asset-viewer segments.
+- Entity detail: album, Event, folder, tag, person, and asset routes with optional asset-viewer segments.
 - Operations: `/manage`, `/settings`, `/studio`, `/server-monitor`, and `/lumilio`.
 - Public/auth/setup: `/s/:token/*`, login, registration, password/MFA, and bootstrap routes outside or around the authenticated shell as appropriate.
 
@@ -241,8 +241,9 @@ The production web image uses Caddy:
   an overscanned viewport window. Offscreen thumbnail/media nodes are removed,
   and inactive asset list/search queries use bounded garbage-collection times.
 - The Home map waits until visible and requests a bounded preview. The Map route
-  queries `/assets/map-points` with its current WGS-84 viewport; only Trips opts
-  into draining all map-point and location-cluster pages.
+  queries `/assets/map-points` with its current WGS-84 viewport. The Collections
+  Places rail drains location-cluster pages to produce complete city summaries,
+  but it never drains map points.
 - `web/scripts/check-bundle-budget.ts` enforces a 420 KiB gzip budget for the
   production entry chunk as part of `task web:test:browser`.
 

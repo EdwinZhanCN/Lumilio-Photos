@@ -777,15 +777,15 @@
       "deleteError": "删除相册失败",
       "deleteSuccess": "相册删除成功",
       "loadAlbumsError": "加载相册失败：{{message}}",
-      "loadPeopleError": "加载人物失败：{{message}}"
+      "loadPeopleError": "加载人物失败：{{message}}",
+      "loadPlacesError": "无法加载地点。"
     },
     "newAlbum": "新建相册",
     "places": {
-      "empty": "暂无旅行记录。",
+      "empty": "暂无包含位置信息的地点。",
       "mapView": "地图",
       "mapViewTitle": "地点地图",
-      "tripFallback": "行程",
-      "tripNotFound": "未找到该行程。"
+      "unknown": "未知地点"
     },
     "sections": {
       "albums": "相册",

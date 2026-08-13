@@ -43,6 +43,5 @@ focal-length, camera/lens, time-distribution, available-year, and daily
 activity queries without merging them into client state.
 
 [useMapPhotoAssets](../assets/map/useMapPhotoAssets.ts) requests a bounded map-point preview after the map
-becomes visible. [useLocationClusters](../assets/map/useLocationClusters.ts) supplies the place count. Trips
-may drain those paginated sources elsewhere because grouping requires a
-complete dataset; Home deliberately does not.
+becomes visible. [useLocationClusters](../assets/map/useLocationClusters.ts) supplies the place count. Home
+deliberately does not drain either paginated source.

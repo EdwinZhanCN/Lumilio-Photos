@@ -1,8 +1,8 @@
 /**
  * # Collections
  *
- * Collections owns grouped ways of browsing the catalog: albums, places and
- * derived trips, people entry surfaces, folders, tags, Liked, duplicate review,
+ * Collections owns grouped ways of browsing the catalog: albums, places,
+ * people entry surfaces, folders, tags, Liked, duplicate review,
  * shared-link navigation, and classifier views. Person identity correction
  * remains in People; asset presentation remains in Assets.
  *
@@ -15,8 +15,9 @@
  * gallery search, filters, sort, and viewer identity remain URL state owned by
  * Assets.
  *
- * Trips and utility classifiers are derived views, not client-persisted
- * entities. Folder and tag route identities use
+ * Place summaries are a transient projection of server location clusters;
+ * they are not client-persisted entities. Utility classifiers are also derived
+ * views. Folder and tag route identities use
  * {@link encodeFolderKey}/{@link decodeFolderKey} and
  * {@link encodeTagKey}/{@link decodeTagKey} so paths and composite identities
  * survive navigation without a second store.
@@ -26,26 +27,25 @@
  * ```mermaid
  * flowchart TD
  *     HUB["Collections hub"] --> ALBUMS["Albums"]
- *     HUB --> PLACES["Places / trips"]
+ *     HUB --> PLACES["Places / map"]
  *     HUB --> PEOPLE["People entry"]
  *     HUB --> FOLDERS["Folders"]
  *     HUB --> UTILITIES["Utilities"]
  *     UTILITIES --> TAGS["Tags / classifiers / liked"]
  *     UTILITIES --> DUPLICATES["Duplicate review"]
  *     ALBUMS --> BROWSER["AssetBrowser"]
- *     PLACES --> BROWSER
+ *     PLACES --> MAP["Assets map capability"]
  *     FOLDERS --> BROWSER
  *     TAGS --> BROWSER
  * ```
  *
  * {@link Collections} renders preview rails driven by the same
  * {@link useUtilityShortcuts} list used on the Utilities page.
- * {@link AlbumDetails}, {@link TripDetails}, {@link FolderDetails},
- * {@link TagDetails}, and {@link UtilityClassifierAlbum} all compose
- * {@link AssetBrowser} with different constraints. Only album detail has an
- * editable entity hero; folders provide navigation, and trips/tags/classifiers
- * expose no entity editor. {@link Duplicates} is a review workflow rather than
- * an asset grid.
+ * {@link AlbumDetails}, {@link FolderDetails}, {@link TagDetails}, and
+ * {@link UtilityClassifierAlbum} all compose {@link AssetBrowser} with
+ * different constraints. Only album detail has an editable entity hero;
+ * folders provide navigation, and tags/classifiers expose no entity editor.
+ * {@link Duplicates} is a review workflow rather than an asset grid.
  *
  * ## Data
  *
@@ -56,8 +56,8 @@
  * from repository storage paths, and {@link useTagSummaries} groups tag usage
  * by name and source.
  *
- * {@link useCityTrips} derives trips from complete map-point and
- * location-cluster pagination; there is no backend trip entity.
+ * The Places rail derives city-level summaries from {@link useLocationClusters}
+ * and links them to the map through URL-owned center and zoom parameters.
  * {@link UTILITY_CLASSIFIERS} defines saved classifier constraints, while
  * Liked is the ordinary asset browse contract constrained by `liked: true`.
  * Biological album detail can enqueue an album-scoped BioCLIP rebuild and
@@ -81,8 +81,6 @@ import type { albumsReducer } from "./flows/albums/state/reducer.ts";
 import type Duplicates from "./flows/utilities/DuplicatesFlow.tsx";
 import type FolderDetails from "./flows/folders/FolderDetailsFlow.tsx";
 import type Collections from "./flows/hub/CollectionsFlow.tsx";
-import type TripDetails from "./flows/places/TripDetailsFlow.tsx";
-import type { useCityTrips } from "./flows/places/useCityTrips.ts";
 import type TagDetails from "./flows/tags/TagDetailsFlow.tsx";
 import type UtilityClassifierAlbum from "./flows/utilities/UtilityClassifierFlow.tsx";
 import type { useUtilityShortcuts } from "./flows/utilities/useUtilityShortcuts.ts";
@@ -90,5 +88,6 @@ import type { decodeFolderKey, encodeFolderKey } from "./model/folderKey.ts";
 import type { decodeTagKey, encodeTagKey } from "./model/tagKey.ts";
 import type { UTILITY_CLASSIFIERS } from "./model/utilityClassifiers.ts";
 import type { AssetBrowser } from "../assets/index.ts";
+import type { useLocationClusters } from "../assets/map/useLocationClusters.ts";
 
 export {};

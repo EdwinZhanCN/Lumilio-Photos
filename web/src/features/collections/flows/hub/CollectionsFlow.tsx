@@ -17,15 +17,15 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionErrorAlert } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useEvents } from "@/features/events";
+import { useLocationClusters } from "@/features/assets/map";
 import { usePeople } from "@/features/people";
 import AlbumRail from "./AlbumRail";
 import EventRail from "./EventRail";
 import FoldersRail from "./FoldersRail";
-import MapRail from "./MapRail";
+import PlacesRail from "./PlacesRail";
 import PeopleRail from "./PeopleRail";
 import UtilitiesRail from "./UtilitiesRail";
 import { useAlbums } from "../../api/useAlbums";
-import { useCityTrips } from "../places/useCityTrips";
 import { useFolders } from "../../api/useFolders";
 import { encodeFolderKey } from "../../model/folderKey";
 
@@ -53,10 +53,13 @@ function CollectionsContent() {
     repositoryId: scopedRepositoryId,
   });
   const eventsQuery = useEvents();
+  const placesQuery = useLocationClusters({
+    repositoryId: scopedRepositoryId,
+    autoFetchAll: true,
+  });
 
   const albums = data?.pages.flatMap((page) => page.albums) ?? [];
   const events = eventsQuery.data?.pages.flatMap((page) => page.events ?? []) ?? [];
-  const { trips, isLoading: isTripsLoading } = useCityTrips({ repositoryId: scopedRepositoryId });
   const { data: foldersData, isPending: isFoldersLoading } = useFolders(scopedRepositoryId, "");
   const folders = foldersData?.folders ?? [];
 
@@ -165,17 +168,32 @@ function CollectionsContent() {
               </button>
             </div>
 
-            <MapRail
-              trips={trips.slice(0, 12)}
-              loading={isTripsLoading}
-              onMapClick={() => navigate("/collections/map")}
-              onTripClick={(trip) =>
-                navigate(`/collections/places/${trip.id}`, {
-                  state: { trip },
-                })
+            <PlacesRail
+              clusters={placesQuery.clusters}
+              loading={
+                !placesQuery.isError &&
+                (placesQuery.isLoading ||
+                  placesQuery.isFetchingNextPage ||
+                  Boolean(placesQuery.hasNextPage))
               }
+              onMapClick={() => navigate("/collections/map")}
+              onPlaceClick={(place) => {
+                const params = new URLSearchParams();
+                if (typeof place.latitude === "number" && typeof place.longitude === "number") {
+                  params.set("lat", String(place.latitude));
+                  params.set("lng", String(place.longitude));
+                  params.set("zoom", "12");
+                }
+                const query = params.toString();
+                void navigate(`/collections/map${query ? `?${query}` : ""}`);
+              }}
             />
           </section>
+          {placesQuery.isError && (
+            <CollectionErrorAlert
+              message={t("collections.messages.loadPlacesError", "Places could not be loaded.")}
+            />
+          )}
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">

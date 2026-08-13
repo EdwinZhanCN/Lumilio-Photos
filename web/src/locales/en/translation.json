@@ -778,15 +778,15 @@
       "deleteError": "Failed to delete albums",
       "deleteSuccess": "Albums deleted successfully",
       "loadAlbumsError": "Failed to load albums: {{message}}",
-      "loadPeopleError": "Failed to load people: {{message}}"
+      "loadPeopleError": "Failed to load people: {{message}}",
+      "loadPlacesError": "Places could not be loaded."
     },
     "newAlbum": "New Album",
     "places": {
-      "empty": "No trips with location data yet.",
+      "empty": "No places with location data yet.",
       "mapView": "Map",
       "mapViewTitle": "Places Map",
-      "tripFallback": "Trip",
-      "tripNotFound": "Trip not found."
+      "unknown": "Unknown place"
     },
     "sections": {
       "albums": "Albums",

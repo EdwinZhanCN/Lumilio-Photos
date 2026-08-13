@@ -35,7 +35,7 @@
  * ```
  *
  * {@link Assets} and {@link AssetsTrash} are thin route flows over
- * {@link AssetBrowser}; album, person, folder, tag, trip, classifier, and pin
+ * {@link AssetBrowser}; album, person, folder, tag, classifier, and pin
  * surfaces pass a constraint or source instead. {@link JustifiedGallery} and
  * {@link SquareGallery} share the same browse model and virtualize the mounted
  * viewport. {@link AssetViewer} keeps the logical primary as the carousel item
