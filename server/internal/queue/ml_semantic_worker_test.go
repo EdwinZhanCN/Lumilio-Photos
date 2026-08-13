@@ -59,6 +59,10 @@ func (s *semanticWorkerLumenStub) GetNodes() []*discovery.NodeInfo {
 	return nil
 }
 
+func (s *semanticWorkerLumenStub) RuntimeSnapshot() service.LumenRuntimeSnapshot {
+	return service.NewDisabledLumenService().RuntimeSnapshot()
+}
+
 func (s *semanticWorkerLumenStub) IsTaskAvailable(taskName string) bool {
 	return s.available[taskName]
 }

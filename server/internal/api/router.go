@@ -189,6 +189,7 @@ type AgentControllerInterface interface {
 // CapabilitiesControllerInterface defines the interface for public system capability controllers.
 type CapabilitiesControllerInterface interface {
 	GetCapabilities(c *gin.Context) // GET /capabilities - Get de-sensitized runtime capabilities
+	GetLumenRuntime(c *gin.Context) // GET /admin/lumen/runtime - Get administrator Lumen diagnostics
 }
 
 type SettingsControllerInterface interface {
@@ -665,6 +666,10 @@ func NewRouter(
 		admin := v1.Group("/admin")
 		admin.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
+			lumen := admin.Group("/lumen")
+			{
+				lumen.GET("/runtime", capabilitiesController.GetLumenRuntime)
+			}
 			river := admin.Group("/river")
 			{
 				river.GET("/queue-summary", queueController.GetQueueSummary)

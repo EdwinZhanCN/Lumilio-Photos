@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/client"
 	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
@@ -20,6 +21,9 @@ import (
 
 // PoolStats mirrors client.PoolStats so callers don't need the SDK import.
 type PoolStats = client.PoolStats
+
+// LumenRuntimeSnapshot is the immutable SDK-owned diagnostic projection.
+type LumenRuntimeSnapshot = client.RuntimeSnapshot
 
 // LumenService is the contract for ML inference operations.
 //
@@ -41,6 +45,7 @@ type LumenService interface {
 	// PoolStats returns connection pool statistics for monitoring.
 	PoolStats() PoolStats
 	GetNodes() []*discovery.NodeInfo
+	RuntimeSnapshot() LumenRuntimeSnapshot
 	IsTaskAvailable(taskName string) bool
 }
 
@@ -146,6 +151,18 @@ func (disabledLumenService) PoolStats() PoolStats { return PoolStats{} }
 
 func (disabledLumenService) GetNodes() []*discovery.NodeInfo { return nil }
 
+func (disabledLumenService) RuntimeSnapshot() LumenRuntimeSnapshot {
+	return LumenRuntimeSnapshot{
+		CapturedAt:     time.Now().UTC(),
+		DiscoveryState: discovery.BackendDisabled,
+		Backends: []discovery.ResolverStatus{{
+			Source: "lumen",
+			State:  discovery.BackendDisabled,
+		}},
+		Nodes: []*discovery.NodeInfo{},
+	}
+}
+
 func (disabledLumenService) IsTaskAvailable(string) bool { return false }
 
 func (s *lumenService) Start(ctx context.Context) error { return s.lumenClient.Start(ctx) }
@@ -155,6 +172,10 @@ func (s *lumenService) Close() error { return s.lumenClient.Close() }
 func (s *lumenService) PoolStats() PoolStats { return s.lumenClient.PoolStats() }
 
 func (s *lumenService) GetNodes() []*discovery.NodeInfo { return s.lumenClient.GetNodes() }
+
+func (s *lumenService) RuntimeSnapshot() LumenRuntimeSnapshot {
+	return s.lumenClient.RuntimeSnapshot()
+}
 
 func (s *lumenService) IsTaskAvailable(taskName string) bool {
 	for _, node := range s.lumenClient.GetNodes() {

@@ -75,6 +75,10 @@ func (s *semanticTestLumenStub) GetNodes() []*discovery.NodeInfo {
 	return nil
 }
 
+func (s *semanticTestLumenStub) RuntimeSnapshot() LumenRuntimeSnapshot {
+	return NewDisabledLumenService().RuntimeSnapshot()
+}
+
 type semanticTestEmbeddingStub struct {
 	resolveFn func(ctx context.Context, embeddingType EmbeddingType, model string, dimensions int) (repo.EmbeddingSpace, error)
 }

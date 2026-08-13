@@ -71,6 +71,10 @@ func (s *faceWorkerLumenStub) GetNodes() []*discovery.NodeInfo {
 	return nil
 }
 
+func (s *faceWorkerLumenStub) RuntimeSnapshot() service.LumenRuntimeSnapshot {
+	return service.NewDisabledLumenService().RuntimeSnapshot()
+}
+
 type faceWorkerFaceServiceStub struct {
 	service.FaceService
 	savedAssetID uuid.UUID

@@ -1502,6 +1502,65 @@
   "monitor": {
     "adminOnlyDescription": "Processing activity and runtime diagnostics are only available to administrators.",
     "adminOnlyTitle": "Admin access required",
+    "capabilities": {
+      "capabilityPending": "Capability exchange pending",
+      "compatibility": "Compatibility",
+      "consecutiveFailures_one": "{{count}} consecutive failures",
+      "consecutiveFailures_other": "{{count}} consecutive failures",
+      "diagnostic": "Diagnostic",
+      "discovery": {
+        "degraded": "Lumen discovery is degraded",
+        "degradedDetail": "Previous observations are preserved while the backend retries automatically.",
+        "disabled": "Lumen discovery is disabled",
+        "disabledDetail": "Media management remains available, but external ML tasks cannot run.",
+        "healthy": "Lumen discovery is healthy",
+        "healthyDetail": "Scheduled discovery is running independently of this page.",
+        "starting": "Lumen discovery is starting",
+        "startingDetail": "The first bounded discovery scan has not completed yet."
+      },
+      "discoveryBackends": "Discovery backends",
+      "errors": {
+        "capabilityUnimplemented": "Capability exchange is not implemented",
+        "incompatible": "Node is incompatible",
+        "protocolIncompatible": "Protocol version is incompatible",
+        "queryFailed": "Discovery scan failed",
+        "queryTimedOut": "Discovery scan timed out",
+        "resolveFailed": "A matching service had no usable address",
+        "socketOpenFailed": "Discovery socket could not open",
+        "socketReadFailed": "Discovery replies could not be read",
+        "socketSendFailed": "Discovery query could not be sent",
+        "transportUnavailable": "Transport unavailable",
+        "watchClosed": "Discovery backend stopped unexpectedly",
+        "watchStartFailed": "Discovery backend could not start"
+      },
+      "lastObserved": "Last observed",
+      "lastSuccess": "Last successful scan",
+      "noCurrentNodes": "No validated Lumen Hubs are currently visible",
+      "node": "Node",
+      "noNodes": "No validated Lumen Hubs are advertised",
+      "noNodesDetail": "A Hub that appears later will be discovered and validated without restarting Photos or opening Monitor.",
+      "refreshStatus": "Refresh status",
+      "scanResults": "Matched / rejected",
+      "source": "Source",
+      "state": "State",
+      "states": {
+        "active": "active",
+        "compatible": "compatible",
+        "connecting": "connecting",
+        "degraded": "degraded",
+        "disabled": "disabled",
+        "healthy": "healthy",
+        "incompatible": "incompatible",
+        "pending": "pending",
+        "ready": "ready",
+        "starting": "starting",
+        "unavailable": "unavailable",
+        "unknown": "unknown"
+      },
+      "tasks": "Advertised tasks",
+      "transport": "Transport",
+      "validatedNodes": "Validated nodes"
+    },
     "ml": {
       "allIndexed": "All indexed",
       "bioAlbumCoverage": "Bio album species coverage",
@@ -2218,11 +2277,7 @@
       "runtimeInfoTitle": "Runtime configuration",
       "taskAvailability": "Task availability",
       "taskNames": {
-        "bioClipClassify": "BioCLIP Species Recognition",
-        "faceDetectAndEmbed": "Person Recognition",
-        "ocr": "OCR Text Recognition",
-        "semanticImageEmbed": "Image Semantic Analysis · image task",
-        "semanticTextEmbed": "Image Semantic Analysis · text task"
+        "bioClipClassify": "BioCLIP Species Recognition"
       },
       "unavailable": "Unavailable",
       "workingRepositoryHint": "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",

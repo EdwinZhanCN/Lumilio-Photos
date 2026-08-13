@@ -336,6 +336,21 @@ calls SDK defaults or env loading. ML and LLM feature settings remain
 runtime-mutable catalog settings and do not belong in `AppConfig`. Zero-shot
 classifier preview is exposed through `/api/v1/classifiers/preview`.
 
+The SDK owns the continuous Lumen runtime pipeline: bounded DNS-SD scans,
+strict service correlation, source-owned snapshot reconciliation, gRPC
+transport state, and the in-band capability verdict. Failed scans preserve
+prior observations; only consecutive successful omissions expire a node.
+mDNS, Broker, and static sources are additive and supervised independently.
+Photos consumes one immutable SDK runtime snapshot and does not couple feature
+switches, Monitor polling, or status refreshes to discovery progress.
+
+`GET /api/v1/capabilities` exposes only aggregate discovery state/counts and
+task enablement/availability. `GET /api/v1/admin/lumen/runtime` is the
+administrator-only Monitor projection with bounded backend diagnostics,
+endpoint/source details, transport and compatibility states, canonical
+service/task identifiers, and descriptive version/runtime. Neither route
+returns arbitrary TXT metadata or raw resolver errors.
+
 Desktop installs a platform-specific, release-pinned Lumen Hub into private
 app-data and supervises it as a separate process tree. Its Hub configuration
 is rendered and validated from the same platform/backend/preset/region/cache

@@ -92,8 +92,8 @@ github.com/disintegration/imaging v1.6.2 h1:w1LecBlG2Lnp8B3jk5zSuNqd7b4DXhcjwek1
 github.com/disintegration/imaging v1.6.2/go.mod h1:44/5580QXChDfwIclfc/PCwrr44amcmDAg8hxG0Ewe4=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
-github.com/edwinzhancn/lumen-sdk v1.4.0 h1:4DnBe22Uz9ql170aJfKG3wwljFlXvcVtpuaJYZecSZM=
-github.com/edwinzhancn/lumen-sdk v1.4.0/go.mod h1:QSJcTTV1cMI25xo8bapXY58CqhLX0IqD50nFNxZJalw=
+github.com/edwinzhancn/lumen-sdk v1.4.1 h1:iEpyFUY3lOjCIGv+VcsVpNXiNBaLwr6ZlIslEKILA64=
+github.com/edwinzhancn/lumen-sdk v1.4.1/go.mod h1:vabxLSrB/Rl76yCR2phJV6dDXn/0TE2l1+Wy1ykMwEc=
 github.com/eino-contrib/jsonschema v1.0.3 h1:2Kfsm1xlMV0ssY2nuxshS4AwbLFuqmPmzIjLVJ1Fsp0=
 github.com/eino-contrib/jsonschema v1.0.3/go.mod h1:cpnX4SyKjWjGC7iN2EbhxaTdLqGjCi0e9DxpLYxddD4=
 github.com/eino-contrib/ollama v0.1.0 h1:z1NaMdKW6X1ftP8g5xGGR5zDRPUtuTKFq35vBQgxsN4=

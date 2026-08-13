@@ -13,7 +13,7 @@ route and is not persisted as browse or upload preference.
 [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) keeps only expanded rows and transient copied status;
 [MLMonitor](./flows/overview/MLMonitor.tsx) keeps its confirmation dialog and missing-only/full choice.
 
-Queue, capability, and indexing results remain TanStack Query server state.
+Queue, capability, Lumen runtime, and indexing results remain TanStack Query server state.
 The route checks the authenticated user before monitor queries render.
 
 ## Flows
@@ -44,7 +44,11 @@ whose tree and detail column scroll independently.
 
 Queue stats and summary endpoints poll every five seconds. Queue summaries
 include bounded error samples suitable for copied diagnostics.
-[useCapabilities](../../lib/capabilities/useCapabilities.ts) also polls every five seconds.
+[useCapabilities](../../lib/capabilities/useCapabilities.ts) and [useLumenRuntime](./api/useLumenRuntime.ts) poll every five seconds.
+The public capability snapshot supplies de-sensitized task availability;
+the administrator runtime snapshot supplies typed discovery-backend,
+transport, compatibility, and node diagnostics. Refresh observes both
+snapshots and never restarts or rescans discovery.
 
 [useAssetIndexingStats](./api/useAssetIndexing.ts) polls repository-aware coverage every fifteen
 seconds. [AssetIndexingStats](./api/useAssetIndexing.ts) distinguishes photo and video totals and

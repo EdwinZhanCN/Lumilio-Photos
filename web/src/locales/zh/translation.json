@@ -1487,6 +1487,64 @@
   "monitor": {
     "adminOnlyDescription": "处理活动与运行时诊断仅对管理员开放。",
     "adminOnlyTitle": "需要管理员权限",
+    "capabilities": {
+      "capabilityPending": "正在交换能力信息",
+      "compatibility": "兼容性",
+      "consecutiveFailures_other": "连续失败 {{count}} 次",
+      "diagnostic": "诊断信息",
+      "discovery": {
+        "degraded": "Lumen 发现服务状态异常",
+        "degradedDetail": "后端自动重试期间会保留此前发现的节点。",
+        "disabled": "Lumen 发现服务已禁用",
+        "disabledDetail": "媒体管理仍可使用，但外部 ML 任务无法运行。",
+        "healthy": "Lumen 发现服务运行正常",
+        "healthyDetail": "定时发现任务独立运行，不依赖此页面。",
+        "starting": "Lumen 发现服务正在启动",
+        "startingDetail": "首次限时发现扫描尚未完成。"
+      },
+      "discoveryBackends": "发现后端",
+      "errors": {
+        "capabilityUnimplemented": "节点未实现能力交换接口",
+        "incompatible": "节点不兼容",
+        "protocolIncompatible": "协议版本不兼容",
+        "queryFailed": "发现扫描失败",
+        "queryTimedOut": "发现扫描超时",
+        "resolveFailed": "匹配的服务没有可用地址",
+        "socketOpenFailed": "无法打开发现套接字",
+        "socketReadFailed": "无法读取发现响应",
+        "socketSendFailed": "无法发送发现查询",
+        "transportUnavailable": "传输连接不可用",
+        "watchClosed": "发现后端意外停止",
+        "watchStartFailed": "发现后端无法启动"
+      },
+      "lastObserved": "最近发现时间",
+      "lastSuccess": "最近成功扫描",
+      "noCurrentNodes": "当前未发现已验证的 Lumen Hub",
+      "node": "节点",
+      "noNodes": "当前没有已广播且通过验证的 Lumen Hub",
+      "noNodesDetail": "稍后启动的 Hub 会被自动发现并验证，无需重启 Photos 或打开监控页面。",
+      "refreshStatus": "刷新状态",
+      "scanResults": "匹配 / 拒绝",
+      "source": "来源",
+      "state": "状态",
+      "states": {
+        "active": "活跃",
+        "compatible": "兼容",
+        "connecting": "连接中",
+        "degraded": "异常",
+        "disabled": "已禁用",
+        "healthy": "正常",
+        "incompatible": "不兼容",
+        "pending": "待验证",
+        "ready": "就绪",
+        "starting": "启动中",
+        "unavailable": "不可用",
+        "unknown": "未知"
+      },
+      "tasks": "已通告任务",
+      "transport": "传输状态",
+      "validatedNodes": "已验证节点"
+    },
     "ml": {
       "allIndexed": "全部已索引",
       "bioAlbumCoverage": "生物图鉴相册覆盖率",
@@ -2197,11 +2255,7 @@
       "runtimeInfoTitle": "运行时配置",
       "taskAvailability": "任务可用性",
       "taskNames": {
-        "bioClipClassify": "BioCLIP物种识别",
-        "faceDetectAndEmbed": "人物识别",
-        "ocr": "OCR文字识别",
-        "semanticImageEmbed": "图像语义分析",
-        "semanticTextEmbed": "文本语义分析"
+        "bioClipClassify": "BioCLIP物种识别"
       },
       "unavailable": "不可用",
       "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持资源库过滤时都会默认使用这个范围。",

@@ -1,4 +1,47 @@
 export interface paths {
+    "/api/v1/admin/lumen/runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lumen runtime diagnostics
+         * @description Return bounded per-backend and per-node Lumen runtime diagnostics for administrators.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Lumen runtime diagnostics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.LumenRuntimeDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/river/queue-summary": {
         parameters: {
             query?: never;
@@ -14517,6 +14560,56 @@ export interface components {
             password: string;
             username: string;
         };
+        "dto.LumenBackendStatusDTO": {
+            consecutive_failures?: number;
+            last_error_code?: string;
+            /** @enum {string} */
+            last_outcome?: "success" | "failed" | "timed_out" | "cancelled";
+            last_scan_completed_at?: string;
+            last_scan_started_at?: string;
+            last_scan_succeeded_at?: string;
+            matched_count?: number;
+            next_scan_at?: string;
+            rejected_count?: number;
+            source?: string;
+            /** @enum {string} */
+            state?: "disabled" | "starting" | "healthy" | "degraded";
+        };
+        "dto.LumenNodeRuntimeDTO": {
+            /** @enum {string} */
+            compatibility?: "pending" | "compatible" | "incompatible";
+            endpoint?: string;
+            error_code?: string;
+            id?: string;
+            last_observed_at?: string;
+            runtime?: string;
+            sources?: string[];
+            tasks?: components["schemas"]["dto.LumenNodeTaskDTO"][];
+            /** @enum {string} */
+            transport?: "connecting" | "ready" | "unavailable";
+            updated_at?: string;
+            version?: string;
+        };
+        "dto.LumenNodeTaskDTO": {
+            service?: string;
+            task?: string;
+        };
+        "dto.LumenRuntimeCountsDTO": {
+            active?: number;
+            connecting?: number;
+            discovered?: number;
+            incompatible?: number;
+            pending?: number;
+            unavailable?: number;
+        };
+        "dto.LumenRuntimeDTO": {
+            backends?: components["schemas"]["dto.LumenBackendStatusDTO"][];
+            captured_at?: string;
+            counts?: components["schemas"]["dto.LumenRuntimeCountsDTO"];
+            /** @enum {string} */
+            discovery_state?: "disabled" | "starting" | "healthy" | "degraded";
+            nodes?: components["schemas"]["dto.LumenNodeRuntimeDTO"][];
+        };
         "dto.LumilioSidecarSourceDTO": {
             /** @example 1048576 */
             file_size?: number;
@@ -14555,9 +14648,22 @@ export interface components {
         "dto.MLCapabilitiesDTO": {
             /** @example 1 */
             active_node_count?: number;
+            /** @example 0 */
+            connecting_node_count?: number;
             /** @example 2 */
             discovered_node_count?: number;
+            /**
+             * @example healthy
+             * @enum {string}
+             */
+            discovery_state?: "disabled" | "starting" | "healthy" | "degraded";
+            /** @example 0 */
+            incompatible_node_count?: number;
+            /** @example 1 */
+            pending_node_count?: number;
             tasks?: components["schemas"]["dto.MLTaskSetDTO"];
+            /** @example 0 */
+            unavailable_node_count?: number;
         };
         "dto.MLSettingsDTO": {
             bioclip_enabled?: boolean;
