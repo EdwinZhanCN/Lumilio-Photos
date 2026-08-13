@@ -120,11 +120,11 @@ const docTemplate = `{
             },
             "dbtypes.PhotoSpecificMetadata": {
                 "properties": {
-                    "camera_model": {
+                    "camera_make": {
                         "type": "string"
                     },
-                    "capture_offset_minutes": {
-                        "type": "integer"
+                    "camera_model": {
+                        "type": "string"
                     },
                     "content_identifier": {
                         "type": "string"
@@ -132,10 +132,7 @@ const docTemplate = `{
                     "description": {
                         "type": "string"
                     },
-                    "dimensions": {
-                        "type": "string"
-                    },
-                    "exposure": {
+                    "exposure_compensation": {
                         "type": "number"
                     },
                     "exposure_time": {
@@ -147,12 +144,6 @@ const docTemplate = `{
                     "focal_length": {
                         "type": "number"
                     },
-                    "gps_latitude": {
-                        "type": "number"
-                    },
-                    "gps_longitude": {
-                        "type": "number"
-                    },
                     "is_raw": {
                         "type": "boolean"
                     },
@@ -160,12 +151,6 @@ const docTemplate = `{
                         "type": "integer"
                     },
                     "lens_model": {
-                        "type": "string"
-                    },
-                    "resolution": {
-                        "type": "string"
-                    },
-                    "taken_time": {
                         "type": "string"
                     }
                 },
@@ -190,12 +175,13 @@ const docTemplate = `{
                         "example": 1000000,
                         "type": "integer"
                     },
+                    "camera_make": {
+                        "example": "Canon",
+                        "type": "string"
+                    },
                     "camera_model": {
                         "example": "Canon EOS 5D Mark IV",
                         "type": "string"
-                    },
-                    "capture_offset_minutes": {
-                        "type": "integer"
                     },
                     "codec": {
                         "example": "H.264",
@@ -211,18 +197,6 @@ const docTemplate = `{
                     "frame_rate": {
                         "example": 30,
                         "type": "number"
-                    },
-                    "gps_latitude": {
-                        "example": 37.7749,
-                        "type": "number"
-                    },
-                    "gps_longitude": {
-                        "example": -122.4194,
-                        "type": "number"
-                    },
-                    "recorded_time": {
-                        "example": "2023-01-01T00:00:00Z",
-                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -591,6 +565,12 @@ const docTemplate = `{
                     "file_size": {
                         "type": "integer"
                     },
+                    "gps_latitude": {
+                        "type": "number"
+                    },
+                    "gps_longitude": {
+                        "type": "number"
+                    },
                     "hash": {
                         "type": "string"
                     },
@@ -781,6 +761,12 @@ const docTemplate = `{
                     "file_size": {
                         "type": "integer"
                     },
+                    "gps_latitude": {
+                        "type": "number"
+                    },
+                    "gps_longitude": {
+                        "type": "number"
+                    },
                     "hash": {
                         "type": "string"
                     },
@@ -883,6 +869,12 @@ const docTemplate = `{
                     },
                     "file_size": {
                         "type": "integer"
+                    },
+                    "gps_latitude": {
+                        "type": "number"
+                    },
+                    "gps_longitude": {
+                        "type": "number"
                     },
                     "hash": {
                         "type": "string"
@@ -3837,6 +3829,180 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.LumenBackendStatusDTO": {
+                "properties": {
+                    "consecutive_failures": {
+                        "type": "integer"
+                    },
+                    "last_error_code": {
+                        "type": "string"
+                    },
+                    "last_outcome": {
+                        "enum": [
+                            "success",
+                            "failed",
+                            "timed_out",
+                            "cancelled"
+                        ],
+                        "type": "string"
+                    },
+                    "last_scan_completed_at": {
+                        "type": "string"
+                    },
+                    "last_scan_started_at": {
+                        "type": "string"
+                    },
+                    "last_scan_succeeded_at": {
+                        "type": "string"
+                    },
+                    "matched_count": {
+                        "type": "integer"
+                    },
+                    "next_scan_at": {
+                        "type": "string"
+                    },
+                    "rejected_count": {
+                        "type": "integer"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "state": {
+                        "enum": [
+                            "disabled",
+                            "starting",
+                            "healthy",
+                            "degraded"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LumenNodeRuntimeDTO": {
+                "properties": {
+                    "compatibility": {
+                        "enum": [
+                            "pending",
+                            "compatible",
+                            "incompatible"
+                        ],
+                        "type": "string"
+                    },
+                    "endpoint": {
+                        "type": "string"
+                    },
+                    "error_code": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "last_observed_at": {
+                        "type": "string"
+                    },
+                    "runtime": {
+                        "type": "string"
+                    },
+                    "sources": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "tasks": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.LumenNodeTaskDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "transport": {
+                        "enum": [
+                            "connecting",
+                            "ready",
+                            "unavailable"
+                        ],
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LumenNodeTaskDTO": {
+                "properties": {
+                    "service": {
+                        "type": "string"
+                    },
+                    "task": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LumenRuntimeCountsDTO": {
+                "properties": {
+                    "active": {
+                        "type": "integer"
+                    },
+                    "connecting": {
+                        "type": "integer"
+                    },
+                    "discovered": {
+                        "type": "integer"
+                    },
+                    "incompatible": {
+                        "type": "integer"
+                    },
+                    "pending": {
+                        "type": "integer"
+                    },
+                    "unavailable": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LumenRuntimeDTO": {
+                "properties": {
+                    "backends": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.LumenBackendStatusDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "captured_at": {
+                        "type": "string"
+                    },
+                    "counts": {
+                        "$ref": "#/components/schemas/dto.LumenRuntimeCountsDTO"
+                    },
+                    "discovery_state": {
+                        "enum": [
+                            "disabled",
+                            "starting",
+                            "healthy",
+                            "degraded"
+                        ],
+                        "type": "string"
+                    },
+                    "nodes": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.LumenNodeRuntimeDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.LumilioSidecarSourceDTO": {
                 "properties": {
                     "file_size": {
@@ -3933,12 +4099,38 @@ const docTemplate = `{
                         "example": 1,
                         "type": "integer"
                     },
+                    "connecting_node_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
                     "discovered_node_count": {
                         "example": 2,
                         "type": "integer"
                     },
+                    "discovery_state": {
+                        "enum": [
+                            "disabled",
+                            "starting",
+                            "healthy",
+                            "degraded"
+                        ],
+                        "example": "healthy",
+                        "type": "string"
+                    },
+                    "incompatible_node_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "pending_node_count": {
+                        "example": 1,
+                        "type": "integer"
+                    },
                     "tasks": {
                         "$ref": "#/components/schemas/dto.MLTaskSetDTO"
+                    },
+                    "unavailable_node_count": {
+                        "example": 0,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -7890,6 +8082,41 @@ const docTemplate = `{
         "url": ""
     },
     "paths": {
+        "/api/v1/admin/lumen/runtime": {
+            "get": {
+                "description": "Return bounded per-backend and per-node Lumen runtime diagnostics for administrators.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.LumenRuntimeDTO"
+                                }
+                            }
+                        },
+                        "description": "Lumen runtime diagnostics retrieved successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get Lumen runtime diagnostics",
+                "tags": [
+                    "capabilities"
+                ]
+            }
+        },
         "/api/v1/admin/river/queue-summary": {
             "get": {
                 "description": "Get aggregated processing activity per queue, including recent error samples",
