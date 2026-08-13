@@ -266,9 +266,17 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	}
 	newID = *operation.TargetID
 	releaseRoot := rm.acquireRepositoryRootRead(rootID)
-	defer releaseRoot()
 	releaseMutation := rm.acquireRepositoryMutation(previousUUID)
-	defer releaseMutation()
+	locksReleased := false
+	releaseLocks := func() {
+		if locksReleased {
+			return
+		}
+		locksReleased = true
+		releaseMutation()
+		releaseRoot()
+	}
+	defer releaseLocks()
 	rollbackData, err := planRepositoryPrivateStateIsolation(cleanPath, "copied-from-"+previousID)
 	if err != nil {
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err,
@@ -316,6 +324,10 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		registerRepositoryCopyOperationResult{RepositoryID: dbRepo.RepoID.String(), InitialScanQueued: false}); err != nil {
 		return nil, fmt.Errorf("repository copy registered but journal completion failed: %w", err)
 	}
+	// The scanner's enqueue path establishes a repository work lease of its
+	// own. Release the lifecycle locks before entering it, otherwise the
+	// enqueue path waits forever for the locks held by this function.
+	releaseLocks()
 	if rm.initialScan != nil {
 		if err := rm.ScheduleInitialRepositoryScan(ctx, dbRepo.RepoID.String()); err != nil {
 			rm.logger.Warn("repository copy registered but initial scan could not be queued",
