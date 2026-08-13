@@ -25,7 +25,7 @@ type AudioInfo struct {
 	Duration   float64
 	SampleRate int
 	Channels   int
-	Bitrate    int
+	Bitrate    int // bit/s
 	Codec      string
 	Format     string
 }
@@ -63,8 +63,22 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 		return fmt.Errorf("unexpected metadata type for audio: %T", result.Metadata)
 	}
 
-	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID, audioInfo.Duration); err != nil {
-		return fmt.Errorf("update duration: %w", err)
+	if audioInfo.Codec != "" {
+		meta.Codec = audioInfo.Codec
+	}
+	if audioInfo.Bitrate > 0 {
+		meta.Bitrate = audioInfo.Bitrate
+	}
+	if audioInfo.SampleRate > 0 {
+		meta.SampleRate = audioInfo.SampleRate
+	}
+	if audioInfo.Channels > 0 {
+		meta.Channels = audioInfo.Channels
+	}
+	common := result.Common
+	if audioInfo.Duration > 0 {
+		duration := audioInfo.Duration
+		common.Duration = &duration
 	}
 
 	sm, err := dbtypes.MarshalMeta(meta)
@@ -72,7 +86,7 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 		return fmt.Errorf("marshal metadata: %w", err)
 	}
 
-	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID, sm, result.Raw); err != nil {
+	if err := ap.assetService.UpdateAssetExtractedMetadata(ctx, asset.AssetID, sm, common, result.Raw); err != nil {
 		return fmt.Errorf("save metadata: %w", err)
 	}
 	ap.reconcileComponentRelation(ctx, asset, false, asset.MimeType)
@@ -83,7 +97,7 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 
 // transcodeAudioSmart applies a best-effort, resource-aware transcoding strategy.
 func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
-	if strings.ToLower(audioInfo.Format) == "mp3" && audioInfo.Bitrate >= 128 && audioInfo.Bitrate <= 320 {
+	if strings.ToLower(audioInfo.Format) == "mp3" && audioInfo.Bitrate >= 128000 && audioInfo.Bitrate <= 320000 {
 		return copyAudioForWeb(files, sourcePath, asset, "web")
 	}
 
@@ -101,7 +115,7 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_mp3_%s.mp3", filepath.Base(inputPath)))
 
 	targetBitrate := "192k"
-	if audioInfo.Bitrate > 0 && audioInfo.Bitrate < 192 {
+	if audioInfo.Bitrate > 0 && audioInfo.Bitrate < 192000 {
 		targetBitrate = "128k"
 	}
 
@@ -231,7 +245,7 @@ func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
 		info.Channels = stream.Channels
 		info.Codec = stream.CodecName
 		if br, err := strconv.Atoi(stream.BitRate); err == nil {
-			info.Bitrate = br / 1000 // convert to kbps
+			info.Bitrate = br
 		}
 		if stream.Duration != "" {
 			if dur, err := strconv.ParseFloat(stream.Duration, 64); err == nil {
@@ -243,7 +257,7 @@ func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
 	info.Format = probeData.Format.FormatName
 	if info.Bitrate == 0 && probeData.Format.BitRate != "" {
 		if br, err := strconv.Atoi(probeData.Format.BitRate); err == nil {
-			info.Bitrate = br / 1000
+			info.Bitrate = br
 		}
 	}
 	if info.Duration == 0 && probeData.Format.Duration != "" {

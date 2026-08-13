@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -58,7 +57,7 @@ type AssetService interface {
 	RestoreAsset(ctx context.Context, id uuid.UUID) error
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
-	UpdateAssetMetadataWithExifRaw(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, exifRaw json.RawMessage) error
+	UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error
 
 	// Rating management methods
 	UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error
@@ -84,7 +83,6 @@ type AssetService interface {
 
 	CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
-	SaveAssetIndex(ctx context.Context, taskID string, hash string) error
 	CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error)
 
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*repo.Tag, error)
@@ -489,58 +487,70 @@ func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]rep
 	return s.queries.GetAssetsByContentHash(ctx, hash)
 }
 
-// UpdateAssetMetadata updates the specific metadata of an asset and extracts taken_time
+// UpdateAssetMetadata replaces type-specific metadata from the public API. The
+// decode/re-encode step is intentionally destructive: unknown and retired JSON
+// fields are discarded instead of being carried forward.
 func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error {
-	return s.UpdateAssetMetadataWithExifRaw(ctx, id, metadata, nil)
+	asset, err := s.queries.GetAssetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get asset for metadata update: %w", err)
+	}
+
+	typed, err := metadata.UnmarshalByType(dbtypes.AssetType(asset.Type))
+	if err != nil {
+		return fmt.Errorf("decode %s specific metadata: %w", asset.Type, err)
+	}
+	normalized, err := dbtypes.MarshalMeta(typed)
+	if err != nil {
+		return fmt.Errorf("encode %s specific metadata: %w", asset.Type, err)
+	}
+
+	return s.queries.UpdateAssetMetadata(ctx, repo.UpdateAssetMetadataParams{
+		AssetID:          id,
+		SpecificMetadata: normalized,
+	})
 }
 
-func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, exifRaw json.RawMessage) error {
-	// Get the asset to determine its type for taken_time extraction
+func (s *assetService) UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error {
 	asset, err := s.queries.GetAssetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get asset for metadata update: %w", err)
 	}
 
-	// Extract taken_time from metadata based on asset type
-	var takenTime *time.Time
-	var captureOffsetMinutes *int16
-	var gpsLatitude *float64
-	var gpsLongitude *float64
-	var gpsGeohash5 *string
-	var gpsGeohash7 *string
-	assetType := dbtypes.AssetType(asset.Type)
-
-	switch assetType {
-	case dbtypes.AssetTypePhoto:
-		if photoMeta, err := metadata.UnmarshalPhoto(); err == nil {
-			takenTime = photoMeta.TakenTime
-			captureOffsetMinutes = photoMeta.CaptureOffsetMinutes
-			gpsLatitude, gpsLongitude = normalizedGPS(photoMeta.GPSLatitude, photoMeta.GPSLongitude)
-		}
-	case dbtypes.AssetTypeVideo:
-		if videoMeta, err := metadata.UnmarshalVideo(); err == nil {
-			takenTime = videoMeta.RecordedTime
-			captureOffsetMinutes = videoMeta.CaptureOffsetMinutes
-			gpsLatitude, gpsLongitude = normalizedGPS(videoMeta.GPSLatitude, videoMeta.GPSLongitude)
-		}
-	case dbtypes.AssetTypeAudio:
-		// Audio doesn't have taken time
-		takenTime = nil
+	metadata, err = preserveSpecificMetadataDescription(asset.SpecificMetadata, metadata)
+	if err != nil {
+		return fmt.Errorf("preserve asset description: %w", err)
 	}
-	gpsGeohash5, gpsGeohash7 = geohashesForGPS(gpsLatitude, gpsLongitude)
 
-	// Use the new query that updates both metadata and taken_time
+	common, firstExtraction := prepareImportedCommonMetadata(asset, common)
+
+	gpsLatitude, gpsLongitude := normalizedGPS(common.GPSLatitude, common.GPSLongitude)
+	gpsGeohash5, gpsGeohash7 := geohashesForGPS(gpsLatitude, gpsLongitude)
+
 	var takenTimeParam any
-	if takenTime != nil {
-		takenTimeParam = dbtypes.NewTimestamp(*takenTime)
+	if common.TakenTime != nil {
+		takenTimeParam = dbtypes.NewTimestamp(*common.TakenTime)
 	}
 	var captureOffset *int64
-	if captureOffsetMinutes != nil {
-		value := int64(*captureOffsetMinutes)
+	if common.CaptureOffsetMinutes != nil {
+		value := int64(*common.CaptureOffsetMinutes)
 		captureOffset = &value
 	}
+	var width, height, rating *int64
+	if common.Width != nil {
+		value := int64(*common.Width)
+		width = &value
+	}
+	if common.Height != nil {
+		value := int64(*common.Height)
+		height = &value
+	}
+	if common.Rating != nil {
+		value := int64(*common.Rating)
+		rating = &value
+	}
 
-	params := repo.UpdateAssetMetadataWithTakenTimeParams{
+	params := repo.UpdateAssetExtractedMetadataParams{
 		AssetID:              id,
 		SpecificMetadata:     metadata,
 		ExifRaw:              dbtypes.JSON(exifRaw),
@@ -550,6 +560,10 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 		GpsLongitude:         gpsLongitude,
 		GpsGeohash5:          gpsGeohash5,
 		GpsGeohash7:          gpsGeohash7,
+		Width:                width,
+		Height:               height,
+		Duration:             common.Duration,
+		Rating:               rating,
 	}
 
 	tx, err := s.pool.BeginTx(ctx, nil)
@@ -557,8 +571,14 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 		return fmt.Errorf("begin metadata update transaction: %w", err)
 	}
 	defer tx.Rollback()
-	if err := s.queries.WithTx(tx).UpdateAssetMetadataWithTakenTime(ctx, params); err != nil {
+	txQueries := s.queries.WithTx(tx)
+	if err := txQueries.UpdateAssetExtractedMetadata(ctx, params); err != nil {
 		return err
+	}
+	if firstExtraction {
+		if err := importEmbeddedKeywords(ctx, txQueries, id, common.Keywords); err != nil {
+			return err
+		}
 	}
 	if asset.OwnerID != nil {
 		if err := event.MarkEventFactsChangedTx(ctx, tx, *asset.OwnerID, "asset_metadata_changed"); err != nil {
@@ -570,6 +590,74 @@ func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uu
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit metadata update transaction: %w", err)
+	}
+	return nil
+}
+
+func preserveSpecificMetadataDescription(existing, incoming dbtypes.SpecificMetadata) (dbtypes.SpecificMetadata, error) {
+	var existingObject map[string]json.RawMessage
+	if len(existing) == 0 || json.Unmarshal(existing, &existingObject) != nil {
+		return incoming, nil
+	}
+	description, exists := existingObject["description"]
+	if !exists {
+		return incoming, nil
+	}
+	var descriptionText string
+	if err := json.Unmarshal(description, &descriptionText); err != nil {
+		return incoming, nil
+	}
+
+	var incomingObject map[string]json.RawMessage
+	if err := json.Unmarshal(incoming, &incomingObject); err != nil {
+		return nil, err
+	}
+	incomingObject["description"] = description
+	encoded, err := json.Marshal(incomingObject)
+	return dbtypes.SpecificMetadata(encoded), err
+}
+
+func hasStoredExifRaw(raw dbtypes.JSON) bool {
+	trimmed := strings.TrimSpace(string(raw))
+	return trimmed != "" && trimmed != "null" && trimmed != "{}"
+}
+
+func prepareImportedCommonMetadata(asset repo.Asset, common dbtypes.CommonMetadata) (dbtypes.CommonMetadata, bool) {
+	firstExtraction := !hasStoredExifRaw(asset.ExifRaw)
+	if !firstExtraction || common.Rating == nil || *common.Rating < 1 || *common.Rating > 5 || (asset.Rating != nil && *asset.Rating != 0) {
+		common.Rating = nil
+	}
+	if !firstExtraction {
+		common.Keywords = nil
+	}
+	return common, firstExtraction
+}
+
+func importEmbeddedKeywords(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, keywords []string) error {
+	for _, keyword := range keywords {
+		name := strings.TrimSpace(keyword)
+		if name == "" {
+			continue
+		}
+
+		tag, err := queries.GetTagByName(ctx, name)
+		if errors.Is(err, sql.ErrNoRows) {
+			tag, err = queries.CreateTag(ctx, repo.CreateTagParams{
+				TagName:       name,
+				IsAiGenerated: false,
+			})
+		}
+		if err != nil {
+			return fmt.Errorf("resolve embedded keyword %q: %w", name, err)
+		}
+		if err := queries.AddTagToAssetIfMissing(ctx, repo.AddTagToAssetIfMissingParams{
+			AssetID:    assetID,
+			TagID:      tag.TagID,
+			Confidence: 1,
+			Source:     "system",
+		}); err != nil {
+			return fmt.Errorf("attach embedded keyword %q: %w", name, err)
+		}
 	}
 	return nil
 }
@@ -789,51 +877,6 @@ func (s *assetService) SearchTags(ctx context.Context, query string, limit int) 
 		Limit: int64(limit),
 		Query: q,
 	})
-}
-
-// SaveAssetIndex implements the INDEX step: verify asset exists by hash and complete indexing
-func (s *assetService) SaveAssetIndex(ctx context.Context, taskID string, hash string) error {
-	assets, err := s.queries.GetAssetsByContentHash(ctx, hash)
-	if err != nil {
-		return fmt.Errorf("failed to query asset by hash: %w", err)
-	}
-	if len(assets) == 0 {
-		return fmt.Errorf("no asset found for hash %s", hash)
-	}
-
-	// Get the asset for indexing
-	asset := assets[0]
-
-	// Update asset metadata to mark it as indexed
-	metadata := make(map[string]interface{})
-	if len(asset.SpecificMetadata) > 0 {
-		if err := json.Unmarshal(asset.SpecificMetadata, &metadata); err != nil {
-			return fmt.Errorf("failed to unmarshal existing metadata: %w", err)
-		}
-	}
-
-	// Add indexing completion metadata
-	metadata["indexed"] = true
-	metadata["index_task_id"] = taskID
-	metadata["index_completed_at"] = time.Now().Format(time.RFC3339)
-
-	// Marshal metadata back to bytes
-	metadataBytes, err := json.Marshal(metadata)
-	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
-	}
-
-	params := repo.UpdateAssetMetadataParams{
-		AssetID:          asset.AssetID,
-		SpecificMetadata: metadataBytes,
-	}
-
-	if err := s.queries.UpdateAssetMetadata(ctx, params); err != nil {
-		return fmt.Errorf("failed to update asset indexing status: %w", err)
-	}
-
-	log.Printf("Asset indexing completed for hash %s, task %s", hash, taskID)
-	return nil
 }
 
 // SaveNewAsset is deprecated - assets are now saved through repository staging system

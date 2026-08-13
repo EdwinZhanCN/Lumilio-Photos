@@ -25,3 +25,19 @@ func TestToAssetDTONilStoragePath(t *testing.T) {
 	require.Equal(t, "", got.StoragePath)
 	require.Equal(t, "missing-path.jpg", got.OriginalFilename)
 }
+
+func TestToAssetDTOExposesTopLevelGPS(t *testing.T) {
+	latitude, longitude := 37.7749, -122.4194
+
+	got := ToAssetDTO(repo.Asset{
+		AssetID:          uuid.New(),
+		Type:             "PHOTO",
+		OriginalFilename: "photo.jpg",
+		MimeType:         "image/jpeg",
+		GpsLatitude:      &latitude,
+		GpsLongitude:     &longitude,
+	})
+
+	require.Equal(t, &latitude, got.GPSLatitude)
+	require.Equal(t, &longitude, got.GPSLongitude)
+}

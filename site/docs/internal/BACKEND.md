@@ -117,6 +117,19 @@ the Settings WebView never calls the Server HTTP API.
   typed relations. Event membership atoms are always `media_item` rows.
 - `internal/utils`: media, hashing, raw, exif, upload, imaging, and support utilities.
 
+## Asset Metadata Projection
+
+EXIFTool output is retained verbatim in `assets.exif_raw`, then projected into
+two separate models. Common searchable facts—capture time and offset, GPS,
+dimensions, duration, and rating—live in typed `assets` columns. Embedded
+keywords are normalized into `asset_tags`. `specific_metadata` contains only
+media-type-specific display/filter facts; it never duplicates those common
+columns.
+
+Metadata retries replace `specific_metadata` using the current type schema.
+They preserve an existing `description` key and never overwrite rating or
+embedded keyword relationships after the first successful raw extraction.
+
 ## Storage Model
 
 `storage.path` is the non-removable default Storage Location. Startup creates

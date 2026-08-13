@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -107,28 +105,17 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 	}
 	meta.IsRAW = file.IsRAWFile(asset.OriginalFilename)
 
-	// Parse dimensions and update asset
-	// The dimensions in meta.Dimensions are already corrected by orientation
-	re := regexp.MustCompile(`(\d+)\D+(\d+)`)
-	if matches := re.FindStringSubmatch(meta.Dimensions); len(matches) == 3 {
-		width, _ := strconv.ParseInt(matches[1], 10, 32)
-		height, _ := strconv.ParseInt(matches[2], 10, 32)
-		if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID, int32(width), int32(height)); err != nil {
-			return fmt.Errorf("update asset dimensions: %w", err)
-		}
-	}
-
 	sm, err := dbtypes.MarshalMeta(meta)
 	if err != nil {
 		return fmt.Errorf("marshal photo metadata: %w", err)
 	}
-	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID, sm, res.Raw); err != nil {
+	if err := ap.assetService.UpdateAssetExtractedMetadata(ctx, asset.AssetID, sm, res.Common, res.Raw); err != nil {
 		return fmt.Errorf("update asset metadata: %w", err)
 	}
 
 	ap.reconcileComponentRelation(ctx, asset, meta.IsRAW, asset.MimeType)
 
-	if hasValidLocationGPS(meta.GPSLatitude, meta.GPSLongitude) {
+	if hasValidLocationGPS(res.Common.GPSLatitude, res.Common.GPSLongitude) {
 		ap.enqueueLocationClusterRebuild(ctx, asset)
 	}
 	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)

@@ -257,6 +257,8 @@ type AssetDTO struct {
 	UploadTime           time.Time                       `json:"upload_time"`
 	TakenTime            *time.Time                      `json:"taken_time,omitempty"`
 	CaptureOffsetMinutes *int16                          `json:"capture_offset_minutes,omitempty"`
+	GPSLatitude          *float64                        `json:"gps_latitude,omitempty"`
+	GPSLongitude         *float64                        `json:"gps_longitude,omitempty"`
 	Rating               *int32                          `json:"rating,omitempty"`
 	Liked                *bool                           `json:"liked,omitempty"`
 	IsDeleted            *bool                           `json:"is_deleted"`
@@ -539,6 +541,8 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		UploadTime:           uploadTime,
 		TakenTime:            takenTime,
 		CaptureOffsetMinutes: captureOffsetMinutes,
+		GPSLatitude:          a.GpsLatitude,
+		GPSLongitude:         a.GpsLongitude,
 		Rating:               rating,
 		Liked:                &liked,
 		IsDeleted:            &isDeleted,
@@ -781,6 +785,8 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		UploadTime:           uploadTime,
 		TakenTime:            takenTime,
 		CaptureOffsetMinutes: captureOffsetMinutes,
+		GPSLatitude:          r.GpsLatitude,
+		GPSLongitude:         r.GpsLongitude,
 		Rating:               rating,
 		Liked:                &liked,
 		IsDeleted:            &isDeleted,

@@ -54,6 +54,29 @@ func (q *Queries) AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) er
 	return err
 }
 
+const addTagToAssetIfMissing = `-- name: AddTagToAssetIfMissing :exec
+INSERT INTO asset_tags (asset_id, tag_id, confidence, source)
+VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT (asset_id, tag_id) DO NOTHING
+`
+
+type AddTagToAssetIfMissingParams struct {
+	AssetID    uuid.UUID `db:"asset_id" json:"asset_id"`
+	TagID      int32     `db:"tag_id" json:"tag_id"`
+	Confidence float64   `db:"confidence" json:"confidence"`
+	Source     string    `db:"source" json:"source"`
+}
+
+func (q *Queries) AddTagToAssetIfMissing(ctx context.Context, arg AddTagToAssetIfMissingParams) error {
+	_, err := q.db.ExecContext(ctx, addTagToAssetIfMissing,
+		arg.AssetID,
+		arg.TagID,
+		arg.Confidence,
+		arg.Source,
+	)
+	return err
+}
+
 const attachAssetToMediaItem = `-- name: AttachAssetToMediaItem :exec
 INSERT INTO media_item_assets (
     asset_id,
@@ -3086,6 +3109,64 @@ func (q *Queries) UpdateAssetDuration(ctx context.Context, arg UpdateAssetDurati
 	return err
 }
 
+const updateAssetExtractedMetadata = `-- name: UpdateAssetExtractedMetadata :exec
+UPDATE assets
+SET specific_metadata = ?1,
+    exif_raw = ?2,
+    taken_time = CASE
+        WHEN ?3 IS NOT NULL THEN ?3
+        ELSE COALESCE(taken_time, upload_time)
+    END,
+    capture_offset_minutes = COALESCE(
+        ?4,
+        capture_offset_minutes
+    ),
+    gps_latitude = ?5,
+    gps_longitude = ?6,
+    gps_geohash_5 = ?7,
+    gps_geohash_7 = ?8,
+    width = COALESCE(?9, width),
+    height = COALESCE(?10, height),
+    duration = COALESCE(?11, duration),
+    rating = COALESCE(?12, rating)
+WHERE asset_id = ?13
+`
+
+type UpdateAssetExtractedMetadataParams struct {
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	TakenTime            interface{}              `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	Width                *int64                   `db:"width" json:"width"`
+	Height               *int64                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	Rating               *int64                   `db:"rating" json:"rating"`
+	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetExtractedMetadata(ctx context.Context, arg UpdateAssetExtractedMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, updateAssetExtractedMetadata,
+		arg.SpecificMetadata,
+		arg.ExifRaw,
+		arg.TakenTime,
+		arg.CaptureOffsetMinutes,
+		arg.GpsLatitude,
+		arg.GpsLongitude,
+		arg.GpsGeohash5,
+		arg.GpsGeohash7,
+		arg.Width,
+		arg.Height,
+		arg.Duration,
+		arg.Rating,
+		arg.AssetID,
+	)
+	return err
+}
+
 const updateAssetLike = `-- name: UpdateAssetLike :exec
 UPDATE assets
 SET liked = ?1
@@ -3115,52 +3196,6 @@ type UpdateAssetMetadataParams struct {
 
 func (q *Queries) UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error {
 	_, err := q.db.ExecContext(ctx, updateAssetMetadata, arg.AssetID, arg.SpecificMetadata)
-	return err
-}
-
-const updateAssetMetadataWithTakenTime = `-- name: UpdateAssetMetadataWithTakenTime :exec
-UPDATE assets
-SET specific_metadata = ?1,
-    exif_raw = COALESCE(?2, exif_raw),
-    taken_time = CASE
-        WHEN ?3 IS NOT NULL THEN ?3
-        ELSE COALESCE(taken_time, upload_time)
-    END,
-    capture_offset_minutes = COALESCE(
-        ?4,
-        capture_offset_minutes
-    ),
-    gps_latitude = ?5,
-    gps_longitude = ?6,
-    gps_geohash_5 = ?7,
-    gps_geohash_7 = ?8
-WHERE asset_id = ?9
-`
-
-type UpdateAssetMetadataWithTakenTimeParams struct {
-	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
-	TakenTime            interface{}              `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
-	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
-	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
-	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
-}
-
-func (q *Queries) UpdateAssetMetadataWithTakenTime(ctx context.Context, arg UpdateAssetMetadataWithTakenTimeParams) error {
-	_, err := q.db.ExecContext(ctx, updateAssetMetadataWithTakenTime,
-		arg.SpecificMetadata,
-		arg.ExifRaw,
-		arg.TakenTime,
-		arg.CaptureOffsetMinutes,
-		arg.GpsLatitude,
-		arg.GpsLongitude,
-		arg.GpsGeohash5,
-		arg.GpsGeohash7,
-		arg.AssetID,
-	)
 	return err
 }
 

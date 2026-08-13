@@ -128,10 +128,10 @@ UPDATE assets
 SET specific_metadata = ?2
 WHERE asset_id = ?1;
 
--- name: UpdateAssetMetadataWithTakenTime :exec
+-- name: UpdateAssetExtractedMetadata :exec
 UPDATE assets
 SET specific_metadata = sqlc.arg('specific_metadata'),
-    exif_raw = COALESCE(sqlc.narg('exif_raw'), exif_raw),
+    exif_raw = sqlc.arg('exif_raw'),
     taken_time = CASE
         WHEN sqlc.arg('taken_time') IS NOT NULL THEN sqlc.arg('taken_time')
         ELSE COALESCE(taken_time, upload_time)
@@ -143,7 +143,11 @@ SET specific_metadata = sqlc.arg('specific_metadata'),
     gps_latitude = sqlc.narg('gps_latitude'),
     gps_longitude = sqlc.narg('gps_longitude'),
     gps_geohash_5 = sqlc.narg('gps_geohash_5'),
-    gps_geohash_7 = sqlc.narg('gps_geohash_7')
+    gps_geohash_7 = sqlc.narg('gps_geohash_7'),
+    width = COALESCE(sqlc.narg('width'), width),
+    height = COALESCE(sqlc.narg('height'), height),
+    duration = COALESCE(sqlc.narg('duration'), duration),
+    rating = COALESCE(sqlc.narg('rating'), rating)
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: DeleteAsset :exec
@@ -363,6 +367,11 @@ INSERT INTO asset_tags (asset_id, tag_id, confidence, source)
 VALUES (?1, ?2, ?3, ?4)
 ON CONFLICT (asset_id, tag_id) DO UPDATE
 SET confidence = ?3, source = ?4;
+
+-- name: AddTagToAssetIfMissing :exec
+INSERT INTO asset_tags (asset_id, tag_id, confidence, source)
+VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT (asset_id, tag_id) DO NOTHING;
 
 -- name: RemoveTagFromAsset :exec
 DELETE FROM asset_tags

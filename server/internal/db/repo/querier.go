@@ -16,6 +16,7 @@ type Querier interface {
 	AddAssetToAlbum(ctx context.Context, arg AddAssetToAlbumParams) error
 	AddStackMember(ctx context.Context, arg AddStackMemberParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
+	AddTagToAssetIfMissing(ctx context.Context, arg AddTagToAssetIfMissingParams) error
 	AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error)
 	// Per-asset SigLIP aesthetic scores for a ref snapshot. Unscored assets are
 	// omitted; callers that filter by quality percentile drop them.
@@ -631,9 +632,9 @@ type Querier interface {
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
 	UpdateAssetDimensions(ctx context.Context, arg UpdateAssetDimensionsParams) error
 	UpdateAssetDuration(ctx context.Context, arg UpdateAssetDurationParams) error
+	UpdateAssetExtractedMetadata(ctx context.Context, arg UpdateAssetExtractedMetadataParams) error
 	UpdateAssetLike(ctx context.Context, arg UpdateAssetLikeParams) error
 	UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error
-	UpdateAssetMetadataWithTakenTime(ctx context.Context, arg UpdateAssetMetadataWithTakenTimeParams) error
 	UpdateAssetPositionInAlbum(ctx context.Context, arg UpdateAssetPositionInAlbumParams) error
 	UpdateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error
 	UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error

@@ -59,12 +59,19 @@ export default function VideoInfoView({ asset, onAssetUpdate, onClose }: VideoIn
   const codec = fmt(metadata.codec);
   const bitrate = metadata.bitrate ? `${(metadata.bitrate / 1000000).toFixed(1)} Mbps` : "-";
   const frameRate = metadata.frame_rate ? `${metadata.frame_rate.toFixed(0)} fps` : "-";
+  const cameraMake = fmt(metadata.camera_make, "");
   const cameraModel = fmt(metadata.camera_model);
+  const cameraDisplay =
+    cameraMake &&
+    cameraModel !== "-" &&
+    !cameraModel.toLowerCase().startsWith(cameraMake.toLowerCase())
+      ? `${cameraMake} ${cameraModel}`
+      : cameraModel;
 
   // GPS info
-  const hasGPS = metadata.gps_latitude && metadata.gps_longitude;
+  const hasGPS = typeof asset.gps_latitude === "number" && typeof asset.gps_longitude === "number";
   const gpsDisplay = hasGPS
-    ? `${metadata.gps_latitude!.toFixed(4)}, ${metadata.gps_longitude!.toFixed(4)}`
+    ? `${asset.gps_latitude!.toFixed(4)}, ${asset.gps_longitude!.toFixed(4)}`
     : null;
 
   const currentRating = optimisticRating;
@@ -166,7 +173,7 @@ export default function VideoInfoView({ asset, onAssetUpdate, onClose }: VideoIn
             {/* Video Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">
               <div className="px-3 py-2 space-y-1">
-                {cameraModel !== "-" && <p className="text-sm font-medium">{cameraModel}</p>}
+                {cameraDisplay !== "-" && <p className="text-sm font-medium">{cameraDisplay}</p>}
                 <p className="text-xs opacity-70">
                   {t("assets.videoInfoView.codec_label", { codec })}
                 </p>

@@ -46,11 +46,10 @@ export default function PhotoInfoView({
   const metadata = isPhotoMetadata(asset.type, asset.specific_metadata)
     ? (asset.specific_metadata as PhotoSpecificMetadata)
     : ({} as PhotoSpecificMetadata);
-  const hasGPS =
-    typeof metadata.gps_latitude === "number" && typeof metadata.gps_longitude === "number";
+  const hasGPS = typeof asset.gps_latitude === "number" && typeof asset.gps_longitude === "number";
   const locationClusterQuery = useAssetLocationCluster({
-    latitude: hasGPS ? metadata.gps_latitude : undefined,
-    longitude: hasGPS ? metadata.gps_longitude : undefined,
+    latitude: hasGPS ? asset.gps_latitude : undefined,
+    longitude: hasGPS ? asset.gps_longitude : undefined,
     repositoryId: asset.repository_id,
   });
   const locationCluster = locationClusterQuery.cluster;
@@ -75,18 +74,25 @@ export default function PhotoInfoView({
   // Dimensions and file info
   const width = asset?.width;
   const height = asset?.height;
-  const resolution = metadata.resolution || (width && height ? `${width}✕${height}` : "-");
-  const dimensions = metadata.dimensions || resolution;
+  const dimensions = width && height ? `${width}✕${height}` : "-";
+  const resolution = width && height ? `${((width * height) / 1_000_000).toFixed(1)}MP` : "-";
   const sizeM = asset?.file_size ? `${(asset.file_size / 1024 / 1024).toFixed(1)}M` : "-";
 
   // Camera and lens info
+  const cameraMake = fmt(metadata.camera_make, "");
   const cameraModel = fmt(metadata.camera_model);
+  const cameraDisplay =
+    cameraMake &&
+    cameraModel !== "-" &&
+    !cameraModel.toLowerCase().startsWith(cameraMake.toLowerCase())
+      ? `${cameraMake} ${cameraModel}`
+      : cameraModel;
   const lensModel = fmt(metadata.lens_model);
 
   // Exposure settings
   const iso = fmt(metadata.iso_speed);
   const exposure = fmt(metadata.exposure_time);
-  const ev = fmt(metadata.exposure);
+  const ev = fmt(metadata.exposure_compensation);
   const focal = fmt(metadata.focal_length ? `${metadata.focal_length}mm` : metadata.focal_length);
   const fnumber = fmt(metadata.f_number ? `f/${metadata.f_number}` : metadata.f_number);
 
@@ -190,7 +196,7 @@ export default function PhotoInfoView({
             {/* Camera & Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">
               <div className="px-3 py-2 space-y-1">
-                <p className="text-sm font-medium">{cameraModel}</p>
+                <p className="text-sm font-medium">{cameraDisplay}</p>
                 <p className="text-xs opacity-70">{lensModel}</p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
                   <span>{resolution}</span>
@@ -259,9 +265,9 @@ export default function PhotoInfoView({
 
                 {/* GPS Coordinates */}
                 <div className="text-[10px] font-mono text-base-content/50">
-                  {`${t("assets.basicInfo.latitude")}: ${metadata.gps_latitude!.toFixed(6)}`}
+                  {`${t("assets.basicInfo.latitude")}: ${asset.gps_latitude!.toFixed(6)}`}
                   {" • "}
-                  {`${t("assets.basicInfo.longitude")}: ${metadata.gps_longitude!.toFixed(6)}`}
+                  {`${t("assets.basicInfo.longitude")}: ${asset.gps_longitude!.toFixed(6)}`}
                 </div>
               </div>
             )}

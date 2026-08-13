@@ -119,9 +119,6 @@ func formatInspectLine(assetType string, metadata []byte) string {
 		if meta.IsoSpeed > 0 {
 			parts = append(parts, fmt.Sprintf("ISO %d", meta.IsoSpeed))
 		}
-		if meta.Dimensions != "" {
-			parts = append(parts, "size="+ref.SanitizeUserText(meta.Dimensions, ref.MaxPeekFieldLen))
-		}
 	default:
 		var raw map[string]any
 		if err := json.Unmarshal(metadata, &raw); err == nil {

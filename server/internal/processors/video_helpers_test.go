@@ -1,6 +1,7 @@
 package processors
 
 import (
+	"math"
 	"runtime"
 	"testing"
 
@@ -36,6 +37,15 @@ func TestResolveHardwareAccel(t *testing.T) {
 		if autoGot != "vaapi" && autoGot != "none" {
 			t.Errorf("resolveHardwareAccel(\"auto\") on %s = %q; expected \"vaapi\" or \"none\"", runtime.GOOS, autoGot)
 		}
+	}
+}
+
+func TestParseFFprobeFrameRate(t *testing.T) {
+	if got := parseFFprobeFrameRate("30000/1001"); math.Abs(got-29.97002997) > 0.000001 {
+		t.Fatalf("parseFFprobeFrameRate() = %f", got)
+	}
+	if got := parseFFprobeFrameRate("24"); got != 24 {
+		t.Fatalf("parseFFprobeFrameRate() = %f, want 24", got)
 	}
 }
 

@@ -13112,22 +13112,17 @@ export interface components {
             year?: number;
         };
         "dbtypes.PhotoSpecificMetadata": {
+            camera_make?: string;
             camera_model?: string;
-            capture_offset_minutes?: number;
             content_identifier?: string;
             description?: string;
-            dimensions?: string;
-            exposure?: number;
+            exposure_compensation?: number;
             exposure_time?: string;
             f_number?: number;
             focal_length?: number;
-            gps_latitude?: number;
-            gps_longitude?: number;
             is_raw?: boolean;
             iso_speed?: number;
             lens_model?: string;
-            resolution?: string;
-            taken_time?: string;
         };
         "dbtypes.SpeciesPredictionMeta": {
             /** @description 物种标签 */
@@ -13138,9 +13133,10 @@ export interface components {
         "dbtypes.VideoSpecificMetadata": {
             /** @example 1000000 */
             bitrate?: number;
+            /** @example Canon */
+            camera_make?: string;
             /** @example Canon EOS 5D Mark IV */
             camera_model?: string;
-            capture_offset_minutes?: number;
             /** @example H.264 */
             codec?: string;
             content_identifier?: string;
@@ -13148,12 +13144,6 @@ export interface components {
             description?: string;
             /** @example 30 */
             frame_rate?: number;
-            /** @example 37.7749 */
-            gps_latitude?: number;
-            /** @example -122.4194 */
-            gps_longitude?: number;
-            /** @example 2023-01-01T00:00:00Z */
-            recorded_time?: string;
         };
         "dto.AddAssetTagRequestDTO": {
             /** @example vacation */
@@ -13293,6 +13283,8 @@ export interface components {
             deleted_at?: string;
             duration?: number;
             file_size?: number;
+            gps_latitude?: number;
+            gps_longitude?: number;
             hash?: string;
             height?: number;
             is_deleted?: boolean;
@@ -13349,6 +13341,8 @@ export interface components {
             deleted_at?: string;
             duration?: number;
             file_size?: number;
+            gps_latitude?: number;
+            gps_longitude?: number;
             hash?: string;
             height?: number;
             is_deleted?: boolean;
@@ -13376,6 +13370,8 @@ export interface components {
             duration?: number;
             face_result?: components["schemas"]["dto.AssetFaceResultDTO"];
             file_size?: number;
+            gps_latitude?: number;
+            gps_longitude?: number;
             hash?: string;
             height?: number;
             is_deleted?: boolean;

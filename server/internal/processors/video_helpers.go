@@ -25,11 +25,13 @@ import (
 
 // VideoInfo holds video metadata.
 type VideoInfo struct {
-	Width    int
-	Height   int
-	Duration float64
-	Codec    string
-	Format   string
+	Width     int
+	Height    int
+	Duration  float64
+	Codec     string
+	Bitrate   int     // bit/s
+	FrameRate float64 // fps
+	Format    string
 }
 
 // extractVideoMetadata updates the asset with ffprobe/EXIF-derived metadata.
@@ -65,20 +67,35 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 		return fmt.Errorf("unexpected metadata type for video: %T", result.Metadata)
 	}
 
-	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID, videoInfo.Duration); err != nil {
-		return fmt.Errorf("update duration: %w", err)
+	if videoInfo.Codec != "" {
+		meta.Codec = videoInfo.Codec
 	}
-	if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID, int32(videoInfo.Width), int32(videoInfo.Height)); err != nil {
-		return fmt.Errorf("update dimensions: %w", err)
+	if videoInfo.Bitrate > 0 {
+		meta.Bitrate = videoInfo.Bitrate
+	}
+	if videoInfo.FrameRate > 0 {
+		meta.FrameRate = videoInfo.FrameRate
+	}
+	common := result.Common
+	if videoInfo.Width > 0 && videoInfo.Height > 0 {
+		width, height := int32(videoInfo.Width), int32(videoInfo.Height)
+		common.Width, common.Height = &width, &height
+	}
+	if videoInfo.Duration > 0 {
+		duration := videoInfo.Duration
+		common.Duration = &duration
 	}
 	sm, err := dbtypes.MarshalMeta(meta)
 	if err != nil {
 		return fmt.Errorf("marshal metadata: %w", err)
 	}
-	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID, sm, result.Raw); err != nil {
+	if err := ap.assetService.UpdateAssetExtractedMetadata(ctx, asset.AssetID, sm, common, result.Raw); err != nil {
 		return fmt.Errorf("save metadata: %w", err)
 	}
 	ap.reconcileComponentRelation(ctx, asset, false, asset.MimeType)
+	if hasValidLocationGPS(common.GPSLatitude, common.GPSLongitude) {
+		ap.enqueueLocationClusterRebuild(ctx, asset)
+	}
 	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
 	ap.enqueueDetectStacks(ctx, asset)
 
@@ -431,14 +448,17 @@ func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
 
 	var probeData struct {
 		Streams []struct {
-			Width     int    `json:"width"`
-			Height    int    `json:"height"`
-			CodecName string `json:"codec_name"`
-			Duration  string `json:"duration"`
+			Width        int    `json:"width"`
+			Height       int    `json:"height"`
+			CodecName    string `json:"codec_name"`
+			Duration     string `json:"duration"`
+			BitRate      string `json:"bit_rate"`
+			AvgFrameRate string `json:"avg_frame_rate"`
 		} `json:"streams"`
 		Format struct {
 			FormatName string `json:"format_name"`
 			Duration   string `json:"duration"`
+			BitRate    string `json:"bit_rate"`
 		} `json:"format"`
 	}
 
@@ -453,6 +473,10 @@ func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
 		info.Width = stream.Width
 		info.Height = stream.Height
 		info.Codec = stream.CodecName
+		if bitrate, err := strconv.Atoi(stream.BitRate); err == nil {
+			info.Bitrate = bitrate
+		}
+		info.FrameRate = parseFFprobeFrameRate(stream.AvgFrameRate)
 
 		if stream.Duration != "" {
 			if duration, err := strconv.ParseFloat(stream.Duration, 64); err == nil {
@@ -462,6 +486,11 @@ func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
 	}
 
 	info.Format = probeData.Format.FormatName
+	if info.Bitrate == 0 {
+		if bitrate, err := strconv.Atoi(probeData.Format.BitRate); err == nil {
+			info.Bitrate = bitrate
+		}
+	}
 
 	if info.Duration == 0 && probeData.Format.Duration != "" {
 		if duration, err := strconv.ParseFloat(probeData.Format.Duration, 64); err == nil {
@@ -470,4 +499,16 @@ func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
 	}
 
 	return info, nil
+}
+
+func parseFFprobeFrameRate(value string) float64 {
+	if numerator, denominator, ok := strings.Cut(value, "/"); ok {
+		n, numeratorErr := strconv.ParseFloat(numerator, 64)
+		d, denominatorErr := strconv.ParseFloat(denominator, 64)
+		if numeratorErr == nil && denominatorErr == nil && d != 0 {
+			return n / d
+		}
+	}
+	parsed, _ := strconv.ParseFloat(value, 64)
+	return parsed
 }

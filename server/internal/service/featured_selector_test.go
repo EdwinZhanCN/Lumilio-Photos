@@ -149,8 +149,7 @@ func TestSelectFeaturedPhotos_RespectsDayCapWhenPossible(t *testing.T) {
 	targetBucket := targetDay.Format("2006-01-02")
 	hits := 0
 	for _, a := range selected {
-		meta, _ := decodePhotoMetadata(a)
-		if buildDayBucket(a, meta) == targetBucket {
+		if buildDayBucket(a) == targetBucket {
 			hits++
 		}
 	}
@@ -171,10 +170,7 @@ type testPhotoAssetInput struct {
 
 func testPhotoAsset(in testPhotoAssetInput) repo.Asset {
 	id := uuid.NewSHA1(uuid.NameSpaceOID, []byte(in.Name))
-	photoMeta := dbtypes.PhotoSpecificMetadata{
-		TakenTime:   timePtr(in.TakenTime),
-		CameraModel: in.Camera,
-	}
+	photoMeta := dbtypes.PhotoSpecificMetadata{CameraModel: in.Camera}
 	meta, _ := dbtypes.MarshalMeta(photoMeta)
 
 	rating := int64(in.Rating)
@@ -192,10 +188,6 @@ func testPhotoAsset(in testPhotoAssetInput) repo.Asset {
 		TakenTime:        dbtypes.NewTimestamp(in.TakenTime),
 		UploadTime:       dbtypes.NewTimestamp(in.TakenTime.Add(2 * time.Hour)),
 	}
-}
-
-func timePtr(t time.Time) *time.Time {
-	return &t
 }
 
 func assetIDs(assets []repo.Asset) []string {
