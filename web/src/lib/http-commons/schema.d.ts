@@ -4753,7 +4753,7 @@ export interface paths {
         put?: never;
         /**
          * Search assets
-         * @description Search assets with optional top results enhancement and filename fallback.
+         * @description Search assets with optional top results enhancement, filename fallback, or visual similarity to a catalog asset.
          */
         post: {
             parameters: {
@@ -4787,8 +4787,107 @@ export interface paths {
                         "application/json": components["schemas"]["api.ErrorResponse"];
                     };
                 };
+                /** @description Query asset not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Query asset has no Image Semantic Analysis embedding */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Image Semantic Analysis unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/search/by-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search assets by image
+         * @description Embed an uploaded image with Image Semantic Analysis and return visually similar catalog media. The original is reduced to an in-memory medium thumbnail, then discarded; it is not stored. RAW uses the same OpenPhoto path as ingest. Maximum upload size is 256 MiB.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Query image | JSON AssetFilterDTO | Page size | Page offset | KNN cap, maximum 200 | Viewer timezone */
+            requestBody?: {
+                content: {
+                    "application/x-www-form-urlencoded": Record<string, never> | string | number;
+                    "multipart/form-data": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Assets searched successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.SearchAssetsResponseDTO"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Image Semantic Analysis unavailable */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -15359,6 +15458,8 @@ export interface components {
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /** @example red bird on branch */
             query?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            similar_to_asset_id?: string;
             /**
              * @example date_captured
              * @enum {string}

@@ -72,7 +72,8 @@ export interface AssetViewDefinition {
   inheritGlobalFilter?: boolean;
   /** Search configuration */
   search?: {
-    query: string;
+    query?: string;
+    similarAssetId?: string;
   };
   /** Sorting strategy */
   sortBy?: SortByType;
@@ -130,5 +131,7 @@ export interface ViewDefinitionOptions {
   constraint?: AssetBrowseConstraint;
   userFilter?: AssetUserFilter;
   searchQuery?: string;
+  similarAssetId?: string;
+  fileQuery?: File | null;
   viewKey?: string;
 }

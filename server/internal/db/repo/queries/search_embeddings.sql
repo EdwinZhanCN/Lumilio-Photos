@@ -17,6 +17,15 @@ SELECT asset_id, space_id, vector, model_id
 FROM search_embeddings
 WHERE asset_id = ?1 AND frame_ts_ms IS NULL;
 
+-- Visual similarity query vector: photo primary (frame_ts_ms IS NULL) first,
+-- otherwise the earliest video frame.
+-- name: GetSearchQueryEmbedding :one
+SELECT asset_id, space_id, vector, model_id, frame_ts_ms
+FROM search_embeddings
+WHERE asset_id = ?1
+ORDER BY CASE WHEN frame_ts_ms IS NULL THEN 0 ELSE 1 END, frame_ts_ms ASC
+LIMIT 1;
+
 -- name: CountAssetsWithSearchEmbedding :one
 SELECT COUNT(DISTINCT asset_id) AS count
 FROM search_embeddings;

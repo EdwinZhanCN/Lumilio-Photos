@@ -14,6 +14,7 @@ interface AssetViewerActionsProps {
   deleteTarget: Asset | null;
   showInfo: boolean;
   onToggleInfo: () => void;
+  onFindSimilar: () => void;
   onAssetUpdate: (asset: Asset) => void;
   onAssetDelete: (assetId: string) => void;
 }
@@ -27,6 +28,7 @@ export function AssetViewerActions({
   deleteTarget,
   showInfo,
   onToggleInfo,
+  onFindSimilar,
   onAssetUpdate,
   onAssetDelete,
 }: AssetViewerActionsProps) {
@@ -114,6 +116,7 @@ export function AssetViewerActions({
           void navigate(`/studio?assetId=${selectedAsset.asset_id}`);
         }}
         onAddToAlbum={() => openDialog(ALBUM_DIALOG_ID)}
+        onFindSimilar={onFindSimilar}
         onShare={setShareAsset}
       />
 

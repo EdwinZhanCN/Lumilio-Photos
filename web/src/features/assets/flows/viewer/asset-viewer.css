@@ -1,25 +1,37 @@
-/* 1. 核心变量控制：这是修改 SVG 大小的最快路径 */
 .fullscreen-swiper {
-  --swiper-navigation-size: 20px; /* 箭头 SVG 本身的大小 */
-  --swiper-navigation-color: #ffffff; /* 箭头颜色 */
-  /* Reduce browser back/forward gesture stealing horizontal swipes (esp. Safari). */
+  --swiper-navigation-size: 20px;
+  --swiper-navigation-color: #ffffff;
+  --nav-btn-size: 2.75rem;
+  --nav-btn-transform: none;
   overscroll-behavior-x: contain;
 }
 
-/* 2. 导航按钮外圈 */
 .fullscreen-swiper .swiper-button-next,
 .fullscreen-swiper .swiper-button-prev {
   background-color: rgba(30, 41, 59, 0.4);
-  width: 3.5rem; /* 圆圈的宽度 */
-  height: 3.5rem; /* 圆圈的高度 */
+  width: var(--nav-btn-size);
+  height: var(--nav-btn-size);
   border-radius: 50%;
   backdrop-filter: blur(4px);
-  transition: all 0.3s ease;
-
-  /* 强行居中内部的 SVG */
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
   display: flex !important;
   align-items: center;
   justify-content: center;
+  top: 4.5rem;
+  margin-top: 0;
+  transform: var(--nav-btn-transform);
+  touch-action: manipulation;
+  z-index: 10;
+}
+
+.fullscreen-swiper .swiper-button-prev {
+  left: max(0.5rem, env(safe-area-inset-left, 0px));
+}
+
+.fullscreen-swiper .swiper-button-next {
+  right: max(0.5rem, env(safe-area-inset-right, 0px));
 }
 
 .fullscreen-swiper .swiper-button-next svg,
@@ -30,7 +42,6 @@
   overflow: visible;
 }
 
-/* 选中 SVG 内部的路径 */
 .fullscreen-swiper .swiper-button-next svg path,
 .fullscreen-swiper .swiper-button-prev svg path {
   stroke: currentColor;
@@ -45,24 +56,39 @@
   content: "" !important;
 }
 
-.fullscreen-swiper .swiper-button-next:hover,
-.fullscreen-swiper .swiper-button-prev:hover {
-  background-color: rgba(30, 41, 59, 0.7);
-  transform: scale(1.05);
-}
-
 .fullscreen-swiper .swiper-button-next:active,
 .fullscreen-swiper .swiper-button-prev:active {
-  transform: scale(0.95);
-}
-
-.fullscreen-swiper .swiper-button-prev {
-  left: 1.5rem;
-}
-.fullscreen-swiper .swiper-button-next {
-  right: 1.5rem;
+  transform: var(--nav-btn-transform) scale(0.95);
 }
 
 .fullscreen-swiper .swiper-pagination {
   display: none !important;
+}
+
+@media (min-width: 640px) {
+  .fullscreen-swiper {
+    --nav-btn-size: 3.5rem;
+    --nav-btn-transform: translateY(-50%);
+  }
+
+  .fullscreen-swiper .swiper-button-next,
+  .fullscreen-swiper .swiper-button-prev {
+    top: 50%;
+  }
+
+  .fullscreen-swiper .swiper-button-prev {
+    left: 1.5rem;
+  }
+
+  .fullscreen-swiper .swiper-button-next {
+    right: 1.5rem;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fullscreen-swiper .swiper-button-next:hover,
+  .fullscreen-swiper .swiper-button-prev:hover {
+    background-color: rgba(30, 41, 59, 0.7);
+    transform: var(--nav-btn-transform) scale(1.05);
+  }
 }

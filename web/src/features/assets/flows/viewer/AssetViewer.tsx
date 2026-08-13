@@ -16,6 +16,7 @@ import type { Asset } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
 import { normalizeSpeciesPredictions, parseSpeciesPrediction } from "./fieldGuide";
 import { AssetFieldGuide } from "./AssetFieldGuide";
+import { AssetSimilarRail } from "./AssetSimilarRail";
 import { AssetViewerActions } from "./AssetViewerActions";
 
 export interface AssetViewerProps {
@@ -45,6 +46,7 @@ const AssetViewer = ({
     closingRef = useRef(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showFieldGuide, setShowFieldGuide] = useState(false);
+  const [showSimilar, setShowSimilar] = useState(false);
   const [currentAsset, setCurrentAsset] = useState(() => {
     const index = slideIndex !== undefined ? slideIndex : initialSlide;
     return photos[index] || photos[0] || null;
@@ -131,6 +133,9 @@ const AssetViewer = ({
   const toggleInfo = useCallback(() => {
     setShowInfo((visible) => !visible);
   }, []);
+  const openSimilar = useCallback(() => {
+    setShowSimilar(true);
+  }, []);
   const toggleFieldGuide = useCallback(() => {
     if (!hasFieldGuide) return;
     setShowFieldGuide((visible) => !visible);
@@ -160,6 +165,10 @@ const AssetViewer = ({
 
   useEffect(() => {
     setActiveComponentId(currentAsset?.asset_id);
+  }, [currentAsset?.asset_id]);
+
+  useEffect(() => {
+    setShowSimilar(false);
   }, [currentAsset?.asset_id]);
 
   useEffect(() => {
@@ -271,11 +280,20 @@ const AssetViewer = ({
         onToggle={toggleFieldGuide}
       />
 
+      <AssetSimilarRail
+        open={showSimilar}
+        queryAssetId={currentAsset?.asset_id}
+        carouselAssets={photos}
+        onNavigate={onNavigate}
+        onClose={() => setShowSimilar(false)}
+      />
+
       <AssetViewerActions
         asset={activeAsset}
         deleteTarget={currentAsset}
         showInfo={showInfo}
         onToggleInfo={toggleInfo}
+        onFindSimilar={openSimilar}
         onAssetUpdate={handleAssetUpdate}
         onAssetDelete={handleAssetDelete}
       />

@@ -68,6 +68,7 @@ export function convertLegacyAssetBrowseState(candidate: unknown): AssetBrowseRo
   const ui = isRecord(root.ui) ? root.ui : {};
   return {
     query: typeof ui.searchQuery === "string" ? ui.searchQuery.trim() : "",
+    similarAssetId: "",
     sort: ui.sortBy === "recently_added" ? "recently_added" : DEFAULT_ASSET_BROWSE_SORT,
     filter: legacyFilter(root.filters),
   };

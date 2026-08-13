@@ -46,6 +46,9 @@ type Filter struct {
 
 type Request struct {
 	Query string
+	// QueryEmbedding is an optional precomputed query vector. When set,
+	// EmbeddingRetriever skips semantic_text_embed and uses this vector.
+	QueryEmbedding *QueryEmbedding
 	Filter
 	Limit  int
 	Offset int

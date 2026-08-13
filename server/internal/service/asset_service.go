@@ -40,6 +40,8 @@ var (
 	ErrUnsupportedAssetType      = errors.New("unsupported asset type")
 	ErrAssetNotFound             = errors.New("asset not found")
 	ErrSemanticSearchUnavailable = errors.New("semantic search unavailable")
+	ErrEmbeddingMissing          = errors.New("embedding_missing")
+	ErrInvalidImageQuery         = errors.New("invalid image query")
 )
 
 // AssetService defines the interface for asset-related operations
@@ -211,9 +213,14 @@ const (
 
 type SearchAssetsParams struct {
 	QueryAssetsParams
-	EnhancementMode SearchEnhancementMode
-	TopResultsLimit int
-	Debug           bool
+	EnhancementMode    SearchEnhancementMode
+	TopResultsLimit    int
+	Debug              bool
+	SimilarToAssetID   *uuid.UUID
+	QueryEmbedding     *aggregatesearch.QueryEmbedding
+	QueryImage         []byte
+	QueryImagePath     string
+	QueryImageFilename string
 }
 
 type SearchTopResultsMeta struct {

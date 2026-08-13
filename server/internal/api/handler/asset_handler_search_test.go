@@ -3,12 +3,15 @@ package handler
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -29,6 +32,16 @@ type stubAssetService struct {
 }
 
 func (s stubAssetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
+	if s.getAssetFn == nil {
+		return nil, sql.ErrNoRows
+	}
+	return s.getAssetFn(ctx, id)
+}
+
+func (s stubAssetService) GetAssetAny(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
+	if s.getAssetFn == nil {
+		return nil, sql.ErrNoRows
+	}
 	return s.getAssetFn(ctx, id)
 }
 
@@ -249,4 +262,164 @@ func TestAssetHandlerQueryAssets_InvalidSortByReturnsBadRequest(t *testing.T) {
 	handler.QueryAssets(ctx)
 
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
+func TestAssetHandlerSearchAssets_RejectsQueryAndSimilarTogether(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	similar := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	handler := &AssetHandler{assetService: stubAssetService{}}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body, err := json.Marshal(dto.SearchAssetsRequestDTO{
+		Query:            "sunset",
+		SimilarToAssetID: &similar,
+		Pagination:       dto.PaginationDTO{Limit: 20, Offset: 0},
+	})
+	require.NoError(t, err)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/search", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.SearchAssets(ctx)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
+func TestAssetHandlerSearchAssets_SimilarMissingAssetIs404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	similar := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	handler := &AssetHandler{
+		assetService: stubAssetService{
+			getAssetFn: func(context.Context, uuid.UUID) (*repo.Asset, error) {
+				return nil, sql.ErrNoRows
+			},
+		},
+	}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body, err := json.Marshal(dto.SearchAssetsRequestDTO{
+		SimilarToAssetID: &similar,
+		Pagination:       dto.PaginationDTO{Limit: 20, Offset: 0},
+	})
+	require.NoError(t, err)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/search", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.SearchAssets(ctx)
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+}
+
+func TestAssetHandlerSearchAssets_SimilarMissingEmbeddingIs409(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	queryAsset := testHandlerAsset(t, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "query.jpg")
+	ownerID := int32(1)
+	queryAsset.OwnerID = &ownerID
+	similar := queryAsset.AssetID.String()
+	handler := &AssetHandler{
+		assetService: stubAssetService{
+			getAssetFn: func(context.Context, uuid.UUID) (*repo.Asset, error) {
+				return &queryAsset, nil
+			},
+			searchBrowseFn: func(context.Context, service.SearchAssetsParams) (service.SearchBrowseResult, error) {
+				return service.SearchBrowseResult{}, service.ErrEmbeddingMissing
+			},
+		},
+	}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("current_user", &service.UserResponse{UserID: 1, Role: "user"})
+	body, err := json.Marshal(dto.SearchAssetsRequestDTO{
+		SimilarToAssetID: &similar,
+		Pagination:       dto.PaginationDTO{Limit: 20, Offset: 0},
+	})
+	require.NoError(t, err)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/search", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.SearchAssets(ctx)
+
+	require.Equal(t, http.StatusConflict, recorder.Code)
+	var response api.ErrorResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, "embedding_missing", response.Error)
+}
+
+func TestAssetHandlerSearchAssets_SimilarUnavailableIs503(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	queryAsset := testHandlerAsset(t, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "query.jpg")
+	similar := queryAsset.AssetID.String()
+	handler := &AssetHandler{
+		assetService: stubAssetService{
+			getAssetFn: func(context.Context, uuid.UUID) (*repo.Asset, error) {
+				return &queryAsset, nil
+			},
+			searchBrowseFn: func(context.Context, service.SearchAssetsParams) (service.SearchBrowseResult, error) {
+				return service.SearchBrowseResult{}, service.ErrSemanticSearchUnavailable
+			},
+		},
+	}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body, err := json.Marshal(dto.SearchAssetsRequestDTO{
+		SimilarToAssetID: &similar,
+		Pagination:       dto.PaginationDTO{Limit: 12, Offset: 0},
+	})
+	require.NoError(t, err)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/search", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.SearchAssets(ctx)
+
+	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+}
+
+func TestAssetHandlerSearchAssetsByImage_MissingFileIs400(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &AssetHandler{assetService: stubAssetService{}}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	require.NoError(t, writer.Close())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/search/by-image", body)
+	ctx.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	handler.SearchAssetsByImage(ctx)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
+func TestAssetHandlerSearchAssetsByImage_UnavailableIs503(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &AssetHandler{
+		assetService: stubAssetService{
+			searchBrowseFn: func(_ context.Context, params service.SearchAssetsParams) (service.SearchBrowseResult, error) {
+				require.NotEmpty(t, params.QueryImage)
+				require.Equal(t, "query.jpg", params.QueryImageFilename)
+				require.Nil(t, params.SimilarToAssetID)
+				return service.SearchBrowseResult{}, service.ErrSemanticSearchUnavailable
+			},
+		},
+	}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "query.jpg")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("fake-image"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/search/by-image", body)
+	ctx.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	handler.SearchAssetsByImage(ctx)
+
+	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
 }

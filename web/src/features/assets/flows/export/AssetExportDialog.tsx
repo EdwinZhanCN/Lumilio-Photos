@@ -2,6 +2,7 @@ import {
   BookPlus,
   CloudDownload,
   ImageDown,
+  Images,
   Paintbrush,
   RefreshCw,
   Share2,
@@ -26,6 +27,7 @@ interface AssetExportDialogProps {
   onExport?: (asset: Asset, options: ExportOptions) => void | Promise<void>;
   onOpenStudio?: (asset: Asset) => void;
   onAddToAlbum?: (asset: Asset) => void | Promise<void>;
+  onFindSimilar?: (asset: Asset) => void;
   onShare?: (asset: Asset) => void;
 }
 
@@ -36,6 +38,7 @@ export function AssetExportDialog({
   onExport,
   onOpenStudio,
   onAddToAlbum,
+  onFindSimilar,
   onShare,
 }: AssetExportDialogProps) {
   const { t } = useI18n();
@@ -66,6 +69,12 @@ export function AssetExportDialog({
     if (onOpenOriginalInNewTab) await onOpenOriginalInNewTab(asset);
     else if (originalUrl) window.open(originalUrl, "_blank", "noopener,noreferrer");
   }, [asset, onOpenOriginalInNewTab, originalUrl]);
+
+  const handleFindSimilar = useCallback(() => {
+    if (!asset || !onFindSimilar) return;
+    document.querySelector<HTMLDialogElement>("#asset_export_dialog")?.close();
+    onFindSimilar(asset);
+  }, [asset, onFindSimilar]);
 
   const handleShare = useCallback(() => {
     if (!asset || !onShare) return;
@@ -120,6 +129,22 @@ export function AssetExportDialog({
                 <BookPlus />
               </button>
             </div>
+            {onFindSimilar && (
+              <div
+                className="tooltip tooltip-bottom"
+                data-tip={t("assets.mediaViewer.similar", "Similar")}
+              >
+                <button
+                  type="button"
+                  className="btn btn-soft btn-circle"
+                  disabled={!asset}
+                  onClick={handleFindSimilar}
+                  aria-label={t("assets.mediaViewer.similar", "Similar")}
+                >
+                  <Images />
+                </button>
+              </div>
+            )}
             {onShare && (
               <div
                 className="tooltip tooltip-bottom"

@@ -62,7 +62,28 @@ export function useAssetBrowseRouteState({
 
   const setQuery = useCallback(
     (query: string, options: RouteUpdateOptions = { replace: true }) => {
-      updateState((current) => ({ ...current, query }), options);
+      updateState((current) => {
+        const nextQuery = query;
+        return {
+          ...current,
+          query: nextQuery,
+          similarAssetId: nextQuery.trim() ? "" : current.similarAssetId,
+        };
+      }, options);
+    },
+    [updateState],
+  );
+
+  const setSimilarAssetId = useCallback(
+    (similarAssetId: string | null, options: RouteUpdateOptions = { replace: true }) => {
+      updateState((current) => {
+        const next = (similarAssetId ?? "").trim();
+        return {
+          ...current,
+          similarAssetId: next,
+          query: next ? "" : current.query,
+        };
+      }, options);
     },
     [updateState],
   );
@@ -91,6 +112,7 @@ export function useAssetBrowseRouteState({
   return {
     ...state,
     setQuery,
+    setSimilarAssetId,
     setSort,
     applyFilter,
     resetFilter,

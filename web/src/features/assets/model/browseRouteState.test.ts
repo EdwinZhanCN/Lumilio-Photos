@@ -24,6 +24,7 @@ describe("asset browse route state", () => {
 
     expect(parseAssetBrowseParams(params)).toEqual({
       query: "mountain",
+      similarAssetId: "",
       sort: "recently_added",
       filter: {
         type: "PHOTO",
@@ -61,7 +62,7 @@ describe("asset browse route state", () => {
           "type=audio&composition=sidecar&stack_membership=grouped&stack_kind=panorama&rating=8&from=nope&bbox=200,95,-200,-95",
         ),
       ),
-    ).toEqual({ query: "", sort: "date_captured", filter: {} });
+    ).toEqual({ query: "", similarAssetId: "", sort: "date_captured", filter: {} });
   });
 
   it("does not read the retired raw parameter", () => {
@@ -78,5 +79,29 @@ describe("asset browse route state", () => {
     expect(
       serializeAssetBrowseParams({ query: "", sort: "date_captured", filter: {} }).toString(),
     ).toBe("");
+  });
+
+  it("round-trips similar and drops q when both are present", () => {
+    const similar = "550e8400-e29b-41d4-a716-446655440000";
+    const params = serializeAssetBrowseParams({
+      query: "mountain",
+      similarAssetId: similar,
+      sort: "date_captured",
+      filter: {},
+    });
+    expect(params.get("similar")).toBe(similar);
+    expect(params.get("q")).toBeNull();
+    expect(parseAssetBrowseParams(new URLSearchParams(`q=keep&similar=${similar}`))).toEqual({
+      query: "",
+      similarAssetId: similar,
+      sort: "date_captured",
+      filter: {},
+    });
+  });
+
+  it("ignores invalid similar values", () => {
+    expect(parseAssetBrowseParams(new URLSearchParams("similar=not-a-uuid")).similarAssetId).toBe(
+      "",
+    );
   });
 });

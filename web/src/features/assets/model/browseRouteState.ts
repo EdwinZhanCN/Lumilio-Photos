@@ -10,14 +10,18 @@ import {
 
 export type AssetBrowseRouteState = {
   query: string;
+  similarAssetId?: string;
   sort: SortByType;
   filter: AssetUserFilter;
 };
 
 export const DEFAULT_ASSET_BROWSE_SORT: SortByType = "date_captured";
 
+const ASSET_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const BROWSE_PARAM_KEYS = [
   "q",
+  "similar",
   "sort",
   "type",
   "composition",
@@ -121,11 +125,20 @@ export function parseAssetBrowseParams(
     location: parseBBox(params.get("bbox")),
   });
 
+  const similarAssetId = parseSimilarAssetId(params.get("similar"));
+  const query = similarAssetId ? "" : (params.get("q")?.trim() ?? "");
+
   return {
-    query: params.get("q")?.trim() ?? "",
+    query,
+    similarAssetId,
     sort: params.get("sort") === "recently_added" ? "recently_added" : defaultSort,
     filter,
   };
+}
+
+function parseSimilarAssetId(value: string | null): string {
+  const id = value?.trim() ?? "";
+  return ASSET_ID_RE.test(id) ? id : "";
 }
 
 export function serializeAssetBrowseParams(
@@ -136,7 +149,9 @@ export function serializeAssetBrowseParams(
   const params = new URLSearchParams(current);
   BROWSE_PARAM_KEYS.forEach((key) => params.delete(key));
 
-  const query = state.query.trim();
+  const similarAssetId = (state.similarAssetId ?? "").trim();
+  const query = similarAssetId ? "" : state.query.trim();
+  if (similarAssetId) params.set("similar", similarAssetId);
   if (query) params.set("q", query);
   if (state.sort !== defaultSort) params.set("sort", state.sort);
 

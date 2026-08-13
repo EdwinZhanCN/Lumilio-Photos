@@ -2,9 +2,12 @@ package imagesource
 
 import (
 	"bytes"
+	"context"
 	"image"
 	"image/color"
 	"image/jpeg"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"server/internal/utils/imaging"
@@ -23,6 +26,35 @@ func TestProcessMLImageTensorFromReaderSemanticReturns224RGB(t *testing.T) {
 	}
 	if len(out.Data) != 224*224*3 {
 		t.Fatalf("semantic tensor len = %d, want %d", len(out.Data), 224*224*3)
+	}
+}
+
+func TestPrepareSemanticThumbnailReturnsMediumWebP(t *testing.T) {
+	imaging.StartVips()
+
+	jpeg := synthJPEG(t, 1200, 800)
+	thumb, err := PrepareSemanticThumbnailBytes(context.Background(), jpeg, "query.jpg")
+	if err != nil {
+		t.Fatalf("PrepareSemanticThumbnailBytes: %v", err)
+	}
+	if len(thumb) < 12 || string(thumb[:4]) != "RIFF" || string(thumb[8:12]) != "WEBP" {
+		t.Fatalf("thumbnail is not WebP")
+	}
+
+	path := filepath.Join(t.TempDir(), "query.jpg")
+	if err := os.WriteFile(path, jpeg, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fromPath, err := PrepareSemanticThumbnail(context.Background(), path, "query.jpg")
+	if err != nil {
+		t.Fatalf("PrepareSemanticThumbnail: %v", err)
+	}
+	if len(fromPath) < 12 || string(fromPath[:4]) != "RIFF" {
+		t.Fatalf("path thumbnail is not WebP")
+	}
+
+	if _, err := PrepareSemanticThumbnailBytes(context.Background(), []byte("not-an-image"), "query.jpg"); err == nil {
+		t.Fatal("expected invalid image to fail")
 	}
 }
 

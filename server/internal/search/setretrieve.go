@@ -146,7 +146,10 @@ const setInitialPoolSize = maxANNAssetCandidateSet
 // RetrieveSet returns every candidate within the calibrated relevance
 // cutoff, in relevance order, up to maxResults.
 func (r *EmbeddingRetriever) RetrieveSet(ctx context.Context, req Request, strictness SetStrictness, maxResults int) ([]Candidate, SetMeta, error) {
-	if r == nil || r.pool == nil || r.embed == nil || r.resolveSpace == nil {
+	if r == nil || r.pool == nil || r.resolveSpace == nil {
+		return nil, SetMeta{}, fmt.Errorf("embedding retriever is not configured")
+	}
+	if req.QueryEmbedding == nil && r.embed == nil {
 		return nil, SetMeta{}, fmt.Errorf("embedding retriever is not configured")
 	}
 	if maxResults <= 0 {

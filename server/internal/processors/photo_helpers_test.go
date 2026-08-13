@@ -66,6 +66,10 @@ func (s *pHashEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, uuid.UUI
 	panic("not implemented")
 }
 
+func (s *pHashEmbeddingStub) GetSearchQueryEmbedding(context.Context, uuid.UUID) (service.PrimaryEmbedding, error) {
+	panic("not implemented")
+}
+
 type thumbnailAssetServiceStub struct {
 	service.AssetService
 

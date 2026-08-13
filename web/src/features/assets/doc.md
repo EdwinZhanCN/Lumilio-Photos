@@ -8,10 +8,12 @@ public surfaces instead of implementing another gallery or viewer.
 ## State
 
 [useAssetBrowseRouteState](./flows/browse/useAssetBrowseRouteState.ts) makes search, sort, and applied filters URL
-state. [FilterTool](./flows/browse/filtering/FilterTool.tsx) keeps an unapplied draft in a local reducer and
-commits normalized values to that route state. Page constraints are combined
-through [mergeAssetFilters](./model/filter.ts); constrained fields remain locked and
-cannot be removed by user controls.
+state (`q` for text, `similar` for a catalog image query). [FilterTool](./flows/browse/filtering/FilterTool.tsx)
+keeps an unapplied draft in a local reducer and commits normalized values to
+that route state. Page constraints are combined through
+[mergeAssetFilters](./model/filter.ts); constrained fields remain locked and cannot be
+removed by user controls. A local file query stays in [SearchFAB](./flows/browse/SearchFAB.tsx)
+React state and is not URL-addressable.
 
 [AssetBrowserScope](./flows/browse/selection/AssetBrowserScope.tsx) creates one scoped Zustand selection store through
 [createAssetSelectionStore](./flows/browse/selection/selection.store.ts). It holds only selected [BrowseItem](./types.ts)
@@ -39,7 +41,13 @@ surfaces pass a constraint or source instead. [JustifiedGallery](./flows/browse/
 [SquareGallery](./flows/browse/gallery/SquareGallery/SquareGallery.tsx) share the same browse model and virtualize the mounted
 viewport. [AssetViewer](./flows/viewer/AssetViewer.tsx) keeps the logical primary as the carousel item
 while allowing the active RAW/JPEG physical component to drive metadata and
-actions.
+actions. [AssetSimilarRail](./flows/viewer/AssetSimilarRail.tsx) previews visually similar media for the
+current asset from the share/export menu; See all opens the main library
+with `?similar=`.
+[SearchFAB](./flows/browse/SearchFAB.tsx) defaults to text search. Image mode keeps the same-width
+slot as a repository [PhotoPicker](./picker/PhotoPicker.tsx) primary button and a circular local-file
+control. The text input uses the same height as the FAB close control so the
+image-mode toggle does not shift it.
 
 [AssetExportDialog](./flows/export/AssetExportDialog.tsx) owns export and reprocess interaction.
 [PhotoPicker](./picker/PhotoPicker.tsx) is the isolated single-selection entry used by other
@@ -50,7 +58,9 @@ entry. Neither exposes gallery implementation details.
 
 [useAssetBrowser](./flows/browse/useAssetBrowser.ts) reads `/api/v1/assets/list` through
 [useAssetsList](./api/useAssetsList.ts) and switches to `/api/v1/assets/search` when search is
-active. Source adapters return [AssetsViewResult](./types.ts); rendering consumes
+active, including `similar_to_asset_id` and
+`/api/v1/assets/search/by-image`. Source adapters return
+[AssetsViewResult](./types.ts); rendering consumes
 [BrowseGroup](./types.ts) and [BrowseItem](./types.ts). The conversion helpers, including
 [createBrowseGroupsFromBrowseItemDTOs](./model/browseItems.ts), compose physical files into
 logical media items before presentation.

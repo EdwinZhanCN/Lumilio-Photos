@@ -424,6 +424,9 @@ type Querier interface {
 	GetRepositoryRootByPath(ctx context.Context, path string) (RepositoryRoot, error)
 	GetRepositoryScanRun(ctx context.Context, scanID uuid.UUID) (RepositoryScanRun, error)
 	GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
+	// Visual similarity query vector: photo primary (frame_ts_ms IS NULL) first,
+	// otherwise the earliest video frame.
+	GetSearchQueryEmbedding(ctx context.Context, assetID uuid.UUID) (GetSearchQueryEmbeddingRow, error)
 	GetSettings(ctx context.Context) (Setting, error)
 	GetShareLinkByID(ctx context.Context, arg GetShareLinkByIDParams) (ShareLink, error)
 	GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams) ([]GetSimilarFacesRow, error)

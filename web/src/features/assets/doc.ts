@@ -9,10 +9,12 @@
  * ## State
  *
  * {@link useAssetBrowseRouteState} makes search, sort, and applied filters URL
- * state. {@link FilterTool} keeps an unapplied draft in a local reducer and
- * commits normalized values to that route state. Page constraints are combined
- * through {@link mergeAssetFilters}; constrained fields remain locked and
- * cannot be removed by user controls.
+ * state (`q` for text, `similar` for a catalog image query). {@link FilterTool}
+ * keeps an unapplied draft in a local reducer and commits normalized values to
+ * that route state. Page constraints are combined through
+ * {@link mergeAssetFilters}; constrained fields remain locked and cannot be
+ * removed by user controls. A local file query stays in {@link SearchFAB}
+ * React state and is not URL-addressable.
  *
  * {@link AssetBrowserScope} creates one scoped Zustand selection store through
  * {@link createAssetSelectionStore}. It holds only selected {@link BrowseItem}
@@ -40,7 +42,13 @@
  * {@link SquareGallery} share the same browse model and virtualize the mounted
  * viewport. {@link AssetViewer} keeps the logical primary as the carousel item
  * while allowing the active RAW/JPEG physical component to drive metadata and
- * actions.
+ * actions. {@link AssetSimilarRail} previews visually similar media for the
+ * current asset from the share/export menu; See all opens the main library
+ * with `?similar=`.
+ * {@link SearchFAB} defaults to text search. Image mode keeps the same-width
+ * slot as a repository {@link PhotoPicker} primary button and a circular local-file
+ * control. The text input uses the same height as the FAB close control so the
+ * image-mode toggle does not shift it.
  *
  * {@link AssetExportDialog} owns export and reprocess interaction.
  * {@link PhotoPicker} is the isolated single-selection entry used by other
@@ -51,7 +59,9 @@
  *
  * {@link useAssetBrowser} reads `/api/v1/assets/list` through
  * {@link useAssetsList} and switches to `/api/v1/assets/search` when search is
- * active. Source adapters return {@link AssetsViewResult}; rendering consumes
+ * active, including `similar_to_asset_id` and
+ * `/api/v1/assets/search/by-image`. Source adapters return
+ * {@link AssetsViewResult}; rendering consumes
  * {@link BrowseGroup} and {@link BrowseItem}. The conversion helpers, including
  * {@link createBrowseGroupsFromBrowseItemDTOs}, compose physical files into
  * logical media items before presentation.
@@ -86,11 +96,13 @@ import type SquareGallery from "./flows/browse/gallery/SquareGallery/SquareGalle
 import type { useBulkAssetActions } from "./flows/browse/bulk-actions/useBulkAssetActions.ts";
 import type { AssetBrowserScope } from "./flows/browse/selection/AssetBrowserScope.tsx";
 import type { createAssetSelectionStore } from "./flows/browse/selection/selection.store.ts";
+import type { SearchFAB } from "./flows/browse/SearchFAB.tsx";
 import type { useAssetBrowser } from "./flows/browse/useAssetBrowser.ts";
 import type { useAssetBrowseRouteState } from "./flows/browse/useAssetBrowseRouteState.ts";
 import type { AssetExportDialog } from "./flows/export/AssetExportDialog.tsx";
 import type Assets from "./flows/library/AssetsFlow.tsx";
 import type AssetsTrash from "./flows/trash/AssetsTrashFlow.tsx";
+import type { AssetSimilarRail } from "./flows/viewer/AssetSimilarRail.tsx";
 import type AssetViewer from "./flows/viewer/AssetViewer.tsx";
 import type { SpeciesReferenceTrigger } from "./flows/viewer/SpeciesReferenceTrigger.tsx";
 import type { parseSpeciesPrediction } from "./flows/viewer/fieldGuide.ts";

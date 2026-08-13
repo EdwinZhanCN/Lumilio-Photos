@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"server/internal/agent/pins"
@@ -345,6 +346,10 @@ func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 	}
 	if req.EnhancementMode == "" {
 		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
+	}
+	if req.SimilarToAssetID != nil && strings.TrimSpace(*req.SimilarToAssetID) != "" {
+		api.GinBadRequest(c, errors.New("similar_to_asset_id is not supported for pin search"), "similar_to_asset_id is not supported for pin search")
+		return
 	}
 
 	params, err := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, "", req.Filter, req.Pagination)

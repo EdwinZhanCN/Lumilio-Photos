@@ -18,6 +18,7 @@ describe("legacy asset browse state migration", () => {
       }),
     ).toEqual({
       query: "beach",
+      similarAssetId: "",
       sort: "recently_added",
       filter: {
         rating: 0,
@@ -34,6 +35,6 @@ describe("legacy asset browse state migration", () => {
         filters: { enabled: false, liked: true },
         selection: { selectionMode: "single" },
       }),
-    ).toEqual({ query: "", sort: "date_captured", filter: {} });
+    ).toEqual({ query: "", similarAssetId: "", sort: "date_captured", filter: {} });
   });
 });

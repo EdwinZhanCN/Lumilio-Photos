@@ -116,6 +116,10 @@ func (s *semanticWorkerEmbeddingStub) GetPrimaryEmbeddingVector(context.Context,
 	panic("not implemented")
 }
 
+func (s *semanticWorkerEmbeddingStub) GetSearchQueryEmbedding(context.Context, uuid.UUID) (service.PrimaryEmbedding, error) {
+	panic("not implemented")
+}
+
 type semanticWorkerTagStub struct {
 	tags    []service.AIGeneratedTag
 	sources []string

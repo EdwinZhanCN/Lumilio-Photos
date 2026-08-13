@@ -68,6 +68,37 @@ func (q *Queries) GetPrimarySearchEmbedding(ctx context.Context, assetID uuid.UU
 	return i, err
 }
 
+const getSearchQueryEmbedding = `-- name: GetSearchQueryEmbedding :one
+SELECT asset_id, space_id, vector, model_id, frame_ts_ms
+FROM search_embeddings
+WHERE asset_id = ?1
+ORDER BY CASE WHEN frame_ts_ms IS NULL THEN 0 ELSE 1 END, frame_ts_ms ASC
+LIMIT 1
+`
+
+type GetSearchQueryEmbeddingRow struct {
+	AssetID   uuid.UUID      `db:"asset_id" json:"asset_id"`
+	SpaceID   int64          `db:"space_id" json:"space_id"`
+	Vector    dbtypes.Vector `db:"vector" json:"vector"`
+	ModelID   string         `db:"model_id" json:"model_id"`
+	FrameTsMs *int64         `db:"frame_ts_ms" json:"frame_ts_ms"`
+}
+
+// Visual similarity query vector: photo primary (frame_ts_ms IS NULL) first,
+// otherwise the earliest video frame.
+func (q *Queries) GetSearchQueryEmbedding(ctx context.Context, assetID uuid.UUID) (GetSearchQueryEmbeddingRow, error) {
+	row := q.db.QueryRowContext(ctx, getSearchQueryEmbedding, assetID)
+	var i GetSearchQueryEmbeddingRow
+	err := row.Scan(
+		&i.AssetID,
+		&i.SpaceID,
+		&i.Vector,
+		&i.ModelID,
+		&i.FrameTsMs,
+	)
+	return i, err
+}
+
 const insertSearchEmbedding = `-- name: InsertSearchEmbedding :exec
 
 INSERT INTO search_embeddings (asset_id, space_id, frame_ts_ms, vector, model_id, created_at)

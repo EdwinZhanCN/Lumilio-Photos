@@ -12,6 +12,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"path"
 	"path/filepath"
 	"server/internal/api"
@@ -2547,12 +2548,15 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 
 // SearchAssets handles sectioned asset search with best-effort top results.
 // @Summary Search assets
-// @Description Search assets with optional top results enhancement and filename fallback.
+// @Description Search assets with optional top results enhancement, filename fallback, or visual similarity to a catalog asset.
 // @Tags assets
 // @Produce json
 // @Param data body dto.SearchAssetsRequestDTO true "Search parameters"
 // @Success 200 {object} dto.SearchAssetsResponseDTO "Assets searched successfully"
 // @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 404 {object} api.ErrorResponse "Query asset not found"
+// @Failure 409 {object} api.ErrorResponse "Query asset has no Image Semantic Analysis embedding"
+// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
 // @Failure 500 {object} api.ErrorResponse "Internal server error"
 // @Router /api/v1/assets/search [post]
 func (h *AssetHandler) SearchAssets(c *gin.Context) {
@@ -2580,7 +2584,23 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
 	}
 
-	params, err := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, "", req.Filter, req.Pagination)
+	similarID, err := parseSimilarToAssetID(req.SimilarToAssetID)
+	if err != nil {
+		api.GinBadRequest(c, err, "similar_to_asset_id must be a valid UUID")
+		return
+	}
+	query := strings.TrimSpace(req.Query)
+	if similarID != nil && query != "" {
+		api.GinBadRequest(c, errors.New("query and similar_to_asset_id are mutually exclusive"), "Provide either query or similar_to_asset_id, not both")
+		return
+	}
+	if similarID != nil {
+		if _, ok := h.loadVisibleSearchQueryAsset(c, *similarID); !ok {
+			return
+		}
+	}
+
+	params, err := buildQueryAssetsParams(query, "filename", req.SortBy, req.ViewerTimezone, "", req.Filter, req.Pagination)
 	if err != nil {
 		api.GinBadRequest(c, err, "Invalid filter parameters")
 		return
@@ -2592,8 +2612,12 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		EnhancementMode:   service.SearchEnhancementMode(req.EnhancementMode),
 		TopResultsLimit:   req.TopResultsLimit,
 		Debug:             req.Debug,
+		SimilarToAssetID:  similarID,
 	})
 	if err != nil {
+		if !h.respondVisualSearchError(c, err) {
+			return
+		}
 		if errors.Is(err, service.ErrInvalidBrowseFilter) {
 			api.GinBadRequest(c, err, "Invalid browse filter combination")
 			return
@@ -2606,6 +2630,228 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 	searchResponse := toSearchBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset)
 
 	api.JSONOK(c, searchResponse)
+}
+
+const (
+	maxImageSearchUploadBytes         = 256 << 20
+	imageSearchMultipartMemoryBytes   = 32 << 20
+	imageSearchMultipartOverheadBytes = 8 << 20
+)
+
+// SearchAssetsByImage searches the catalog by a live-embedded local image file.
+// @Summary Search assets by image
+// @Description Embed an uploaded image with Image Semantic Analysis and return visually similar catalog media. The original is reduced to an in-memory medium thumbnail, then discarded; it is not stored. RAW uses the same OpenPhoto path as ingest. Maximum upload size is 256 MiB.
+// @Tags assets
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Query image"
+// @Param filter formData string false "JSON AssetFilterDTO"
+// @Param limit formData int false "Page size"
+// @Param offset formData int false "Page offset"
+// @Param top_results_limit formData int false "KNN cap, maximum 200"
+// @Param viewer_timezone formData string false "Viewer timezone"
+// @Success 200 {object} dto.SearchAssetsResponseDTO "Assets searched successfully"
+// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
+// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
+// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Router /api/v1/assets/search/by-image [post]
+func (h *AssetHandler) SearchAssetsByImage(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxImageSearchUploadBytes+imageSearchMultipartOverheadBytes)
+	if err := c.Request.ParseMultipartForm(imageSearchMultipartMemoryBytes); err != nil {
+		if isImageSearchTooLarge(err) {
+			api.GinBadRequest(c, service.ErrAssetFileTooLarge, "Image exceeds 256 MiB")
+			return
+		}
+		api.GinBadRequest(c, err, "Invalid multipart request")
+		return
+	}
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		api.GinBadRequest(c, err, "Missing image file")
+		return
+	}
+	defer file.Close()
+	if header.Size > maxImageSearchUploadBytes {
+		api.GinBadRequest(c, service.ErrAssetFileTooLarge, "Image exceeds 256 MiB")
+		return
+	}
+
+	filename := filepath.Base(filepath.ToSlash(header.Filename))
+	if filename == "." || filename == string(filepath.Separator) {
+		filename = ""
+	}
+	queryPath, queryBytes, err := readImageSearchUpload(file, header)
+	if err != nil {
+		if isImageSearchTooLarge(err) {
+			api.GinBadRequest(c, service.ErrAssetFileTooLarge, "Image exceeds 256 MiB")
+			return
+		}
+		api.GinBadRequest(c, err, "Failed to read image file")
+		return
+	}
+	if queryPath == "" && len(queryBytes) == 0 {
+		api.GinBadRequest(c, errors.New("empty image file"), "Missing image file")
+		return
+	}
+
+	filter, err := parseImageSearchFilter(c.PostForm("filter"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid filter parameters")
+		return
+	}
+	pagination := dto.PaginationDTO{
+		Limit:  formIntDefault(c.PostForm("limit"), 20),
+		Offset: formIntDefault(c.PostForm("offset"), 0),
+	}
+	normalizeAssetQueryPagination(&pagination)
+	topResultsLimit := formIntDefault(c.PostForm("top_results_limit"), 0)
+
+	params, err := buildQueryAssetsParams("", "filename", "", c.PostForm("viewer_timezone"), "", filter, pagination)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid filter parameters")
+		return
+	}
+	params = applyAssetOwnershipScope(c, params)
+
+	result, err := h.assetService.SearchBrowseItems(c.Request.Context(), service.SearchAssetsParams{
+		QueryAssetsParams:  params,
+		EnhancementMode:    service.SearchEnhancementModeOnly,
+		TopResultsLimit:    topResultsLimit,
+		QueryImage:         queryBytes,
+		QueryImagePath:     queryPath,
+		QueryImageFilename: filename,
+	})
+	if err != nil {
+		if !h.respondVisualSearchError(c, err) {
+			return
+		}
+		if errors.Is(err, service.ErrInvalidBrowseFilter) {
+			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			return
+		}
+		log.Printf("Failed to search assets by image: %v", err)
+		api.GinInternalError(c, err, "Failed to search assets")
+		return
+	}
+
+	api.JSONOK(c, toSearchBrowseResponseDTO(result, pagination.Limit, pagination.Offset))
+}
+
+func readImageSearchUpload(file multipart.File, header *multipart.FileHeader) (string, []byte, error) {
+	if osFile, ok := file.(*os.File); ok {
+		if header.Size == 0 {
+			info, err := osFile.Stat()
+			if err != nil {
+				return "", nil, err
+			}
+			if info.Size() == 0 {
+				return "", nil, nil
+			}
+			if info.Size() > maxImageSearchUploadBytes {
+				return "", nil, &http.MaxBytesError{Limit: maxImageSearchUploadBytes}
+			}
+		}
+		return osFile.Name(), nil, nil
+	}
+
+	imageBytes, err := io.ReadAll(io.LimitReader(file, maxImageSearchUploadBytes+1))
+	if err != nil {
+		return "", nil, err
+	}
+	if int64(len(imageBytes)) > maxImageSearchUploadBytes {
+		return "", nil, &http.MaxBytesError{Limit: maxImageSearchUploadBytes}
+	}
+	return "", imageBytes, nil
+}
+
+func isImageSearchTooLarge(err error) bool {
+	var maxBytes *http.MaxBytesError
+	if errors.As(err, &maxBytes) {
+		return true
+	}
+	return strings.Contains(err.Error(), "http: request body too large")
+}
+
+func parseSimilarToAssetID(raw *string) (*uuid.UUID, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	value := strings.TrimSpace(*raw)
+	if value == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(value)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
+
+func (h *AssetHandler) loadVisibleSearchQueryAsset(c *gin.Context, assetID uuid.UUID) (*repo.Asset, bool) {
+	asset, err := h.assetService.GetAssetAny(c.Request.Context(), assetID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			api.GinNotFound(c, err, "Asset not found")
+			return nil, false
+		}
+		api.GinInternalError(c, err, "Failed to access asset")
+		return nil, false
+	}
+
+	user, ok := currentUserFromContext(c)
+	if !ok {
+		if asset.OwnerID != nil {
+			api.GinNotFound(c, errors.New("asset not found"), "Asset not found")
+			return nil, false
+		}
+		return asset, true
+	}
+	if service.IsAdminRole(user.Role) || asset.OwnerID == nil || int32(user.UserID) == *asset.OwnerID {
+		return asset, true
+	}
+	api.GinNotFound(c, errors.New("asset not found"), "Asset not found")
+	return nil, false
+}
+
+func (h *AssetHandler) respondVisualSearchError(c *gin.Context, err error) bool {
+	switch {
+	case errors.Is(err, service.ErrEmbeddingMissing):
+		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "This asset has no Image Semantic Analysis embedding")
+		return false
+	case errors.Is(err, service.ErrSemanticSearchUnavailable):
+		api.GinError(c, http.StatusServiceUnavailable, err, http.StatusServiceUnavailable, "Image Semantic Analysis is currently unavailable")
+		return false
+	case errors.Is(err, service.ErrInvalidImageQuery):
+		api.GinBadRequest(c, err, "Unsupported or unreadable image")
+		return false
+	default:
+		return true
+	}
+}
+
+func parseImageSearchFilter(raw string) (dto.AssetFilterDTO, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return dto.AssetFilterDTO{}, nil
+	}
+	var filter dto.AssetFilterDTO
+	if err := json.Unmarshal([]byte(raw), &filter); err != nil {
+		return dto.AssetFilterDTO{}, err
+	}
+	return filter, nil
+}
+
+func formIntDefault(raw string, fallback int) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	return value
 }
 
 // ListIndexingRepositories returns repository options for scope selectors

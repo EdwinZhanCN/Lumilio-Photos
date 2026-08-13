@@ -125,7 +125,7 @@ export default function VideoInfoView({ asset, onAssetUpdate, onClose }: VideoIn
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-20 font-mono sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-5 sm:right-5">
-      <div className="card w-full sm:w-[380px] max-h-[75vh] sm:max-h-[calc(100vh-40px)] rounded-b-none sm:rounded-box bg-base-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="card w-full sm:w-[380px] max-h-[60vh] rounded-b-none sm:rounded-box bg-base-100 shadow-sm overflow-hidden flex flex-col">
         <div className="card-body p-0 flex flex-col overflow-hidden">
           {/* Header - Fixed */}
           <div className="p-4 pb-2 flex items-center justify-between border-b border-base-200">

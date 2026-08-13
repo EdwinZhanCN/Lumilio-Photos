@@ -282,6 +282,10 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 		return SearchBrowseResult{}, err
 	}
 
+	if visualSearchRequested(params) {
+		return s.searchVisualSimilarBrowseItems(ctx, params)
+	}
+
 	result := SearchBrowseResult{
 		TopResults:     []BrowseItem{},
 		TopResultsMeta: SearchTopResultsMeta{Enabled: false, SourceTypes: []string{}},

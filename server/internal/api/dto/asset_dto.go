@@ -1103,13 +1103,14 @@ type FilterAssetsRequestDTO struct {
 
 // SearchAssetsRequestDTO represents the request structure for searching assets
 type SearchAssetsRequestDTO struct {
-	Query           string         `json:"query,omitempty" example:"red bird on branch"`
-	Filter          AssetFilterDTO `json:"filter,omitempty"`
-	SortBy          string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
-	ViewerTimezone  string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
-	Pagination      PaginationDTO  `json:"pagination"`
-	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
-	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"200" minimum:"1" maximum:"200"`
+	Query            string         `json:"query,omitempty" example:"red bird on branch"`
+	SimilarToAssetID *string        `json:"similar_to_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Filter           AssetFilterDTO `json:"filter,omitempty"`
+	SortBy           string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
+	ViewerTimezone   string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
+	Pagination       PaginationDTO  `json:"pagination"`
+	EnhancementMode  string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
+	TopResultsLimit  int            `json:"top_results_limit,omitempty" example:"200" minimum:"1" maximum:"200"`
 	// StackMode is no longer part of the search contract: search results are
 	// always flat by media item. The field only remains bindable so handlers
 	// can reject requests that still send it.

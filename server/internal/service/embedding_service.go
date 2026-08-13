@@ -27,6 +27,7 @@ type EmbeddingService interface {
 	DeleteEmbedding(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType, model string) error
 	ResolveDefaultSearchSpace(ctx context.Context, embeddingType EmbeddingType, model string, dimensions int) (repo.EmbeddingSpace, error)
 	GetPrimaryEmbeddingVector(ctx context.Context, assetID uuid.UUID, embeddingType EmbeddingType) (PrimaryEmbedding, error)
+	GetSearchQueryEmbedding(ctx context.Context, assetID uuid.UUID) (PrimaryEmbedding, error)
 }
 
 // VideoFrameEmbedding is one sampled video frame's semantic vector.
@@ -341,6 +342,25 @@ func (e *embeddingService) GetPrimaryEmbeddingVector(ctx context.Context, assetI
 		Vector:     row.Vector.Slice(),
 		Model:      row.EmbeddingModel,
 		Dimensions: int(row.EmbeddingDimensions),
+	}, nil
+}
+
+// GetSearchQueryEmbedding returns the catalog vector used as a visual-similarity
+// query: the photo primary row (frame_ts_ms IS NULL), or the earliest video
+// frame when no primary row exists.
+func (e *embeddingService) GetSearchQueryEmbedding(ctx context.Context, assetID uuid.UUID) (PrimaryEmbedding, error) {
+	row, err := e.queries.GetSearchQueryEmbedding(ctx, assetID)
+	if err != nil {
+		return PrimaryEmbedding{}, err
+	}
+	if row.Vector == nil {
+		return PrimaryEmbedding{}, fmt.Errorf("search query embedding has no vector")
+	}
+	vec := row.Vector.Slice()
+	return PrimaryEmbedding{
+		Vector:     vec,
+		Model:      row.ModelID,
+		Dimensions: len(vec),
 	}, nil
 }
 

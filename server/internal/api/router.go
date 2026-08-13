@@ -45,6 +45,7 @@ type AssetControllerInterface interface {
 	// New filtering and search operations
 	QueryAssets(c *gin.Context)              // POST /assets/list - Unified asset listing, filtering, and search
 	SearchAssets(c *gin.Context)             // POST /assets/search - Sectioned search with top results and fallback results
+	SearchAssetsByImage(c *gin.Context)      // POST /assets/search/by-image - Visual search from an uploaded image
 	ListIndexingRepositories(c *gin.Context) // GET /assets/indexing/repositories - List repositories for indexing filters
 	GetIndexingStats(c *gin.Context)         // GET /assets/indexing/stats - Index coverage and queue status
 	RebuildAssetIndexes(c *gin.Context)      // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
@@ -520,6 +521,7 @@ func NewRouter(
 			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.RebuildAssetIndexes)
 			assets.POST("/list", assetController.QueryAssets)
 			assets.POST("/search", assetController.SearchAssets)
+			assets.POST("/search/by-image", assetController.SearchAssetsByImage)
 			assets.POST("/precheck", assetController.PrecheckUpload)
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.POST("/batch/sessions", assetController.CreateUploadSession)
