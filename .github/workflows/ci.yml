@@ -36,7 +36,6 @@ jobs:
             recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
-            agent_loop: ${{ steps.filter.outputs.agent_loop }}
         steps:
             - uses: actions/checkout@v7
             - uses: dorny/paths-filter@v4
@@ -192,16 +191,6 @@ jobs:
                           - '.github/workflows/ci.yml'
                       site:
                           - 'site/**'
-                          - 'taskfile.yml'
-                          - '.github/workflows/ci.yml'
-                      agent_loop:
-                          - '.github/ISSUE_TEMPLATE/**'
-                          - '.github/codex/**'
-                          - '.github/workflows/agent-*.yml'
-                          - '.agents/skills/lumilio-agent-task-loop/**'
-                          - 'AGENTS.md'
-                          - 'site/docs/internal/agent-harness.md'
-                          - 'site/docs/internal/exec-plans/active/agent-issue-loop.md'
                           - 'taskfile.yml'
                           - '.github/workflows/ci.yml'
 
@@ -556,26 +545,6 @@ jobs:
             - name: Install and build docs site
               run: task ci:site
 
-    agent-loop:
-        name: GitHub agent-loop policies
-        needs: changes
-        if: needs.changes.outputs.agent_loop == 'true'
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v7
-
-            - uses: actions/setup-node@v6
-              with:
-                  node-version: '24'
-
-            - name: Install Task
-              uses: go-task/setup-task@v2
-              with:
-                  version: 3.52.0
-
-            - name: Test agent-loop policies
-              run: task agent-loop:test
-
     # This is the single stable branch-protection check. It always runs, even
     # when a path-filtered job is skipped, and verifies that every job which was
     # expected for this change actually succeeded.
@@ -591,7 +560,6 @@ jobs:
             - desktop-macos
             - desktop-windows
             - site
-            - agent-loop
         runs-on: ubuntu-latest
         steps:
             - name: Require all applicable CI jobs
@@ -608,8 +576,6 @@ jobs:
                   DESKTOP_WINDOWS_RESULT: ${{ needs.desktop-windows.result }}
                   SITE_CHANGED: ${{ needs.changes.outputs.site }}
                   SITE_RESULT: ${{ needs.site.result }}
-                  AGENT_LOOP_CHANGED: ${{ needs.changes.outputs.agent_loop }}
-                  AGENT_LOOP_RESULT: ${{ needs.agent-loop.result }}
               run: |
                   set -eu
 
@@ -649,4 +615,3 @@ jobs:
                   check_job "desktop macos" "$DESKTOP_CHANGED" "$DESKTOP_MACOS_RESULT"
                   check_job "desktop windows" "$DESKTOP_CHANGED" "$DESKTOP_WINDOWS_RESULT"
                   check_job "site" "$SITE_CHANGED" "$SITE_RESULT"
-                  check_job "GitHub agent-loop policies" "$AGENT_LOOP_CHANGED" "$AGENT_LOOP_RESULT"

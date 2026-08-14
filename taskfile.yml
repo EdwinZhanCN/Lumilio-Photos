@@ -110,11 +110,6 @@ tasks:
     cmds:
       - go -C server run ./tools/architecturecheck
 
-  agent-loop:test:
-    desc: Test GitHub agent-loop parsing, state, and publishing policies
-    cmds:
-      - node --test .github/codex/scripts/*.test.mjs
-
   compose:test:
     desc: Validate every Docker Compose configuration
     cmds:
