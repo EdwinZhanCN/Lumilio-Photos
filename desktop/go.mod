@@ -62,7 +62,7 @@ require (
 	github.com/davidbyttow/govips/v2 v2.18.0 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/edwinzhancn/lumen-sdk v1.4.0 // indirect
+	github.com/edwinzhancn/lumen-sdk v1.4.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect
 	github.com/eino-contrib/ollama v0.1.0 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
