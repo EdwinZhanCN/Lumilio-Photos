@@ -1,0 +1,64 @@
+name: Quick task / 快速记录
+description: Capture a bug or improvement for maintainer triage in under 30 seconds / 快速记录错误或改进
+title: "[Quick] "
+labels:
+  - quick-capture
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Save the observation first; incomplete reproduction steps are fine.
+
+        请先记录观察结果；复现步骤不完整也没关系。
+
+        **Privacy / 隐私：** Do not attach original media, database files, secret values, local paths, or unsanitized logs. 请勿附加原始媒体、数据库、密钥、本地路径或未经清理的日志。
+
+  - type: textarea
+    id: observation
+    attributes:
+      label: What happened or should change? / 发生了什么或希望如何修改？
+      description: Describe the visible problem or desired outcome in a few sentences. / 用几句话描述可见问题或期望结果。
+      placeholder: The thumbnail action stopped responding after… / 缩略图操作在……之后没有响应
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface / 范围
+      options:
+        - Unknown / 不确定
+        - Web
+        - Server
+        - Desktop
+        - Deploy
+        - Docs
+        - Cross-cutting / 跨模块
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction notes / 复现线索
+      description: Optional rough steps, frequency, and expected behavior. / 可选：粗略步骤、频率和预期行为。
+      placeholder: Open an album, select an asset, then… / 打开相册、选择资源，然后……
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence / 已清理的证据
+      description: Optional screenshots or short excerpts with secrets, media, paths, and personal data removed. / 可选：已移除密钥、媒体、路径和个人信息的截图或短摘录。
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Version and environment / 版本与环境
+      description: Optional sanitized version, platform, browser, and route. / 可选：已清理的版本、平台、浏览器和页面路径。
+      placeholder: dev@abc123, macOS, Chromium, /assets / 开发版、macOS、Chromium、/assets
+    validations:
+      required: false
