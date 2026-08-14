@@ -2,12 +2,10 @@ version: "2"
 sql:
     - engine: "sqlite"
       queries: "internal/db/repo/queries"
-      # Destructive experimental generations keep historical baselines
-      # embedded for auditability. sqlc must parse only the active baseline.
+      # sqlc parses the complete baseline used by the current development
+      # catalog; migration files are runtime assets, not query inputs.
       schema:
-          - "migrations/000003_vec1_baseline.up.sql"
-          - "migrations/000004_media_semantic_events.up.sql"
-          - "migrations/000005_repository_file_index.up.sql"
+          - "migrations/000009_auth_security_baseline.up.sql"
       gen:
           go:
               package: "repo"
@@ -164,6 +162,8 @@ sql:
                   - column: "*.resolved_at"
                     go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
                   - column: "*.geocoded_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "*.geocode_next_attempt_at"
                     go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
                   - column: "*.queried_at"
                     go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }

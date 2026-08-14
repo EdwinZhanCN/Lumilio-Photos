@@ -18,7 +18,7 @@ import (
 // SchemaID is the published identity of the manifest schema. Generated example
 // manifests reference it through a `#:schema` directive so a TOML-aware editor
 // finds it without any per-project configuration.
-const SchemaID = "https://lumilio.org/schema/lumilio-server-v3.schema.json"
+const SchemaID = "https://lumilio.org/schema/lumilio-server-v4.schema.json"
 
 // GenerateJSONSchema reflects the manifest struct into a JSON Schema.
 //
@@ -55,7 +55,7 @@ func GenerateJSONSchema() ([]byte, error) {
 	schema := reflector.Reflect(&manifest{})
 	schema.ID = SchemaID
 	schema.Version = "https://json-schema.org/draft/2020-12/schema"
-	schema.Title = "Lumilio Photos runtime manifest (schema v3)"
+	schema.Title = "Lumilio Photos runtime manifest (schema v4)"
 	schema.Description = "Complete runtime configuration. There are no code defaults, " +
 		"no configuration file search, and no environment-variable overrides: every " +
 		"key below must be present in the file."

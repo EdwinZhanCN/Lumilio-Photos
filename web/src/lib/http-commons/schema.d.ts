@@ -5692,9 +5692,10 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: {
+            /** @description Recent security verification token */
+            requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["dto.PasskeyDeleteRequestDTO"];
                 };
             };
             responses: {
@@ -5704,7 +5705,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
+                        "application/json": components["schemas"]["dto.PasskeyMutationResponseDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5825,7 +5826,7 @@ export interface paths {
             /** @description Passkey enrollment verification payload */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["dto.PasskeyVerifyRequestDTO"];
+                    "application/json": components["schemas"]["dto.PasskeyEnrollmentVerifyRequestDTO"];
                 };
             };
             responses: {
@@ -5835,7 +5836,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.PasskeyCredentialSummaryDTO"];
+                        "application/json": components["schemas"]["dto.PasskeyEnrollmentResponseDTO"];
                     };
                 };
                 /** @description Invalid or expired challenge */
@@ -6106,9 +6107,10 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
+            /** @description Security verification payload */
+            requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["dto.TOTPSetupRequestDTO"];
                 };
             };
             responses: {
@@ -6589,6 +6591,68 @@ export interface paths {
                 };
                 /** @description Internal server error */
                 500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/security/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify recent account security
+         * @description Create a one-time security proof for a TOTP, recovery-code, or passkey mutation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Security verification payload */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.SecurityVerificationRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Security proof created */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.SecurityVerificationResponseDTO"];
+                    };
+                };
+                /** @description Invalid request data */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.ErrorResponse"];
+                    };
+                };
+                /** @description Invalid security verification */
+                401: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -14142,7 +14206,7 @@ export interface components {
             phash_groups?: number;
         };
         "dto.DisableTOTPRequestDTO": {
-            current_password: string;
+            security_token: string;
         };
         "dto.DownloadAssetsRequestDTO": {
             /**
@@ -14400,6 +14464,19 @@ export interface components {
             repository_name?: string;
             /** @example 18 */
             video_count?: number;
+        };
+        "dto.GeocodingSettingsDTO": {
+            /** @example en */
+            language?: string;
+            /** @example https://nominatim.openstreetmap.org/reverse */
+            nominatim_endpoint?: string;
+            /**
+             * @example disabled
+             * @enum {string}
+             */
+            provider?: "disabled" | "nominatim";
+            /** @example Lumilio-Photos/1.0 */
+            user_agent?: string;
         };
         "dto.GetAlbumResponseDTO": {
             album_id?: number;
@@ -14742,6 +14819,7 @@ export interface components {
             passkey_count?: number;
             recovery_codes_generated_at?: string;
             recovery_codes_remaining?: number;
+            session?: components["schemas"]["dto.AuthResponseDTO"];
             totp_enabled?: boolean;
         };
         "dto.MLCapabilitiesDTO": {
@@ -14932,9 +15010,25 @@ export interface components {
             passkey_id?: number;
             transports?: string[];
         };
+        "dto.PasskeyDeleteRequestDTO": {
+            security_token: string;
+        };
+        "dto.PasskeyEnrollmentResponseDTO": {
+            credential?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"];
+            session?: components["schemas"]["dto.AuthResponseDTO"];
+        };
+        "dto.PasskeyEnrollmentVerifyRequestDTO": {
+            challenge_token: string;
+            credential: unknown;
+            security_token: string;
+        };
         "dto.PasskeyListResponseDTO": {
             credentials?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"][];
             total?: number;
+        };
+        "dto.PasskeyMutationResponseDTO": {
+            session?: components["schemas"]["dto.AuthResponseDTO"];
+            status?: components["schemas"]["dto.MFAStatusDTO"];
         };
         "dto.PasskeyOptionsRequestDTO": {
             username?: string;
@@ -15118,10 +15212,11 @@ export interface components {
         "dto.RecoveryCodesResponseDTO": {
             generated_at?: string;
             recovery_codes?: string[];
+            session?: components["schemas"]["dto.AuthResponseDTO"];
             status?: components["schemas"]["dto.MFAStatusDTO"];
         };
         "dto.RegenerateRecoveryCodesRequestDTO": {
-            current_password: string;
+            security_token: string;
         };
         "dto.RegistrationStartRequestDTO": {
             password: string;
@@ -15426,8 +15521,6 @@ export interface components {
             acme_last_managed_at?: string;
             /** @example production */
             environment?: string;
-            /** @example disabled */
-            geocoding_provider?: string;
             /** @example none */
             hardware_accel?: string;
             /** @example info */
@@ -15520,6 +15613,18 @@ export interface components {
              */
             source_types?: string[];
             sources?: components["schemas"]["dto.SearchSourceMetaDTO"][];
+        };
+        "dto.SecurityVerificationRequestDTO": {
+            code?: string;
+            current_password: string;
+            /** @enum {string} */
+            method?: "totp" | "recovery_code";
+            /** @enum {string} */
+            purpose: "totp_setup" | "totp_disable" | "recovery_regenerate" | "passkey_mutation";
+        };
+        "dto.SecurityVerificationResponseDTO": {
+            expires_at?: string;
+            security_token?: string;
         };
         "dto.SessionProgressDTO": {
             bytes_done?: number;
@@ -15911,13 +16016,18 @@ export interface components {
         };
         "dto.SystemSettingsDTO": {
             backup?: components["schemas"]["dto.BackupSettingsDTO"];
+            geocoding?: components["schemas"]["dto.GeocodingSettingsDTO"];
             llm?: components["schemas"]["dto.LLMSettingsDTO"];
             ml?: components["schemas"]["dto.MLSettingsDTO"];
             updated_at?: string;
             updated_by?: number;
         };
+        "dto.TOTPSetupRequestDTO": {
+            security_token: string;
+        };
         "dto.TOTPSetupResponseDTO": {
             account_name?: string;
+            expires_at?: string;
             issuer?: string;
             otpauth_uri?: string;
             secret?: string;
@@ -15978,6 +16088,13 @@ export interface components {
             /** @example A beautiful sunset photo */
             description?: string;
         };
+        "dto.UpdateGeocodingSettingsDTO": {
+            language?: string;
+            nominatim_endpoint?: string;
+            /** @enum {string} */
+            provider?: "disabled" | "nominatim";
+            user_agent?: string;
+        };
         "dto.UpdateLLMSettingsDTO": {
             agent_enabled?: boolean;
             api_key?: string;
@@ -16029,6 +16146,7 @@ export interface components {
         };
         "dto.UpdateSystemSettingsDTO": {
             backup?: components["schemas"]["dto.UpdateBackupSettingsDTO"];
+            geocoding?: components["schemas"]["dto.UpdateGeocodingSettingsDTO"];
             llm?: components["schemas"]["dto.UpdateLLMSettingsDTO"];
             ml?: components["schemas"]["dto.UpdateMLSettingsDTO"];
         };

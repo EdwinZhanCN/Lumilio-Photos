@@ -40,7 +40,7 @@ Startup ownership is split between the thin CLI host and the shared app runtime:
 
 ## Configuration Boundary
 
-Runtime-immutable configuration is a complete schema v3 manifest, not a defaults
+Runtime-immutable configuration is a complete schema v4 manifest, not a defaults
 or override layer. Missing, unknown, legacy, contradictory, or invalid fields
 fail startup. Relative paths use the manifest directory. Startup logs the
 absolute path, schema version, and source SHA-256 without logging secret content.
@@ -75,11 +75,16 @@ Windows ship the Desktop App rather than a separately operated Server, but that
 does not narrow their backend test surface: the App embeds the complete runtime,
 so both Desktop platforms run all Server tests in their native CI environment.
 
-TOML contains all immutable database/server/logging/storage/scanner/geocoding/
-auth/transcode/Lumen/tool decisions. `[database]` contains only the explicit
+TOML contains all immutable database/server/logging/storage/scanner/auth/
+transcode/Lumen/tool decisions. `[database]` contains only the explicit
 persistent catalog path. The application secret is a file reference and may be
 created at that exact path on first start. No secret value appears in TOML,
 generated desktop manifests, or logs.
+
+Reverse-geocoding provider, endpoint, response language, and User-Agent are
+runtime-mutable administrator settings owned by the singleton SQLite `settings`
+row. They are read and updated through the system-settings API; they are not
+TOML fields or environment overrides.
 
 Standalone accepts diagnostics through `--pprof-addr` and
 `--agent-audit-log`. Agent ref hot memory is bounded by the single-run

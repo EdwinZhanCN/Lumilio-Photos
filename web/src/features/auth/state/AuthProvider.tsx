@@ -68,10 +68,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatu
       throw new Error("auth.errors.invalidSessionResponse");
     }
 
-    saveToken(token, csrfToken);
-    await ensureMediaToken(true);
-    dispatch({ type: "AUTH_SUCCESS", payload: user });
-    return user;
+    try {
+      saveToken(token, csrfToken);
+      await ensureMediaToken(true);
+      dispatch({ type: "AUTH_SUCCESS", payload: user });
+      return user;
+    } catch (error) {
+      // A security mutation may already have revoked the previous session
+      // before the replacement response reaches the browser. Never leave a
+      // stale access/CSRF pair in storage when installing the replacement
+      // session fails part-way through.
+      await resetClientSession();
+      dispatch({ type: "AUTH_FAILURE", payload: "auth.errors.invalidSessionResponse" });
+      throw error;
+    }
   };
 
   useEffect(() => {

@@ -4,7 +4,11 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { USERNAME_MIN_LENGTH } from "../../model/credentialPolicy.ts";
 import { useBrowserCapabilities } from "../../api/useBrowserCapabilities.ts";
-import { getPasskeyCredential, getPasskeySupport } from "../../modules/webauthn/webauthn.ts";
+import {
+  getPasskeyCredential,
+  getPasskeySupport,
+  getPasskeySupportMessage,
+} from "../../modules/webauthn/webauthn.ts";
 import { storeRequiredPasswordChangeChallenge } from "../../state/passwordChangeChallenge.ts";
 import { useAuth } from "../../state/useAuth.ts";
 import type { MFAMethod, User } from "../../types.ts";
@@ -70,7 +74,7 @@ export function useLoginFlow() {
   const passkeyBusy = passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
   const identifyBusy = loginOptionsMutation.isPending;
   const displayError = optionsError ?? passkeyError ?? error;
-  const passkeySupportReason = passkeySupport.reasonKey ? t(passkeySupport.reasonKey) : null;
+  const passkeySupportReason = getPasskeySupportMessage(t, passkeySupport.reasonKey);
   const passkeyEnvironmentAvailable = browserCapabilities.data?.passkey_available === true;
   const passkeyEnvironmentReason = (() => {
     switch (browserCapabilities.data?.passkey_unavailable_reason) {

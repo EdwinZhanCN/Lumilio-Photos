@@ -126,19 +126,27 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 }
 
 const createRefreshToken = `-- name: CreateRefreshToken :one
-INSERT INTO refresh_tokens (user_id, token, expires_at, created_at)
-VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
-RETURNING token_id, user_id, token, expires_at, created_at, is_revoked
+INSERT INTO refresh_tokens (user_id, token, expires_at, created_at, auth_version, assurance)
+VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER), ?4, ?5)
+RETURNING token_id, user_id, token, expires_at, created_at, is_revoked, auth_version, assurance
 `
 
 type CreateRefreshTokenParams struct {
-	UserID    int32             `db:"user_id" json:"user_id"`
-	Token     string            `db:"token" json:"token"`
-	ExpiresAt dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	UserID      int32             `db:"user_id" json:"user_id"`
+	Token       string            `db:"token" json:"token"`
+	ExpiresAt   dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	AuthVersion int64             `db:"auth_version" json:"auth_version"`
+	Assurance   string            `db:"assurance" json:"assurance"`
 }
 
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error) {
-	row := q.db.QueryRowContext(ctx, createRefreshToken, arg.UserID, arg.Token, arg.ExpiresAt)
+	row := q.db.QueryRowContext(ctx, createRefreshToken,
+		arg.UserID,
+		arg.Token,
+		arg.ExpiresAt,
+		arg.AuthVersion,
+		arg.Assurance,
+	)
 	var i RefreshToken
 	err := row.Scan(
 		&i.TokenID,
@@ -147,6 +155,8 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.IsRevoked,
+		&i.AuthVersion,
+		&i.Assurance,
 	)
 	return i, err
 }
@@ -248,7 +258,7 @@ func (q *Queries) GetOldestActiveAdmin(ctx context.Context) (User, error) {
 }
 
 const getRefreshTokenByToken = `-- name: GetRefreshTokenByToken :one
-SELECT token_id, user_id, token, expires_at, created_at, is_revoked FROM refresh_tokens
+SELECT token_id, user_id, token, expires_at, created_at, is_revoked, auth_version, assurance FROM refresh_tokens
 WHERE token = ?1 AND is_revoked = false
 `
 
@@ -262,12 +272,14 @@ func (q *Queries) GetRefreshTokenByToken(ctx context.Context, token string) (Ref
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.IsRevoked,
+		&i.AuthVersion,
+		&i.Assurance,
 	)
 	return i, err
 }
 
 const getRefreshTokenRecordByToken = `-- name: GetRefreshTokenRecordByToken :one
-SELECT token_id, user_id, token, expires_at, created_at, is_revoked FROM refresh_tokens
+SELECT token_id, user_id, token, expires_at, created_at, is_revoked, auth_version, assurance FROM refresh_tokens
 WHERE token = ?1
 `
 
@@ -281,6 +293,8 @@ func (q *Queries) GetRefreshTokenRecordByToken(ctx context.Context, token string
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.IsRevoked,
+		&i.AuthVersion,
+		&i.Assurance,
 	)
 	return i, err
 }
@@ -316,6 +330,35 @@ SELECT user_id, username, password, created_at, updated_at, is_active, last_logi
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsActive,
+		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarAssetID,
+		&i.Role,
+		&i.WebauthnUserHandle,
+		&i.AuthVersion,
+		&i.PasswordChangeRequired,
+	)
+	return i, err
+}
+
+const incrementUserAuthVersion = `-- name: IncrementUserAuthVersion :one
+UPDATE users
+SET auth_version = auth_version + 1,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
+RETURNING user_id, username, password, created_at, updated_at, is_active, last_login, display_name, avatar_asset_id, role, webauthn_user_handle, auth_version, password_change_required
+`
+
+func (q *Queries) IncrementUserAuthVersion(ctx context.Context, userID int32) (User, error) {
+	row := q.db.QueryRowContext(ctx, incrementUserAuthVersion, userID)
 	var i User
 	err := row.Scan(
 		&i.UserID,

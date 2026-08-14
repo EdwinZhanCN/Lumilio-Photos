@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const completeManifest = `schema_version = 3
+const completeManifest = `schema_version = 4
 environment = "development"
 [database]
 path = "data/app-state/library.sqlite3"
@@ -44,11 +44,6 @@ interval_seconds = 300
 settle_seconds = 5
 max_concurrent_repos = 1
 batch_size = 500
-[geocoding]
-provider = "disabled"
-nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
-language = "en"
-user_agent = "Lumilio-Photos/1.0"
 [auth]
 secret_key_file = "data/app-state/secrets/key"
 access_token_ttl = "15m"

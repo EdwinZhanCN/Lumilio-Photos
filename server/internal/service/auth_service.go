@@ -235,12 +235,12 @@ func (s *AuthService) GetLoginOptions(ctx context.Context, username string) (Log
 		return resolveLoginOptions(true, false, 0), nil
 	}
 
-	status, err := s.queries.GetUserMFAStatus(ctx, user.UserID)
+	status, err := s.getMFAStatusByUserID(ctx, user.UserID)
 	if err != nil {
 		return LoginOptions{}, fmt.Errorf("load mfa status: %w", err)
 	}
 
-	return resolveLoginOptions(true, true, status.PasskeyCount), nil
+	return resolveLoginOptions(true, true, int64(status.PasskeyCount)), nil
 }
 
 // Login authenticates a user and returns tokens
@@ -264,12 +264,12 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 		return s.issueRequiredPasswordChange(user)
 	}
 
-	status, err := s.queries.GetUserMFAStatus(context.Background(), user.UserID)
+	status, err := s.getMFAStatusByUserID(context.Background(), user.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("error loading mfa status: %w", err)
 	}
 
-	if coerceBool(status.TotpEnabled) {
+	if status.TOTPEnabled {
 		challenge, err := s.issueLoginMFAChallenge(user, status)
 		if err != nil {
 			return nil, fmt.Errorf("error creating mfa challenge: %w", err)
@@ -347,6 +347,10 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 		_ = s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID)
 		return nil, ErrPasswordChangeRequired
 	}
+	if refreshToken.AuthVersion != user.AuthVersion {
+		_ = s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID)
+		return nil, ErrInvalidToken
+	}
 
 	// Rotate fail-closed: revoke the presented refresh token *before* issuing a
 	// new one. If revocation fails we abort instead of leaving two valid tokens
@@ -356,7 +360,7 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 	}
 
 	// Generate new tokens
-	authResponse, err := s.generateAuthResponse(user)
+	authResponse, err := s.generateAuthResponseWithAssurance(user, refreshToken.Assurance)
 	if err != nil {
 		return nil, err
 	}
@@ -488,6 +492,10 @@ func (s *AuthService) GetCurrentUser(userID int) (*UserResponse, error) {
 
 // generateAuthResponse creates an authentication response with tokens
 func (s *AuthService) generateAuthResponse(user repo.User) (*AuthResponse, error) {
+	return s.generateAuthResponseWithAssurance(user, "password")
+}
+
+func (s *AuthService) generateAuthResponseWithAssurance(user repo.User, assurance string) (*AuthResponse, error) {
 	// Generate access token
 	accessToken, expiresAt, err := s.generateAccessToken(user)
 	if err != nil {
@@ -495,7 +503,7 @@ func (s *AuthService) generateAuthResponse(user repo.User) (*AuthResponse, error
 	}
 
 	// Generate refresh token
-	refreshTokenString, err := s.generateRefreshToken(int(user.UserID))
+	refreshTokenString, err := s.generateRefreshToken(int(user.UserID), user.AuthVersion, assurance)
 	if err != nil {
 		return nil, fmt.Errorf("error generating refresh token: %w", err)
 	}
@@ -536,7 +544,7 @@ func (s *AuthService) generateAccessToken(user repo.User) (string, time.Time, er
 }
 
 // generateRefreshToken creates a new refresh token
-func (s *AuthService) generateRefreshToken(userID int) (string, error) {
+func (s *AuthService) generateRefreshToken(userID int, authVersion int64, assurance string) (string, error) {
 	// Generate random token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -548,9 +556,11 @@ func (s *AuthService) generateRefreshToken(userID int) (string, error) {
 	expiresAt := dbtypes.NewTimestamp(time.Now().Add(s.refreshTokenTTL))
 
 	params := repo.CreateRefreshTokenParams{
-		UserID:    int32(userID),
-		Token:     tokenString,
-		ExpiresAt: expiresAt,
+		UserID:      int32(userID),
+		Token:       tokenString,
+		ExpiresAt:   expiresAt,
+		AuthVersion: authVersion,
+		Assurance:   assurance,
 	}
 
 	if _, err := s.queries.CreateRefreshToken(context.Background(), params); err != nil {

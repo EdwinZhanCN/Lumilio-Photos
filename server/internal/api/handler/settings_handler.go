@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"sync"
 
 	"server/internal/api"
@@ -105,6 +106,10 @@ func (h *SettingsHandler) UpdateSystemSettings(c *gin.Context) {
 
 	settings, err := h.settingsService.UpdateSystemSettings(c.Request.Context(), input)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidSystemSettings) {
+			api.GinBadRequest(c, err, "Invalid request data")
+			return
+		}
 		api.GinInternalError(c, err, "Failed to update system settings")
 		return
 	}

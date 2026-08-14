@@ -21,5 +21,9 @@ export {
   USERNAME_PATTERN,
   normalizeUsernameInput,
 } from "./model/credentialPolicy";
-export { createPasskeyCredential, getPasskeySupport } from "./modules/webauthn/webauthn";
+export {
+  createPasskeyCredential,
+  getPasskeySupport,
+  getPasskeySupportMessage,
+} from "./modules/webauthn/webauthn";
 export { default as RoleRoute } from "./modules/access/RoleRoute";

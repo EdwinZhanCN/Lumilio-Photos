@@ -114,6 +114,15 @@ tasks:
       - task: e2e:seed
       - vp run e2e:test --grep @auth-hardening --workers=1
 
+  test:auth-totp:
+    desc: Run the fresh first-admin TOTP bootstrap regression
+    env:
+      CI: "1"
+    cmds:
+      # This slice intentionally runs before e2e:seed on the disposable
+      # environment so the browser owns the first-admin ceremony.
+      - vp run e2e:test --grep @auth-totp --workers=1
+
   test:video-semantic:
     desc: Run the video semantic regression
     env:

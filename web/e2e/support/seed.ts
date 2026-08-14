@@ -1,4 +1,5 @@
 import process from "node:process";
+import { loadBootstrapTOTP, totpCode } from "./totp.ts";
 
 const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://localhost:16657";
 const username = process.env.LUMILIO_E2E_USERNAME ?? "e2e-admin";
@@ -33,6 +34,38 @@ async function request<T = Record<string, unknown>>(
 
 const status = await request<{ admin_initialized: boolean }>("/api/v1/setup/status");
 
+type AuthResponse = {
+  token?: string;
+  requires_mfa?: boolean;
+  mfa_token?: string;
+  mfa_methods?: string[];
+};
+
+async function loginBootstrap(): Promise<{ token: string }> {
+  const login = await request<AuthResponse>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+  if (login.token) return { token: login.token };
+  if (!login.requires_mfa || !login.mfa_token) {
+    throw new Error("bootstrap admin login did not return a session or an MFA challenge");
+  }
+  const bootstrapTOTP = loadBootstrapTOTP();
+  if (!bootstrapTOTP || bootstrapTOTP.username !== username) {
+    throw new Error("bootstrap admin requires MFA but the temporary E2E TOTP hand-off is missing");
+  }
+  const verified = await request<AuthResponse>("/api/v1/auth/mfa/verify", {
+    method: "POST",
+    body: JSON.stringify({
+      mfa_token: login.mfa_token,
+      code: totpCode(bootstrapTOTP.secret),
+      method: "totp",
+    }),
+  });
+  if (!verified.token) throw new Error("bootstrap admin MFA verification did not return a session");
+  return { token: verified.token };
+}
+
 let auth: { token: string };
 if (!status.admin_initialized) {
   auth = await request<{ token: string }>("/api/v1/auth/register/start", {
@@ -40,10 +73,7 @@ if (!status.admin_initialized) {
     body: JSON.stringify({ username, password }),
   });
 } else {
-  auth = await request<{ token: string }>("/api/v1/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ username, password }),
-  });
+  auth = await loginBootstrap();
 }
 const headers = { authorization: `Bearer ${auth.token}` };
 const repositories = await request<{ repositories: Repository[] }>("/api/v1/repositories", {

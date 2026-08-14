@@ -133,8 +133,8 @@ ORDER BY u.created_at DESC, u.user_id DESC
 LIMIT ?1 OFFSET ?2;
 
 -- name: CreateRefreshToken :one
-INSERT INTO refresh_tokens (user_id, token, expires_at, created_at)
-VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
+INSERT INTO refresh_tokens (user_id, token, expires_at, created_at, auth_version, assurance)
+VALUES (?1, ?2, ?3, CAST(unixepoch('subsec') * 1000000 AS INTEGER), ?4, ?5)
 RETURNING *;
 
 -- name: GetRefreshTokenByToken :one
@@ -153,3 +153,10 @@ UPDATE refresh_tokens
 SET is_revoked = true
 WHERE user_id = ?1
   AND is_revoked = false;
+
+-- name: IncrementUserAuthVersion :one
+UPDATE users
+SET auth_version = auth_version + 1,
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE user_id = ?1
+RETURNING *;

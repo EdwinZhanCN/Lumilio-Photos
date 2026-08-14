@@ -305,7 +305,20 @@ func run(
 	}()
 	ocrIndexWriter := bleveocr.NewWriter(sqlDB, queries, ocrIndex)
 
-	settingsService := service.NewSettingsService(queries, settings.Default(appConfig.Environment), appConfig.Auth.SecretKeyFile)
+	// River must exist before settings construction: geocoding settings writes
+	// reset location projections and insert the revisioned resolver job through
+	// one SQLite transaction.
+	workers := river.NewWorkers()
+	queueClient, err := queue.New(sqlDB, workers, logRuntime.RiverLogger())
+	if err != nil {
+		return fmt.Errorf("initialize queue: %w", err)
+	}
+	settingsService := service.NewSettingsServiceWithRuntime(
+		queries,
+		settings.Default(appConfig.Environment),
+		appConfig.Auth.SecretKeyFile,
+		service.SettingsRuntime{DB: sqlDB, Queue: queueClient},
+	)
 	if err := settingsService.EnsureInitialized(ctx); err != nil {
 		return fmt.Errorf("initialize system settings: %w", err)
 	}
@@ -386,11 +399,6 @@ func run(
 		appLogger.Warn("failed to reconcile repository capacity", zap.Error(err))
 	}
 	go monitorRepositoryCapacity(ctx, repoManager, appLogger.Named("storage_capacity"))
-	workers := river.NewWorkers()
-	queueClient, err := queue.New(sqlDB, workers, logRuntime.RiverLogger())
-	if err != nil {
-		return fmt.Errorf("initialize queue: %w", err)
-	}
 	eventService := event.NewService(sqlDB, queueClient)
 	river.AddWorker[queue.EventRebuildArgs](workers, &queue.EventRebuildWorker{
 		DB: sqlDB, Service: eventService,
@@ -428,7 +436,7 @@ func run(
 	if err != nil {
 		return fmt.Errorf("initialize asset service: %w", err)
 	}
-	locationService := service.NewLocationService(queries, sqlDB, appConfig.Geocoding)
+	locationService := service.NewLocationService(queries, sqlDB, queueClient)
 	speciesReferenceService := service.NewSpeciesReferenceService()
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, sqlDB, indexingLogger, repoAuditProvider, repositoryFiles)
 	stackService := service.NewStackServiceWithQueue(queries, sqlDB, appLogger.Named("stack"), repoAuditProvider, queueClient)
@@ -516,6 +524,7 @@ func run(
 	river.AddWorker[queue.AssetRetryArgs](workers, &queue.AssetRetryWorker{ProcessRetry: assetProcessor.ProcessRetryTask})
 	river.AddWorker[queue.ReindexAssetsArgs](workers, &queue.ReindexAssetsWorker{IndexingService: indexingService})
 	river.AddWorker[queue.RebuildLocationClustersArgs](workers, &queue.RebuildLocationClustersWorker{LocationService: locationService})
+	river.AddWorker[queue.ResolveLocationClustersArgs](workers, &queue.ResolveLocationClustersWorker{LocationService: locationService})
 	river.AddWorker[queue.ScanRepositoryArgs](workers, &queue.ScanRepositoryWorker{ProcessScan: repositoryScanner.ProcessScanRepository})
 	river.AddWorker[queue.DetectStacksArgs](workers, &queue.DetectStacksWorker{StackService: stackService})
 	river.AddWorker[queue.LivePhotoMatchArgs](workers, &queue.LivePhotoMatchWorker{StackService: stackService})

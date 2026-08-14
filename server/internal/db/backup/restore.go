@@ -25,9 +25,6 @@ const (
 	pendingStateFailedPreserved   = "failed_preserved"
 	pendingStatePreviousRestored  = "previous_restored"
 
-	// Kept as an internal source-compatibility alias for older tests and callers.
-	pendingStateApplied = pendingStateVerified
-
 	faultAfterStagedCopy     = "after_staged_copy"
 	faultAfterPreviousRename = "after_active_to_previous"
 	faultAfterPreviousMarker = "after_previous_preserved_marker"

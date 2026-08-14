@@ -10,7 +10,7 @@ import (
 )
 
 const getSettings = `-- name: GetSettings :one
-SELECT id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, ml_bioclip_enabled, ml_video_semantic_enabled, ml_video_max_frames, ml_video_long_threshold_seconds, ml_video_scene_threshold, backup_enabled, backup_interval_hours, backup_keep_last, created_at, updated_at, updated_by FROM settings
+SELECT id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, ml_bioclip_enabled, ml_video_semantic_enabled, ml_video_max_frames, ml_video_long_threshold_seconds, ml_video_scene_threshold, backup_enabled, backup_interval_hours, backup_keep_last, created_at, updated_at, updated_by, geocoding_provider, geocoding_nominatim_endpoint, geocoding_language, geocoding_user_agent, geocoding_revision FROM settings
 WHERE id = 1
 `
 
@@ -41,6 +41,11 @@ func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UpdatedBy,
+		&i.GeocodingProvider,
+		&i.GeocodingNominatimEndpoint,
+		&i.GeocodingLanguage,
+		&i.GeocodingUserAgent,
+		&i.GeocodingRevision,
 	)
 	return i, err
 }
@@ -66,6 +71,11 @@ INSERT INTO settings (
     backup_enabled,
     backup_interval_hours,
     backup_keep_last,
+    geocoding_provider,
+    geocoding_nominatim_endpoint,
+    geocoding_language,
+    geocoding_user_agent,
+    geocoding_revision,
     created_at,
     updated_at,
     updated_by
@@ -90,9 +100,14 @@ VALUES (
     ?16,
     ?17,
     ?18,
+    ?19,
+    ?20,
+    ?21,
+    ?22,
+    ?23,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
-    ?19
+    ?24
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -113,9 +128,14 @@ ON CONFLICT (id) DO UPDATE SET
     backup_enabled = EXCLUDED.backup_enabled,
     backup_interval_hours = EXCLUDED.backup_interval_hours,
     backup_keep_last = EXCLUDED.backup_keep_last,
+    geocoding_provider = EXCLUDED.geocoding_provider,
+    geocoding_nominatim_endpoint = EXCLUDED.geocoding_nominatim_endpoint,
+    geocoding_language = EXCLUDED.geocoding_language,
+    geocoding_user_agent = EXCLUDED.geocoding_user_agent,
+    geocoding_revision = EXCLUDED.geocoding_revision,
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_by = EXCLUDED.updated_by
-RETURNING id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, ml_bioclip_enabled, ml_video_semantic_enabled, ml_video_max_frames, ml_video_long_threshold_seconds, ml_video_scene_threshold, backup_enabled, backup_interval_hours, backup_keep_last, created_at, updated_at, updated_by
+RETURNING id, llm_agent_enabled, llm_provider, llm_model_name, llm_base_url, llm_api_key_ciphertext, llm_api_key_configured, ml_auto, ml_semantic_enabled, ml_ocr_enabled, ml_caption_enabled, ml_face_enabled, ml_bioclip_enabled, ml_video_semantic_enabled, ml_video_max_frames, ml_video_long_threshold_seconds, ml_video_scene_threshold, backup_enabled, backup_interval_hours, backup_keep_last, created_at, updated_at, updated_by, geocoding_provider, geocoding_nominatim_endpoint, geocoding_language, geocoding_user_agent, geocoding_revision
 `
 
 type UpsertSettingsParams struct {
@@ -137,6 +157,11 @@ type UpsertSettingsParams struct {
 	BackupEnabled               bool    `db:"backup_enabled" json:"backup_enabled"`
 	BackupIntervalHours         int64   `db:"backup_interval_hours" json:"backup_interval_hours"`
 	BackupKeepLast              int64   `db:"backup_keep_last" json:"backup_keep_last"`
+	GeocodingProvider           string  `db:"geocoding_provider" json:"geocoding_provider"`
+	GeocodingNominatimEndpoint  string  `db:"geocoding_nominatim_endpoint" json:"geocoding_nominatim_endpoint"`
+	GeocodingLanguage           string  `db:"geocoding_language" json:"geocoding_language"`
+	GeocodingUserAgent          string  `db:"geocoding_user_agent" json:"geocoding_user_agent"`
+	GeocodingRevision           int64   `db:"geocoding_revision" json:"geocoding_revision"`
 	UpdatedBy                   *int32  `db:"updated_by" json:"updated_by"`
 }
 
@@ -160,6 +185,11 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		arg.BackupEnabled,
 		arg.BackupIntervalHours,
 		arg.BackupKeepLast,
+		arg.GeocodingProvider,
+		arg.GeocodingNominatimEndpoint,
+		arg.GeocodingLanguage,
+		arg.GeocodingUserAgent,
+		arg.GeocodingRevision,
 		arg.UpdatedBy,
 	)
 	var i Setting
@@ -187,6 +217,11 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UpdatedBy,
+		&i.GeocodingProvider,
+		&i.GeocodingNominatimEndpoint,
+		&i.GeocodingLanguage,
+		&i.GeocodingUserAgent,
+		&i.GeocodingRevision,
 	)
 	return i, err
 }

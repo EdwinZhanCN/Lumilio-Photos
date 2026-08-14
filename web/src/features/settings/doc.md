@@ -17,6 +17,8 @@ dirty/reset/save state, and explicit commit through
 [SettingsSaveBar](./components/SettingsSaveBar.tsx). [useAISettingsDraft](./flows/ai/useAISettingsDraft.ts) adapts LLM credentials
 and semantic, video-semantic, BioCLIP, OCR, and face switches. Server facts
 remain Query data and are not copied into the preferences store.
+[useGeocodingSettingsDraft](./flows/server/useGeocodingSettingsDraft.ts) gives the Server tab an explicit local
+draft for the provider, endpoint, language, and User-Agent aggregate.
 
 The active settings tab is the `tab` URL parameter. Repository browse and
 upload preferences are owned by Repositories; authentication reset clears
@@ -47,6 +49,9 @@ chrome.
 create, download, restore, and delete interaction. A successful restore
 reloads the application because the entire catalog and every cached server
 fact have changed.
+[GeocodingSection](./flows/server/GeocodingSection.tsx) owns the manual-save reverse-geocoding editor. It
+keeps privacy-sensitive endpoint and User-Agent edits local until the admin
+explicitly saves them.
 
 ## Data
 

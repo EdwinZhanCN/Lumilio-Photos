@@ -6,9 +6,15 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"server/config"
+	"server/internal/db"
+	"server/internal/settings"
 
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +65,7 @@ func TestGeohashesForGPSRejectsInvalidCoordinates(t *testing.T) {
 }
 
 func TestReverseGeocoderDefaultsToDisabled(t *testing.T) {
-	geocoder := newReverseGeocoder(config.GeocodingConfig{})
+	geocoder := newReverseGeocoder(settings.Geocoding{})
 
 	require.Equal(t, geocoderProviderDisabled, geocoder.Provider())
 	_, err := geocoder.Reverse(context.Background(), 0, 0)
@@ -76,6 +82,7 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 		requested = true
 		require.Equal(t, "Lumilio-Test/1.0", r.Header.Get("User-Agent"))
 		require.Equal(t, "jsonv2", r.URL.Query().Get("format"))
+		require.Equal(t, "en", r.URL.Query().Get("accept-language"))
 		require.Equal(t, "0.00000000", r.URL.Query().Get("lat"))
 		require.Equal(t, "0.00000000", r.URL.Query().Get("lon"))
 		fmt.Fprint(w, `{"display_name":"Null Island","address":{"country":"Ocean","state":"Equator","city":"Prime Meridian"}}`)
@@ -84,7 +91,7 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	server.Start()
 	defer server.Close()
 
-	geocoder := newReverseGeocoder(config.GeocodingConfig{
+	geocoder := newReverseGeocoder(settings.Geocoding{
 		Provider:          "nominatim",
 		NominatimEndpoint: server.URL,
 		Language:          "en",
@@ -99,4 +106,62 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	require.NotNil(t, result.Country)
 	require.Equal(t, "Ocean", *result.Country)
 	require.NotEmpty(t, result.RawResponse)
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, 30*time.Second, parseRetryAfter("30"))
+	require.Equal(t, time.Hour, parseRetryAfter("9223372036"))
+	require.Equal(t, 0*time.Second, parseRetryAfter("not-a-date"))
+}
+
+func TestProviderRetryDelay(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, 5*time.Second, providerRetryDelay(1, 0))
+	require.Equal(t, 10*time.Second, providerRetryDelay(2, 0))
+	require.Equal(t, 5*time.Minute, providerRetryDelay(10, 0))
+	require.Equal(t, time.Hour, providerRetryDelay(1, 2*time.Hour))
+}
+
+func TestLocationRevisionCheckPropagatesDatabaseErrors(t *testing.T) {
+	ctx := context.Background()
+	catalogDir := filepath.Join(t.TempDir(), "private")
+	require.NoError(t, os.Mkdir(catalogDir, 0o700))
+	catalog, err := db.Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(catalogDir, "catalog.sqlite3"),
+	})
+	require.NoError(t, err)
+	require.NoError(t, catalog.Migrate(ctx))
+	service := &locationService{queries: catalog.Queries}
+	require.NoError(t, catalog.Close(ctx))
+
+	_, err = service.revisionIsCurrent(ctx, 1)
+	require.ErrorContains(t, err, "check geocoding revision")
+}
+
+func TestNominatimGeocoderRejectsOversizedResponse(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("sandbox does not permit loopback listeners: %v", err)
+	}
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, strings.Repeat("x", maxReverseGeocodeBody+1))
+	}))
+	server.Listener = listener
+	server.Start()
+	defer server.Close()
+
+	geocoder := newReverseGeocoder(settings.Geocoding{
+		Provider:          geocoderProviderNominatim,
+		NominatimEndpoint: server.URL,
+		Language:          "en",
+		UserAgent:         settings.DefaultGeocodingUserAgent,
+	})
+	_, err = geocoder.Reverse(context.Background(), 1, 2)
+
+	var providerErr *geocodeProviderError
+	require.ErrorAs(t, err, &providerErr)
+	require.False(t, providerErr.retryable)
 }

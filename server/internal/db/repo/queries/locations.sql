@@ -32,6 +32,7 @@ INSERT INTO location_clusters (
   centroid_latitude,
   centroid_longitude,
   photo_count,
+  provider,
   geocode_status,
   created_at,
   updated_at
@@ -45,7 +46,8 @@ VALUES (
   sqlc.arg('centroid_latitude'),
   sqlc.arg('centroid_longitude'),
   sqlc.arg('photo_count'),
-  'pending',
+  sqlc.narg('provider'),
+  sqlc.arg('geocode_status'),
   sqlc.arg('created_at'),
   sqlc.arg('updated_at')
 )
@@ -92,31 +94,67 @@ WHERE (sqlc.narg('repository_id') IS NULL OR repository_id = sqlc.narg('reposito
 SELECT *
 FROM location_clusters
 WHERE geocode_status = 'pending'
+  AND (geocode_next_attempt_at IS NULL OR geocode_next_attempt_at <= sqlc.arg('now'))
   AND (sqlc.narg('repository_id') IS NULL OR repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'))
 ORDER BY photo_count DESC, updated_at DESC
 LIMIT sqlc.arg('limit');
 
--- name: MarkLocationClustersGeocodeDisabled :exec
+-- name: DisableUnresolvedLocationClusters :exec
 UPDATE location_clusters
 SET geocode_status = 'disabled',
-    provider = sqlc.arg('provider'),
-    geocoded_at = sqlc.arg('geocoded_at')
-WHERE geocode_status = 'pending'
-  AND (sqlc.narg('repository_id') IS NULL OR repository_id = sqlc.narg('repository_id'))
-  AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'));
+    provider = 'disabled',
+    geocode_attempt_count = 0,
+    geocode_next_attempt_at = NULL
+WHERE geocode_status IN ('pending', 'failed');
+
+-- name: ResetLocationClustersForGeocodingSource :exec
+UPDATE location_clusters
+SET label = NULL,
+    country = NULL,
+    region = NULL,
+    city = NULL,
+    provider = NULL,
+    geocode_status = 'pending',
+    geocoded_at = NULL,
+    geocode_attempt_count = 0,
+    geocode_next_attempt_at = NULL
+WHERE 1 = 1;
+
+-- name: ResetLocationClustersForGeocodingUserAgent :exec
+UPDATE location_clusters
+SET geocode_status = CASE
+        WHEN geocode_status IN ('disabled', 'failed') THEN 'pending'
+        ELSE geocode_status
+    END,
+    geocode_attempt_count = 0,
+    geocode_next_attempt_at = NULL
+WHERE geocode_status IN ('pending', 'disabled', 'failed');
+
+-- name: GetPendingLocationClusterSchedule :one
+SELECT COUNT(*) AS pending_count,
+       CASE WHEN EXISTS (
+           SELECT 1
+           FROM location_clusters
+           WHERE geocode_status = 'pending'
+             AND geocode_next_attempt_at IS NULL
+       ) THEN 0 ELSE COALESCE(MIN(geocode_next_attempt_at), 0) END AS next_attempt_at
+FROM location_clusters
+WHERE geocode_status = 'pending';
 
 -- name: GetReverseGeocodeCache :one
 SELECT *
 FROM reverse_geocode_cache
-WHERE cache_key = sqlc.arg('cache_key')
+WHERE source_key = sqlc.arg('source_key')
+  AND geohash = sqlc.arg('geohash')
   AND provider = sqlc.arg('provider')
   AND language = sqlc.arg('language')
   AND (expires_at IS NULL OR expires_at > sqlc.arg('now'));
 
 -- name: UpsertReverseGeocodeCache :one
 INSERT INTO reverse_geocode_cache (
-  cache_key,
+  source_key,
+  geohash,
   provider,
   language,
   latitude,
@@ -129,7 +167,8 @@ INSERT INTO reverse_geocode_cache (
   queried_at,
   expires_at
 ) VALUES (
-  sqlc.arg('cache_key'),
+  sqlc.arg('source_key'),
+  sqlc.arg('geohash'),
   sqlc.arg('provider'),
   sqlc.arg('language'),
   sqlc.arg('latitude'),
@@ -142,7 +181,7 @@ INSERT INTO reverse_geocode_cache (
   sqlc.arg('queried_at'),
   sqlc.narg('expires_at')
 )
-ON CONFLICT (cache_key) DO UPDATE
+ON CONFLICT (source_key, geohash) DO UPDATE
 SET
   provider = EXCLUDED.provider,
   language = EXCLUDED.language,
@@ -157,14 +196,31 @@ SET
   expires_at = EXCLUDED.expires_at
 RETURNING *;
 
--- name: UpdateLocationClusterGeocode :exec
+-- name: UpdateLocationClusterGeocodeIfRevision :execrows
 UPDATE location_clusters
-SET
-  label = sqlc.narg('label'),
-  country = sqlc.narg('country'),
-  region = sqlc.narg('region'),
-  city = sqlc.narg('city'),
-  provider = sqlc.arg('provider'),
-  geocode_status = sqlc.arg('geocode_status'),
-  geocoded_at = sqlc.arg('geocoded_at')
-WHERE cluster_id = sqlc.arg('cluster_id');
+SET label = sqlc.narg('label'),
+    country = sqlc.narg('country'),
+    region = sqlc.narg('region'),
+    city = sqlc.narg('city'),
+    provider = sqlc.narg('provider'),
+    geocode_status = sqlc.arg('geocode_status'),
+    geocoded_at = sqlc.arg('geocoded_at'),
+    geocode_attempt_count = sqlc.arg('geocode_attempt_count'),
+    geocode_next_attempt_at = sqlc.narg('geocode_next_attempt_at')
+WHERE cluster_id = sqlc.arg('cluster_id')
+  AND EXISTS (
+      SELECT 1 FROM settings
+      WHERE id = 1 AND geocoding_revision = sqlc.arg('geocoding_revision')
+  );
+
+-- name: UpdateLocationClusterRetryIfRevision :execrows
+UPDATE location_clusters
+SET geocode_status = sqlc.arg('geocode_status'),
+    geocode_attempt_count = sqlc.arg('geocode_attempt_count'),
+    geocode_next_attempt_at = sqlc.narg('geocode_next_attempt_at'),
+    geocoded_at = sqlc.arg('geocoded_at')
+WHERE cluster_id = sqlc.arg('cluster_id')
+  AND EXISTS (
+      SELECT 1 FROM settings
+      WHERE id = 1 AND geocoding_revision = sqlc.arg('geocoding_revision')
+  );

@@ -4,29 +4,36 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 
-	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/queue/jobs"
+	"server/internal/settings"
 )
 
 const (
-	geocoderProviderDisabled  = "disabled"
-	geocoderProviderNominatim = "nominatim"
-	defaultGeocodeLimit       = 500
+	geocoderProviderDisabled  = settings.GeocodingProviderDisabled
+	geocoderProviderNominatim = settings.GeocodingProviderNominatim
+	maxGeocodeClustersPerRun  = 25
+	maxProviderAttempts       = 8
+	maxReverseGeocodeBody     = 1 << 20
 	reverseGeocodeCacheTTL    = 30 * 24 * time.Hour
 )
 
 type LocationService interface {
 	RebuildLocationClusters(ctx context.Context, repositoryID *string, ownerID *int32) error
+	ResolveLocationClusters(ctx context.Context, geocodingRevision int64) (time.Duration, error)
 	ListLocationClusters(ctx context.Context, params ListLocationClustersParams) ([]LocationCluster, int64, error)
 }
 
@@ -71,19 +78,25 @@ type ReverseGeocoder interface {
 }
 
 type locationService struct {
-	queries  *repo.Queries
-	pool     *sql.DB
-	geocoder ReverseGeocoder
+	queries *repo.Queries
+	pool    *sql.DB
+	queue   RiverJobInserter
+	pacer   *requestPacer
 }
 
-func NewLocationService(queries *repo.Queries, pool *sql.DB, cfg config.GeocodingConfig) LocationService {
+func NewLocationService(queries *repo.Queries, pool *sql.DB, queue RiverJobInserter) LocationService {
 	return &locationService{
-		queries:  queries,
-		pool:     pool,
-		geocoder: newReverseGeocoder(cfg),
+		queries: queries,
+		pool:    pool,
+		queue:   queue,
+		pacer:   &requestPacer{},
 	}
 }
 
+// RebuildLocationClusters owns only deterministic topology. The settings
+// snapshot and resolver enqueue share this transaction, so a rebuild cannot
+// publish work for a revision that was not current when its clusters were
+// created.
 func (s *locationService) RebuildLocationClusters(ctx context.Context, repositoryID *string, ownerID *int32) error {
 	repositoryUUID, err := parseOptionalUUID(repositoryID)
 	if err != nil {
@@ -95,8 +108,24 @@ func (s *locationService) RebuildLocationClusters(ctx context.Context, repositor
 		return fmt.Errorf("begin location cluster rebuild: %w", err)
 	}
 	defer tx.Rollback()
-
 	qtx := s.queries.WithTx(tx)
+
+	settingsRow, err := qtx.GetSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("read geocoding settings for location rebuild: %w", err)
+	}
+	geocoding, err := normalizeStoredGeocoding(settingsRow)
+	if err != nil {
+		return fmt.Errorf("read geocoding settings for location rebuild: %w", err)
+	}
+	geocodeStatus := "pending"
+	var provider *string
+	if !geocoding.IsEnabled() {
+		geocodeStatus = "disabled"
+		value := geocoderProviderDisabled
+		provider = &value
+	}
+
 	scope := repo.DeleteLocationClustersForScopeParams{
 		RepositoryID: repositoryUUID,
 		OwnerID:      ownerID,
@@ -126,6 +155,8 @@ func (s *locationService) RebuildLocationClusters(ctx context.Context, repositor
 			CentroidLatitude:  *candidate.CentroidLatitude,
 			CentroidLongitude: *candidate.CentroidLongitude,
 			PhotoCount:        candidate.PhotoCount,
+			Provider:          provider,
+			GeocodeStatus:     geocodeStatus,
 			CreatedAt:         now,
 			UpdatedAt:         now,
 		}); err != nil {
@@ -138,11 +169,21 @@ func (s *locationService) RebuildLocationClusters(ctx context.Context, repositor
 	}); err != nil {
 		return fmt.Errorf("insert location cluster memberships: %w", err)
 	}
+	if geocoding.IsEnabled() {
+		if s.queue == nil {
+			return errors.New("location resolver queue is not configured")
+		}
+		args := jobs.ResolveLocationClustersArgs{GeocodingRevision: settingsRow.GeocodingRevision}
+		opts := args.InsertOpts()
+		if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
+			return fmt.Errorf("enqueue location cluster resolution: %w", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit location cluster rebuild: %w", err)
 	}
-
-	return s.resolvePendingClusterLabels(ctx, repositoryUUID, ownerID)
+	return nil
 }
 
 func (s *locationService) ListLocationClusters(ctx context.Context, params ListLocationClustersParams) ([]LocationCluster, int64, error) {
@@ -178,61 +219,190 @@ func (s *locationService) ListLocationClusters(ctx context.Context, params ListL
 	return clusters, total, nil
 }
 
-func (s *locationService) resolvePendingClusterLabels(ctx context.Context, repositoryID uuid.NullUUID, ownerID *int32) error {
-	if s.geocoder == nil || s.geocoder.Provider() == geocoderProviderDisabled {
-		provider := geocoderProviderDisabled
-		return s.queries.MarkLocationClustersGeocodeDisabled(ctx, repo.MarkLocationClustersGeocodeDisabledParams{
-			Provider:     &provider,
-			GeocodedAt:   dbtypes.NewTimestamp(time.Now()),
-			RepositoryID: repositoryID,
-			OwnerID:      ownerID,
-		})
+// ResolveLocationClusters performs one bounded durable batch. A positive
+// duration tells the River worker to snooze the same job until the next
+// eligible cluster rather than completing and hoping a successor is inserted.
+func (s *locationService) ResolveLocationClusters(ctx context.Context, geocodingRevision int64) (time.Duration, error) {
+	settingsRow, err := s.queries.GetSettings(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("load geocoding settings: %w", err)
+	}
+	geocoding, err := normalizeStoredGeocoding(settingsRow)
+	if err != nil {
+		return 0, fmt.Errorf("load geocoding settings: %w", err)
+	}
+	if settingsRow.GeocodingRevision != geocodingRevision || !geocoding.IsEnabled() {
+		return 0, nil
 	}
 
+	now := time.Now().UTC()
 	clusters, err := s.queries.ListPendingLocationClusters(ctx, repo.ListPendingLocationClustersParams{
-		RepositoryID: repositoryID,
-		OwnerID:      ownerID,
-		Limit:        int64(defaultGeocodeLimit),
+		Now:          dbtypes.NewTimestamp(now),
+		RepositoryID: nil,
+		OwnerID:      nil,
+		Limit:        maxGeocodeClustersPerRun,
 	})
 	if err != nil {
-		return fmt.Errorf("list pending location clusters: %w", err)
+		return 0, fmt.Errorf("list pending location clusters: %w", err)
 	}
-
+	geocoder := newReverseGeocoder(geocoding, s.pacer)
 	for _, cluster := range clusters {
-		if err := s.resolveClusterLabel(ctx, cluster); err != nil {
-			return err
+		current, err := s.revisionIsCurrent(ctx, geocodingRevision)
+		if err != nil {
+			return 0, err
+		}
+		if !current {
+			return 0, nil
+		}
+
+		cached, cacheErr := s.queries.GetReverseGeocodeCache(ctx, repo.GetReverseGeocodeCacheParams{
+			SourceKey: geocoding.SourceKey(),
+			Geohash:   cluster.Geohash,
+			Provider:  geocoding.Provider,
+			Language:  geocoding.Language,
+			Now:       dbtypes.NewTimestamp(time.Now().UTC()),
+		})
+		if cacheErr == nil {
+			published, err := s.publishClusterResult(ctx, geocodingRevision, cluster.ClusterID, geocoding.Provider, "cached", cached.Label, cached.Country, cached.Region, cached.City)
+			if err != nil {
+				return 0, err
+			}
+			if !published {
+				return 0, nil
+			}
+			continue
+		}
+		if !errors.Is(cacheErr, sql.ErrNoRows) {
+			return 0, fmt.Errorf("get reverse geocode cache: %w", cacheErr)
+		}
+
+		current, err = s.revisionIsCurrent(ctx, geocodingRevision)
+		if err != nil {
+			return 0, err
+		}
+		if !current {
+			return 0, nil
+		}
+		result, providerErr := geocoder.Reverse(ctx, cluster.CentroidLatitude, cluster.CentroidLongitude)
+		if providerErr != nil {
+			if ctx.Err() != nil {
+				return 0, ctx.Err()
+			}
+			published, err := s.recordProviderFailure(ctx, geocodingRevision, cluster, providerErr)
+			if err != nil {
+				return 0, err
+			}
+			if !published {
+				return 0, nil
+			}
+			continue
+		}
+
+		published, err := s.publishRemoteResult(ctx, geocodingRevision, geocoding, cluster, result)
+		if err != nil {
+			return 0, err
+		}
+		if !published {
+			return 0, nil
 		}
 	}
-	return nil
+
+	current, err := s.revisionIsCurrent(ctx, geocodingRevision)
+	if err != nil {
+		return 0, err
+	}
+	if !current {
+		return 0, nil
+	}
+	schedule, err := s.queries.GetPendingLocationClusterSchedule(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("schedule pending location clusters: %w", err)
+	}
+	if schedule.PendingCount == 0 {
+		return 0, nil
+	}
+	nextAttemptAt := scheduleUnixMicro(schedule.NextAttemptAt)
+	if nextAttemptAt <= 0 {
+		return time.Second, nil
+	}
+	delay := time.Until(time.UnixMicro(nextAttemptAt))
+	if delay < time.Second {
+		return time.Second, nil
+	}
+	return delay, nil
 }
 
-func (s *locationService) resolveClusterLabel(ctx context.Context, cluster repo.LocationCluster) error {
-	provider := s.geocoder.Provider()
-	language := s.geocoder.Language()
-	cacheKey := fmt.Sprintf("%s:%s:%s", provider, language, cluster.Geohash)
-
-	cached, err := s.queries.GetReverseGeocodeCache(ctx, repo.GetReverseGeocodeCacheParams{
-		CacheKey: cacheKey,
-		Provider: provider,
-		Language: language,
-		Now:      dbtypes.NewTimestamp(time.Now()),
-	})
-	if err == nil {
-		return s.updateClusterGeocode(ctx, cluster.ClusterID, provider, "cached", cached.Label, cached.Country, cached.Region, cached.City)
+func scheduleUnixMicro(value any) int64 {
+	switch typed := value.(type) {
+	case int64:
+		return typed
+	case int:
+		return int64(typed)
+	case int32:
+		return int64(typed)
+	case float64:
+		return int64(typed)
+	case string:
+		parsed, _ := strconv.ParseInt(typed, 10, 64)
+		return parsed
+	case []byte:
+		parsed, _ := strconv.ParseInt(string(typed), 10, 64)
+		return parsed
+	case dbtypes.Timestamp:
+		if typed.Valid {
+			return typed.Time.UnixMicro()
+		}
 	}
-	if err != sql.ErrNoRows {
-		return fmt.Errorf("get reverse geocode cache: %w", err)
-	}
+	return 0
+}
 
-	result, err := s.geocoder.Reverse(ctx, cluster.CentroidLatitude, cluster.CentroidLongitude)
+func (s *locationService) revisionIsCurrent(ctx context.Context, revision int64) (bool, error) {
+	row, err := s.queries.GetSettings(ctx)
 	if err != nil {
-		return s.updateClusterGeocode(ctx, cluster.ClusterID, provider, "failed", nil, nil, nil, nil)
+		return false, fmt.Errorf("check geocoding revision: %w", err)
 	}
+	return row.GeocodingRevision == revision, nil
+}
 
-	cache, err := s.queries.UpsertReverseGeocodeCache(ctx, repo.UpsertReverseGeocodeCacheParams{
-		CacheKey:    cacheKey,
-		Provider:    provider,
-		Language:    language,
+func (s *locationService) publishClusterResult(ctx context.Context, revision int64, clusterID uuid.UUID, provider, status string, label, country, region, city *string) (bool, error) {
+	rows, err := s.queries.UpdateLocationClusterGeocodeIfRevision(ctx, repo.UpdateLocationClusterGeocodeIfRevisionParams{
+		Label:                label,
+		Country:              country,
+		Region:               region,
+		City:                 city,
+		Provider:             &provider,
+		GeocodeStatus:        status,
+		GeocodedAt:           dbtypes.NewTimestamp(time.Now().UTC()),
+		GeocodeAttemptCount:  0,
+		GeocodeNextAttemptAt: dbtypes.Timestamp{},
+		ClusterID:            clusterID,
+		GeocodingRevision:    revision,
+	})
+	if err != nil {
+		return false, fmt.Errorf("publish location cluster result: %w", err)
+	}
+	return rows > 0, nil
+}
+
+func (s *locationService) publishRemoteResult(ctx context.Context, revision int64, geocoding settings.Geocoding, cluster repo.LocationCluster, result ReverseGeocodeResult) (bool, error) {
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("begin reverse geocode publication: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := s.queries.WithTx(tx)
+	current, err := qtx.GetSettings(ctx)
+	if err != nil {
+		return false, fmt.Errorf("check geocoding revision before publication: %w", err)
+	}
+	if current.GeocodingRevision != revision {
+		return false, nil
+	}
+	cache, err := qtx.UpsertReverseGeocodeCache(ctx, repo.UpsertReverseGeocodeCacheParams{
+		SourceKey:   geocoding.SourceKey(),
+		Geohash:     cluster.Geohash,
+		Provider:    geocoding.Provider,
+		Language:    geocoding.Language,
 		Latitude:    cluster.CentroidLatitude,
 		Longitude:   cluster.CentroidLongitude,
 		Label:       result.Label,
@@ -240,27 +410,83 @@ func (s *locationService) resolveClusterLabel(ctx context.Context, cluster repo.
 		Region:      result.Region,
 		City:        result.City,
 		RawResponse: dbtypes.JSON(result.RawResponse),
-		QueriedAt:   dbtypes.NewTimestamp(time.Now()),
-		ExpiresAt:   dbtypes.NewTimestamp(time.Now().Add(reverseGeocodeCacheTTL)),
+		QueriedAt:   dbtypes.NewTimestamp(time.Now().UTC()),
+		ExpiresAt:   dbtypes.NewTimestamp(time.Now().UTC().Add(reverseGeocodeCacheTTL)),
 	})
 	if err != nil {
-		return fmt.Errorf("cache reverse geocode result: %w", err)
+		return false, fmt.Errorf("cache reverse geocode result: %w", err)
 	}
-
-	return s.updateClusterGeocode(ctx, cluster.ClusterID, provider, "resolved", cache.Label, cache.Country, cache.Region, cache.City)
+	rows, err := qtx.UpdateLocationClusterGeocodeIfRevision(ctx, repo.UpdateLocationClusterGeocodeIfRevisionParams{
+		Label:                cache.Label,
+		Country:              cache.Country,
+		Region:               cache.Region,
+		City:                 cache.City,
+		Provider:             &geocoding.Provider,
+		GeocodeStatus:        "resolved",
+		GeocodedAt:           dbtypes.NewTimestamp(time.Now().UTC()),
+		GeocodeAttemptCount:  0,
+		GeocodeNextAttemptAt: dbtypes.Timestamp{},
+		ClusterID:            cluster.ClusterID,
+		GeocodingRevision:    revision,
+	})
+	if err != nil {
+		return false, fmt.Errorf("publish location cluster result: %w", err)
+	}
+	if rows == 0 {
+		return false, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit reverse geocode publication: %w", err)
+	}
+	return true, nil
 }
 
-func (s *locationService) updateClusterGeocode(ctx context.Context, clusterID uuid.UUID, provider, status string, label, country, region, city *string) error {
-	return s.queries.UpdateLocationClusterGeocode(ctx, repo.UpdateLocationClusterGeocodeParams{
-		ClusterID:     clusterID,
-		Provider:      &provider,
-		GeocodeStatus: status,
-		GeocodedAt:    dbtypes.NewTimestamp(time.Now()),
-		Label:         label,
-		Country:       country,
-		Region:        region,
-		City:          city,
+func (s *locationService) recordProviderFailure(ctx context.Context, revision int64, cluster repo.LocationCluster, providerErr error) (bool, error) {
+	var typed *geocodeProviderError
+	if !errors.As(providerErr, &typed) {
+		typed = &geocodeProviderError{retryable: true, cause: providerErr}
+	}
+	attempt := cluster.GeocodeAttemptCount + 1
+	status := "pending"
+	nextAttemptAt := dbtypes.Timestamp{}
+	if !typed.retryable || attempt >= maxProviderAttempts {
+		status = "failed"
+	} else {
+		nextAttemptAt = dbtypes.NewTimestamp(time.Now().UTC().Add(providerRetryDelay(attempt, typed.retryAfter)))
+	}
+	rows, err := s.queries.UpdateLocationClusterRetryIfRevision(ctx, repo.UpdateLocationClusterRetryIfRevisionParams{
+		GeocodeStatus:        status,
+		GeocodeAttemptCount:  attempt,
+		GeocodeNextAttemptAt: nextAttemptAt,
+		GeocodedAt:           dbtypes.NewTimestamp(time.Now().UTC()),
+		ClusterID:            cluster.ClusterID,
+		GeocodingRevision:    revision,
 	})
+	if err != nil {
+		return false, fmt.Errorf("persist reverse geocode retry state: %w", err)
+	}
+	return rows > 0, nil
+}
+
+func providerRetryDelay(attempt int64, retryAfter time.Duration) time.Duration {
+	delay := 5 * time.Second
+	for index := int64(1); index < attempt; index++ {
+		if delay >= 5*time.Minute {
+			delay = 5 * time.Minute
+			break
+		}
+		delay *= 2
+	}
+	if delay > 5*time.Minute {
+		delay = 5 * time.Minute
+	}
+	if retryAfter > delay {
+		delay = retryAfter
+	}
+	if delay > time.Hour {
+		delay = time.Hour
+	}
+	return delay
 }
 
 func parseOptionalUUID(raw *string) (uuid.NullUUID, error) {
@@ -315,7 +541,31 @@ type disabledGeocoder struct{}
 func (disabledGeocoder) Provider() string { return geocoderProviderDisabled }
 func (disabledGeocoder) Language() string { return "" }
 func (disabledGeocoder) Reverse(context.Context, float64, float64) (ReverseGeocodeResult, error) {
-	return ReverseGeocodeResult{}, fmt.Errorf("reverse geocoder disabled")
+	return ReverseGeocodeResult{}, &geocodeProviderError{cause: errors.New("reverse geocoder disabled")}
+}
+
+type requestPacer struct {
+	mu        sync.Mutex
+	lastStart time.Time
+}
+
+func (p *requestPacer) acquire(ctx context.Context) (func(), error) {
+	p.mu.Lock()
+	wait := time.Until(p.lastStart.Add(time.Second))
+	if wait > 0 {
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			p.mu.Unlock()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+	p.lastStart = time.Now()
+	return p.mu.Unlock, nil
 }
 
 type nominatimGeocoder struct {
@@ -323,21 +573,24 @@ type nominatimGeocoder struct {
 	language   string
 	userAgent  string
 	httpClient *http.Client
+	pacer      *requestPacer
 }
 
-func newReverseGeocoder(cfg config.GeocodingConfig) ReverseGeocoder {
+func newReverseGeocoder(cfg settings.Geocoding, pacers ...*requestPacer) ReverseGeocoder {
 	provider := strings.ToLower(strings.TrimSpace(cfg.Provider))
-	endpoint := strings.TrimSpace(cfg.NominatimEndpoint)
 	if provider != geocoderProviderNominatim {
 		return disabledGeocoder{}
 	}
-	language := strings.TrimSpace(cfg.Language)
-	userAgent := strings.TrimSpace(cfg.UserAgent)
+	pacer := &requestPacer{}
+	if len(pacers) != 0 && pacers[0] != nil {
+		pacer = pacers[0]
+	}
 	return &nominatimGeocoder{
-		endpoint:   endpoint,
-		language:   language,
-		userAgent:  userAgent,
+		endpoint:   strings.TrimSpace(cfg.NominatimEndpoint),
+		language:   strings.TrimSpace(cfg.Language),
+		userAgent:  strings.TrimSpace(cfg.UserAgent),
 		httpClient: &http.Client{Timeout: 10 * time.Second},
+		pacer:      pacer,
 	}
 }
 
@@ -347,7 +600,7 @@ func (g *nominatimGeocoder) Language() string { return g.language }
 func (g *nominatimGeocoder) Reverse(ctx context.Context, latitude, longitude float64) (ReverseGeocodeResult, error) {
 	baseURL, err := url.Parse(g.endpoint)
 	if err != nil {
-		return ReverseGeocodeResult{}, fmt.Errorf("invalid nominatim endpoint: %w", err)
+		return ReverseGeocodeResult{}, &geocodeProviderError{cause: fmt.Errorf("invalid nominatim endpoint: %w", err)}
 	}
 	query := baseURL.Query()
 	query.Set("format", "jsonv2")
@@ -362,22 +615,34 @@ func (g *nominatimGeocoder) Reverse(ctx context.Context, latitude, longitude flo
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), nil)
 	if err != nil {
-		return ReverseGeocodeResult{}, err
+		return ReverseGeocodeResult{}, &geocodeProviderError{cause: err}
 	}
 	req.Header.Set("User-Agent", g.userAgent)
+	release, err := g.pacer.acquire(ctx)
+	if err != nil {
+		return ReverseGeocodeResult{}, &geocodeProviderError{retryable: true, cause: err}
+	}
+	defer release()
 
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
-		return ReverseGeocodeResult{}, err
+		return ReverseGeocodeResult{}, &geocodeProviderError{retryable: true, cause: err}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return ReverseGeocodeResult{}, fmt.Errorf("nominatim returned status %d", resp.StatusCode)
+		return ReverseGeocodeResult{}, &geocodeProviderError{
+			retryable:  resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500,
+			retryAfter: parseRetryAfter(resp.Header.Get("Retry-After")),
+			statusCode: resp.StatusCode,
+			cause:      fmt.Errorf("nominatim returned status class %dxx", resp.StatusCode/100),
+		}
 	}
-
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxReverseGeocodeBody+1))
 	if err != nil {
-		return ReverseGeocodeResult{}, err
+		return ReverseGeocodeResult{}, &geocodeProviderError{retryable: true, cause: err}
+	}
+	if len(body) > maxReverseGeocodeBody {
+		return ReverseGeocodeResult{}, &geocodeProviderError{cause: errors.New("nominatim response exceeds the configured size limit")}
 	}
 
 	var parsed struct {
@@ -386,7 +651,7 @@ func (g *nominatimGeocoder) Reverse(ctx context.Context, latitude, longitude flo
 		Address     map[string]string `json:"address"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return ReverseGeocodeResult{}, err
+		return ReverseGeocodeResult{}, &geocodeProviderError{cause: fmt.Errorf("decode nominatim response: %w", err)}
 	}
 
 	label := firstNonEmpty(parsed.DisplayName, parsed.Name)
@@ -401,6 +666,50 @@ func (g *nominatimGeocoder) Reverse(ctx context.Context, latitude, longitude flo
 		City:        emptyStringToNil(city),
 		RawResponse: body,
 	}, nil
+}
+
+type geocodeProviderError struct {
+	retryable  bool
+	retryAfter time.Duration
+	statusCode int
+	cause      error
+}
+
+func (e *geocodeProviderError) Error() string {
+	if e.cause == nil {
+		return "reverse geocoding provider failed"
+	}
+	return e.cause.Error()
+}
+
+func (e *geocodeProviderError) Unwrap() error { return e.cause }
+
+func parseRetryAfter(raw string) time.Duration {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	if seconds, err := strconv.ParseInt(raw, 10, 64); err == nil && seconds >= 0 {
+		if seconds >= int64(time.Hour/time.Second) {
+			return time.Hour
+		}
+		return time.Duration(seconds) * time.Second
+	}
+	when, err := http.ParseTime(raw)
+	if err != nil {
+		return 0
+	}
+	if delay := time.Until(when); delay > 0 {
+		return minDuration(delay, time.Hour)
+	}
+	return 0
+}
+
+func minDuration(left, right time.Duration) time.Duration {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func firstNonEmpty(values ...string) string {

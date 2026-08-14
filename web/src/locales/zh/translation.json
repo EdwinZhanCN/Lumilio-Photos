@@ -220,15 +220,19 @@
         "center_lat": "中心纬度",
         "center_lon": "中心经度",
         "close_modal": "关闭",
+        "current_location_error": "无法访问你的当前位置。",
+        "current_location_unsupported": "当前浏览器不支持获取当前位置。",
         "done": "完成",
         "east_placeholder": "东",
         "generate_bbox": "生成边界框",
+        "locating": "正在定位…",
         "modal_description": "提供中心点 + 半径以生成边界框，或手动编辑值。",
         "modal_title": "选择位置",
         "north_placeholder": "北",
         "pick_on_map": "在地图上选择",
         "preview_map": "预览地图",
         "radius_km": "半径 (公里)",
+        "secure_context_required": "获取当前位置需要使用 HTTPS 或 localhost。",
         "south_placeholder": "南",
         "title": "位置",
         "use_current_location": "使用当前位置",
@@ -559,15 +563,22 @@
     "logout": "退出登录",
     "mfa": {
       "backToSettings": "返回设置",
+      "confirmSetup": "确认账户安全",
+      "confirmSetupSubtitle": "创建身份验证器密钥前，请输入当前密码。",
+      "continueSetup": "继续",
       "disableSubtitle": "输入密码以关闭双重认证。",
       "enabledTitle": "双重认证已开启",
+      "existingFactor": "现有验证方式",
+      "existingFactorCode": "当前身份验证器码或恢复码",
       "introSubtitle": "使用 TOTP 身份验证器应用保护你的账户。",
       "introTitle": "双重认证",
       "qrAlt": "身份验证器二维码",
+      "recoveryCode": "恢复码",
       "recoverySubtitle": "当你无法使用身份验证器时，这是最后的恢复方式。",
       "regenerateSubtitle": "这会让现有恢复码失效。",
       "setupSubtitle": "使用身份验证器应用扫描二维码。",
-      "setupTitle": "添加身份验证器"
+      "setupTitle": "添加身份验证器",
+      "totpCode": "身份验证器码"
     },
     "passkey": {
       "affordance": {
@@ -579,6 +590,12 @@
       "domainRequired": "通过 HTTPS 使用 Passkey 时需要域名，不能直接使用 IP 地址。",
       "invalidOrigin": "当前浏览器 Origin 无法使用 Passkey。",
       "secureOriginRequired": "Passkey 需要 HTTPS 或 localhost 地址。"
+    },
+    "passkeySupport": {
+      "browserOnly": "Passkey 仅可在浏览器中使用。",
+      "httpsRequired": "Passkey 需要 HTTPS 或 localhost 地址。",
+      "notSupported": "当前浏览器不支持 Passkey。",
+      "secureContextRequired": "Passkey 需要 HTTPS 或 localhost。"
     },
     "passwordField": {
       "hidePassword": "隐藏密码",
@@ -615,6 +632,9 @@
       "passkeyAction": "创建 Passkey",
       "passkeyDescription": "无需记住密码。Passkey 保存在此设备上，并可防止钓鱼攻击。",
       "passkeyHeadline": "使用面容、指纹或设备解锁登录",
+      "passkeySecurityCode": "当前身份验证器验证码",
+      "passkeySecurityCodeHint": "添加 Passkey 前，请输入身份验证器生成的最新验证码。",
+      "passkeySecurityVerificationError": "在设置通行密钥前无法验证账户安全。",
       "passkeyStartError": "启动 Passkey 注册失败。",
       "passkeyStepSubtitle": "Passkey 是最快也最安全的登录方式。建议现在添加一个。",
       "passkeyStepTitle": "使用 Passkey 保护账户",
@@ -634,6 +654,7 @@
       "submit": "继续",
       "subtitle": "请先创建用户名和密码，然后完成账户安全设置。",
       "title": "创建账户",
+      "totpSecurityVerificationError": "在设置 TOTP 前无法验证账户安全。",
       "totpSetupCompleteError": "完成身份验证器设置失败。",
       "totpSetupStartError": "启动身份验证器设置失败。",
       "totpSubtitle": "请使用 Duo、1Password 或其他身份验证器应用扫描二维码，并完成一次验证码校验。",
@@ -875,6 +896,7 @@
     "confirm": "确认",
     "copied": "已复制",
     "copy": "复制",
+    "copyFailed": "复制失败。",
     "delete": "删除",
     "dismiss": "关闭",
     "done": "完成",
@@ -2014,6 +2036,8 @@
         "passkeyLastUsed": "上次使用",
         "passkeyLoadError": "通行密钥暂时不可用。",
         "passkeyRequiresTotp": "请先启用身份验证器应用（TOTP）— 通行密钥只能在其基础上添加。",
+        "passkeySecurityHint": "更改通行密钥前请输入密码和当前身份验证器验证码。",
+        "passkeySecurityTitle": "确认账户安全",
         "passkeyTitle": "通行密钥",
         "recoveryCodesTitle": "恢复码",
         "recoveryRemaining": "个恢复码剩余",
@@ -2022,8 +2046,10 @@
         "regenerateTitle": "重新生成恢复码",
         "remainingCodes_one": "剩余 {{count}} 个恢复码",
         "remainingCodes_other": "剩余 {{count}} 个恢复码",
+        "securityVerificationError": "无法验证账户安全。",
         "setupError": "启动身份验证器设置失败。",
-        "statusLoadError": "MFA 状态暂时不可用。"
+        "statusLoadError": "MFA 状态暂时不可用。",
+        "totpCode": "身份验证器码"
       },
       "pageDescription": "管理你的资料、密码、MFA 和通行密钥。",
       "passwordDescription": "修改你的账户密码。修改后需重新登录。",
@@ -2267,6 +2293,23 @@
       "disabled": "禁用",
       "discoveredNodes": "已发现节点",
       "enabled": "启用",
+      "geocoding": {
+        "description": "启用提供方后，照片坐标会发送到配置的端点；禁用时坐标保留在本地。",
+        "endpointDescription": "请输入绝对 HTTP(S) URL。允许回环地址和私有网络地址。",
+        "endpointLabel": "Nominatim 端点",
+        "languageDescription": "作为提供方的语言偏好发送。",
+        "languageLabel": "语言",
+        "loadError": "反向地理编码设置暂时不可用。",
+        "providerDescription": "禁用后坐标保留在本地，且不会向提供方发起请求。",
+        "providerLabel": "提供方",
+        "providers": {
+          "disabled": "禁用",
+          "nominatim": "Nominatim"
+        },
+        "title": "反向地理编码",
+        "userAgentDescription": "请求会使用此值标识自身。请勿包含凭据或个人数据。",
+        "userAgentLabel": "User-Agent"
+      },
       "healthCheckDescription": "控制应用程序检测服务器健康状态的频率。较低的数值会更频繁地更新，但可能增加网络使用量。",
       "healthCheckInterval": "健康检查间隔",
       "llmTitle": "LLM Agent",
@@ -2466,7 +2509,9 @@
       "readyHint": "降低图层的深度值，使其隐藏在更近的物体后面。",
       "regenerate": "重新生成",
       "retry": "重试",
-      "title": "场景深度"
+      "secureContextRequired": "深度估计需要使用 HTTPS 或 localhost。",
+      "title": "场景深度",
+      "webgpuUnavailable": "深度估计需要支持 WebGPU 的浏览器。"
     },
     "develop": {
       "blacks": "黑色",

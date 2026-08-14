@@ -133,7 +133,7 @@ function installCorruptBackupFixture(): string {
       {
         format_version: 2,
         app_version: "e2e-corrupt",
-        config_schema_version: 3,
+        config_schema_version: 4,
         application_migration_version: 3,
         river_migration_version: 1,
         sqlite_version: "invalid-fixture",

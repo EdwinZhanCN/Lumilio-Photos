@@ -9,6 +9,7 @@ import {
   InlineError,
   PasswordField,
   RecoveryCodesPanel,
+  TextInput,
   TotpSetupPanel,
 } from "../../components/ui";
 import { useMFAFlow } from "./useMFAFlow.ts";
@@ -23,6 +24,10 @@ export default function MFAFlow(): React.ReactNode {
     setVerificationCode,
     password,
     setPassword,
+    securityCode,
+    setSecurityCode,
+    securityMethod,
+    setSecurityMethod,
     error,
     recoveryCodes,
     activeAction,
@@ -81,6 +86,74 @@ export default function MFAFlow(): React.ReactNode {
         />
       </>
     );
+  } else if (activeAction === "setup") {
+    body = (
+      <>
+        <CardHead
+          icon={Lock}
+          tone="primary"
+          title={t("auth.mfa.confirmSetup", {
+            defaultValue: "Confirm account security",
+          })}
+          sub={t("auth.mfa.confirmSetupSubtitle", {
+            defaultValue: "Enter your current password before creating an authenticator secret.",
+          })}
+        />
+        {error && <InlineError>{error}</InlineError>}
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleBeginSetup();
+          }}
+        >
+          <PasswordField
+            label={t("settings.account.mfa.currentPassword", {
+              defaultValue: "Current password",
+            })}
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+          />
+          {status?.totp_enabled && (
+            <>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-base-content/70">
+                  {t("auth.mfa.existingFactor", { defaultValue: "Existing factor" })}
+                </span>
+                <select
+                  className="select select-bordered w-full"
+                  value={securityMethod}
+                  onChange={(event) =>
+                    setSecurityMethod(event.target.value as "totp" | "recovery_code")
+                  }
+                >
+                  <option value="totp">
+                    {t("auth.mfa.totpCode", { defaultValue: "Authenticator code" })}
+                  </option>
+                  <option value="recovery_code">
+                    {t("auth.mfa.recoveryCode", { defaultValue: "Recovery code" })}
+                  </option>
+                </select>
+              </label>
+              <TextInput
+                value={securityCode}
+                onChange={(event) => setSecurityCode(event.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+              />
+            </>
+          )}
+          <Btn type="submit" variant="primary" loading={isBeginningSetup}>
+            {t("auth.mfa.continueSetup", { defaultValue: "Continue" })}
+          </Btn>
+          <Btn type="button" variant="ghost" onClick={resetAction}>
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </Btn>
+        </form>
+      </>
+    );
   } else if (setupResponse) {
     body = (
       <>
@@ -134,6 +207,37 @@ export default function MFAFlow(): React.ReactNode {
             onChange={setPassword}
             autoComplete="current-password"
           />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-base-content/70">
+              {t("auth.mfa.existingFactor", { defaultValue: "Existing factor" })}
+            </span>
+            <select
+              className="select select-bordered w-full"
+              value={securityMethod}
+              onChange={(event) =>
+                setSecurityMethod(event.target.value as "totp" | "recovery_code")
+              }
+            >
+              <option value="totp">
+                {t("auth.mfa.totpCode", { defaultValue: "Authenticator code" })}
+              </option>
+              <option value="recovery_code">
+                {t("auth.mfa.recoveryCode", { defaultValue: "Recovery code" })}
+              </option>
+            </select>
+          </label>
+          {status?.totp_enabled && (
+            <TextInput
+              value={securityCode}
+              onChange={(event) => setSecurityCode(event.target.value)}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder={t("auth.mfa.existingFactorCode", {
+                defaultValue: "Current authenticator or recovery code",
+              })}
+              required
+            />
+          )}
           <Btn type="submit" variant="primary" loading={isDisabling}>
             {t("settings.account.mfa.confirmDisable", {
               defaultValue: "Disable two-factor",
@@ -167,6 +271,35 @@ export default function MFAFlow(): React.ReactNode {
             value={password}
             onChange={setPassword}
             autoComplete="current-password"
+          />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-base-content/70">
+              {t("auth.mfa.existingFactor", { defaultValue: "Existing factor" })}
+            </span>
+            <select
+              className="select select-bordered w-full"
+              value={securityMethod}
+              onChange={(event) =>
+                setSecurityMethod(event.target.value as "totp" | "recovery_code")
+              }
+            >
+              <option value="totp">
+                {t("auth.mfa.totpCode", { defaultValue: "Authenticator code" })}
+              </option>
+              <option value="recovery_code">
+                {t("auth.mfa.recoveryCode", { defaultValue: "Recovery code" })}
+              </option>
+            </select>
+          </label>
+          <TextInput
+            value={securityCode}
+            onChange={(event) => setSecurityCode(event.target.value)}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder={t("auth.mfa.existingFactorCode", {
+              defaultValue: "Current authenticator or recovery code",
+            })}
+            required
           />
           <Btn type="submit" variant="primary" loading={isRegenerating}>
             {t("settings.account.mfa.confirmRegenerate", {
@@ -225,7 +358,7 @@ export default function MFAFlow(): React.ReactNode {
           variant="primary"
           icon={ShieldCheck}
           loading={isBeginningSetup}
-          onClick={() => void handleBeginSetup()}
+          onClick={() => setActiveAction("setup")}
         >
           {t("settings.account.mfa.beginSetup", {
             defaultValue: "Set up two-factor",

@@ -85,7 +85,7 @@ func TestOpenMigrateAndReopenSQLiteCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inspect reopened catalog: %v", err)
 	}
-	if info.ApplicationMigration != 7 || info.RiverMigration == 0 || info.LibraryID == "" {
+	if info.ApplicationMigration != 9 || info.RiverMigration == 0 || info.LibraryID == "" {
 		t.Fatalf("unexpected catalog identity: %+v", info)
 	}
 }
@@ -168,7 +168,7 @@ func TestMigrationLedgerRejectsHistoricalChecksumChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
-		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 3
+		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 9
 	`, strings.Repeat("0", 64)); err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestOpenRejectsOldGenerationBeforeDerivedModuleChecks(t *testing.T) {
 }
 
 func TestBioAlbumSchemaAndQueryLiteralsShareDomainValue(t *testing.T) {
-	baseline, err := migrations.FS.ReadFile("000003_vec1_baseline.up.sql")
+	baseline, err := migrations.FS.ReadFile("000009_auth_security_baseline.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,6 +518,7 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		CentroidLatitude:  *locationCandidates[0].CentroidLatitude,
 		CentroidLongitude: *locationCandidates[0].CentroidLongitude,
 		PhotoCount:        locationCandidates[0].PhotoCount,
+		GeocodeStatus:     "disabled",
 		CreatedAt:         dbtypes.NewTimestamp(time.Now().UTC()),
 		UpdatedAt:         dbtypes.NewTimestamp(time.Now().UTC()),
 	})

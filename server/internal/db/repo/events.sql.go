@@ -285,7 +285,7 @@ func (q *Queries) GetEventForOwner(ctx context.Context, arg GetEventForOwnerPara
 }
 
 const getEventOwnerState = `-- name: GetEventOwnerState :one
-SELECT owner_id, active_algorithm_version, initialized_at, last_full_rebuild_at, automatic_rebuild_paused, revision, updated_at FROM event_owner_state WHERE owner_id = ?
+SELECT owner_id, active_algorithm_version, initialized_at, last_full_rebuild_at, automatic_rebuild_paused, revision, updated_at, source_revision, published_revision, rebuild_lease_token, rebuild_lease_expires_at FROM event_owner_state WHERE owner_id = ?
 `
 
 func (q *Queries) GetEventOwnerState(ctx context.Context, ownerID int32) (EventOwnerState, error) {
@@ -299,6 +299,10 @@ func (q *Queries) GetEventOwnerState(ctx context.Context, ownerID int32) (EventO
 		&i.AutomaticRebuildPaused,
 		&i.Revision,
 		&i.UpdatedAt,
+		&i.SourceRevision,
+		&i.PublishedRevision,
+		&i.RebuildLeaseToken,
+		&i.RebuildLeaseExpiresAt,
 	)
 	return i, err
 }

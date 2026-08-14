@@ -12,14 +12,34 @@ import (
 
 	"server/internal/db/repo"
 	"server/internal/llm"
+	"server/internal/queue/jobs"
 	"server/internal/secretbox"
 	"server/internal/settings"
+
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
+
+var ErrInvalidSystemSettings = errors.New("invalid system settings")
+
+// RiverJobInserter is the small transaction boundary the settings service
+// needs. Keeping this interface here avoids making service depend on the
+// queue package while still allowing River InsertTx to share the settings
+// transaction.
+type RiverJobInserter interface {
+	InsertTx(context.Context, *sql.Tx, river.JobArgs, *river.InsertOpts) (*rivertype.JobInsertResult, error)
+}
+
+type SettingsRuntime struct {
+	DB    *sql.DB
+	Queue RiverJobInserter
+}
 
 type SystemSettings struct {
 	LLM       LLMSettings
 	ML        MLSettings
 	Backup    BackupSettings
+	Geocoding GeocodingSettings
 	UpdatedAt time.Time
 	UpdatedBy *int32
 }
@@ -36,6 +56,13 @@ type LLMSettings struct {
 	ModelName        string
 	BaseURL          string
 	APIKeyConfigured bool
+}
+
+type GeocodingSettings struct {
+	Provider          string
+	NominatimEndpoint string
+	Language          string
+	UserAgent         string
 }
 
 func (s LLMSettings) EffectiveProvider() string {
@@ -71,7 +98,15 @@ type UpdateSystemSettingsInput struct {
 	LLM       *UpdateLLMSettingsInput
 	ML        *UpdateMLSettingsInput
 	Backup    *UpdateBackupSettingsInput
+	Geocoding *UpdateGeocodingSettingsInput
 	UpdatedBy *int32
+}
+
+type UpdateGeocodingSettingsInput struct {
+	Provider          *string
+	NominatimEndpoint *string
+	Language          *string
+	UserAgent         *string
 }
 
 type UpdateBackupSettingsInput struct {
@@ -114,12 +149,15 @@ type SettingsService interface {
 	GetLLMConfig(ctx context.Context) (settings.LLM, error)
 	GetMLConfig(ctx context.Context) (settings.ML, error)
 	GetBackupConfig(ctx context.Context) (settings.Backup, error)
+	GetGeocodingConfig(ctx context.Context) (settings.Geocoding, error)
 	GetEffectiveMLConfig(ctx context.Context) (settings.ML, error)
 	ValidateLLMDraft(ctx context.Context, input ValidateLLMDraftInput) error
 }
 
 type settingsService struct {
 	queries          *repo.Queries
+	db               *sql.DB
+	queue            RiverJobInserter
 	secretPath       string
 	defaults         settings.Settings
 	encryptionSecret string
@@ -131,8 +169,14 @@ type settingsService struct {
 // program-fixed seed values for the runtime-mutable settings; secretKeyPath is
 // the encryption key file. Repository defaults are owned by the storage package.
 func NewSettingsService(queries *repo.Queries, defaults settings.Settings, secretKeyPath string) SettingsService {
+	return NewSettingsServiceWithRuntime(queries, defaults, secretKeyPath, SettingsRuntime{})
+}
+
+func NewSettingsServiceWithRuntime(queries *repo.Queries, defaults settings.Settings, secretKeyPath string, runtime SettingsRuntime) SettingsService {
 	return &settingsService{
 		queries:    queries,
+		db:         runtime.DB,
+		queue:      runtime.Queue,
 		secretPath: strings.TrimSpace(secretKeyPath),
 		defaults:   defaults,
 	}
@@ -184,8 +228,20 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		BackupEnabled:               row.BackupEnabled,
 		BackupIntervalHours:         row.BackupIntervalHours,
 		BackupKeepLast:              row.BackupKeepLast,
+		GeocodingProvider:           strings.TrimSpace(row.GeocodingProvider),
+		GeocodingNominatimEndpoint:  strings.TrimSpace(row.GeocodingNominatimEndpoint),
+		GeocodingLanguage:           strings.TrimSpace(row.GeocodingLanguage),
+		GeocodingUserAgent:          strings.TrimSpace(row.GeocodingUserAgent),
+		GeocodingRevision:           row.GeocodingRevision,
 		UpdatedBy:                   input.UpdatedBy,
 	}
+
+	currentGeocoding, err := normalizeStoredGeocoding(row)
+	if err != nil {
+		return SystemSettings{}, fmt.Errorf("%w: stored geocoding settings: %v", ErrInvalidSystemSettings, err)
+	}
+	candidateGeocoding := currentGeocoding
+	geocodingChanged := false
 
 	if input.LLM != nil {
 		if input.LLM.AgentEnabled != nil {
@@ -274,6 +330,35 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		}
 	}
 
+	if input.Geocoding != nil {
+		candidate := currentGeocoding
+		if input.Geocoding.Provider != nil {
+			candidate.Provider = *input.Geocoding.Provider
+		}
+		if input.Geocoding.NominatimEndpoint != nil {
+			candidate.NominatimEndpoint = *input.Geocoding.NominatimEndpoint
+		}
+		if input.Geocoding.Language != nil {
+			candidate.Language = *input.Geocoding.Language
+		}
+		if input.Geocoding.UserAgent != nil {
+			candidate.UserAgent = *input.Geocoding.UserAgent
+		}
+		normalized, normalizeErr := candidate.Normalize()
+		if normalizeErr != nil {
+			return SystemSettings{}, fmt.Errorf("%w: %v", ErrInvalidSystemSettings, normalizeErr)
+		}
+		candidateGeocoding = normalized
+		geocodingChanged = candidateGeocoding != currentGeocoding
+		params.GeocodingProvider = candidateGeocoding.Provider
+		params.GeocodingNominatimEndpoint = candidateGeocoding.NominatimEndpoint
+		params.GeocodingLanguage = candidateGeocoding.Language
+		params.GeocodingUserAgent = candidateGeocoding.UserAgent
+		if geocodingChanged {
+			params.GeocodingRevision = row.GeocodingRevision + 1
+		}
+	}
+
 	candidateLLM := LLMSettings{
 		AgentEnabled:     params.LlmAgentEnabled,
 		Provider:         params.LlmProvider,
@@ -283,6 +368,10 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 	}
 	if candidateLLM.AgentEnabled && !candidateLLM.IsConfigured() {
 		return SystemSettings{}, errors.New("cannot enable Lumilio Agent until an explicit provider, model, and credential have been configured")
+	}
+
+	if geocodingChanged {
+		return s.updateGeocodingSettings(ctx, params, currentGeocoding, candidateGeocoding)
 	}
 
 	updated, err := s.queries.UpsertSettings(ctx, params)
@@ -351,6 +440,69 @@ func (s *settingsService) GetBackupConfig(ctx context.Context) (settings.Backup,
 	}, nil
 }
 
+func (s *settingsService) GetGeocodingConfig(ctx context.Context) (settings.Geocoding, error) {
+	row, err := s.getSettingsRow(ctx)
+	if err != nil {
+		return settings.Geocoding{}, err
+	}
+	return normalizeStoredGeocoding(row)
+}
+
+func (s *settingsService) updateGeocodingSettings(
+	ctx context.Context,
+	params repo.UpsertSettingsParams,
+	previous settings.Geocoding,
+	candidate settings.Geocoding,
+) (SystemSettings, error) {
+	if s.db == nil || s.queue == nil {
+		return SystemSettings{}, errors.New("geocoding settings runtime dependencies are not configured")
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return SystemSettings{}, fmt.Errorf("begin geocoding settings update: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := s.queries.WithTx(tx)
+
+	updated, err := qtx.UpsertSettings(ctx, params)
+	if err != nil {
+		return SystemSettings{}, fmt.Errorf("update settings: %w", err)
+	}
+
+	previousEnabled := previous.IsEnabled()
+	candidateEnabled := candidate.IsEnabled()
+	sourceChanged := previous.SourceKey() != candidate.SourceKey()
+	userAgentChanged := previous.UserAgent != candidate.UserAgent
+	switch {
+	case !candidateEnabled && previousEnabled:
+		if err := qtx.DisableUnresolvedLocationClusters(ctx); err != nil {
+			return SystemSettings{}, fmt.Errorf("disable unresolved location clusters: %w", err)
+		}
+	case candidateEnabled && sourceChanged:
+		if err := qtx.ResetLocationClustersForGeocodingSource(ctx); err != nil {
+			return SystemSettings{}, fmt.Errorf("reset location clusters for geocoding source: %w", err)
+		}
+	case candidateEnabled && userAgentChanged:
+		if err := qtx.ResetLocationClustersForGeocodingUserAgent(ctx); err != nil {
+			return SystemSettings{}, fmt.Errorf("reset location clusters for geocoding user agent: %w", err)
+		}
+	}
+
+	if candidateEnabled {
+		args := jobs.ResolveLocationClustersArgs{GeocodingRevision: params.GeocodingRevision}
+		opts := args.InsertOpts()
+		if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
+			return SystemSettings{}, fmt.Errorf("enqueue location cluster resolution: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return SystemSettings{}, fmt.Errorf("commit geocoding settings update: %w", err)
+	}
+	return mapSystemSettings(updated), nil
+}
+
 func (s *settingsService) ValidateLLMDraft(ctx context.Context, input ValidateLLMDraftInput) error {
 	cfg := settings.LLM{
 		Provider:  settings.NormalizeLLMProvider(input.Provider),
@@ -381,6 +533,10 @@ func (s *settingsService) ValidateLLMDraft(ctx context.Context, input ValidateLL
 func (s *settingsService) seedFromDefaults(ctx context.Context) error {
 	llmCfg := s.defaults.LLM
 	mlCfg := s.defaults.ML
+	geocodingCfg, err := s.defaults.Geocoding.Normalize()
+	if err != nil {
+		return fmt.Errorf("seed settings from defaults: %w", err)
+	}
 
 	params := repo.UpsertSettingsParams{
 		LlmAgentEnabled:             llmCfg.AgentEnabled,
@@ -399,9 +555,14 @@ func (s *settingsService) seedFromDefaults(ctx context.Context) error {
 		MlVideoSceneThreshold:       mlCfg.EffectiveVideoSceneThreshold(),
 		// Mirror the migration's column defaults: this INSERT names the backup
 		// columns explicitly, so zero values here would override them.
-		BackupEnabled:       true,
-		BackupIntervalHours: 24,
-		BackupKeepLast:      14,
+		BackupEnabled:              true,
+		BackupIntervalHours:        24,
+		BackupKeepLast:             14,
+		GeocodingProvider:          geocodingCfg.Provider,
+		GeocodingNominatimEndpoint: geocodingCfg.NominatimEndpoint,
+		GeocodingLanguage:          geocodingCfg.Language,
+		GeocodingUserAgent:         geocodingCfg.UserAgent,
+		GeocodingRevision:          1,
 	}
 
 	if params.LlmApiKeyConfigured {
@@ -461,9 +622,24 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 			IntervalHours: int32(row.BackupIntervalHours),
 			KeepLast:      int32(row.BackupKeepLast),
 		},
+		Geocoding: GeocodingSettings{
+			Provider:          strings.TrimSpace(row.GeocodingProvider),
+			NominatimEndpoint: strings.TrimSpace(row.GeocodingNominatimEndpoint),
+			Language:          strings.TrimSpace(row.GeocodingLanguage),
+			UserAgent:         strings.TrimSpace(row.GeocodingUserAgent),
+		},
 		UpdatedAt: updatedAt,
 		UpdatedBy: row.UpdatedBy,
 	}
+}
+
+func normalizeStoredGeocoding(row repo.Setting) (settings.Geocoding, error) {
+	return (settings.Geocoding{
+		Provider:          row.GeocodingProvider,
+		NominatimEndpoint: row.GeocodingNominatimEndpoint,
+		Language:          row.GeocodingLanguage,
+		UserAgent:         row.GeocodingUserAgent,
+	}).Normalize()
 }
 
 func clampInt32(v, lo, hi int32) int32 {

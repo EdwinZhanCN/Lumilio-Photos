@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lumilio.org/schema/lumilio-server-v3.schema.json",
+  "$id": "https://lumilio.org/schema/lumilio-server-v4.schema.json",
   "properties": {
     "schema_version": {
       "type": "integer",
@@ -210,38 +210,6 @@
         "settle_seconds",
         "max_concurrent_repos",
         "batch_size"
-      ]
-    },
-    "geocoding": {
-      "properties": {
-        "provider": {
-          "type": "string",
-          "enum": [
-            "disabled",
-            "nominatim"
-          ],
-          "description": "Reverse-geocoding backend. \"disabled\" keeps coordinates local and makes\nno network calls."
-        },
-        "nominatim_endpoint": {
-          "type": "string",
-          "description": "Nominatim reverse endpoint. Read only when provider = \"nominatim\"."
-        },
-        "language": {
-          "type": "string",
-          "description": "Preferred language for returned place names."
-        },
-        "user_agent": {
-          "type": "string",
-          "description": "User-Agent presented to the provider. Public Nominatim requires a real\ncontact string in its usage policy."
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "provider",
-        "nominatim_endpoint",
-        "language",
-        "user_agent"
       ]
     },
     "auth": {
@@ -466,12 +434,11 @@
     "logging",
     "storage",
     "repository_scan",
-    "geocoding",
     "auth",
     "transcode",
     "lumen",
     "tools"
   ],
-  "title": "Lumilio Photos runtime manifest (schema v3)",
+  "title": "Lumilio Photos runtime manifest (schema v4)",
   "description": "Complete runtime configuration. There are no code defaults, no configuration file search, and no environment-variable overrides: every key below must be present in the file."
 }

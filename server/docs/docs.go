@@ -2486,12 +2486,12 @@ const docTemplate = `{
             },
             "dto.DisableTOTPRequestDTO": {
                 "properties": {
-                    "current_password": {
+                    "security_token": {
                         "type": "string"
                     }
                 },
                 "required": [
-                    "current_password"
+                    "security_token"
                 ],
                 "type": "object"
             },
@@ -3173,6 +3173,31 @@ const docTemplate = `{
                     "video_count": {
                         "example": 18,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.GeocodingSettingsDTO": {
+                "properties": {
+                    "language": {
+                        "example": "en",
+                        "type": "string"
+                    },
+                    "nominatim_endpoint": {
+                        "example": "https://nominatim.openstreetmap.org/reverse",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "enum": [
+                            "disabled",
+                            "nominatim"
+                        ],
+                        "example": "disabled",
+                        "type": "string"
+                    },
+                    "user_agent": {
+                        "example": "Lumilio-Photos/1.0",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4087,6 +4112,9 @@ const docTemplate = `{
                     "recovery_codes_remaining": {
                         "type": "integer"
                     },
+                    "session": {
+                        "$ref": "#/components/schemas/dto.AuthResponseDTO"
+                    },
                     "totp_enabled": {
                         "type": "boolean"
                     }
@@ -4584,6 +4612,45 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.PasskeyDeleteRequestDTO": {
+                "properties": {
+                    "security_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "security_token"
+                ],
+                "type": "object"
+            },
+            "dto.PasskeyEnrollmentResponseDTO": {
+                "properties": {
+                    "credential": {
+                        "$ref": "#/components/schemas/dto.PasskeyCredentialSummaryDTO"
+                    },
+                    "session": {
+                        "$ref": "#/components/schemas/dto.AuthResponseDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PasskeyEnrollmentVerifyRequestDTO": {
+                "properties": {
+                    "challenge_token": {
+                        "type": "string"
+                    },
+                    "credential": {},
+                    "security_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "challenge_token",
+                    "credential",
+                    "security_token"
+                ],
+                "type": "object"
+            },
             "dto.PasskeyListResponseDTO": {
                 "properties": {
                     "credentials": {
@@ -4595,6 +4662,17 @@ const docTemplate = `{
                     },
                     "total": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PasskeyMutationResponseDTO": {
+                "properties": {
+                    "session": {
+                        "$ref": "#/components/schemas/dto.AuthResponseDTO"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/dto.MFAStatusDTO"
                     }
                 },
                 "type": "object"
@@ -5057,6 +5135,9 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
+                    "session": {
+                        "$ref": "#/components/schemas/dto.AuthResponseDTO"
+                    },
                     "status": {
                         "$ref": "#/components/schemas/dto.MFAStatusDTO"
                     }
@@ -5065,12 +5146,12 @@ const docTemplate = `{
             },
             "dto.RegenerateRecoveryCodesRequestDTO": {
                 "properties": {
-                    "current_password": {
+                    "security_token": {
                         "type": "string"
                     }
                 },
                 "required": [
-                    "current_password"
+                    "security_token"
                 ],
                 "type": "object"
             },
@@ -5777,10 +5858,6 @@ const docTemplate = `{
                         "example": "production",
                         "type": "string"
                     },
-                    "geocoding_provider": {
-                        "example": "disabled",
-                        "type": "string"
-                    },
                     "hardware_accel": {
                         "example": "none",
                         "type": "string"
@@ -6004,6 +6081,48 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SecurityVerificationRequestDTO": {
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "current_password": {
+                        "type": "string"
+                    },
+                    "method": {
+                        "enum": [
+                            "totp",
+                            "recovery_code"
+                        ],
+                        "type": "string"
+                    },
+                    "purpose": {
+                        "enum": [
+                            "totp_setup",
+                            "totp_disable",
+                            "recovery_regenerate",
+                            "passkey_mutation"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "current_password",
+                    "purpose"
+                ],
+                "type": "object"
+            },
+            "dto.SecurityVerificationResponseDTO": {
+                "properties": {
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "security_token": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -6908,6 +7027,9 @@ const docTemplate = `{
                     "backup": {
                         "$ref": "#/components/schemas/dto.BackupSettingsDTO"
                     },
+                    "geocoding": {
+                        "$ref": "#/components/schemas/dto.GeocodingSettingsDTO"
+                    },
                     "llm": {
                         "$ref": "#/components/schemas/dto.LLMSettingsDTO"
                     },
@@ -6923,9 +7045,23 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.TOTPSetupRequestDTO": {
+                "properties": {
+                    "security_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "security_token"
+                ],
+                "type": "object"
+            },
             "dto.TOTPSetupResponseDTO": {
                 "properties": {
                     "account_name": {
+                        "type": "string"
+                    },
+                    "expires_at": {
                         "type": "string"
                     },
                     "issuer": {
@@ -7115,6 +7251,27 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.UpdateGeocodingSettingsDTO": {
+                "properties": {
+                    "language": {
+                        "type": "string"
+                    },
+                    "nominatim_endpoint": {
+                        "type": "string"
+                    },
+                    "provider": {
+                        "enum": [
+                            "disabled",
+                            "nominatim"
+                        ],
+                        "type": "string"
+                    },
+                    "user_agent": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UpdateLLMSettingsDTO": {
                 "properties": {
                     "agent_enabled": {
@@ -7261,6 +7418,9 @@ const docTemplate = `{
                 "properties": {
                     "backup": {
                         "$ref": "#/components/schemas/dto.UpdateBackupSettingsDTO"
+                    },
+                    "geocoding": {
+                        "$ref": "#/components/schemas/dto.UpdateGeocodingSettingsDTO"
                     },
                     "llm": {
                         "$ref": "#/components/schemas/dto.UpdateLLMSettingsDTO"
@@ -14096,7 +14256,7 @@ const docTemplate = `{
                                         "type": "object"
                                     },
                                     {
-                                        "$ref": "#/components/schemas/dto.PasskeyVerifyRequestDTO",
+                                        "$ref": "#/components/schemas/dto.PasskeyEnrollmentVerifyRequestDTO",
                                         "summary": "request",
                                         "description": "Passkey enrollment verification payload"
                                     }
@@ -14112,7 +14272,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.PasskeyCredentialSummaryDTO"
+                                    "$ref": "#/components/schemas/dto.PasskeyEnrollmentResponseDTO"
                                 }
                             }
                         },
@@ -14178,17 +14338,28 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object"
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.PasskeyDeleteRequestDTO",
+                                        "summary": "request",
+                                        "description": "Recent security verification token"
+                                    }
+                                ]
                             }
                         }
-                    }
+                    },
+                    "description": "Recent security verification token",
+                    "required": true
                 },
                 "responses": {
                     "200": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                    "$ref": "#/components/schemas/dto.PasskeyMutationResponseDTO"
                                 }
                             }
                         },
@@ -14471,10 +14642,21 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object"
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.TOTPSetupRequestDTO",
+                                        "summary": "request",
+                                        "description": "Security verification payload"
+                                    }
+                                ]
                             }
                         }
-                    }
+                    },
+                    "description": "Security verification payload",
+                    "required": true
                 },
                 "responses": {
                     "200": {
@@ -14960,6 +15142,72 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Register a new account",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/security/verify": {
+            "post": {
+                "description": "Create a one-time security proof for a TOTP, recovery-code, or passkey mutation.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.SecurityVerificationRequestDTO",
+                                        "summary": "request",
+                                        "description": "Security verification payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Security verification payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.SecurityVerificationResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Security proof created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid security verification"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Verify recent account security",
                 "tags": [
                     "auth"
                 ]

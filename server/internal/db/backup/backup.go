@@ -60,8 +60,7 @@ type Snapshot struct {
 }
 
 // Compatibility constrains which snapshot may be staged over the active
-// runtime. Older schemas are allowed because the next generation migrates
-// them; future schemas are rejected.
+// runtime. Restore never performs application migrations.
 type Compatibility struct {
 	LibraryID               string
 	ConfigSchemaVersion     int

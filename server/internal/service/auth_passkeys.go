@@ -63,13 +63,18 @@ type PasskeyListResponse struct {
 	Total       int                        `json:"total"`
 }
 
+type PasskeyEnrollmentResponse struct {
+	Credential PasskeyCredentialSummary `json:"credential"`
+	Session    *AuthResponse            `json:"session,omitempty"`
+}
+
 type passkeyChallengeClaims struct {
-	Purpose               string               `json:"purpose"`
-	Origin                string               `json:"origin"`
-	UserID                int                  `json:"user_id,omitempty"`
-	Username              string               `json:"username,omitempty"`
-	RegistrationSessionID string               `json:"registration_session_id,omitempty"`
-	SessionData           webauthn.SessionData `json:"session_data"`
+	Purpose     string               `json:"purpose"`
+	Origin      string               `json:"origin"`
+	UserID      int                  `json:"user_id,omitempty"`
+	Username    string               `json:"username,omitempty"`
+	AuthVersion int64                `json:"auth_version"`
+	SessionData webauthn.SessionData `json:"session_data"`
 	jwt.RegisteredClaims
 }
 
@@ -194,6 +199,7 @@ func (s *AuthService) BeginPasskeyLogin(ctx context.Context, username string, or
 		Origin:      normalizedOrigin,
 		UserID:      int(userRecord.UserID),
 		Username:    userRecord.Username,
+		AuthVersion: userRecord.AuthVersion,
 		SessionData: *sessionData,
 	}, passkeyChallengeTTL)
 	if err != nil {
@@ -214,6 +220,16 @@ func (s *AuthService) VerifyPasskeyLogin(ctx context.Context, challengeToken str
 
 	userRecord, err := s.getActiveUserByID(ctx, challenge.UserID)
 	if err != nil {
+		return nil, ErrPasskeyNotConfigured
+	}
+	if userRecord.AuthVersion != challenge.AuthVersion {
+		return nil, ErrInvalidPasskeyChallenge
+	}
+	status, err := s.getMFAStatusByUserID(ctx, userRecord.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if !status.TOTPEnabled || status.PasskeyCount == 0 {
 		return nil, ErrPasskeyNotConfigured
 	}
 
@@ -249,7 +265,7 @@ func (s *AuthService) VerifyPasskeyLogin(ctx context.Context, challengeToken str
 		userRecord.LastLogin = lastLogin
 	}
 
-	return s.generateAuthResponse(userRecord)
+	return s.generateAuthResponseWithAssurance(userRecord, "passkey")
 }
 
 func (s *AuthService) BeginPasskeyEnrollment(ctx context.Context, userID int, origin string) (PasskeyOptionsResponse, error) {
@@ -292,6 +308,7 @@ func (s *AuthService) BeginPasskeyEnrollment(ctx context.Context, userID int, or
 		Origin:      normalizedOrigin,
 		UserID:      userID,
 		Username:    userRecord.Username,
+		AuthVersion: userRecord.AuthVersion,
 		SessionData: *sessionData,
 	}, passkeyChallengeTTL)
 	if err != nil {
@@ -304,56 +321,90 @@ func (s *AuthService) BeginPasskeyEnrollment(ctx context.Context, userID int, or
 	}, nil
 }
 
-func (s *AuthService) VerifyPasskeyEnrollment(ctx context.Context, userID int, challengeToken string, credentialJSON []byte, origin string) (PasskeyCredentialSummary, error) {
+func (s *AuthService) VerifyPasskeyEnrollment(ctx context.Context, userID int, challengeToken string, credentialJSON []byte, securityToken string, origin string) (PasskeyEnrollmentResponse, error) {
 	challenge, err := s.parsePasskeyChallenge(challengeToken, passkeyTokenPurposeEnroll)
 	if err != nil {
-		return PasskeyCredentialSummary{}, err
+		return PasskeyEnrollmentResponse{}, err
 	}
 	if challenge.UserID != userID {
-		return PasskeyCredentialSummary{}, ErrInvalidPasskeyChallenge
+		return PasskeyEnrollmentResponse{}, ErrInvalidPasskeyChallenge
 	}
 
 	userRecord, err := s.getActiveUserByID(ctx, userID)
 	if err != nil {
-		return PasskeyCredentialSummary{}, err
+		return PasskeyEnrollmentResponse{}, err
+	}
+	if userRecord.AuthVersion != challenge.AuthVersion {
+		return PasskeyEnrollmentResponse{}, ErrInvalidPasskeyChallenge
 	}
 
 	if enabled, err := s.userHasTOTP(ctx, userRecord.UserID); err != nil {
-		return PasskeyCredentialSummary{}, err
+		return PasskeyEnrollmentResponse{}, err
 	} else if !enabled {
-		return PasskeyCredentialSummary{}, ErrTOTPRequiredForPasskey
+		return PasskeyEnrollmentResponse{}, ErrTOTPRequiredForPasskey
 	}
 
 	passkeys, err := s.queries.ListUserWebAuthnCredentials(ctx, userRecord.UserID)
 	if err != nil {
-		return PasskeyCredentialSummary{}, fmt.Errorf("load passkeys: %w", err)
+		return PasskeyEnrollmentResponse{}, fmt.Errorf("load passkeys: %w", err)
 	}
 
 	wa, err := s.newWebAuthnForChallenge(challenge, origin)
 	if err != nil {
-		return PasskeyCredentialSummary{}, err
+		return PasskeyEnrollmentResponse{}, err
 	}
 
 	parsed, err := protocol.ParseCredentialCreationResponseBytes(credentialJSON)
 	if err != nil {
-		return PasskeyCredentialSummary{}, ErrInvalidPasskeyChallenge
+		return PasskeyEnrollmentResponse{}, ErrInvalidPasskeyChallenge
 	}
 
 	credential, err := wa.CreateCredential(userToWebAuthnUser(userRecord, passkeys), challenge.SessionData, parsed)
 	if err != nil {
-		return PasskeyCredentialSummary{}, ErrInvalidPasskeyChallenge
+		return PasskeyEnrollmentResponse{}, ErrInvalidPasskeyChallenge
 	}
 
-	row, err := s.queries.CreateUserWebAuthnCredential(ctx, credentialToCreateParams(userRecord.UserID, *credential))
+	var (
+		row         repo.UserWebauthnCredential
+		updatedUser repo.User
+	)
+	if err := s.withTx(ctx, func(q *repo.Queries) error {
+		if err := s.consumeSecurityVerification(ctx, q, userRecord, securityToken, securityPurposePasskeyMutation); err != nil {
+			return err
+		}
+		var err error
+		row, err = q.CreateUserWebAuthnCredential(ctx, credentialToCreateParams(userRecord.UserID, *credential))
+		if err != nil {
+			return fmt.Errorf("create passkey: %w", err)
+		}
+		updatedUser, err = q.IncrementUserAuthVersion(ctx, userRecord.UserID)
+		if err != nil {
+			return fmt.Errorf("advance authentication version: %w", err)
+		}
+		if err := q.RevokeUserRefreshTokens(ctx, userRecord.UserID); err != nil {
+			return fmt.Errorf("revoke prior sessions: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return PasskeyEnrollmentResponse{}, err
+	}
+
+	summary, err := passkeySummaryFromRow(row, len(passkeys)+1)
 	if err != nil {
-		return PasskeyCredentialSummary{}, fmt.Errorf("create passkey: %w", err)
+		return PasskeyEnrollmentResponse{}, err
 	}
-
-	return passkeySummaryFromRow(row, len(passkeys)+1)
+	session, err := s.generateAuthResponseWithAssurance(updatedUser, "mfa")
+	if err != nil {
+		return PasskeyEnrollmentResponse{}, fmt.Errorf("issue replacement session: %w", err)
+	}
+	return PasskeyEnrollmentResponse{Credential: summary, Session: session}, nil
 }
 
 func (s *AuthService) ListPasskeys(ctx context.Context, userID int) (PasskeyListResponse, error) {
 	if _, err := s.getActiveUserByID(ctx, userID); err != nil {
+		return PasskeyListResponse{}, err
+	}
+	if _, err := s.getMFAStatusByUserID(ctx, int32(userID)); err != nil {
 		return PasskeyListResponse{}, err
 	}
 
@@ -377,34 +428,64 @@ func (s *AuthService) ListPasskeys(ctx context.Context, userID int) (PasskeyList
 	}, nil
 }
 
-func (s *AuthService) DeletePasskey(ctx context.Context, userID int, passkeyID int) error {
-	if _, err := s.getActiveUserByID(ctx, userID); err != nil {
-		return err
-	}
-
-	rowsAffected, err := s.queries.DeleteUserWebAuthnCredential(ctx, repo.DeleteUserWebAuthnCredentialParams{
-		UserID:                   int32(userID),
-		UserWebauthnCredentialID: int64(passkeyID),
-	})
+func (s *AuthService) DeletePasskey(ctx context.Context, userID int, passkeyID int, securityToken string) (MFAStatusResponse, error) {
+	user, err := s.getActiveUserByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("delete passkey: %w", err)
+		return MFAStatusResponse{}, err
 	}
-	if rowsAffected == 0 {
-		return ErrPasskeyCredentialNotFound
+	status, err := s.getMFAStatusByUserID(ctx, user.UserID)
+	if err != nil {
+		return MFAStatusResponse{}, err
+	}
+	if !status.TOTPEnabled || status.PasskeyCount == 0 {
+		return MFAStatusResponse{}, ErrPasskeyNotConfigured
 	}
 
-	return nil
+	var updatedUser repo.User
+	if err := s.withTx(ctx, func(q *repo.Queries) error {
+		if err := s.consumeSecurityVerification(ctx, q, user, securityToken, securityPurposePasskeyMutation); err != nil {
+			return err
+		}
+		rowsAffected, err := q.DeleteUserWebAuthnCredential(ctx, repo.DeleteUserWebAuthnCredentialParams{
+			UserID:                   int32(userID),
+			UserWebauthnCredentialID: int64(passkeyID),
+		})
+		if err != nil {
+			return fmt.Errorf("delete passkey: %w", err)
+		}
+		if rowsAffected == 0 {
+			return ErrPasskeyCredentialNotFound
+		}
+		updatedUser, err = q.IncrementUserAuthVersion(ctx, user.UserID)
+		if err != nil {
+			return fmt.Errorf("advance authentication version: %w", err)
+		}
+		if err := q.RevokeUserRefreshTokens(ctx, user.UserID); err != nil {
+			return fmt.Errorf("revoke prior sessions: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return MFAStatusResponse{}, err
+	}
+
+	status, err = s.getMFAStatusByUserID(ctx, user.UserID)
+	if err != nil {
+		return MFAStatusResponse{}, err
+	}
+	session, err := s.generateAuthResponseWithAssurance(updatedUser, "mfa")
+	if err != nil {
+		return MFAStatusResponse{}, fmt.Errorf("issue replacement session: %w", err)
+	}
+	return MFAStatusResponse{Status: status, Session: session}, nil
 }
 
 // userHasTOTP reports whether the user has an active TOTP credential.
 func (s *AuthService) userHasTOTP(ctx context.Context, userID int32) (bool, error) {
-	if _, err := s.queries.GetUserTOTPCredential(ctx, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
-		return false, fmt.Errorf("get totp credential: %w", err)
+	status, err := s.getMFAStatusByUserID(ctx, userID)
+	if err != nil {
+		return false, err
 	}
-	return true, nil
+	return status.TOTPEnabled, nil
 }
 
 func (s *AuthService) getUserForPasskey(ctx context.Context, username string) (repo.User, webAuthnUser, error) {
@@ -416,6 +497,11 @@ func (s *AuthService) getUserForPasskey(ctx context.Context, username string) (r
 		return repo.User{}, webAuthnUser{}, fmt.Errorf("get user by username: %w", err)
 	}
 	if !user.IsActive {
+		return repo.User{}, webAuthnUser{}, ErrPasskeyNotConfigured
+	}
+	if enabled, err := s.userHasTOTP(ctx, user.UserID); err != nil {
+		return repo.User{}, webAuthnUser{}, err
+	} else if !enabled {
 		return repo.User{}, webAuthnUser{}, ErrPasskeyNotConfigured
 	}
 
@@ -545,7 +631,7 @@ func passkeySummaryFromRow(row repo.UserWebauthnCredential, ordinal int) (Passke
 		Label:      fmt.Sprintf("%s %d", defaultPasskeyCredentialLabel, ordinal),
 		Transports: transports,
 		CreatedAt:  row.CreatedAt.Time,
-		LastUsedAt: coerceOptionalTime(row.LastUsedAt),
+		LastUsedAt: optionalDBTimestamp(row.LastUsedAt),
 	}, nil
 }
 
@@ -560,7 +646,7 @@ func passkeySummaryFromListRow(row repo.ListUserWebAuthnCredentialSummariesRow, 
 		Label:      fmt.Sprintf("%s %d", defaultPasskeyCredentialLabel, ordinal),
 		Transports: transports,
 		CreatedAt:  row.CreatedAt.Time,
-		LastUsedAt: coerceOptionalTime(row.LastUsedAt),
+		LastUsedAt: optionalDBTimestamp(row.LastUsedAt),
 	}, nil
 }
 

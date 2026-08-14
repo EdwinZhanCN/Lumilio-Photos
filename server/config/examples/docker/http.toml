@@ -1,5 +1,5 @@
 #:schema ../../schema/lumilio-server.schema.json
-# Lumilio Photos runtime manifest, schema v3.
+# Lumilio Photos runtime manifest, schema v4.
 # Docker default: host-network HTTP on port 6680.
 #
 # Scenario: zero-configuration Docker HTTP
@@ -17,7 +17,7 @@
 
 # Manifest format version. The loader accepts exactly this version and
 # never migrates an older file in place.
-schema_version = 3
+schema_version = 4
 
 # Deployment environment. Selects test-only affordances; it does not relax
 # runtime manifest validation.
@@ -116,22 +116,6 @@ max_concurrent_repos = 1
 
 # Files per scan batch.
 batch_size = 500
-
-[geocoding]
-# Reverse-geocoding backend. "disabled" keeps coordinates local and makes
-# no network calls.
-# One of: disabled, nominatim
-provider = "disabled"
-
-# Nominatim reverse endpoint. Read only when provider = "nominatim".
-nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
-
-# Preferred language for returned place names.
-language = "en"
-
-# User-Agent presented to the provider. Public Nominatim requires a real
-# contact string in its usage policy.
-user_agent = "Lumilio-Photos/1.0"
 
 [auth]
 # Path to the token-signing key. This is a path, never the secret itself;

@@ -1,40 +1,64 @@
+import type { TFunction } from "i18next";
+
+export type PasskeySupportReasonKey =
+  | "auth.passkeySupport.browserOnly"
+  | "auth.passkeySupport.notSupported"
+  | "auth.passkeySupport.secureContextRequired"
+  | "auth.passkeySupport.httpsRequired";
+
 export interface PasskeySupport {
   supported: boolean;
-  reasonKey?:
-    | "auth.passkeySupport.browserOnly"
-    | "auth.passkeySupport.notSupported"
-    | "auth.passkeySupport.secureContextRequired"
-    | "auth.passkeySupport.httpsRequired";
+  reasonKey?: PasskeySupportReasonKey;
+}
+
+export type PasskeySupportEnvironment = {
+  browser: boolean;
+  secureContext: boolean;
+  publicKeyCredentialAvailable: boolean;
+  protocol: string;
+  hostname: string;
+};
+
+function getBrowserEnvironment(): PasskeySupportEnvironment {
+  const browser = typeof window !== "undefined";
+  return {
+    browser,
+    secureContext: browser && window.isSecureContext,
+    publicKeyCredentialAvailable: browser && "PublicKeyCredential" in window,
+    protocol: browser ? window.location.protocol : "",
+    hostname: browser ? window.location.hostname : "",
+  };
 }
 
 function isLocalHostname(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
-export function getPasskeySupport(): PasskeySupport {
-  if (typeof window === "undefined") {
+export function getPasskeySupport(
+  environment: PasskeySupportEnvironment = getBrowserEnvironment(),
+): PasskeySupport {
+  if (!environment.browser) {
     return {
       supported: false,
       reasonKey: "auth.passkeySupport.browserOnly",
     };
   }
 
-  if (!("PublicKeyCredential" in window)) {
-    return {
-      supported: false,
-      reasonKey: "auth.passkeySupport.notSupported",
-    };
-  }
-
-  if (!window.isSecureContext) {
+  if (!environment.secureContext) {
     return {
       supported: false,
       reasonKey: "auth.passkeySupport.secureContextRequired",
     };
   }
 
-  const { protocol, hostname } = window.location;
-  if (protocol === "https:" || isLocalHostname(hostname)) {
+  if (!environment.publicKeyCredentialAvailable) {
+    return {
+      supported: false,
+      reasonKey: "auth.passkeySupport.notSupported",
+    };
+  }
+
+  if (environment.protocol === "https:" || isLocalHostname(environment.hostname)) {
     return { supported: true };
   }
 
@@ -42,6 +66,32 @@ export function getPasskeySupport(): PasskeySupport {
     supported: false,
     reasonKey: "auth.passkeySupport.httpsRequired",
   };
+}
+
+export function getPasskeySupportMessage(
+  t: TFunction,
+  reasonKey: PasskeySupportReasonKey | undefined,
+): string | null {
+  switch (reasonKey) {
+    case "auth.passkeySupport.browserOnly":
+      return t("auth.passkeySupport.browserOnly", {
+        defaultValue: "Passkeys are available only in a browser.",
+      });
+    case "auth.passkeySupport.notSupported":
+      return t("auth.passkeySupport.notSupported", {
+        defaultValue: "Passkeys are not supported by this browser.",
+      });
+    case "auth.passkeySupport.secureContextRequired":
+      return t("auth.passkeySupport.secureContextRequired", {
+        defaultValue: "Passkeys require HTTPS or localhost.",
+      });
+    case "auth.passkeySupport.httpsRequired":
+      return t("auth.passkeySupport.httpsRequired", {
+        defaultValue: "Passkeys require HTTPS or a localhost address.",
+      });
+    default:
+      return null;
+  }
 }
 
 function base64UrlToUint8Array(value: string): Uint8Array {

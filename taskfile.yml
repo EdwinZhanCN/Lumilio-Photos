@@ -311,6 +311,11 @@ tasks:
     cmds:
       - task: web:test:auth-hardening
 
+  ci:web:e2e:auth-totp:
+    desc: Run the fresh first-admin TOTP bootstrap regression
+    cmds:
+      - task: web:test:auth-totp
+
   ci:web:e2e:agent-trust:
     desc: Run the deterministic Lumilio Agent trust-contract regression
     cmds:

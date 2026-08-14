@@ -8,17 +8,25 @@ import (
 )
 
 type SystemSettingsDTO struct {
-	LLM       LLMSettingsDTO    `json:"llm"`
-	ML        MLSettingsDTO     `json:"ml"`
-	Backup    BackupSettingsDTO `json:"backup"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	UpdatedBy *int32            `json:"updated_by,omitempty"`
+	LLM       LLMSettingsDTO       `json:"llm"`
+	ML        MLSettingsDTO        `json:"ml"`
+	Backup    BackupSettingsDTO    `json:"backup"`
+	Geocoding GeocodingSettingsDTO `json:"geocoding"`
+	UpdatedAt time.Time            `json:"updated_at"`
+	UpdatedBy *int32               `json:"updated_by,omitempty"`
 }
 
 type BackupSettingsDTO struct {
 	Enabled       bool  `json:"enabled"`
 	IntervalHours int32 `json:"interval_hours" example:"24"`
 	KeepLast      int32 `json:"keep_last" example:"14"`
+}
+
+type GeocodingSettingsDTO struct {
+	Provider          string `json:"provider" example:"disabled" enums:"disabled,nominatim"`
+	NominatimEndpoint string `json:"nominatim_endpoint" example:"https://nominatim.openstreetmap.org/reverse"`
+	Language          string `json:"language" example:"en"`
+	UserAgent         string `json:"user_agent" example:"Lumilio-Photos/1.0"`
 }
 
 type LLMSettingsDTO struct {
@@ -48,15 +56,23 @@ type RepositoryDefaultsDTO struct {
 }
 
 type UpdateSystemSettingsDTO struct {
-	LLM    *UpdateLLMSettingsDTO    `json:"llm,omitempty"`
-	ML     *UpdateMLSettingsDTO     `json:"ml,omitempty"`
-	Backup *UpdateBackupSettingsDTO `json:"backup,omitempty"`
+	LLM       *UpdateLLMSettingsDTO       `json:"llm,omitempty"`
+	ML        *UpdateMLSettingsDTO        `json:"ml,omitempty"`
+	Backup    *UpdateBackupSettingsDTO    `json:"backup,omitempty"`
+	Geocoding *UpdateGeocodingSettingsDTO `json:"geocoding,omitempty"`
 }
 
 type UpdateBackupSettingsDTO struct {
 	Enabled       *bool  `json:"enabled,omitempty"`
 	IntervalHours *int32 `json:"interval_hours,omitempty" binding:"omitempty,min=1,max=720"`
 	KeepLast      *int32 `json:"keep_last,omitempty" binding:"omitempty,min=1,max=365"`
+}
+
+type UpdateGeocodingSettingsDTO struct {
+	Provider          *string `json:"provider,omitempty" enums:"disabled,nominatim"`
+	NominatimEndpoint *string `json:"nominatim_endpoint,omitempty"`
+	Language          *string `json:"language,omitempty"`
+	UserAgent         *string `json:"user_agent,omitempty"`
 }
 
 type UpdateLLMSettingsDTO struct {
@@ -115,7 +131,6 @@ type RuntimeInfoDTO struct {
 	LogLevel                     string     `json:"log_level" example:"info"`
 	StorageRoot                  string     `json:"storage_root" example:"/data/storage"`
 	HardwareAccel                string     `json:"hardware_accel" example:"none"`
-	GeocodingProvider            string     `json:"geocoding_provider" example:"disabled"`
 	RepositoryScanEnabled        bool       `json:"repository_scan_enabled" example:"true"`
 	RepositoryScanIntervalSecond int        `json:"repository_scan_interval_seconds" example:"300"`
 	LumenDiscoveryEnabled        bool       `json:"lumen_discovery_enabled" example:"true"`
@@ -140,7 +155,6 @@ func NewRuntimeInfoDTO(cfg config.AppConfig) RuntimeInfoDTO {
 		LogLevel:                     cfg.LoggingConfig.Level,
 		StorageRoot:                  cfg.StorageConfig.Path,
 		HardwareAccel:                cfg.Transcode.HardwareAccel,
-		GeocodingProvider:            cfg.Geocoding.Provider,
 		RepositoryScanEnabled:        cfg.RepositoryScan.Enabled,
 		RepositoryScanIntervalSecond: cfg.RepositoryScan.IntervalSeconds,
 		LumenDiscoveryEnabled:        cfg.Lumen.DiscoveryEnabled,
@@ -177,6 +191,12 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 			Enabled:       settings.Backup.Enabled,
 			IntervalHours: settings.Backup.IntervalHours,
 			KeepLast:      settings.Backup.KeepLast,
+		},
+		Geocoding: GeocodingSettingsDTO{
+			Provider:          settings.Geocoding.Provider,
+			NominatimEndpoint: settings.Geocoding.NominatimEndpoint,
+			Language:          settings.Geocoding.Language,
+			UserAgent:         settings.Geocoding.UserAgent,
 		},
 		UpdatedAt: settings.UpdatedAt,
 		UpdatedBy: settings.UpdatedBy,
@@ -216,6 +236,15 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 			Enabled:       dto.Backup.Enabled,
 			IntervalHours: dto.Backup.IntervalHours,
 			KeepLast:      dto.Backup.KeepLast,
+		}
+	}
+
+	if dto.Geocoding != nil {
+		input.Geocoding = &service.UpdateGeocodingSettingsInput{
+			Provider:          dto.Geocoding.Provider,
+			NominatimEndpoint: dto.Geocoding.NominatimEndpoint,
+			Language:          dto.Geocoding.Language,
+			UserAgent:         dto.Geocoding.UserAgent,
 		}
 	}
 

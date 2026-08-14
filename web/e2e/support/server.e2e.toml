@@ -1,4 +1,4 @@
-schema_version = 3
+schema_version = 4
 environment = "test"
 
 [database]
@@ -37,12 +37,6 @@ interval_seconds = 3600
 settle_seconds = 1
 max_concurrent_repos = 1
 batch_size = 50
-
-[geocoding]
-provider = "disabled"
-nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
-language = "en"
-user_agent = "Lumilio-Photos-E2E/1.0"
 
 [auth]
 secret_key_file = "/data/app-state/secrets/lumilio_secret_key"

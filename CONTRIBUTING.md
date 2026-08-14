@@ -123,17 +123,26 @@ task web:test:browser
 task web:e2e:down
 ```
 
+Authentication changes also have a fresh-environment first-admin regression;
+run it before the seeded hardening suite:
+
+```bash
+task web:test:auth-totp
+task web:test:auth-hardening
+```
+
 The repository also provides narrower root targets:
 
 ```bash
 task web:test:browser
+task web:test:auth-totp
 task web:test:auth-hardening
 task web:test:video-semantic
 task web:test:backup-recovery
 ```
 
 The matching CI E2E contracts are `task ci:web:e2e:browser`,
-`task ci:web:e2e:auth-hardening`, `task ci:web:e2e:video-semantic`, and
+`task ci:web:e2e:auth-totp`, `task ci:web:e2e:auth-hardening`, `task ci:web:e2e:video-semantic`, and
 `task ci:web:e2e:backup-recovery`. Playwright installation is exposed through
 `task ci:web:playwright:install` and `task ci:web:playwright:install:deps`.
 

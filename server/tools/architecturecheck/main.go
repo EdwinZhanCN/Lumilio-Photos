@@ -153,6 +153,13 @@ func mixedSliceQueries(root string) ([]string, error) {
 	for _, relative := range files {
 		file, err := os.Open(filepath.Join(root, filepath.FromSlash(relative)))
 		if err != nil {
+			// git ls-files includes a tracked file that is intentionally deleted
+			// in the working tree. Generated query cleanup is part of destructive
+			// schema changes, so do not make the architecture check require an
+			// intermediate index/staging step before it can run.
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return nil, fmt.Errorf("open generated query %s: %w", relative, err)
 		}
 		scanner := bufio.NewScanner(file)

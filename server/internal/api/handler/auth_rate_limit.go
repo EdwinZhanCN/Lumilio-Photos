@@ -27,6 +27,7 @@ const (
 	authRateScopePasskeyVerify  = "passkey_verify"
 	authRateScopeMFAVerify      = "mfa_verify"
 	authRateScopeRefresh        = "refresh"
+	authRateScopeSecurityVerify = "security_verify"
 )
 
 // AuthRateLimiter applies independent network and subject policies at the HTTP

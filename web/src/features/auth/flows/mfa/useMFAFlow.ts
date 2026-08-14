@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
+import { $api } from "@/lib/http-commons/queryClient";
+import { useAuth } from "../../state/useAuth.ts";
 import {
   useBeginTOTPSetup,
   useDisableTOTP,
@@ -47,7 +49,11 @@ export function useMFAFlow() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [activeAction, setActiveAction] = useState<"disable" | "regenerate" | null>(null);
+  const [activeAction, setActiveAction] = useState<"setup" | "disable" | "regenerate" | null>(null);
+  const [securityCode, setSecurityCode] = useState("");
+  const [securityMethod, setSecurityMethod] = useState<"totp" | "recovery_code">("totp");
+  const { completeAuth } = useAuth();
+  const securityVerify = $api.useMutation("post", "/api/v1/auth/security/verify");
 
   const status = statusQuery.data;
   const shouldAutoStartSetup = searchParams.get("mfa") === "setup";
@@ -71,6 +77,8 @@ export function useMFAFlow() {
   const resetAction = () => {
     setActiveAction(null);
     setPassword("");
+    setSecurityCode("");
+    setSecurityMethod("totp");
     setError(null);
     clearFlowParams("action");
   };
@@ -78,10 +86,27 @@ export function useMFAFlow() {
   const handleBeginSetup = async () => {
     setError(null);
     try {
-      const payload = await beginSetupMutation.mutateAsync({});
+      const security = await securityVerify.mutateAsync({
+        body: {
+          current_password: password,
+          ...(status?.totp_enabled ? { code: securityCode, method: securityMethod } : {}),
+          purpose: "totp_setup",
+        },
+      });
+      if (!security?.security_token) {
+        throw new Error(
+          t("settings.account.mfa.securityVerificationError", {
+            defaultValue: "Unable to verify account security.",
+          }),
+        );
+      }
+      const payload = await beginSetupMutation.mutateAsync({
+        body: { security_token: security.security_token },
+      });
       if (payload) {
         setSetupResponse(payload);
         setVerificationCode("");
+        setSecurityCode("");
         setRecoveryCodes([]);
         setActiveAction(null);
       }
@@ -108,7 +133,23 @@ export function useMFAFlow() {
           code: verificationCode,
         },
       });
-      setRecoveryCodes(payload?.recovery_codes ?? []);
+      if (payload?.status?.totp_enabled !== true || !payload.session) {
+        throw new Error(
+          t("settings.account.mfa.enableError", {
+            defaultValue: "TOTP activation was not confirmed by the server.",
+          }),
+        );
+      }
+      const codes = payload.recovery_codes ?? [];
+      if (codes.length === 0) {
+        throw new Error(
+          t("settings.account.mfa.enableError", {
+            defaultValue: "TOTP activation did not return recovery codes.",
+          }),
+        );
+      }
+      await completeAuth(payload.session);
+      setRecoveryCodes(codes);
       setSetupResponse(null);
       setVerificationCode("");
       clearFlowParams("mfa", "action");
@@ -128,7 +169,20 @@ export function useMFAFlow() {
     event.preventDefault();
     setError(null);
     try {
-      await disableTOTP.mutateAsync({ body: { current_password: password } });
+      const security = await securityVerify.mutateAsync({
+        body: {
+          current_password: password,
+          code: securityCode,
+          method: securityMethod,
+          purpose: "totp_disable",
+        },
+      });
+      if (!security?.security_token) throw new Error("Invalid security verification");
+      const response = await disableTOTP.mutateAsync({
+        body: { security_token: security.security_token },
+      });
+      if (!response?.session) throw new Error("Session replacement was not returned");
+      await completeAuth(response.session);
       resetAction();
       setRecoveryCodes([]);
     } catch (cause) {
@@ -147,9 +201,20 @@ export function useMFAFlow() {
     event.preventDefault();
     setError(null);
     try {
-      const payload = await regenerateRecoveryCodes.mutateAsync({
-        body: { current_password: password },
+      const security = await securityVerify.mutateAsync({
+        body: {
+          current_password: password,
+          code: securityCode,
+          method: securityMethod,
+          purpose: "recovery_regenerate",
+        },
       });
+      if (!security?.security_token) throw new Error("Invalid security verification");
+      const payload = await regenerateRecoveryCodes.mutateAsync({
+        body: { security_token: security.security_token },
+      });
+      if (!payload?.session) throw new Error("Session replacement was not returned");
+      await completeAuth(payload.session);
       setRecoveryCodes(payload?.recovery_codes ?? []);
       setActiveAction(null);
       setPassword("");
@@ -173,18 +238,20 @@ export function useMFAFlow() {
       statusQuery.isLoading ||
       status?.totp_enabled ||
       setupResponse ||
+      activeAction ||
       beginSetupMutation.isPending
     ) {
       return;
     }
     autoSetupTriggeredRef.current = true;
-    void handleBeginSetup();
+    setActiveAction("setup");
   }, [
     beginSetupMutation.isPending,
     setupResponse,
     shouldAutoStartSetup,
     status?.totp_enabled,
     statusQuery.isLoading,
+    activeAction,
   ]);
 
   useEffect(() => {
@@ -201,6 +268,10 @@ export function useMFAFlow() {
     setVerificationCode,
     password,
     setPassword,
+    securityCode,
+    setSecurityCode,
+    securityMethod,
+    setSecurityMethod,
     error,
     recoveryCodes,
     activeAction,
@@ -212,7 +283,7 @@ export function useMFAFlow() {
     handleDisable,
     handleRegenerate,
     finishRecoveryCodes: () => navigate(backTo),
-    isBeginningSetup: beginSetupMutation.isPending,
+    isBeginningSetup: beginSetupMutation.isPending || securityVerify.isPending,
     isEnabling: enableTOTP.isPending,
     isDisabling: disableTOTP.isPending,
     isRegenerating: regenerateRecoveryCodes.isPending,

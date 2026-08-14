@@ -172,7 +172,7 @@ func TestStagedRestoreReplacesOnlyBetweenGenerations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if marker.State != pendingStateApplied || marker.RestorePoint == "" || marker.PreviousPath == "" {
+	if marker.State != pendingStateVerified || marker.RestorePoint == "" || marker.PreviousPath == "" {
 		t.Fatalf("applied marker = %+v", marker)
 	}
 

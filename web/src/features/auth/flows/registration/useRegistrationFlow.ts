@@ -34,6 +34,8 @@ type RegistrationFlowState = {
   totpSetup: TOTPSetupResponse | null;
   totpCode: string;
   setTotpCode: (value: string) => void;
+  passkeySecurityCode: string;
+  setPasskeySecurityCode: (value: string) => void;
   recoveryCodes: string[];
   displayError: string | null;
   isBusy: boolean;
@@ -62,6 +64,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   const queryClient = useQueryClient();
   const { completeAuth, isAuthenticated } = useAuth();
   const registerMutation = $api.useMutation("post", "/api/v1/auth/register/start");
+  const securityVerifyMutation = $api.useMutation("post", "/api/v1/auth/security/verify");
   const totpSetupMutation = $api.useMutation("post", "/api/v1/auth/mfa/totp/setup");
   const totpEnableMutation = $api.useMutation("post", "/api/v1/auth/mfa/totp/enable");
   const passkeyOptionsMutation = $api.useMutation("post", "/api/v1/auth/mfa/passkeys/options");
@@ -80,6 +83,10 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   const [flowError, setFlowError] = useState<string | null>(null);
   const [totpSetup, setTotpSetup] = useState<TOTPSetupResponse | null>(null);
   const [totpCode, setTotpCode] = useState("");
+  // The code used to enable TOTP may expire while the browser ceremony is
+  // waiting for WebAuthn. Keep a separate editable value so passkey setup can
+  // be retried with a fresh factor instead of silently replaying stale input.
+  const [passkeySecurityCode, setPasskeySecurityCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
 
   const redirectTo = useMemo(() => {
@@ -102,6 +109,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   const displayError = flowError;
   const isBusy =
     registerMutation.isPending ||
+    securityVerifyMutation.isPending ||
     totpSetupMutation.isPending ||
     totpEnableMutation.isPending ||
     passkeyOptionsMutation.isPending ||
@@ -115,6 +123,33 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
     }
   }, [isAuthenticated, navigate, redirectTo]);
 
+  const beginTOTPSetup = async () => {
+    const security = await securityVerifyMutation.mutateAsync({
+      body: {
+        current_password: password,
+        purpose: "totp_setup",
+      },
+    });
+    if (!security?.security_token) {
+      throw new Error(
+        t("auth.register.totpSecurityVerificationError", {
+          defaultValue: "Unable to verify account security before TOTP setup.",
+        }),
+      );
+    }
+
+    const setupResponse = await totpSetupMutation.mutateAsync({
+      body: { security_token: security.security_token },
+    });
+    const setupPayload = setupResponse;
+    if (!setupPayload?.setup_token) {
+      throw new Error(t("auth.register.totpSetupStartError"));
+    }
+    setTotpSetup(setupPayload);
+    setTotpCode("");
+    setStep("totp");
+  };
+
   const handleStartRegistration = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFlowError(null);
@@ -125,6 +160,14 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
     }
 
     try {
+      // Registration and the first security-verification request are separate
+      // network operations. If the latter fails, the account already exists;
+      // retry the ceremony instead of submitting registration a second time.
+      if (startedRef.current) {
+        await beginTOTPSetup();
+        return;
+      }
+
       const response = await registerMutation.mutateAsync({
         body: { username, password },
       });
@@ -135,18 +178,10 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
 
       // Account exists and is logged in. MFA is offered next but fully optional;
       // TOTP comes first because a passkey may only be added once TOTP is on.
-      startedRef.current = true;
       await completeAuth(payload);
+      startedRef.current = true;
       await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
-
-      const setupResponse = await totpSetupMutation.mutateAsync({});
-      const setupPayload = setupResponse;
-      if (!setupPayload?.setup_token) {
-        throw new Error(t("auth.register.totpSetupStartError"));
-      }
-      setTotpSetup(setupPayload);
-      setTotpCode("");
-      setStep("totp");
+      await beginTOTPSetup();
     } catch (registrationError) {
       setFlowError(getApiMessage(registrationError, t("auth.register.startError")));
     }
@@ -169,7 +204,18 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
         throw new Error(t("auth.register.totpSetupCompleteError"));
       }
 
-      setRecoveryCodes(payload.recovery_codes ?? []);
+      if (payload.status?.totp_enabled !== true || !payload.session) {
+        throw new Error(t("auth.register.totpSetupCompleteError"));
+      }
+      const codes = payload.recovery_codes ?? [];
+      if (codes.length === 0) {
+        throw new Error(t("auth.register.totpSetupCompleteError"));
+      }
+      await completeAuth(payload.session);
+      // Enabling TOTP consumes this counter. Require a fresh code for the
+      // purpose-bound passkey verification instead of prefilling a replay.
+      setPasskeySecurityCode("");
+      setRecoveryCodes(codes);
       // TOTP is now enabled, so a passkey may be offered as the next option.
       setStep(passkeySupported ? "passkey" : "recovery");
     } catch (totpError) {
@@ -190,6 +236,21 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
   const handleCreatePasskey = async () => {
     setFlowError(null);
     try {
+      const security = await securityVerifyMutation.mutateAsync({
+        body: {
+          current_password: password,
+          code: passkeySecurityCode,
+          method: "totp",
+          purpose: "passkey_mutation",
+        },
+      });
+      if (!security?.security_token) {
+        throw new Error(
+          t("auth.register.passkeySecurityVerificationError", {
+            defaultValue: "Unable to verify account security before passkey setup.",
+          }),
+        );
+      }
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({});
       const optionsData = optionsResponse;
       if (!optionsData?.challenge_token) {
@@ -197,12 +258,17 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
       }
 
       const credential = await createPasskeyCredential(optionsData.options);
-      await passkeyVerifyMutation.mutateAsync({
+      const passkeyResponse = await passkeyVerifyMutation.mutateAsync({
         body: {
           challenge_token: optionsData.challenge_token,
           credential,
+          security_token: security.security_token,
         },
       });
+      if (!passkeyResponse?.session) {
+        throw new Error(t("auth.register.passkeyVerifyError"));
+      }
+      await completeAuth(passkeyResponse.session);
 
       setStep("recovery");
     } catch (passkeyError) {
@@ -236,6 +302,8 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
     totpSetup,
     totpCode,
     setTotpCode,
+    passkeySecurityCode,
+    setPasskeySecurityCode,
     recoveryCodes,
     displayError,
     isBusy,

@@ -220,15 +220,19 @@
         "center_lat": "Center lat",
         "center_lon": "Center lon",
         "close_modal": "close",
+        "current_location_error": "Could not access your current location.",
+        "current_location_unsupported": "Current location is not supported by this browser.",
         "done": "Done",
         "east_placeholder": "East",
         "generate_bbox": "Generate BBox",
+        "locating": "Locating…",
         "modal_description": "Provide a center + radius to generate a bounding box, or manually edit the values.",
         "modal_title": "Pick location",
         "north_placeholder": "North",
         "pick_on_map": "Pick on map",
         "preview_map": "Preview map",
         "radius_km": "Radius (km)",
+        "secure_context_required": "Current location requires HTTPS or localhost.",
         "south_placeholder": "South",
         "title": "Location",
         "use_current_location": "Use current location",
@@ -559,15 +563,22 @@
     "logout": "Logout",
     "mfa": {
       "backToSettings": "Back to settings",
+      "confirmSetup": "Confirm account security",
+      "confirmSetupSubtitle": "Enter your current password before creating an authenticator secret.",
+      "continueSetup": "Continue",
       "disableSubtitle": "Confirm with your password to turn off 2FA.",
       "enabledTitle": "Two-factor is on",
+      "existingFactor": "Existing factor",
+      "existingFactorCode": "Current authenticator or recovery code",
       "introSubtitle": "Protect your account with a TOTP authenticator app.",
       "introTitle": "Two-factor authentication",
       "qrAlt": "Authenticator QR code",
+      "recoveryCode": "Recovery code",
       "recoverySubtitle": "Your last resort if you lose your authenticator.",
       "regenerateSubtitle": "This invalidates your existing codes.",
       "setupSubtitle": "Scan the code with your authenticator app.",
-      "setupTitle": "Add your authenticator"
+      "setupTitle": "Add your authenticator",
+      "totpCode": "Authenticator code"
     },
     "passkey": {
       "affordance": {
@@ -579,6 +590,12 @@
       "domainRequired": "Passkeys over HTTPS require a domain name instead of an IP address.",
       "invalidOrigin": "This browser origin cannot use passkeys.",
       "secureOriginRequired": "Passkeys require HTTPS or a localhost address."
+    },
+    "passkeySupport": {
+      "browserOnly": "Passkeys are available only in a browser.",
+      "httpsRequired": "Passkeys require HTTPS or a localhost address.",
+      "notSupported": "Passkeys are not supported by this browser.",
+      "secureContextRequired": "Passkeys require HTTPS or localhost."
     },
     "passwordField": {
       "hidePassword": "Hide password",
@@ -615,6 +632,9 @@
       "passkeyAction": "Create a passkey",
       "passkeyDescription": "No password to remember. Your passkey stays on this device and can’t be phished.",
       "passkeyHeadline": "Sign in with your face or fingerprint",
+      "passkeySecurityCode": "Current authenticator code",
+      "passkeySecurityCodeHint": "Enter a fresh code from your authenticator before adding this passkey.",
+      "passkeySecurityVerificationError": "Unable to verify account security before passkey setup.",
       "passkeyStartError": "Failed to start passkey registration.",
       "passkeyStepSubtitle": "Passkeys are the fastest, safest way in. We recommend adding one now.",
       "passkeyStepTitle": "Secure with a passkey",
@@ -634,6 +654,7 @@
       "submit": "Continue",
       "subtitle": "Create your username and password first, then secure the account.",
       "title": "Create an account",
+      "totpSecurityVerificationError": "Unable to verify account security before TOTP setup.",
       "totpSetupCompleteError": "Failed to complete authenticator setup.",
       "totpSetupStartError": "Failed to start authenticator setup.",
       "totpSubtitle": "Required — scan the code with your authenticator app.",
@@ -879,6 +900,7 @@
     "confirm": "Confirm",
     "copied": "Copied",
     "copy": "Copy",
+    "copyFailed": "Copy failed.",
     "delete": "Delete",
     "dismiss": "Dismiss",
     "done": "Done",
@@ -2036,6 +2058,8 @@
         "passkeyLastUsed": "Last used",
         "passkeyLoadError": "Passkeys are temporarily unavailable.",
         "passkeyRequiresTotp": "Enable an authenticator app (TOTP) first — a passkey can only be added on top of it.",
+        "passkeySecurityHint": "Enter your password and a current authenticator code before changing passkeys.",
+        "passkeySecurityTitle": "Confirm account security",
         "passkeyTitle": "Passkeys",
         "recoveryCodesTitle": "Recovery codes",
         "recoveryRemaining": "recovery codes remaining",
@@ -2044,8 +2068,10 @@
         "regenerateTitle": "Regenerate recovery codes",
         "remainingCodes_one": "{{count}} recovery codes remaining",
         "remainingCodes_other": "{{count}} recovery codes remaining",
+        "securityVerificationError": "Unable to verify account security.",
         "setupError": "Failed to start TOTP setup.",
-        "statusLoadError": "MFA status is temporarily unavailable."
+        "statusLoadError": "MFA status is temporarily unavailable.",
+        "totpCode": "Authenticator code"
       },
       "pageDescription": "Manage your profile, password, MFA, and passkeys.",
       "passwordDescription": "Change your account password. You will be signed out afterwards.",
@@ -2289,6 +2315,23 @@
       "disabled": "Disabled",
       "discoveredNodes": "Discovered nodes",
       "enabled": "Enabled",
+      "geocoding": {
+        "description": "Enabling a provider sends photo coordinates to the configured endpoint; Disabled keeps them local.",
+        "endpointDescription": "Use an absolute HTTP(S) URL. Loopback and private-network endpoints are allowed.",
+        "endpointLabel": "Nominatim endpoint",
+        "languageDescription": "Sent as the provider's language preference.",
+        "languageLabel": "Language",
+        "loadError": "Reverse-geocoding settings are temporarily unavailable.",
+        "providerDescription": "Disabled keeps coordinates local and performs no provider requests.",
+        "providerLabel": "Provider",
+        "providers": {
+          "disabled": "Disabled",
+          "nominatim": "Nominatim"
+        },
+        "title": "Reverse geocoding",
+        "userAgentDescription": "Requests identify themselves with this value. Do not include credentials or personal data.",
+        "userAgentLabel": "User-Agent"
+      },
       "healthCheckDescription": "Control how often the app pings the server for health status. Lower values update more frequently but may increase network usage.",
       "healthCheckInterval": "Health check interval",
       "llmTitle": "LLM Agent",
@@ -2490,7 +2533,9 @@
       "readyHint": "Lower a layer's Depth to tuck it behind nearer objects.",
       "regenerate": "Regenerate",
       "retry": "Retry",
-      "title": "Scene depth"
+      "secureContextRequired": "Depth estimation requires HTTPS or localhost.",
+      "title": "Scene depth",
+      "webgpuUnavailable": "Depth estimation requires a browser with WebGPU support."
     },
     "develop": {
       "blacks": "Blacks",

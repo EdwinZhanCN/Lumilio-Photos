@@ -83,6 +83,8 @@ type Querier interface {
 	CompleteLifecycleOperation(ctx context.Context, arg CompleteLifecycleOperationParams) (LifecycleOperation, error)
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
+	ConsumeAuthSecurityVerification(ctx context.Context, arg ConsumeAuthSecurityVerificationParams) (int64, error)
+	ConsumePendingTOTPEnrollment(ctx context.Context, arg ConsumePendingTOTPEnrollmentParams) (int64, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
@@ -132,6 +134,7 @@ type Querier interface {
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
 	CreateAssetStack(ctx context.Context, arg CreateAssetStackParams) (AssetStack, error)
+	CreateAuthSecurityVerification(ctx context.Context, arg CreateAuthSecurityVerificationParams) (AuthSecurityVerification, error)
 	CreateCloudCredential(ctx context.Context, arg CreateCloudCredentialParams) (CloudCredential, error)
 	CreateCloudImportRun(ctx context.Context, arg CreateCloudImportRunParams) (CloudImportRun, error)
 	CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (uuid.UUID, error)
@@ -147,8 +150,8 @@ type Querier interface {
 	CreateOCRResult(ctx context.Context, arg CreateOCRResultParams) (OcrResult, error)
 	CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemParams) (OcrTextItem, error)
 	CreatePendingAgentEffect(ctx context.Context, arg CreatePendingAgentEffectParams) (AgentPendingEffect, error)
+	CreatePendingTOTPEnrollment(ctx context.Context, arg CreatePendingTOTPEnrollmentParams) (PendingTotpEnrollment, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
-	CreateRegistrationSession(ctx context.Context, arg CreateRegistrationSessionParams) (RegistrationSession, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateRepositoryScanRun(ctx context.Context, arg CreateRepositoryScanRunParams) (RepositoryScanRun, error)
 	CreateShareLink(ctx context.Context, arg CreateShareLinkParams) (ShareLink, error)
@@ -174,7 +177,7 @@ type Querier interface {
 	DeleteEventConstraint(ctx context.Context, arg DeleteEventConstraintParams) error
 	DeleteEventMemberships(ctx context.Context, arg DeleteEventMembershipsParams) error
 	DeleteExpiredAgentRefs(ctx context.Context, now dbtypes.Timestamp) error
-	DeleteExpiredRegistrationSessions(ctx context.Context) error
+	DeleteExpiredAuthSecurityVerifications(ctx context.Context) error
 	DeleteExternalRepositoryRoot(ctx context.Context, rootID uuid.UUID) (int64, error)
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
@@ -192,8 +195,7 @@ type Querier interface {
 	// Removes the pending detection state for a repository. Merged and dismissed
 	// groups are preserved so the user retains an audit trail of resolved sets.
 	DeletePendingDuplicateGroupsByRepository(ctx context.Context, repositoryID uuid.UUID) error
-	DeleteRegistrationSession(ctx context.Context, sessionID uuid.UUID) error
-	DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error
+	DeletePendingTOTPEnrollments(ctx context.Context, userID int32) error
 	DeleteRepositories(ctx context.Context, repoIds []uuid.UUID) error
 	DeleteRepository(ctx context.Context, repoID uuid.UUID) error
 	DeleteRepositoryFileIndexEntry(ctx context.Context, arg DeleteRepositoryFileIndexEntryParams) error
@@ -210,6 +212,7 @@ type Querier interface {
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
 	DisableRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) error
+	DisableUnresolvedLocationClusters(ctx context.Context) error
 	EndRepositoryMaintenance(ctx context.Context, arg EndRepositoryMaintenanceParams) (Repository, error)
 	EventCandidateTimeBounds(ctx context.Context, ownerID *int32) (EventCandidateTimeBoundsRow, error)
 	ExtendShareLinkExpiry(ctx context.Context, arg ExtendShareLinkExpiryParams) (ShareLink, error)
@@ -284,6 +287,7 @@ type Querier interface {
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
 	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
 	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
+	GetAuthSecurityVerification(ctx context.Context, arg GetAuthSecurityVerificationParams) (AuthSecurityVerification, error)
 	GetAuthorizedAssetIDs(ctx context.Context, arg GetAuthorizedAssetIDsParams) ([]uuid.UUID, error)
 	GetAvailableYears(ctx context.Context, repositoryID interface{}) ([]int64, error)
 	GetBurstStackByGroupKey(ctx context.Context, groupKey *string) (AssetStack, error)
@@ -400,6 +404,8 @@ type Querier interface {
 	// a specific asset set, for the agent dedupe tool's in-memory similarity graph.
 	GetPHashEmbeddingsByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetPHashEmbeddingsByAssetIDsRow, error)
 	GetPendingAgentEffectForUpdate(ctx context.Context, arg GetPendingAgentEffectForUpdateParams) (AgentPendingEffect, error)
+	GetPendingLocationClusterSchedule(ctx context.Context) (GetPendingLocationClusterScheduleRow, error)
+	GetPendingTOTPEnrollment(ctx context.Context, arg GetPendingTOTPEnrollmentParams) (PendingTotpEnrollment, error)
 	GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error)
 	GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScopedParams) (GetPersonFaceScopedRow, error)
 	// Lightweight photo locations for map clustering/rendering.
@@ -411,7 +417,6 @@ type Querier interface {
 	GetPrimarySearchEmbedding(ctx context.Context, assetID uuid.UUID) (GetPrimarySearchEmbeddingRow, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRefreshTokenRecordByToken(ctx context.Context, token string) (RefreshToken, error)
-	GetRegistrationSessionByID(ctx context.Context, sessionID uuid.UUID) (RegistrationSession, error)
 	GetRepository(ctx context.Context, repoID uuid.UUID) (Repository, error)
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
@@ -479,6 +484,7 @@ type Querier interface {
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
 	IncrementCloudImportRunCounts(ctx context.Context, arg IncrementCloudImportRunCountsParams) (CloudImportRun, error)
 	IncrementShareLinkView(ctx context.Context, shareID uuid.UUID) error
+	IncrementUserAuthVersion(ctx context.Context, userID int32) (User, error)
 	InsertDuplicateGroupAsset(ctx context.Context, arg InsertDuplicateGroupAssetParams) error
 	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
@@ -550,7 +556,6 @@ type Querier interface {
 	MarkDuplicateGroupDismissed(ctx context.Context, groupID uuid.UUID) error
 	MarkDuplicateGroupMerged(ctx context.Context, arg MarkDuplicateGroupMergedParams) error
 	MarkEventRedirected(ctx context.Context, arg MarkEventRedirectedParams) error
-	MarkLocationClustersGeocodeDisabled(ctx context.Context, arg MarkLocationClustersGeocodeDisabledParams) error
 	MarkStaleCloudImportRunsInterrupted(ctx context.Context) error
 	// ============================================================================
 	// Metadata merge helpers (used inside merge transactions)
@@ -598,6 +603,8 @@ type Querier interface {
 	RepositoryExists(ctx context.Context, path string) (int64, error)
 	RequestAgentRunCancel(ctx context.Context, arg RequestAgentRunCancelParams) (AgentRun, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error)
+	ResetLocationClustersForGeocodingSource(ctx context.Context) error
+	ResetLocationClustersForGeocodingUserAgent(ctx context.Context) error
 	ResetRepositoriesByActivity(ctx context.Context, arg ResetRepositoriesByActivityParams) (int64, error)
 	ResetRepositoryFileIndex(ctx context.Context, repositoryID uuid.UUID) error
 	ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error)
@@ -656,13 +663,13 @@ type Querier interface {
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
 	UpdateFaceResultStats(ctx context.Context, assetID uuid.UUID) error
 	UpdateLifecycleOperationPhase(ctx context.Context, arg UpdateLifecycleOperationPhaseParams) (LifecycleOperation, error)
-	UpdateLocationClusterGeocode(ctx context.Context, arg UpdateLocationClusterGeocodeParams) error
+	UpdateLocationClusterGeocodeIfRevision(ctx context.Context, arg UpdateLocationClusterGeocodeIfRevisionParams) (int64, error)
+	UpdateLocationClusterRetryIfRevision(ctx context.Context, arg UpdateLocationClusterRetryIfRevisionParams) (int64, error)
 	UpdateMediaItemAfterStructuralMerge(ctx context.Context, arg UpdateMediaItemAfterStructuralMergeParams) error
 	UpdateMediaItemAsLivePhoto(ctx context.Context, arg UpdateMediaItemAsLivePhotoParams) error
 	UpdateMediaItemPrimaryAsset(ctx context.Context, arg UpdateMediaItemPrimaryAssetParams) error
 	UpdateOCRResultStats(ctx context.Context, assetID uuid.UUID) error
 	UpdatePendingAgentEffect(ctx context.Context, arg UpdatePendingAgentEffectParams) error
-	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
 	// Reachability and activity are deliberately absent: their state machines own
 	// those columns. Letting a settings edit write reachability resurrects a repository that reconcile
 	// has marked offline.
@@ -683,7 +690,6 @@ type Querier interface {
 	UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
-	UpdateUserTOTPLastUsed(ctx context.Context, userID int32) error
 	UpdateUserWebAuthnCredentialUsage(ctx context.Context, arg UpdateUserWebAuthnCredentialUsageParams) (UserWebauthnCredential, error)
 	UpsertAgentRef(ctx context.Context, arg UpsertAgentRefParams) error
 	UpsertAgentThread(ctx context.Context, arg UpsertAgentThreadParams) (AgentThread, error)
@@ -705,6 +711,7 @@ type Querier interface {
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
 	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)
 	UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int64, error)
+	UseTOTPCode(ctx context.Context, arg UseTOTPCodeParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

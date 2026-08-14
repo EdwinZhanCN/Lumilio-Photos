@@ -24,21 +24,13 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 
-	baseline, err := migrations.FS.ReadFile("000003_vec1_baseline.up.sql")
+	baseline, err := migrations.FS.ReadFile("000009_auth_security_baseline.up.sql")
 	if err != nil {
 		t.Fatalf("read SQLite baseline: %v", err)
 	}
 	if _, err := database.ExecContext(ctx, string(baseline)); err != nil {
 		t.Fatalf("execute SQLite baseline: %v", err)
 	}
-	eventsMigration, err := migrations.FS.ReadFile("000004_media_semantic_events.up.sql")
-	if err != nil {
-		t.Fatalf("read Event migration: %v", err)
-	}
-	if _, err := database.ExecContext(ctx, string(eventsMigration)); err != nil {
-		t.Fatalf("execute Event migration: %v", err)
-	}
-
 	for _, table := range applicationTables {
 		assertStrictTable(t, database, table)
 	}
@@ -47,9 +39,30 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&userVersion); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if userVersion != 5 {
-		t.Fatalf("baseline user_version = %d, want 5", userVersion)
+	if userVersion != 7 {
+		t.Fatalf("baseline user_version = %d, want 7", userVersion)
 	}
+
+	var provider, endpoint, language, userAgent string
+	var revision int64
+	if err := database.QueryRowContext(ctx, `
+		SELECT geocoding_provider, geocoding_nominatim_endpoint,
+		       geocoding_language, geocoding_user_agent, geocoding_revision
+		FROM settings WHERE id = 1
+	`).Scan(&provider, &endpoint, &language, &userAgent, &revision); err != nil {
+		t.Fatalf("read geocoding defaults: %v", err)
+	}
+	if provider != "disabled" || endpoint != "https://nominatim.openstreetmap.org/reverse" ||
+		language != "en" || userAgent != "Lumilio-Photos/1.0" || revision != 1 {
+		t.Fatalf("unexpected geocoding defaults: provider=%q endpoint=%q language=%q user_agent=%q revision=%d", provider, endpoint, language, userAgent, revision)
+	}
+	assertRejected(t, database, `UPDATE settings SET geocoding_provider = 'other' WHERE id = 1`)
+	assertRejected(t, database, `UPDATE settings SET geocoding_revision = 0 WHERE id = 1`)
+	assertRejected(t, database, `UPDATE settings SET geocoding_user_agent = 'bad' || char(9) || 'agent' WHERE id = 1`)
+	assertRejected(t, database, `UPDATE settings SET geocoding_nominatim_endpoint = replace(printf('%2049s', 'x'), ' ', 'x') WHERE id = 1`)
+	assertRejected(t, database, `UPDATE settings SET geocoding_nominatim_endpoint = 'https://user:pass@example.test/reverse' WHERE id = 1`)
+	assertRejected(t, database, `UPDATE settings SET geocoding_nominatim_endpoint = 'https:///reverse' WHERE id = 1`)
+	assertRejected(t, database, `UPDATE settings SET geocoding_nominatim_endpoint = 'https://example.test/reverse#fragment' WHERE id = 1`)
 
 	var browseFactColumns int
 	if err := database.QueryRowContext(ctx, `
@@ -75,10 +88,10 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	}
 
 	assertRejected(t, database, `
-		INSERT INTO registration_sessions (
-			session_id, username, password_hash, role, webauthn_user_handle,
+		INSERT INTO pending_totp_enrollments (
+			enrollment_id, user_id, secret_ciphertext, auth_version,
 			created_at, expires_at
-		) VALUES ('NOT-A-UUID', 'bad', 'hash', 'admin', x'00', 1, 2)
+		) VALUES ('NOT-A-UUID', 999, x'00', 0, 1, 2)
 	`)
 	assertRejected(t, database, `
 		INSERT INTO agent_pins (
@@ -262,7 +275,8 @@ func insertFTSFixture(t *testing.T, ctx context.Context, database *sql.DB) {
 
 var applicationTables = []string{
 	"users",
-	"registration_sessions",
+	"pending_totp_enrollments",
+	"auth_security_verifications",
 	"settings",
 	"user_mfa_recovery_codes",
 	"user_mfa_totp_credentials",

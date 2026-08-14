@@ -230,6 +230,31 @@ func (RebuildLocationClustersArgs) InsertOpts() river.InsertOpts {
 	}}
 }
 
+// ResolveLocationClustersArgs drains the durable reverse-geocoding projection
+// for one settings revision. A newer revision may coexist briefly so the old
+// worker can observe the revision guard and exit without publishing anything.
+type ResolveLocationClustersArgs struct {
+	GeocodingRevision int64 `json:"geocodingRevision" river:"unique"`
+}
+
+func (ResolveLocationClustersArgs) Kind() string { return "resolve_location_clusters" }
+
+func (ResolveLocationClustersArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue: "rebuild_location_clusters",
+		UniqueOpts: river.UniqueOpts{
+			ByArgs: true,
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateRunning,
+				rivertype.JobStateScheduled,
+			},
+		},
+	}
+}
+
 const (
 	RepositoryScanModePeriodic = "periodic"
 	RepositoryScanModeManual   = "manual"

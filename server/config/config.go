@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 // AppConfig is the fully resolved, runtime-immutable configuration consumed by
 // server/app. Production hosts obtain it only from LoadAppConfig.
@@ -35,7 +35,6 @@ type AppConfig struct {
 	LoggingConfig  LoggingConfig
 	StorageConfig  StorageConfig
 	RepositoryScan RepositoryScanConfig
-	Geocoding      GeocodingConfig
 	Auth           AuthConfig
 	Transcode      TranscodeConfig
 	Lumen          LumenConfig
@@ -108,13 +107,6 @@ type RepositoryScanConfig struct {
 	BatchSize          int
 }
 
-type GeocodingConfig struct {
-	Provider          string
-	NominatimEndpoint string
-	Language          string
-	UserAgent         string
-}
-
 type AuthConfig struct {
 	SecretKeyFile   string
 	AccessTokenTTL  time.Duration
@@ -177,7 +169,6 @@ type manifest struct {
 	Logging        *loggingManifest        `toml:"logging" json:"logging"`
 	Storage        *storageManifest        `toml:"storage" json:"storage"`
 	RepositoryScan *repositoryScanManifest `toml:"repository_scan" json:"repository_scan"`
-	Geocoding      *geocodingManifest      `toml:"geocoding" json:"geocoding"`
 	Auth           *authManifest           `toml:"auth" json:"auth"`
 	Transcode      *transcodeManifest      `toml:"transcode" json:"transcode"`
 	Lumen          *lumenManifest          `toml:"lumen" json:"lumen"`
@@ -258,18 +249,6 @@ type repositoryScanManifest struct {
 	MaxConcurrentRepos *int `toml:"max_concurrent_repos" json:"max_concurrent_repos"`
 	// Files per scan batch.
 	BatchSize *int `toml:"batch_size" json:"batch_size"`
-}
-type geocodingManifest struct {
-	// Reverse-geocoding backend. "disabled" keeps coordinates local and makes
-	// no network calls.
-	Provider *string `toml:"provider" json:"provider" jsonschema:"enum=disabled,enum=nominatim"`
-	// Nominatim reverse endpoint. Read only when provider = "nominatim".
-	NominatimEndpoint *string `toml:"nominatim_endpoint" json:"nominatim_endpoint"`
-	// Preferred language for returned place names.
-	Language *string `toml:"language" json:"language"`
-	// User-Agent presented to the provider. Public Nominatim requires a real
-	// contact string in its usage policy.
-	UserAgent *string `toml:"user_agent" json:"user_agent"`
 }
 type authManifest struct {
 	// Path to the token-signing key. This is a path, never the secret itself;
@@ -416,7 +395,6 @@ func validateManifestPresence(m manifest) []string {
 	requiredSection(&p, "logging", m.Logging)
 	requiredSection(&p, "storage", m.Storage)
 	requiredSection(&p, "repository_scan", m.RepositoryScan)
-	requiredSection(&p, "geocoding", m.Geocoding)
 	requiredSection(&p, "auth", m.Auth)
 	requiredSection(&p, "transcode", m.Transcode)
 	requiredSection(&p, "lumen", m.Lumen)
@@ -459,12 +437,6 @@ func validateManifestPresence(m manifest) []string {
 		required(&p, "repository_scan.settle_seconds", m.RepositoryScan.SettleSeconds)
 		required(&p, "repository_scan.max_concurrent_repos", m.RepositoryScan.MaxConcurrentRepos)
 		required(&p, "repository_scan.batch_size", m.RepositoryScan.BatchSize)
-	}
-	if m.Geocoding != nil {
-		required(&p, "geocoding.provider", m.Geocoding.Provider)
-		required(&p, "geocoding.nominatim_endpoint", m.Geocoding.NominatimEndpoint)
-		required(&p, "geocoding.language", m.Geocoding.Language)
-		required(&p, "geocoding.user_agent", m.Geocoding.UserAgent)
 	}
 	if m.Auth != nil {
 		required(&p, "auth.secret_key_file", m.Auth.SecretKeyFile)
@@ -589,13 +561,6 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requirePositive(&p, "repository_scan.max_concurrent_repos", scan.MaxConcurrentRepos)
 	requirePositive(&p, "repository_scan.batch_size", scan.BatchSize)
 
-	geocoding := GeocodingConfig{Provider: strings.ToLower(strings.TrimSpace(*m.Geocoding.Provider)), NominatimEndpoint: strings.TrimSpace(*m.Geocoding.NominatimEndpoint), Language: strings.TrimSpace(*m.Geocoding.Language), UserAgent: strings.TrimSpace(*m.Geocoding.UserAgent)}
-	requireOneOf(&p, "geocoding.provider", geocoding.Provider, geocodingProviders...)
-	requireNonEmpty(&p, "geocoding.nominatim_endpoint", geocoding.NominatimEndpoint)
-	requireHTTPURL(&p, "geocoding.nominatim_endpoint", geocoding.NominatimEndpoint)
-	requireNonEmpty(&p, "geocoding.language", geocoding.Language)
-	requireNonEmpty(&p, "geocoding.user_agent", geocoding.UserAgent)
-
 	auth := AuthConfig{
 		SecretKeyFile: resolvePath(base, *m.Auth.SecretKeyFile),
 		Passkey: PasskeyConfig{
@@ -662,7 +627,7 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requireNonEmpty(&p, "tools.ffmpeg_path", tools.FFmpegPath)
 	requireNonEmpty(&p, "tools.ffprobe_path", tools.FFprobePath)
 
-	return AppConfig{Environment: environment, DatabaseConfig: db, ServerConfig: server, LoggingConfig: logging, StorageConfig: storage, RepositoryScan: scan, Geocoding: geocoding, Auth: auth, Transcode: transcode, Lumen: lumen, Tools: tools}, p
+	return AppConfig{Environment: environment, DatabaseConfig: db, ServerConfig: server, LoggingConfig: logging, StorageConfig: storage, RepositoryScan: scan, Auth: auth, Transcode: transcode, Lumen: lumen, Tools: tools}, p
 }
 
 func invalidConfig(p []string) error {

@@ -36,19 +36,25 @@ func generateTOTPSecret() (string, error) {
 }
 
 func validateTOTPCode(secret string, code string, now time.Time) bool {
+	_, ok := totpCodeCounter(secret, code, now)
+	return ok
+}
+
+func totpCodeCounter(secret string, code string, now time.Time) (int64, bool) {
 	normalizedCode := normalizeTOTPCode(code)
 	if len(normalizedCode) != totpDigits {
-		return false
+		return 0, false
 	}
 
 	for offset := -totpAllowedTimeSkew; offset <= totpAllowedTimeSkew; offset++ {
-		codeAtTime, err := generateTOTPCode(secret, now.Add(time.Duration(offset)*totpPeriod))
+		at := now.Add(time.Duration(offset) * totpPeriod)
+		codeAtTime, err := generateTOTPCode(secret, at)
 		if err == nil && subtleEqual(codeAtTime, normalizedCode) {
-			return true
+			return at.Unix() / int64(totpPeriod/time.Second), true
 		}
 	}
 
-	return false
+	return 0, false
 }
 
 func generateTOTPCode(secret string, now time.Time) (string, error) {

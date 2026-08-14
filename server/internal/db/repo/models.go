@@ -182,6 +182,17 @@ type AssetTag struct {
 	Source     string    `db:"source" json:"source"`
 }
 
+type AuthSecurityVerification struct {
+	VerificationID string            `db:"verification_id" json:"verification_id"`
+	TokenHash      string            `db:"token_hash" json:"token_hash"`
+	UserID         int32             `db:"user_id" json:"user_id"`
+	AuthVersion    int64             `db:"auth_version" json:"auth_version"`
+	Purpose        string            `db:"purpose" json:"purpose"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	ExpiresAt      dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	ConsumedAt     *int64            `db:"consumed_at" json:"consumed_at"`
+}
+
 type ClassifierDefinition struct {
 	ID                  int32             `db:"id" json:"id"`
 	Slug                string            `db:"slug" json:"slug"`
@@ -372,6 +383,24 @@ type EventOwnerState struct {
 	AutomaticRebuildPaused int64             `db:"automatic_rebuild_paused" json:"automatic_rebuild_paused"`
 	Revision               int64             `db:"revision" json:"revision"`
 	UpdatedAt              dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	SourceRevision         int64             `db:"source_revision" json:"source_revision"`
+	PublishedRevision      int64             `db:"published_revision" json:"published_revision"`
+	RebuildLeaseToken      *string           `db:"rebuild_lease_token" json:"rebuild_lease_token"`
+	RebuildLeaseExpiresAt  *int64            `db:"rebuild_lease_expires_at" json:"rebuild_lease_expires_at"`
+}
+
+type EventRebuildRun struct {
+	RunID             uuid.UUID         `db:"run_id" json:"run_id"`
+	OwnerID           int32             `db:"owner_id" json:"owner_id"`
+	State             string            `db:"state" json:"state"`
+	RequestedRevision int64             `db:"requested_revision" json:"requested_revision"`
+	PublishedRevision *int64            `db:"published_revision" json:"published_revision"`
+	RequestedAt       int64             `db:"requested_at" json:"requested_at"`
+	StartedAt         dbtypes.Timestamp `db:"started_at" json:"started_at"`
+	FinishedAt        dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	EventCount        int64             `db:"event_count" json:"event_count"`
+	MemberCount       int64             `db:"member_count" json:"member_count"`
+	ErrorCode         *string           `db:"error_code" json:"error_code"`
 }
 
 type EventRedirect struct {
@@ -501,23 +530,25 @@ type LifecycleOperation struct {
 }
 
 type LocationCluster struct {
-	ClusterID         uuid.UUID         `db:"cluster_id" json:"cluster_id"`
-	OwnerID           *int32            `db:"owner_id" json:"owner_id"`
-	RepositoryID      uuid.UUID         `db:"repository_id" json:"repository_id"`
-	Geohash           string            `db:"geohash" json:"geohash"`
-	Precision         int64             `db:"precision" json:"precision"`
-	CentroidLatitude  float64           `db:"centroid_latitude" json:"centroid_latitude"`
-	CentroidLongitude float64           `db:"centroid_longitude" json:"centroid_longitude"`
-	PhotoCount        int64             `db:"photo_count" json:"photo_count"`
-	Label             *string           `db:"label" json:"label"`
-	Country           *string           `db:"country" json:"country"`
-	Region            *string           `db:"region" json:"region"`
-	City              *string           `db:"city" json:"city"`
-	Provider          *string           `db:"provider" json:"provider"`
-	GeocodeStatus     string            `db:"geocode_status" json:"geocode_status"`
-	GeocodedAt        dbtypes.Timestamp `db:"geocoded_at" json:"geocoded_at"`
-	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	ClusterID            uuid.UUID         `db:"cluster_id" json:"cluster_id"`
+	OwnerID              *int32            `db:"owner_id" json:"owner_id"`
+	RepositoryID         uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Geohash              string            `db:"geohash" json:"geohash"`
+	Precision            int64             `db:"precision" json:"precision"`
+	CentroidLatitude     float64           `db:"centroid_latitude" json:"centroid_latitude"`
+	CentroidLongitude    float64           `db:"centroid_longitude" json:"centroid_longitude"`
+	PhotoCount           int64             `db:"photo_count" json:"photo_count"`
+	Label                *string           `db:"label" json:"label"`
+	Country              *string           `db:"country" json:"country"`
+	Region               *string           `db:"region" json:"region"`
+	City                 *string           `db:"city" json:"city"`
+	Provider             *string           `db:"provider" json:"provider"`
+	GeocodeStatus        string            `db:"geocode_status" json:"geocode_status"`
+	GeocodedAt           dbtypes.Timestamp `db:"geocoded_at" json:"geocoded_at"`
+	CreatedAt            dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt            dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	GeocodeAttemptCount  int64             `db:"geocode_attempt_count" json:"geocode_attempt_count"`
+	GeocodeNextAttemptAt dbtypes.Timestamp `db:"geocode_next_attempt_at" json:"geocode_next_attempt_at"`
 }
 
 type LocationClusterAsset struct {
@@ -601,24 +632,25 @@ type OcrTextItem struct {
 	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
-type RefreshToken struct {
-	TokenID   int64             `db:"token_id" json:"token_id"`
-	UserID    int32             `db:"user_id" json:"user_id"`
-	Token     string            `db:"token" json:"token"`
-	ExpiresAt dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
-	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	IsRevoked bool              `db:"is_revoked" json:"is_revoked"`
+type PendingTotpEnrollment struct {
+	EnrollmentID     string            `db:"enrollment_id" json:"enrollment_id"`
+	UserID           int32             `db:"user_id" json:"user_id"`
+	SecretCiphertext []byte            `db:"secret_ciphertext" json:"secret_ciphertext"`
+	AuthVersion      int64             `db:"auth_version" json:"auth_version"`
+	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	ExpiresAt        dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	ConsumedAt       *int64            `db:"consumed_at" json:"consumed_at"`
 }
 
-type RegistrationSession struct {
-	SessionID            uuid.UUID         `db:"session_id" json:"session_id"`
-	Username             string            `db:"username" json:"username"`
-	PasswordHash         string            `db:"password_hash" json:"password_hash"`
-	Role                 string            `db:"role" json:"role"`
-	WebauthnUserHandle   []byte            `db:"webauthn_user_handle" json:"webauthn_user_handle"`
-	TotpSecretCiphertext []byte            `db:"totp_secret_ciphertext" json:"totp_secret_ciphertext"`
-	CreatedAt            dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	ExpiresAt            dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+type RefreshToken struct {
+	TokenID     int64             `db:"token_id" json:"token_id"`
+	UserID      int32             `db:"user_id" json:"user_id"`
+	Token       string            `db:"token" json:"token"`
+	ExpiresAt   dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	IsRevoked   bool              `db:"is_revoked" json:"is_revoked"`
+	AuthVersion int64             `db:"auth_version" json:"auth_version"`
+	Assurance   string            `db:"assurance" json:"assurance"`
 }
 
 type Repository struct {
@@ -713,7 +745,8 @@ type RepositoryScanRun struct {
 }
 
 type ReverseGeocodeCache struct {
-	CacheKey    string            `db:"cache_key" json:"cache_key"`
+	SourceKey   string            `db:"source_key" json:"source_key"`
+	Geohash     string            `db:"geohash" json:"geohash"`
 	Provider    string            `db:"provider" json:"provider"`
 	Language    string            `db:"language" json:"language"`
 	Latitude    float64           `db:"latitude" json:"latitude"`
@@ -771,6 +804,11 @@ type Setting struct {
 	CreatedAt                   dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt                   dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 	UpdatedBy                   *int32            `db:"updated_by" json:"updated_by"`
+	GeocodingProvider           string            `db:"geocoding_provider" json:"geocoding_provider"`
+	GeocodingNominatimEndpoint  string            `db:"geocoding_nominatim_endpoint" json:"geocoding_nominatim_endpoint"`
+	GeocodingLanguage           string            `db:"geocoding_language" json:"geocoding_language"`
+	GeocodingUserAgent          string            `db:"geocoding_user_agent" json:"geocoding_user_agent"`
+	GeocodingRevision           int64             `db:"geocoding_revision" json:"geocoding_revision"`
 }
 
 type ShareLink struct {
@@ -854,12 +892,14 @@ type UserMfaRecoveryCode struct {
 }
 
 type UserMfaTotpCredential struct {
-	UserID           int32             `db:"user_id" json:"user_id"`
-	SecretCiphertext []byte            `db:"secret_ciphertext" json:"secret_ciphertext"`
-	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-	EnabledAt        dbtypes.Timestamp `db:"enabled_at" json:"enabled_at"`
-	LastUsedAt       dbtypes.Timestamp `db:"last_used_at" json:"last_used_at"`
+	UserID            int32             `db:"user_id" json:"user_id"`
+	SecretCiphertext  []byte            `db:"secret_ciphertext" json:"secret_ciphertext"`
+	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EnabledAt         dbtypes.Timestamp `db:"enabled_at" json:"enabled_at"`
+	LastUsedAt        dbtypes.Timestamp `db:"last_used_at" json:"last_used_at"`
+	CredentialVersion int64             `db:"credential_version" json:"credential_version"`
+	LastUsedCounter   int64             `db:"last_used_counter" json:"last_used_counter"`
 }
 
 type UserWebauthnCredential struct {

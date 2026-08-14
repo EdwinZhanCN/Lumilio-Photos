@@ -8,7 +8,7 @@ import (
 // SchemaFile is the generated schema's path relative to this package.
 const SchemaFile = "schema/lumilio-server.schema.json"
 
-// GenerateManifest returns a complete schema-v3 manifest for one explicit
+// GenerateManifest returns a complete schema-v4 manifest for one explicit
 // operator profile, validated through the same resolver used at runtime.
 //
 // The output carries the generated per-key documentation, so a manifest an

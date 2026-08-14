@@ -5,6 +5,7 @@ import { useBrowserCapabilities, BrowserSecurityNotice } from "@/features/auth";
 import { GaugeIcon } from "lucide-react";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import BackupSection from "./BackupSection";
+import GeocodingSection from "./GeocodingSection";
 
 function formatBoolean(value: boolean | undefined, t: (key: string) => string): string {
   return t(`settings.serverSettings.booleanValues.${value ? "true" : "false"}`);
@@ -43,7 +44,6 @@ export default function ServerTab() {
         ["repository_scan_enabled", formatBoolean(runtime.repository_scan_enabled, t)],
         ["repository_scan_interval_seconds", runtime.repository_scan_interval_seconds],
         ["log_level", runtime.log_level],
-        ["geocoding_provider", runtime.geocoding_provider],
         ["lumen_discovery_enabled", formatBoolean(runtime.lumen_discovery_enabled, t)],
       ]
     : [];
@@ -99,6 +99,8 @@ export default function ServerTab() {
           </div>
         </SettingsBlock>
       </SettingsGroup>
+
+      <GeocodingSection />
 
       <BackupSection />
 

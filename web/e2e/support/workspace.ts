@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { api } from "./api";
+import { loadBootstrapTOTP, nextTOTPCode, totpCode } from "./totp";
 import {
   AUTH_ISOLATION_ASSET,
   smokeAsset,
@@ -42,7 +43,11 @@ export type Workspace = {
   videoFilename: string;
 };
 
-type Auth = { token: string };
+type Auth = {
+  token?: string;
+  requires_mfa?: boolean;
+  mfa_token?: string;
+};
 type User = { user_id: number; username: string };
 type Repository = { id: string; name: string; path: string };
 
@@ -68,6 +73,38 @@ async function ensureWorkerAdmin(index: number, adminToken: string) {
   });
 
   return username;
+}
+
+async function loginBootstrap(): Promise<{ token: string }> {
+  const login = await api<Auth>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify(bootstrap),
+  });
+  if (login.token) return { token: login.token };
+  if (!login.requires_mfa || !login.mfa_token) {
+    throw new Error("bootstrap admin login did not return a session or an MFA challenge");
+  }
+  const bootstrapTOTP = loadBootstrapTOTP();
+  if (!bootstrapTOTP || bootstrapTOTP.username !== bootstrap.username) {
+    throw new Error("bootstrap admin requires MFA but the temporary E2E TOTP hand-off is missing");
+  }
+  const verify = (code: string) =>
+    api<Auth>("/api/v1/auth/mfa/verify", {
+      method: "POST",
+      body: JSON.stringify({ mfa_token: login.mfa_token, code, method: "totp" }),
+    });
+  const code = totpCode(bootstrapTOTP.secret);
+  let verified: Auth;
+  try {
+    verified = await verify(code);
+  } catch (error) {
+    // The seed process may have consumed this thirty-second counter moments
+    // earlier. Replay rejection is expected; any other failure still aborts.
+    if (!(error instanceof Error) || !error.message.includes("invalid mfa code")) throw error;
+    verified = await verify(await nextTOTPCode(bootstrapTOTP.secret, code));
+  }
+  if (!verified.token) throw new Error("bootstrap admin MFA verification did not return a session");
+  return { token: verified.token };
 }
 
 async function ensureWorkerRepository(index: number, token: string) {
@@ -110,16 +147,15 @@ function placeScanFixture(repository: Repository, source: string, scanFilename: 
  * workers never scan or upload into the same mutable state.
  */
 export async function provisionWorkspace(index: number): Promise<Workspace> {
-  const { token: adminToken } = await api<Auth>("/api/v1/auth/login", {
-    method: "POST",
-    body: JSON.stringify(bootstrap),
-  });
+  const { token: adminToken } = await loginBootstrap();
 
   const username = await ensureWorkerAdmin(index, adminToken);
-  const { token } = await api<Auth>("/api/v1/auth/login", {
+  const workerAuth = await api<Auth>("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({ username, password: bootstrap.password }),
   });
+  if (!workerAuth.token) throw new Error(`worker user ${username} login did not return a session`);
+  const { token } = workerAuth;
 
   const repository = await ensureWorkerRepository(index, token);
   // The smoke profile is deliberately minimal — one scan and one upload asset —

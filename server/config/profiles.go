@@ -218,12 +218,6 @@ func baseManifest(environment string, deploymentID string, logLevel string, l la
 			MaxConcurrentRepos: ptr(1),
 			BatchSize:          ptr(500),
 		},
-		Geocoding: &geocodingManifest{
-			Provider:          ptr("disabled"),
-			NominatimEndpoint: ptr("https://nominatim.openstreetmap.org/reverse"),
-			Language:          ptr("en"),
-			UserAgent:         ptr("Lumilio-Photos/1.0"),
-		},
 		Auth: &authManifest{
 			SecretKeyFile:   ptr(l.secretKey),
 			AccessTokenTTL:  ptr("15m"),
@@ -293,7 +287,6 @@ var profileTable = []Profile{
 		Defaults: ProfileInputs{StateDir: "../state", StorageDir: "../storage"},
 		build: func(inputs ProfileInputs) manifest {
 			m := baseManifest("development", "local", "debug", developmentLayout(inputs.StateDir, inputs.StorageDir))
-			m.Geocoding.Language = ptr("zh")
 			m.Server.Proxy.TrustedCIDRs = ptr([]string{"127.0.0.1/32", "::1/128"})
 			return m
 		},

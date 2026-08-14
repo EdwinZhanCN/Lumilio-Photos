@@ -22,7 +22,7 @@ useful; implementation plans belong in `exec-plans/`.
   into `.local/dev/config/server.toml`. Container images ship complete
   `docker-http` and `docker-caddy` manifests; ACME and custom operator
   manifests are generated into app-state by `server config init`. The
-  Desktop keeps a complete schema-v3 runtime intent and projects it through
+  Desktop keeps a complete schema-v4 runtime intent and projects it through
   the same strict `server/config` loader before calling `server/app`.
 - Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
 
@@ -32,7 +32,7 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/app`: the only server runtime — logging, migrations, queue workers, router, repository bootstrap, SPA serving, and graceful shutdown via `Run(ctx, cfg, controls)`. It rejects configuration not produced by the strict loader.
 - `server/config`: leaf package exposing the runtime constructor
   `LoadAppConfig(path)` plus a one-shot complete-manifest generator. It strictly
-  decodes schema v3, resolves manifest-relative paths and secret files,
+  decodes schema v4, resolves manifest-relative paths and secret files,
   validates the complete graph, and fingerprints the source bytes.
 - `server/internal/httporigin`: request-derived target/browser Origin policy
   and trusted-proxy client-IP recovery.
