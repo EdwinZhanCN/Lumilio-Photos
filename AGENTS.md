@@ -10,6 +10,18 @@ Lumilio Photos is local-first: preserve original media, keep repository and
 application-state ownership explicit, make ML/AI optional, and prefer boring
 configuration that boots and diagnoses cleanly.
 
+## Branch And Pull Request Routing
+
+- `dev` is the default integration branch. Create ordinary feature, fix,
+  refactor, documentation, and agent-harness branches from the latest `dev`,
+  and open every Draft or implementation PR with `dev` as its base.
+- `main` is the stable/release branch. Changes normally reach it through an
+  intentional `dev` → `main` promotion PR. Target `main` directly only when
+  the Issue or a human explicitly requests that exception.
+- GitHub's default branch is not a target-selection signal. Verify the base
+  explicitly before creating or updating a PR; never infer `main` merely
+  because GitHub presents it as the default.
+
 ## Repository Map
 
 - `server/`: Go API and embedded SQLite runtime. `server/cmd/main.go` is the thin

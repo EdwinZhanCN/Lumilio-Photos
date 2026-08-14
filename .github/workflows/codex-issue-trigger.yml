@@ -44,7 +44,7 @@ jobs:
                   fi
 
                   printf '%s\n' \
-                      '@codex 请先只做 preflight/triage，不要修改代码。阅读此 Issue、AGENTS.md 和相关仓库文档，调研问题并输出 findings、scope、todos、validation、risks 和 open questions；如果属于非小型改动，请提出 exec plan 方案。完成后等待人工确认。' \
+                      '@codex 请先只做 preflight/triage，不要修改代码。阅读此 Issue、AGENTS.md 和相关仓库文档，调研问题并输出 findings、scope、todos、validation、risks 和 open questions；如果属于非小型改动，请提出 exec plan 方案。后续若获人工批准实施，必须从最新 dev 创建工作分支，并让任何 Draft PR 或实现 PR 以 dev 为 base；只有此 Issue 或人工明确指定其他目标分支时才例外，不要因为 GitHub 默认分支是 main 而选择 main。完成后等待人工确认。' \
                       '' \
                       "$marker" \
                       | gh issue comment "$ISSUE_NUMBER" --repo "$GH_REPO" --body-file -
