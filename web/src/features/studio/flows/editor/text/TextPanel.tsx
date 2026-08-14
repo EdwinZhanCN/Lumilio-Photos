@@ -35,6 +35,7 @@ type TextPanelProps = {
   onLayersChange: (next: Layer[]) => void;
   depthStatus: DepthStatus;
   depthFeather: number;
+  depthUnavailableReason?: string;
   onGenerateDepth: () => void;
   onDepthFeatherChange: (value: number) => void;
 };
@@ -67,6 +68,7 @@ export function TextPanel({
   onLayersChange,
   depthStatus,
   depthFeather,
+  depthUnavailableReason,
   onGenerateDepth,
   onDepthFeatherChange,
 }: TextPanelProps): React.JSX.Element {
@@ -182,7 +184,8 @@ export function TextPanel({
           <button
             type="button"
             onClick={onGenerateDepth}
-            disabled={disabled || depthStatus === "generating"}
+            disabled={disabled || depthStatus === "generating" || Boolean(depthUnavailableReason)}
+            title={depthUnavailableReason}
             className="btn btn-xs gap-1 border-base-300 bg-base-100 text-base-content/80"
           >
             {depthStatus === "generating" && <Loader2 size={12} className="animate-spin" />}
@@ -190,13 +193,14 @@ export function TextPanel({
           </button>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-base-content/45">
-          {depthReady
-            ? t("studio.depth.readyHint", {
-                defaultValue: "Lower a layer's Depth to tuck it behind nearer objects.",
-              })
-            : t("studio.depth.hint", {
-                defaultValue: "Estimate depth to let text sit inside the scene.",
-              })}
+          {depthUnavailableReason ??
+            (depthReady
+              ? t("studio.depth.readyHint", {
+                  defaultValue: "Lower a layer's Depth to tuck it behind nearer objects.",
+                })
+              : t("studio.depth.hint", {
+                  defaultValue: "Estimate depth to let text sit inside the scene.",
+                }))}
         </p>
         {depthReady && (
           <div className="mt-2">

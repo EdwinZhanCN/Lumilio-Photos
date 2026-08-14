@@ -7,11 +7,12 @@ import type {
   InterruptInfo,
   SideChannelEvent,
 } from "../model/chatTypes";
+import { createUUID } from "@/lib/uuid";
 
 /** Pure reduction rules from SSE events onto the typed-block conversation.
  * Rendering never parses strings for structure (no pseudo-tags). */
 
-const newId = () => crypto.randomUUID();
+const newId = () => createUUID();
 
 export const userMessage = (content: string, request?: AgentTurnSnapshot): ChatMessage => ({
   id: newId(),

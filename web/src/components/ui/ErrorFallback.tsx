@@ -2,6 +2,7 @@ import React from "react";
 import { FallbackProps } from "react-error-boundary";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Home, RefreshCw, Bug, ExternalLink, Copy } from "lucide-react";
+import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/lib/i18n";
 
 type ErrorFallbackProps = {
@@ -21,6 +22,7 @@ export default function ErrorFallback({
 }: ErrorFallbackProps & FallbackProps): React.ReactElement {
   const { t } = useI18n();
   const [copied, setCopied] = React.useState(false);
+  const [copyFailed, setCopyFailed] = React.useState(false);
 
   const details = React.useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "(unknown)";
@@ -55,11 +57,14 @@ export default function ErrorFallback({
 
   const onCopyDetails = async () => {
     try {
-      await navigator.clipboard.writeText(details);
+      await copyText(details);
       setCopied(true);
+      setCopyFailed(false);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
+      setCopyFailed(true);
+      window.setTimeout(() => setCopyFailed(false), 2400);
     }
   };
 
@@ -161,6 +166,13 @@ export default function ErrorFallback({
                 defaultValue: "Copied error details to clipboard.",
               })}
             </span>
+          </div>
+        </div>
+      )}
+      {copyFailed && (
+        <div className="toast toast-end z-toast">
+          <div className="alert alert-error">
+            <span>{t("common.copyFailed", { defaultValue: "Copy failed." })}</span>
           </div>
         </div>
       )}

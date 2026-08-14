@@ -33,7 +33,11 @@ import { CropOverlay } from "./crop/CropOverlay";
 import { TextOverlay } from "./text/TextOverlay";
 import { getAspectRatio } from "../../modules/crop/cropMath";
 import { displayedFrameSize } from "../../modules/rendering/coordinateSystem";
-import { estimateDepthField, disposeDepthPipeline } from "../../modules/depth/depthEstimation";
+import {
+  estimateDepthField,
+  disposeDepthPipeline,
+  getDepthCapability,
+} from "../../modules/depth/depthEstimation";
 
 export type DepthStatus = "idle" | "generating" | "ready" | "error";
 
@@ -277,6 +281,16 @@ export function StudioEditor({
   const [depthStatus, setDepthStatus] = useState<DepthStatus>("idle");
   const [depthFeather, setDepthFeather] = useState(0.08);
   const [depthVersion, setDepthVersion] = useState(0);
+  const depthCapability = getDepthCapability();
+  const depthUnavailableReason = depthCapability.supported
+    ? undefined
+    : depthCapability.reason === "secure-context-required"
+      ? t("studio.depth.secureContextRequired", {
+          defaultValue: "Depth estimation requires HTTPS or localhost.",
+        })
+      : t("studio.depth.webgpuUnavailable", {
+          defaultValue: "Depth estimation requires a browser with WebGPU support.",
+        });
   // A text layer being dragged on-canvas: hidden from the worker so its live DOM
   // preview is the only copy, avoiding a lagging rasterized duplicate.
   const [hiddenLayerId, setHiddenLayerId] = useState<string | null>(null);
@@ -709,6 +723,11 @@ export function StudioEditor({
   const generateDepth = useCallback(async () => {
     const worker = workerRef.current;
     if (!worker) return;
+    if (depthUnavailableReason) {
+      setDepthStatus("error");
+      showMessage("error", depthUnavailableReason);
+      return;
+    }
     setDepthStatus("generating");
     try {
       // Depth must align with the edited image, so estimate on the developed +
@@ -742,7 +761,7 @@ export function StudioEditor({
           : t("studio.depth.failed", { defaultValue: "Depth estimation failed" }),
       );
     }
-  }, [adjustments, depthFeather, callWorker, showMessage, t]);
+  }, [adjustments, depthFeather, callWorker, depthUnavailableReason, showMessage, t]);
 
   const getExifSource = useCallback(async (id: string): Promise<Blob | null> => {
     if (exifSourceRef.current?.assetId === id) return exifSourceRef.current.blob;
@@ -940,6 +959,7 @@ export function StudioEditor({
           onResetCrop={handleResetCrop}
           depthStatus={depthStatus}
           depthFeather={depthFeather}
+          depthUnavailableReason={depthUnavailableReason}
           onGenerateDepth={() => void generateDepth()}
           onDepthFeatherChange={setDepthFeather}
           disabled={!asset || isLoadingAsset}

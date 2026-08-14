@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
+import { toast } from "sonner";
 import { QueueSummaryList } from "./QueueSummaryList";
 
 const now = new Date("2026-06-12T12:00:00.000Z").toISOString();
@@ -75,9 +76,7 @@ describe("QueueSummaryList", () => {
     await screen.getByRole("button", { name: "Review 2 issues" }).click();
 
     await expect.element(screen.getByText("Build previews")).toBeInTheDocument();
-    await expect
-      .element(screen.getByText("thumbnail failed: decode error"))
-      .toBeInTheDocument();
+    await expect.element(screen.getByText("thumbnail failed: decode error")).toBeInTheDocument();
 
     await screen.getByRole("button", { name: "Copy error" }).click();
 
@@ -90,5 +89,26 @@ describe("QueueSummaryList", () => {
     expect(clipboardWriteText).toHaveBeenCalledWith(
       expect.stringContaining("thumbnail failed: decode error"),
     );
+  });
+
+  it("reports copy failures instead of leaving an unhandled rejection", async () => {
+    serveSummary();
+    const toastError = vi.spyOn(toast, "error").mockImplementation(() => "copy-error");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: undefined,
+    });
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: vi.fn(() => false),
+    });
+    const screen = await renderWithProviders(<QueueSummaryList />);
+
+    await screen.getByRole("button", { name: "Review 2 issues" }).click();
+    await screen.getByRole("button", { name: "Copy error" }).click();
+
+    await vi.waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith("Copy failed.", expect.any(Object));
+    });
   });
 });

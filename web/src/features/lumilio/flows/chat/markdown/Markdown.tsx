@@ -2,6 +2,7 @@ import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
 import { createMathPlugin } from "@streamdown/math";
 import { Streamdown, type Components } from "streamdown";
+import { isAsyncClipboardAvailable } from "@/lib/clipboard";
 import { Img, Link } from "./MarkdownBlocks";
 
 const math = createMathPlugin({
@@ -23,23 +24,31 @@ type MarkdownProps = {
   isAnimating?: boolean;
 };
 
+export function getMarkdownControls(
+  canUseStreamdownCopy = isAsyncClipboardAvailable(),
+): React.ComponentProps<typeof Streamdown>["controls"] {
+  return {
+    code: { copy: canUseStreamdownCopy, download: false },
+    table: { copy: canUseStreamdownCopy, download: false, fullscreen: false },
+  };
+}
+
 export const Markdown = ({
   content = "",
   className = "text-base leading-relaxed",
   isAnimating = false,
-}: MarkdownProps) => (
-  <Streamdown
-    className={className}
-    components={components}
-    controls={{
-      code: { copy: true, download: false },
-      table: { copy: true, download: false, fullscreen: false },
-    }}
-    dir="auto"
-    isAnimating={isAnimating}
-    lineNumbers={false}
-    plugins={plugins}
-  >
-    {content}
-  </Streamdown>
-);
+}: MarkdownProps) => {
+  return (
+    <Streamdown
+      className={className}
+      components={components}
+      controls={getMarkdownControls()}
+      dir="auto"
+      isAnimating={isAnimating}
+      lineNumbers={false}
+      plugins={plugins}
+    >
+      {content}
+    </Streamdown>
+  );
+};

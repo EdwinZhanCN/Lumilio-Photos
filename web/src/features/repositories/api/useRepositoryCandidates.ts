@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
+import { createUUID } from "@/lib/uuid";
 
 export type RepositoryCandidate = components["schemas"]["dto.RepositoryCandidateDTO"];
 
@@ -21,7 +22,7 @@ export function useOpenRepositoryCandidate() {
   const openRepositoryCandidate = useCallback(
     async (directoryName: string, riskConfirmation = false) => {
       const response = await mutation.mutateAsync({
-        params: { header: { "Idempotency-Key": crypto.randomUUID() } },
+        params: { header: { "Idempotency-Key": createUUID() } },
         body: { directory_name: directoryName, risk_confirmation: riskConfirmation },
       });
       await Promise.all([
@@ -54,7 +55,7 @@ export function useResolveRepositoryCandidate() {
       riskConfirmation = false,
     ) => {
       const response = await mutation.mutateAsync({
-        params: { header: { "Idempotency-Key": crypto.randomUUID() } },
+        params: { header: { "Idempotency-Key": createUUID() } },
         body: { directory_name: directoryName, resolution, risk_confirmation: riskConfirmation },
       });
       await Promise.all([

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
+import { createUUID } from "@/lib/uuid";
 import {
   type HostAction,
   type HostActionKind,
@@ -42,7 +43,7 @@ export default function NativeHostActionModal({
   const [name, setName] = useState("");
   const [confirmSeparate, setConfirmSeparate] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const requestID = useRef(crypto.randomUUID());
+  const requestID = useRef(createUUID());
   const persistenceScope = rootId || repositoryId || "new";
   const shouldPoll = Boolean(action?.id && !terminalStatuses.has(action.status ?? ""));
   const actionQuery = useNativeHostAction(action?.id ?? "", shouldPoll);
@@ -96,7 +97,7 @@ export default function NativeHostActionModal({
     setName("");
     setConfirmSeparate(false);
     setError(null);
-    requestID.current = crypto.randomUUID();
+    requestID.current = createUUID();
   }, [isOpen]);
 
   const title = hostActionTitle(kind, t);
@@ -131,7 +132,7 @@ export default function NativeHostActionModal({
           purpose,
           root_id: rootId,
           repository_id: repositoryId,
-          session_id: crypto.randomUUID(),
+          session_id: createUUID(),
           expires_in_seconds: 600,
         },
       });

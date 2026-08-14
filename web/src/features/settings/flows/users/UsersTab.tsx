@@ -3,6 +3,7 @@ import { AlertTriangleIcon, KeyRoundIcon, MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import UserAvatar from "@/components/ui/UserAvatar";
 import PhotoPicker from "@/features/assets/picker";
+import { copyText } from "@/lib/clipboard";
 import {
   DISPLAY_NAME_HINT,
   DISPLAY_NAME_MAX_LENGTH,
@@ -13,11 +14,7 @@ import {
   normalizeUsernameInput,
   useAuth,
 } from "@/features/auth";
-import {
-  useAdminUpdateUser,
-  useResetUserAccess,
-  useUsers,
-} from "@/features/users";
+import { useAdminUpdateUser, useResetUserAccess, useUsers } from "@/features/users";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import { SettingsDropdown } from "../../components/SettingsDropdown";
 import { SettingsSaveBar } from "../../components/SettingsSaveBar";
@@ -37,10 +34,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
     if (maybeApiError.error) return maybeApiError.error;
   }
   return fallback;
-}
-
-async function copyToClipboard(value: string) {
-  await navigator.clipboard.writeText(value);
 }
 
 export default function UsersTab() {
@@ -180,10 +173,14 @@ export default function UsersTab() {
   const handleCopyTemporaryPassword = async () => {
     if (!resetAccessState?.temporaryPassword) return;
     try {
-      await copyToClipboard(resetAccessState.temporaryPassword);
+      await copyText(resetAccessState.temporaryPassword);
       setCopiedTemporaryPassword(true);
     } catch {
       setCopiedTemporaryPassword(false);
+      setFeedback({
+        tone: "error",
+        message: t("common.copyFailed", { defaultValue: "Copy failed." }),
+      });
     }
   };
 

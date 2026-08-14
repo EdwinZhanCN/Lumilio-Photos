@@ -21,6 +21,8 @@ import {
   Video,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useMessage } from "@/features/notifications";
+import { copyText } from "@/lib/clipboard";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { QueueErrorSampleDTO, QueueSummaryDTO } from "../../types";
@@ -266,6 +268,7 @@ function buildDiagnosticText(queueName: string, sample: QueueErrorSampleDTO) {
 
 export function QueueSummaryList() {
   const { t, i18n } = useI18n();
+  const showMessage = useMessage();
   const [expandedQueues, setExpandedQueues] = useState<Set<string>>(new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -311,11 +314,16 @@ export function QueueSummaryList() {
 
   const copyDiagnostic = async (queueName: string, sample: QueueErrorSampleDTO) => {
     const key = `${queueName}:${sample.job_id}`;
-    await navigator.clipboard.writeText(buildDiagnosticText(queueName, sample));
-    setCopiedKey(key);
-    window.setTimeout(() => {
-      setCopiedKey((current) => (current === key ? null : current));
-    }, 1600);
+    try {
+      await copyText(buildDiagnosticText(queueName, sample));
+      setCopiedKey(key);
+      window.setTimeout(() => {
+        setCopiedKey((current) => (current === key ? null : current));
+      }, 1600);
+    } catch {
+      setCopiedKey(null);
+      showMessage("error", t("common.copyFailed", { defaultValue: "Copy failed." }));
+    }
   };
 
   if (summaryQuery.isLoading) {

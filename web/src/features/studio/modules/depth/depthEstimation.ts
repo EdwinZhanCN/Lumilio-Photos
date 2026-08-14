@@ -24,9 +24,42 @@ type RawImageLike = {
 type DepthOutput = { depth: RawImageLike };
 type DepthPipeline = (input: unknown) => Promise<DepthOutput>;
 
+export type DepthCapability =
+  | { supported: true }
+  | { supported: false; reason: "secure-context-required" | "webgpu-unavailable" };
+
+type DepthEnvironment = {
+  secureContext: boolean;
+  webGPUAvailable: boolean;
+};
+
+export function getDepthCapability(
+  environment: DepthEnvironment = {
+    secureContext: typeof window !== "undefined" && window.isSecureContext,
+    webGPUAvailable: typeof navigator !== "undefined" && "gpu" in navigator,
+  },
+): DepthCapability {
+  if (!environment.secureContext) {
+    return { supported: false, reason: "secure-context-required" };
+  }
+  if (!environment.webGPUAvailable) {
+    return { supported: false, reason: "webgpu-unavailable" };
+  }
+  return { supported: true };
+}
+
 let pipelinePromise: Promise<DepthPipeline> | null = null;
 
 async function getDepthPipeline(): Promise<DepthPipeline> {
+  const capability = getDepthCapability();
+  if (!capability.supported) {
+    throw new Error(
+      capability.reason === "secure-context-required"
+        ? "Depth estimation requires HTTPS or localhost."
+        : "Depth estimation requires a browser with WebGPU support.",
+    );
+  }
+
   if (!pipelinePromise) {
     pipelinePromise = (async () => {
       const transformers = await import("@huggingface/transformers");
@@ -48,7 +81,10 @@ async function getDepthPipeline(): Promise<DepthPipeline> {
         device: "webgpu",
       });
       return pipe as unknown as DepthPipeline;
-    })();
+    })().catch((error: unknown) => {
+      pipelinePromise = null;
+      throw error;
+    });
   }
   return pipelinePromise;
 }

@@ -1,4 +1,5 @@
 import { getToken } from "@/lib/http-commons/auth.ts";
+import { createUUID } from "../uuid";
 import type {
   UploadResponse,
   BatchUploadResponse,
@@ -354,7 +355,7 @@ export const createUploadSession = async (request: {
 };
 
 export const generateSessionId = (): string => {
-  return crypto.randomUUID();
+  return createUUID();
 };
 
 export const getResumableSessionId = (

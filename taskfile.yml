@@ -237,6 +237,21 @@ tasks:
     cmds:
       - cargo install wasm-pack --locked
 
+  wasm:blake3:
+    desc: Rebuild the single-threaded browser BLAKE3 package
+    preconditions:
+      - sh: command -v wasm-pack >/dev/null 2>&1
+        msg: Run `task wasm:setup` to install wasm-pack first
+    cmds:
+      - wasm-pack build wasm/blake3-wasm --target web --no-pack
+      - >-
+        cp
+        wasm/blake3-wasm/pkg/blake3_wasm.d.ts
+        wasm/blake3-wasm/pkg/blake3_wasm.js
+        wasm/blake3-wasm/pkg/blake3_wasm_bg.wasm
+        wasm/blake3-wasm/pkg/blake3_wasm_bg.wasm.d.ts
+        web/src/wasm/blake3/
+
   tools:swag:
     internal: true
     status:

@@ -1,6 +1,8 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Check, Copy, HardDrive } from "lucide-react";
+import { useMessage } from "@/features/notifications";
 import type { components } from "@/lib/http-commons/schema";
+import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "@/lib/utils/formatters";
 
@@ -79,15 +81,17 @@ function StorageLocationDetail({
   repositories: StorageDiagnostic[];
 }) {
   const { t } = useI18n();
+  const showMessage = useMessage();
   const [copiedRepositoryID, setCopiedRepositoryID] = useState<string | null>(null);
 
   const copyRepositoryPath = async (repository: StorageDiagnostic, repositoryKey: string) => {
-    if (!repository.path || !navigator.clipboard) return;
+    if (!repository.path) return;
     try {
-      await navigator.clipboard.writeText(repository.path);
+      await copyText(repository.path);
       setCopiedRepositoryID(repositoryKey);
     } catch {
       setCopiedRepositoryID(null);
+      showMessage("error", t("common.copyFailed", { defaultValue: "Copy failed." }));
     }
   };
 

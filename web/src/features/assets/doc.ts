@@ -43,7 +43,7 @@
  * viewport. {@link AssetViewer} keeps the logical primary as the carousel item
  * while allowing the active RAW/JPEG physical component to drive metadata and
  * actions. {@link AssetSimilarRail} previews visually similar media for the
- * current asset from the share/export menu; See all opens the main library
+ * current asset from the share/export menu; See all opens the main Repository view
  * with `?similar=`.
  * {@link SearchFAB} defaults to text search. Image mode keeps the same-width
  * slot as a repository {@link PhotoPicker} primary button and a circular local-file
