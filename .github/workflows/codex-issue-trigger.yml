@@ -1,0 +1,50 @@
+name: Trigger Codex from an Issue label
+
+on:
+    issues:
+        types: [opened, labeled]
+
+permissions:
+    contents: read
+
+concurrency:
+    group: codex-issue-${{ github.event.issue.number }}
+    cancel-in-progress: false
+
+jobs:
+    trigger:
+        name: Ask Codex to triage
+        if: >-
+            github.actor == github.repository_owner &&
+            ((github.event.action == 'opened' &&
+              contains(github.event.issue.labels.*.name, 'codex')) ||
+             (github.event.action == 'labeled' &&
+              github.event.label.name == 'codex'))
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - name: Comment as the repository owner
+              env:
+                  GH_TOKEN: ${{ secrets.CODEX_TRIGGER_TOKEN || secrets.AGENT_PROJECT_TOKEN }}
+                  GH_REPO: ${{ github.repository }}
+                  ISSUE_NUMBER: ${{ github.event.issue.number }}
+              run: |
+                  set -eu
+
+                  if [ -z "$GH_TOKEN" ]; then
+                      echo "::error::Configure CODEX_TRIGGER_TOKEN with Issues read/write access."
+                      exit 1
+                  fi
+
+                  marker='<!-- lumilio-codex-issue-trigger:v1 -->'
+                  if gh api --paginate "repos/$GH_REPO/issues/$ISSUE_NUMBER/comments" \
+                      --jq '.[].body' | grep -Fq "$marker"; then
+                      echo "Codex was already triggered for Issue #$ISSUE_NUMBER."
+                      exit 0
+                  fi
+
+                  printf '%s\n' \
+                      '@codex 请先只做 preflight/triage，不要修改代码。阅读此 Issue、AGENTS.md 和相关仓库文档，调研问题并输出 findings、scope、todos、validation、risks 和 open questions；如果属于非小型改动，请提出 exec plan 方案。完成后等待人工确认。' \
+                      '' \
+                      "$marker" \
+                      | gh issue comment "$ISSUE_NUMBER" --repo "$GH_REPO" --body-file -
