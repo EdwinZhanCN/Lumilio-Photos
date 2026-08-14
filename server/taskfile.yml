@@ -30,7 +30,6 @@ tasks:
 
   test:ci:
     desc: Run Go Server tests in CI mode with a clean cache
-    internal: true
     env:
       CGO_ENABLED: '1'
       GOFLAGS: -buildvcs=false

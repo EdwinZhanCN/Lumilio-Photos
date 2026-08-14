@@ -9,8 +9,7 @@ Docs are local at `web/node_modules/vite-plus/docs` or online at https://viteplu
 ## Review Checklist
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
-- [ ] Prefer the repo gate `task web:test`. The CI install-and-test contract is
-      `task ci:web`. If intentionally scoped to `web/`,
+- [ ] Prefer the repo gate `task web:test`. If intentionally scoped to `web/`,
       run the same sequence directly: `vp check --no-fmt --no-lint`, `vp lint`,
       then `vp test`.
 - [ ] Treat `vp fmt` as a write command. Use `vp fmt --check` for a dry run.

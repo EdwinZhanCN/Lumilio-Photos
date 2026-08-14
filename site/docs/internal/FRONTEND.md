@@ -1,6 +1,8 @@
 # Frontend
 
 This document describes the current React frontend as implemented in `web/`.
+Procedures live in `.agents/skills/`; this file keeps contracts, maps, and
+design boundaries.
 
 ## Runtime Entry
 
@@ -19,47 +21,17 @@ The app mounts `I18nProvider`, then `PreferencesEffects`, `GlobalProvider`, `Que
 
 The frontend uses Vite+ as the command surface.
 
-Core stack:
+Core stack: React 19, TypeScript, React Router 7, TanStack Query 5, Zustand 5
+with immer, Tailwind CSS 4 and DaisyUI 5, Vitest 4 through Vite+, Web Workers
+and WASM modules for compute-heavy paths.
 
-- React 19
-- TypeScript
-- React Router 7
-- TanStack Query 5
-- Zustand 5 with immer
-- Tailwind CSS 4 and DaisyUI 5
-- Vitest 4 through Vite+
-- Web Workers and WASM modules for compute-heavy paths
+Daily commands: `task web:dev`, `task web:test`. Direct `vp` commands from
+`web/` are acceptable when intentionally scoped to that workspace. Tooling
+notes: [vite-plus.md](vite-plus.md).
 
-Daily commands:
-
-```bash
-task web:dev
-task web:test
-```
-
-Use the Taskfile targets by default. Direct commands are acceptable when you are
-intentionally running only the web workspace:
-
-```bash
-cd web
-vp dev --host --port 6657
-vp check --no-fmt --no-lint
-vp lint
-vp test
-```
-
-For i18n (internationalization), every user-facing string literal must go through the i18n layer. The workflow is **extract-then-fill — never hand-edit translation JSON structure**:
-
-1. **Write code first**: use `t("dotted.key", "English default")` with an inline default. The default doubles as the en value and tells the extractor the key exists.
-2. **Extract**: run `vp exec i18next-cli extract` — scans `src/**/*.{ts,tsx}` and creates/updates keys in `src/locales/{en,zh}/translation.json` automatically.
-3. **Fill zh**: open `src/locales/zh/translation.json`, translate any new/empty keys. Verify with `vp exec i18next-cli status` (must reach 100%).
-
-```bash
-vp exec i18next-cli extract    # step 2: auto-generate keys from code
-vp exec i18next-cli status     # step 3: verify zh coverage (must be 100%)
-```
-
-**Do NOT** manually add keys, restructure JSON nesting, or delete keys by hand in `translation.json`. The extractor is the single source of truth for key structure; manual edits will be overwritten or cause drift. Only fill values for keys the extractor has created.
+Every user-facing string goes through the i18n layer. Translation JSON is
+never hand-edited beyond filling values the extractor created. Procedure:
+[lumilio-frontend-i18n](../../../.agents/skills/lumilio-frontend-i18n/SKILL.md).
 
 ## Source Layout
 
@@ -93,7 +65,8 @@ Feature roots use one optional vocabulary:
 - `routes/`: thin router entries that delegate to a flow.
 - `utils/`: legacy/general pure helpers without domain vocabulary; prefer `model/` or a named lower-layer `lib/` owner for new code.
 - `doc.ts`: the feature architecture source; generated `doc.md` stays beside it
-  at the feature root.
+  at the feature root. Authoring:
+  [lumilio-feature-doc](../../../.agents/skills/lumilio-feature-doc/SKILL.md).
 
 Directories are optional. Do not create placeholders or alternate roots, and do
 not leave compatibility re-exports at old internal paths. Inside a feature use
@@ -108,49 +81,17 @@ OpenAPI is the source of truth for HTTP contracts.
 - Prefer `$api.useQuery`, `$api.useInfiniteQuery`, and `$api.useMutation`.
 - Do not hand-edit `src/lib/http-commons/schema.d.ts`.
 - Do not create ad-hoc request/response types when an endpoint exists in OpenAPI.
-
-> **An `as` cast on an API response is a red flag — never use it to "fix" a type.**
-> If you find yourself writing `someQuery.data?.data as { ... }` (or `as any`) to
-> read response fields, the generated type is wrong or missing. Do **not** cast
-> around it — casting silently desyncs the frontend from the contract. Instead:
-> 1. Check the backend handler's `@Success ... {data=dto.XxxDTO}` annotation —
->    does the referenced DTO actually declare the fields you need?
-> 2. If the DTO is correct but `schema.d.ts` shows `Record<string, never>`,
->    `unknown`, or stale/missing fields, the **generated contract is broken** →
->    fix the backend annotation/DTO/codegen and run `task dto`.
-> 3. Only then read the now-typed field.
->
-> Do not add frontend compatibility shims, endpoint-local response casts, or
-> hand-written response types to work around stale DTO output. Runtime guards are
-> allowed only as defensive checks after the generated contract is correct; they
-> are not a substitute for fixing OpenAPI.
->
-> Real bug this caught: `/assets/filter-options` returns `camera_models`, but a
-> cast had guessed `cameras`, silently breaking the camera `@`-mention. The DTO
-> (`dto.OptionsResponseDTO`) and its `@Success` annotation were both correct —
-> `task dto` simply had not been re-run, so the cast masked the stale type.
-
-For API changes:
-
-1. Update backend annotations and handler behavior.
-2. Run `task dto`.
-3. Update frontend hooks/components against generated types.
+- An `as` cast on an API response is a red flag, never a fix.
 
 The checked-in fetch/query runtime comes from the official `openapi-fetch`,
-`openapi-react-query`, and `openapi-typescript-helpers` packages. `task dto`
-runs `web/scripts/generate-openapi-types.ts`, which removes the known empty
-object branch emitted by swag v2 for required JSON request bodies before type
-generation. Keep this normalization in the generator; never post-edit
-`schema.d.ts`.
+`openapi-react-query`, and `openapi-typescript-helpers` packages. Regeneration,
+cast triage, and the swag empty-object quirk:
+[lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
 
 ## State Boundaries
 
-Use TanStack Query for server state:
-
-- fetched backend data
-- cache lifecycle
-- loading/error state
-- pagination and refetch behavior
+Use TanStack Query for server state: fetched backend data, cache lifecycle,
+loading/error state, pagination and refetch behavior.
 
 Events follow this boundary directly: the index uses opaque server cursors,
 detail and mutation state remain in TanStack Query, and the detail gallery
@@ -158,11 +99,8 @@ composes the public Assets entry with an immutable `event_id` constraint.
 Assets exposes feature-neutral logical selection values to Event correction
 actions; Events never imports Assets selection internals.
 
-Use Context for cross-cutting runtime capabilities:
-
-- auth session
-- global runtime/notification coordination
-- worker dependencies
+Use Context for cross-cutting runtime capabilities: auth session, global
+runtime/notification coordination, worker dependencies.
 
 Use flow-local Zustand or `useReducer` for interaction shared by several
 components in one workflow. Use component-local state for one component, URL
@@ -245,54 +183,21 @@ The production web image uses Caddy:
   Places rail drains location-cluster pages to produce complete city summaries,
   but it never drains map points.
 - `web/scripts/check-bundle-budget.ts` enforces a 420 KiB gzip budget for the
-  production entry chunk as part of `task web:test:browser`.
+  production entry chunk as part of `vp run test:bundle`.
 
-## Z-Index Strategy
+## Z-Index
 
-Three rules, in priority order:
-
-1. **Decorative overlays → DOM order.** Gradient tints, badges, hover masks, and
-   other purely visual layers must not carry a z-index. Place them after the
-   content they cover in DOM order.
-2. **Component-internal overlap → `isolation: isolate`.** When a component has
-   multiple overlapping layers (dropdown inside a card, sticky header inside a
-   panel), add `isolate` to the component root and keep internal values small
-   (z-10 / z-20 / z-30). Internal z-index must never leak into the global stack.
-3. **Cross-component floating layers → z-index tokens.** Use the theme tokens
-   defined in `App.css` `@theme inline`:
-
-| Token | Value | Use |
-| --- | --- | --- |
-| `z-sticky` | 100 | Sticky headers, save bars |
-| `z-dropdown` | 200 | Dropdown menus, popovers, autocomplete |
-| `z-overlay` | 300 | FABs, application drawers, floating docks, drag overlays |
-| `z-modal` | 400 | Modals and modal bottom-sheets |
-| `z-lightbox` | 500 | Fullscreen viewers (AssetViewer, PublicShareLightbox) |
-| `z-tooltip` | 600 | Portaled tooltips/popovers that escape a lightbox |
-| `z-toast` | 700 | App-wide notifications above other document-layer floating UI |
-
-Apply a global token once, on the floating layer's stacking-context root. Its
-children should use DOM order or small local values. If an in-tree floating
-layer is trapped by a component's `isolate`, portal the layer root to
-`document.body`.
-
-React-controlled daisyUI `.modal-open` roots must carry `z-modal`, which
-overrides daisyUI's library default. Native dialogs opened with `showModal()`
-live in the browser top layer and are the exception: do not add a token merely
-to compete with document stacking contexts.
-
-Inline styles use `var(--z-index-<token-name>)`. Do not introduce new numeric
-z-index values for cross-component layers; extend the token scale if a new tier
-is genuinely needed.
+Decorative overlays use DOM order; component-internal overlap uses
+`isolation: isolate`; cross-component floating layers use the token scale in
+`App.css`. Application procedure:
+[lumilio-z-index](../../../.agents/skills/lumilio-z-index/SKILL.md).
 
 ## Test layers
 
 Pick the layer by what the test must exercise; the file name and directory pick
-the runner and dependency boundary for you (`web/vite.config.ts` `test.projects`
-maps them). Do not invent other conventions — e.g. there is no
-`*.integration.test.tsx`; `flows/<flow>/*.spec.tsx` and `e2e/specs/*.spec.ts`
-share the word "spec" but their directory, extension, runner and dependency edge
-already disambiguate.
+the runner (`web/vite.config.ts` `test.projects`). Do not invent other
+conventions. Placement, GPU self-skip, and proving a guard can fail:
+[lumilio-write-a-test](../../../.agents/skills/lumilio-write-a-test/SKILL.md).
 
 | Layer | File | Runner / Vitest project | Answers |
 | --- | --- | --- | --- |
@@ -304,178 +209,22 @@ already disambiguate.
 
 The `unit` project excludes `*.browser.test.ts` and `src/workers/**` so an
 accidental browser dependency fails instead of hiding; `integration` and
-`browser` run real Chromium via the Playwright provider. Details per layer:
-Integration Specs and E2E have their own sections below.
+`browser` run real Chromium via the Playwright provider. Core-browsing UI is
+assigned to Playwright by the
+[test-layer assignment decision](../../../.agents/decisions/2026-08-14-frontend-test-layer-assignment.md).
 
-`src/workers/hash.test.ts` is a browser contract test selected through the
-worker directory even though it uses the shorter `.test.ts` suffix. The normal
-Web gate covers small files and the backend-compatible quick-hash path for
-files over 100 MiB. The 20 × 50 MiB throughput case is intentionally excluded;
-run it explicitly with `vp run test:hash-perf` when changing hash-worker
-performance.
-
-### GPU / WebGL capability tests
-
-A `*.browser.test.ts` gets a real Worker, WASM, Canvas and WebGL context — but
-**headless Chromium falls back to SwiftShader, whose WebGL is disabled on Apple
-Silicon**, so a WebGL2-dependent test cannot get a context headless on an M-series
-Mac (and usually not on a GPU-less CI runner either). Such a test must therefore:
-
-- **Guard the capability** at runtime and skip, never fail: probe with a helper
-  like `webgl2Available()` (`new OffscreenCanvas(1,1).getContext("webgl2")`) and
-  wrap the suite in `describe.skipIf(!webgl2Available())`. A skipped capability is
-  correct; a suite that fails to launch a browser is not.
-- **Run headed locally** to actually exercise it. The `browser` project reads
-  `STUDIO_GPU=true` (see `vite.config.ts`, same env-gated shape as
-  `hash-performance`) and switches to `headless: false`, using the machine's real
-  GPU. So `STUDIO_GPU=true vp test <files>` runs them for real; the default stays
-  headless so CI can always launch (those suites skip there).
-
-Non-GPU capability tests (Canvas 2D, Worker, WASM) run headless everywhere and
-need no guard — keep them assertable in CI.
+Flow specs: [lumilio-integration-spec](../../../.agents/skills/lumilio-integration-spec/SKILL.md).
+Playwright specs: [lumilio-e2e-spec](../../../.agents/skills/lumilio-e2e-spec/SKILL.md).
+E2E stack: [lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md).
 
 ## Quality Gate
 
-Frontend gate:
-
 ```bash
 task web:test
-task web:test:browser
 ```
 
-Direct equivalent when intentionally scoped to `web/`:
-
-```bash
-cd web && vp check --no-fmt --no-lint && vp lint && vp test
-cd web && vp run e2e:up
-cd web && vp run e2e:seed
-cd web && vp run e2e:test --grep @smoke --workers=1
-cd web && vp run e2e:down
-```
-
-`web:test:browser` runs the `@smoke` subset of the Playwright E2E suite against
-the isolated Compose environment with one worker. The compact suite covers
-capabilities, login, a real repository scan, and one upload reused across album,
-viewer, Trash, and restore assertions. Authentication hardening, video
-semantics, and database recovery are separate serial suites and CI selects them
-through narrow path filters; do not fold them back into every Web run or add a
-scheduled full-library matrix. `task web:test:backup-recovery` is the targeted
-public UI/API recovery gate.
-
-The first-party API, SQLite catalog, storage, and queues are real; only external
-services may be replaced. Run `e2e:up` first and `e2e:down` afterwards. Install
-the project-pinned browser revision with `vp exec playwright install chromium` locally, or
-`vp exec playwright install --with-deps chromium` on Linux CI.
-
-Rebuild the `lumilio` service (`docker compose -f web/e2e/compose.yml -p
-lumilio-photos-e2e up -d --build lumilio`) after changing frontend source; the
-container serves a built image, so edits are otherwise invisible to the suite.
-
-### E2E Locators
-
-Specs run under `locale: "en-US"` (set in `playwright.config.ts`), which is what
-i18next detects from `navigator`. Pick locators in this order:
-
-1. `getByRole(role, { name })` with the name resolved through `e2e/support/i18n.ts`,
-   which reads the same `en` bundle the app renders. Roles are semantic and are
-   never translated; rewording a string keeps specs green, renaming a key fails
-   them — which is the structural change that should fail.
-2. Data anchors from `.cache/e2e/seed.json` via the `seed` export in
-   `e2e/fixtures/test.ts`. Filenames and ids are data, not copy.
-3. API and URL facts. `waitForResponse` on a real response beats waiting for UI
-   wording, and it is the only reliable signal for work that continues after the
-   request is accepted.
-4. `getByTestId`, only for elements with no stable accessible semantics. Scope
-   dynamic rows through a container test id plus a data attribute instead of
-   interpolating a runtime id into the test id.
-
-Two things are not allowed:
-
-- **UI copy literals in specs.** They couple tests to translations, so every
-  wording change drags a spec change behind it.
-- **`aria-label` as a test hook.** It is user-facing text that screen readers
-  announce. Translated, it couples to copy exactly like visible text and buys
-  nothing; frozen in English to stabilise tests, it breaks non-English assistive
-  technology. On an element that already has visible text it also overrides the
-  accessible name, violating WCAG 2.5.3 (Label in Name) and breaking voice
-  control. Reserve `aria-label` for elements with no visible text, such as
-  icon-only buttons.
-
-Form fields get their accessible name from `<label htmlFor>` paired with
-`<input id>`. `Field` in `features/auth/components/ui/Fields.tsx` generates the
-id with `useId` and passes it down through context, so `TextInput` and
-`PasswordField` pair automatically and no call site can forget. Follow that
-shape when adding field components rather than re-exposing an optional
-`htmlFor`, which is how the pairing was missed before.
-
-Assert on data and API facts, not on wording; copy correctness belongs to i18n,
-not to E2E. Note that `getByLabel` matches substrings — pass `{ exact: true }`
-where a shorter label would otherwise also match a longer one, as "Password"
-does against the "Show password" toggle.
-
-### Integration Specs (Vitest `integration` project)
-
-Component `*.test.tsx` and colocated flow `*.spec.tsx` run in real Chromium via
-`vitest-browser-react` — there is no jsdom/happy-dom, so layout, CSS,
-`matchMedia`, `ResizeObserver`/`IntersectionObserver`, storage and events are the
-real implementations. See ADR-006 for the layering rationale. Shared test
-infrastructure lives under `web/test/` (alias `@test`):
-
-- `@test/render` — `renderWithProviders(ui, opts)` wraps real i18n, global
-  context and a fresh `QueryClient` (retries off, so a mocked error surfaces at
-  once). `opts.auth: true` adds the real `AuthProvider`; `opts.router: false`
-  when the spec brings its own `MemoryRouter`/`Routes` (needed for `useParams`,
-  a seeded history, or custom `Routes`). Returns the `vitest-browser-react`
-  result — `await` it.
-- `@test/msw` — the shared `setupWorker` plus re-exported `http`/`HttpResponse`.
-  Declare per-test responses with `worker.use(http.get("*/api/v1/…", …))`; the
-  `*` origin prefix matches whatever base URL the client builds. Only `/api/`
-  requests are guarded (erroring when unhandled) so Vite can still serve modules.
-- `@test/i18n` — `t(key, opts?)` resolves a translation key to its current `en`
-  copy through the app's own i18next instance.
-- `@test/session` — `seedSession(user)` stores an access token plus CSRF proof
-  and answers the cookie-session bootstrap (`/auth/csrf` + `/auth/refresh`),
-  `/auth/me`, and media-token requests so the real `AuthProvider` settles to
-  `user`. Pair with `renderWithProviders(ui, { auth: true })`.
-
-Mock **only** the HTTP boundary through MSW. Do not mock `$api`, Query/Router
-hooks, or feature stores — drive them with real data via `worker.use` and, where
-a hook needs scope context, wrap in the real provider (e.g. `AssetBrowserScope`
-with `initialSelection` to seed selection without a gallery). Type fixtures with
-the generated DTOs and `satisfies`, never `as any`. A component `*.test.tsx` may
-still stub a genuinely heavy **leaf child** at a clear boundary (a full-screen
-`AssetViewer`, a WASM gallery) to keep the subject in focus; a flow `*.spec.tsx`
-should not.
-
-**What belongs in E2E instead.** Core-browsing UI — the full `AssetBrowser` with
-its WASM justified layout, viewport virtualization, URL/route state and real
-selection — is assigned to Playwright by ADR-005/006. Do not force it into the
-integration project; a real render there is high-effort and brittle for low
-fidelity. Extract any pure logic to a unit test and put the interactive path in
-`e2e/specs/`. (This is why `PhotoPicker` and `AlbumDetailsFlow` have E2E
-placeholders rather than integration specs.)
-
-**Locators.** Match E2E discipline: **no app-copy literals** — resolve accessible
-names by key through `t` from `@test/i18n` (rewording keeps specs green; renaming
-a key fails them). Only strings the spec owns (route sentinels, fixtures) are
-literals. `getByRole`/`getByLabelText` names match as substrings — pass
-`{ exact: true }` when a shorter name also matches a longer one ("Confirm" vs
-"Confirm action", "New password" vs "Confirm new password"). There is **no
-`getByDisplayValue`** in the browser locator API; target inputs by their label.
-
-Gotchas:
-
-- **Import cross-feature test infrastructure by its narrow module path, never the
-  feature barrel.** `@test/render` imports `AuthProvider` from
-  `@/features/auth/state/AuthProvider`, not `@/features/auth`. The barrel eagerly
-  evaluates the whole feature graph (webauthn, MFA, gates), pulling a second
-  React / react-query instance into the pre-bundle; hooks then read a null
-  context and throw `Cannot read properties of null (reading 'useContext')`.
-- **One unresolved import anywhere under `src/` fails the whole dependency scan**,
-  so no integration test runs. While migrating, park a not-yet-rewritten file out
-  of the glob rather than leaving a broken import in range.
-- **A `let` mutated only inside a closure narrows to `never` under optional
-  chaining.** A module-level `let probe = null` assigned inside a `vi.mock`
-  factory, then reset with `probe = null` in the test body, makes TS treat
-  `probe?.prop` as access on `never`. Use a container object (`const probe =
-  { current: null }`) and reset it in `beforeEach`, not inline.
+That is typecheck, lint, source-boundary check, and the Vitest
+unit/integration/browser projects. Playwright slices are separate Task
+targets and need Docker; CI selects them through path filters. Map a diff to
+the narrowest evidence with
+[lumilio-select-checks](../../../.agents/skills/lumilio-select-checks/SKILL.md).

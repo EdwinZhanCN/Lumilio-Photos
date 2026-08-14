@@ -86,14 +86,14 @@ copied into the image.
 | `task web:test` | Run frontend type, lint, boundary, and unit checks |
 | `task desktop:test` | Run the Wails desktop race-test gate |
 | `task compose:test` | Validate production and E2E Compose files |
-| `task ci:architecture` | Run the architecture and Compose CI gates |
-| `task ci:server` | Run the clean-cache Server CI gate |
-| `task ci:web` | Install Web dependencies with the lockfile and run Web checks |
+| `task ci:architecture` | Run the architecture, Compose, and lock CI gates |
+| `task verify:generated` | Regenerate OpenAPI, types, doc.md, config examples; fail on drift |
 | `task ci:site` | Install the documentation site with the lockfile and build it |
 | `task ci:desktop:panel` | Install and build the Desktop control-panel frontend |
 | `task ci:desktop:native` | Test Server and Desktop modules, then compile Desktop |
 | `task dto` | Regenerate OpenAPI, frontend API types, and API documentation |
 | `task config:examples` | Regenerate the configuration schema and TOML examples |
+| `task lumen:record` | Start the E2E stack with fakelumen recording against a real Hub |
 | `task dev:clean` | Delete rebuildable development indexes and logs |
 | `task dev:reset` | Delete development application state while preserving media and caches |
 | `task dev:purge` | Delete the complete development instance, including media (confirms interactively) |
@@ -117,15 +117,18 @@ task compose:test
 does not include the desktop app or browser E2E. Follow the “Test layers”
 section in
 [FRONTEND.md](site/docs/internal/FRONTEND.md) when choosing frontend test
-file names and runners, including GPU and WebGL capability tests.
+file names and runners. Placement:
+[lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 
-The root `ci:*` targets are the commands used by GitHub Actions. Run them from
-the repository root when reproducing a workflow failure:
+Workflows call module targets directly. Reproduce a CI failure with the same
+name the workflow uses:
 
 ```bash
 task ci:architecture
-task ci:server
-task ci:web
+task verify:generated
+task server:test:ci
+task web:install:ci
+task web:test
 task ci:site
 task ci:desktop:panel
 task ci:desktop:native
@@ -157,14 +160,14 @@ task web:test:video-semantic
 task web:test:backup-recovery
 ```
 
-The matching CI E2E contracts are `task ci:web:e2e:browser`,
-`task ci:web:e2e:auth-totp`, `task ci:web:e2e:auth-hardening`, `task ci:web:e2e:video-semantic`, and
-`task ci:web:e2e:backup-recovery`. Playwright installation is exposed through
-`task ci:web:playwright:install` and `task ci:web:playwright:install:deps`.
+The matching CI E2E jobs call the same `web:*` targets. Playwright installation
+is `task web:playwright:install` and `task web:playwright:install:deps`.
 
 Versioned demo and E2E media comes from the
 [`Lumilio-Assets`](https://github.com/EdwinZhanCN/Lumilio-Assets) repository.
-The selected revision is pinned in `assets.lock.json`:
+The selected revision is pinned in `assets.lock.json`. Sync, seed, and pin
+updates: [lumilio-pin-reconcile](.agents/skills/lumilio-pin-reconcile/SKILL.md),
+[lumilio-e2e-environment](.agents/skills/lumilio-e2e-environment/SKILL.md).
 
 ```bash
 cd web
@@ -188,14 +191,16 @@ verifies catalog, `SHA256SUMS`, and consumer builds in CI). See
 
 Update generated artifacts through their source tools; never hand-edit them:
 
-- After changing backend DTOs or API annotations, run `task dto`.
+- After changing backend DTOs or API annotations, run `task dto`
+  ([lumilio-api-contract-change](.agents/skills/lumilio-api-contract-change/SKILL.md)).
 - After changing configuration profiles, schema comments, or examples, run
   `task config:examples`.
-- After changing the SQL schema or queries, run
-  `cd server && sqlc generate`.
-- For frontend i18n, first write `t("key", "default")` in code, then run
-  `cd web && vp exec i18next-cli extract`, and finally fill the Chinese value in
-  the generated JSON.
+- After changing the SQL schema or queries, run `task server:sqlc`.
+- For frontend i18n, follow
+  [lumilio-frontend-i18n](.agents/skills/lumilio-frontend-i18n/SKILL.md).
+- After editing a feature `doc.ts`, run `task web:docs`.
+- `task verify:generated` regenerates the checked-in artifacts above and
+  fails if any of them drifted.
 
 If frontend code needs an `as` cast around an API response, the backend DTO,
 `@Success` annotation, or generated type is usually stale. Fix the contract and

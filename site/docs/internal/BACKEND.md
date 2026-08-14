@@ -234,42 +234,13 @@ absences separated by the configured settle interval.
   `active_installed`, `verified`, and `completed`; rollback has corresponding
   durable phases. Startup reconciles the marker with active/staged/previous/
   failed files after any interrupted rename.
-- Generated sqlc code lives under `server/internal/db/repo`.
-- Generated OpenAPI output lives in `server/docs`.
-- Frontend generated types live in `web/src/lib/http-commons/schema.d.ts`.
 
-After API changes, run:
-
-```bash
-task dto
-```
-
-After SQL schema or SQL queries change, run:
-
-```bash
-cd server && sqlc generate
-```
-
-Do not hand-edit generated OpenAPI or frontend schema artifacts.
-
-Swag v2 currently emits an extra empty-object `oneOf` branch for body
-parameters in OpenAPI 3.1. The frontend DTO generator removes that branch only
-for required JSON request bodies in memory, then generates `schema.d.ts`.
-Optional empty payloads remain optional; backend annotations and DTO validation
-tags still define the contract.
-
-> **If the frontend is casting (`as { ... }`) around a response, the contract is
-> the bug — not the frontend.** Either the handler's `@Success ... {data=dto.X}`
-> annotation is missing/points at the wrong DTO, or the DTO is correct and the
-> generated artifacts are stale (`task dto` was not re-run). Fix the annotation /
-> DTO and regenerate; never let the frontend cast around a typed endpoint. If
-> generated `schema.d.ts` exposes `data?: Record<string, never>` or
-> `data?: unknown` for an endpoint that returns payload data, that is a contract
-> failure: fix backend DTO/annotation/codegen before frontend work proceeds. Do
-> not add frontend compatibility shims for stale DTOs. A stale `task dto` once
-> let `dto.OptionsResponseDTO.camera_models` surface to the SPA as an untyped
-> `Record<string, never>`, so a frontend cast guessed `cameras` and silently
-> broke a feature.
+Generated sqlc code lives under `server/internal/db/repo`. Generated OpenAPI
+output lives in `server/docs`. Frontend generated types live in
+`web/src/lib/http-commons/schema.d.ts`. None of these are hand-edited.
+Regeneration, cast triage, and the swag empty-object quirk:
+[lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
+`task verify:generated` is the CI freshness gate.
 
 ## Browser Session And Cross-Origin Boundary
 
@@ -323,7 +294,8 @@ Accepted uploads expose their user-scoped ingest lifecycle at
 `GET /api/v1/assets/batch/jobs?task_ids=…`. Frontend upload completion means the
 River ingest job reached a terminal state, not merely that multipart transport
 returned 2xx. Repository scans expose run lifecycle through the existing
-`/api/v1/repositories/{id}/scans/latest` endpoint.
+`/api/v1/repositories/{id}/scans/latest` endpoint. E2E seeding and readiness:
+[lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md).
 
 Materialization owns staging files. A commit error is always returned to River
 or the caller; failed quarantine never deletes the source. Existing physical
@@ -383,22 +355,19 @@ Structured Control logs are queried with a bounded, non-following `TailLogs`
 request. Control telemetry is deliberately separate from the lifecycle version
 counter so a status frame cannot make a concurrent start/stop command stale.
 
-The app should remain useful when ML/LLM features are disabled.
+The app should remain useful when ML/LLM features are disabled. Isolated E2E
+talks to `fakelumen`, which replays recorded Hub responses (or a deterministic
+builtin embedding when no fixture matches). Recording is explicit, never
+implicit in CI:
+[lumilio-lumen-fixtures](../../../.agents/skills/lumilio-lumen-fixtures/SKILL.md).
 
 ## Quality Gate
-
-Backend gate:
 
 ```bash
 task server:test
 ```
 
-Use the Taskfile target by default. It exports the local cgo flag allowlist
-needed by media dependencies on macOS. Only run the direct command when you have
-a concrete reason and preserve the same environment:
-
-```bash
-cd server && go test -tags=sqlite_fts5 ./...
-```
-
-Run `gofmt` on changed Go files.
+The Taskfile target exports the local cgo flag allowlist needed by media
+dependencies on macOS. Reproduce the CI Server gate with `task server:test:ci`.
+Run `gofmt` on changed Go files. Map a diff to evidence with
+[lumilio-select-checks](../../../.agents/skills/lumilio-select-checks/SKILL.md).

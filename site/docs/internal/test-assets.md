@@ -5,56 +5,32 @@ repository (`github.com/EdwinZhanCN/Lumilio-Assets`); this repo only pins a
 revision and materializes assets on demand with integrity checks. Never commit
 media files here.
 
+Pin, reconcile, and verify procedure:
+[lumilio-pin-reconcile](../../../.agents/skills/lumilio-pin-reconcile/SKILL.md).
+E2E seed and stack lifecycle:
+[lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md).
+
 ## Pin & profiles
 
-- Root `assets.lock.json` (schemaVersion 1) pins `repository`, `revision` (full
-  40-char SHA), `release`, default `profile`, and `manifestSha256` (integrity of
-  the source `assets.json` catalog). To change the fixture set, bump these — a
-  mismatch fails the sync loudly. Only `release` is chosen by hand: the
-  `assets:reconcile` workflow (manual `workflow_dispatch`) picks the newest
-  stable `assets-vX.Y.Z`, verifies the release's `release.json`, and opens one
-  PR that updates `release` + `revision` + `manifestSha256` together
-  (downgrades rejected; re-running is a no-op). `task assets:check` is the CI
-  gate that validates the lock against the pinned release.
-- The source repo holds `assets.json` (catalog: `id`, `media/...` path, `sha256`,
-  `bytes`), `profiles/<name>.json` (a list of asset IDs), and publishes
-  `release.json` with every release. Profiles: `smoke` (minimal, for e2e) and
-  `demo` (full image pool), plus `e2e` (the deterministic test set).
+Root `assets.lock.json` (schemaVersion 1) pins `repository`, `revision` (full
+40-char SHA), `release`, default `profile`, and `manifestSha256` (integrity of
+the source `assets.json` catalog). Only `release` is chosen by hand; reconcile
+writes `release` + `revision` + `manifestSha256` together. Downgrades are
+rejected. `task assets:check` is the offline CI gate.
 
-## Sync — `vp run assets:sync [--profile <name>]`
+The source repo holds `assets.json` (catalog: `id`, `media/...` path, `sha256`,
+`bytes`), `profiles/<name>.json` (a list of asset IDs), and publishes
+`release.json` with every release. Profiles: `smoke` (minimal, for e2e),
+`demo` (full image pool), and `e2e` (the deterministic test set).
 
-`web/scripts/assets-sync.ts`. Shallow-fetches the pinned revision with
-`GIT_LFS_SKIP_SMUDGE=1`, verifies `assets.json` against `manifestSha256`,
-sparse-checkouts only the selected profile's media + manifest, `git lfs pull`s
-just those files, verifies each file's `sha256`+`bytes`, and atomically
-materializes into `.cache/lumilio-assets/<revision>/<profile>/`. The cache is
-validated (revision+profile+manifest) and reused, so re-runs are cheap.
+Sync materializes into `.cache/lumilio-assets/<revision>/<profile>/`. The cache
+is validated (revision+profile+manifest) and reused.
 
-## Seed a running instance
+## Seed contract
 
-Both seeders drive the real setup-status, repository, and upload HTTP APIs; they
-do not touch the catalog directly.
-
-- **`vp run demo:seed`** (`web/scripts/demo-seed.ts`) — local demo. Syncs the
-  `demo` profile, creates/logs in admin
-  `lumilio-demo` / `Lumilio-Demo-2026!`, creates a dedicated `Lumilio Demo`
-  repository, uploads via `POST /api/v1/assets` against `http://localhost:6680`
-  (`LUMILIO_DEMO_BASE_URL`), then waits for ingestion. Flags: `--concurrency`
-  (1–8), `--timeout` (seconds).
-- **`vp run e2e:seed`** — `assets:sync` (smoke) + `e2e/support/seed.ts` into the
-  e2e stack (base `:16657`, admin `e2e-admin`). The `web/e2e/compose.yml`
-  stack is managed by `vp run e2e:up | e2e:down | e2e:logs`.
-
-## Gotchas
-
-- Seeders wait for **ingestion only, not ML**. `search_embeddings` / semantic
-  search populate asynchronously afterward and only when a Lumen Hub is online —
-  verify those after the ML workers drain, not right when a seed finishes.
-- `server/tools/uploadbench` deliberately **excludes** ML/AI processing; it is a
-  pipeline benchmark, not a way to validate embeddings.
-- First-run readiness: business endpoints (incl. `GET /repositories`) return
-  `409 app_not_initialized` until the instance is fully bootstrapped — admin +
-  exactly one **primary** repository. `demo:seed`
-  self-bootstraps this: on a fresh instance it creates the demo repository as the
-  primary via the ungated `POST /repositories`; when a primary already exists it
-  adds a separate regular demo repository.
+Seeders drive the real setup-status, repository, and upload HTTP APIs; they do
+not touch the catalog directly. They wait for **ingestion only, not ML**.
+`search_embeddings` / semantic search populate asynchronously afterward and
+only when a Lumen Hub (or fakelumen) is online. Business endpoints return
+`409 app_not_initialized` until admin + exactly one primary repository exist.
+`server/tools/uploadbench` deliberately excludes ML.

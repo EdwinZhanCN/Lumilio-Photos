@@ -1,8 +1,5 @@
 # Agent Harness
 
-Status: proposed; the bootstrap directories and entry-point links described
-below are not implemented yet.
-
 The loops, memories, and gates that let coding agents work in this repository
 without losing decisions, repeating incidents, or skipping verification. This
 file is the reference for the harness itself. Repository rules stay in
@@ -21,6 +18,9 @@ file is the reference for the harness itself. Repository rules stay in
 - **Agents cannot read the owner's Obsidian vault.** Strategic and personal
   ADRs live there by design. Any rationale a future agent needs in order not
   to re-litigate a settled decision must exist in this repository.
+- **Skills own the how; internal docs own the what must hold.** When a
+  reference doc carries a step sequence, move it into a skill and leave the
+  contract plus a link.
 
 ## Layout
 
@@ -32,17 +32,21 @@ file is the reference for the harness itself. Repository rules stay in
                 guardrails added
 ```
 
+`.claude/skills` is a symlink to `.agents/skills` so Claude Code loads the
+same tree. `.agents/` stays the real home.
+
 Existing homes keep their jobs: `site/docs/internal/` holds current-state
-reference docs, `site/docs/internal/exec-plans/` tracks large prospective
-work, and root `AGENTS.md` remains the single entry point that links
-everything here.
+reference docs, `site/docs/internal/exec-plans/active/` tracks large
+prospective work (plans are deleted at completion after decision extraction;
+there is no completed archive), and root `AGENTS.md` remains the single entry
+point that links everything here.
 
 | Content | Home |
 | --- | --- |
 | Standing orders for every session | root `AGENTS.md` |
 | Current-state contracts and maps | `site/docs/internal/*.md`, `web/ARCHITECTURE.md` |
-| Large prospective work | `exec-plans/active/` |
-| How to run a recurring workflow | `.agents/skills/<name>/SKILL.md` |
+| Large prospective work | `exec-plans/active/`, deleted at completion |
+| How to run a recurring workflow | `.agents/skills/lumilio-<name>/SKILL.md` |
 | Why a project-coupled decision stands, and what it beat | `.agents/decisions/` |
 | Why an escaped bug got through, and what now stops it | `.agents/postmortems/` |
 | Strategic and personal ADRs | owner's Obsidian vault, outside the repo |
@@ -50,50 +54,31 @@ everything here.
 ## Skills
 
 A skill is one procedure an agent follows end to end: trigger, steps,
-verification, and the mistakes it prevents. Skills own the *how*; reference
-docs own the *what must hold* and link to the skill instead of inlining
-steps.
+verification, and the mistakes it prevents. Each skill is
+`.agents/skills/lumilio-<name>/SKILL.md` with YAML frontmatter whose
+`description` states *when to invoke*. The body is imperative: numbered
+steps, exact commands, the verification that proves the step worked, and
+known failure modes.
 
-Each skill is `.agents/skills/<name>/SKILL.md` with YAML frontmatter:
+`AGENTS.md` lists every skill with its one-line trigger.
 
-```markdown
----
-name: api-contract-change
-description: Use when changing any server DTO, handler annotation, or API
-  response so the OpenAPI spec, frontend types, and docs regenerate together.
----
-```
+### Current set
 
-The `description` states *when to invoke*, not just what it is — agents match
-on it. The body is imperative: numbered steps, exact commands, the
-verification that proves the step worked, and known failure modes. Keep one
-skill per workflow; link contracts rather than restating them.
-
-`AGENTS.md` lists every skill with its one-line trigger. Tool-specific
-loaders may be pointed at the same tree via symlink (for example
-`.claude/skills -> ../.agents/skills`); `.agents/` stays the real home.
-
-### Extraction rule
-
-When a reference doc carries a step sequence that agents repeatedly follow,
-move the procedure into a skill and leave the contract plus a link. This is
-how scattered workflow prose in `internal/` docs drains into `.agents/skills/`
-over time — extraction happens when a doc is next touched, not as a big-bang
-migration.
-
-### Initial set
-
-| Skill | Procedure it owns | Extracted from |
-| --- | --- | --- |
-| `api-contract-change` | backend DTO/annotation change, `task dto`, regenerated `schema.d.ts` verification | AGENTS.md OpenAPI-first rule |
-| `frontend-i18n` | `t("key", "default")`, extract, fill Chinese values | AGENTS.md i18n rule |
-| `feature-doc` | `doc.ts` authoring, `{@link}`/import pairing, `doc.md` regeneration | AGENTS.md + docts.md |
-| `write-a-test` | pick the layer from the FRONTEND.md taxonomy, create the file where the runner expects it | FRONTEND.md test layers |
-| `e2e-environment` | `e2e:up`, seed variants, slice selection, `e2e:down`, log triage | FRONTEND.md E2E sections + web taskfile |
-| `select-checks` | map a diff to the narrowest `task` targets before push; CI owns the full matrix | AGENTS.md test-target rule |
-
-Candidates extracted on demand: WASM rebuild, assets/lumen pin reconcile,
-desktop and docker release.
+| Skill | Procedure it owns |
+| --- | --- |
+| [lumilio-select-checks](../../../.agents/skills/lumilio-select-checks/SKILL.md) | map a diff to the narrowest `task` targets before push |
+| [lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md) | DTO/annotation change, `task dto`, `schema.d.ts` verification, cast triage |
+| [lumilio-write-a-test](../../../.agents/skills/lumilio-write-a-test/SKILL.md) | pick the test layer, file name, GPU self-skip, prove it can fail |
+| [lumilio-integration-spec](../../../.agents/skills/lumilio-integration-spec/SKILL.md) | Vitest component/flow specs: MSW, helpers, locators, import gotchas |
+| [lumilio-e2e-spec](../../../.agents/skills/lumilio-e2e-spec/SKILL.md) | Playwright locator order, i18n-safe names, forbidden aria-label hooks |
+| [lumilio-frontend-i18n](../../../.agents/skills/lumilio-frontend-i18n/SKILL.md) | extract-then-fill workflow and capability terminology |
+| [lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md) | E2E stack lifecycle, seed variants, slice selection, readiness |
+| [lumilio-lumen-fixtures](../../../.agents/skills/lumilio-lumen-fixtures/SKILL.md) | record real Hub responses, replay them keyless in CI |
+| [lumilio-z-index](../../../.agents/skills/lumilio-z-index/SKILL.md) | three-rule stacking strategy and token scale |
+| [lumilio-add-task-target](../../../.agents/skills/lumilio-add-task-target/SKILL.md) | Taskfile placement, naming, when a `ci:*` orchestrator is earned |
+| [lumilio-feature-doc](../../../.agents/skills/lumilio-feature-doc/SKILL.md) | `doc.ts` authoring, `{@link}`/import pairing, `doc.md` regeneration |
+| [lumilio-pin-reconcile](../../../.agents/skills/lumilio-pin-reconcile/SKILL.md) | assets.lock / lumen.lock bump, verify, PR shape |
+| [lumilio-exec-plan](../../../.agents/skills/lumilio-exec-plan/SKILL.md) | plan creation criteria, skeleton, completion extraction |
 
 ## Decision records
 
@@ -126,8 +111,10 @@ Status: implemented | rejected — <one line>
 When to write one: a non-trivial, project-coupled change — behavior, a
 cross-module contract, an on-disk or wire format, process or tooling, a
 dependency or pin policy — records its decision in the same PR. Work driven
-by an exec plan may keep the decision inside the plan's completed record;
-link it instead of duplicating. Mechanical or local edits are exempt.
+by an exec plan keeps interim decisions inside the active plan; completing
+the plan extracts the durable ones here
+([lumilio-exec-plan](../../../.agents/skills/lumilio-exec-plan/SKILL.md)).
+Mechanical or local edits are exempt.
 
 ## Postmortems
 
@@ -151,29 +138,21 @@ interesting part is why every safety net missed it, not the one-line fix.
 - `## Guardrails added` must link the real artifacts — the regression test,
   CI gate, or AGENTS.md rule merged because of this incident. A postmortem
   without a merged guardrail is not finished.
-- Existing regression slices (`auth-totp`, `backup-recovery`, ...) show the
-  pattern: an incident buys a permanent gate. The postmortem keeps the *why*
-  attached to that gate.
+- An empty directory is a good sign, not a gap.
 
 ## Generated-artifact freshness
 
 Rule: every checked-in generated artifact either has a CI freshness gate or a
-named exception with a reason. "Never hand-edit" stays a prose rule only
-until a gate exists; gates are the durable form.
-
-A root `verify:generated` task regenerates and asserts a clean tree
-(`git diff --exit-code`), wired into CI:
+named exception with a reason. `task verify:generated` regenerates and
+asserts a clean tree (`git diff --exit-code`) in the `generated` CI job:
 
 | Artifact | Generator | Gate |
 | --- | --- | --- |
 | `web/src/lib/http-commons/schema.d.ts`, OpenAPI spec and docs | `task dto` | `verify:generated` |
-| `doc.md` siblings of feature `doc.ts` | docts | `verify:generated` |
+| `doc.md` siblings of feature `doc.ts` | `task web:docs` | `verify:generated` |
 | Server config schema and examples | `task config:examples` | `verify:generated` |
 | `assets.lock.json`, `lumen.lock.json` | reconcile/sync tools | already gated: `assets:check`, `lumen:check` |
 | `web/src/wasm/*` bundles | `task wasm:blake3` | **exception**: Rust toolchain is not a CI baseline; PR review owns freshness |
-
-Pre-commit may regenerate-and-stage instead of rejecting, so a forgotten
-generator run is fixed at commit time rather than failing CI later.
 
 ## Testing doctrine
 
@@ -190,12 +169,13 @@ Linked from `AGENTS.md`; this section is the home.
 - **A guard must be proven to fail.** When adding a regression test, introduce
   the regression, watch the test go red, revert. A test that cannot fail for
   its mechanism is a false guard; state the red run in the PR.
-- **Record/replay at the expensive nondeterministic boundary.** The Lumen
-  inference boundary (`siglip`, `face`, `ocr`, `bioclip`) is the candidate:
-  record real responses once into reviewed fixtures, replay them keyless and
-  GPU-less in CI, and keep the full-stack E2E slices for a small set of
-  smokes. Recording is explicit, never implicit in CI; every fixture diff is
-  reviewed.
+- **Record/replay at the expensive nondeterministic boundary.** Lumen
+  inference (`siglip`, `face`, `ocr`, `bioclip`) records real Hub responses
+  into reviewed fixtures and replays them keyless and GPU-less through
+  `fakelumen`. Recording is explicit (`task lumen:record`), never implicit in
+  CI. Until a recorded set is committed, replay serves the deterministic
+  builtin embedding — same as the previous constant-vector fixture.
+  Procedure: [lumilio-lumen-fixtures](../../../.agents/skills/lumilio-lumen-fixtures/SKILL.md).
 
 ## The obligation
 
@@ -205,10 +185,9 @@ The single rule that closes the loop, carried in `AGENTS.md`:
 > decision record, exec plan, or postmortem — and passes the gates its diff
 > touches. Mechanical or local edits are exempt.
 
-## Bootstrap state
+## Current state
 
-The directories, this reference, and the `AGENTS.md` links come first; the
-initial skills are extracted from the docs named above; `verify:generated`
-lands with the first gate it can enforce. Decision records and postmortems
-accumulate as the work happens — an empty `postmortems/` directory is a good
-sign, not a gap.
+The directories, the skills listed above, `.claude/skills` symlink, the
+`AGENTS.md` routing, `verify:generated`, and Lumen record/replay exist.
+`ci:*` names remain only for real orchestrators; workflows call module
+targets directly. Postmortems accumulate as incidents happen.

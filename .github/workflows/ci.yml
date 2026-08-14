@@ -14,8 +14,9 @@ concurrency:
 
 # Ownership boundary: this workflow owns triggers, path filters, runner OS,
 # native packages, credentials, caches, Buildx, and artifacts. Repository
-# commands and their sequencing live in the Taskfiles (task ci:* / web:* /
-# desktop:* contracts); see third_party/MIGRATION.md.
+# commands live in the Taskfiles. Workflows call module targets directly
+# (web:test, server:test:ci, web:e2e:up, …). Root ci:* names exist only for
+# real cross-module orchestration (ci:architecture, ci:site, ci:desktop:*).
 jobs:
     # Detect which subtrees changed so each gate only runs when relevant.
     changes:
@@ -35,6 +36,7 @@ jobs:
             recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
+            agent_loop: ${{ steps.filter.outputs.agent_loop }}
         steps:
             - uses: actions/checkout@v7
             - uses: dorny/paths-filter@v4
@@ -62,6 +64,7 @@ jobs:
                           - 'server/go.mod'
                           - 'server/go.sum'
                           - 'server/migrations/**'
+                          - 'server/tools/fakelumen/**'
                           - 'server/internal/api/handler/album_handler.go'
                           - 'server/internal/api/handler/asset_handler*.go'
                           - 'server/internal/api/handler/repository_scan_handler*.go'
@@ -159,6 +162,7 @@ jobs:
                           - 'server/internal/queue/jobs/types.go'
                           - 'web/e2e/specs/video-semantic*.spec.ts'
                           - 'web/e2e/support/fakelumen.Dockerfile'
+                          - 'server/tools/fakelumen/**'
                           - 'web/src/features/assets/flows/viewer/media/**'
                           - 'web/src/features/assets/model/browseItems.ts'
                           - 'web/src/features/monitor/api/useAssetIndexing.ts'
@@ -190,6 +194,16 @@ jobs:
                           - 'site/**'
                           - 'taskfile.yml'
                           - '.github/workflows/ci.yml'
+                      agent_loop:
+                          - '.github/ISSUE_TEMPLATE/**'
+                          - '.github/codex/**'
+                          - '.github/workflows/agent-*.yml'
+                          - '.agents/skills/lumilio-agent-task-loop/**'
+                          - 'AGENTS.md'
+                          - 'site/docs/internal/agent-harness.md'
+                          - 'site/docs/internal/exec-plans/active/agent-issue-loop.md'
+                          - 'taskfile.yml'
+                          - '.github/workflows/ci.yml'
 
     sqlite-architecture:
         name: SQLite-only architecture
@@ -212,6 +226,45 @@ jobs:
 
             - name: Run architecture and Compose gates
               run: task ci:architecture
+
+    generated:
+        name: generated artifacts
+        needs: changes
+        permissions:
+            contents: read
+            packages: read
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: server/go.mod
+                  cache-dependency-path: server/go.sum
+
+            - uses: voidzero-dev/setup-vp@v1
+              with:
+                  node-version: '24'
+                  cache: true
+
+            - name: Authenticate GitHub Packages
+              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install generators
+              run: |
+                  task tools:install
+                  task web:install:ci
+                  task site:install:ci
+
+            - name: Verify generated artifacts are fresh
+              run: task verify:generated
 
     # Linux is the standalone Server deployment target. macOS and Windows run
     # the same complete Server suite below as part of their Desktop App gates,
@@ -242,7 +295,7 @@ jobs:
                   sudo apt-get install -y --no-install-recommends libvips-dev libraw-dev libsqlite3-dev libheif-plugin-aomenc libheif-plugin-libde265
 
             - name: Run Server CI gate
-              run: task ci:server
+              run: task server:test:ci
 
     web:
         name: web (Task)
@@ -273,7 +326,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Install dependencies
-              run: task ci:web:install
+              run: task web:install:ci
 
             # Keyed on the lockfile, which changes when the Playwright version
             # does. A hit still needs `install-deps` for the apt libraries the
@@ -288,15 +341,15 @@ jobs:
 
             - name: Install Playwright Chromium
               if: steps.playwright-cache.outputs.cache-hit != 'true'
-              run: task ci:web:playwright:install
+              run: task web:playwright:install
 
             - name: Install Playwright browser system dependencies
               if: steps.playwright-cache.outputs.cache-hit == 'true'
-              run: task ci:web:playwright:install:deps
+              run: task web:playwright:install:deps
 
             - name: Run Web checks and unit tests
               if: needs.changes.outputs.web == 'true'
-              run: task ci:web:test
+              run: task web:test
 
             # A docker-container builder plus the ACTIONS_* runtime env let the
             # E2E image builds read and write the GitHub Actions layer cache;
@@ -308,33 +361,33 @@ jobs:
 
             - name: Start isolated E2E environment
               if: needs.changes.outputs.e2e == 'true'
-              run: task ci:web:e2e:up
+              run: task web:e2e:up
               env:
                   LUMILIO_E2E_COMPOSE_EXTRA: web/e2e/compose.ci.yml
 
             - name: Run first-admin TOTP bootstrap regression
               if: needs.changes.outputs.auth_e2e == 'true'
-              run: task ci:web:e2e:auth-totp
+              run: task web:test:auth-totp
 
             - name: Run Chromium smoke
               if: needs.changes.outputs.browser_smoke == 'true'
-              run: task ci:web:e2e:browser
+              run: task web:test:browser
 
             - name: Run authentication hardening regression
               if: needs.changes.outputs.auth_e2e == 'true'
-              run: task ci:web:e2e:auth-hardening
+              run: task web:test:auth-hardening
 
             - name: Run Lumilio Agent trust-contract regression
               if: needs.changes.outputs.agent_e2e == 'true'
-              run: task ci:web:e2e:agent-trust
+              run: task web:test:agent-trust
 
             - name: Run video semantic regression
               if: needs.changes.outputs.video_e2e == 'true'
-              run: task ci:web:e2e:video-semantic
+              run: task web:test:video-semantic
 
             - name: Run database backup and recovery regression
               if: needs.changes.outputs.recovery_e2e == 'true'
-              run: task ci:web:e2e:backup-recovery
+              run: task web:test:backup-recovery
 
             - name: Capture E2E service logs
               if: ${{ failure() && needs.changes.outputs.e2e == 'true' }}
@@ -356,7 +409,7 @@ jobs:
 
             - name: Stop isolated E2E environment
               if: ${{ always() && needs.changes.outputs.e2e == 'true' }}
-              run: task ci:web:e2e:down
+              run: task web:e2e:down
 
     # macOS and Windows intentionally validate the same product surface:
     # complete embedded Server tests, complete Desktop tests, and a native CGo
@@ -503,6 +556,26 @@ jobs:
             - name: Install and build docs site
               run: task ci:site
 
+    agent-loop:
+        name: GitHub agent-loop policies
+        needs: changes
+        if: needs.changes.outputs.agent_loop == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - name: Test agent-loop policies
+              run: task agent-loop:test
+
     # This is the single stable branch-protection check. It always runs, even
     # when a path-filtered job is skipped, and verifies that every job which was
     # expected for this change actually succeeded.
@@ -512,17 +585,20 @@ jobs:
         needs:
             - changes
             - sqlite-architecture
+            - generated
             - server-linux
             - web
             - desktop-macos
             - desktop-windows
             - site
+            - agent-loop
         runs-on: ubuntu-latest
         steps:
             - name: Require all applicable CI jobs
               env:
                   CHANGES_RESULT: ${{ needs.changes.result }}
                   SQLITE_ARCHITECTURE_RESULT: ${{ needs.sqlite-architecture.result }}
+                  GENERATED_RESULT: ${{ needs.generated.result }}
                   SERVER_CHANGED: ${{ needs.changes.outputs.server }}
                   SERVER_RESULT: ${{ needs.server-linux.result }}
                   WEB_REQUIRED: ${{ needs.changes.outputs.web_job }}
@@ -532,6 +608,8 @@ jobs:
                   DESKTOP_WINDOWS_RESULT: ${{ needs.desktop-windows.result }}
                   SITE_CHANGED: ${{ needs.changes.outputs.site }}
                   SITE_RESULT: ${{ needs.site.result }}
+                  AGENT_LOOP_CHANGED: ${{ needs.changes.outputs.agent_loop }}
+                  AGENT_LOOP_RESULT: ${{ needs.agent-loop.result }}
               run: |
                   set -eu
 
@@ -542,6 +620,11 @@ jobs:
 
                   if [ "$SQLITE_ARCHITECTURE_RESULT" != "success" ]; then
                       echo "::error::sqlite architecture finished with $SQLITE_ARCHITECTURE_RESULT"
+                      exit 1
+                  fi
+
+                  if [ "$GENERATED_RESULT" != "success" ]; then
+                      echo "::error::generated artifacts finished with $GENERATED_RESULT"
                       exit 1
                   fi
 
@@ -566,3 +649,4 @@ jobs:
                   check_job "desktop macos" "$DESKTOP_CHANGED" "$DESKTOP_MACOS_RESULT"
                   check_job "desktop windows" "$DESKTOP_CHANGED" "$DESKTOP_WINDOWS_RESULT"
                   check_job "site" "$SITE_CHANGED" "$SITE_RESULT"
+                  check_job "GitHub agent-loop policies" "$AGENT_LOOP_CHANGED" "$AGENT_LOOP_RESULT"

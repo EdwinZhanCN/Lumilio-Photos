@@ -428,8 +428,8 @@ reading server logs.
   unchanged.
 - Update `BACKEND.md` with the final snapshot and lifecycle authority, and
   update Monitor feature documentation through its canonical `doc.ts` flow.
-- Move this record to `completed/`, retaining the final contracts, validation
-  evidence, and durable decisions.
+- Complete this plan per [README.md](README.md): extract durable decisions to
+  `.agents/decisions/`, then delete this file.
 
 Exit: all automated and real-node gates below pass with no Server restart,
 manual rescan, or feature-toggle side effect.

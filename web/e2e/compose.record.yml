@@ -1,0 +1,26 @@
+# Recording overlay: point the Lumen boundary at a real Hub and persist every
+# inference exchange into the committed fixture tree. Usage (from web/):
+#
+#   docker compose -f e2e/compose.yml -f e2e/compose.record.yml -p lumilio-photos-e2e up -d --build
+#
+# then seed and run the slices whose fixtures you want to refresh, tear the
+# stack down, and review/commit the diff under server/tools/fakelumen/fixtures/.
+# The upstream defaults to a Hub on the Docker host; override with
+# LUMILIO_LUMEN_RECORD_UPSTREAM. See
+# .agents/skills/lumilio-lumen-fixtures/SKILL.md for the full procedure.
+services:
+  lumen-fixture:
+    command:
+      - "-record"
+      - "-upstream"
+      - "${LUMILIO_LUMEN_RECORD_UPSTREAM:-host.docker.internal:50051}"
+      - "-fixtures"
+      - "/record-out"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../../server/tools/fakelumen/fixtures:/record-out
+    # The scratch image runs as 65532; recording needs to write the mounted
+    # fixture tree, so run the recording container as the invoking user's
+    # default instead.
+    user: "0:0"

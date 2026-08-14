@@ -32,6 +32,6 @@ task compose:test
 task ci:site
 ```
 
-浏览器回归通过隔离 Compose 环境和 Web Taskfile 运行；认证强化、Agent 信任、视频语义和备份恢复有窄化目标。CI 失败应优先使用同名 `ci:*` 任务复现。
+浏览器回归通过隔离 Compose 环境和 Web Taskfile 运行；认证强化、Agent 信任、视频语义和备份恢复有窄化目标。CI 失败应使用 workflow 里的同名任务复现（例如 `task web:test`、`task server:test:ci`），只有真正跨模块编排才保留 `ci:*`（`ci:architecture`、`ci:site`、`ci:desktop:*`）。
 
 文档变更至少运行站点 `docs-checks.ts` 和 VitePress build。新增中文页面还应保证侧栏可达、旧路由兼容、frontmatter baseline 存在且无孤儿主页面。

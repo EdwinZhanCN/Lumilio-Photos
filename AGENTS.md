@@ -45,29 +45,33 @@ Then read only the references relevant to the change:
   [vite-plus.md](site/docs/internal/vite-plus.md) and
   [docts.md](site/docs/internal/docts.md).
 - Known debt: [tech-debt-tracker.md](site/docs/internal/exec-plans/tech-debt-tracker.md).
+- Harness itself (memories, skills, gates):
+  [agent-harness.md](site/docs/internal/agent-harness.md).
 
-Completed plans under `site/docs/internal/exec-plans/completed/` are
-historical records, not required reading.
+## Agent Memories And Skills
 
-## Canonical Lumen Capability Terminology
+Recurring procedures live in `.agents/skills/lumilio-<name>/SKILL.md`; read
+the skill before running its workflow. Current set:
 
-The following four user-facing capability names are exact product terms. Use
-them consistently in the Web UI, Desktop UI, CLI TUI, documentation, READMEs,
-release notes, and deployment tools.
+- `select-checks` — map a diff to the narrowest checks
+- `api-contract-change` — DTO / OpenAPI / `schema.d.ts`
+- `write-a-test` — layer, placement, GPU self-skip
+- `integration-spec` — Vitest component/flow specs
+- `e2e-spec` — Playwright locators
+- `frontend-i18n` — extract-then-fill and capability terminology
+- `e2e-environment` — Compose stack, seeds, slices
+- `lumen-fixtures` — record/replay Hub inference
+- `z-index` — stacking tokens
+- `add-task-target` — Taskfile / CI wiring
+- `feature-doc` — `doc.ts` / `doc.md`
+- `pin-reconcile` — `assets.lock.json` / `lumen.lock.json`
+- `exec-plan` — plan lifecycle
 
-| Internal service | Simplified Chinese | English |
-| --- | --- | --- |
-| `siglip` | `图像语义分析` | `Image Semantic Analysis` |
-| `face` | `人物识别` | `Person Recognition` |
-| `ocr` | `OCR文字识别` | `OCR Text Recognition` |
-| `bioclip` | `BioCLIP物种识别` | `BioCLIP Species Recognition` |
-
-Do not rename these capabilities as `语义搜索` / `Semantic Search`, `人脸识别`
-/ `Face Recognition`, bare `OCR`, or bare `物种识别` / `Species Recognition`.
-Descriptions may explain that a capability enables natural-language search,
-face processing, text extraction, or species classification, but the capability
-label itself must use the exact term above. Protocol task names, model names,
-database fields, and API identifiers remain unchanged.
+Project-coupled decisions live in `.agents/decisions/`; escaped-bug records
+live in `.agents/postmortems/`. A non-trivial change updates one memory in
+the same PR — the owning decision record, exec plan, or postmortem;
+mechanical or local edits are exempt. Formats:
+[agent-harness.md](site/docs/internal/agent-harness.md).
 
 ## Non-Negotiable Rules
 
@@ -76,28 +80,30 @@ database fields, and API identifiers remain unchanged.
   desktop changes, and `task compose:test` for deployment changes. These are
   local development gates; `task test` intentionally runs only the architecture,
   Server, and Web gates. It does not include Site, Desktop, or browser E2E.
-- The root `ci:*` targets are the CI contracts and must be runnable from the
-  repository root: `task ci:architecture`, `task ci:server`, `task ci:web`,
-  `task ci:site`, `task ci:desktop:panel`, and `task ci:desktop:native`.
-  Web CI slices use `task ci:web:playwright:*` and
-  `task ci:web:e2e:*`; use the corresponding `web:*` targets for local,
-  module-scoped runs.
+  Map a diff to its narrowest evidence with
+  [lumilio-select-checks](.agents/skills/lumilio-select-checks/SKILL.md).
+- Workflows call module targets directly (`task web:test`,
+  `task server:test:ci`, `task web:e2e:up`). Root `ci:*` names exist only for
+  real cross-module orchestration: `task ci:architecture`, `task ci:site`,
+  `task ci:desktop:panel`, `task ci:desktop:native`. Do not add a 1:1 `ci:`
+  wrapper for a target a workflow can already invoke.
 - Keep the Taskfile/workflow boundary explicit. `.github/workflows/*.yml`
   owns triggers, path filters, runner and native dependency setup, credentials,
   caches, Buildx, and artifacts. Taskfiles own repository commands, working
-  directories, sequencing, flags, and CI environment variables. Workflows
-  should invoke root `task ci:*` contracts rather than reimplementing repository
-  commands inline.
+  directories, sequencing, flags, and CI environment variables.
 - When adding or changing a CI-relevant Taskfile target, update the affected
-  workflow path filters in the same change. In particular, Web E2E filters must
-  include `web/taskfile.yml`, and Site/Server/Web filters must include the root
-  `taskfile.yml` when its orchestration changes.
-- Follow the frontend “Test layers” taxonomy in
+  workflow path filters in the same change. Follow
+  [lumilio-add-task-target](.agents/skills/lumilio-add-task-target/SKILL.md).
+- Follow the frontend test-layer taxonomy in
   [FRONTEND.md](site/docs/internal/FRONTEND.md); do not invent test-file
-  conventions.
+  conventions. Placement:
+  [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 - API contracts are OpenAPI-first. Never hand-edit
   `web/src/lib/http-commons/schema.d.ts` or cast around a stale response type.
-  Fix the backend DTO or annotation and run `task dto`.
+  Fix the backend DTO or annotation and run `task dto`
+  ([lumilio-api-contract-change](.agents/skills/lumilio-api-contract-change/SKILL.md)).
+  `task verify:generated` is the CI freshness gate for OpenAPI, `schema.d.ts`,
+  feature `doc.md`, and config examples.
 - The Server requires a complete schema-versioned TOML manifest. Do not add
   code defaults, consumer fallbacks, automatic config search, or ordinary
   environment overrides for runtime-immutable fields.
@@ -105,17 +111,21 @@ database fields, and API identifiers remain unchanged.
   values and secret-path overrides do not belong in environment variables.
 - Keep generated files generated and record the command used. Format Go with
   `gofmt`; follow Vite+ fmt/lint for TypeScript.
-- Frontend i18n is extract-then-fill: write `t("key", "default")`, run
-  `vp exec i18next-cli extract`, then fill the generated Chinese value. Never
-  hand-edit translation keys.
+- Frontend i18n is extract-then-fill, and Lumen capability labels
+  (`图像语义分析` / `Image Semantic Analysis`, …) are exact product terms.
+  Procedure and the terminology table:
+  [lumilio-frontend-i18n](.agents/skills/lumilio-frontend-i18n/SKILL.md).
 - Follow `web/ARCHITECTURE.md` for state ownership, thin routes, workflow
   placement, public entries, and dependency direction.
 - Feature documentation uses a root `doc.ts`; every `{@link X}` must have a
   matching `import type`, and the generated sibling `doc.md` is never edited by
-  hand.
+  hand
+  ([lumilio-feature-doc](.agents/skills/lumilio-feature-doc/SKILL.md)).
 
 ## Execution Plans
 
-Keep unfinished plans in `site/docs/internal/exec-plans/active/`. Move
-completed records to `site/docs/internal/exec-plans/completed/`, retaining
-only the goal, final contracts, validation boundaries, and useful decisions.
+Keep unfinished plans in `site/docs/internal/exec-plans/active/`; follow
+[lumilio-exec-plan](.agents/skills/lumilio-exec-plan/SKILL.md) for creation
+criteria, the skeleton, and maintenance. Completing a plan extracts its
+durable decisions into `.agents/decisions/` and deletes the plan file; there
+is no completed archive — git history is the record.

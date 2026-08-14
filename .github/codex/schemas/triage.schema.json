@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edwinzhancn/Lumilio-Photos/blob/dev/.github/codex/schemas/triage.schema.json",
+  "title": "Lumilio agent triage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "track",
+    "summary",
+    "area",
+    "priority",
+    "scope",
+    "non_goals",
+    "todos",
+    "validation",
+    "memory",
+    "questions",
+    "related"
+  ],
+  "properties": {
+    "track": {
+      "type": "string",
+      "enum": ["small", "exec_plan", "needs_input"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "area": {
+      "type": "string",
+      "enum": ["server", "web", "desktop", "deploy", "docs", "cross-cutting", "unknown"]
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["P0", "P1", "P2", "P3"]
+    },
+    "scope": { "$ref": "#/$defs/stringList" },
+    "non_goals": { "$ref": "#/$defs/stringList" },
+    "todos": { "$ref": "#/$defs/stringList" },
+    "validation": { "$ref": "#/$defs/stringList" },
+    "memory": {
+      "type": "string",
+      "enum": ["none", "decision", "postmortem", "active_plan"]
+    },
+    "questions": { "$ref": "#/$defs/stringList" },
+    "related": { "$ref": "#/$defs/stringList" }
+  },
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    }
+  }
+}

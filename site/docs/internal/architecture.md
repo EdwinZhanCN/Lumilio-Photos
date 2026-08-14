@@ -101,7 +101,8 @@ useful; implementation plans belong in `exec-plans/`.
 
 ## Contracts
 
-- OpenAPI is the HTTP contract source of truth. Run `task dto` after backend API changes.
+- OpenAPI is the HTTP contract source of truth. Regeneration:
+  [lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
 - Do not hand-edit generated OpenAPI artifacts.
 - `storage.path` is registered at startup as the non-removable default Storage
   Location, identified by `.lumilioroot`; startup does not create repositories.

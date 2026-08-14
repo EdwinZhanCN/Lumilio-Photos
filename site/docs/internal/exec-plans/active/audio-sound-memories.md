@@ -65,7 +65,8 @@ Known gaps this plan owns:
 3. **Transcription is a new optional Lumen capability**, never an embedded
    model. Internal service name `whisper`, protocol task `audio_transcribe`.
    Canonical user-facing capability terminology (must be added to the
-   CLAUDE.md/AGENTS.md table when Phase 2 ships): `语音转写` /
+   [lumilio-frontend-i18n](../../../../../.agents/skills/lumilio-frontend-i18n/SKILL.md)
+   table and `productTerminology.test.ts` when Phase 2 ships): `语音转写` /
    `Voice Transcription`. ML stays optional: with no Hub, recordings remain
    fully browsable/playable.
 4. **Transcript search mirrors the OCR sidecar exactly.** SQLite rows are

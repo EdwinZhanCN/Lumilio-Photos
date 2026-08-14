@@ -73,7 +73,9 @@ jobs:
               run: task ci:desktop:panel
 
             - name: Build web SPA
-              run: task ci:web:build
+              run: |
+                  task web:install:ci
+                  task web:build
 
             - name: Generate third-party notices
               run: task desktop:licenses

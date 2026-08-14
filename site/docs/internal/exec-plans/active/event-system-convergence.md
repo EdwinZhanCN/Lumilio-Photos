@@ -2,16 +2,16 @@
 
 Status: active. Core convergence implementation landed on 2026-08-10; the
 correction command/version contract and production recovery run remain before
-this record can move to `completed/`.
+this plan can complete.
 
 Primary owners: `server/internal/event`, `server/internal/queue`,
 `server/internal/sourcing`, `server/internal/service`, `server/internal/api`, and
 `web/src/features/events`.
 
-This plan reopens contracts recorded as complete in
-[`media-semantic-organization.md`](../completed/media-semantic-organization.md).
-That document remains a historical record; this plan is the authority for the
-unfinished correctness work.
+This plan reopens contracts the earlier media-semantic-organization plan had
+recorded as complete (that plan is deleted; git history retains it). The
+shipped Event model is documented in [BACKEND.md](../../BACKEND.md); this plan
+is the authority for the unfinished correctness work.
 
 ## Goal
 
@@ -321,8 +321,8 @@ different scope than its gallery.
   redirects, manual covers, and membership collisions.
 - Regenerate OpenAPI/TypeScript and i18n artifacts with their canonical tools.
 - Update architecture docs to name the revision lifecycle and shared resolver.
-- Move this plan to `completed/`, retaining only the goal, final contracts,
-  validation evidence, and durable decisions.
+- Complete this plan per [README.md](README.md): extract durable decisions to
+  `.agents/decisions/`, then delete this file.
 
 Exit: all validation below passes and the seven-media reproduction publishes
 one Event with seven projected members.
@@ -389,7 +389,7 @@ workflow path filters in the same change.
 Validation evidence for this implementation slice:
 
 - `task ci:architecture` passed.
-- `task ci:server` passed with `go test -tags=sqlite_fts5 ./...`.
+- `task server:test:ci` passed with `go test -tags=sqlite_fts5 ./...`.
 - `task web:test` passed (330 tests, 6 skipped).
 - `task dto` regenerated OpenAPI, TypeScript, and ReDoc artifacts.
 - The E2E fixture image is pinned to the repository Go toolchain (`1.25.12`);
