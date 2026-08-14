@@ -37,7 +37,7 @@
     "operationConflict": "已有其他操作正在使用此控制面板。",
     "operationNotCancellable": "此操作已进入不可取消阶段。",
     "readinessTimeout": "进程未能在规定时间内就绪。",
-    "recoveryRequired": "Desktop 需要先恢复，才能继续此操作。",
+    "recoveryRequired": "Desktop 需要先完成恢复操作才能继续。",
     "repositoryControlUnavailable": "运行时就绪后才能管理存储位置。",
     "runtimeNotConfigured": "请先完成运行时配置。",
     "runtimeNotReady": "运行时尚未就绪。",
