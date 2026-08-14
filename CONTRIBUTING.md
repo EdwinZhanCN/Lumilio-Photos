@@ -58,6 +58,22 @@ and backups, lives under `state/`; portable development media lives under
 `storage/`. Dependency and test-asset caches remain outside this tree and are
 not reset with the development instance.
 
+To exercise the current checkout in the production Linux container shape, run
+the standalone development Compose file:
+
+```bash
+docker compose -f deploy/compose/dev.compose.yml up -d
+```
+
+This builds the current Server and Web sources instead of pulling the published
+image. It uses host networking and Docker-managed named volumes for media and
+app-state, so it also works when a local IDE controls a remote Linux Docker
+daemon. The Web build reads the local `~/.npmrc` as a BuildKit secret because
+`@edwinzhancn/docts` is hosted on GitHub Packages; the token needs
+`read:packages`. Set `LUMILIO_DEV_NPMRC` when the credential file lives
+elsewhere. The secret is mounted only for dependency installation and is not
+copied into the image.
+
 ## Common Commands
 
 | Command | Purpose |

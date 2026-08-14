@@ -1,0 +1,27 @@
+# Build and run the current checkout in the production Linux runtime shape.
+name: lumilio-photos-dev
+
+services:
+    lumilio:
+        image: lumilio-server:dev
+        pull_policy: build
+        build:
+            context: ../..
+            dockerfile: server/Dockerfile
+            args:
+                VERSION: ${LUMILIO_DEV_VERSION:-dev}
+            secrets:
+                - npmrc
+        restart: unless-stopped
+        network_mode: host
+        volumes:
+            - media:/data/storage
+            - app_state:/data/app-state
+
+volumes:
+    media:
+    app_state:
+
+secrets:
+    npmrc:
+        file: ${LUMILIO_DEV_NPMRC:-${HOME}/.npmrc}

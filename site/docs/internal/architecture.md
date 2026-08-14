@@ -7,7 +7,9 @@ useful; implementation plans belong in `exec-plans/`.
 
 - Docker production on Linux starts with `deploy/compose/compose.yml`, a
   zero-input host-network HTTP deployment at port 6680. Optional
-  `caddy.compose.yml` and `acme.compose.yml` add HTTPS. The Go process owns the
+  `caddy.compose.yml` and `acme.compose.yml` add HTTPS. The standalone
+  `dev.compose.yml` builds the current checkout in the same host-network runtime
+  shape with Docker-managed development volumes. The Go process owns the
   embedded SQLite catalog and serves both the API and built React SPA.
 - Linux is the standalone Server/Docker delivery target. macOS and Windows are
   Desktop App delivery targets; the App hosts the same complete `server/app`

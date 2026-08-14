@@ -114,6 +114,7 @@ tasks:
     desc: Validate every Docker Compose configuration
     cmds:
       - docker compose -f deploy/compose/compose.yml config --quiet
+      - docker compose -f deploy/compose/dev.compose.yml config --quiet
       - >-
         LUMILIO_STORAGE=/srv/lumilio/media
         LUMILIO_STATE=/srv/lumilio/state

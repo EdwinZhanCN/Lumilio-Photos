@@ -21,6 +21,9 @@ This document describes the current Go backend as implemented in `server/`.
 - Linux production Compose files: `deploy/compose/compose.yml`,
   `deploy/compose/caddy.compose.yml`, and `deploy/compose/acme.compose.yml`;
   all use host networking.
+- Current-checkout container deployment: `deploy/compose/dev.compose.yml`; it
+  builds the Server and Web sources and uses host networking plus
+  Docker-managed named volumes for isolated development state.
 - Browser E2E Compose files: `web/e2e/compose.yml` plus the CI cache overlay
   `web/e2e/compose.ci.yml`.
 
