@@ -927,6 +927,7 @@
     "selected_other": "{{count}} selected",
     "share": "Share",
     "undo": "Undo",
+    "unknown": "Unknown",
     "uploaded": "Uploaded",
     "viewAll": "View All"
   },
@@ -1652,6 +1653,7 @@
       "fetchError": "Failed to load processing activity.",
       "kinds": {
         "classify_zeroshot": "Match saved classifiers",
+        "database_backup": "Create database backup",
         "detect_stacks": "Find related originals",
         "discover_asset": "Import discovered file",
         "ingest_asset": "Import uploaded file",
@@ -1660,15 +1662,20 @@
         "process_bioclip": "Tag nature photos",
         "process_face": "Find people",
         "process_ocr": "Read text in images",
+        "process_ocr_outbox": "Update OCR search index",
         "process_phash": "Analyze duplicates",
         "process_semantic": "Build visual search index",
+        "process_video_frames": "Image Semantic Analysis (video)",
+        "rebuild_events": "Rebuild Events",
         "rebuild_location_clusters": "Refresh places",
         "reindex_assets": "Rebuild AI index",
         "retry_asset": "Retry media processing",
         "scan_repository": "Scan Repository folder",
+        "schedule_event_rebuilds": "Schedule Event rebuilds",
         "schedule_repository_scans": "Schedule Repository scans",
         "thumbnail_asset": "Build previews",
-        "transcode_asset": "Prepare playable media"
+        "transcode_asset": "Prepare playable media",
+        "unknown": "Other background task · {{name}}"
       },
       "loading": "Loading processing activity...",
       "metrics": {
@@ -1688,6 +1695,10 @@
           "description": "Matches saved classifier albums after visual indexing.",
           "name": "Classifier matching"
         },
+        "db_backup": {
+          "description": "Creates scheduled and administrator-requested database backups.",
+          "name": "Database Backups"
+        },
         "default": {
           "description": "Background work for the media collection."
         },
@@ -1698,6 +1709,10 @@
         "discover_asset": {
           "description": "Materializes files found during Repository scans.",
           "name": "Discovered files"
+        },
+        "event_scheduler": {
+          "description": "Schedules Event rebuilds when background projections need refresh.",
+          "name": "Event Scheduler"
         },
         "ingest_asset": {
           "description": "Moves uploaded media into a Repository safely.",
@@ -1711,17 +1726,21 @@
           "description": "Reads EXIF, capture time, camera, location, and media details.",
           "name": "Media information"
         },
+        "ocr_index": {
+          "description": "Makes extracted OCR text available to search.",
+          "name": "OCR Search Index"
+        },
         "process_bioclip": {
           "description": "Adds nature and species labels where enabled.",
-          "name": "Nature tagging"
+          "name": "BioCLIP Species Recognition"
         },
         "process_face": {
           "description": "Finds faces and updates people groupings.",
-          "name": "People recognition"
+          "name": "Person Recognition"
         },
         "process_ocr": {
           "description": "Extracts searchable text from images.",
-          "name": "Text recognition"
+          "name": "OCR Text Recognition"
         },
         "process_phash": {
           "description": "Computes fingerprints used by duplicate detection.",
@@ -1729,7 +1748,15 @@
         },
         "process_semantic": {
           "description": "Builds visual embeddings for search and AI organization.",
-          "name": "Visual search index"
+          "name": "Image Semantic Analysis"
+        },
+        "process_video_frames": {
+          "description": "Builds searchable semantic embeddings from representative video frames.",
+          "name": "Image Semantic Analysis (video)"
+        },
+        "rebuild_events": {
+          "description": "Rebuilds Events from current media facts.",
+          "name": "Event Rebuilds"
         },
         "rebuild_location_clusters": {
           "description": "Refreshes place clusters after media locations change.",
@@ -1754,6 +1781,9 @@
         "transcode_asset": {
           "description": "Prepares video and audio versions for browser playback.",
           "name": "Playback media"
+        },
+        "unknown": {
+          "name": "Other processing · {{name}}"
         }
       },
       "reviewErrors_one": "Review {{count}} issue",

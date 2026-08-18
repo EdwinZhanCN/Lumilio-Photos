@@ -923,6 +923,7 @@
     "selected_other": "已选 {{count}} 项",
     "share": "分享",
     "undo": "撤销",
+    "unknown": "未知",
     "uploaded": "上传于",
     "viewAll": "查看全部"
   },
@@ -1636,6 +1637,7 @@
       "fetchError": "加载处理活动失败。",
       "kinds": {
         "classify_zeroshot": "匹配已保存分类器",
+        "database_backup": "创建数据库备份",
         "detect_stacks": "查找关联原片",
         "discover_asset": "导入扫描发现的文件",
         "ingest_asset": "导入上传文件",
@@ -1644,15 +1646,20 @@
         "process_bioclip": "识别自然与物种",
         "process_face": "识别人像",
         "process_ocr": "识别图片文字",
+        "process_ocr_outbox": "更新 OCR 搜索索引",
         "process_phash": "分析重复照片",
         "process_semantic": "建立视觉搜索索引",
+        "process_video_frames": "图像语义分析（视频）",
+        "rebuild_events": "重建事件",
         "rebuild_location_clusters": "刷新地点",
         "reindex_assets": "重建 AI 索引",
         "retry_asset": "重试媒体处理",
         "scan_repository": "扫描资源库文件夹",
+        "schedule_event_rebuilds": "安排事件重建",
         "schedule_repository_scans": "安排资源库扫描",
         "thumbnail_asset": "生成预览图",
-        "transcode_asset": "准备可播放媒体"
+        "transcode_asset": "准备可播放媒体",
+        "unknown": "其他后台任务 · {{name}}"
       },
       "loading": "正在加载处理活动...",
       "metrics": {
@@ -1672,6 +1679,10 @@
           "description": "在视觉索引完成后匹配已保存的分类相册。",
           "name": "零样本分类"
         },
+        "db_backup": {
+          "description": "创建定时或管理员手动请求的数据库备份。",
+          "name": "数据库备份"
+        },
         "default": {
           "description": "资源库的后台处理。"
         },
@@ -1682,6 +1693,10 @@
         "discover_asset": {
           "description": "整理资源库扫描时发现的文件。",
           "name": "扫描发现"
+        },
+        "event_scheduler": {
+          "description": "在后台投影需要刷新时安排事件重建。",
+          "name": "事件调度"
         },
         "ingest_asset": {
           "description": "安全地把上传媒体放入资源库。",
@@ -1694,6 +1709,10 @@
         "metadata_asset": {
           "description": "读取 EXIF、拍摄时间、相机、位置和媒体信息。",
           "name": "媒体信息"
+        },
+        "ocr_index": {
+          "description": "让提取出的 OCR 文字可用于搜索。",
+          "name": "OCR 搜索索引"
         },
         "process_bioclip": {
           "description": "在启用时添加自然与物种标签。",
@@ -1714,6 +1733,14 @@
         "process_semantic": {
           "description": "建立用于搜索和 AI 整理的视觉向量。",
           "name": "图像语义分析"
+        },
+        "process_video_frames": {
+          "description": "从代表性视频帧建立可搜索的语义向量。",
+          "name": "图像语义分析（视频）"
+        },
+        "rebuild_events": {
+          "description": "根据当前媒体数据重建事件。",
+          "name": "事件重建"
         },
         "rebuild_location_clusters": {
           "description": "在媒体位置变化后刷新地点聚类。",
@@ -1738,6 +1765,9 @@
         "transcode_asset": {
           "description": "为浏览器播放准备视频和音频版本。",
           "name": "播放媒体"
+        },
+        "unknown": {
+          "name": "其他处理 · {{name}}"
         }
       },
       "reviewErrors_one": "查看 {{count}} 个问题",

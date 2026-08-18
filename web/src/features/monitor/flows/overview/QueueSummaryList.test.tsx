@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
 import { toast } from "sonner";
+import i18n from "@/lib/i18n";
+import type { QueueSummaryResponse } from "../../types";
 import { QueueSummaryList } from "./QueueSummaryList";
 
 const now = new Date("2026-06-12T12:00:00.000Z").toISOString();
@@ -36,15 +38,21 @@ const summaryResponse = {
       ],
     },
   ],
-};
+} satisfies QueueSummaryResponse;
 
-function serveSummary() {
-  worker.use(
-    http.get("/api/v1/admin/river/queue-summary", () => HttpResponse.json(summaryResponse)),
-  );
+function serveSummary(response: QueueSummaryResponse = summaryResponse) {
+  worker.use(http.get("/api/v1/admin/river/queue-summary", () => HttpResponse.json(response)));
 }
 
 describe("QueueSummaryList", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
   it("renders each queue as a processing area with aggregate metrics", async () => {
     serveSummary();
     const screen = await renderWithProviders(<QueueSummaryList />);
@@ -110,5 +118,41 @@ describe("QueueSummaryList", () => {
     await vi.waitFor(() => {
       expect(toastError).toHaveBeenCalledWith("Copy failed.", expect.any(Object));
     });
+  });
+
+  it("localizes every registered Server queue that previously used the raw fallback", async () => {
+    const queueNames = [
+      "db_backup",
+      "event_scheduler",
+      "ocr_index",
+      "process_video_frames",
+      "rebuild_events",
+    ] as const;
+    serveSummary({
+      generated_at: now,
+      queues: queueNames.map((name) => ({
+        name,
+        total_jobs: 0,
+        processed_jobs: 0,
+        remaining_jobs: 0,
+        running_jobs: 0,
+        attention_jobs: 0,
+        error_samples: [],
+      })),
+    });
+    await i18n.changeLanguage("zh");
+
+    const screen = await renderWithProviders(<QueueSummaryList />);
+
+    for (const name of queueNames) {
+      await expect
+        .element(
+          screen.getByRole("heading", {
+            name: i18n.t(`monitor.queueSummary.queues.${name}.name`),
+            exact: true,
+          }),
+        )
+        .toBeInTheDocument();
+    }
   });
 });

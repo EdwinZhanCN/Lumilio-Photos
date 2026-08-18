@@ -57,12 +57,12 @@ const QUEUE_PRESENTATION: Record<string, QueuePresentation> = {
   process_face: { icon: UsersRound, tone: "text-secondary bg-secondary/10" },
   classify_zeroshot: { icon: Brain, tone: "text-primary bg-primary/10" },
   process_phash: { icon: Fingerprint, tone: "text-warning bg-warning/10" },
+  db_backup: { icon: RefreshCw, tone: "text-success bg-success/10" },
+  event_scheduler: { icon: Clock, tone: "text-info bg-info/10" },
+  ocr_index: { icon: TextSearch, tone: "text-accent bg-accent/10" },
+  process_video_frames: { icon: Video, tone: "text-primary bg-primary/10" },
+  rebuild_events: { icon: RefreshCw, tone: "text-secondary bg-secondary/10" },
 };
-
-function humanizeQueueName(name?: string): string {
-  if (!name) return "";
-  return name.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
 
 function getPresentation(name?: string): QueuePresentation {
   return (
@@ -79,6 +79,14 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
       name: t("monitor.queueSummary.queues.classify_zeroshot.name"),
       description: t("monitor.queueSummary.queues.classify_zeroshot.description"),
     },
+    db_backup: {
+      name: t("monitor.queueSummary.queues.db_backup.name", {
+        defaultValue: "Database Backups",
+      }),
+      description: t("monitor.queueSummary.queues.db_backup.description", {
+        defaultValue: "Creates scheduled and administrator-requested database backups.",
+      }),
+    },
     detect_stacks: {
       name: t("monitor.queueSummary.queues.detect_stacks.name"),
       description: t("monitor.queueSummary.queues.detect_stacks.description"),
@@ -86,6 +94,14 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
     discover_asset: {
       name: t("monitor.queueSummary.queues.discover_asset.name"),
       description: t("monitor.queueSummary.queues.discover_asset.description"),
+    },
+    event_scheduler: {
+      name: t("monitor.queueSummary.queues.event_scheduler.name", {
+        defaultValue: "Event Scheduler",
+      }),
+      description: t("monitor.queueSummary.queues.event_scheduler.description", {
+        defaultValue: "Schedules Event rebuilds when background projections need refresh.",
+      }),
     },
     ingest_asset: {
       name: t("monitor.queueSummary.queues.ingest_asset.name"),
@@ -98,6 +114,14 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
     metadata_asset: {
       name: t("monitor.queueSummary.queues.metadata_asset.name"),
       description: t("monitor.queueSummary.queues.metadata_asset.description"),
+    },
+    ocr_index: {
+      name: t("monitor.queueSummary.queues.ocr_index.name", {
+        defaultValue: "OCR Search Index",
+      }),
+      description: t("monitor.queueSummary.queues.ocr_index.description", {
+        defaultValue: "Makes extracted OCR text available to search.",
+      }),
     },
     process_bioclip: {
       name: t("monitor.queueSummary.queues.process_bioclip.name", {
@@ -122,8 +146,26 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
       description: t("monitor.queueSummary.queues.process_phash.description"),
     },
     process_semantic: {
-      name: t("monitor.queueSummary.queues.process_semantic.name"),
+      name: t("monitor.queueSummary.queues.process_semantic.name", {
+        defaultValue: "Image Semantic Analysis",
+      }),
       description: t("monitor.queueSummary.queues.process_semantic.description"),
+    },
+    process_video_frames: {
+      name: t("monitor.queueSummary.queues.process_video_frames.name", {
+        defaultValue: "Image Semantic Analysis (video)",
+      }),
+      description: t("monitor.queueSummary.queues.process_video_frames.description", {
+        defaultValue: "Builds searchable semantic embeddings from representative video frames.",
+      }),
+    },
+    rebuild_events: {
+      name: t("monitor.queueSummary.queues.rebuild_events.name", {
+        defaultValue: "Event Rebuilds",
+      }),
+      description: t("monitor.queueSummary.queues.rebuild_events.description", {
+        defaultValue: "Rebuilds Events from current media facts.",
+      }),
     },
     rebuild_location_clusters: {
       name: t("monitor.queueSummary.queues.rebuild_location_clusters.name"),
@@ -155,6 +197,9 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
 function getKindLabels(t: TFunction): Record<string, string> {
   return {
     classify_zeroshot: t("monitor.queueSummary.kinds.classify_zeroshot"),
+    database_backup: t("monitor.queueSummary.kinds.database_backup", {
+      defaultValue: "Create database backup",
+    }),
     detect_stacks: t("monitor.queueSummary.kinds.detect_stacks"),
     discover_asset: t("monitor.queueSummary.kinds.discover_asset"),
     ingest_asset: t("monitor.queueSummary.kinds.ingest_asset"),
@@ -163,13 +208,25 @@ function getKindLabels(t: TFunction): Record<string, string> {
     process_bioclip: t("monitor.queueSummary.kinds.process_bioclip"),
     process_face: t("monitor.queueSummary.kinds.process_face"),
     process_ocr: t("monitor.queueSummary.kinds.process_ocr"),
+    process_ocr_outbox: t("monitor.queueSummary.kinds.process_ocr_outbox", {
+      defaultValue: "Update OCR search index",
+    }),
     process_phash: t("monitor.queueSummary.kinds.process_phash"),
     process_semantic: t("monitor.queueSummary.kinds.process_semantic"),
+    process_video_frames: t("monitor.queueSummary.kinds.process_video_frames", {
+      defaultValue: "Image Semantic Analysis (video)",
+    }),
+    rebuild_events: t("monitor.queueSummary.kinds.rebuild_events", {
+      defaultValue: "Rebuild Events",
+    }),
     rebuild_location_clusters: t("monitor.queueSummary.kinds.rebuild_location_clusters"),
     reindex_assets: t("monitor.queueSummary.kinds.reindex_assets"),
     retry_asset: t("monitor.queueSummary.kinds.retry_asset"),
     scan_repository: t("monitor.queueSummary.kinds.scan_repository"),
     schedule_repository_scans: t("monitor.queueSummary.kinds.schedule_repository_scans"),
+    schedule_event_rebuilds: t("monitor.queueSummary.kinds.schedule_event_rebuilds", {
+      defaultValue: "Schedule Event rebuilds",
+    }),
     thumbnail_asset: t("monitor.queueSummary.kinds.thumbnail_asset"),
     transcode_asset: t("monitor.queueSummary.kinds.transcode_asset"),
   };
@@ -381,7 +438,12 @@ export function QueueSummaryList() {
         {queues.map((queue) => {
           const queueName = queue.name ?? "";
           const copy = queueCopy[queueName];
-          const displayName = copy?.name ?? humanizeQueueName(queueName);
+          const displayName =
+            copy?.name ??
+            t("monitor.queueSummary.queues.unknown.name", {
+              defaultValue: "Other processing · {{name}}",
+              name: queueName || t("common.unknown", { defaultValue: "Unknown" }),
+            });
           const description =
             copy?.description ?? t("monitor.queueSummary.queues.default.description");
           const presentation = getPresentation(queueName);
@@ -510,7 +572,11 @@ export function QueueSummaryList() {
                             errorStateLabels[sample.state ?? ""] ??
                             t("monitor.queueSummary.errorStates.unknown");
                           const kindLabel =
-                            kindLabels[sample.kind ?? ""] ?? humanizeQueueName(sample.kind);
+                            kindLabels[sample.kind ?? ""] ??
+                            t("monitor.queueSummary.kinds.unknown", {
+                              defaultValue: "Other background task · {{name}}",
+                              name: sample.kind || t("common.unknown", { defaultValue: "Unknown" }),
+                            });
 
                           return (
                             <div
