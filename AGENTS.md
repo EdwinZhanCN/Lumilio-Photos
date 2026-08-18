@@ -70,7 +70,7 @@ the skill before running its workflow. Current set:
 - `write-a-test` — layer, placement, GPU self-skip
 - `integration-spec` — Vitest component/flow specs
 - `e2e-spec` — Playwright locators
-- `frontend-i18n` — extract-then-fill and capability terminology
+- `frontend-i18n` — extract-then-fill and the canonical bilingual product terminology registry
 - `e2e-environment` — Compose stack, seeds, slices
 - `lumen-fixtures` — record/replay Hub inference
 - `z-index` — stacking tokens
@@ -123,9 +123,10 @@ mechanical or local edits are exempt. Formats:
   values and secret-path overrides do not belong in environment variables.
 - Keep generated files generated and record the command used. Format Go with
   `gofmt`; follow Vite+ fmt/lint for TypeScript.
-- Frontend i18n is extract-then-fill, and Lumen capability labels
-  (`图像语义分析` / `Image Semantic Analysis`, …) are exact product terms.
-  Procedure and the terminology table:
+- Frontend i18n is extract-then-fill. Define, change, and apply every
+  human-facing product term through the canonical bilingual terminology
+  registry, including Storage Location / 存储位置, Repository / 资源库, and
+  Lumen capability labels. Procedure and registry:
   [lumilio-frontend-i18n](.agents/skills/lumilio-frontend-i18n/SKILL.md).
 - Follow `web/ARCHITECTURE.md` for state ownership, thin routes, workflow
   placement, public entries, and dependency direction.

@@ -63,7 +63,7 @@ export function useWorkingRepository() {
             defaultValue: "Repository options unavailable",
           })
       : t("navbar.repository.all", {
-          defaultValue: "All repositories",
+          defaultValue: "All Repositories",
         });
 
   const scopeDescription = selectedRepository?.path
@@ -74,7 +74,7 @@ export function useWorkingRepository() {
         })
       : t("settings.serverSettings.workingRepositoryHint", {
           defaultValue:
-            "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
+            "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support Repository filtering.",
         });
 
   return {

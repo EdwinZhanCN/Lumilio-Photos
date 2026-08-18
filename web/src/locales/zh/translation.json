@@ -464,9 +464,9 @@
         "warning": "每个恢复码只能使用一次。请将其保存在安全的地方——如果你丢失了 Passkey 和身份验证器，这是恢复访问的唯一方式。"
       },
       "repository": {
-        "submit": "创建并打开控制台",
-        "subtitle": "选择媒体存储位置。此设置将作为以后创建资源库的默认值。",
-        "title": "设置主存储"
+        "submit": "创建主资源库并打开控制台",
+        "subtitle": "主资源库是配置的默认存储位置中的第一个具体媒体单元。",
+        "title": "创建主资源库"
       },
       "sidebarNote": "此向导只会出现一次，直到首个管理员创建完成。",
       "step": {
@@ -610,15 +610,15 @@
       "weak": "弱"
     },
     "primaryRepository": {
-      "description": "选择流明集存放第一个本地资源库的位置。现有设置也会作为后续资源库的默认值。",
+      "description": "主资源库是默认存储位置的 primary/ 文件夹中唯一的主资源库；未选择其他资源库时，流明集会使用它。",
       "error": "创建主资源库失败。",
-      "loading": "正在检查资源库设置...",
+      "loading": "正在检查主资源库设置...",
       "name": "名称",
-      "nameHint": "此显示名称之后仍可修改。主资源库目录仍固定为 <root>/primary。",
-      "root": "存储位置",
-      "rootHint": "由服务器配置决定。主资源库会创建在 <root>/primary。",
-      "statusError": "无法加载资源库默认值。",
-      "submit": "创建资源库",
+      "nameHint": "此显示名称之后仍可修改。主资源库目录始终为 primary/。",
+      "root": "默认存储位置",
+      "rootHint": "由服务器配置决定。流明集会在这个默认存储位置的 primary/ 文件夹中创建主资源库。",
+      "statusError": "无法加载主资源库默认值。",
+      "submit": "创建主资源库",
       "title": "创建主资源库"
     },
     "register": {
@@ -677,7 +677,7 @@
     },
     "storageRecovery": {
       "checkAgain": "重新检查",
-      "description": "请恢复配置的默认存储位置及其中的 primary 目录，且不要更改它们的标记身份。其他可用资源库仍可继续使用。",
+      "description": "请恢复配置的默认存储位置及其中的主资源库，且不要更改任一标记身份。其他可用资源库仍可继续使用。",
       "title": "需要恢复存储"
     }
   },
@@ -1386,7 +1386,7 @@
         "layoutDescription": "此设置决定以后导入文件的磁盘布局，创建后无法修改。",
         "layoutTitle": "选择新文件的存放方式",
         "location": "存储位置",
-        "locationDescription": "Lumilio 会在这个已授权位置的直接子目录中创建资源库。",
+        "locationDescription": "存储位置是已授权的父级位置；流明集会把这个资源库创建为其直接子目录。",
         "locationTitle": "选择存储位置",
         "progress": "创建进度",
         "review": "确认",
@@ -1394,7 +1394,7 @@
         "reviewTitle": "检查并创建",
         "stepCount": "第 {{current}} 步，共 {{total}} 步"
       },
-      "description": "当前接入的资源库，可用于上传、筛选和文件系统扫描。",
+      "description": "存储位置是可容纳多个资源库的已授权父级位置；资源库是各自拥有独立身份的具体媒体单元。",
       "detectStacks": "检测堆叠",
       "detectStacksCompleted_one": "在 {{name}} 中检测到 {{count}} 个堆叠。",
       "detectStacksCompleted_other": "在 {{name}} 中检测到 {{count}} 个堆叠。",
@@ -1490,11 +1490,11 @@
       "storageLocationAvailable": "可用",
       "storageLocationCapacity": "可用 {{available}}，总计 {{total}}",
       "storageLocationCapacityUnknown": "容量不可用",
-      "storageLocationDefault": "默认",
+      "storageLocationDefault": "默认存储位置",
       "storageLocationEmpty": "没有可写的位置",
       "storageLocationError": "无法获取存储位置。",
       "storageLocationErrorBadge": "存储位置需要处理",
-      "storageLocationHint": "外部位置需要在桌面端控制面板中授权。",
+      "storageLocationHint": "一个存储位置可以容纳多个资源库；请在 Desktop 控制面板中授权外部存储位置。",
       "storageLocationLabel": "存储位置",
       "storageLocationLoading": "正在加载位置…",
       "storageLocationMaintenanceBadge": "存储位置维护中",

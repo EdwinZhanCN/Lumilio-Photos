@@ -54,7 +54,7 @@ export default function RemoveRepositoryModal({
         "error",
         error instanceof Error
           ? error.message
-          : t("manage.repositories.removeFailed", "Could not remove this repository."),
+          : t("manage.repositories.removeFailed", "Could not remove this Repository."),
       );
     }
   };

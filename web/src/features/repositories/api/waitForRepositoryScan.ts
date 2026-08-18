@@ -16,7 +16,7 @@ export const waitForRepositoryScan = async (
       params: { path: { id: repositoryId } },
     });
     if (error && response.status !== 404) {
-      throw new Error(error.error || error.message || "Failed to load repository scan status");
+      throw new Error(error.error || error.message || "Failed to load Repository scan status");
     }
     const startedAt = data?.started_at ? Date.parse(data.started_at) : 0;
     const belongsToRequest = startedAt >= requestedAt - 2_000;
@@ -28,5 +28,5 @@ export const waitForRepositoryScan = async (
     }
     await wait(options.intervalMs ?? 750);
   }
-  throw new Error("Timed out waiting for repository scan completion");
+  throw new Error("Timed out waiting for Repository scan completion");
 };

@@ -8,7 +8,7 @@ export function getRepositoryDisplayName(
 ): string {
   if (!repository) {
     return t("navbar.repository.all", {
-      defaultValue: "All repositories",
+      defaultValue: "All Repositories",
     });
   }
 

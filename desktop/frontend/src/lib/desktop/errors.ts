@@ -11,7 +11,7 @@ const messages: Record<ErrorCode, () => string> = {
   [ErrorCode.ErrorRuntimeNotConfigured]: () => i18n.t("errors.runtimeNotConfigured", "Complete the runtime configuration first."),
   [ErrorCode.ErrorRuntimeNotReady]: () => i18n.t("errors.runtimeNotReady", "The runtime is not ready yet."),
   [ErrorCode.ErrorRepositoryControlUnavailable]: () => i18n.t("errors.repositoryControlUnavailable", "Storage control is available only after the runtime is ready."),
-  [ErrorCode.ErrorStorageLocationOffline]: () => i18n.t("errors.storageLocationOffline", "This storage location is offline or no longer authorized."),
+  [ErrorCode.ErrorStorageLocationOffline]: () => i18n.t("errors.storageLocationOffline", "This Storage Location is offline or no longer authorized."),
   [ErrorCode.ErrorStopTimeout]: () => i18n.t("errors.stopTimeout", "The process did not stop within the safety budget; cleanup is required."),
   [ErrorCode.ErrorReadinessTimeout]: () => i18n.t("errors.readinessTimeout", "The process did not become ready within the safety budget."),
   [ErrorCode.ErrorSignatureInvalid]: () => i18n.t("errors.signatureInvalid", "The downloaded artifact failed signature verification."),

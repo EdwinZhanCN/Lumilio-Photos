@@ -20,7 +20,7 @@ export default function NotFound(): React.ReactNode {
           <p className="mt-4 text-base-content/70">
             {t(
               "notFound.description",
-              "The address may be outdated or mistyped. Your repositories and photos are still safe.",
+              "The address may be outdated or mistyped. Your Repositories and photos are still safe.",
             )}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">

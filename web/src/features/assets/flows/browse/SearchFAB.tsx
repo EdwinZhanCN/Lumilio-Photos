@@ -104,7 +104,7 @@ export function SearchFAB({
             )
           : null;
 
-  const fromRepositoryLabel = t("assets.searchByImageFromLibrary", "Choose from repository");
+  const fromRepositoryLabel = t("assets.searchByImageFromLibrary", "Choose from Repository");
   const chipName =
     fileQuery?.name ??
     similarQuery.data?.original_filename ??

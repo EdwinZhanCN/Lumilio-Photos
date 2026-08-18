@@ -172,7 +172,7 @@ export default function CloudSourcesModal({
           })}
           {!statusQuery.isLoading && sources.length === 0 ? (
             <p className="rounded-lg bg-base-200/60 p-4 text-sm text-base-content/65">
-              {t("cloud.sources.empty", "No cloud source is connected to this repository.")}
+              {t("cloud.sources.empty", "No cloud source is connected to this Repository.")}
             </p>
           ) : null}
         </div>

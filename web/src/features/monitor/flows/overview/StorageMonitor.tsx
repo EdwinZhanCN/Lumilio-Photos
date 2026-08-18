@@ -294,7 +294,7 @@ function StorageToolbar({
           {hasData
             ? t(
                 "monitor.storage.summaryMeta",
-                "{{locations}} locations · {{repositories}} repositories",
+                "{{locations}} Storage Locations · {{repositories}} Repositories",
                 {
                   locations: locationCount,
                   repositories: repositoryCount,

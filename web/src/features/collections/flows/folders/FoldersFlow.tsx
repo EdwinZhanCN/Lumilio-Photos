@@ -59,7 +59,7 @@ function FoldersContent() {
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">
         {!isPending && folders.length === 0 ? (
           <p className="text-sm text-base-content/60">
-            {t("collections.folders.empty", "No folders found in this repository yet.")}
+            {t("collections.folders.empty", "No folders found in this Repository yet.")}
           </p>
         ) : (
           <div className="space-y-6">

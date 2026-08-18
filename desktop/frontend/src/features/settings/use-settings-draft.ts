@@ -218,7 +218,7 @@ export function useSettingsDraft(
   const chooseDefaultStorage = async () => {
     try {
       const path = await StorageService.PickLocation(
-        t("storage.chooseDefaultLocation", "Choose the default Lumilio Photos storage location"),
+        t("storage.chooseDefaultLocation", "Choose Default Storage Location"),
       );
       if (!path || path === runtimeRef.current?.storagePath) return;
       if (savedStoragePath.current) {

@@ -93,7 +93,7 @@ export default function RemoveStorageLocationModal({
               : t("manage.repositories.storageLocationCapacityUnknown", "Capacity unavailable")}
             {` · ${t(
               "manage.repositories.storageLocationRepositoryCount",
-              "{{count}} repositories",
+              "{{count}} Repositories",
               { count: root.repository_count ?? 0 },
             )}`}
           </div>

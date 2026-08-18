@@ -479,11 +479,11 @@ const BootstrapFlow: React.FC = () => {
                 <CardHead
                   icon={HardDrive}
                   title={t("auth.bootstrap.repository.title", {
-                    defaultValue: "Set up primary storage",
+                    defaultValue: "Create Primary Repository",
                   })}
                   sub={t("auth.bootstrap.repository.subtitle", {
                     defaultValue:
-                      "Choose where Lumilio Photos stores media. This becomes the default for future repositories.",
+                      "The Primary Repository is the first concrete media unit inside the configured Default Storage Location.",
                   })}
                 />
 
@@ -498,7 +498,7 @@ const BootstrapFlow: React.FC = () => {
                     label={t("auth.primaryRepository.name", { defaultValue: "Name" })}
                     hint={t(
                       "auth.primaryRepository.nameHint",
-                      "This display name can be changed later. The primary directory remains <root>/primary.",
+                      "This display name can be changed later. The Primary Repository directory remains primary/.",
                     )}
                     error={
                       repoName.length > 0 && repoNameError
@@ -518,10 +518,12 @@ const BootstrapFlow: React.FC = () => {
                   </Field>
 
                   <Field
-                    label={t("auth.primaryRepository.root", { defaultValue: "Storage Location" })}
+                    label={t("auth.primaryRepository.root", {
+                      defaultValue: "Default Storage Location",
+                    })}
                     hint={t("auth.primaryRepository.rootHint", {
                       defaultValue:
-                        "Set by server configuration. The primary repository is created at <root>/primary.",
+                        "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
                     })}
                   >
                     <TextInput
@@ -557,7 +559,7 @@ const BootstrapFlow: React.FC = () => {
                     className="self-start px-6"
                   >
                     {t("auth.bootstrap.repository.submit", {
-                      defaultValue: "Create & open dashboard",
+                      defaultValue: "Create Primary Repository & open dashboard",
                     })}
                   </Btn>
                 </form>

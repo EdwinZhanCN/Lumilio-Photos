@@ -63,7 +63,7 @@ export default function MonitorOverview() {
                 ? t("monitor.subtitles.capabilities")
                 : t(
                     "monitor.subtitles.storage",
-                    "Storage Location, repository, capacity, mount, and lifecycle health.",
+                    "Storage Location, Repository, capacity, mount, and lifecycle health.",
                   )
         }
         icon={<Activity className="w-6 h-6 text-primary" />}
@@ -78,7 +78,7 @@ export default function MonitorOverview() {
             >
               <option value="">
                 {t("navbar.repository.all", {
-                  defaultValue: "All repositories",
+                  defaultValue: "All Repositories",
                 })}
               </option>
               {repositories.map((repo) => (

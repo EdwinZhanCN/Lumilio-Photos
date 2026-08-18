@@ -56,7 +56,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
           <span className="loading loading-spinner loading-lg text-primary" />
           <p className="animate-pulse text-sm font-medium opacity-50">
             {t("auth.primaryRepository.loading", {
-              defaultValue: "Checking repository setup...",
+              defaultValue: "Checking Primary Repository setup...",
             })}
           </p>
         </div>
@@ -78,7 +78,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
               <p className="mt-0.5 text-sm">
                 {t(
                   "auth.storageRecovery.description",
-                  "Restore the configured default Storage Location and its primary folder without changing their marker identities. Other available repositories remain usable.",
+                  "Restore the configured Default Storage Location and its Primary Repository without changing either marker identity. Other available Repositories remain usable.",
                 )}
               </p>
               {defaults?.default_root ? (
@@ -121,7 +121,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
     ? apiMessage(
         createMutation.error,
         t("auth.primaryRepository.error", {
-          defaultValue: "Failed to create the primary repository.",
+          defaultValue: "Failed to create the Primary Repository.",
         }),
       )
     : null;
@@ -136,13 +136,13 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
           <div>
             <h1 className="text-xl font-semibold">
               {t("auth.primaryRepository.title", {
-                defaultValue: "Create primary repository",
+                defaultValue: "Create Primary Repository",
               })}
             </h1>
             <p className="mt-1 text-sm text-base-content/70">
               {t("auth.primaryRepository.description", {
                 defaultValue:
-                  "Choose where Lumilio Photos should store the first local repository. Existing settings use this as the default for future repositories too.",
+                  "The Primary Repository is the unique Repository in the Default Storage Location's primary/ folder. Lumilio uses it when no other Repository is selected.",
               })}
             </p>
           </div>
@@ -151,7 +151,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
         {setupQuery.isError && (
           <div className="alert alert-error mb-4 text-sm">
             {t("auth.primaryRepository.statusError", {
-              defaultValue: "Unable to load repository defaults.",
+              defaultValue: "Unable to load Primary Repository defaults.",
             })}
           </div>
         )}
@@ -185,7 +185,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
                 ? repositoryNameErrorMessage(nameError, t)
                 : t(
                     "auth.primaryRepository.nameHint",
-                    "This display name can be changed later. The primary directory remains <root>/primary.",
+                    "This display name can be changed later. The Primary Repository directory remains primary/.",
                   )}
             </span>
           </div>
@@ -193,7 +193,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
           <label className="form-control">
             <span className="label-text mb-1 font-medium">
               {t("auth.primaryRepository.root", {
-                defaultValue: "Storage Location",
+                defaultValue: "Default Storage Location",
               })}
             </span>
             <input
@@ -205,7 +205,7 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
             <span className="label-text-alt mt-1 text-base-content/50">
               {t("auth.primaryRepository.rootHint", {
                 defaultValue:
-                  "Set by server configuration. The primary repository is created at <root>/primary.",
+                  "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
               })}
             </span>
           </label>
@@ -231,7 +231,9 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
               ) : (
                 <FolderPlus size={16} />
               )}
-              {t("auth.primaryRepository.submit", { defaultValue: "Create repository" })}
+              {t("auth.primaryRepository.submit", {
+                defaultValue: "Create Primary Repository",
+              })}
             </button>
           </div>
         </form>

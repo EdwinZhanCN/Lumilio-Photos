@@ -71,7 +71,7 @@ known failure modes.
 | [lumilio-write-a-test](../../../.agents/skills/lumilio-write-a-test/SKILL.md) | pick the test layer, file name, GPU self-skip, prove it can fail |
 | [lumilio-integration-spec](../../../.agents/skills/lumilio-integration-spec/SKILL.md) | Vitest component/flow specs: MSW, helpers, locators, import gotchas |
 | [lumilio-e2e-spec](../../../.agents/skills/lumilio-e2e-spec/SKILL.md) | Playwright locator order, i18n-safe names, forbidden aria-label hooks |
-| [lumilio-frontend-i18n](../../../.agents/skills/lumilio-frontend-i18n/SKILL.md) | extract-then-fill workflow and capability terminology |
+| [lumilio-frontend-i18n](../../../.agents/skills/lumilio-frontend-i18n/SKILL.md) | extract-then-fill workflow and canonical bilingual product terminology registry |
 | [lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md) | E2E stack lifecycle, seed variants, slice selection, readiness |
 | [lumilio-lumen-fixtures](../../../.agents/skills/lumilio-lumen-fixtures/SKILL.md) | record real Hub responses, replay them keyless in CI |
 | [lumilio-z-index](../../../.agents/skills/lumilio-z-index/SKILL.md) | three-rule stacking strategy and token scale |

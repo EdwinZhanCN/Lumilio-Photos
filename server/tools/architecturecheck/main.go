@@ -19,7 +19,7 @@ var (
 	numberedParameter       = regexp.MustCompile("\\?[[:digit:]]+")
 	rawReference            = regexp.MustCompile("PhotoSpecificMetadata|dbtypes|is_raw.*(metadata|exif)|legacyBrowseStateMigration")
 	stackListExclusion      = regexp.MustCompile("useAssetsList\\.ts|schema\\.d\\.ts")
-	retiredRepositoryTerms  = regexp.MustCompile(`(?i)\bstorage root\b|\blibrary\b|图库|媒体库|存储根目录|存储根|仓库`)
+	retiredRepositoryTerms  = regexp.MustCompile(`(?i)\b(?:storage|repository) root\b|\blibrary\b|图库|媒体库|存储根目录|存储根|资源库根|仓库`)
 	retiredCapabilityLabels = regexp.MustCompile(`["'` + "`" + `](Semantic Search|Face Recognition|OCR|Species Recognition|语义搜索|人脸识别|物种识别)["'` + "`" + `]`)
 )
 

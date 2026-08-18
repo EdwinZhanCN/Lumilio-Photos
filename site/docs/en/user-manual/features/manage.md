@@ -54,7 +54,7 @@ Scanning does not copy files and does not make the browser choose server paths; 
 
 ### Preparation
 
-- Put the files anywhere in the user-visible media tree under the repository root, including `inbox/`, but never under `.lumilio/`.
+- Put the files anywhere in the Repository's user-visible media tree, including `inbox/`, but never under `.lumilio/`.
 - Desktop: authorize the Storage Location in the Desktop Control Panel first.
 - Server: complete the bind mount per [repository mounting and creation](../introduction/repositories); the in-container path must be readable.
 

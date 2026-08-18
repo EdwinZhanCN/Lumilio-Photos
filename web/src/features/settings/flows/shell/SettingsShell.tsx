@@ -106,7 +106,7 @@ export default function SettingsShell() {
       label: t("settings.server"),
       title: t("settings.server"),
       description: t("settings.pageDescriptions.server", {
-        defaultValue: "Review repository scope, health checks, and runtime details.",
+        defaultValue: "Review Repository scope, health checks, and runtime details.",
       }),
       icon: ServerIcon,
     },

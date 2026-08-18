@@ -21,6 +21,35 @@ describe("canonical product terminology", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps the Storage Location and Repository hierarchy explicit", () => {
+    expect(en.manage.repositories.description).toBe(
+      "A Storage Location is an authorized parent location that can contain multiple Repositories. A Repository is a concrete media unit with its own identity.",
+    );
+    expect(zh.manage.repositories.description).toBe(
+      "存储位置是可容纳多个资源库的已授权父级位置；资源库是各自拥有独立身份的具体媒体单元。",
+    );
+    expect(en.manage.repositories.storageLocationDefault).toBe("Default Storage Location");
+    expect(zh.manage.repositories.storageLocationDefault).toBe("默认存储位置");
+    expect(en.manage.repositories.primaryBadge).toBe("Primary Repository");
+    expect(zh.manage.repositories.primaryBadge).toBe("主资源库");
+    expect(en.auth.primaryRepository.root).toBe("Default Storage Location");
+    expect(zh.auth.primaryRepository.root).toBe("默认存储位置");
+
+    const englishViolations = translationValues(en).filter((value) =>
+      /\b(?:storage|repository) roots?\b/i.test(value),
+    );
+    const englishCaseViolations = translationValues(en).filter((value) => {
+      const copy = value.replace(/\{\{[^}]+\}\}/g, "");
+      return /\b(?:storage locations?|repositories?)\b/.test(copy);
+    });
+    const chineseViolations = translationValues(zh).filter((value) =>
+      /存储根目录|存储根|资源库根/.test(value),
+    );
+    expect(englishViolations).toEqual([]);
+    expect(englishCaseViolations).toEqual([]);
+    expect(chineseViolations).toEqual([]);
+  });
+
   it("keeps all four Lumen capability labels canonical", () => {
     const englishLabels = new Set(translationValues(en));
     const chineseLabels = new Set(translationValues(zh));

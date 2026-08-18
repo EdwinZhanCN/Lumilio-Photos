@@ -125,7 +125,7 @@ function StorageLocationDetail({
               <li className="text-sm text-base-content/50">
                 {t(
                   "monitor.storage.noRepositories",
-                  "No repositories are registered in this location.",
+                  "No Repositories are registered in this Storage Location.",
                 )}
               </li>
             ) : (

@@ -19,7 +19,7 @@ code-evidence:
 
 # 资源库目录与布局策略
 
-每个资源库根至少包含：
+每个资源库至少包含以下内容：
 
 ```text
 repository/

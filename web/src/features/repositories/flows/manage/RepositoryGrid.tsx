@@ -189,7 +189,12 @@ export default function RepositoryGrid({
           <h2 className="text-base font-semibold">
             {t("manage.repositories.title", "Repositories")}
           </h2>
-          <p className="text-sm text-base-content/60">{t("manage.repositories.description")}</p>
+          <p className="text-sm text-base-content/60">
+            {t(
+              "manage.repositories.description",
+              "A Storage Location is an authorized parent location that can contain multiple Repositories. A Repository is a concrete media unit with its own identity.",
+            )}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <div className="join">
@@ -208,7 +213,7 @@ export default function RepositoryGrid({
                 className="btn btn-primary btn-sm join-item px-2"
                 aria-label={t(
                   "manage.repositories.moreCreateOptions",
-                  "More ways to add repositories",
+                  "More ways to add Repositories",
                 )}
               >
                 <ChevronDown size={16} />
@@ -344,7 +349,10 @@ export default function RepositoryGrid({
                       <span className="text-sm font-semibold">{root.name}</span>
                       {root.kind === "default" ? (
                         <span className="badge badge-primary badge-sm badge-soft">
-                          {t("manage.repositories.storageLocationDefault", "Default")}
+                          {t(
+                            "manage.repositories.storageLocationDefault",
+                            "Default Storage Location",
+                          )}
                         </span>
                       ) : null}
                       {root.status !== "active" ? (
@@ -375,7 +383,7 @@ export default function RepositoryGrid({
                           )}`}
                       {` · ${t(
                         "manage.repositories.storageLocationRepositoryCount",
-                        "{{count}} repositories",
+                        "{{count}} Repositories",
                         { count: root.repository_count ?? 0 },
                       )}`}
                     </div>
@@ -428,7 +436,7 @@ export default function RepositoryGrid({
                   <p className="border-t border-base-200 px-4 py-5 text-center text-xs text-base-content/50">
                     {t(
                       "manage.repositories.locationEmpty",
-                      "No repositories in this Storage Location yet.",
+                      "No Repositories in this Storage Location yet.",
                     )}
                   </p>
                 )}
@@ -557,7 +565,7 @@ function storageRootRemovalBlockedLabel(
     case "registered_repositories":
       return t(
         "manage.repositories.storageLocationRemoveBlockedRepositories",
-        "Remove its repositories from Lumilio first.",
+        "Remove its Repositories from Lumilio first.",
       );
     case "active_operation":
       return t(

@@ -21,7 +21,7 @@ export function RootErrorFallback({ error, resetErrorBoundary }: FallbackProps):
           <p className="mt-4 text-base-content/70">
             {t(
               "rootError.description",
-              "Reload the application to recover. Your original photos and repositories are not changed by this error.",
+              "Reload the application to recover. Your original photos and Repositories are not changed by this error.",
             )}
           </p>
           {message && (

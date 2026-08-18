@@ -54,8 +54,8 @@ export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
   {
     path: "workingRepositoryId",
     truthSource: "web_local_preference",
-    description: "Current working repository scope for repository-aware views",
-    precedence: ["user local setting", "all repositories"],
+    description: "Current working Repository scope for Repository-aware views",
+    precedence: ["user local setting", "all Repositories"],
   },
   {
     path: "assetPage.layout",

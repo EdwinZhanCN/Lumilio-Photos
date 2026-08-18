@@ -15,7 +15,9 @@ func TestRepositoryTerminologyTechnicalContextAllowlistIsNarrow(t *testing.T) {
 	for _, line := range []string{
 		"Open your Library",
 		"The storage root is offline",
+		"The Repository Root is offline",
 		"打开图库",
+		"资源库根不可用",
 	} {
 		if allowedRepositoryTermContext("site/docs/en/example.md", line) {
 			t.Fatalf("product synonym unexpectedly allowed: %q", line)

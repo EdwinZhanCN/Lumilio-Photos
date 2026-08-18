@@ -338,7 +338,7 @@ export default function NativeHostActionModal({
                 <span>
                   {t(
                     "manage.repositories.hostAction.copyConfirmation",
-                    "I understand this creates a separate repository identity and isolates copied private state before scanning.",
+                    "I understand this creates a separate Repository identity and isolates copied private state before scanning.",
                   )}
                 </span>
               </label>
@@ -369,7 +369,7 @@ export default function NativeHostActionModal({
                   onClick={() => void resolve("add_separate")}
                   disabled={busy || !confirmSeparate}
                 >
-                  {t("manage.repositories.hostAction.addSeparate", "Add as separate repository")}
+                  {t("manage.repositories.hostAction.addSeparate", "Add as separate Repository")}
                 </button>
               ) : null}
             </div>
@@ -448,7 +448,7 @@ function hostActionPurpose(kind: HostActionKind, t: ReturnType<typeof useI18n>["
     case "authorize_storage_location":
       return t(
         "manage.repositories.hostAction.addPurpose",
-        "Choose and authorize a folder for repositories",
+        "Choose and authorize a folder for Repositories",
       );
     case "locate_storage_location":
       return t(
@@ -458,12 +458,12 @@ function hostActionPurpose(kind: HostActionKind, t: ReturnType<typeof useI18n>["
     case "locate_repository":
       return t(
         "manage.repositories.hostAction.locateRepositoryPurpose",
-        "Choose the current folder for this moved repository",
+        "Choose the current folder for this moved Repository",
       );
     default:
       return t(
         "manage.repositories.hostAction.openPurpose",
-        "Choose a folder that contains an existing repository",
+        "Choose a folder that contains an existing Repository",
       );
   }
 }

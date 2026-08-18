@@ -103,7 +103,7 @@ export default function RepositoryRow({
               <span className="truncate text-sm font-medium text-base-content">{name}</span>
               {repository.isPrimary && (
                 <span className="badge badge-primary badge-sm badge-soft">
-                  {t("manage.repositories.primaryBadge")}
+                  {t("manage.repositories.primaryBadge", "Primary Repository")}
                 </span>
               )}
               {hasCloudBinding && (
@@ -169,7 +169,7 @@ export default function RepositoryRow({
                   disabled={isBusy || isUnavailable}
                 >
                   <Pencil size={15} />
-                  {t("manage.repositories.rename", "Rename repository")}
+                  {t("manage.repositories.rename", "Rename Repository")}
                 </button>
               </li>
               <li>

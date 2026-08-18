@@ -33,7 +33,7 @@ export function useBrowseScope() {
       ? repositoriesQuery.isLoading
         ? t("common.loading")
         : t("navbar.repository.unavailable", { defaultValue: "Repository options unavailable" })
-      : t("navbar.repository.all", { defaultValue: "All repositories" });
+      : t("navbar.repository.all", { defaultValue: "All Repositories" });
 
   return {
     repositories,

@@ -42,7 +42,7 @@ export default function RenameRepositoryModal({
       });
       showMessage(
         "success",
-        t("manage.repositories.renameSuccess", 'Renamed repository to "{{name}}".', { name }),
+        t("manage.repositories.renameSuccess", 'Renamed Repository to "{{name}}".', { name }),
       );
       onClose();
     } catch (error) {
@@ -65,7 +65,7 @@ export default function RenameRepositoryModal({
             </div>
             <div>
               <h3 className="text-base font-semibold">
-                {t("manage.repositories.renameTitle", "Rename repository")}
+                {t("manage.repositories.renameTitle", "Rename Repository")}
               </h3>
               <p className="mt-0.5 text-sm text-base-content/60">{repository.name}</p>
             </div>
@@ -156,7 +156,7 @@ function renameNameErrorMessage(
 ): string {
   switch (error) {
     case "required":
-      return t("manage.repositories.createNameRequired", "Enter a repository name.");
+      return t("manage.repositories.createNameRequired", "Enter a Repository name.");
     case "leadingOrTrailingSpace":
       return t(
         "manage.repositories.createNameEdgeSpace",

@@ -95,7 +95,7 @@ export function useBootstrapFlow() {
     ? apiMessage(
         createRepositoryMutation.error,
         t("auth.primaryRepository.error", {
-          defaultValue: "Failed to create the primary repository.",
+          defaultValue: "Failed to create the Primary Repository.",
         }),
       )
     : null;
