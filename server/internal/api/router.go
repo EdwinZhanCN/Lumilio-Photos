@@ -2,12 +2,15 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"server/config"
+	"server/internal/api/problem"
 	"server/internal/httporigin"
 	"server/internal/version"
 
@@ -346,8 +349,11 @@ func NewRouter(
 	logger *zap.Logger,
 ) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Recovery())
 	r.Use(requestErrorLogger(logger))
+	r.Use(gin.CustomRecovery(func(c *gin.Context, recovered any) {
+		WriteProblem(c, Internal(fmt.Errorf("panic: %v\n%s", recovered, debug.Stack())))
+		c.Abort()
+	}))
 	r.Use(originPolicyMiddleware(originPolicy))
 	trustedSessionOrigin := trustedSessionOriginMiddleware(originPolicy)
 
@@ -783,6 +789,17 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 		if len(c.Errors) > 0 {
 			fields = append(fields, zap.String("gin_errors", c.Errors.String()))
 		}
+		if instance, ok := c.Get(problemInstanceContextKey); ok {
+			fields = append(fields, zap.String("problem_instance", instance.(string)))
+		}
+		if problemType, ok := c.Get(problemTypeContextKey); ok {
+			fields = append(fields, zap.String("problem_type", problemType.(string)))
+		}
+		if cause, ok := c.Get(problemCauseContextKey); ok {
+			if problemCause, valid := cause.(error); valid {
+				fields = append(fields, zap.Error(problemCause))
+			}
+		}
 
 		if status >= http.StatusInternalServerError {
 			logger.Error("http request failed", fields...)
@@ -839,7 +856,7 @@ func trustedSessionOriginMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 			if referer != "" {
 				parsed, err := url.Parse(referer)
 				if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-					GinForbidden(c, errors.New("invalid request referer"), "Untrusted request origin")
+					WriteProblem(c, KnownProblem(problem.UntrustedOrigin, errors.New("invalid request referer")))
 					c.Abort()
 					return
 				}
@@ -849,7 +866,7 @@ func trustedSessionOriginMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 
 		if origin == "" {
 			if strings.EqualFold(strings.TrimSpace(c.GetHeader("Sec-Fetch-Site")), "cross-site") {
-				GinForbidden(c, errors.New("cross-site request has no verifiable origin"), "Untrusted request origin")
+				WriteProblem(c, KnownProblem(problem.UntrustedOrigin, errors.New("cross-site request has no verifiable origin")))
 				c.Abort()
 				return
 			}
@@ -861,7 +878,7 @@ func trustedSessionOriginMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 		resolved, resolvedOK := RequestOriginContext(c)
 		configured := err == nil && policy.IsCORSAllowed(normalized)
 		if err != nil || !resolvedOK || (normalized != resolved.TargetOrigin && !configured) {
-			GinForbidden(c, errors.New("request origin is not trusted"), "Untrusted request origin")
+			WriteProblem(c, KnownProblem(problem.UntrustedOrigin, errors.New("request origin is not trusted")))
 			c.Abort()
 			return
 		}

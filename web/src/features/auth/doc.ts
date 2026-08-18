@@ -51,6 +51,10 @@
  * one failed request from a clone captured before body consumption.
  * {@link registerSessionExpiredHandler} reports transport refresh exhaustion
  * back to React without coupling the HTTP client to routing.
+ * Auth and bootstrap flows preserve generated Problem objects until their
+ * presentation boundary calls {@link localizeAPIProblem} with the current
+ * language and an operation-specific fallback. Session recovery branches on
+ * HTTP status or exact Problem type, never on localized or server-authored copy.
  *
  * Reusable auth queries and mutations live in `api/`; browser WebAuthn
  * conversion stays in {@link getPasskeySupport}, and deterministic account
@@ -81,5 +85,6 @@ import type {
   refreshBrowserSession,
 } from "../../lib/http-commons/client.ts";
 import type { registerSessionExpiredHandler } from "../../lib/http-commons/sessionEvents.ts";
+import type { localizeAPIProblem } from "../../lib/http-commons/problem.ts";
 
 export {};

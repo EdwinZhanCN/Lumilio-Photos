@@ -1,40 +1,39 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { $api, client } from "@/lib/http-commons/queryClient";
 import { authenticatedFetch } from "@/lib/http-commons/client";
+import { normalizeProblem, readProblemResponse } from "@/lib/http-commons/problem";
 import type { Schemas } from "./types";
 
 export type BackupEntry = Schemas["dto.BackupEntryDTO"];
 
-export interface RestoreOperation {
+export type RestoreOperation = Schemas["dto.RestoreOperationDTO"] & {
   id: string;
   backup_name: string;
-  status:
-    | "staged"
-    | "restart_requested"
-    | "installing"
-    | "verifying"
-    | "completed"
-    | "rolling_back"
-    | "rolled_back"
-    | "failed";
-  message: string;
-  error_code?: string;
-  restore_point?: string;
+  status: string;
   requested_at: string;
   updated_at: string;
-  completed_at?: string;
-}
+};
 
 export const backupsQueryKey = ["get", "/api/v1/settings/backups"] as const;
 
-const parseResponse = async <T>(response: Response): Promise<T> => {
+const parseRestoreOperation = async (response: Response): Promise<RestoreOperation> => {
+  if (!response.ok) throw await readProblemResponse(response);
   const payload: unknown = await response.json().catch(() => undefined);
-  if (!response.ok) {
-    const detail = payload as { message?: string; error?: string } | undefined;
-    throw new Error(detail?.message ?? detail?.error ?? `HTTP ${response.status}`);
-  }
-  return payload as T;
+  if (!isRestoreOperation(payload)) throw normalizeProblem(undefined);
+  return payload;
 };
+
+function isRestoreOperation(value: unknown): value is RestoreOperation {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<RestoreOperation>;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.backup_name === "string" &&
+    typeof candidate.status === "string" &&
+    typeof candidate.requested_at === "string" &&
+    typeof candidate.updated_at === "string"
+  );
+}
 
 /** Lists SQLite snapshots, newest first. Pass poll=true to refetch every few
  * seconds after a queued snapshot request. */
@@ -77,7 +76,7 @@ export function useRestoreBackup() {
         `/api/v1/settings/backups/${encodeURIComponent(name)}/restore`,
         { method: "POST", headers: { Accept: "application/json" } },
       );
-      return parseResponse<RestoreOperation>(response);
+      return parseRestoreOperation(response);
     },
   });
 }
@@ -94,7 +93,7 @@ export function useLatestRestoreOperation(enabled = true) {
         headers: { Accept: "application/json" },
       });
       if (response.status === 404) return null;
-      return parseResponse<RestoreOperation>(response);
+      return parseRestoreOperation(response);
     },
   });
 }
@@ -118,7 +117,7 @@ export function useRestoreOperation(operationID: string | null) {
         `/api/v1/settings/backup-restores/${encodeURIComponent(operationID ?? "")}`,
         { headers: { Accept: "application/json" } },
       );
-      return parseResponse<RestoreOperation>(response);
+      return parseRestoreOperation(response);
     },
   });
 }
@@ -131,7 +130,8 @@ export async function downloadBackup(name: string): Promise<void> {
     parseAs: "blob",
   });
   if (error || !(data instanceof Blob)) {
-    throw new Error("backup download failed");
+    if (error) throw error;
+    throw normalizeProblem(undefined);
   }
   const blobUrl = window.URL.createObjectURL(data);
   const link = document.createElement("a");

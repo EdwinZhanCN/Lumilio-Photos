@@ -3,6 +3,7 @@ import { MoveRight } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import EventPicker from "./EventPicker";
 
 type EventMoveModalProps = {
@@ -47,7 +48,7 @@ export default function EventMoveModal({
       showMessage(
         "error",
         t("events.moveError", "Failed to move media: {{message}}", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
     }

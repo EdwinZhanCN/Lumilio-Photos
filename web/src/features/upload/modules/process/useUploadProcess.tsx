@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/features/notifications";
 import { useWorkingRepository } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useGenerateHashcode } from "./useGenerateHashcode.ts";
 import type { HashcodeProgress } from "./useGenerateHashcode.ts";
 import { useBatchUploadMutation, useChunkedUploadMutation } from "../../api/useUploadMutations.ts";
@@ -80,6 +81,7 @@ export function useUploadProcess(): useUploadProcessReturn {
           repositoryId: scopedRepositoryId,
           config: resolveUploadTransportConfig(uploadConfigQuery.data),
           messages,
+          localizeProblem: (problem, fallback) => localizeAPIProblem(problem, t, fallback),
           generateHashCodes,
           initializeFileProgress,
           updateFileProgress,
@@ -101,7 +103,7 @@ export function useUploadProcess(): useUploadProcessReturn {
         showUploadSummary(summary, t, showMessage);
         return summary;
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : messages.processFailed;
+        const message = localizeAPIProblem(error, t, messages.processFailed);
         showMessage("error", message);
         return {
           uploaded: [],

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
@@ -262,12 +262,15 @@ func TestCreateRepositoryReturnsExistingMarkerAsStructuredRecoveryFact(t *testin
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	var response dto.RepositoryConflictDTO
+	var response problem.RepositoryConflictDetails
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if response.ConflictType != "existing_repository_found" || len(response.Actions) != 1 || response.Actions[0] != "open" {
 		t.Fatalf("structured recovery response = %+v", response)
+	}
+	if strings.Contains(recorder.Body.String(), manager.createErr.Error()) || strings.Contains(recorder.Body.String(), "/storage/") {
+		t.Fatalf("public Problem exposed a host path or raw cause: %s", recorder.Body.String())
 	}
 }
 
@@ -293,7 +296,7 @@ func TestCreateRepositoryReturnsInvalidMarkerAsStructuredRecoveryFact(t *testing
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	var response dto.RepositoryConflictDTO
+	var response problem.RepositoryConflictDetails
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -325,7 +328,7 @@ func TestCreateRepositoryReturnsRegisteredIdentityAsMoveOrCopyConflict(t *testin
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	var response dto.RepositoryConflictDTO
+	var response problem.RepositoryConflictDetails
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}

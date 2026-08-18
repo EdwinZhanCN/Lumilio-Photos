@@ -1,6 +1,10 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"server/internal/api/problem"
+)
 
 // CloudProviderFieldDTO describes one provider-specific form input.
 // Label, Placeholder, and HelpText carry frontend i18n keys.
@@ -99,22 +103,22 @@ type ListCloudCredentialsResponse struct {
 
 // CloudImportRunDTO is a safe public view of a repo-scoped cloud import run.
 type CloudImportRunDTO struct {
-	ID              string     `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	OwnerID         int32      `json:"owner_id" example:"123"`
-	RepositoryID    string     `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	CredentialID    string     `json:"credential_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Provider        string     `json:"provider" example:"icloud"`
-	Status          string     `json:"status" example:"running"`
-	TotalSeen       int64      `json:"total_seen" example:"120"`
-	DownloadedCount int64      `json:"downloaded_count" example:"80"`
-	ImportedCount   int64      `json:"imported_count" example:"75"`
-	SkippedCount    int64      `json:"skipped_count" example:"40"`
-	FailedCount     int64      `json:"failed_count" example:"5"`
-	Error           *string    `json:"error,omitempty"`
-	StartedAt       *time.Time `json:"started_at,omitempty"`
-	FinishedAt      *time.Time `json:"finished_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID              string             `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	OwnerID         int32              `json:"owner_id" example:"123"`
+	RepositoryID    string             `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CredentialID    string             `json:"credential_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Provider        string             `json:"provider" example:"icloud"`
+	Status          string             `json:"status" example:"running"`
+	TotalSeen       int64              `json:"total_seen" example:"120"`
+	DownloadedCount int64              `json:"downloaded_count" example:"80"`
+	ImportedCount   int64              `json:"imported_count" example:"75"`
+	SkippedCount    int64              `json:"skipped_count" example:"40"`
+	FailedCount     int64              `json:"failed_count" example:"5"`
+	Problem         *problem.Reference `json:"problem,omitempty"`
+	StartedAt       *time.Time         `json:"started_at,omitempty"`
+	FinishedAt      *time.Time         `json:"finished_at,omitempty"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       time.Time          `json:"updated_at"`
 }
 
 // StartCloudImportResponse is returned when a cloud import run is queued.

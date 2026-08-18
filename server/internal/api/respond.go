@@ -1,17 +1,28 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
+
+	"server/internal/api/problem"
 
 	"github.com/gin-gonic/gin"
 )
 
-// ErrorResponse represents a standardized error response.
-type ErrorResponse struct {
-	Code    int    `json:"code" example:"400"`
-	Message string `json:"message" example:"Bad request"`
-	Error   string `json:"error,omitempty" example:"validation failed"`
-}
+const ProblemMediaType = problem.MediaType
+
+// OpenAPI response models are aliases of the registry-owned wire structs.
+// Runtime emission still goes exclusively through WriteProblem.
+type ProblemResponse = problem.Details
+type RateLimitedProblemResponse = problem.RateLimitedDetails
+type RepositoryConflictProblemResponse = problem.RepositoryConflictDetails
+type ProblemReference = problem.Reference
+
+const (
+	problemInstanceContextKey = "lumilio.problem.instance"
+	problemTypeContextKey     = "lumilio.problem.type"
+	problemCauseContextKey    = "lumilio.problem.cause"
+)
 
 // SuccessResponse represents a simple success response for endpoints that only return a message.
 type SuccessResponse struct {
@@ -23,69 +34,36 @@ func JSONOK(c *gin.Context, data any) {
 	c.JSON(http.StatusOK, data)
 }
 
-// GinError sends a standardized error response using gin.Context.
-func GinError(c *gin.Context, code int, err error, statusCode int, messages ...string) {
-	msg := "operation failed"
-	if len(messages) > 0 {
-		msg = messages[0]
-	}
-
-	result := ErrorResponse{
-		Code:    code,
-		Message: msg,
-	}
+// WriteProblem is the only HTTP Problem emitter. Public fields come from the
+// closed registry; the private cause is retained only for request logging.
+func WriteProblem(c *gin.Context, failure problem.Failure) {
+	instance := problem.NewInstance()
+	body, err := json.Marshal(failure.Body(instance))
 	if err != nil {
-		result.Error = err.Error()
+		failure = problem.About(http.StatusInternalServerError, err)
+		body, _ = json.Marshal(failure.Body(instance))
 	}
-	c.JSON(statusCode, result)
+	c.Set(problemInstanceContextKey, instance)
+	c.Set(problemTypeContextKey, failure.Type())
+	if cause := failure.Cause(); cause != nil {
+		c.Set(problemCauseContextKey, cause)
+	}
+	c.Data(failure.Status(), ProblemMediaType, body)
 }
 
-// HandleError is a helper function for consistent error handling with gin.Context.
-func HandleError(c *gin.Context, statusCode int, message string, err error) {
-	GinError(c, statusCode, err, statusCode, message)
+// Generic status constructors deliberately accept no display string.
+func BadRequest(cause error) problem.Failure   { return problem.About(http.StatusBadRequest, cause) }
+func Unauthorized(cause error) problem.Failure { return problem.About(http.StatusUnauthorized, cause) }
+func Forbidden(cause error) problem.Failure    { return problem.About(http.StatusForbidden, cause) }
+func NotFound(cause error) problem.Failure     { return problem.About(http.StatusNotFound, cause) }
+func Internal(cause error) problem.Failure {
+	return problem.About(http.StatusInternalServerError, cause)
+}
+func StatusProblem(status int, cause error) problem.Failure {
+	return problem.About(status, cause)
 }
 
-// GinBadRequest sends a 400 Bad Request response.
-func GinBadRequest(c *gin.Context, err error, message ...string) {
-	msg := "Bad request"
-	if len(message) > 0 {
-		msg = message[0]
-	}
-	GinError(c, http.StatusBadRequest, err, http.StatusBadRequest, msg)
-}
-
-// GinUnauthorized sends a 401 Unauthorized response.
-func GinUnauthorized(c *gin.Context, err error, message ...string) {
-	msg := "Unauthorized"
-	if len(message) > 0 {
-		msg = message[0]
-	}
-	GinError(c, http.StatusUnauthorized, err, http.StatusUnauthorized, msg)
-}
-
-// GinForbidden sends a 403 Forbidden response.
-func GinForbidden(c *gin.Context, err error, message ...string) {
-	msg := "Access denied"
-	if len(message) > 0 {
-		msg = message[0]
-	}
-	GinError(c, http.StatusForbidden, err, http.StatusForbidden, msg)
-}
-
-// GinNotFound sends a 404 Not Found response.
-func GinNotFound(c *gin.Context, err error, message ...string) {
-	msg := "Resource not found"
-	if len(message) > 0 {
-		msg = message[0]
-	}
-	GinError(c, http.StatusNotFound, err, http.StatusNotFound, msg)
-}
-
-// GinInternalError sends a 500 Internal Server Error response.
-func GinInternalError(c *gin.Context, err error, message ...string) {
-	msg := "Internal server error"
-	if len(message) > 0 {
-		msg = message[0]
-	}
-	GinError(c, http.StatusInternalServerError, err, http.StatusInternalServerError, msg)
+// KnownProblem selects a registered type with no extension members.
+func KnownProblem(descriptor problem.Descriptor, cause error) problem.Failure {
+	return problem.New(descriptor, cause)
 }

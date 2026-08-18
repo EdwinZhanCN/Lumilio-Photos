@@ -27,14 +27,14 @@ import (
 // @Produce json
 // @Param request body dto.CreateAgentPinRequest true "Pin request"
 // @Success 200 {object} dto.AgentPinDTO
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Ref not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Ref not found"
 // @Router /api/v1/agent/pins [post]
 func (h *AgentHandler) CreatePin(c *gin.Context) {
 	var req dto.CreateAgentPinRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	user, ok := requireCurrentUser(c)
@@ -57,10 +57,10 @@ func (h *AgentHandler) CreatePin(c *gin.Context) {
 	pin, err := h.pins.CreateFromRef(c.Request.Context(), params)
 	if err != nil {
 		if errors.Is(err, pins.ErrNotFound) {
-			api.GinNotFound(c, err, "Ref not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to create pin")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, toAgentPinDTO(pin))
@@ -72,7 +72,7 @@ func (h *AgentHandler) CreatePin(c *gin.Context) {
 // @Tags agent
 // @Produce json
 // @Success 200 {array} dto.AgentPinDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
 // @Router /api/v1/agent/pins [get]
 func (h *AgentHandler) ListPins(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -81,7 +81,7 @@ func (h *AgentHandler) ListPins(c *gin.Context) {
 	}
 	rows, err := h.pins.List(c.Request.Context(), int32(user.UserID))
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to list pins")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	out := make([]dto.AgentPinDTO, 0, len(rows))
@@ -98,8 +98,8 @@ func (h *AgentHandler) ListPins(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Pin ID"
 // @Success 200 {object} dto.AgentPinDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Pin not found"
 // @Router /api/v1/agent/pins/{id} [get]
 func (h *AgentHandler) GetPin(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -108,13 +108,13 @@ func (h *AgentHandler) GetPin(c *gin.Context) {
 	}
 	pinID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
 	pin, ids, hydration, err := h.pins.AssetIDsWithMeta(c.Request.Context(), int32(user.UserID), pinID)
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
@@ -124,7 +124,7 @@ func (h *AgentHandler) GetPin(c *gin.Context) {
 		Scope:    ref.Scope{UserID: int32(user.UserID)},
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to compute pin facets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -146,8 +146,8 @@ func (h *AgentHandler) GetPin(c *gin.Context) {
 // @Param limit query int false "Page size (default 50, max 200)"
 // @Param offset query int false "Page offset (default 0)"
 // @Success 200 {object} dto.AgentRefAssetsDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Pin not found"
 // @Router /api/v1/agent/pins/{id}/assets [get]
 func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -156,13 +156,13 @@ func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 	}
 	pinID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
 	_, ids, err := h.pins.AssetIDs(c.Request.Context(), int32(user.UserID), pinID)
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
@@ -180,7 +180,7 @@ func (h *AgentHandler) GetPinAssets(c *gin.Context) {
 		page := ids[offset:end]
 		rows, err := h.libraries.ForUser(int32(user.UserID)).Assets(c.Request.Context(), page)
 		if err != nil {
-			api.GinNotFound(c, err, "Pin not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		byID := make(map[uuid.UUID]dto.AssetDTO, len(rows))
@@ -208,13 +208,13 @@ func (h *AgentHandler) resolvePinAssetSource(c *gin.Context) (*service.AssetSetS
 	}
 	pinID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return nil, false
 	}
 
 	_, ids, err := h.pins.AssetIDs(c.Request.Context(), int32(user.UserID), pinID)
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return nil, false
 	}
 
@@ -234,21 +234,21 @@ func (h *AgentHandler) resolvePinAssetSource(c *gin.Context) (*service.AssetSetS
 // @Param id path string true "Pin ID"
 // @Param data body dto.AssetQueryRequestDTO true "Query parameters"
 // @Success 200 {object} dto.QueryAssetsResponseDTO "Pin assets queried successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Pin not found"
-// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Pin not found"
+// @Failure 503 {object} api.ProblemResponse "Image Semantic Analysis unavailable"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/agent/pins/{id}/assets/list [post]
 func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
 	if h.assetService == nil {
-		api.GinInternalError(c, errors.New("asset service unavailable"), "Failed to query pin assets")
+		api.WriteProblem(c, api.Internal(errors.New("asset service unavailable")))
 		return
 	}
 
 	var req dto.AssetQueryRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -259,15 +259,15 @@ func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
 
 	normalizeAssetQueryPagination(&req.Pagination)
 	if err := validateAssetQuerySearchType(req.SearchType); err != nil {
-		api.GinBadRequest(c, err, "Search type must be 'filename' or 'semantic'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
-		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := validateStackMode(req.StackMode); err != nil {
-		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if req.SearchType == "" {
@@ -276,7 +276,7 @@ func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
 
 	params, err := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid filter parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	params = applyAssetOwnershipScope(c, params)
@@ -285,15 +285,15 @@ func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
 	result, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidBrowseFilter) {
-			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, 503, err, 503, "Image Semantic Analysis is currently unavailable")
+			api.WriteProblem(c, api.StatusProblem(503, err))
 			return
 		}
 		log.Printf("Failed to query pin assets: %v", err)
-		api.GinInternalError(c, err, "Failed to query pin assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -309,20 +309,20 @@ func (h *AgentHandler) QueryPinAssets(c *gin.Context) {
 // @Param id path string true "Pin ID"
 // @Param data body dto.SearchAssetsRequestDTO true "Search parameters"
 // @Success 200 {object} dto.SearchAssetsResponseDTO "Pin assets searched successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Pin not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Pin not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/agent/pins/{id}/assets/search [post]
 func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 	if h.assetService == nil {
-		api.GinInternalError(c, errors.New("asset service unavailable"), "Failed to search pin assets")
+		api.WriteProblem(c, api.Internal(errors.New("asset service unavailable")))
 		return
 	}
 
 	var req dto.SearchAssetsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -333,28 +333,28 @@ func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 
 	normalizeAssetQueryPagination(&req.Pagination)
 	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
-		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := rejectSearchStackMode(req.StackMode); err != nil {
-		api.GinBadRequest(c, err, "stack_mode is not supported for search; results are flat by media item")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := validateSearchEnhancementMode(req.EnhancementMode); err != nil {
-		api.GinBadRequest(c, err, "Enhancement mode must be 'auto', 'off', or 'only'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if req.EnhancementMode == "" {
 		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
 	}
 	if req.SimilarToAssetID != nil && strings.TrimSpace(*req.SimilarToAssetID) != "" {
-		api.GinBadRequest(c, errors.New("similar_to_asset_id is not supported for pin search"), "similar_to_asset_id is not supported for pin search")
+		api.WriteProblem(c, api.BadRequest(errors.New("similar_to_asset_id is not supported for pin search")))
 		return
 	}
 
 	params, err := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, "", req.Filter, req.Pagination)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid filter parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	params = applyAssetOwnershipScope(c, params)
@@ -368,11 +368,11 @@ func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidBrowseFilter) {
-			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		log.Printf("Failed to search pin assets: %v", err)
-		api.GinInternalError(c, err, "Failed to search pin assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -387,13 +387,13 @@ func (h *AgentHandler) SearchPinAssets(c *gin.Context) {
 // @Produce json
 // @Param request body dto.UpdateAgentPinLayoutRequest true "Layout updates"
 // @Success 200 {object} api.SuccessResponse
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
 // @Router /api/v1/agent/pins/layout [patch]
 func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 	var req dto.UpdateAgentPinLayoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	user, ok := requireCurrentUser(c)
@@ -407,7 +407,7 @@ func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 		}
 		if err := h.pins.UpdateLayout(c.Request.Context(), int32(user.UserID), pinID,
 			pins.Layout{X: item.X, Y: item.Y, W: item.W, H: item.H}); err != nil {
-			api.GinInternalError(c, err, "Failed to update layout")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 	}
@@ -424,14 +424,14 @@ func (h *AgentHandler) UpdatePinLayout(c *gin.Context) {
 // @Param id path string true "Pin ID"
 // @Param request body dto.UpdateAgentPinRequest true "Pin update"
 // @Success 200 {object} api.SuccessResponse
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Pin not found"
 // @Router /api/v1/agent/pins/{id} [patch]
 func (h *AgentHandler) UpdatePin(c *gin.Context) {
 	var req dto.UpdateAgentPinRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	user, ok := requireCurrentUser(c)
@@ -440,22 +440,22 @@ func (h *AgentHandler) UpdatePin(c *gin.Context) {
 	}
 	pinID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if req.Title != nil {
 		if err := h.pins.UpdateTitle(c.Request.Context(), int32(user.UserID), pinID, *req.Title); err != nil {
-			api.GinInternalError(c, err, "Failed to update pin title")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 	}
 	if req.Widget != nil {
 		if err := h.pins.UpdateWidget(c.Request.Context(), int32(user.UserID), pinID, *req.Widget); err != nil {
 			if errors.Is(err, pins.ErrUnknownWidget) {
-				api.GinBadRequest(c, err, "Unknown widget view")
+				api.WriteProblem(c, api.BadRequest(err))
 				return
 			}
-			api.GinInternalError(c, err, "Failed to update pin widget")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 	}
@@ -469,8 +469,8 @@ func (h *AgentHandler) UpdatePin(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Pin ID"
 // @Success 200 {object} api.SuccessResponse
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Pin not found"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Pin not found"
 // @Router /api/v1/agent/pins/{id} [delete]
 func (h *AgentHandler) DeletePin(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -479,11 +479,11 @@ func (h *AgentHandler) DeletePin(c *gin.Context) {
 	}
 	pinID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Pin not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if err := h.pins.Delete(c.Request.Context(), int32(user.UserID), pinID); err != nil {
-		api.GinInternalError(c, err, "Failed to delete pin")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, api.SuccessResponse{Message: "Pin deleted"})

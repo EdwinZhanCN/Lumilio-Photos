@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Cloud, CloudDownload, Pause, Play, Plus, X } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useCloudCredentials } from "../../api/useCloudCredentials";
 import {
   useBindRepositoryCloudSource,
@@ -65,9 +66,11 @@ export default function CloudSourcesModal({
     } catch (error) {
       showMessage(
         "error",
-        error instanceof Error
-          ? error.message
-          : t("cloud.sources.bindFailed", "Unable to connect cloud source."),
+        localizeAPIProblem(
+          error,
+          t,
+          t("cloud.sources.bindFailed", "Unable to connect cloud source."),
+        ),
       );
     }
   };

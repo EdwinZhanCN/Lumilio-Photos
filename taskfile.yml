@@ -99,10 +99,11 @@ tasks:
       - web:test
 
   dto:
-    desc: Generate OpenAPI, TypeScript types, and API documentation
+    desc: Generate OpenAPI, TypeScript types, Problem pages, and API documentation
     cmds:
       - task: server:openapi
       - task: web:openapi-types
+      - go -C server run ./tools/problemcatalog ../site/docs/public/problems
       - task: site:openapi-docs
 
   architecture:check:
@@ -275,7 +276,7 @@ tasks:
       - task: dto
       - task: config:examples
       - task: web:docs
-      - git diff --exit-code -- server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html
+      - git diff --exit-code -- server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
 
   # CI contracts exist only when they orchestrate more than one module target.
   # One-to-one wrappers are forbidden: workflows call the module target

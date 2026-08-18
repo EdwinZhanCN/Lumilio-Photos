@@ -3,23 +3,37 @@ import { describe, expect, it } from "vite-plus/test";
 import { classifySearchError, isAssetSearchActive, isSearchByImageFile } from "./visualSearch";
 
 describe("classifySearchError", () => {
-  it("maps embedding_missing and 409", () => {
-    expect(classifySearchError({ error: "embedding_missing", code: 409 })).toBe(
-      "embedding_missing",
-    );
+  const instance = "urn:lumilio:problem:0123456789abcdef0123456789abcdef";
+
+  it("maps the embedding-missing Problem type", () => {
     expect(
-      classifySearchError(Object.assign(new Error("embedding_missing"), { status: 409 })),
+      classifySearchError({
+        type: "https://lumilio.org/problems/media/image-embedding-missing",
+        status: 409,
+        instance,
+      }),
     ).toBe("embedding_missing");
   });
 
-  it("maps 503 to unavailable", () => {
-    expect(classifySearchError({ code: 503, message: "down" })).toBe("unavailable");
+  it("maps availability Problem types", () => {
+    expect(
+      classifySearchError({
+        type: "https://lumilio.org/problems/service/unavailable",
+        status: 503,
+        instance,
+      }),
+    ).toBe("unavailable");
   });
 
-  it("maps unsupported image to invalid_image", () => {
-    expect(classifySearchError({ code: 400, message: "Unsupported or unreadable image" })).toBe(
-      "invalid_image",
-    );
+  it("maps the invalid-media Problem type and ignores retired envelopes", () => {
+    expect(
+      classifySearchError({
+        type: "https://lumilio.org/problems/media/invalid-request",
+        status: 422,
+        instance,
+      }),
+    ).toBe("invalid_image");
+    expect(classifySearchError({ code: 400, message: "Unsupported image" })).toBe("generic");
   });
 });
 

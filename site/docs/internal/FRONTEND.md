@@ -88,6 +88,29 @@ The checked-in fetch/query runtime comes from the official `openapi-fetch`,
 cast triage, and the swag empty-object quirk:
 [lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
 
+All request failures remain structured until presentation.
+`src/lib/http-commons/problem.ts` consumes the generated RFC 9457 Problem and
+Problem Reference unions, validates untrusted runtime payloads, and distinguishes
+registered Problems from unknown/malformed responses, network failures, and
+browser aborts. Manual fetch, XHR, binary-download, and SSE adapters throw or
+return that shared structure; they never build an `Error.message` from response
+text or parse a private `{message,error}` shape.
+
+The rendering boundary calls `localizeProblem`/`localizeProblemReference` (or
+their combined adapter) with an already-localized operation fallback and the
+current `t` function. Known actionable types may override the fallback through
+literal keys below `apiErrors`; `about:blank`, future types, malformed bodies,
+and network states cannot display or stringify wire content. Business behavior
+branches only on HTTP status or the exact Problem `type`, never translated copy.
+Because localization happens at render/recovery time, repeating a failure after
+a runtime language change uses the new language without changing the Server
+response or persisted operation state.
+
+The type mapping is exhaustive against the generated union. Architecture checks
+also require every registered URI to have a literal switch case and non-empty
+English and Simplified Chinese catalog values, and reject dynamic URI-derived
+translation keys or feature-private Problem parsers.
+
 ## State Boundaries
 
 Use TanStack Query for server state: fetched backend data, cache lifecycle,

@@ -7,6 +7,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem, localizeProblemReference } from "@/lib/http-commons/problem";
 import { formatBytes } from "@/lib/utils/formatters";
 import { useSystemSettings, useUpdateSystemSettings } from "../../api/useSystemSettings";
 import {
@@ -93,9 +94,13 @@ export default function BackupSection() {
         clearRestoreOperationID();
         setRestoreOperationID(null);
         setError(
-          t("settings.serverSettings.backup.restoreFailed", {
-            defaultValue: "Restore failed. The previous database remains active.",
-          }),
+          localizeProblemReference(
+            restoreOperation.problem,
+            t,
+            t("settings.serverSettings.backup.restoreFailed", {
+              defaultValue: "Restore failed. The previous database remains active.",
+            }),
+          ),
         );
         break;
       default:
@@ -156,11 +161,13 @@ export default function BackupSection() {
       },
       onError: (cause) => {
         setError(
-          cause instanceof Error
-            ? cause.message
-            : t("settings.serverSettings.backup.restoreFailed", {
-                defaultValue: "Restore could not be started.",
-              }),
+          localizeProblem(
+            cause,
+            t,
+            t("settings.serverSettings.backup.restoreFailed", {
+              defaultValue: "Restore could not be started.",
+            }),
+          ),
         );
       },
     });
@@ -267,7 +274,9 @@ export default function BackupSection() {
             <p className="mt-1 text-base-content/70">
               {restoreOperation
                 ? t(`settings.serverSettings.backup.restorePhases.${restoreOperation.status}`, {
-                    defaultValue: restoreOperation.message,
+                    defaultValue: t("settings.serverSettings.backup.restoring", {
+                      defaultValue: "Database restore in progress",
+                    }),
                   })
                 : t("settings.serverSettings.backup.restoreDisconnect", {
                     defaultValue:

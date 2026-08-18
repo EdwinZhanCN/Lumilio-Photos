@@ -3,6 +3,7 @@ import { GitHubStyleHeatmap } from "./GitHubStyleHeatmap";
 import { usePhotoStats } from "../../api/usePhotoStats";
 import { useI18n } from "@/lib/i18n.tsx";
 import { CameraIcon, ClockIcon } from "lucide-react";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 
 export type StatsCardsProps = {
   className?: string;
@@ -143,7 +144,11 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "", repositoryId })
         <div className="col-span-full card bg-base-100 shadow-sm">
           <div className="card-body">
             <div className="alert alert-error">
-              <span>{t("home.stats.error", { error: String(error) })}</span>
+              <span>
+                {t("home.stats.error", {
+                  error: localizeAPIProblem(error, t, t("home.errors.unknown")),
+                })}
+              </span>
             </div>
           </div>
         </div>

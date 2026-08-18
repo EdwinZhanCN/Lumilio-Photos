@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -9,6 +10,7 @@ import (
 
 	"server/config"
 	"server/internal/api"
+	"server/internal/api/problem"
 	"server/internal/httporigin"
 
 	"github.com/gin-gonic/gin"
@@ -45,6 +47,16 @@ func TestAuthRateLimiterReturnsRetryAfterAndRecoversAfterReset(t *testing.T) {
 	}
 	if got := recorder.Header().Get("Retry-After"); got != "60" {
 		t.Fatalf("Retry-After = %q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != api.ProblemMediaType {
+		t.Fatalf("Content-Type = %q", got)
+	}
+	var body problem.RateLimitedDetails
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Type != problem.RateLimited.Type || body.Status != http.StatusTooManyRequests || body.RetryAfterSeconds != 60 {
+		t.Fatalf("Problem = %#v", body)
 	}
 
 	handler.resetAuthUsername(authRateScopeLogin, "EXAMPLEUSER")

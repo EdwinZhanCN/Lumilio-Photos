@@ -7,6 +7,7 @@ import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { formatBytes } from "@/lib/utils/formatters";
 import type { DuplicateGroup, DuplicateMethod, DuplicateStatus } from "@/lib/duplicates/types";
@@ -98,7 +99,7 @@ const DuplicateGroupCard = ({ group, status }: DuplicateGroupCardProps) => {
       showMessage(
         "error",
         t("duplicates.group.mergeError", {
-          message: err instanceof Error ? err.message : String(err),
+          message: localizeAPIProblem(err, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -113,7 +114,7 @@ const DuplicateGroupCard = ({ group, status }: DuplicateGroupCardProps) => {
       showMessage(
         "error",
         t("duplicates.group.dismissError", {
-          message: err instanceof Error ? err.message : String(err),
+          message: localizeAPIProblem(err, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -354,10 +355,7 @@ function DuplicatesContent() {
               <AlertTriangle className="size-5" />
               <span>
                 {t("duplicates.summaryLoadError", {
-                  message:
-                    summaryQuery.error instanceof Error
-                      ? summaryQuery.error.message
-                      : JSON.stringify(summaryQuery.error ?? ""),
+                  message: localizeAPIProblem(summaryQuery.error, t, t("home.errors.unknown")),
                 })}
               </span>
             </div>
@@ -368,10 +366,7 @@ function DuplicatesContent() {
               <AlertTriangle className="size-5" />
               <span>
                 {t("duplicates.loadError", {
-                  message:
-                    groupQuery.error instanceof Error
-                      ? groupQuery.error.message
-                      : (JSON.stringify(groupQuery.error ?? "") ?? ""),
+                  message: localizeAPIProblem(groupQuery.error, t, t("home.errors.unknown")),
                 })}
               </span>
             </div>

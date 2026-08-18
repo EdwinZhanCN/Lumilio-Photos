@@ -1,4 +1,59 @@
 {
+  "apiErrors": {
+    "agent": {
+      "operationFailed": "智能助手操作未能完成。"
+    },
+    "auth": {
+      "authenticationRequired": "请先登录再继续。",
+      "invalidCredentials": "用户名或密码不正确。",
+      "mfaInvalid": "验证码无效或已过期。",
+      "passkeyUnavailable": "当前浏览器或部署环境无法使用通行密钥。",
+      "permissionDenied": "你没有执行此操作的权限。",
+      "rateLimited": "尝试次数过多，请稍后重试。",
+      "rateLimitedWithDelay_other": "尝试次数过多，请在 {{count}} 秒后重试。",
+      "sessionExpired": "会话已过期，请重新登录。",
+      "untrustedOrigin": "此浏览器来源不受信任。"
+    },
+    "backup": {
+      "restoreFailed": "数据库恢复未能完成，原数据库仍在使用。"
+    },
+    "bootstrap": {
+      "appNotInitialized": "请先完成初始设置再继续。"
+    },
+    "cloud": {
+      "importFailed": "云端导入未能完成。"
+    },
+    "lumen": {
+      "imageSemanticAnalysisUnavailable": "图像语义分析不可用。"
+    },
+    "media": {
+      "imageEmbeddingMissing": "所选资源尚未完成图像语义分析。",
+      "invalidRequest": "无法处理此媒体请求。"
+    },
+    "repository": {
+      "conflicts": {
+        "existingFound": "在此存储位置中发现了现有资源库。",
+        "generic": "继续操作前需要先处理此资源库的问题。",
+        "identity": "此资源库标识已被注册。",
+        "invalidMarker": "所选资源库的标记需要处理。",
+        "storageLocationOffline": "存储位置已离线。"
+      },
+      "scanFailed": "资源库扫描未能完成。",
+      "scanIncomplete": "资源库扫描已完成，但结果不完整。",
+      "unavailable": "此操作所需的资源库不可用。"
+    },
+    "service": {
+      "unavailable": "所需服务不可用。"
+    },
+    "storage": {
+      "confirmationRequired": "请检查并确认存储位置风险后再继续。",
+      "hostActionExpired": "桌面端审批已过期，请重新发起此操作。",
+      "hostActionFailed": "桌面端未能完成此存储操作。"
+    },
+    "upload": {
+      "processingFailed": "无法处理此上传。"
+    }
+  },
   "app": {
     "name": "流明集"
   },
@@ -172,6 +227,21 @@
     "clearSearchAriaLabel": "清除搜索",
     "errorFallback": {
       "something_went_wrong": "出了些问题"
+    },
+    "export": {
+      "allFailed": "无法导出任何图像。",
+      "cancelled": "已取消导出。",
+      "conversionUnavailable": "视频和音频资源不支持转换导出。",
+      "downloadCancelled": "已取消下载。",
+      "downloaded": "图像已下载。",
+      "downloadFailed": "下载失败。",
+      "downloadingOriginal": "正在下载原始文件…",
+      "exported": "图像已导出。",
+      "failed": "导出失败。",
+      "multipleCompleted_other": "已导出 {{count}} / {{total}} 张图像。",
+      "noDownload": "没有可供下载的图像。",
+      "noExport": "没有可供导出的图像。",
+      "noneSelected": "尚未选择要导出的图像。"
     },
     "filterTool": {
       "cameraMakeSection": {
@@ -1150,6 +1220,7 @@
       "unreachable": "Lumilio Agent 暂时无法连接。请检查 Server 连接后重试。"
     },
     "board": {
+      "changeFailed": "未能保存看板更改，已恢复之前的布局。",
       "deletePending": "小组件已移除。",
       "desktopSizeOnly": "可在较宽的屏幕上调整卡片尺寸。",
       "empty": "这里还没有固定内容。请在对话抽屉中向 Lumilio Agent 提问，再把结果固定到看板。",
@@ -1178,6 +1249,7 @@
         "retry": "重试",
         "title": "需要确认"
       },
+      "connectionFailed": "Lumilio Agent 未能完成此请求。",
       "empty": "开始与 Lumilio Agent 对话吧！",
       "newConversation": "新对话",
       "openAiSettings": "打开 AI 设置",
@@ -2083,6 +2155,13 @@
         "totpCode": "身份验证器码"
       },
       "pageDescription": "管理你的资料、密码、MFA 和通行密钥。",
+      "passkeys": {
+        "added": "通行密钥已添加。",
+        "addFailed": "添加通行密钥失败。",
+        "invalidID": "通行密钥 ID 无效。",
+        "removed": "通行密钥已移除。",
+        "removeFailed": "移除通行密钥失败。"
+      },
       "passwordDescription": "修改你的账户密码。修改后需重新登录。",
       "passwordTitle": "密码",
       "permissions": {
@@ -2574,6 +2653,7 @@
       "export": "导出",
       "fit": "适应",
       "fitToScreen": "适应屏幕",
+      "loadFailed": "加载 Studio 资源失败。",
       "loading": "加载中…",
       "renderFailed": "渲染失败",
       "rendering": "正在渲染预览…",
@@ -2582,6 +2662,7 @@
       "save": "保存",
       "saved": "已保存",
       "savedToast": "Sidecar 已保存",
+      "saveFailed": "保存 Sidecar 失败。",
       "undo": "撤销",
       "unsaved": "未保存的更改",
       "upToDate": "已是最新",
@@ -2603,6 +2684,7 @@
       "confirm": "导出",
       "downscaledToast": "导出已缩放至 {{w}}×{{h}} 以符合限制。",
       "estimate": "预计输出",
+      "failed": "导出图像失败。",
       "format": "格式",
       "longEdge": "长边",
       "longEdgePx": "长边（像素）",

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { authenticatedFetch, client } from "@/lib/http-commons/client";
+import { normalizeProblem, readProblemResponse } from "@/lib/http-commons/problem";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 import type { AssetViewDefinition, AssetsViewResult, ViewDefinitionOptions } from "../types";
 import { getViewerTimeZone } from "../model/assetGroups";
@@ -105,11 +106,11 @@ export function useAssetsSearch(
           signal,
         });
       }
-      const { data, error, response } = await client.POST("/api/v1/assets/search", {
+      const { data, error } = await client.POST("/api/v1/assets/search", {
         body: withBodyPaginationOffset(request, offset),
         signal,
       });
-      if (error) throwSearchError(error, response.status);
+      if (error) throwSearchError(error);
       return data;
     },
     enabled: autoFetch && !disabled && searchActive,
@@ -174,12 +175,7 @@ export function useAssetsSearch(
     [resultAssets, topResults],
   );
   const lastPage = pages.at(-1);
-  const error =
-    query.error instanceof Error
-      ? query.error.message
-      : query.error
-        ? (JSON.stringify(query.error) ?? "Unknown error")
-        : null;
+  const error = query.error ?? null;
 
   if (!searchActive) return { ...EMPTY_SEARCH_VIEW, viewKey };
   return {
@@ -238,7 +234,12 @@ async function searchByImage({
     body,
     signal,
   });
-  const payload: unknown = await response.json().catch(() => ({}));
-  if (!response.ok) throwSearchError(payload, response.status);
-  return payload as SearchAssetsResponse;
+  if (!response.ok) throw await readProblemResponse(response);
+  const payload: unknown = await response.json().catch(() => undefined);
+  if (!isSearchAssetsResponse(payload)) throw normalizeProblem(undefined);
+  return payload;
+}
+
+function isSearchAssetsResponse(value: unknown): value is SearchAssetsResponse {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

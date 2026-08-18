@@ -5,6 +5,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"server/internal/api/problem"
 )
 
 var (
@@ -21,6 +24,8 @@ var (
 	stackListExclusion      = regexp.MustCompile("useAssetsList\\.ts|schema\\.d\\.ts")
 	retiredRepositoryTerms  = regexp.MustCompile(`(?i)\b(?:storage|repository) root\b|\blibrary\b|图库|媒体库|存储根目录|存储根|资源库根|仓库`)
 	retiredCapabilityLabels = regexp.MustCompile(`["'` + "`" + `](Semantic Search|Face Recognition|OCR|Species Recognition|语义搜索|人脸识别|物种识别)["'` + "`" + `]`)
+	apiErrorKeyPattern      = regexp.MustCompile(`t\(\s*["'](apiErrors\.[[:alnum:]_.]+)["']`)
+	privateProblemHelper    = regexp.MustCompile(`^(?:export[[:space:]]+)?(?:function|const)[[:space:]]+(?:normalize|parse|read)[[:alnum:]_]*(?:Problem|problem)`)
 )
 
 func main() {
@@ -52,6 +57,11 @@ func main() {
 		fail(err)
 	}
 	fmt.Println("User-facing terminology checks passed")
+
+	if err := checkAPIProblemArchitecture(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("API Problem architecture checks passed")
 }
 
 func fail(err error) {
@@ -373,6 +383,193 @@ func checkUserFacingTerminology(root string) error {
 		)
 	}
 	return nil
+}
+
+func checkAPIProblemArchitecture(root string) error {
+	serverViolations, err := scanTextPaths(root, []string{"server/internal/api"}, func(relative, line string) bool {
+		if strings.HasSuffix(relative, "_test.go") {
+			return false
+		}
+		for _, retired := range []string{
+			"ErrorResponse", "GinError", "GinBadRequest", "GinUnauthorized", "GinForbidden",
+			"GinNotFound", "GinInternalError", "HandleError",
+		} {
+			if strings.Contains(line, retired) {
+				return true
+			}
+		}
+		if strings.Contains(line, "c.JSON(") && !successJSONWrite(line) {
+			return true
+		}
+		if strings.Contains(line, problem.Namespace) && relative != "server/internal/api/problem/problem.go" {
+			return true
+		}
+		if strings.Contains(line, ".Error()") && !allowedPrivateErrorUse(relative, line) {
+			return true
+		}
+		return false
+	})
+	if err != nil {
+		return err
+	}
+	if len(serverViolations) > 0 {
+		return fmt.Errorf(
+			"API Problem check found a legacy responder, direct non-success JSON writer, unregistered URI literal, or raw error use:\n%s\nUse the closed Problem registry and api.WriteProblem; keep private causes out of public payloads.",
+			strings.Join(serverViolations, "\n"),
+		)
+	}
+
+	if err := checkProblemCatalogArtifacts(root); err != nil {
+		return err
+	}
+	if err := checkWebProblemBoundary(root); err != nil {
+		return err
+	}
+	return nil
+}
+
+func successJSONWrite(line string) bool {
+	for _, status := range []string{
+		"http.StatusOK", "http.StatusCreated", "http.StatusAccepted", "http.StatusNoContent",
+		"http.StatusPartialContent", "200", "201", "202", "203", "204", "205", "206",
+	} {
+		if strings.Contains(line, "c.JSON("+status) {
+			return true
+		}
+	}
+	return false
+}
+
+func allowedPrivateErrorUse(relative, line string) bool {
+	if relative == "server/internal/api/problem/problem.go" && strings.Contains(line, "panic(") {
+		return true
+	}
+	// Upload-session manifests are private recovery state. The public progress
+	// DTO deliberately omits this diagnostic and exposes only the stable state.
+	return relative == "server/internal/api/handler/asset_handler.go" && strings.Contains(line, "SetSessionError(")
+}
+
+func checkProblemCatalogArtifacts(root string) error {
+	swagger, err := os.ReadFile(filepath.Join(root, "server/docs/swagger.yaml"))
+	if err != nil {
+		return fmt.Errorf("read generated OpenAPI Problem contract: %w", err)
+	}
+	webSource, err := os.ReadFile(filepath.Join(root, "web/src/lib/http-commons/problem.ts"))
+	if err != nil {
+		return fmt.Errorf("read Web Problem catalog: %w", err)
+	}
+	for _, descriptor := range problem.Registered() {
+		path := strings.TrimPrefix(descriptor.Type, problem.Namespace)
+		docPath := filepath.Join(root, "site/docs/public/problems", filepath.FromSlash(path), "index.html")
+		doc, err := os.ReadFile(docPath)
+		if err != nil {
+			return fmt.Errorf("Problem type %s has no generated public page at %s: %w", descriptor.Type, docPath, err)
+		}
+		if !strings.Contains(string(doc), descriptor.Type) || !strings.Contains(string(doc), descriptor.Definition) {
+			return fmt.Errorf("generated Problem page for %s does not match its registry descriptor", descriptor.Type)
+		}
+		if strings.Count(string(swagger), "const: "+descriptor.Type) < 2 {
+			return fmt.Errorf("generated OpenAPI lacks exact HTTP and Reference schemas for Problem type %s", descriptor.Type)
+		}
+		knownLiteral := fmt.Sprintf("%q: true", descriptor.Type)
+		caseLiteral := fmt.Sprintf("case %q:", descriptor.Type)
+		if !strings.Contains(string(webSource), knownLiteral) || !strings.Contains(string(webSource), caseLiteral) {
+			return fmt.Errorf("Web Problem catalog is not exhaustive for generated type %s", descriptor.Type)
+		}
+	}
+	return nil
+}
+
+func checkWebProblemBoundary(root string) error {
+	violations, err := scanTextPaths(root, []string{"web/src"}, func(relative, line string) bool {
+		if strings.HasSuffix(relative, ".test.ts") || strings.HasSuffix(relative, ".test.tsx") ||
+			strings.HasSuffix(relative, ".worker.ts") || relative == "web/src/lib/http-commons/problem.ts" ||
+			relative == "web/src/lib/http-commons/schema.d.ts" {
+			return false
+		}
+		if strings.Contains(line, `"error" in payload`) || strings.Contains(line, `"message" in payload`) {
+			return true
+		}
+		if strings.Contains(line, "failed with status ${response.status}") ||
+			strings.Contains(line, "failed with ${response.status}") {
+			return true
+		}
+		if strings.Contains(line, "apiErrors") &&
+			(strings.Contains(line, "${") || strings.Contains(line, ".replace(") || strings.Contains(line, "+")) {
+			return true
+		}
+		return privateProblemHelper.MatchString(strings.TrimSpace(line))
+	})
+	if err != nil {
+		return err
+	}
+	if len(violations) > 0 {
+		return fmt.Errorf(
+			"Web Problem check found a private legacy parser, status-authored Error, dynamic API-error key, or feature-owned Problem normalizer:\n%s\nPreserve structured failures through lib/http-commons/problem and localize only at the presentation boundary.",
+			strings.Join(violations, "\n"),
+		)
+	}
+
+	source, err := os.ReadFile(filepath.Join(root, "web/src/lib/http-commons/problem.ts"))
+	if err != nil {
+		return err
+	}
+	keys := make(map[string]struct{})
+	for _, match := range apiErrorKeyPattern.FindAllStringSubmatch(string(source), -1) {
+		keys[match[1]] = struct{}{}
+	}
+	if len(keys) == 0 {
+		return errors.New("Web Problem catalog has no literal apiErrors translation keys")
+	}
+	for _, language := range []string{"en", "zh"} {
+		catalogPath := filepath.Join(root, "web/src/locales", language, "translation.json")
+		catalog, err := readJSONCatalog(catalogPath)
+		if err != nil {
+			return err
+		}
+		for key := range keys {
+			if !hasTranslation(catalog, key) {
+				return fmt.Errorf("Web Problem translation %s is missing from %s", key, catalogPath)
+			}
+		}
+	}
+	return nil
+}
+
+func readJSONCatalog(path string) (map[string]any, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read translation catalog %s: %w", path, err)
+	}
+	var catalog map[string]any
+	if err := json.Unmarshal(data, &catalog); err != nil {
+		return nil, fmt.Errorf("parse translation catalog %s: %w", path, err)
+	}
+	return catalog, nil
+}
+
+func hasTranslation(catalog map[string]any, dottedKey string) bool {
+	parts := strings.Split(dottedKey, ".")
+	current := catalog
+	for _, part := range parts[:len(parts)-1] {
+		next, ok := current[part].(map[string]any)
+		if !ok {
+			return false
+		}
+		current = next
+	}
+	leaf := parts[len(parts)-1]
+	if value, ok := current[leaf].(string); ok && strings.TrimSpace(value) != "" {
+		return true
+	}
+	for key, value := range current {
+		if strings.HasPrefix(key, leaf+"_") {
+			if translation, ok := value.(string); ok && strings.TrimSpace(translation) != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func userFacingTerminologyViolation(relative, line string) bool {

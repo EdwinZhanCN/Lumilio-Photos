@@ -10,11 +10,15 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { localizeProblem } from "@/lib/http-commons/problem";
 
 interface SettingsSaveBarProps {
   isDirty?: boolean;
   isSaving?: boolean;
   justSaved?: boolean;
+  /** Already-localized validation or workflow copy owned by the caller. */
+  localizedError?: string | null;
+  /** Structured API Problem localized here with the shared fallback. */
   error?: unknown;
   canSave?: boolean;
   onSave: () => void;
@@ -25,17 +29,11 @@ interface SettingsSaveBarProps {
   extraAction?: ReactNode;
 }
 
-function errorMessage(error: unknown, fallback: string): string | null {
-  if (!error) return null;
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return fallback;
-}
-
 export function SettingsSaveBar({
   isDirty,
   isSaving,
   justSaved,
+  localizedError,
   error,
   canSave,
   onSave,
@@ -45,7 +43,11 @@ export function SettingsSaveBar({
   extraAction,
 }: SettingsSaveBarProps) {
   const { t } = useTranslation();
-  const err = errorMessage(error, t("settings.section.saveFailed", { defaultValue: "Save failed" }));
+  const err =
+    localizedError ??
+    (error
+      ? localizeProblem(error, t, t("settings.section.saveFailed", { defaultValue: "Save failed" }))
+      : null);
   const visible = Boolean(err) || isSaving || justSaved || isDirty;
 
   return (

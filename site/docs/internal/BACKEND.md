@@ -245,6 +245,42 @@ Regeneration, cast triage, and the swag empty-object quirk:
 [lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
 `task verify:generated` is the CI freshness gate.
 
+### API Problem boundary
+
+Every non-2xx JSON response below `/api/v1` is an RFC 9457 Problem with
+`application/problem+json`. The response contains only required `type`,
+`status`, and opaque `instance` members plus fields from an exact registered
+subtype. It never contains `title`, `detail`, display copy, or the private Go
+cause. Generic status-only failures use `about:blank`; a Lumilio type below
+`https://lumilio.org/problems/` exists only when the client needs a distinct
+explanation, recovery path, or machine action.
+
+`internal/api/problem` is the closed descriptor registry and wire-structure
+owner. Handlers select a typed failure and pass its diagnostic cause to the
+single `internal/api.WriteProblem` boundary; they cannot supply display text or
+an arbitrary extension map. That boundary generates the occurrence URI and
+attaches its instance, type, and cause to the normalized-route request log. The
+public instance can therefore identify exactly one structured log event without
+revealing the cause. Gin's direct writer is retained as the central handler
+boundary because handlers and pre-handler middleware share the same context;
+introducing a second error-returning handler signature would add routing
+indirection without strengthening the closed writer contract.
+
+Failures after request acceptance use the generated transport-neutral Problem
+Reference union: `type`, opaque `instance`, optional retryability, and the same
+bounded subtype facts, but no HTTP `status`. Agent/upload streams and durable
+scan, restore, cloud, and native-host operation DTOs preserve these references
+across polling and restart. Operator-only queue samples and support diagnostics
+remain separate and may retain sanitized technical detail; ordinary UI copy
+never comes from them.
+
+`tools/openapinormalize` installs the exact HTTP and Reference discriminator
+unions and rewrites every documented 4xx/5xx response media type after `swag`.
+`tools/problemcatalog` publishes the registry-backed pages under
+`site/docs/public/problems/`. Both run through `task dto`; architecture checks
+reject legacy responders, direct non-success `c.JSON`, raw public error text,
+unregistered type literals, undocumented types, and catalog drift.
+
 ## Browser Session And Cross-Origin Boundary
 
 Short-lived access tokens remain explicit Bearer credentials. Long-lived

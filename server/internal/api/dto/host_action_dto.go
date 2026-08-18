@@ -1,6 +1,10 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"server/internal/api/problem"
+)
 
 // NativeHostCapabilityDTO tells the Web client whether this Server process has
 // an in-process Desktop host that can present a native directory picker.
@@ -54,8 +58,7 @@ type HostActionDTO struct {
 	ExpectedVersion uint64               `json:"expected_version,omitempty"`
 	Status          string               `json:"status" example:"pending"`
 	Result          *HostActionResultDTO `json:"result,omitempty"`
-	ErrorCode       string               `json:"error_code,omitempty" example:"expired"`
-	ErrorMessage    string               `json:"error_message,omitempty" example:"Native host approval expired"`
+	Problem         *problem.Reference   `json:"problem,omitempty"`
 	ExpiresAt       time.Time            `json:"expires_at"`
 	CreatedAt       time.Time            `json:"created_at"`
 	UpdatedAt       time.Time            `json:"updated_at"`

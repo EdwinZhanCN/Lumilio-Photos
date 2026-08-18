@@ -70,7 +70,7 @@ export type ChunkedUploadVariables = {
  * ```
  */
 export const useUploadFileMutation = () =>
-  useMutation<UploadResponse, Error, UploadFileVariables>({
+  useMutation<UploadResponse, unknown, UploadFileVariables>({
     mutationFn: ({ file, hash, options }) => uploadFile(file, hash, options),
   });
 
@@ -91,7 +91,7 @@ export const useUploadFileMutation = () =>
  * ```
  */
 export const useBatchUploadMutation = () =>
-  useMutation<BatchUploadResponse, Error, BatchUploadVariables>({
+  useMutation<BatchUploadResponse, unknown, BatchUploadVariables>({
     mutationFn: ({ files, repositoryId, options }) =>
       batchUploadFiles(files, repositoryId, options),
   });
@@ -118,7 +118,7 @@ export const useBatchUploadMutation = () =>
  * ```
  */
 export const useChunkedUploadMutation = () =>
-  useMutation<BatchUploadResponse, Error, ChunkedUploadVariables>({
+  useMutation<BatchUploadResponse, unknown, ChunkedUploadVariables>({
     mutationFn: ({ file, sessionId, hash, chunkSize, repositoryId, onProgress, options }) =>
       uploadFileInChunks(file, sessionId, hash, chunkSize, repositoryId, onProgress, options),
   });

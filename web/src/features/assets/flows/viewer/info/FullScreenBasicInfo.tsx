@@ -7,6 +7,7 @@ import type { components } from "@/lib/http-commons/schema.d.ts";
 import { ExifDataDisplay } from "./ExifDataDisplay";
 import type { Asset } from "@/lib/http-commons";
 import { isPhotoMetadata, isVideoMetadata, isAudioMetadata } from "@/lib/http-commons";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import PhotoInfoView from "./PhotoInfoView";
 import VideoInfoView from "./VideoInfoView";
 import AudioInfoView from "./AudioInfoView";
@@ -54,12 +55,11 @@ export default function FullScreenBasicInfo({ asset, onAssetUpdate }: FullScreen
     const result = await exifQuery.refetch();
 
     if (result.isError) {
-      const message =
-        result.error instanceof Error
-          ? result.error.message
-          : t("assets.basicInfo.errors.extractFailed", {
-              message: String(result.error),
-            });
+      const message = localizeAPIProblem(
+        result.error,
+        t,
+        t("assets.basicInfo.errors.extractFailed", { message: t("home.errors.unknown") }),
+      );
       showMessage("error", message);
       return;
     }

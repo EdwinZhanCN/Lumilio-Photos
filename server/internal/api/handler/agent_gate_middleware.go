@@ -13,13 +13,13 @@ func RequireLLMAgentEnabled(settingsService service.SettingsService) gin.Handler
 	return func(c *gin.Context) {
 		settings, err := settingsService.GetSystemSettings(c.Request.Context())
 		if err != nil {
-			api.GinInternalError(c, err, "Failed to load system settings")
+			api.WriteProblem(c, api.Internal(err))
 			c.Abort()
 			return
 		}
 
 		if !settings.LLM.AgentEnabled {
-			api.GinNotFound(c, errors.New("llm agent is disabled"), "Agent is disabled")
+			api.WriteProblem(c, api.NotFound(errors.New("llm agent is disabled")))
 			c.Abort()
 			return
 		}

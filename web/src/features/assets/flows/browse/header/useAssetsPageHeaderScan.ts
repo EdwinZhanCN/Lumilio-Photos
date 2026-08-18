@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useMessage } from "@/features/notifications";
 import { useBrowseScope, useRepositoryScan } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 
 export function useAssetsPageHeaderScan() {
   const { t } = useI18n();
@@ -32,10 +33,7 @@ export function useAssetsPageHeaderScan() {
             }),
       );
     } catch (error) {
-      showMessage(
-        "error",
-        error instanceof Error ? error.message : t("assets.assetsPageHeader.scan.failed"),
-      );
+      showMessage("error", localizeAPIProblem(error, t, t("assets.assetsPageHeader.scan.failed")));
     }
   }, [repositories, scanRepositories, scopeLabel, selectedRepository, showMessage, t]);
 

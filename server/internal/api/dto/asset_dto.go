@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 )
@@ -116,15 +117,15 @@ type BatchUploadResponseDTO struct {
 
 // BatchUploadResultDTO represents a single result in a batch upload
 type BatchUploadResultDTO struct {
-	Success     bool    `json:"success"`
-	SessionID   string  `json:"session_id,omitempty"`
-	FileName    string  `json:"file_name,omitempty"`
-	ContentHash string  `json:"content_hash"`
-	TaskID      *int64  `json:"task_id,omitempty"`
-	Status      *string `json:"status,omitempty"`
-	Size        *int64  `json:"size,omitempty"`
-	Message     *string `json:"message,omitempty"`
-	Error       *string `json:"error,omitempty"`
+	Success     bool               `json:"success"`
+	SessionID   string             `json:"session_id,omitempty"`
+	FileName    string             `json:"file_name,omitempty"`
+	ContentHash string             `json:"content_hash"`
+	TaskID      *int64             `json:"task_id,omitempty"`
+	Status      *string            `json:"status,omitempty"`
+	Size        *int64             `json:"size,omitempty"`
+	Message     *string            `json:"message,omitempty"`
+	Problem     *problem.Reference `json:"problem,omitempty"`
 }
 
 // UploadPrecheckFileDTO is one candidate file in an upload precheck request.
@@ -228,12 +229,12 @@ type UploadProgressResponseDTO struct {
 // UploadJobStatusDTO reports whether an accepted upload has been materialized
 // by the ingest queue. Only jobs owned by the current caller are returned.
 type UploadJobStatusDTO struct {
-	TaskID   int64   `json:"task_id" example:"12345"`
-	FileName string  `json:"file_name" example:"photo.jpg"`
-	Status   string  `json:"status" example:"completed"`
-	Terminal bool    `json:"terminal" example:"true"`
-	Success  bool    `json:"success" example:"true"`
-	Error    *string `json:"error,omitempty" example:"failed to materialize asset"`
+	TaskID   int64              `json:"task_id" example:"12345"`
+	FileName string             `json:"file_name" example:"photo.jpg"`
+	Status   string             `json:"status" example:"completed"`
+	Terminal bool               `json:"terminal" example:"true"`
+	Success  bool               `json:"success" example:"true"`
+	Problem  *problem.Reference `json:"problem,omitempty"`
 }
 
 type UploadJobStatusResponseDTO struct {

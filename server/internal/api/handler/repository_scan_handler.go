@@ -17,6 +17,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
@@ -42,7 +43,7 @@ func (h *RepositoryScanHandler) ListLifecycleAudit(c *gin.Context) {
 		TargetType: c.Query("target_type"), TargetID: c.Query("target_id"), Limit: limit, Offset: offset,
 	})
 	if err != nil {
-		api.GinBadRequest(c, err, "Lifecycle audit history is unavailable")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	api.JSONOK(c, dto.ListLifecycleAuditEventsResponseDTO{Events: lifecycleAuditDTOs(events, false)})
@@ -58,7 +59,7 @@ func (h *RepositoryScanHandler) ListLifecycleAudit(c *gin.Context) {
 func (h *RepositoryScanHandler) GetStorageDiagnostics(c *gin.Context) {
 	items, err := h.storageDiagnostics(c.Request.Context(), false)
 	if err != nil {
-		api.GinInternalError(c, err, "Storage diagnostics are unavailable")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, dto.StorageDiagnosticsResponseDTO{GeneratedAt: time.Now().UTC(), Items: items})
@@ -74,12 +75,12 @@ func (h *RepositoryScanHandler) GetStorageDiagnostics(c *gin.Context) {
 func (h *RepositoryScanHandler) DownloadStorageSupportBundle(c *gin.Context) {
 	items, err := h.storageDiagnostics(c.Request.Context(), true)
 	if err != nil {
-		api.GinInternalError(c, err, "Storage support bundle is unavailable")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	events, err := h.repoManager.ListLifecycleAudit(c.Request.Context(), storage.LifecycleAuditFilter{Limit: 200})
 	if err != nil {
-		api.GinInternalError(c, err, "Storage support bundle audit history is unavailable")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	c.Header("Content-Disposition", `attachment; filename="lumilio-storage-support.json"`)
@@ -259,27 +260,27 @@ func NewRepositoryScanHandler(scanService RepositoryScanService, repoManager sto
 // @Security BearerAuth
 // @Param request body dto.CreateRepositoryRequestDTO true "Repository name"
 // @Success 200 {object} dto.CreateRepositoryResponseDTO "Repository created successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 409 {object} dto.RepositoryConflictDTO "Repository identity conflict"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 409 {object} api.RepositoryConflictProblemResponse "Repository identity conflict"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/repositories [post]
 func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	if h == nil || h.repoManager == nil {
-		api.GinInternalError(c, errors.New("repository manager unavailable"), "Repository manager unavailable")
+		api.WriteProblem(c, api.Internal(errors.New("repository manager unavailable")))
 		return
 	}
 
 	var req dto.CreateRepositoryRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid repository request")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	name := req.Name
 	if err := storage.ValidateRepositoryName(name); err != nil {
-		api.GinBadRequest(c, err, "Invalid repository name")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -287,14 +288,14 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	directoryName := req.DirectoryName
 	if role != dbtypes.RepoRolePrimary {
 		if err := storage.ValidateRepositoryDirectoryName(directoryName); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository storage folder")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 	}
 	actorOwnerID := adminIDFromContext(c)
 	hostOwnerID, err := h.repoManager.HostOwnerID(c.Request.Context())
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve host owner")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	// Authenticated first-run setup always has an admin, but retain this
@@ -331,62 +332,39 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		var invalidMarker *storage.RepositoryMarkerInvalidError
 		switch {
 		case errors.Is(err, storage.ErrPrimaryRepositoryExists):
-			writeRepositoryConflict(c, "primary_exists", "Primary repository already exists")
+			writeRepositoryConflict(c, err, "primary_exists")
 		case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
-			writeRepositoryConflict(c, "primary_required", "Primary repository must be created first")
+			writeRepositoryConflict(c, err, "primary_required")
 		case errors.Is(err, storage.ErrRepositoryRootOffline):
-			writeRepositoryConflict(c, "storage_location_offline", "Storage Location is offline")
+			writeRepositoryConflict(c, err, "storage_location_offline")
 		case errors.Is(err, storage.ErrRepositoryRootInvalid):
-			writeRepositoryConflict(c, "storage_location_invalid", "Storage Location needs attention")
+			writeRepositoryConflict(c, err, "storage_location_invalid")
 		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
-			api.GinBadRequest(c, err, "Repository already exists")
+			api.WriteProblem(c, api.BadRequest(err))
 		case errors.Is(err, storage.ErrInvalidRepositoryName):
-			api.GinBadRequest(c, err, "Invalid repository name")
+			api.WriteProblem(c, api.BadRequest(err))
 		case errors.Is(err, storage.ErrInvalidRepositoryDirectory):
-			api.GinBadRequest(c, err, "Invalid repository storage folder")
+			api.WriteProblem(c, api.BadRequest(err))
 		case errors.Is(err, storage.ErrRepositoryDirectoryConflict):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository storage folder conflicts with an existing directory")
+			writeRepositoryConflict(c, err, "repository_directory_conflict")
 		case errors.Is(err, storage.ErrRepositoryTargetNotEmpty):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository target directory is not empty")
+			writeRepositoryConflict(c, err, "repository_target_not_empty")
 		case errors.Is(err, storage.ErrRepositoryStorageNotWritable):
-			api.GinBadRequest(c, err, "Repository storage is not writable")
+			api.WriteProblem(c, api.BadRequest(err))
 		case errors.Is(err, storage.ErrRepositoryExistingTargetNotMountPoint):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "An existing empty Linux target must be a verified mount point")
+			writeRepositoryConflict(c, err, "repository_target_not_mount_point")
 		case errors.Is(err, storage.ErrPathNotAllowed):
-			api.GinBadRequest(c, err, "Repository path is not allowed")
+			api.WriteProblem(c, api.BadRequest(err))
 		case errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Storage placement risks require administrator confirmation")
+			api.WriteProblem(c, api.KnownProblem(problem.StorageConfirmationRequired, err))
 		case errors.As(err, &conflict):
-			// Only the user can say whether this is the same Repository that moved
-			// or an independent copy. Hand back both paths so the client can ask.
-			c.JSON(http.StatusConflict, dto.RepositoryConflictDTO{
-				Code:           http.StatusConflict,
-				Message:        "Repository identity is already registered",
-				ConflictType:   "repository_identity",
-				RepositoryID:   conflict.RepositoryID,
-				RegisteredPath: conflict.RegisteredPath,
-				RequestedPath:  conflict.RequestedPath,
-				Actions:        conflict.Actions,
-			})
+			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
 		case errors.As(err, &existing):
-			c.JSON(http.StatusConflict, dto.RepositoryConflictDTO{
-				Code:          http.StatusConflict,
-				Message:       "An existing repository was found in the selected storage folder",
-				ConflictType:  "existing_repository_found",
-				RepositoryID:  existing.RepositoryID,
-				RequestedPath: existing.RequestedPath,
-				Actions:       []string{"open"},
-			})
+			api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, []string{"open"}))
 		case errors.As(err, &invalidMarker):
-			c.JSON(http.StatusConflict, dto.RepositoryConflictDTO{
-				Code:          http.StatusConflict,
-				Message:       "The selected storage folder contains an invalid repository marker",
-				ConflictType:  "repository_marker_invalid",
-				RequestedPath: invalidMarker.RequestedPath,
-				Actions:       []string{"diagnose"},
-			})
+			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", []string{"diagnose"}))
 		default:
-			api.GinBadRequest(c, err, "Failed to create repository")
+			api.WriteProblem(c, api.BadRequest(err))
 		}
 		return
 	}
@@ -409,7 +387,7 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 func (h *RepositoryScanHandler) ListRepositoryCandidates(c *gin.Context) {
 	candidates, err := h.repoManager.ListDefaultRepositoryCandidates(c.Request.Context())
 	if err != nil {
-		api.GinBadRequest(c, err, "Repository candidates are unavailable")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	items := make([]dto.RepositoryCandidateDTO, 0, len(candidates))
@@ -438,22 +416,22 @@ func (h *RepositoryScanHandler) ListRepositoryCandidates(c *gin.Context) {
 // @Param Idempotency-Key header string false "Stable request identifier"
 // @Param request body dto.ResolveRepositoryCandidateRequestDTO true "Repository candidate decision"
 // @Success 200 {object} dto.RepositoryDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 409 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 409 {object} api.ProblemResponse
 // @Router /api/v1/repository-candidates/resolve [post]
 func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 	var req dto.ResolveRepositoryCandidateRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid repository candidate decision")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	ownerID, err := h.repoManager.HostOwnerID(c.Request.Context())
 	if err != nil {
-		api.GinBadRequest(c, err, "Host Owner is unavailable")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if ownerID == nil {
-		api.GinBadRequest(c, errors.New("Host Owner is unavailable"), "Host Owner is unavailable")
+		api.WriteProblem(c, api.BadRequest(errors.New("Host Owner is unavailable")))
 		return
 	}
 	requestID := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
@@ -471,10 +449,10 @@ func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, storage.ErrRepositoryOriginalOnline) || errors.Is(err, storage.ErrRepositoryBusy) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository candidate cannot use that decision")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
-		api.GinBadRequest(c, err, "Repository candidate decision failed")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	api.JSONOK(c, toRepositoryDTO(repository))
@@ -490,26 +468,26 @@ func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 // @Param Idempotency-Key header string false "Stable request identifier"
 // @Param request body dto.OpenRepositoryCandidateRequestDTO true "Repository candidate"
 // @Success 200 {object} dto.RepositoryDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 409 {object} dto.RepositoryConflictDTO
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 409 {object} api.RepositoryConflictProblemResponse
 // @Router /api/v1/repository-candidates/open [post]
 func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 	var req dto.OpenRepositoryCandidateRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid repository candidate")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := storage.ValidateRepositoryDirectoryName(req.DirectoryName); err != nil {
-		api.GinBadRequest(c, err, "Invalid repository storage folder")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	ownerID, err := h.repoManager.HostOwnerID(c.Request.Context())
 	if err != nil {
-		api.GinBadRequest(c, err, "Host Owner is unavailable")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if ownerID == nil {
-		api.GinBadRequest(c, errors.New("Host Owner is unavailable"), "Host Owner is unavailable")
+		api.WriteProblem(c, api.BadRequest(errors.New("Host Owner is unavailable")))
 		return
 	}
 	requestID := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
@@ -528,24 +506,17 @@ func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 	if err != nil {
 		var conflict *storage.RepositoryConflictError
 		if errors.As(err, &conflict) {
-			c.JSON(http.StatusConflict, dto.RepositoryConflictDTO{
-				Code: http.StatusConflict, Message: "Repository identity is already registered",
-				ConflictType: "repository_identity", RepositoryID: conflict.RepositoryID,
-				RegisteredPath: conflict.RegisteredPath, RequestedPath: conflict.RequestedPath,
-				Actions: conflict.Actions,
-			})
+			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
 			return
 		}
-		api.GinBadRequest(c, err, "Repository candidate could not be opened")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	api.JSONOK(c, toRepositoryDTO(repository))
 }
 
-func writeRepositoryConflict(c *gin.Context, conflictType, message string) {
-	c.JSON(http.StatusConflict, dto.RepositoryConflictDTO{
-		Code: http.StatusConflict, Message: message, ConflictType: conflictType,
-	})
+func writeRepositoryConflict(c *gin.Context, cause error, conflictType string) {
+	api.WriteProblem(c, problem.NewRepositoryConflict(cause, conflictType, "", nil))
 }
 
 // QueueRepositoryScan queues a manual repository scan.
@@ -558,20 +529,20 @@ func writeRepositoryConflict(c *gin.Context, conflictType, message string) {
 // @Param id path string true "Repository UUID"
 // @Param request body dto.RepositoryScanRequestDTO false "Scan request"
 // @Success 200 {object} dto.RepositoryScanQueuedDTO "Repository scan queued successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
 // @Router /api/v1/repositories/{id}/scan [post]
 func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 	if h == nil || h.scanService == nil {
-		api.GinInternalError(c, errors.New("repository scan service unavailable"), "Repository scan service unavailable")
+		api.WriteProblem(c, api.Internal(errors.New("repository scan service unavailable")))
 		return
 	}
 
 	var req dto.RepositoryScanRequestDTO
 	if c.Request.Body != nil && c.Request.ContentLength != 0 {
 		if err := c.ShouldBindJSON(&req); err != nil {
-			api.GinBadRequest(c, err, "Invalid scan request")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 	}
@@ -587,7 +558,7 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 
 	result, err := h.scanService.EnqueueManualScan(c.Request.Context(), strings.TrimSpace(c.Param("id")), requestedBy, req.Force)
 	if err != nil {
-		api.GinBadRequest(c, err, "Failed to queue repository scan")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -607,16 +578,16 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Success 200 {object} dto.RepositoryScanRunDTO "Latest repository scan retrieved successfully"
-// @Failure 404 {object} api.ErrorResponse "No scan run found"
+// @Failure 404 {object} api.ProblemResponse "No scan run found"
 // @Router /api/v1/repositories/{id}/scans/latest [get]
 func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 	scanRun, err := h.scanService.GetLatestScanRun(c.Request.Context(), strings.TrimSpace(c.Param("id")))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "No repository scan run found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinBadRequest(c, err, "Failed to load latest repository scan")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	api.JSONOK(c, toRepositoryScanRunDTO(scanRun))
@@ -638,7 +609,7 @@ func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 	offset := parseInt32Query(c, "offset", 0)
 	scans, err := h.scanService.ListScanRuns(c.Request.Context(), strings.TrimSpace(c.Param("id")), limit, offset)
 	if err != nil {
-		api.GinBadRequest(c, err, "Failed to list repository scans")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	items := make([]dto.RepositoryScanRunDTO, 0, len(scans))
@@ -658,12 +629,12 @@ func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 // @Router /api/v1/repositories [get]
 func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
 	if err := h.repoManager.ReconcileAll(c.Request.Context()); err != nil {
-		api.GinInternalError(c, err, "Failed to refresh repository reachability")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	repos, err := h.repoManager.ListRepositories()
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to list repositories")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -685,7 +656,7 @@ func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
 func (h *RepositoryScanHandler) ListRepositoryRoots(c *gin.Context) {
 	roots, err := h.repoManager.ListRepositoryRoots(c.Request.Context())
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to list Storage Locations")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	items := make([]dto.RepositoryRootDTO, 0, len(roots))
@@ -698,7 +669,7 @@ func (h *RepositoryScanHandler) ListRepositoryRoots(c *gin.Context) {
 		}
 		impact, impactErr := h.repoManager.PreviewRepositoryRootRemoval(c.Request.Context(), root.RootID.String())
 		if impactErr != nil {
-			api.GinInternalError(c, impactErr, "Failed to inspect Storage Location")
+			api.WriteProblem(c, api.Internal(impactErr))
 			return
 		}
 		items = append(items, dto.RepositoryRootDTO{
@@ -724,16 +695,16 @@ func (h *RepositoryScanHandler) ListRepositoryRoots(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Storage Location UUID"
 // @Success 200 {object} api.SuccessResponse "Storage Location registration removed successfully"
-// @Failure 404 {object} api.ErrorResponse "Storage Location not found"
-// @Failure 409 {object} api.ErrorResponse "Default, non-empty, or busy Storage Location"
+// @Failure 404 {object} api.ProblemResponse "Storage Location not found"
+// @Failure 409 {object} api.ProblemResponse "Default, non-empty, or busy Storage Location"
 // @Router /api/v1/repository-roots/{id} [delete]
 func (h *RepositoryScanHandler) DeleteRepositoryRoot(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	if _, err := h.repoManager.GetRepositoryRoot(c.Request.Context(), id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Storage Location not found")
+			api.WriteProblem(c, api.NotFound(err))
 		} else {
-			api.GinBadRequest(c, err, "Invalid Storage Location")
+			api.WriteProblem(c, api.BadRequest(err))
 		}
 		return
 	}
@@ -741,10 +712,10 @@ func (h *RepositoryScanHandler) DeleteRepositoryRoot(c *gin.Context) {
 	if err := h.repoManager.DeleteRepositoryRoot(c.Request.Context(), id, storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID()}); err != nil {
 		if errors.Is(err, storage.ErrRepositoryRootNotRemovable) ||
 			errors.Is(err, storage.ErrRepositoryRootInUse) || errors.Is(err, storage.ErrRepositoryBusy) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Storage Location cannot be removed")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to remove Storage Location")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, api.SuccessResponse{Message: "Storage Location registration removed; files were preserved"})
@@ -758,12 +729,12 @@ func (h *RepositoryScanHandler) DeleteRepositoryRoot(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Success 200 {object} dto.RepositoryDTO "Repository retrieved successfully"
-// @Failure 404 {object} api.ErrorResponse "Repository not found"
+// @Failure 404 {object} api.ProblemResponse "Repository not found"
 // @Router /api/v1/repositories/{id} [get]
 func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
 	repo, err := h.repoManager.GetRepository(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		api.GinNotFound(c, err, "Repository not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	api.JSONOK(c, toRepositoryDTO(repo))
@@ -778,12 +749,12 @@ func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Success 200 {object} dto.RepositoryRemovalImpactDTO "Repository removal impact"
-// @Failure 404 {object} api.ErrorResponse "Repository not found"
+// @Failure 404 {object} api.ProblemResponse "Repository not found"
 // @Router /api/v1/repositories/{id}/removal-impact [get]
 func (h *RepositoryScanHandler) GetRepositoryRemovalImpact(c *gin.Context) {
 	impact, err := h.repoManager.PreviewRepositoryRemoval(c.Request.Context(), strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		api.GinNotFound(c, err, "Repository not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	api.JSONOK(c, dto.RepositoryRemovalImpactDTO{
@@ -806,14 +777,14 @@ func (h *RepositoryScanHandler) GetRepositoryRemovalImpact(c *gin.Context) {
 // @Param id path string true "Repository UUID"
 // @Param request body dto.RenameRepositoryRequestDTO true "New display name"
 // @Success 200 {object} dto.RepositoryDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 404 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
 // @Router /api/v1/repositories/{id}/rename [post]
 func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var request dto.RenameRepositoryRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid repository name")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	requestID, actor := lifecycleRequestFromWeb(c)
@@ -822,10 +793,10 @@ func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Repository not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinBadRequest(c, err, "Repository could not be renamed")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	api.JSONOK(c, toRepositoryDTO(updated))
@@ -841,39 +812,39 @@ func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 // @Param id path string true "Repository UUID"
 // @Param request body dto.RemoveRepositoryRequestDTO true "Exact repository-name confirmation"
 // @Success 200 {object} api.SuccessResponse "Repository registration removed successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid confirmation"
-// @Failure 409 {object} api.ErrorResponse "Primary or busy repository"
-// @Failure 404 {object} api.ErrorResponse "Repository not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid confirmation"
+// @Failure 409 {object} api.ProblemResponse "Primary or busy repository"
+// @Failure 404 {object} api.ProblemResponse "Repository not found"
 // @Router /api/v1/repositories/{id} [delete]
 func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 
 	existing, err := h.repoManager.GetRepository(id)
 	if err != nil {
-		api.GinNotFound(c, err, "Repository not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	var req dto.RemoveRepositoryRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Repository name confirmation is required")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if req.ConfirmationName != existing.Name {
-		api.GinBadRequest(c, errors.New("repository name confirmation does not match"), "Repository name confirmation does not match")
+		api.WriteProblem(c, api.BadRequest(errors.New("repository name confirmation does not match")))
 		return
 	}
 	if existing.Role == dbtypes.RepoRolePrimary {
-		api.GinError(c, http.StatusConflict, storage.ErrPrimaryRepositoryNotRemovable, http.StatusConflict, "Primary repository cannot be removed")
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, storage.ErrPrimaryRepositoryNotRemovable))
 		return
 	}
 
 	requestID, actor := lifecycleRequestFromWeb(c)
 	if err := h.repoManager.RemoveRepository(c.Request.Context(), id, storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID()}); err != nil {
 		if errors.Is(err, storage.ErrPrimaryRepositoryNotRemovable) || errors.Is(err, storage.ErrRepositoryBusy) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository cannot be removed while busy")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to remove repository")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -960,6 +931,15 @@ func toRepositoryScanRunDTO(scanRun repo.RepositoryScanRun) dto.RepositoryScanRu
 		t := scanRun.FinishedAt.Time
 		finishedAt = &t
 	}
+	var operationProblem *problem.Reference
+	switch {
+	case scanRun.Status == "failed":
+		value := problem.ReferenceFor(problem.RepositoryScanFailed, scanRun.ScanID.String(), true)
+		operationProblem = &value
+	case scanRun.Status == "completed" && scanRun.PartialReason != nil:
+		value := problem.ReferenceFor(problem.RepositoryScanIncomplete, scanRun.ScanID.String(), true)
+		operationProblem = &value
+	}
 	return dto.RepositoryScanRunDTO{
 		ScanID:          scanRun.ScanID.String(),
 		RepositoryID:    scanRun.RepositoryID.String(),
@@ -976,7 +956,6 @@ func toRepositoryScanRunDTO(scanRun repo.RepositoryScanRun) dto.RepositoryScanRu
 		DeferredCount:   scanRun.DeferredCount,
 		AmbiguousCount:  scanRun.AmbiguousCount,
 		Authoritative:   scanRun.Authoritative,
-		PartialReason:   scanRun.PartialReason,
-		Error:           scanRun.Error,
+		Problem:         operationProblem,
 	}
 }

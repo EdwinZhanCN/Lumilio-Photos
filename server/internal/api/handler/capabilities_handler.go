@@ -40,13 +40,13 @@ func NewCapabilitiesHandler(
 func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 	systemSettings, err := h.settingsService.GetSystemSettings(c.Request.Context())
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load system settings")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	effectiveMLConfig, err := h.settingsService.GetEffectiveMLConfig(c.Request.Context())
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load ML settings")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 

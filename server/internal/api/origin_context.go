@@ -55,8 +55,8 @@ func writeOriginPolicyError(c *gin.Context, err error) {
 	case errors.Is(err, httporigin.ErrInvalidPeerAddress),
 		errors.Is(err, httporigin.ErrInvalidTargetOrigin),
 		errors.Is(err, httporigin.ErrInvalidBrowserOrigin):
-		GinError(c, http.StatusBadRequest, err, http.StatusBadRequest, "invalid_request_origin")
+		WriteProblem(c, StatusProblem(http.StatusBadRequest, err))
 	default:
-		GinError(c, http.StatusBadRequest, err, http.StatusBadRequest, "invalid_request_origin")
+		WriteProblem(c, StatusProblem(http.StatusBadRequest, err))
 	}
 }

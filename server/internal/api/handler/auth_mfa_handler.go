@@ -6,6 +6,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -23,8 +24,8 @@ import (
 // @Security BearerAuth
 // @Param request body dto.SecurityVerificationRequestDTO true "Security verification payload"
 // @Success 200 {object} dto.SecurityVerificationResponseDTO "Security proof created"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Invalid security verification"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Invalid security verification"
 // @Router /api/v1/auth/security/verify [post]
 func (h *AuthHandler) VerifySecurity(c *gin.Context) {
 	if !h.allowAuthNetwork(c, authRateScopeSecurityVerify) {
@@ -40,7 +41,7 @@ func (h *AuthHandler) VerifySecurity(c *gin.Context) {
 	}
 	var req dto.SecurityVerificationRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	response, err := h.authService.VerifySecurity(c.Request.Context(), user.UserID, service.SecurityVerificationInput{
@@ -54,9 +55,9 @@ func (h *AuthHandler) VerifySecurity(c *gin.Context) {
 		case errors.Is(err, service.ErrInvalidCurrentSecret),
 			errors.Is(err, service.ErrInvalidSecurityProof),
 			errors.Is(err, service.ErrInvalidMFACode):
-			api.GinUnauthorized(c, err, "Invalid security verification")
+			api.WriteProblem(c, api.KnownProblem(problem.MFAInvalid, err))
 		default:
-			api.GinInternalError(c, err, "Failed to verify account security")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -72,10 +73,10 @@ func (h *AuthHandler) VerifySecurity(c *gin.Context) {
 // @Produce json
 // @Param request body dto.VerifyMFARequestDTO true "MFA verification payload"
 // @Success 200 {object} dto.AuthResponseDTO "MFA verification successful"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Invalid or expired MFA challenge"
-// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Invalid or expired MFA challenge"
+// @Failure 429 {object} api.ProblemResponse "Too many authentication attempts"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/verify [post]
 func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 	if !h.allowAuthNetwork(c, authRateScopeMFAVerify) {
@@ -84,7 +85,7 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 
 	var req dto.VerifyMFARequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if !h.allowAuthOpaqueSubject(c, authRateScopeMFAVerify, req.MFAToken) {
@@ -103,9 +104,9 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 			errors.Is(err, service.ErrInvalidMFACode),
 			errors.Is(err, service.ErrUserNotFound),
 			errors.Is(err, service.ErrMFANotEnabled):
-			api.GinUnauthorized(c, err, "Invalid or expired MFA challenge")
+			api.WriteProblem(c, api.KnownProblem(problem.MFAInvalid, err))
 		default:
-			api.GinInternalError(c, err, "Failed to verify MFA challenge")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -122,8 +123,8 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.MFAStatusDTO "MFA status retrieved successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa [get]
 func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -133,7 +134,7 @@ func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 
 	status, err := h.authService.GetMFAStatus(c.Request.Context(), user.UserID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load MFA status")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -149,8 +150,8 @@ func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body dto.TOTPSetupRequestDTO true "Security verification payload"
 // @Success 200 {object} dto.TOTPSetupResponseDTO "TOTP setup created successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/totp/setup [post]
 func (h *AuthHandler) BeginTOTPSetup(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -159,7 +160,7 @@ func (h *AuthHandler) BeginTOTPSetup(c *gin.Context) {
 	}
 	var req dto.TOTPSetupRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -167,9 +168,9 @@ func (h *AuthHandler) BeginTOTPSetup(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidSecurityProof):
-			api.GinUnauthorized(c, err, "Invalid or expired security verification")
+			api.WriteProblem(c, api.Unauthorized(err))
 		default:
-			api.GinInternalError(c, err, "Failed to start TOTP setup")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -186,9 +187,9 @@ func (h *AuthHandler) BeginTOTPSetup(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body dto.EnableTOTPRequestDTO true "TOTP enable payload"
 // @Success 200 {object} dto.RecoveryCodesResponseDTO "TOTP enabled successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid setup token or verification code"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid setup token or verification code"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/totp/enable [post]
 func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -198,7 +199,7 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 
 	var req dto.EnableTOTPRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -211,9 +212,9 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 		case errors.Is(err, service.ErrInvalidMFAToken),
 			errors.Is(err, service.ErrExpiredMFAToken),
 			errors.Is(err, service.ErrInvalidMFACode):
-			api.GinBadRequest(c, err, "Invalid setup token or verification code")
+			api.WriteProblem(c, api.BadRequest(err))
 		default:
-			api.GinInternalError(c, err, "Failed to enable TOTP")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -230,9 +231,9 @@ func (h *AuthHandler) EnableTOTP(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body dto.DisableTOTPRequestDTO true "Disable TOTP payload"
 // @Success 200 {object} dto.MFAStatusDTO "TOTP disabled successfully"
-// @Failure 400 {object} api.ErrorResponse "MFA is not enabled"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized or incorrect password"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "MFA is not enabled"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized or incorrect password"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/totp/disable [post]
 func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -242,7 +243,7 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 
 	var req dto.DisableTOTPRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -250,11 +251,11 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidSecurityProof):
-			api.GinUnauthorized(c, err, "Invalid or expired security verification")
+			api.WriteProblem(c, api.Unauthorized(err))
 		case errors.Is(err, service.ErrMFANotEnabled):
-			api.GinBadRequest(c, err, "TOTP is not enabled")
+			api.WriteProblem(c, api.BadRequest(err))
 		default:
-			api.GinInternalError(c, err, "Failed to disable TOTP")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -271,9 +272,9 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body dto.RegenerateRecoveryCodesRequestDTO true "Recovery code regeneration payload"
 // @Success 200 {object} dto.RecoveryCodesResponseDTO "Recovery codes regenerated successfully"
-// @Failure 400 {object} api.ErrorResponse "MFA is not enabled"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized or incorrect password"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "MFA is not enabled"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized or incorrect password"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/recovery-codes/regenerate [post]
 func (h *AuthHandler) RegenerateRecoveryCodes(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -283,7 +284,7 @@ func (h *AuthHandler) RegenerateRecoveryCodes(c *gin.Context) {
 
 	var req dto.RegenerateRecoveryCodesRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -291,11 +292,11 @@ func (h *AuthHandler) RegenerateRecoveryCodes(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidSecurityProof):
-			api.GinUnauthorized(c, err, "Invalid or expired security verification")
+			api.WriteProblem(c, api.Unauthorized(err))
 		case errors.Is(err, service.ErrMFANotEnabled):
-			api.GinBadRequest(c, err, "TOTP is not enabled")
+			api.WriteProblem(c, api.BadRequest(err))
 		default:
-			api.GinInternalError(c, err, "Failed to regenerate recovery codes")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}

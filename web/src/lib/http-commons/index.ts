@@ -90,3 +90,19 @@ export function getTypedMetadata(
 // Re-export token management functions and client
 export { getToken, getCSRFToken, saveToken, saveCSRFToken, removeToken } from "./auth.ts";
 export { default as client } from "./client";
+export {
+  getProblemInstance,
+  getProblemType,
+  isAbortProblem,
+  localizeProblem,
+  normalizeProblem,
+  normalizeProblemReference,
+  readProblemResponse,
+} from "./problem";
+export type {
+  KnownProblem,
+  KnownProblemReference,
+  KnownProblemType,
+  NormalizedProblem,
+  NormalizedProblemReference,
+} from "./problem";

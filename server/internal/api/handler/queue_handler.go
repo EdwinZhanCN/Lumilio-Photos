@@ -86,13 +86,13 @@ func (h *QueueHandler) GetQueueSummary(c *gin.Context) {
 	errorLimit := parseErrorLimit(c.DefaultQuery("error_limit", "5"))
 	queues, err := h.loadQueueSummaries(ctx)
 	if err != nil {
-		api.GinError(c, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to fetch queue summaries")
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
 		return
 	}
 
 	if len(queues) > 0 && errorLimit > 0 {
 		if err := h.attachQueueErrorSamples(ctx, queues, errorLimit); err != nil {
-			api.GinError(c, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to fetch queue errors")
+			api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
 			return
 		}
 	}
@@ -133,7 +133,7 @@ func (h *QueueHandler) GetJobStats(c *gin.Context) {
 		query := `SELECT COUNT(*) FROM river_job WHERE state = ?`
 		err := h.dbpool.QueryRowContext(ctx, query, state).Scan(countPtr)
 		if err != nil {
-			api.GinError(c, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to fetch job stats")
+			api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
 			return
 		}
 	}

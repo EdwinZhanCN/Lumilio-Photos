@@ -64,6 +64,10 @@ active, including `similar_to_asset_id` and
 [BrowseGroup](./types.ts) and [BrowseItem](./types.ts). The conversion helpers, including
 [createBrowseGroupsFromBrowseItemDTOs](./model/browseItems.ts), compose physical files into
 logical media items before presentation.
+Manual image search, export, and download fetches use
+[readProblemResponse](../../lib/http-commons/problem.ts); UI flows localize the structured result and
+visual-search recovery branches on exact Problem type rather than message
+text.
 
 [useAssetMediaItem](./api/useAssetMediaItem.ts) resolves RAW/JPEG and Live Photo components.
 [useStackCarouselAssets](./api/useStackCarouselAssets.ts) resolves one logical primary per burst/manual

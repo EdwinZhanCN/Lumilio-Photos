@@ -20,19 +20,20 @@ import (
 // 404 semantics are preserved.
 func RegisterSPA(r *gin.Engine, webRoot string) {
 	webRoot = strings.TrimSpace(webRoot)
-	if webRoot == "" {
-		return
-	}
 	indexPath := filepath.Join(webRoot, "index.html")
 
 	r.NoRoute(func(c *gin.Context) {
 		p := c.Request.URL.Path
 		if p == "/api" || strings.HasPrefix(p, "/api/") || strings.HasPrefix(p, "/swagger") {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			WriteProblem(c, NotFound(os.ErrNotExist))
 			return
 		}
 		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			WriteProblem(c, NotFound(os.ErrNotExist))
+			return
+		}
+		if webRoot == "" {
+			c.Status(http.StatusNotFound)
 			return
 		}
 		setCrossOriginIsolationHeaders(c.Header)

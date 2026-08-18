@@ -25,7 +25,7 @@ interface SearchFABProps {
   query: string;
   similarAssetId?: string;
   fileQuery?: File | null;
-  searchError?: string | null;
+  searchError?: unknown;
   onQueryChange: (query: string) => void;
   onSimilarChange: (assetId: string | null) => void;
   onFileQueryChange: (file: File | null) => void;

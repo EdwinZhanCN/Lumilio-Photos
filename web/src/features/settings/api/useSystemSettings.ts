@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { authenticatedFetch } from "@/lib/http-commons/client";
+import { normalizeProblem, readProblemResponse } from "@/lib/http-commons/problem";
 import type { Schemas } from "./types";
 
 export type SystemSettings = Schemas["dto.SystemSettingsDTO"];
@@ -51,14 +52,12 @@ export async function validateLLMDraft(body: ValidateLLMDraft): Promise<void> {
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
   });
+  if (!response.ok) throw await readProblemResponse(response);
   const payload: unknown = await response.json().catch(() => undefined);
   const valid = Boolean(
     payload && typeof payload === "object" && "valid" in payload && payload.valid,
   );
-  if (!response.ok || !valid) {
-    const detail = payload as { message?: string; error?: string } | undefined;
-    throw new Error(detail?.message ?? detail?.error ?? `HTTP ${response.status}`);
-  }
+  if (!valid) throw normalizeProblem(undefined);
 }
 
 export function useValidateLLMSettings() {

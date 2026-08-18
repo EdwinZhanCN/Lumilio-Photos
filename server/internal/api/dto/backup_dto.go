@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"server/internal/api/problem"
 	"server/internal/service"
 )
 
@@ -39,24 +40,27 @@ func ToBackupListDTO(entries []service.BackupEntry) BackupListDTO {
 // RestoreOperationDTO is the durable observation surface for a restore that
 // continues across an HTTP disconnect and runtime restart.
 type RestoreOperationDTO struct {
-	ID           string     `json:"id" example:"d62cbbf3-f564-458b-86ca-0f6d10fcd8d4"`
-	BackupName   string     `json:"backup_name" example:"20260711T020000.000000Z-library.sqlite3"`
-	Status       string     `json:"status" enums:"staged,restart_requested,installing,verifying,completed,rolling_back,rolled_back,failed"`
-	Message      string     `json:"message"`
-	ErrorCode    string     `json:"error_code,omitempty"`
-	RestorePoint string     `json:"restore_point,omitempty"`
-	RequestedAt  time.Time  `json:"requested_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	CompletedAt  *time.Time `json:"completed_at,omitempty"`
+	ID           string             `json:"id" example:"d62cbbf3-f564-458b-86ca-0f6d10fcd8d4"`
+	BackupName   string             `json:"backup_name" example:"20260711T020000.000000Z-library.sqlite3"`
+	Status       string             `json:"status" enums:"staged,restart_requested,installing,verifying,completed,rolling_back,rolled_back,failed"`
+	Problem      *problem.Reference `json:"problem,omitempty"`
+	RestorePoint string             `json:"restore_point,omitempty"`
+	RequestedAt  time.Time          `json:"requested_at"`
+	UpdatedAt    time.Time          `json:"updated_at"`
+	CompletedAt  *time.Time         `json:"completed_at,omitempty"`
 }
 
 func ToRestoreOperationDTO(operation service.RestoreOperation) RestoreOperationDTO {
+	var operationProblem *problem.Reference
+	if operation.Status == "failed" || operation.Status == "rolled_back" {
+		value := problem.ReferenceFor(problem.BackupRestoreFailed, operation.ID, false)
+		operationProblem = &value
+	}
 	return RestoreOperationDTO{
 		ID:           operation.ID,
 		BackupName:   operation.BackupName,
 		Status:       string(operation.Status),
-		Message:      operation.Message,
-		ErrorCode:    operation.ErrorCode,
+		Problem:      operationProblem,
 		RestorePoint: operation.RestorePoint,
 		RequestedAt:  operation.RequestedAt,
 		UpdatedAt:    operation.UpdatedAt,

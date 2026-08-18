@@ -36,9 +36,9 @@ func NewUserHandler(userService service.UserService, loggers ...*zap.Logger) *Us
 // @Security BearerAuth
 // @Param request body dto.UpdateOwnProfileRequestDTO true "Profile update payload"
 // @Success 200 {object} dto.UserDTO "Profile updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/users/me/profile [patch]
 func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -48,7 +48,7 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 
 	var req dto.UpdateOwnProfileRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -60,10 +60,10 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 		if errors.Is(err, service.ErrInvalidDisplayName) ||
 			errors.Is(err, service.ErrInvalidAvatarAsset) ||
 			errors.Is(err, service.ErrAvatarAssetMustBePhoto) {
-			api.GinBadRequest(c, err, err.Error())
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to update profile")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -86,9 +86,9 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 // @Param limit query int false "Maximum number of results" default(20)
 // @Param offset query int false "Number of results to skip" default(0)
 // @Success 200 {object} dto.ListUsersResponseDTO "Users retrieved successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/users [get]
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
@@ -113,7 +113,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 	result, err := h.userService.ListUsers(c.Request.Context(), limit, offset)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load users")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -130,12 +130,12 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 // @Param id path int true "User ID"
 // @Param request body dto.AdminUpdateUserRequestDTO true "User update payload"
 // @Success 200 {object} dto.UserDTO "User updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 404 {object} api.ErrorResponse "User not found"
-// @Failure 409 {object} api.ErrorResponse "User already exists"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 404 {object} api.ProblemResponse "User not found"
+// @Failure 409 {object} api.ProblemResponse "User already exists"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/users/{id} [patch]
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	admin, ok := requireAdminUser(c)
@@ -145,13 +145,13 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid user ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.AdminUpdateUserRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	if req.Role != nil {
 		normalized := service.UserRole(strings.ToLower(strings.TrimSpace(*req.Role)))
 		if normalized != service.UserRoleAdmin && normalized != service.UserRoleUser {
-			api.GinBadRequest(c, errors.New("invalid role"), "Role must be admin or user")
+			api.WriteProblem(c, api.BadRequest(errors.New("invalid role")))
 			return
 		}
 		role = &normalized
@@ -176,18 +176,18 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		switch {
 		case errors.Is(err, service.ErrInvalidUsernameFormat),
 			errors.Is(err, service.ErrInvalidDisplayName):
-			api.GinBadRequest(c, err, err.Error())
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		case errors.Is(err, service.ErrUserNotFound):
-			api.GinNotFound(c, err, "User not found")
+			api.WriteProblem(c, api.NotFound(err))
 		case errors.Is(err, service.ErrUserAlreadyExists):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "User already exists")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 		case errors.Is(err, service.ErrInsufficientPermissions):
-			api.GinForbidden(c, err, "Admin access required")
+			api.WriteProblem(c, api.Forbidden(err))
 		case errors.Is(err, service.ErrCannotDisableLastAdmin):
-			api.GinBadRequest(c, err, "At least one active admin must remain")
+			api.WriteProblem(c, api.BadRequest(err))
 		default:
-			api.GinInternalError(c, err, "Failed to update user")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -204,9 +204,9 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 // @Security BearerAuth
 // @Param request body dto.ChangePasswordRequestDTO true "Password change payload"
 // @Success 200 {object} api.SuccessResponse "Password updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Current password is incorrect"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Current password is incorrect"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/users/me/password [patch]
 func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -216,7 +216,7 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 
 	var req dto.ChangePasswordRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -226,12 +226,12 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 	}); err != nil {
 		switch {
 		case errors.Is(err, service.ErrWeakPassword):
-			api.GinBadRequest(c, err, err.Error())
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		case errors.Is(err, service.ErrInvalidCurrentSecret):
-			api.GinUnauthorized(c, err, "Current password is incorrect")
+			api.WriteProblem(c, api.Unauthorized(err))
 		default:
-			api.GinInternalError(c, err, "Failed to change password")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -248,11 +248,11 @@ func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path int true "User ID"
 // @Success 200 {object} dto.ResetAccessResponseDTO "User access reset successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 404 {object} api.ErrorResponse "User not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 404 {object} api.ProblemResponse "User not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/users/{id}/reset-access [post]
 func (h *UserHandler) ResetUserAccess(c *gin.Context) {
 	admin, ok := requireAdminUser(c)
@@ -262,7 +262,7 @@ func (h *UserHandler) ResetUserAccess(c *gin.Context) {
 
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid user ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -277,11 +277,11 @@ func (h *UserHandler) ResetUserAccess(c *gin.Context) {
 		)
 		switch {
 		case errors.Is(err, service.ErrUserNotFound):
-			api.GinNotFound(c, err, "User not found")
+			api.WriteProblem(c, api.NotFound(err))
 		case errors.Is(err, service.ErrInsufficientPermissions):
-			api.GinForbidden(c, err, "Admin access required")
+			api.WriteProblem(c, api.Forbidden(err))
 		default:
-			api.GinInternalError(c, err, "Failed to reset access")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}

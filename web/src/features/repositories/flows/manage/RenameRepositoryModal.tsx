@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import type { RepositoryOption } from "../../types";
 import { validateRepositoryName, type RepositoryNameError } from "../../model/repositorySetup";
 
@@ -48,9 +49,11 @@ export default function RenameRepositoryModal({
     } catch (error) {
       showMessage(
         "error",
-        error instanceof Error
-          ? error.message
-          : t("manage.repositories.renameFailed", "Repository could not be renamed."),
+        localizeAPIProblem(
+          error,
+          t,
+          t("manage.repositories.renameFailed", "Repository could not be renamed."),
+        ),
       );
     }
   };

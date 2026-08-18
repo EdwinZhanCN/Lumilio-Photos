@@ -4,6 +4,7 @@ import { useMessage } from "@/features/notifications";
 import { CreateShareLinkModal, createShareSelectedBulkAction } from "@/features/share";
 import type { AssetsBulkActionContext } from "@/lib/assets/bulkActions";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import type { EventDetail, EventPatch } from "../../model/event";
 import EventMoveModal from "./components/EventMoveModal";
 
@@ -55,7 +56,7 @@ export function useEventBulkActions(event: EventDetail, operations: EventCorrect
               showMessage(
                 "error",
                 t("events.coverError", "Failed to update the Event cover: {{message}}", {
-                  message: error instanceof Error ? error.message : String(error),
+                  message: localizeAPIProblem(error, t, t("home.errors.unknown")),
                 }),
               );
               throw error;
@@ -83,7 +84,7 @@ export function useEventBulkActions(event: EventDetail, operations: EventCorrect
               showMessage(
                 "error",
                 t("events.splitError", "Failed to split Event: {{message}}", {
-                  message: error instanceof Error ? error.message : String(error),
+                  message: localizeAPIProblem(error, t, t("home.errors.unknown")),
                 }),
               );
               throw error;
@@ -127,7 +128,7 @@ export function useEventBulkActions(event: EventDetail, operations: EventCorrect
               showMessage(
                 "error",
                 t("events.removeError", "Failed to remove media: {{message}}", {
-                  message: error instanceof Error ? error.message : String(error),
+                  message: localizeAPIProblem(error, t, t("home.errors.unknown")),
                 }),
               );
               throw error;

@@ -1,4 +1,60 @@
 {
+  "apiErrors": {
+    "agent": {
+      "operationFailed": "The Agent operation could not be completed."
+    },
+    "auth": {
+      "authenticationRequired": "Sign in to continue.",
+      "invalidCredentials": "The username or password is incorrect.",
+      "mfaInvalid": "The verification code is invalid or expired.",
+      "passkeyUnavailable": "Passkeys are unavailable in this browser or deployment.",
+      "permissionDenied": "You do not have permission to do that.",
+      "rateLimited": "Too many attempts. Try again later.",
+      "rateLimitedWithDelay_one": "Too many attempts. Try again in {{count}} seconds.",
+      "rateLimitedWithDelay_other": "Too many attempts. Try again in {{count}} seconds.",
+      "sessionExpired": "Your session expired. Sign in again.",
+      "untrustedOrigin": "This browser origin is not trusted."
+    },
+    "backup": {
+      "restoreFailed": "The database restore could not be completed. The previous database remains active."
+    },
+    "bootstrap": {
+      "appNotInitialized": "Finish initial setup before continuing."
+    },
+    "cloud": {
+      "importFailed": "The cloud import could not be completed."
+    },
+    "lumen": {
+      "imageSemanticAnalysisUnavailable": "Image Semantic Analysis is unavailable."
+    },
+    "media": {
+      "imageEmbeddingMissing": "The selected asset has not completed Image Semantic Analysis.",
+      "invalidRequest": "The media request could not be processed."
+    },
+    "repository": {
+      "conflicts": {
+        "existingFound": "An existing Repository was found in this Storage Location.",
+        "generic": "The Repository needs attention before continuing.",
+        "identity": "This Repository identity is already registered.",
+        "invalidMarker": "The selected Repository marker needs attention.",
+        "storageLocationOffline": "The Storage Location is offline."
+      },
+      "scanFailed": "The Repository scan could not be completed.",
+      "scanIncomplete": "The Repository scan completed with partial results.",
+      "unavailable": "The Repository required for this operation is unavailable."
+    },
+    "service": {
+      "unavailable": "A required service is unavailable."
+    },
+    "storage": {
+      "confirmationRequired": "Review and confirm the Storage Location risks before continuing.",
+      "hostActionExpired": "The Desktop approval expired. Start the action again.",
+      "hostActionFailed": "The Desktop could not complete the storage action."
+    },
+    "upload": {
+      "processingFailed": "The upload could not be processed."
+    }
+  },
   "app": {
     "name": "Lumilio Photos"
   },
@@ -172,6 +228,22 @@
     "clearSearchAriaLabel": "Clear search",
     "errorFallback": {
       "something_went_wrong": "Something went wrong"
+    },
+    "export": {
+      "allFailed": "No images could be exported.",
+      "cancelled": "Export cancelled.",
+      "conversionUnavailable": "Export conversion is unavailable for video and audio assets.",
+      "downloadCancelled": "Download cancelled.",
+      "downloaded": "Image downloaded.",
+      "downloadFailed": "Download failed.",
+      "downloadingOriginal": "Downloading original…",
+      "exported": "Image exported.",
+      "failed": "Export failed.",
+      "multipleCompleted_one": "Exported {{count}} of {{total}} images.",
+      "multipleCompleted_other": "Exported {{count}} of {{total}} images.",
+      "noDownload": "No image is available for download.",
+      "noExport": "No image is available for export.",
+      "noneSelected": "No images are selected for export."
     },
     "filterTool": {
       "cameraMakeSection": {
@@ -1161,6 +1233,7 @@
       "unreachable": "Lumilio Agent is temporarily unreachable. Check the Server connection and try again."
     },
     "board": {
+      "changeFailed": "The board change could not be saved. Your previous layout was restored.",
       "deletePending": "Widget removed.",
       "desktopSizeOnly": "Widget size can be adjusted on larger screens.",
       "empty": "Nothing pinned yet. Ask Lumilio Agent in the dock, then pin a result to keep it on this board.",
@@ -1189,6 +1262,7 @@
         "retry": "Try again",
         "title": "Confirmation required"
       },
+      "connectionFailed": "Lumilio Agent could not complete this request.",
       "empty": "Start a conversation with Lumilio Agent!",
       "newConversation": "New conversation",
       "openAiSettings": "Open AI settings",
@@ -2105,6 +2179,13 @@
         "totpCode": "Authenticator code"
       },
       "pageDescription": "Manage your profile, password, MFA, and passkeys.",
+      "passkeys": {
+        "added": "Passkey added successfully.",
+        "addFailed": "Failed to add passkey.",
+        "invalidID": "Invalid passkey ID.",
+        "removed": "Passkey removed successfully.",
+        "removeFailed": "Failed to remove passkey."
+      },
       "passwordDescription": "Change your account password. You will be signed out afterwards.",
       "passwordTitle": "Password",
       "permissions": {
@@ -2598,6 +2679,7 @@
       "export": "Export",
       "fit": "Fit",
       "fitToScreen": "Fit to screen",
+      "loadFailed": "Failed to load the Studio asset.",
       "loading": "Loading…",
       "renderFailed": "Render failed",
       "rendering": "Rendering preview…",
@@ -2606,6 +2688,7 @@
       "save": "Save",
       "saved": "Saved",
       "savedToast": "Sidecar saved",
+      "saveFailed": "Failed to save the sidecar.",
       "undo": "Undo",
       "unsaved": "Unsaved changes",
       "upToDate": "Up to date",
@@ -2627,6 +2710,7 @@
       "confirm": "Export",
       "downscaledToast": "Export was scaled to {{w}}×{{h}} to stay within limits.",
       "estimate": "Approx. output",
+      "failed": "Failed to export the image.",
       "format": "Format",
       "longEdge": "Long edge",
       "longEdgePx": "Long edge (px)",

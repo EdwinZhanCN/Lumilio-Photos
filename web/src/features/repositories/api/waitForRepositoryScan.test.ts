@@ -44,13 +44,18 @@ describe("waitForRepositoryScan", () => {
     expect(mocks.get).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects a requested terminal failure with the backend error", async () => {
+  it("rejects a requested terminal failure with its Problem Reference", async () => {
     const requestedAt = Date.parse("2026-07-16T12:00:00.000Z");
+    const problem = {
+      type: "https://lumilio.org/problems/repository/scan-failed",
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      retryable: true,
+    };
     mocks.get.mockResolvedValue({
       data: {
         started_at: "2026-07-16T12:00:00.000Z",
         status: "failed",
-        error: "scan failed",
+        problem,
       },
       response: { status: 200 },
     });
@@ -60,12 +65,17 @@ describe("waitForRepositoryScan", () => {
         intervalMs: 0,
         timeoutMs: 1_000,
       }),
-    ).rejects.toThrow("scan failed");
+    ).rejects.toEqual(problem);
   });
 
-  it("rejects non-404 status errors immediately", async () => {
+  it("rejects non-404 request failures as normalized Problems", async () => {
+    const error = {
+      type: "https://lumilio.org/problems/service/unavailable",
+      status: 503,
+      instance: "urn:lumilio:problem:fedcba9876543210fedcba9876543210",
+    };
     mocks.get.mockResolvedValue({
-      error: { message: "service unavailable" },
+      error,
       response: { status: 503 },
     });
 
@@ -74,6 +84,13 @@ describe("waitForRepositoryScan", () => {
         intervalMs: 0,
         timeoutMs: 1_000,
       }),
-    ).rejects.toThrow("service unavailable");
+    ).rejects.toEqual({
+      kind: "problem",
+      ...error,
+      retryAfterSeconds: undefined,
+      conflictType: undefined,
+      repositoryID: undefined,
+      actions: undefined,
+    });
   });
 });

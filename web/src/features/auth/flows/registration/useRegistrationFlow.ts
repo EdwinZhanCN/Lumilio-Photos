@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } 
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../../state/useAuth.ts";
 import { setupStatusQueryKey } from "../../api/useSetupStatus.ts";
@@ -46,18 +47,6 @@ type RegistrationFlowState = {
   handleSkipPasskey: () => void;
   handleFinish: () => void;
 };
-
-function getApiMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (error && typeof error === "object") {
-    const apiError = error as { message?: string; error?: string };
-    if (apiError.message) return apiError.message;
-    if (apiError.error) return apiError.error;
-  }
-  return fallback;
-}
 
 export function useRegistrationFlow(options?: { onComplete?: () => void }): RegistrationFlowState {
   const { t } = useI18n();
@@ -183,7 +172,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
       await queryClient.invalidateQueries({ queryKey: setupStatusQueryKey });
       await beginTOTPSetup();
     } catch (registrationError) {
-      setFlowError(getApiMessage(registrationError, t("auth.register.startError")));
+      setFlowError(localizeProblem(registrationError, t, t("auth.register.startError")));
     }
   };
 
@@ -220,7 +209,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
       setStep(passkeySupported ? "passkey" : "recovery");
     } catch (totpError) {
       setTotpCode("");
-      setFlowError(getApiMessage(totpError, t("auth.register.totpSetupCompleteError")));
+      setFlowError(localizeProblem(totpError, t, t("auth.register.totpSetupCompleteError")));
     }
   };
 
@@ -272,7 +261,7 @@ export function useRegistrationFlow(options?: { onComplete?: () => void }): Regi
 
       setStep("recovery");
     } catch (passkeyError) {
-      setFlowError(getApiMessage(passkeyError, t("auth.register.passkeyVerifyError")));
+      setFlowError(localizeProblem(passkeyError, t, t("auth.register.passkeyVerifyError")));
     }
   };
 

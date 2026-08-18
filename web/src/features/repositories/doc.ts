@@ -84,6 +84,10 @@
  * {@link useRepositoryScan} starts scans and stack detection.
  * {@link waitForRepositoryScan} follows a scan run to a terminal state before
  * repository-aware list/search queries are invalidated.
+ * Repository conflicts use the exact generated Problem subtype for safe
+ * recovery facts. Scan and native-host terminal states retain a Problem
+ * Reference, and their flows call {@link localizeProblemReference} only when
+ * rendering; persisted English failure text is not part of the contract.
  * {@link RepositoryReachability} carries storage availability while
  * {@link RepositoryActivity} carries current work; neither is guessed from
  * missing data. Consumers must use the root `index.ts`, which
@@ -108,6 +112,7 @@ import type AddRepositoryModal from "./flows/manage/AddRepositoryModal.tsx";
 import type NativeHostActionModal from "./flows/manage/NativeHostActionModal.tsx";
 import type RepositoryCandidateModal from "./flows/manage/RepositoryCandidateModal.tsx";
 import type { useWorkingRepository } from "./flows/working-repository/useWorkingRepository.ts";
+import type { localizeProblemReference } from "../../lib/http-commons/problem.ts";
 import type { normalizeRepositoryOptions } from "./model/repositoryOptions.ts";
 import type { getStorageEntityDisplayName } from "./model/storageEntities.ts";
 import type { RepositoryActivity, RepositoryReachability, StorageEntity } from "./types.ts";

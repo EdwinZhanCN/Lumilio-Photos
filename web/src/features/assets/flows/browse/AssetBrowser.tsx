@@ -303,7 +303,7 @@ export function AssetBrowser({
           </div>
         )}
 
-        {error && (
+        {Boolean(error) && (
           <div className="px-4">
             <div className="alert alert-warning">
               <span>

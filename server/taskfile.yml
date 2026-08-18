@@ -62,6 +62,7 @@ tasks:
     desc: Generate the OpenAPI spec (server/docs/swagger.yaml)
     cmds:
       - swag init --v3.1 -g cmd/main.go -o docs/
+      - go run ./tools/openapinormalize
 
   config-examples:
     desc: Regenerate the config schema and example manifests from profiles.go

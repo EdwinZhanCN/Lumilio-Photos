@@ -9,17 +9,9 @@ import {
   type RepositoryStorageStrategy,
 } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
 import { repositoryNameErrorMessage } from "../../model/repositoryNameValidation.ts";
-
-function apiMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const record = error as { message?: string; error?: string };
-    return record.message || record.error || fallback;
-  }
-  return fallback;
-}
 
 const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useI18n();
@@ -118,8 +110,9 @@ const PrimaryRepositoryGate: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const error = createMutation.error
-    ? apiMessage(
+    ? localizeProblem(
         createMutation.error,
+        t,
         t("auth.primaryRepository.error", {
           defaultValue: "Failed to create the Primary Repository.",
         }),

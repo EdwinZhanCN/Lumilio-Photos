@@ -1,6 +1,12 @@
 import { fetchEventSource, type EventSourceMessage } from "@microsoft/fetch-event-source";
 import { getToken } from "@/lib/http-commons/auth";
 import { client } from "@/lib/http-commons/queryClient";
+import {
+  normalizeProblem,
+  normalizeProblemReference,
+  readProblemResponse,
+} from "@/lib/http-commons/problem";
+import type { components } from "@/lib/http-commons/schema";
 import type {
   AgentCancelRequest,
   AgentCancelResponse,
@@ -16,12 +22,16 @@ import type {
 
 const baseUrl = import.meta.env.VITE_API_URL ?? "";
 
+type GeneratedAgentEffectStatus = components["schemas"]["handler.AgentEffectStatusResponse"];
 
-export interface AgentEffectStatus {
+export type AgentEffectStatus = Omit<
+  GeneratedAgentEffectStatus,
+  "effect_id" | "status" | "receipt"
+> & {
   effect_id: string;
   status: "pending" | "committed" | "rejected" | "cancelled" | "failed";
   receipt?: EffectReceipt;
-}
+};
 
 export interface AgentStreamCallbacks {
   onSessionInfo: (threadId: string, runId: string, droppedMentions: DroppedMention[]) => void;
@@ -30,7 +40,7 @@ export interface AgentStreamCallbacks {
   onSideEvent: (event: SideChannelEvent) => void;
   onInterrupt: (interrupt: InterruptInfo) => void;
   onDone: () => void;
-  onError: (message: string) => void;
+  onError: (problem: unknown) => void;
 }
 
 const isInterruptInfo = (value: unknown): value is InterruptInfo => {
@@ -39,27 +49,12 @@ const isInterruptInfo = (value: unknown): value is InterruptInfo => {
   return Array.isArray(interrupt.InterruptContexts);
 };
 
-const getErrorMessage = (data: unknown): string => {
-  if (typeof data === "string" && data) return data;
-  if (data && typeof data === "object") {
-    if ("message" in data) {
-      const message = (data as { message?: string }).message;
-      if (message) return message;
-    }
-    if ("error" in data) {
-      const message = (data as { error?: string }).error;
-      if (message) return message;
-    }
-  }
-  return "Lumilio Agent could not complete this request.";
-};
-
 const parsePayload = (message: EventSourceMessage): unknown => {
   if (!message.data) return undefined;
   try {
     return JSON.parse(message.data);
   } catch {
-    return message.data;
+    return undefined;
   }
 };
 
@@ -95,7 +90,7 @@ const isDroppedMention = (value: unknown): value is DroppedMention => {
 export async function cancelAgentRun(body: AgentCancelRequest): Promise<AgentCancelResponse> {
   const { data, error, response } = await client.POST("/api/v1/agent/chat/cancel", { body });
   if (!response.ok || !data) {
-    throw new Error(getErrorMessage(error) || `HTTP ${response.status}`);
+    throw error ? normalizeProblem(error) : normalizeProblem(undefined);
   }
   return data;
 }
@@ -108,22 +103,35 @@ export async function getAgentEffectStatus(
   effectId: string,
   signal?: AbortSignal,
 ): Promise<AgentEffectStatus> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const query = new URLSearchParams({ thread_id: threadId });
-  const response = await fetch(
-    `${baseUrl}/api/v1/agent/effects/${encodeURIComponent(effectId)}?${query}`,
-    { headers, signal },
-  );
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = undefined;
+  const { data, error } = await client.GET("/api/v1/agent/effects/{id}", {
+    params: { path: { id: effectId }, query: { thread_id: threadId } },
+    signal,
+  });
+  if (error || !data?.effect_id || !isEffectStatus(data.status)) {
+    throw error ? normalizeProblem(error) : normalizeProblem(undefined);
   }
-  if (!response.ok) throw new Error(getErrorMessage(payload) || `HTTP ${response.status}`);
-  return payload as AgentEffectStatus;
+  const receipt = isEffectReceipt(data.receipt) ? data.receipt : undefined;
+  return { ...data, effect_id: data.effect_id, status: data.status, receipt };
+}
+
+function isEffectStatus(value: unknown): value is AgentEffectStatus["status"] {
+  return (
+    typeof value === "string" &&
+    ["pending", "committed", "rejected", "cancelled", "failed"].includes(value)
+  );
+}
+
+function isEffectReceipt(value: unknown): value is EffectReceipt {
+  if (!value || typeof value !== "object") return false;
+  const receipt = value as Partial<EffectReceipt>;
+  return (
+    typeof receipt.effect_id === "string" &&
+    typeof receipt.tool_name === "string" &&
+    typeof receipt.status === "string" &&
+    ["committed", "rejected", "cancelled", "failed"].includes(receipt.status) &&
+    typeof receipt.count === "number" &&
+    typeof receipt.message === "string"
+  );
 }
 
 /** Opens an authenticated SSE stream against an agent endpoint and routes
@@ -146,13 +154,7 @@ export async function streamAgent(
     openWhenHidden: true,
     async onopen(response) {
       if (response.ok) return;
-      let payload: unknown;
-      try {
-        payload = JSON.parse(await response.text());
-      } catch {
-        payload = undefined;
-      }
-      throw new Error(getErrorMessage(payload) || `HTTP ${response.status}`);
+      throw await readProblemResponse(response);
     },
     onmessage(message) {
       const eventType = message.event || "message";
@@ -187,7 +189,7 @@ export async function streamAgent(
           callbacks.onDone();
           break;
         case "error":
-          callbacks.onError(getErrorMessage(data));
+          callbacks.onError(normalizeProblemReference(data) ?? normalizeProblem(undefined));
           break;
         default:
           break; // heartbeat and forward-compatible events

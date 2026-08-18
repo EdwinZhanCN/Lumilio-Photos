@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem, localizeProblemReference } from "@/lib/http-commons/problem";
 import { createUUID } from "@/lib/uuid";
 import {
   type HostAction,
@@ -142,6 +143,7 @@ export default function NativeHostActionModal({
       setError(
         actionErrorMessage(
           reason,
+          t,
           t(
             "manage.repositories.hostAction.createFailed",
             "The Desktop request could not be created.",
@@ -164,6 +166,7 @@ export default function NativeHostActionModal({
       setError(
         actionErrorMessage(
           reason,
+          t,
           t(
             "manage.repositories.hostAction.resolveFailed",
             "The recovery decision could not be applied.",
@@ -186,6 +189,7 @@ export default function NativeHostActionModal({
       setError(
         actionErrorMessage(
           reason,
+          t,
           t("manage.repositories.hostAction.cancelFailed", "The request could not be cancelled."),
         ),
       );
@@ -394,11 +398,14 @@ export default function NativeHostActionModal({
             <div role="alert" className="alert alert-error alert-soft text-sm">
               <AlertTriangle className="size-5 shrink-0" />
               <span>
-                {action.error_message ||
+                {localizeProblemReference(
+                  action.problem,
+                  t,
                   t(
                     "manage.repositories.hostAction.ended",
                     "The Desktop request ended before it completed.",
-                  )}
+                  ),
+                )}
               </span>
             </div>
             <div className="modal-action">
@@ -426,8 +433,12 @@ export default function NativeHostActionModal({
   );
 }
 
-function actionErrorMessage(reason: unknown, fallback: string): string {
-  return reason instanceof Error && reason.message ? reason.message : fallback;
+function actionErrorMessage(
+  reason: unknown,
+  t: ReturnType<typeof useI18n>["t"],
+  fallback: string,
+): string {
+  return localizeAPIProblem(reason, t, fallback);
 }
 
 function hostActionTitle(kind: HostActionKind, t: ReturnType<typeof useI18n>["t"]): string {

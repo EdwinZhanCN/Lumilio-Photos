@@ -12,6 +12,7 @@ import { AlertTriangle, LayoutDashboard, RotateCcw, Sparkles, Undo2 } from "luci
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { BoardTile } from "../../modules/widgets/chrome/BoardTile";
 import { DIMS, getWidget } from "../../modules/widgets/registry";
 import type { AgentPinDTO, WidgetSizeKey } from "../../modules/widgets/types";
@@ -46,11 +47,6 @@ function serializeLayout(layout: Layout) {
   return JSON.stringify(layout.map((item: LayoutItem) => [item.i, item.x, item.y, item.w, item.h]));
 }
 
-function mutationMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return "The board change could not be saved. Your previous layout was restored.";
-}
-
 /** Durable Agent workspace. Desktop layout is canonical; narrow screens render
  * a read-safe single column and never write responsive coordinates back into
  * the desktop grid. */
@@ -65,6 +61,15 @@ export function AgentBoard() {
   const pinsQuery = $api.useQuery("get", "/api/v1/agent/pins", {});
   const pins = useMemo(() => pinsQuery.data ?? [], [pinsQuery.data]);
   const isNarrow = mounted && width > 0 && width < MOBILE_BREAKPOINT;
+  const mutationMessage = (error: unknown) =>
+    localizeAPIProblem(
+      error,
+      t,
+      t(
+        "lumilio.board.changeFailed",
+        "The board change could not be saved. Your previous layout was restored.",
+      ),
+    );
 
   const layoutMutation = $api.useMutation("patch", "/api/v1/agent/pins/layout", {
     onMutate: async (variables) => {
@@ -94,7 +99,8 @@ export function AgentBoard() {
     },
     onError: (error, _variables, context) => {
       const typedContext = context as LayoutMutationContext | undefined;
-      if (typedContext?.previousPins) queryClient.setQueryData(PINS_QUERY_KEY, typedContext.previousPins);
+      if (typedContext?.previousPins)
+        queryClient.setQueryData(PINS_QUERY_KEY, typedContext.previousPins);
       setOperationError(mutationMessage(error));
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: PINS_QUERY_KEY }),
@@ -126,7 +132,8 @@ export function AgentBoard() {
     },
     onError: (error: unknown, _variables: unknown, context: unknown) => {
       const typedContext = context as LayoutMutationContext | undefined;
-      if (typedContext?.previousPins) queryClient.setQueryData(PINS_QUERY_KEY, typedContext.previousPins);
+      if (typedContext?.previousPins)
+        queryClient.setQueryData(PINS_QUERY_KEY, typedContext.previousPins);
       setOperationError(mutationMessage(error));
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: PINS_QUERY_KEY }),
@@ -312,7 +319,11 @@ export function AgentBoard() {
           <p className="text-sm text-base-content/75">
             {t("lumilio.board.loadFailed", "The Agent board could not be loaded.")}
           </p>
-          <button className="btn btn-sm mt-3" type="button" onClick={() => void pinsQuery.refetch()}>
+          <button
+            className="btn btn-sm mt-3"
+            type="button"
+            onClick={() => void pinsQuery.refetch()}
+          >
             <RotateCcw size={14} />
             {t("common.retry", "Retry")}
           </button>
@@ -352,7 +363,11 @@ export function AgentBoard() {
         <div className="alert alert-error mb-3 text-sm" role="alert">
           <AlertTriangle size={16} />
           <span>{operationError}</span>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={() => setOperationError(null)}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => setOperationError(null)}
+          >
             {t("common.dismiss", "Dismiss")}
           </button>
         </div>

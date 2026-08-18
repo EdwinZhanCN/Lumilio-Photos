@@ -21,6 +21,11 @@ import (
 // BackupEntry is one finalized SQLite snapshot with manifest provenance.
 type RestoreOperation = backup.RestoreOperation
 
+var (
+	ErrInvalidBackupName = errors.New("invalid backup name")
+	ErrRestoreInProgress = backup.ErrRestoreInProgress
+)
+
 type BackupEntry struct {
 	Name          string
 	SizeBytes     int64
@@ -121,7 +126,7 @@ func (s *backupService) TriggerNow(ctx context.Context) error {
 func (s *backupService) ResolvePath(name string) (string, error) {
 	base, _ := trimRestorePoint(name)
 	if _, ok := backup.ParseName(base); !ok || filepath.Base(name) != name {
-		return "", fmt.Errorf("invalid backup name %q", name)
+		return "", fmt.Errorf("%w: %q", ErrInvalidBackupName, name)
 	}
 	return filepath.Join(s.rt.Dir, name), nil
 }
@@ -149,7 +154,7 @@ func (s *backupService) Restore(ctx context.Context, name string) (backup.Restor
 		return backup.RestoreOperation{}, fmt.Errorf("backup %s: %w", name, err)
 	}
 	if !s.restore.TryLock() {
-		return backup.RestoreOperation{}, errors.New("another restore is already in progress")
+		return backup.RestoreOperation{}, ErrRestoreInProgress
 	}
 	defer s.restore.Unlock()
 

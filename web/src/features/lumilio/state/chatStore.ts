@@ -45,7 +45,7 @@ interface LumilioChatStore {
   isStopping: boolean;
   awaitingConfirmation: boolean;
   pendingConfirmation: PendingConfirmation | null;
-  connectionError: string | null;
+  connectionError: unknown;
   usage: TokenUsageInfo | null;
 
   sendMessage: (
@@ -110,12 +110,11 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
     });
   };
 
-  const reconcilePendingConfirmation = async (fallbackMessage: string): Promise<boolean> => {
+  const reconcilePendingConfirmation = async (): Promise<boolean> => {
     const pending = get().pendingConfirmation;
     const threadId = get().threadId;
     if (!pending || !threadId || !pending.effectId) return false;
 
-    let lastError = fallbackMessage;
     for (const delayMs of [0, 150, 400]) {
       if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
       try {
@@ -132,20 +131,17 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
           return true;
         }
         if (["cancelled", "failed"].includes(status.status)) {
-          lastError = `The server reports this action as ${status.status}. You can retry safely.`;
           break;
         }
-      } catch (error) {
-        lastError = (error as Error).message || fallbackMessage;
+      } catch {
+        // The confirmation block owns the localized retry fallback.
       }
     }
 
     const current = get().pendingConfirmation;
     if (current?.interruptId === pending.interruptId) {
       set((state) => ({
-        messages: removeTrailingEmptyAssistant(
-          failConfirm(state.messages, pending.interruptId, lastError),
-        ),
+        messages: removeTrailingEmptyAssistant(failConfirm(state.messages, pending.interruptId)),
         pendingConfirmation: null,
         awaitingConfirmation: true,
         isGenerating: false,
@@ -249,16 +245,21 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
           isStopping: false,
         }));
       },
-      onError: (message) => {
+      onError: (problem) => {
         if (!isCurrent()) return;
         clearAfterStop = false;
         if (get().pendingConfirmation) {
-          set({ activeRunId: null, connectionError: message, isGenerating: true, isStopping: false });
+          set({
+            activeRunId: null,
+            connectionError: problem,
+            isGenerating: true,
+            isStopping: false,
+          });
           return;
         }
         set({
           activeRunId: null,
-          connectionError: message,
+          connectionError: problem,
           awaitingConfirmation: false,
           isGenerating: false,
           isStopping: false,
@@ -330,7 +331,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
           controller.signal,
         );
       } catch (error) {
-        if (!controller.signal.aborted) callbacksFor(controller).onError((error as Error).message);
+        if (!controller.signal.aborted) callbacksFor(controller).onError(error);
       } finally {
         if (activeStreamController === controller) activeStreamController = null;
       }
@@ -363,8 +364,6 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
       const controller = new AbortController();
       activeStreamController?.abort();
       activeStreamController = controller;
-      let reconciliationMessage =
-        "The confirmation stream ended without a receipt. Lumilio Agent will verify the effect before allowing a retry.";
       try {
         await streamAgent(
           "/api/v1/agent/chat/resume",
@@ -373,13 +372,12 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
           controller.signal,
         );
       } catch (error) {
-        reconciliationMessage = (error as Error).message || reconciliationMessage;
-        if (!controller.signal.aborted) callbacksFor(controller).onError(reconciliationMessage);
+        if (!controller.signal.aborted) callbacksFor(controller).onError(error);
       } finally {
         if (activeStreamController === controller) activeStreamController = null;
       }
       if (!controller.signal.aborted && get().pendingConfirmation?.interruptId === interruptId) {
-        await reconcilePendingConfirmation(reconciliationMessage);
+        await reconcilePendingConfirmation();
       }
     },
 
@@ -408,7 +406,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         if (clearAfterStop) clearConversation();
       } catch (error) {
         clearAfterStop = false;
-        set({ isStopping: false, connectionError: (error as Error).message });
+        set({ isStopping: false, connectionError: error });
       }
     },
 

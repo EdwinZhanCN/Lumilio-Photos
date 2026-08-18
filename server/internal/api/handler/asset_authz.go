@@ -69,10 +69,10 @@ func (h *AssetHandler) loadAsset(c *gin.Context, assetID uuid.UUID) (*repo.Asset
 	asset, err := h.assetService.GetAsset(c.Request.Context(), assetID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Asset not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return nil, false
 		}
-		api.GinInternalError(c, err, "Failed to access asset")
+		api.WriteProblem(c, api.Internal(err))
 		return nil, false
 	}
 
@@ -83,10 +83,10 @@ func (h *AssetHandler) loadAssetAny(c *gin.Context, assetID uuid.UUID) (*repo.As
 	asset, err := h.assetService.GetAssetAny(c.Request.Context(), assetID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Asset not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return nil, false
 		}
-		api.GinInternalError(c, err, "Failed to access asset")
+		api.WriteProblem(c, api.Internal(err))
 		return nil, false
 	}
 
@@ -146,30 +146,29 @@ func (h *AssetHandler) ensureOwnerAccessForMedia(c *gin.Context, ownerID *int32,
 		if service.IsAdminRole(user.Role) || int32(user.UserID) == *ownerID {
 			return true
 		}
-		api.GinForbidden(c, errors.New("access denied"), forbiddenMessage)
+		api.WriteProblem(c, api.Forbidden(errors.New("access denied")))
 		return false
 	}
 
 	mediaToken := strings.TrimSpace(c.Query("mt"))
 	if mediaToken == "" {
-		api.GinUnauthorized(c, errors.New("authentication required"), unauthorizedMessage)
+		api.WriteProblem(c, api.Unauthorized(errors.New("authentication required")))
 		return false
 	}
 	if h.authService == nil {
-		api.GinUnauthorized(c, errors.New("media token authentication unavailable"), unauthorizedMessage)
+		api.WriteProblem(c, api.Unauthorized(errors.New("media token authentication unavailable")))
 		return false
 	}
 
 	claims, err := h.authService.ValidateMediaToken(c.Request.Context(), mediaToken)
 	if err != nil {
-		api.GinUnauthorized(c, errors.New("invalid or expired media token"), unauthorizedMessage)
+		api.WriteProblem(c, api.Unauthorized(errors.New("invalid or expired media token")))
 		return false
 	}
 
 	if service.IsAdminRole(claims.Role) || int32(claims.UserID) == *ownerID {
 		return true
 	}
-
-	api.GinForbidden(c, errors.New("access denied"), forbiddenMessage)
+	api.WriteProblem(c, api.Forbidden(errors.New("access denied")))
 	return false
 }

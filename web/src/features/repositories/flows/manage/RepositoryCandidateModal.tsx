@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Copy, FolderOpen, RefreshCw, X } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import {
   type RepositoryCandidate,
   useOpenRepositoryCandidate,
@@ -44,9 +45,11 @@ export default function RepositoryCandidateModal({
     } catch (reason: unknown) {
       showMessage(
         "error",
-        reason instanceof Error
-          ? reason.message
-          : t("manage.repositories.candidates.openFailed", "Repository could not be opened."),
+        localizeAPIProblem(
+          reason,
+          t,
+          t("manage.repositories.candidates.openFailed", "Repository could not be opened."),
+        ),
       );
     }
   };
@@ -72,12 +75,14 @@ export default function RepositoryCandidateModal({
     } catch (reason: unknown) {
       showMessage(
         "error",
-        reason instanceof Error
-          ? reason.message
-          : t(
-              "manage.repositories.candidates.resolveFailed",
-              "Repository decision could not be applied.",
-            ),
+        localizeAPIProblem(
+          reason,
+          t,
+          t(
+            "manage.repositories.candidates.resolveFailed",
+            "Repository decision could not be applied.",
+          ),
+        ),
       );
     }
   };

@@ -65,10 +65,10 @@ func getRepositoryForAsset(ctx context.Context, queries *repo.Queries, asset *re
 // recognize regardless of which endpoint it hit.
 func respondRepositoryResolveError(c *gin.Context, err error, message string) {
 	if errors.Is(err, storage.ErrRepositoryOffline) {
-		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is unavailable")
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 		return
 	}
-	api.GinInternalError(c, err, message)
+	api.WriteProblem(c, api.Internal(err))
 }
 
 func openRepositoryMedia(factory *storage.RepositoryFSFactory, repository repo.Repository, rawPath string) (*storage.RepositoryFS, *os.File, error) {
@@ -110,7 +110,7 @@ func serveRepositoryFile(c *gin.Context, repositoryFS *storage.RepositoryFS, fil
 	defer file.Close()
 	info, err := file.Stat()
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to access repository file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	http.ServeContent(c.Writer, c.Request, filename, info.ModTime(), file)

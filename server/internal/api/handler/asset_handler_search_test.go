@@ -13,6 +13,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
@@ -342,9 +343,10 @@ func TestAssetHandlerSearchAssets_SimilarMissingEmbeddingIs409(t *testing.T) {
 	handler.SearchAssets(ctx)
 
 	require.Equal(t, http.StatusConflict, recorder.Code)
-	var response api.ErrorResponse
+	var response api.ProblemResponse
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, "embedding_missing", response.Error)
+	require.Equal(t, problem.ImageEmbeddingMissing.Type, response.Type)
+	require.Equal(t, http.StatusConflict, response.Status)
 }
 
 func TestAssetHandlerSearchAssets_SimilarUnavailableIs503(t *testing.T) {

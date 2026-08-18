@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"server/internal/api"
+	"server/internal/api/problem"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -71,7 +72,7 @@ func adminIDFromContext(c *gin.Context) *int32 {
 func requireCurrentUser(c *gin.Context) (*service.UserResponse, bool) {
 	user, ok := currentUserFromContext(c)
 	if !ok {
-		api.GinUnauthorized(c, errors.New("user not found in context"), "Unauthorized")
+		api.WriteProblem(c, api.KnownProblem(problem.AuthenticationRequired, errors.New("user not found in context")))
 		return nil, false
 	}
 	return user, true
@@ -83,7 +84,7 @@ func requireAdminUser(c *gin.Context) (*service.UserResponse, bool) {
 		return nil, false
 	}
 	if !service.IsAdminRole(user.Role) {
-		api.GinForbidden(c, errors.New("admin access required"), "Admin access required")
+		api.WriteProblem(c, api.KnownProblem(problem.PermissionDenied, errors.New("admin access required")))
 		return nil, false
 	}
 	return user, true
@@ -96,14 +97,13 @@ func ensureOwnerAccess(c *gin.Context, ownerID *int32, unauthorizedMessage, forb
 
 	user, ok := currentUserFromContext(c)
 	if !ok {
-		api.GinUnauthorized(c, errors.New("authentication required"), unauthorizedMessage)
+		api.WriteProblem(c, api.KnownProblem(problem.AuthenticationRequired, errors.New("authentication required")))
 		return false
 	}
 
 	if service.IsAdminRole(user.Role) || int32(user.UserID) == *ownerID {
 		return true
 	}
-
-	api.GinForbidden(c, errors.New("access denied"), forbiddenMessage)
+	api.WriteProblem(c, api.KnownProblem(problem.PermissionDenied, errors.New("access denied")))
 	return false
 }

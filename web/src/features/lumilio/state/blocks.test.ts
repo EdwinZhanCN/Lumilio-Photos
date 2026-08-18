@@ -127,11 +127,11 @@ describe("confirmation receipts", () => {
   it("keeps a failed confirmation retryable", () => {
     let messages = applyInterrupt(conversation(), interrupt);
     messages = setConfirmSubmitting(messages, "int-1", true);
-    messages = failConfirm(messages, "int-1", "network lost");
+    messages = failConfirm(messages, "int-1");
     expect(messages[1].blocks[0]).toMatchObject({
       kind: "confirm",
       state: "failed",
-      error: "network lost",
+      error: undefined,
     });
   });
 });
@@ -146,9 +146,10 @@ describe("turn snapshots", () => {
         { type: "person", id: "2", label: "Grace", status: "accepted" },
       ],
     };
-    const messages = applyDroppedMentions([userMessage("compare", snapshot), assistantMessage()], [
-      { type: "person", id: "2", label: "Grace", reason: "not_found" },
-    ]);
+    const messages = applyDroppedMentions(
+      [userMessage("compare", snapshot), assistantMessage()],
+      [{ type: "person", id: "2", label: "Grace", reason: "not_found" }],
+    );
     expect(messages[0].request?.mentions).toEqual([
       { type: "person", id: "1", label: "Ada", status: "accepted" },
       { type: "person", id: "2", label: "Grace", status: "dropped", reason: "not_found" },

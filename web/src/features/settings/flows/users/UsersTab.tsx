@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangleIcon, KeyRoundIcon, MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import UserAvatar from "@/components/ui/UserAvatar";
 import PhotoPicker from "@/features/assets/picker";
 import { copyText } from "@/lib/clipboard";
@@ -25,16 +26,6 @@ import {
 } from "../../model/userEditor";
 
 type FeedbackState = { tone: "success" | "error"; message: string } | null;
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
-}
 
 export default function UsersTab() {
   const { t } = useI18n();
@@ -128,8 +119,9 @@ export default function UsersTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(
+        message: localizeProblem(
           error,
+          t,
           t("settings.users.saveError", { defaultValue: "Failed to update user." }),
         ),
       });
@@ -162,8 +154,9 @@ export default function UsersTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(
+        message: localizeProblem(
           error,
+          t,
           t("settings.users.resetAccessError", { defaultValue: "Failed to reset access." }),
         ),
       });

@@ -53,7 +53,9 @@ confirmation, and Stop. Inline results render through
 [streamAgent](./api/agentStream.ts) opens authenticated SSE for chat/resume.
 `session_info` binds a run, text becomes [TextBlock](./model/chatTypes.ts), tool/widget side
 channels become [ToolBlock](./model/chatTypes.ts)/[WidgetBlock](./model/chatTypes.ts), and interrupts become
-[ConfirmBlock](./model/chatTypes.ts). [cancelAgentRun](./api/agentStream.ts) targets the exact thread/run;
+[ConfirmBlock](./model/chatTypes.ts). Stream failures carry a generated Problem Reference;
+[ChatDock](./flows/chat/ChatDock.tsx) localizes that reference from current i18n state instead of
+storing display copy. [cancelAgentRun](./api/agentStream.ts) targets the exact thread/run;
 [cancelActiveBlocks](./state/blocks.ts) preserves partial text while marking unfinished
 blocks stopped.
 

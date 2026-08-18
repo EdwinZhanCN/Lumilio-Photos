@@ -65,6 +65,10 @@
  * {@link BrowseGroup} and {@link BrowseItem}. The conversion helpers, including
  * {@link createBrowseGroupsFromBrowseItemDTOs}, compose physical files into
  * logical media items before presentation.
+ * Manual image search, export, and download fetches use
+ * {@link readProblemResponse}; UI flows localize the structured result and
+ * visual-search recovery branches on exact Problem type rather than message
+ * text.
  *
  * {@link useAssetMediaItem} resolves RAW/JPEG and Live Photo components.
  * {@link useStackCarouselAssets} resolves one logical primary per burst/manual
@@ -113,5 +117,6 @@ import type {
 import type { mergeAssetFilters } from "./model/filter.ts";
 import type PhotoPicker from "./picker/PhotoPicker.tsx";
 import type { AssetsViewResult, BrowseGroup, BrowseItem } from "./types.ts";
+import type { readProblemResponse } from "../../lib/http-commons/problem.ts";
 
 export {};

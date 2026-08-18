@@ -70,7 +70,7 @@ func TestRegisterSPADoesNotShadowAPIOrSwagger(t *testing.T) {
 	if w := do(r, http.MethodGet, "/api/v1/health"); w.Code != http.StatusOK {
 		t.Errorf("GET /api/v1/health = %d, want 200", w.Code)
 	}
-	// Unknown API path 404s as JSON instead of returning the SPA shell.
+	// Unknown API path 404s as a Problem instead of returning the SPA shell.
 	w := do(r, http.MethodGet, "/api/v1/does-not-exist")
 	if w.Code != http.StatusNotFound {
 		t.Errorf("GET /api/v1/does-not-exist = %d, want 404", w.Code)
@@ -78,6 +78,7 @@ func TestRegisterSPADoesNotShadowAPIOrSwagger(t *testing.T) {
 	if body := w.Body.String(); body == "INDEX" {
 		t.Error("API miss returned the SPA shell; it must 404 instead")
 	}
+	require.Equal(t, ProblemMediaType, w.Header().Get("Content-Type"))
 	// Swagger misses also must not return the SPA shell.
 	if w := do(r, http.MethodGet, "/swagger/missing"); w.Body.String() == "INDEX" {
 		t.Error("swagger miss returned the SPA shell; it must 404 instead")
@@ -86,10 +87,12 @@ func TestRegisterSPADoesNotShadowAPIOrSwagger(t *testing.T) {
 
 func TestRegisterSPANoopWhenWebRootEmpty(t *testing.T) {
 	r := newSPATestRouter(t, "")
-	// No NoRoute handler registered → gin's default 404 for an unknown route.
 	if w := do(r, http.MethodGet, "/"); w.Code != http.StatusNotFound {
 		t.Errorf("GET / with empty webRoot = %d, want 404 (API-only)", w.Code)
 	}
+	w := do(r, http.MethodGet, "/api/v1/does-not-exist")
+	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Equal(t, ProblemMediaType, w.Header().Get("Content-Type"))
 }
 
 func TestResolveStaticFileGuardsTraversal(t *testing.T) {

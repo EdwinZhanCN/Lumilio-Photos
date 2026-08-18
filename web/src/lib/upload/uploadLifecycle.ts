@@ -2,6 +2,7 @@ import type { components } from "@/lib/http-commons/schema.d.ts";
 import { client } from "@/lib/http-commons/queryClient";
 import { getToken } from "@/lib/http-commons/auth";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
+import { normalizeProblem, readProblemResponse } from "@/lib/http-commons/problem";
 
 type UploadJobStatus = components["schemas"]["dto.UploadJobStatusDTO"];
 
@@ -59,7 +60,7 @@ async function pollUploadJobs(
       params: { query: { task_ids: ids.join(",") } },
       signal: options.signal,
     });
-    if (error) throw new Error(error.error || error.message || "Failed to load upload status");
+    if (error) throw normalizeProblem(error);
 
     const jobs = data?.jobs ?? [];
     jobs.forEach((job) => options.onUpdate?.(job));
@@ -93,8 +94,7 @@ async function streamUploadJobs(
     signal: options.signal,
     openWhenHidden: true,
     onopen: async (response) => {
-      if (!response.ok)
-        throw new Error(`Upload status stream failed with status ${response.status}`);
+      if (!response.ok) throw await readProblemResponse(response);
     },
     onmessage: (message) => {
       if (message.event !== "jobs" && message.event !== "done") return;
@@ -114,8 +114,9 @@ async function streamUploadJobs(
   const jobs = ids
     .map((id) => latest.get(id))
     .filter((job): job is UploadJobStatus => Boolean(job));
-  if (jobs.length !== ids.length || !jobs.every((job) => job.terminal))
-    throw new Error("Upload status stream ended early");
+  if (jobs.length !== ids.length || !jobs.every((job) => job.terminal)) {
+    throw normalizeProblem(undefined);
+  }
   return jobs;
 }
 

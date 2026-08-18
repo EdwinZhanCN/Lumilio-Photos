@@ -13,6 +13,7 @@ import {
 import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 
 export default function RepositoryMaintenancePanel() {
   const { t } = useI18n();
@@ -71,10 +72,7 @@ export default function RepositoryMaintenancePanel() {
               ),
         );
       } catch (error) {
-        showMessage(
-          "error",
-          error instanceof Error ? error.message : t("manage.repositories.scanFailed"),
-        );
+        showMessage("error", localizeAPIProblem(error, t, t("manage.repositories.scanFailed")));
       }
     },
     [scanRepository, showMessage, t],
@@ -94,7 +92,7 @@ export default function RepositoryMaintenancePanel() {
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error ? error.message : t("manage.repositories.detectStacksFailed"),
+          localizeAPIProblem(error, t, t("manage.repositories.detectStacksFailed")),
         );
       }
     },
@@ -120,8 +118,7 @@ export default function RepositoryMaintenancePanel() {
         showMessage(
           "error",
           t("duplicates.scanError", {
-            message:
-              error instanceof Error ? error.message : t("manage.repositories.duplicateScanFailed"),
+            message: localizeAPIProblem(error, t, t("manage.repositories.duplicateScanFailed")),
           }),
         );
       }
@@ -146,7 +143,7 @@ export default function RepositoryMaintenancePanel() {
         });
         showMessage("success", t("manage.repositories.rebuildLocationQueued"));
       } catch (error) {
-        showMessage("error", error instanceof Error ? error.message : String(error));
+        showMessage("error", localizeAPIProblem(error, t, t("home.errors.unknown")));
       }
     },
     [locationRebuildMutation, showMessage, t],
@@ -176,7 +173,7 @@ export default function RepositoryMaintenancePanel() {
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error ? error.message : t("manage.repositories.cloudImportFailed"),
+          localizeAPIProblem(error, t, t("manage.repositories.cloudImportFailed")),
         );
       }
     },
@@ -198,7 +195,7 @@ export default function RepositoryMaintenancePanel() {
       showMessage(
         "error",
         t("people.rebuild.error", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -217,7 +214,7 @@ export default function RepositoryMaintenancePanel() {
       showMessage(
         "error",
         t("events.rebuild.error", "Failed to rebuild Events: {{message}}", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -233,10 +230,7 @@ export default function RepositoryMaintenancePanel() {
         }),
       );
     } catch (error) {
-      showMessage(
-        "error",
-        error instanceof Error ? error.message : t("manage.repositories.scanFailed"),
-      );
+      showMessage("error", localizeAPIProblem(error, t, t("manage.repositories.scanFailed")));
     }
   }, [repositoryIds, scanRepositories, showMessage, t]);
 

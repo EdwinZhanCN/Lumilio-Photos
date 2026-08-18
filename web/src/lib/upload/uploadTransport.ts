@@ -1,4 +1,5 @@
 import { getToken } from "@/lib/http-commons/auth.ts";
+import { normalizeProblem, readProblemResponse } from "@/lib/http-commons/problem.ts";
 import { createUUID } from "../uuid";
 import type {
   UploadResponse,
@@ -14,36 +15,30 @@ import type {
 
 const baseURL = import.meta.env.VITE_API_URL ?? "";
 
-const responseError = async (response: Response, operation: string): Promise<Error> => {
-  let detail = "";
+const parseSuccessfulJSON = async <T>(response: Response): Promise<T> => {
+  if (!response.ok) throw await readProblemResponse(response);
   try {
-    const payload: unknown = await response.json();
-    if (payload && typeof payload === "object") {
-      if ("error" in payload && typeof payload.error === "string") detail = payload.error;
-      else if ("message" in payload && typeof payload.message === "string")
-        detail = payload.message;
-    }
+    return (await response.json()) as T;
   } catch {
-    // The status code remains actionable when the response has no JSON body.
+    throw normalizeProblem(undefined);
   }
-  return new Error(
-    `${operation} failed with status ${response.status}${detail ? `: ${detail}` : ""}`,
-  );
 };
 
-const parseSuccessfulJSON = async <T>(response: Response, operation: string): Promise<T> => {
-  if (!response.ok) throw await responseError(response, operation);
-  return response.json() as Promise<T>;
-};
-
-const parseSuccessfulXHR = <T>(xhr: XMLHttpRequest, operation: string): T => {
+const parseSuccessfulXHR = <T>(xhr: XMLHttpRequest): T => {
   if (xhr.status < 200 || xhr.status >= 300) {
-    throw new Error(`${operation} failed with status ${xhr.status}`);
+    const contentType = xhr.getResponseHeader("Content-Type")?.split(";", 1)[0]?.trim();
+    if (contentType !== "application/problem+json") throw normalizeProblem(undefined);
+    try {
+      throw normalizeProblem(JSON.parse(xhr.responseText) as unknown);
+    } catch (error) {
+      if (typeof error === "object" && error && "kind" in error) throw error;
+      throw normalizeProblem(undefined);
+    }
   }
   try {
     return JSON.parse(xhr.responseText) as T;
   } catch {
-    throw new Error(`${operation} returned an invalid response`);
+    throw normalizeProblem(undefined);
   }
 };
 
@@ -73,7 +68,7 @@ export const precheckUploads = async (
     signal,
   });
 
-  return parseSuccessfulJSON<UploadPrecheckResponse>(response, "Upload precheck");
+  return parseSuccessfulJSON<UploadPrecheckResponse>(response);
 };
 
 export const uploadFile = async (
@@ -111,13 +106,13 @@ export const uploadFile = async (
 
       xhr.onload = () => {
         try {
-          resolve(parseSuccessfulXHR<UploadResponse>(xhr, "Upload"));
+          resolve(parseSuccessfulXHR<UploadResponse>(xhr));
         } catch (error) {
           reject(error);
         }
       };
 
-      xhr.onerror = () => reject(new Error("Upload failed"));
+      xhr.onerror = () => reject(normalizeProblem(new TypeError("network request failed")));
       xhr.onabort = () => reject(new DOMException("Upload aborted", "AbortError"));
 
       if (options.signal) {
@@ -139,7 +134,7 @@ export const uploadFile = async (
     signal: options?.signal,
   });
 
-  return parseSuccessfulJSON<UploadResponse>(response, "Upload");
+  return parseSuccessfulJSON<UploadResponse>(response);
 };
 
 export const batchUploadFiles = async (
@@ -195,13 +190,13 @@ export const batchUploadFiles = async (
 
       xhr.onload = () => {
         try {
-          resolve(parseSuccessfulXHR<BatchUploadResponse>(xhr, "Batch upload"));
+          resolve(parseSuccessfulXHR<BatchUploadResponse>(xhr));
         } catch (error) {
           reject(error);
         }
       };
 
-      xhr.onerror = () => reject(new Error("Batch upload failed"));
+      xhr.onerror = () => reject(normalizeProblem(new TypeError("network request failed")));
       xhr.onabort = () => reject(new DOMException("Batch upload aborted", "AbortError"));
 
       if (options.signal) {
@@ -223,7 +218,7 @@ export const batchUploadFiles = async (
     signal: options?.signal,
   });
 
-  return parseSuccessfulJSON<BatchUploadResponse>(response, "Batch upload");
+  return parseSuccessfulJSON<BatchUploadResponse>(response);
 };
 
 export const uploadFileInChunks = async (
@@ -351,7 +346,7 @@ export const createUploadSession = async (request: {
     headers,
     body: JSON.stringify(request),
   });
-  return parseSuccessfulJSON<UploadSessionState>(response, "Upload session");
+  return parseSuccessfulJSON<UploadSessionState>(response);
 };
 
 export const generateSessionId = (): string => {

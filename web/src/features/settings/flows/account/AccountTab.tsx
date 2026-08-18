@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import UserAvatar from "@/components/ui/UserAvatar";
 import {
   DISPLAY_NAME_HINT,
@@ -98,16 +99,6 @@ function getPermissionDescription(key: string, t: ReturnType<typeof useI18n>["t"
     }),
   };
   return descriptions[key] ?? "";
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
 }
 
 function isValidUserDTO(value: unknown): value is UserDTO {
@@ -529,11 +520,12 @@ export default function AccountTab() {
         body: { display_name: displayName, avatar_asset_id: avatarAssetId },
       });
       if (!isValidUserDTO(response)) {
-        throw new Error(
+        setProfileError(
           t("settings.account.invalidProfileResponse", {
             defaultValue: "Profile saved, but the server returned an invalid user payload.",
           }),
         );
+        return;
       }
       dispatch({ type: "SET_USER", payload: response });
       setProfileTouched(false);
@@ -542,8 +534,9 @@ export default function AccountTab() {
       profileSavedTimer.current = setTimeout(() => setProfileJustSaved(false), 2500);
     } catch (error) {
       setProfileError(
-        getErrorMessage(
+        localizeProblem(
           error,
+          t,
           t("settings.account.saveError", { defaultValue: "Failed to update profile." }),
         ),
       );
@@ -579,11 +572,18 @@ export default function AccountTab() {
       setSecurityPassword("");
       setSecurityCode("");
       setSecurityMethod("totp");
-      setSecurityFeedback({ tone: "success", message: "Passkey added successfully." });
+      setSecurityFeedback({
+        tone: "success",
+        message: t("settings.account.passkeys.added", "Passkey added successfully."),
+      });
     } catch (error) {
       setSecurityFeedback({
         tone: "error",
-        message: getErrorMessage(error, "Failed to add passkey."),
+        message: localizeProblem(
+          error,
+          t,
+          t("settings.account.passkeys.addFailed", "Failed to add passkey."),
+        ),
       });
     }
   };
@@ -591,7 +591,10 @@ export default function AccountTab() {
   const handleDeletePasskey = async (passkeyID: number) => {
     setSecurityFeedback(null);
     if (!Number.isFinite(passkeyID) || passkeyID <= 0) {
-      setSecurityFeedback({ tone: "error", message: "Invalid passkey ID." });
+      setSecurityFeedback({
+        tone: "error",
+        message: t("settings.account.passkeys.invalidID", "Invalid passkey ID."),
+      });
       return;
     }
     try {
@@ -613,11 +616,18 @@ export default function AccountTab() {
       setSecurityPassword("");
       setSecurityCode("");
       setSecurityMethod("totp");
-      setSecurityFeedback({ tone: "success", message: "Passkey removed successfully." });
+      setSecurityFeedback({
+        tone: "success",
+        message: t("settings.account.passkeys.removed", "Passkey removed successfully."),
+      });
     } catch (error) {
       setSecurityFeedback({
         tone: "error",
-        message: getErrorMessage(error, "Failed to remove passkey."),
+        message: localizeProblem(
+          error,
+          t,
+          t("settings.account.passkeys.removeFailed", "Failed to remove passkey."),
+        ),
       });
     }
   };
@@ -836,7 +846,7 @@ export default function AccountTab() {
         isDirty={isDirty}
         isSaving={updateProfileMutation.isPending}
         justSaved={profileJustSaved}
-        error={profileError}
+        localizedError={profileError}
         canSave={isDirty && !updateProfileMutation.isPending}
         onSave={() => void handleProfileSave()}
         onReset={resetProfileDraft}

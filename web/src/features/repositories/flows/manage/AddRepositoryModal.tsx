@@ -11,6 +11,7 @@ import {
 import { useMessage } from "@/features/notifications";
 import { formatBytes } from "@/lib/utils/formatters";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useCreateRepository } from "../../api/useCreateRepository";
 import { useRepositoryCandidates } from "../../api/useRepositoryCandidates";
 import { useRepositoryRoots } from "../../api/useRepositoryRoots";
@@ -165,10 +166,7 @@ export default function AddRepositoryModal({
           onRecoveryRequired(conflictType);
           return;
         }
-        showMessage(
-          "error",
-          error instanceof Error ? error.message : t("manage.repositories.createFailed"),
-        );
+        showMessage("error", localizeAPIProblem(error, t, t("manage.repositories.createFailed")));
       }
     },
     [

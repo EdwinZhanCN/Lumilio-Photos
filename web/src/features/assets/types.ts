@@ -101,7 +101,7 @@ export interface AssetsViewResult {
   isLoading: boolean;
   isLoadingMore: boolean;
   isFetched: boolean;
-  error: string | null;
+  error: unknown;
   fetchMore: () => Promise<void>;
   refetch: () => Promise<void>;
   hasMore: boolean;

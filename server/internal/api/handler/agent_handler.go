@@ -18,6 +18,7 @@ import (
 	"server/internal/agent/ref"
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/service"
 
 	"github.com/cloudwego/eino/adk"
@@ -79,15 +80,6 @@ type AgentEffectStatusResponse struct {
 	Receipt  *core.EffectReceipt `json:"receipt,omitempty"`
 }
 
-// AgentStreamError is the stable public error envelope for an already-open
-// Agent SSE stream. Internal/provider errors are logged server-side and never
-// become user-visible transport text.
-type AgentStreamError struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Retryable bool   `json:"retryable"`
-}
-
 // AgentResumeRequest represents request body for resuming agent chat
 type AgentResumeRequest struct {
 	ThreadID string         `json:"thread_id" binding:"required"`
@@ -102,14 +94,14 @@ type AgentResumeRequest struct {
 // @Produce text/event-stream
 // @Param request body AgentChatRequest true "Chat request"
 // @Success 200 {string} string "SSE stream"
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/agent/chat [post]
 func (h *AgentHandler) Chat(c *gin.Context) {
 	var req AgentChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -128,18 +120,18 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 	sideChannel := make(chan *core.SideChannelEvent, 100)
 	contextJSON, err := json.Marshal(req.Context)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid context bindings")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	mentionsJSON, err := json.Marshal(req.Mentions)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid mention bindings")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if _, err := h.agentService.EnsureThread(c.Request.Context(), int32(user.UserID), threadID, req.Mode, core.ThreadBindings{
 		Context: contextJSON, Mentions: mentionsJSON,
 	}); err != nil {
-		api.GinBadRequest(c, err, "Invalid agent thread")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -151,19 +143,19 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 		ThreadID: threadID,
 	}, req.Context, req.Mentions)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to prepare agent context")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	run, err := h.agentService.AskAgent(c.Request.Context(), int32(user.UserID), threadID, req.Query, prepared.SyntheticData, sideChannel)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to start agent run")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	flusher, err := h.prepareSSE(c)
 	if err != nil {
 		_, _ = h.agentService.CancelRun(context.WithoutCancel(c.Request.Context()), int32(user.UserID), threadID, run.RunID)
-		api.GinInternalError(c, err)
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -187,14 +179,14 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 // @Produce text/event-stream
 // @Param request body AgentResumeRequest true "Resume request"
 // @Success 200 {string} string "SSE stream"
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/agent/chat/resume [post]
 func (h *AgentHandler) ResumeChat(c *gin.Context) {
 	var req AgentResumeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -212,13 +204,13 @@ func (h *AgentHandler) ResumeChat(c *gin.Context) {
 
 	run, err := h.agentService.ResumeAgent(c.Request.Context(), int32(user.UserID), req.ThreadID, params, sideChannel)
 	if err != nil {
-		api.GinNotFound(c, err, "Agent thread not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	flusher, err := h.prepareSSE(c)
 	if err != nil {
 		_, _ = h.agentService.CancelRun(context.WithoutCancel(c.Request.Context()), int32(user.UserID), req.ThreadID, run.RunID)
-		api.GinInternalError(c, err)
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -235,14 +227,14 @@ func (h *AgentHandler) ResumeChat(c *gin.Context) {
 // @Produce json
 // @Param request body AgentCancelRequest true "Cancel request"
 // @Success 200 {object} AgentCancelResponse
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 401 {object} api.ErrorResponse
-// @Failure 404 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 401 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
 // @Router /api/v1/agent/chat/cancel [post]
 func (h *AgentHandler) CancelChat(c *gin.Context) {
 	var req AgentCancelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	user, ok := requireCurrentUser(c)
@@ -251,12 +243,12 @@ func (h *AgentHandler) CancelChat(c *gin.Context) {
 	}
 	runID, err := uuid.Parse(req.RunID)
 	if err != nil {
-		api.GinNotFound(c, err, "Agent run not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	status, err := h.agentService.CancelRun(c.Request.Context(), int32(user.UserID), req.ThreadID, runID)
 	if err != nil {
-		api.GinNotFound(c, err, "Agent run not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	api.JSONOK(c, AgentCancelResponse{ThreadID: req.ThreadID, RunID: req.RunID, Status: status})
@@ -270,9 +262,9 @@ func (h *AgentHandler) CancelChat(c *gin.Context) {
 // @Param id path string true "Effect ID"
 // @Param thread_id query string true "Thread that owns the effect"
 // @Success 200 {object} AgentEffectStatusResponse
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 401 {object} api.ErrorResponse
-// @Failure 404 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 401 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
 // @Router /api/v1/agent/effects/{id} [get]
 func (h *AgentHandler) GetEffectStatus(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -281,17 +273,17 @@ func (h *AgentHandler) GetEffectStatus(c *gin.Context) {
 	}
 	threadID := strings.TrimSpace(c.Query("thread_id"))
 	if threadID == "" {
-		api.GinBadRequest(c, errors.New("thread_id is required"), "Missing agent thread")
+		api.WriteProblem(c, api.BadRequest(errors.New("thread_id is required")))
 		return
 	}
 	effectID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Agent effect not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	receipt, status, err := h.agentService.GetEffectReceipt(c.Request.Context(), int32(user.UserID), threadID, effectID)
 	if err != nil {
-		api.GinNotFound(c, err, "Agent effect not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	response := AgentEffectStatusResponse{EffectID: effectID.String(), Status: status}
@@ -311,8 +303,8 @@ func (h *AgentHandler) GetEffectStatus(c *gin.Context) {
 // @Param id path string true "Ref ID"
 // @Param thread_id query string true "Thread (conversation) the ref belongs to"
 // @Success 200 {object} dto.AgentRefDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Ref not found"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Ref not found"
 // @Router /api/v1/agent/refs/{id} [get]
 func (h *AgentHandler) GetRef(c *gin.Context) {
 	r, ok := h.resolveRef(c)
@@ -322,7 +314,7 @@ func (h *AgentHandler) GetRef(c *gin.Context) {
 
 	facetSummary, err := h.libraries.ForUser(r.Scope.UserID).BuildFacets(c.Request.Context(), r)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to compute ref facets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -347,8 +339,8 @@ func (h *AgentHandler) GetRef(c *gin.Context) {
 // @Param limit query int false "Page size (default 50, max 200)"
 // @Param offset query int false "Page offset (default 0)"
 // @Success 200 {object} dto.AgentRefAssetsDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Ref not found"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Ref not found"
 // @Router /api/v1/agent/refs/{id}/assets [get]
 func (h *AgentHandler) GetRefAssets(c *gin.Context) {
 	r, ok := h.resolveRef(c)
@@ -369,7 +361,7 @@ func (h *AgentHandler) GetRefAssets(c *gin.Context) {
 	if len(page) > 0 {
 		rows, err := h.libraries.ForUser(r.Scope.UserID).Assets(c.Request.Context(), page)
 		if err != nil {
-			api.GinNotFound(c, errors.New("ref not found"), "Ref not found")
+			api.WriteProblem(c, api.NotFound(errors.New("ref not found")))
 			return
 		}
 		// GetAssetsByIDs has no order guarantee; restore snapshot order.
@@ -402,14 +394,14 @@ func (h *AgentHandler) resolveRef(c *gin.Context) (*ref.Ref, bool) {
 	threadID := c.Query("thread_id")
 	refID := c.Param("id")
 	if threadID == "" || refID == "" {
-		api.GinNotFound(c, errors.New("ref not found"), "Ref not found")
+		api.WriteProblem(c, api.NotFound(errors.New("ref not found")))
 		return nil, false
 	}
 
 	scope := ref.Scope{UserID: int32(user.UserID), ThreadID: threadID}
 	r, refErr := h.refStore.Get(c.Request.Context(), scope, refID)
 	if refErr != nil {
-		api.GinNotFound(c, errors.New("ref not found"), "Ref not found")
+		api.WriteProblem(c, api.NotFound(errors.New("ref not found")))
 		return nil, false
 	}
 	return r, true
@@ -542,7 +534,7 @@ func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, r
 				log.Printf("[AgentHandler] Error event: %v", event.Err)
 				status := finish("failed")
 				h.sendSSE(c, flusher, "run_status", map[string]any{"run_id": run.RunID.String(), "status": status})
-				h.sendAgentStreamError(c, flusher, "AGENT_RUN_FAILED", "Lumilio Agent could not complete this request.", true)
+				h.sendAgentStreamError(c, flusher, true)
 				return
 			}
 			if event.Action != nil && event.Action.Interrupted != nil {
@@ -576,8 +568,8 @@ func drainAgentEvent(event *adk.AgentEvent) {
 	}
 }
 
-func (h *AgentHandler) sendAgentStreamError(c *gin.Context, flusher http.Flusher, code, message string, retryable bool) {
-	h.sendSSE(c, flusher, "error", AgentStreamError{Code: code, Message: message, Retryable: retryable})
+func (h *AgentHandler) sendAgentStreamError(c *gin.Context, flusher http.Flusher, retryable bool) {
+	h.sendSSE(c, flusher, "error", problem.NewReference(problem.AgentFailed, retryable))
 }
 
 // sendSSE sends a Server-Sent Event
@@ -637,10 +629,6 @@ func (h *AgentHandler) formatAgentEvent(event *adk.AgentEvent) map[string]interf
 	if event.Action != nil {
 		result["action"] = event.Action
 	}
-	if event.Err != nil {
-		result["error"] = event.Err.Error()
-	}
-
 	return result
 }
 
@@ -659,7 +647,7 @@ func (h *AgentHandler) handleStreamingOutput(c *gin.Context, flusher http.Flushe
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("[AgentHandler] stream receive error: %v", err)
-				h.sendAgentStreamError(c, flusher, "AGENT_STREAM_FAILED", "Lumilio Agent lost the response stream. Please retry.", true)
+				h.sendAgentStreamError(c, flusher, true)
 			}
 			return
 		}

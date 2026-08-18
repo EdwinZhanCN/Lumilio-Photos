@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
@@ -157,15 +158,15 @@ func rejectOfflineRepository(repository repo.Repository) error {
 func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, errInvalidRepositoryID):
-		api.GinBadRequest(c, err, "Invalid repository ID")
+		api.WriteProblem(c, api.BadRequest(err))
 	case errors.Is(err, errRepositoryNotFound):
-		api.GinNotFound(c, err, "Repository not found")
+		api.WriteProblem(c, api.NotFound(err))
 	case errors.Is(err, storage.ErrRepositoryOffline):
-		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is unavailable")
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 	case errors.Is(err, storage.ErrRepositoryBusy):
-		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository writes are paused")
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 	default:
-		api.GinBadRequest(c, err, "Please specify a repository_id or create a repository first")
+		api.WriteProblem(c, api.BadRequest(err))
 	}
 }
 
@@ -178,8 +179,8 @@ func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 // @Param file formData file true "Asset file to upload"
 // @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.UploadResponseDTO "Upload successful"
-// @Failure 400 {object} api.ErrorResponse "Bad request - no file provided or parse error"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request - no file provided or parse error"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets [post]
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	h.uploadLimiter <- struct{}{}
@@ -189,26 +190,26 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 
 	var req dto.UploadAssetRequestDTO
 	if err := c.ShouldBind(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	err := c.Request.ParseMultipartForm(32 << 20)
 	if err != nil {
-		api.GinBadRequest(c, err, "Failed to parse form")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		api.GinBadRequest(c, errors.New("no file provided"))
+		api.WriteProblem(c, api.BadRequest(errors.New("no file provided")))
 		return
 	}
 	defer file.Close()
 
 	validationResult := filevalidator.ValidateFile(header.Filename, header.Header.Get("Content-Type"))
 	if !validationResult.Valid {
-		api.GinBadRequest(c, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason))
+		api.WriteProblem(c, api.BadRequest(fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)))
 		return
 	}
 	log.Printf("Validated file %s as %s with canonical MIME %s (RAW: %v)",
@@ -228,7 +229,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	stagingFile, stagingWriter, err := h.stagingManager.CreateStagingFile(repository, header.Filename)
 	if err != nil {
 		log.Printf("Failed to create staging file: %v", err)
-		api.GinInternalError(c, err, "Upload failed")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -237,21 +238,21 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		_ = stagingWriter.Close()
 		log.Printf("Failed to copy file to staging: %v", err)
 		h.handleUploadFailureFile(repository, stagingFile, "copy upload data to staging")
-		api.GinInternalError(c, err, "Upload failed")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	if err := stagingWriter.Sync(); err != nil {
 		_ = stagingWriter.Close()
 		h.handleUploadFailureFile(repository, stagingFile, "sync upload staging file")
-		api.GinInternalError(c, err, "Upload failed")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	stagingInfo, err := stagingWriter.Stat()
 	if err != nil {
 		_ = stagingWriter.Close()
 		h.handleUploadFailureFile(repository, stagingFile, "stat upload staging file")
-		api.GinInternalError(c, err, "Upload failed")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	hashResult, err := hash.CalculateLayeredBLAKE3Reader(stagingWriter, stagingInfo.Size())
@@ -260,13 +261,13 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	if err != nil {
 		log.Printf("Failed to calculate authoritative hash: %v", err)
 		h.handleUploadFailureFile(repository, stagingFile, "calculate upload hash")
-		api.GinInternalError(c, err, "Failed to calculate file hash")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	duplicate, err := h.findDuplicateByHash(ctx, hashResult.ContentHash, hashResult.FileSize, repository.RepoID)
 	if err != nil {
 		h.handleUploadFailureFile(repository, stagingFile, "check duplicate content")
-		api.GinInternalError(c, err, "Failed to check for duplicate content")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	if duplicate != nil {
@@ -311,13 +312,13 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	if err != nil {
 		log.Printf("Failed to enqueue task: %v", err)
 		h.handleUploadFailureFile(repository, stagingFile, "enqueue ingest task")
-		api.GinInternalError(c, err, "Upload failed")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	if jobInsetResult == nil || jobInsetResult.Job == nil {
 		log.Printf("Failed to enqueue task: empty result")
 		h.handleUploadFailureFile(repository, stagingFile, "enqueue ingest task returned empty result")
-		api.GinInternalError(c, fmt.Errorf("enqueue failed"), "Upload failed")
+		api.WriteProblem(c, api.Internal(fmt.Errorf("enqueue failed")))
 		return
 	}
 	jobId := jobInsetResult.Job.ID
@@ -345,8 +346,8 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 // @Param file formData file false "Single file upload - use format: single_{session_id}" example("single_123e4567-e89b-12d3-a456-426614174000")
 // @Param file formData file false "Chunked file upload - use format: chunk_{session_id}_{index}_{total}" example("chunk_123e4567-e89b-12d3-a456-426614174000_1_10")
 // @Success 200 {object} dto.BatchUploadResponseDTO "Batch upload completed"
-// @Failure 400 {object} api.ErrorResponse "Bad request - no files provided or parse error"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request - no files provided or parse error"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/batch [post]
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	h.uploadLimiter <- struct{}{}
@@ -373,7 +374,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 	mr, err := c.Request.MultipartReader()
 	if err != nil {
-		api.GinBadRequest(c, err, "Failed to read multipart data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -403,7 +404,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			break
 		}
 		if perr != nil {
-			api.GinBadRequest(c, perr, "Failed to read multipart data")
+			api.WriteProblem(c, api.BadRequest(perr))
 			return
 		}
 		if part.FileName() == "" {
@@ -420,7 +421,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		fileInfo, err := upload.ParseFileField(fieldName)
 		if err != nil {
 			part.Close()
-			api.GinBadRequest(c, err, "Invalid file field name")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 
@@ -446,7 +447,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		if _, exists := h.sessionManager.GetSession(fileInfo.SessionID); !exists {
 			if fileInfo.Type == "chunk" {
 				part.Close()
-				api.GinBadRequest(c, errors.New("upload session must be created first"), "Unknown upload session")
+				api.WriteProblem(c, api.BadRequest(errors.New("upload session must be created first")))
 				return
 			}
 			h.sessionManager.CreateSession(fileInfo.SessionID, filename, 0, fileInfo.TotalChunks, contentType, repository.RepoID.String(), userID)
@@ -454,7 +455,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		session, _ := h.sessionManager.GetSession(fileInfo.SessionID)
 		if session.UserID != userID || session.RepositoryID != repository.RepoID.String() || session.TotalChunks != fileInfo.TotalChunks || session.Filename != path.Base(strings.ReplaceAll(filename, `\`, "/")) {
 			part.Close()
-			api.GinBadRequest(c, errors.New("upload session metadata mismatch"), "Invalid upload session")
+			api.WriteProblem(c, api.BadRequest(errors.New("upload session metadata mismatch")))
 			return
 		}
 		alreadyReceived := false
@@ -485,7 +486,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		stagingFile, dst, err := h.stagingManager.CreateStagingFile(repository, targetName)
 		if err != nil {
 			part.Close()
-			api.GinInternalError(c, err, "Failed to create staging file")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 
@@ -495,19 +496,19 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		part.Close()
 		if err != nil {
 			h.handleUploadFailureFile(repository, stagingFile, "save batch upload data")
-			api.GinInternalError(c, err, "Failed to save upload data")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 
 		if !h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written, stagingFile.PrivatePath) {
-			api.GinInternalError(c, errors.New("failed to persist upload session"), "Failed to save upload progress")
+			api.WriteProblem(c, api.Internal(errors.New("failed to persist upload session")))
 			return
 		}
 
 	}
 
 	if len(sessions) == 0 {
-		api.GinBadRequest(c, errors.New("no files provided"), "No files provided")
+		api.WriteProblem(c, api.BadRequest(errors.New("no files provided")))
 		return
 	}
 
@@ -540,12 +541,11 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 				ID: sessionID, RepositoryID: repository.RepoID, PrivatePath: chunk.PrivatePath, Filename: state.filename,
 			})
 			if err != nil {
-				errMsg := err.Error()
 				results = append(results, dto.BatchUploadResultDTO{
 					Success:   false,
 					SessionID: sessionID,
 					FileName:  state.filename,
-					Error:     &errMsg,
+					Problem:   newUploadProblem(false),
 				})
 				continue
 			}
@@ -575,14 +575,13 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		h.sessionManager.UpdateSessionStatus(sessionID, "merging")
 		mergeResult, err := h.chunkMerger.MergeChunks(repository, sessionID, state.info.TotalChunks, state.filename)
 		if err != nil {
-			errMsg := err.Error()
-			h.sessionManager.SetSessionError(sessionID, errMsg)
+			h.sessionManager.SetSessionError(sessionID, err.Error())
 			h.chunkMerger.CleanupChunks(repository, sessionID)
 			results = append(results, dto.BatchUploadResultDTO{
 				Success:   false,
 				SessionID: sessionID,
 				FileName:  state.filename,
-				Error:     &errMsg,
+				Problem:   newUploadProblem(false),
 			})
 			continue
 		}
@@ -600,13 +599,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 		if err != nil {
 			_ = h.stagingManager.RemoveStagingFile(repository, mergeResult.StagingFile)
-			errMsg := err.Error()
-			h.sessionManager.SetSessionError(sessionID, errMsg)
+			h.sessionManager.SetSessionError(sessionID, err.Error())
 			results = append(results, dto.BatchUploadResultDTO{
 				Success:   false,
 				SessionID: sessionID,
 				FileName:  state.filename,
-				Error:     &errMsg,
+				Problem:   newUploadProblem(false),
 			})
 			continue
 		}
@@ -634,16 +632,16 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 // @Produce json
 // @Param request body dto.UploadPrecheckRequestDTO true "Candidate files"
 // @Success 200 {object} dto.UploadPrecheckResponseDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 404 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/assets/precheck [post]
 func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	var req dto.UploadPrecheckRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -671,7 +669,7 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 		RepositoryID:  uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to precheck uploads")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -701,7 +699,7 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 		RepositoryID:      uuid.NullUUID{UUID: repository.RepoID, Valid: true},
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to precheck upload fingerprints")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	quickCandidates := make(map[fingerprint]existingAsset, len(quickRows))
@@ -786,7 +784,7 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 	var req dto.CreateUploadSessionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid upload session")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	repository, err := h.resolveUploadRepository(c.Request.Context(), req.RepositoryID)
@@ -817,11 +815,11 @@ func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 func (h *AssetHandler) respondCapacityError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, storage.ErrRepositoryReadOnly):
-		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository storage is read-only")
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 	case errors.Is(err, storage.ErrInsufficientSpace):
-		api.GinError(c, http.StatusInsufficientStorage, err, http.StatusInsufficientStorage, "Repository does not have enough free space for this write and its safety margin; work was paused")
+		api.WriteProblem(c, api.StatusProblem(http.StatusInsufficientStorage, err))
 	default:
-		api.GinInternalError(c, err, "Repository capacity could not be verified")
+		api.WriteProblem(c, api.Internal(err))
 	}
 }
 
@@ -911,12 +909,12 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Produce json
 // @Param task_ids query string true "Comma-separated upload task IDs"
 // @Success 200 {object} dto.UploadJobStatusResponseDTO "Upload materialization status"
-// @Failure 400 {object} api.ErrorResponse "Invalid task IDs"
+// @Failure 400 {object} api.ProblemResponse "Invalid task IDs"
 // @Router /api/v1/assets/batch/jobs [get]
 func (h *AssetHandler) GetUploadJobStatus(c *gin.Context) {
 	statuses, err := h.loadUploadJobStatuses(c, c.Query("task_ids"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid upload task IDs")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	api.JSONOK(c, dto.UploadJobStatusResponseDTO{Jobs: statuses})
@@ -932,12 +930,12 @@ func (h *AssetHandler) GetUploadJobStatus(c *gin.Context) {
 func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
 	requestedIDs, err := parseUploadTaskIDs(c.Query("task_ids"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid upload task IDs")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
-		api.GinInternalError(c, errors.New("streaming unsupported"), "Streaming unsupported")
+		api.WriteProblem(c, api.Internal(errors.New("streaming unsupported")))
 		return
 	}
 	c.Header("Content-Type", "text/event-stream")
@@ -961,7 +959,7 @@ func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
 	for {
 		statuses, err := h.loadUploadJobStatuses(c, c.Query("task_ids"))
 		if err != nil {
-			send("error", map[string]string{"error": err.Error()})
+			send("error", problem.NewReference(problem.UploadProcessingFailed, true))
 			return
 		}
 		if !send("jobs", dto.UploadJobStatusResponseDTO{Jobs: statuses}) {
@@ -1053,15 +1051,20 @@ func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.Uploa
 	}
 	terminal := row.State == rivertype.JobStateCompleted || row.State == rivertype.JobStateCancelled || row.State == rivertype.JobStateDiscarded
 	success := row.State == rivertype.JobStateCompleted
-	var errorMessage *string
+	var operationProblem *problem.Reference
 	if len(row.Errors) > 0 && !success {
-		message := row.Errors[len(row.Errors)-1].Error
-		errorMessage = &message
+		value := problem.ReferenceFor(problem.UploadProcessingFailed, fmt.Sprintf("river-job:%d", row.ID), true)
+		operationProblem = &value
 	}
 	return dto.UploadJobStatusDTO{
 		TaskID: row.ID, FileName: args.FileName, Status: string(row.State),
-		Terminal: terminal, Success: success, Error: errorMessage,
+		Terminal: terminal, Success: success, Problem: operationProblem,
 	}, true
+}
+
+func newUploadProblem(retryable bool) *problem.Reference {
+	value := problem.NewReference(problem.UploadProcessingFailed, retryable)
+	return &value
 }
 
 // GetAsset retrieves a single asset by ID
@@ -1078,14 +1081,14 @@ func uploadJobStatusForCaller(row *rivertype.JobRow, callerID string) (dto.Uploa
 // @Param include_ocr query bool false "Include OCR Text Recognition results" default(false)
 // @Param include_faces query bool false "Include Person Recognition results" default(false)
 // @Success 200 {object} dto.AssetDetailDTO "Asset details with optional relationships"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
 // @Router /api/v1/assets/{id} [get]
 func (h *AssetHandler) GetAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1106,7 +1109,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 
 	row, err := h.assetService.GetAssetRelations(c.Request.Context(), id)
 	if err != nil {
-		api.GinNotFound(c, err, "Asset not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
@@ -1121,14 +1124,14 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.AssetExifResponseDTO "Raw EXIF JSON"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
-// @Failure 404 {object} api.ErrorResponse "Asset or EXIF not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
+// @Failure 404 {object} api.ProblemResponse "Asset or EXIF not found"
 // @Router /api/v1/assets/{id}/exif [get]
 func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1138,17 +1141,17 @@ func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 
 	exifRaw, err := h.assetService.GetAssetExifRaw(c.Request.Context(), id)
 	if err != nil {
-		api.GinNotFound(c, err, "Asset not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if len(exifRaw) == 0 {
-		api.GinNotFound(c, errors.New("raw EXIF has not been extracted for this asset"), "EXIF not found")
+		api.WriteProblem(c, api.NotFound(errors.New("raw EXIF has not been extracted for this asset")))
 		return
 	}
 
 	var exifRawObject map[string]any
 	if err := json.Unmarshal(exifRaw, &exifRawObject); err != nil {
-		api.GinInternalError(c, err, "Failed to decode EXIF")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1166,14 +1169,14 @@ func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.AssetSidecarResponseDTO "Asset sidecar"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/sidecar [get]
 func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1186,17 +1189,17 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 	exists := false
 
 	if !asset.RepositoryID.Valid {
-		api.GinInternalError(c, errors.New("asset has no repository"), "Failed to resolve asset sidecar")
+		api.WriteProblem(c, api.Internal(errors.New("asset has no repository")))
 		return
 	}
 	content, err := h.repoManager.ReadRepositorySidecar(c.Request.Context(), asset.RepositoryID.UUID.String(), id.String())
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to read asset sidecar")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	if content != nil {
 		if err := json.Unmarshal(content, &sidecar); err != nil {
-			api.GinInternalError(c, err, "Failed to decode asset sidecar")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		exists = true
@@ -1224,14 +1227,14 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param data body dto.LumilioSidecarV1DTO true "Sidecar payload"
 // @Success 200 {object} dto.AssetSidecarResponseDTO "Asset sidecar saved"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or request body"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID or request body"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/sidecar [put]
 func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1242,7 +1245,7 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 
 	var sidecar dto.LumilioSidecarV1DTO
 	if err := c.ShouldBindJSON(&sidecar); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1253,16 +1256,16 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 
 	content, err := json.MarshalIndent(sidecar, "", "  ")
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to encode asset sidecar")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	if !asset.RepositoryID.Valid {
-		api.GinInternalError(c, errors.New("asset has no repository"), "Failed to resolve asset sidecar")
+		api.WriteProblem(c, api.Internal(errors.New("asset has no repository")))
 		return
 	}
 	if err := h.repoManager.WriteRepositorySidecar(c.Request.Context(), asset.RepositoryID.UUID.String(), id.String(), content); err != nil {
-		api.GinInternalError(c, err, "Failed to save asset sidecar")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1281,16 +1284,16 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param size query string false "Thumbnail size" default(medium) Enums(small,medium,large)
 // @Success 200 {file} string "Thumbnail image file"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or size parameter"
-// @Failure 404 {object} api.ErrorResponse "Asset or thumbnail not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID or size parameter"
+// @Failure 404 {object} api.ProblemResponse "Asset or thumbnail not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/thumbnail [get]
 func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
 	assetID, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1299,7 +1302,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 
 	// Validate size parameter
 	if size != "small" && size != "medium" && size != "large" {
-		api.GinBadRequest(c, errors.New("invalid size parameter"), "Invalid size parameter. Must be 'small', 'medium', or 'large'")
+		api.WriteProblem(c, api.BadRequest(errors.New("invalid size parameter")))
 		return
 	}
 
@@ -1312,11 +1315,11 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), assetID, size)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Thumbnail not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to retrieve thumbnail metadata: %v", err)
-		api.GinInternalError(c, err, "Failed to retrieve thumbnail")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1329,18 +1332,18 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, thumbnail.StoragePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Thumbnail file not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to open thumbnail: %v", err)
-		api.GinInternalError(c, err, "Failed to access thumbnail file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	fileInfo, err := file.Stat()
 	if err != nil {
 		_ = file.Close()
 		_ = repositoryFS.Close()
-		api.GinInternalError(c, err, "Failed to access thumbnail file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1374,9 +1377,9 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 // @Produce application/octet-stream
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {file} file "Original file content"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/original [get]
 func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1385,7 +1388,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1395,7 +1398,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	}
 
 	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Original file not found")
+		api.WriteProblem(c, api.NotFound(fmt.Errorf("asset storage path is empty")))
 		return
 	}
 
@@ -1408,10 +1411,10 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	repositoryFS, file, err := openRepositoryMedia(h.files, *repository, *asset.StoragePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Original file not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to access original file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1455,12 +1458,12 @@ func clampedIntQuery(c *gin.Context, key string, def, min, max int) int {
 // @Param max_height query int false "Maximum output height in pixels"
 // @Param filename query string false "Base download filename (without extension)"
 // @Success 200 {file} file "Encoded image"
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Authentication required"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 404 {object} api.ErrorResponse "Asset or original file not found"
-// @Failure 422 {object} api.ErrorResponse "Source image could not be encoded"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Authentication required"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 404 {object} api.ProblemResponse "Asset or original file not found"
+// @Failure 422 {object} api.ProblemResponse "Source image could not be encoded"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/export [get]
 func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1468,13 +1471,13 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	format := strings.ToLower(strings.TrimSpace(c.Query("format")))
 	if !imaging.IsSupportedExportFormat(format) {
-		api.GinBadRequest(c, fmt.Errorf("unsupported export format %q", format), "Unsupported export format")
+		api.WriteProblem(c, api.BadRequest(fmt.Errorf("unsupported export format %q", format)))
 		return
 	}
 
@@ -1484,7 +1487,7 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	}
 
 	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Original file not found")
+		api.WriteProblem(c, api.NotFound(fmt.Errorf("asset storage path is empty")))
 		return
 	}
 
@@ -1496,7 +1499,7 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	}
 	repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
 	if err != nil {
-		api.GinInternalError(c, err, "Invalid original file path")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	repositoryFS, err := h.files.Open(*repository)
@@ -1508,10 +1511,10 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	fullPath, err := repositoryFS.LocalMediaPath(repositoryPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Original file not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to access original file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1521,8 +1524,7 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	reader, err := imagesource.OpenPhoto(ctx, fullPath, asset.OriginalFilename)
 	if err != nil {
 		log.Printf("Failed to open source for export of asset %s: %v", id, err)
-		api.GinError(c, http.StatusUnprocessableEntity, err, http.StatusUnprocessableEntity,
-			"Failed to decode the source image for export")
+		api.WriteProblem(c, api.StatusProblem(http.StatusUnprocessableEntity, err))
 		return
 	}
 	defer reader.Close()
@@ -1530,7 +1532,7 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	buf, err := io.ReadAll(reader)
 	if err != nil {
 		log.Printf("Failed to read source for export of asset %s: %v", id, err)
-		api.GinInternalError(c, err, "Failed to read source image")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1542,8 +1544,7 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Failed to export asset %s as %s: %v", id, format, err)
-		api.GinError(c, http.StatusUnprocessableEntity, err, http.StatusUnprocessableEntity,
-			"Failed to encode export; the source image may be unsupported")
+		api.WriteProblem(c, api.StatusProblem(http.StatusUnprocessableEntity, err))
 		return
 	}
 
@@ -1567,23 +1568,23 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 // @Produce application/zip
 // @Param data body dto.DownloadAssetsRequestDTO true "Asset IDs to download"
 // @Success 200 {file} file "Zip archive"
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Authentication required"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 404 {object} api.ErrorResponse "Asset or original file not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Authentication required"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 404 {object} api.ProblemResponse "Asset or original file not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/download [post]
 func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	var req dto.DownloadAssetsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	if len(req.AssetIDs) == 0 {
-		api.GinBadRequest(c, errors.New("asset_ids is required"), "asset_ids is required")
+		api.WriteProblem(c, api.BadRequest(errors.New("asset_ids is required")))
 		return
 	}
 
@@ -1592,7 +1593,7 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 		assetIDText := strings.TrimSpace(rawAssetID)
 		assetID, err := uuid.Parse(assetIDText)
 		if err != nil {
-			api.GinBadRequest(c, err, "Invalid asset ID")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 
@@ -1602,7 +1603,7 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 		}
 
 		if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-			api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Original file not found")
+			api.WriteProblem(c, api.NotFound(fmt.Errorf("asset storage path is empty")))
 			return
 		}
 
@@ -1615,7 +1616,7 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 
 		repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
 		if err != nil {
-			api.GinInternalError(c, err, "Invalid original file path")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		repositoryFS, err := h.files.Open(*repository)
@@ -1627,9 +1628,9 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 		if err != nil {
 			_ = repositoryFS.Close()
 			if errors.Is(err, fs.ErrNotExist) {
-				api.GinNotFound(c, err, "Original file not found")
+				api.WriteProblem(c, api.NotFound(err))
 			} else {
-				api.GinInternalError(c, err, "Failed to access original file")
+				api.WriteProblem(c, api.Internal(err))
 			}
 			return
 		}
@@ -1671,9 +1672,9 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 // @Produce video/mp4
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {file} file "Web-optimized video file"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
-// @Failure 404 {object} api.ErrorResponse "Asset not found or not a video"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
+// @Failure 404 {object} api.ProblemResponse "Asset not found or not a video"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/video/web [get]
 func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1682,7 +1683,7 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1694,26 +1695,26 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 
 	// Check if asset is a video
 	if asset.Type != "VIDEO" {
-		api.GinBadRequest(c, fmt.Errorf("asset is not a video"), "Asset is not a video")
+		api.WriteProblem(c, api.BadRequest(fmt.Errorf("asset is not a video")))
 		return
 	}
 
 	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Video file not found")
+		api.WriteProblem(c, api.NotFound(fmt.Errorf("asset storage path is empty")))
 		return
 	}
 
 	repository, err := h.getRepositoryForAsset(ctx, asset)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to access repository")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	repositoryFS, file, err := openWebOrOriginal(h.files, *repository, asset, "videos", "_web.mp4")
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Video file not found")
+			api.WriteProblem(c, api.NotFound(err))
 		} else {
-			api.GinInternalError(c, err, "Failed to access video file")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -1733,9 +1734,9 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 // @Produce audio/mpeg
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {file} file "Web-optimized audio file"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
-// @Failure 404 {object} api.ErrorResponse "Asset not found or not audio"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
+// @Failure 404 {object} api.ProblemResponse "Asset not found or not audio"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/audio/web [get]
 func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -1744,7 +1745,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1756,26 +1757,26 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 
 	// Check if asset is audio
 	if asset.Type != "AUDIO" {
-		api.GinBadRequest(c, fmt.Errorf("asset is not audio"), "Asset is not audio")
+		api.WriteProblem(c, api.BadRequest(fmt.Errorf("asset is not audio")))
 		return
 	}
 
 	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Audio file not found")
+		api.WriteProblem(c, api.NotFound(fmt.Errorf("asset storage path is empty")))
 		return
 	}
 
 	repository, err := h.getRepositoryForAsset(ctx, asset)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to access repository")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	repositoryFS, file, err := openWebOrOriginal(h.files, *repository, asset, "audios", "_web.mp3")
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Audio file not found")
+			api.WriteProblem(c, api.NotFound(err))
 		} else {
-			api.GinInternalError(c, err, "Failed to access audio file")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -1797,14 +1798,14 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param data body dto.UpdateAssetRequestDTO true "Asset metadata"
 // @Success 200 {object} dto.MessageResponseDTO "Asset updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or request body"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID or request body"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id} [put]
 func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1814,14 +1815,14 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 
 	var updateData dto.UpdateAssetRequestDTO
 	if err := c.ShouldBindJSON(&updateData); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	err = h.assetService.UpdateAssetMetadata(c.Request.Context(), id, updateData.Metadata)
 	if err != nil {
 		log.Printf("Failed to update asset metadata: %v", err)
-		api.GinInternalError(c, err, "Failed to update asset")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1836,14 +1837,14 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.MessageResponseDTO "Asset deleted successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID format"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID format"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id} [delete]
 func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1854,7 +1855,7 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	err = h.assetService.DeleteAsset(c.Request.Context(), id)
 	if err != nil {
 		log.Printf("Failed to delete asset: %v", err)
-		api.GinInternalError(c, err, "Failed to delete asset")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1869,14 +1870,14 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.MessageResponseDTO "Asset restored successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID format"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID format"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/restore [post]
 func (h *AssetHandler) RestoreAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1887,7 +1888,7 @@ func (h *AssetHandler) RestoreAsset(c *gin.Context) {
 	err = h.assetService.RestoreAsset(c.Request.Context(), id)
 	if err != nil {
 		log.Printf("Failed to restore asset: %v", err)
-		api.GinInternalError(c, err, "Failed to restore asset")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -1903,19 +1904,19 @@ func (h *AssetHandler) RestoreAsset(c *gin.Context) {
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param albumId path int true "Album ID" example(123)
 // @Success 200 {object} dto.MessageResponseDTO "Asset added to album successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID or album ID"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID or album ID"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/albums/{albumId} [post]
 func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 	assetID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	albumID, err := strconv.Atoi(c.Param("albumId"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -1926,21 +1927,21 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 
 	album, err := h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
 	if err != nil {
-		api.GinNotFound(c, err, "Album not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if !ensureOwnerAccess(c, &album.UserID, "Authentication required to modify this album", "You don't have permission to modify this album") {
 		return
 	}
 	if asset.OwnerID != nil && *asset.OwnerID != album.UserID && !currentUserIsAdmin(c) {
-		api.GinForbidden(c, errors.New("cross-user album access denied"), "Asset and album must belong to the same user")
+		api.WriteProblem(c, api.Forbidden(errors.New("cross-user album access denied")))
 		return
 	}
 
 	err = h.assetService.AddAssetToAlbum(c.Request.Context(), assetID, albumID)
 	if err != nil {
 		log.Printf("Failed to add asset to album: %v", err)
-		api.GinInternalError(c, err, "Failed to add asset to album")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	h.enqueueBioClipForAddedAsset(c.Request.Context(), album, *asset)
@@ -2484,29 +2485,29 @@ func toSearchDebugItemDTOs(debug []service.SearchDebugItem) []dto.SearchDebugIte
 // @Produce json
 // @Param data body dto.AssetQueryRequestDTO true "Query parameters"
 // @Success 200 {object} dto.QueryAssetsResponseDTO "Assets queried successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 503 {object} api.ProblemResponse "Image Semantic Analysis unavailable"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/list [post]
 func (h *AssetHandler) QueryAssets(c *gin.Context) {
 	var req dto.AssetQueryRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	normalizeAssetQueryPagination(&req.Pagination)
 
 	if err := validateAssetQuerySearchType(req.SearchType); err != nil {
-		api.GinBadRequest(c, err, "Search type must be 'filename' or 'semantic'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
-		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := validateStackMode(req.StackMode); err != nil {
-		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -2517,7 +2518,7 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 
 	params, err := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid filter parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	params = applyAssetOwnershipScope(c, params)
@@ -2525,16 +2526,16 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 	browseResult, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidBrowseFilter) {
-			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		// Check for semantic search unavailable error
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, 503, err, 503, "Image Semantic Analysis is currently unavailable")
+			api.WriteProblem(c, api.StatusProblem(503, err))
 			return
 		}
 		log.Printf("Failed to query assets: %v", err)
-		api.GinInternalError(c, err, "Failed to query assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -2553,31 +2554,31 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 // @Produce json
 // @Param data body dto.SearchAssetsRequestDTO true "Search parameters"
 // @Success 200 {object} dto.SearchAssetsResponseDTO "Assets searched successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Query asset not found"
-// @Failure 409 {object} api.ErrorResponse "Query asset has no Image Semantic Analysis embedding"
-// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Query asset not found"
+// @Failure 409 {object} api.ProblemResponse "Query asset has no Image Semantic Analysis embedding"
+// @Failure 503 {object} api.ProblemResponse "Image Semantic Analysis unavailable"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/search [post]
 func (h *AssetHandler) SearchAssets(c *gin.Context) {
 	var req dto.SearchAssetsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	normalizeAssetQueryPagination(&req.Pagination)
 	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
-		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := rejectSearchStackMode(req.StackMode); err != nil {
-		api.GinBadRequest(c, err, "stack_mode is not supported for search; results are flat by media item")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	if err := validateSearchEnhancementMode(req.EnhancementMode); err != nil {
-		api.GinBadRequest(c, err, "Enhancement mode must be 'auto', 'off', or 'only'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if strings.TrimSpace(req.EnhancementMode) == "" {
@@ -2586,12 +2587,12 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 
 	similarID, err := parseSimilarToAssetID(req.SimilarToAssetID)
 	if err != nil {
-		api.GinBadRequest(c, err, "similar_to_asset_id must be a valid UUID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	query := strings.TrimSpace(req.Query)
 	if similarID != nil && query != "" {
-		api.GinBadRequest(c, errors.New("query and similar_to_asset_id are mutually exclusive"), "Provide either query or similar_to_asset_id, not both")
+		api.WriteProblem(c, api.BadRequest(errors.New("query and similar_to_asset_id are mutually exclusive")))
 		return
 	}
 	if similarID != nil {
@@ -2602,7 +2603,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 
 	params, err := buildQueryAssetsParams(query, "filename", req.SortBy, req.ViewerTimezone, "", req.Filter, req.Pagination)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid filter parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	params = applyAssetOwnershipScope(c, params)
@@ -2619,11 +2620,11 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, service.ErrInvalidBrowseFilter) {
-			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		log.Printf("Failed to search assets: %v", err)
-		api.GinInternalError(c, err, "Failed to search assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -2651,29 +2652,29 @@ const (
 // @Param top_results_limit formData int false "KNN cap, maximum 200"
 // @Param viewer_timezone formData string false "Viewer timezone"
 // @Success 200 {object} dto.SearchAssetsResponseDTO "Assets searched successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 503 {object} api.ProblemResponse "Image Semantic Analysis unavailable"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/search/by-image [post]
 func (h *AssetHandler) SearchAssetsByImage(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxImageSearchUploadBytes+imageSearchMultipartOverheadBytes)
 	if err := c.Request.ParseMultipartForm(imageSearchMultipartMemoryBytes); err != nil {
 		if isImageSearchTooLarge(err) {
-			api.GinBadRequest(c, service.ErrAssetFileTooLarge, "Image exceeds 256 MiB")
+			api.WriteProblem(c, api.BadRequest(service.ErrAssetFileTooLarge))
 			return
 		}
-		api.GinBadRequest(c, err, "Invalid multipart request")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		api.GinBadRequest(c, err, "Missing image file")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	defer file.Close()
 	if header.Size > maxImageSearchUploadBytes {
-		api.GinBadRequest(c, service.ErrAssetFileTooLarge, "Image exceeds 256 MiB")
+		api.WriteProblem(c, api.BadRequest(service.ErrAssetFileTooLarge))
 		return
 	}
 
@@ -2684,20 +2685,20 @@ func (h *AssetHandler) SearchAssetsByImage(c *gin.Context) {
 	queryPath, queryBytes, err := readImageSearchUpload(file, header)
 	if err != nil {
 		if isImageSearchTooLarge(err) {
-			api.GinBadRequest(c, service.ErrAssetFileTooLarge, "Image exceeds 256 MiB")
+			api.WriteProblem(c, api.BadRequest(service.ErrAssetFileTooLarge))
 			return
 		}
-		api.GinBadRequest(c, err, "Failed to read image file")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if queryPath == "" && len(queryBytes) == 0 {
-		api.GinBadRequest(c, errors.New("empty image file"), "Missing image file")
+		api.WriteProblem(c, api.BadRequest(errors.New("empty image file")))
 		return
 	}
 
 	filter, err := parseImageSearchFilter(c.PostForm("filter"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid filter parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	pagination := dto.PaginationDTO{
@@ -2709,7 +2710,7 @@ func (h *AssetHandler) SearchAssetsByImage(c *gin.Context) {
 
 	params, err := buildQueryAssetsParams("", "filename", "", c.PostForm("viewer_timezone"), "", filter, pagination)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid filter parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	params = applyAssetOwnershipScope(c, params)
@@ -2727,11 +2728,11 @@ func (h *AssetHandler) SearchAssetsByImage(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, service.ErrInvalidBrowseFilter) {
-			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		log.Printf("Failed to search assets by image: %v", err)
-		api.GinInternalError(c, err, "Failed to search assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -2767,10 +2768,7 @@ func readImageSearchUpload(file multipart.File, header *multipart.FileHeader) (s
 
 func isImageSearchTooLarge(err error) bool {
 	var maxBytes *http.MaxBytesError
-	if errors.As(err, &maxBytes) {
-		return true
-	}
-	return strings.Contains(err.Error(), "http: request body too large")
+	return errors.As(err, &maxBytes)
 }
 
 func parseSimilarToAssetID(raw *string) (*uuid.UUID, error) {
@@ -2792,17 +2790,17 @@ func (h *AssetHandler) loadVisibleSearchQueryAsset(c *gin.Context, assetID uuid.
 	asset, err := h.assetService.GetAssetAny(c.Request.Context(), assetID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Asset not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return nil, false
 		}
-		api.GinInternalError(c, err, "Failed to access asset")
+		api.WriteProblem(c, api.Internal(err))
 		return nil, false
 	}
 
 	user, ok := currentUserFromContext(c)
 	if !ok {
 		if asset.OwnerID != nil {
-			api.GinNotFound(c, errors.New("asset not found"), "Asset not found")
+			api.WriteProblem(c, api.NotFound(errors.New("asset not found")))
 			return nil, false
 		}
 		return asset, true
@@ -2810,20 +2808,20 @@ func (h *AssetHandler) loadVisibleSearchQueryAsset(c *gin.Context, assetID uuid.
 	if service.IsAdminRole(user.Role) || asset.OwnerID == nil || int32(user.UserID) == *asset.OwnerID {
 		return asset, true
 	}
-	api.GinNotFound(c, errors.New("asset not found"), "Asset not found")
+	api.WriteProblem(c, api.NotFound(errors.New("asset not found")))
 	return nil, false
 }
 
 func (h *AssetHandler) respondVisualSearchError(c *gin.Context, err error) bool {
 	switch {
 	case errors.Is(err, service.ErrEmbeddingMissing):
-		api.GinError(c, http.StatusConflict, err, http.StatusConflict, "This asset has no Image Semantic Analysis embedding")
+		api.WriteProblem(c, api.KnownProblem(problem.ImageEmbeddingMissing, err))
 		return false
 	case errors.Is(err, service.ErrSemanticSearchUnavailable):
-		api.GinError(c, http.StatusServiceUnavailable, err, http.StatusServiceUnavailable, "Image Semantic Analysis is currently unavailable")
+		api.WriteProblem(c, api.KnownProblem(problem.SemanticAnalysisUnavailable, err))
 		return false
 	case errors.Is(err, service.ErrInvalidImageQuery):
-		api.GinBadRequest(c, err, "Unsupported or unreadable image")
+		api.WriteProblem(c, api.BadRequest(err))
 		return false
 	default:
 		return true
@@ -2863,18 +2861,18 @@ func formIntDefault(raw string, fallback int) int {
 // @Accept json
 // @Produce json
 // @Success 200 {object} dto.IndexingRepositoryListResponseDTO "Repository options retrieved successfully"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/indexing/repositories [get]
 func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
 	if err := h.repoManager.ReconcileAll(c.Request.Context()); err != nil {
 		log.Printf("Failed to refresh repository reachability: %v", err)
-		api.GinInternalError(c, err, "Failed to refresh repository reachability")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	repositories, err := h.repoManager.ListRepositories()
 	if err != nil {
 		log.Printf("Failed to list repositories for indexing: %v", err)
-		api.GinInternalError(c, err, "Failed to list repositories")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -2890,15 +2888,15 @@ func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.AssetIndexingStatsResponseDTO "Indexing stats retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid repository ID"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid repository ID"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/indexing/stats [get]
 func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
 	repositoryID := strings.TrimSpace(c.Query("repository_id"))
 	var repositoryIDPtr *string
 	if repositoryID != "" {
 		if _, err := uuid.Parse(repositoryID); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository ID")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		repositoryIDPtr = &repositoryID
@@ -2907,7 +2905,7 @@ func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
 	stats, err := h.indexingService.GetIndexingStats(c.Request.Context(), repositoryIDPtr)
 	if err != nil {
 		log.Printf("Failed to load indexing stats: %v", err)
-		api.GinInternalError(c, err, "Failed to load indexing stats")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -2921,19 +2919,19 @@ func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
 // @Produce json
 // @Param data body dto.RebuildAssetIndexesRequestDTO false "Reindex request"
 // @Success 200 {object} dto.RebuildAssetIndexesResponseDTO "Reindex job queued successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/indexing/rebuild [post]
 func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 	var req dto.RebuildAssetIndexesRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	tasks, err := parseIndexingTasks(req.Tasks)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid indexing task list")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -2961,7 +2959,7 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Failed to queue reindex job: %v", err)
-		api.GinInternalError(c, err, "Failed to queue reindex job")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3006,25 +3004,25 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 // @Param seed query string false "Deterministic seed (default: current UTC date YYYY-MM-DD)"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.FeaturedAssetsResponseDTO "Featured photos selected successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/featured [get]
 func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 	count, err := parseIntQueryWithRange(c, "count", 8, 1, 24)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid count parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	candidateLimit, err := parseIntQueryWithRange(c, "candidate_limit", 240, 16, 1000)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid candidate_limit parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	days, err := parseIntQueryWithRange(c, "days", 3650, 0, 36500)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid days parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3037,7 +3035,7 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 	var repositoryID *string
 	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
 		if _, err := uuid.Parse(rawRepoID); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		repositoryID = &rawRepoID
@@ -3063,7 +3061,7 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 	assets, _, err := h.assetService.QueryAssets(c.Request.Context(), params)
 	if err != nil {
 		log.Printf("Failed to query featured candidate assets: %v", err)
-		api.GinInternalError(c, err, "Failed to build featured photos")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3105,26 +3103,26 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 // @Param west query number false "Viewport west longitude (-180 to 180)"
 // @Param east query number false "Viewport east longitude (-180 to 180)"
 // @Success 200 {object} dto.AssetMapPointListResponseDTO "Map points retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/map-points [get]
 func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 	limit, err := parseIntQueryWithRange(c, "limit", 1000, 1, 5000)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid limit parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	offset, err := parseIntQueryWithRange(c, "offset", 0, 0, 10000000)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid offset parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var repositoryID *string
 	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
 		if _, err := uuid.Parse(rawRepoID); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		repositoryID = &rawRepoID
@@ -3132,7 +3130,7 @@ func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 
 	south, north, west, east, err := parseOptionalMapViewport(c)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid viewport parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3147,7 +3145,7 @@ func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 	}))
 	if err != nil {
 		log.Printf("Failed to query photo map points: %v", err)
-		api.GinInternalError(c, err, "Failed to query photo map points")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3245,7 +3243,7 @@ func countUniqueAssets(assets []repo.Asset) int {
 // @Accept json
 // @Produce json
 // @Success 200 {object} dto.OptionsResponseDTO "Filter options retrieved successfully"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/filter-options [get]
 func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -3253,14 +3251,14 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 	cameraModels, err := h.assetService.GetDistinctCameraModels(ctx)
 	if err != nil {
 		log.Printf("Failed to get camera models: %v", err)
-		api.GinInternalError(c, err, "Failed to get filter options")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	lenses, err := h.assetService.GetDistinctLenses(ctx)
 	if err != nil {
 		log.Printf("Failed to get lenses: %v", err)
-		api.GinInternalError(c, err, "Failed to get filter options")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3281,26 +3279,26 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 // @Param id path string true "Asset ID"
 // @Param rating body dto.UpdateRatingRequestDTO true "Rating data"
 // @Success 200 {object} dto.MessageResponseDTO "Rating updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/rating [put]
 func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.UpdateRatingRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	if req.Rating < 0 || req.Rating > 5 {
-		api.GinBadRequest(c, nil, "Rating must be between 0 and 5")
+		api.WriteProblem(c, api.BadRequest(nil))
 		return
 	}
 
@@ -3311,7 +3309,7 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 	err = h.assetService.UpdateAssetRating(c.Request.Context(), id, req.Rating)
 	if err != nil {
 		log.Printf("Failed to update asset rating: %v", err)
-		api.GinInternalError(c, err, "Failed to update rating")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3326,21 +3324,21 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 // @Param id path string true "Asset ID"
 // @Param like body dto.UpdateLikeRequestDTO true "Like data"
 // @Success 200 {object} dto.MessageResponseDTO "Like status updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/like [put]
 func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.UpdateLikeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3351,7 +3349,7 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 	err = h.assetService.UpdateAssetLike(c.Request.Context(), id, req.Liked)
 	if err != nil {
 		log.Printf("Failed to update asset like status: %v", err)
-		api.GinInternalError(c, err, "Failed to update like status")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3366,26 +3364,26 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 // @Param id path string true "Asset ID"
 // @Param data body dto.UpdateRatingAndLikeRequestDTO true "Rating and like data"
 // @Success 200 {object} dto.MessageResponseDTO "Rating and like status updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/rating-and-like [put]
 func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.UpdateRatingAndLikeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	if req.Rating < 0 || req.Rating > 5 {
-		api.GinBadRequest(c, nil, "Rating must be between 0 and 5")
+		api.WriteProblem(c, api.BadRequest(nil))
 		return
 	}
 
@@ -3396,7 +3394,7 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 	err = h.assetService.UpdateAssetRatingAndLike(c.Request.Context(), id, req.Rating, req.Liked)
 	if err != nil {
 		log.Printf("Failed to update asset rating and like status: %v", err)
-		api.GinInternalError(c, err, "Failed to update rating and like status")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3411,21 +3409,21 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 // @Param id path string true "Asset ID"
 // @Param description body dto.UpdateDescriptionRequestDTO true "Description data"
 // @Success 200 {object} dto.MessageResponseDTO "Description updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 404 {object} api.ErrorResponse "Asset not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 404 {object} api.ProblemResponse "Asset not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/description [put]
 func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.UpdateDescriptionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3436,7 +3434,7 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 	err = h.assetService.UpdateAssetDescription(c.Request.Context(), id, req.Description)
 	if err != nil {
 		log.Printf("Failed to update asset description: %v", err)
-		api.GinInternalError(c, err, "Failed to update description")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3450,14 +3448,14 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Success 200 {object} dto.AssetTagsResponseDTO "Tags retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/tags [get]
 func (h *AssetHandler) GetAssetTags(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3468,7 +3466,7 @@ func (h *AssetHandler) GetAssetTags(c *gin.Context) {
 	raw, err := h.assetService.GetAssetTags(c.Request.Context(), id)
 	if err != nil {
 		log.Printf("Failed to get asset tags: %v", err)
-		api.GinInternalError(c, err, "Failed to get tags")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3476,7 +3474,7 @@ func (h *AssetHandler) GetAssetTags(c *gin.Context) {
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &tags); err != nil {
 			log.Printf("Failed to decode asset tags: %v", err)
-			api.GinInternalError(c, err, "Failed to decode tags")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 	}
@@ -3493,20 +3491,20 @@ func (h *AssetHandler) GetAssetTags(c *gin.Context) {
 // @Param id path string true "Asset ID"
 // @Param request body dto.AddAssetTagRequestDTO true "Tag to add"
 // @Success 200 {object} dto.AssetTagDTO "Tag added successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/tags [post]
 func (h *AssetHandler) AddAssetTag(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.AddAssetTagRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3517,7 +3515,7 @@ func (h *AssetHandler) AddAssetTag(c *gin.Context) {
 	tag, err := h.assetService.AddManualTagToAsset(c.Request.Context(), id, req.TagName)
 	if err != nil {
 		log.Printf("Failed to add tag to asset: %v", err)
-		api.GinInternalError(c, err, "Failed to add tag")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3538,20 +3536,20 @@ func (h *AssetHandler) AddAssetTag(c *gin.Context) {
 // @Param id path string true "Asset ID"
 // @Param tagId path int true "Tag ID"
 // @Success 200 {object} dto.MessageResponseDTO "Tag removed successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/tags/{tagId} [delete]
 func (h *AssetHandler) RemoveAssetTag(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	tagID, err := strconv.Atoi(c.Param("tagId"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid tag ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3561,7 +3559,7 @@ func (h *AssetHandler) RemoveAssetTag(c *gin.Context) {
 
 	if err := h.assetService.RemoveTagFromAsset(c.Request.Context(), id, tagID); err != nil {
 		log.Printf("Failed to remove tag from asset: %v", err)
-		api.GinInternalError(c, err, "Failed to remove tag")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3576,7 +3574,7 @@ func (h *AssetHandler) RemoveAssetTag(c *gin.Context) {
 // @Param q query string false "Search query (substring match)"
 // @Param limit query int false "Max results" default(20)
 // @Success 200 {object} dto.TagListResponseDTO "Tags retrieved successfully"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/tags [get]
 func (h *AssetHandler) ListTags(c *gin.Context) {
 	query := c.Query("q")
@@ -3590,7 +3588,7 @@ func (h *AssetHandler) ListTags(c *gin.Context) {
 	tags, err := h.assetService.SearchTags(c.Request.Context(), query, limit)
 	if err != nil {
 		log.Printf("Failed to list tags: %v", err)
-		api.GinInternalError(c, err, "Failed to list tags")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3617,14 +3615,14 @@ func (h *AssetHandler) ListTags(c *gin.Context) {
 // @Param limit query int false "Max results" default(50)
 // @Param offset query int false "Result offset" default(0)
 // @Success 200 {object} dto.TagSummaryListResponseDTO "Tag summaries retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/tag-summaries [get]
 func (h *AssetHandler) GetTagSummaries(c *gin.Context) {
 	var repositoryID *string
 	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
 		if _, err := uuid.Parse(rawRepoID); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		repositoryID = &rawRepoID
@@ -3642,19 +3640,19 @@ func (h *AssetHandler) GetTagSummaries(c *gin.Context) {
 
 	limit, err := parseIntQueryWithRange(c, "limit", 50, 1, 500)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid limit parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	offset, err := parseIntQueryWithRange(c, "offset", 0, 0, 10000000)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid offset parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	summaries, err := h.assetService.ListTagSummaries(c.Request.Context(), ownerScopeID(c), repositoryID, source, query, limit, offset)
 	if err != nil {
 		log.Printf("Failed to list tag summaries: %v", err)
-		api.GinInternalError(c, err, "Failed to list tag summaries")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3680,14 +3678,14 @@ func (h *AssetHandler) GetTagSummaries(c *gin.Context) {
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Param path query string false "Repository-relative parent folder path (empty for root)"
 // @Success 200 {object} dto.FolderListResponseDTO "Folder summaries retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/folders [get]
 func (h *AssetHandler) GetFolders(c *gin.Context) {
 	var repositoryID *string
 	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
 		if _, err := uuid.Parse(rawRepoID); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		repositoryID = &rawRepoID
@@ -3698,7 +3696,7 @@ func (h *AssetHandler) GetFolders(c *gin.Context) {
 	summaries, err := h.assetService.ListFolderSummaries(c.Request.Context(), ownerScopeID(c), repositoryID, parentPath)
 	if err != nil {
 		log.Printf("Failed to list folder summaries: %v", err)
-		api.GinInternalError(c, err, "Failed to list folder summaries")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3717,13 +3715,13 @@ func (h *AssetHandler) GetFolders(c *gin.Context) {
 // @Param repository_id query string true "Repository UUID"
 // @Param path query string false "Repository-relative folder path (empty for root)"
 // @Success 200 {object} dto.FolderSummaryDTO "Folder summary retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/folders/summary [get]
 func (h *AssetHandler) GetFolderSummary(c *gin.Context) {
 	repositoryID := strings.TrimSpace(c.Query("repository_id"))
 	if _, err := uuid.Parse(repositoryID); err != nil {
-		api.GinBadRequest(c, err, "Invalid or missing repository_id parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -3732,7 +3730,7 @@ func (h *AssetHandler) GetFolderSummary(c *gin.Context) {
 	summary, err := h.assetService.GetFolderSummary(c.Request.Context(), ownerScopeID(c), repositoryID, folderPath)
 	if err != nil {
 		log.Printf("Failed to get folder summary: %v", err)
-		api.GinInternalError(c, err, "Failed to get folder summary")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3766,19 +3764,19 @@ func folderSummaryToDTO(summary service.FolderSummary) dto.FolderSummaryDTO {
 // @Param limit query int false "Number of assets to return" default(20)
 // @Param offset query int false "Number of assets to skip" default(0)
 // @Success 200 {object} dto.AssetListResponseDTO "Assets retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Bad request"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Bad request"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/rating/{rating} [get]
 func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 	ratingStr := c.Param("rating")
 	rating, err := strconv.Atoi(ratingStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid rating parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	if rating < 0 || rating > 5 {
-		api.GinBadRequest(c, nil, "Rating must be between 0 and 5")
+		api.WriteProblem(c, api.BadRequest(nil))
 		return
 	}
 
@@ -3810,7 +3808,7 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 	assets, err := h.assetService.GetAssetsByRating(c.Request.Context(), rating, ownerID, limit, offset)
 	if err != nil {
 		log.Printf("Failed to get assets by rating: %v", err)
-		api.GinInternalError(c, err, "Failed to retrieve assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -3837,7 +3835,7 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 // @Param limit query int false "Number of assets to return" default(20)
 // @Param offset query int false "Number of assets to skip" default(0)
 // @Success 200 {object} dto.AssetListResponseDTO "Liked assets retrieved successfully"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/liked [get]
 func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -3869,7 +3867,7 @@ func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 	assets, err := h.assetService.GetLikedAssets(ctx, ownerID, limit, offset)
 	if err != nil {
 		log.Printf("Failed to get liked assets: %v", err)
-		api.GinInternalError(c, err, "Failed to retrieve liked assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -4235,9 +4233,9 @@ func (h *AssetHandler) verifyDuplicateAssetFile(ctx context.Context, repository 
 // @Param id path string true "Asset ID"
 // @Param data body dto.ReprocessAssetRequestDTO false "Reprocessing tasks (optional)"
 // @Success 200 {object} dto.ReprocessAssetResponseDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 404 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/assets/{id}/reprocess [post]
 func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -4246,7 +4244,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -4261,7 +4259,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	if len(req.Tasks) > 0 {
 		for _, task := range req.Tasks {
 			if !isValidReprocessQueue(task) {
-				api.GinBadRequest(c, fmt.Errorf("invalid queue name: %s", task), fmt.Sprintf("Invalid queue name: %s", task))
+				api.WriteProblem(c, api.BadRequest(fmt.Errorf("invalid queue name: %s", task)))
 				return
 			}
 		}
@@ -4271,10 +4269,10 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	asset, err := h.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Asset not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to get asset")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -4287,14 +4285,14 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	if len(asset.Status) > 0 {
 		currentStatus, err = status.FromJSON(asset.Status)
 		if err != nil {
-			api.GinInternalError(c, err, "Failed to parse asset status")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 	}
 
 	// Check for fatal errors (skip state check to allow retry on any state)
 	if currentStatus.HasFatalErrors() {
-		api.GinBadRequest(c, errors.New("asset has fatal errors"), "Asset has fatal errors that prevent reprocessing")
+		api.WriteProblem(c, api.BadRequest(errors.New("asset has fatal errors")))
 		return
 	}
 
@@ -4304,53 +4302,53 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		// repository work gate. Status reset and every enqueue then happen while
 		// removal/maintenance is excluded.
 		if !asset.RepositoryID.Valid {
-			api.GinInternalError(c, errors.New("asset has no repository"), "Failed to get repository")
+			api.WriteProblem(c, api.Internal(errors.New("asset has no repository")))
 			return
 		}
 		repository, err := h.queries.GetRepository(ctx, asset.RepositoryID.UUID)
 		if err != nil {
-			api.GinInternalError(c, err, "Failed to get repository")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 
 		// Check if storage path exists
 		if asset.StoragePath == nil || *asset.StoragePath == "" {
-			api.GinBadRequest(c, errors.New("asset has no storage path"), "Asset has no storage path")
+			api.WriteProblem(c, api.BadRequest(errors.New("asset has no storage path")))
 			return
 		}
 
 		repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
 		if err != nil {
-			api.GinBadRequest(c, err, "Invalid asset storage path")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		indexed, err := h.queries.GetRepositoryFileIndexEntry(ctx, repo.GetRepositoryFileIndexEntryParams{
 			RepositoryID: repository.RepoID, StoragePath: repositoryPath.String(),
 		})
 		if err != nil || !indexed.AssetID.Valid || indexed.AssetID.UUID != asset.AssetID || indexed.State != "present" {
-			api.GinNotFound(c, err, "Asset file is not currently indexed")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		repositoryFS, err := h.files.Open(repository)
 		if err != nil {
-			api.GinInternalError(c, err, "Repository is unavailable")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		observation, inspectErr := repositoryFS.InspectMedia(ctx, repositoryPath, storage.HashNone)
 		closeErr := repositoryFS.Close()
 		if err := errors.Join(inspectErr, closeErr); err != nil || observation.ObservationToken != indexed.ObservationToken {
-			api.GinNotFound(c, err, "Asset file is no longer current")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 
 		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, repository.RepoID.String(), dbtypes.RepositoryActivityProcessing)
 		if err != nil {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is busy or unavailable")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
 		finishWork := func() bool {
 			if releaseErr := releaseWork(); releaseErr != nil {
-				api.GinInternalError(c, releaseErr, "Failed to finish repository work")
+				api.WriteProblem(c, api.Internal(releaseErr))
 				return false
 			}
 			return true
@@ -4358,7 +4356,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		tx, err := h.database.BeginTx(ctx, nil)
 		if err != nil {
 			_ = releaseWork()
-			api.GinInternalError(c, err, "Failed to begin reprocessing transaction")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		defer tx.Rollback()
@@ -4366,7 +4364,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		updatedAsset, err := txQueries.ResetAssetStatusForRetry(ctx, assetID)
 		if err != nil {
 			_ = releaseWork()
-			api.GinInternalError(c, err, "Failed to reset asset status")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 
@@ -4377,7 +4375,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		}
 		if err := insertReprocessJobTx(ctx, h.queueClient, tx, metaArgs, "metadata_asset"); err != nil {
 			_ = releaseWork()
-			api.GinInternalError(c, err, "Failed to enqueue metadata job")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 
@@ -4388,7 +4386,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				ExpectedContentHash: updatedAsset.ContentHash,
 			}, "thumbnail_asset"); err != nil {
 				_ = releaseWork()
-				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
+				api.WriteProblem(c, api.Internal(err))
 				return
 			}
 		case dbtypes.AssetTypeVideo:
@@ -4397,7 +4395,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				ExpectedContentHash: updatedAsset.ContentHash,
 			}, "thumbnail_asset"); err != nil {
 				_ = releaseWork()
-				api.GinInternalError(c, err, "Failed to enqueue thumbnail job")
+				api.WriteProblem(c, api.Internal(err))
 				return
 			}
 			if err := insertReprocessJobTx(ctx, h.queueClient, tx, jobs.TranscodeArgs{
@@ -4405,7 +4403,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				ExpectedContentHash: updatedAsset.ContentHash,
 			}, "transcode_asset"); err != nil {
 				_ = releaseWork()
-				api.GinInternalError(c, err, "Failed to enqueue transcode job")
+				api.WriteProblem(c, api.Internal(err))
 				return
 			}
 		case dbtypes.AssetTypeAudio:
@@ -4414,13 +4412,13 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 				ExpectedContentHash: updatedAsset.ContentHash,
 			}, "transcode_asset"); err != nil {
 				_ = releaseWork()
-				api.GinInternalError(c, err, "Failed to enqueue transcode job")
+				api.WriteProblem(c, api.Internal(err))
 				return
 			}
 		}
 		if err := tx.Commit(); err != nil {
 			_ = releaseWork()
-			api.GinInternalError(c, err, "Failed to commit reprocessing jobs")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		if !finishWork() {
@@ -4441,12 +4439,12 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		return
 	} else {
 		if !asset.RepositoryID.Valid {
-			api.GinInternalError(c, errors.New("asset has no repository"), "Failed to get repository")
+			api.WriteProblem(c, api.Internal(errors.New("asset has no repository")))
 			return
 		}
 		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, asset.RepositoryID.UUID.String(), dbtypes.RepositoryActivityProcessing)
 		if err != nil {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Repository is busy or unavailable")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
 		// Selective retry - enqueue selective retry job
@@ -4461,11 +4459,11 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		jobResult, err := insertSelectiveRetryReceipt(ctx, h.queueClient, retryArgs)
 		if err != nil {
 			_ = releaseWork()
-			api.GinInternalError(c, err, "Failed to enqueue selective retry job")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		if err := releaseWork(); err != nil {
-			api.GinInternalError(c, err, "Failed to finish repository work")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 
@@ -4527,13 +4525,13 @@ func isValidReprocessQueue(queue string) bool {
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Success 200 {object} dto.MediaItemByAssetResponseDTO
-// @Failure 404 {object} api.ErrorResponse
+// @Failure 404 {object} api.ProblemResponse
 // @Router /api/v1/assets/{id}/media-item [get]
 // @Security BearerAuth
 func (h *AssetHandler) GetAssetMediaItem(c *gin.Context) {
 	assetID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if _, ok := h.getAuthorizedAssetForRead(c, assetID, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
@@ -4541,7 +4539,7 @@ func (h *AssetHandler) GetAssetMediaItem(c *gin.Context) {
 	}
 	item, err := h.stackService.GetMediaItemByAsset(c.Request.Context(), assetID, ownerScopeID(c))
 	if err != nil {
-		api.GinNotFound(c, err, "Media item not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	components := make([]dto.MediaItemComponentDTO, 0, len(item.Components))
@@ -4566,14 +4564,14 @@ func (h *AssetHandler) GetAssetMediaItem(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID"
 // @Success 200 {object} dto.StackByAssetResponseDTO
-// @Failure 404 {object} api.ErrorResponse
+// @Failure 404 {object} api.ProblemResponse
 // @Router /api/v1/assets/{id}/stack [get]
 // @Security BearerAuth
 func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -4584,10 +4582,10 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 	stackInfo, err := h.stackService.GetStackByAssetAny(c.Request.Context(), assetID, ownerScopeID(c))
 	if err != nil {
 		if errors.Is(err, service.ErrStackNotFound) {
-			api.GinNotFound(c, err, "Asset is not in a stack")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to get stack")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -4621,19 +4619,19 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 // @Produce json
 // @Param data body dto.CreateManualStackRequestDTO true "Asset IDs to stack"
 // @Success 201 {object} dto.StackDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 409 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 409 {object} api.ProblemResponse
 // @Router /api/v1/assets/stacks [post]
 // @Security BearerAuth
 func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 	var req dto.CreateManualStackRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	if len(req.AssetIDs) < 2 {
-		api.GinBadRequest(c, errors.New("at least 2 asset IDs are required"), "At least 2 asset IDs are required")
+		api.WriteProblem(c, api.BadRequest(errors.New("at least 2 asset IDs are required")))
 		return
 	}
 
@@ -4641,7 +4639,7 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 	for i, idStr := range req.AssetIDs {
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			api.GinBadRequest(c, err, fmt.Sprintf("Invalid asset ID: %s", idStr))
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		assetIDs[i] = id
@@ -4657,10 +4655,10 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 	stackInfo, err := h.stackService.CreateManualStack(c.Request.Context(), assetIDs)
 	if err != nil {
 		if errors.Is(err, service.ErrAssetAlreadyStacked) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "One or more assets already belong to a stack")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to create stack")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -4696,7 +4694,7 @@ func (h *AssetHandler) UnstackAsset(c *gin.Context) {
 	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -4705,7 +4703,7 @@ func (h *AssetHandler) UnstackAsset(c *gin.Context) {
 	}
 
 	if err := h.stackService.RemoveFromStack(c.Request.Context(), assetID); err != nil {
-		api.GinInternalError(c, err, "Failed to unstack asset")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -4725,13 +4723,13 @@ func (h *AssetHandler) AutoDetectStacks(c *gin.Context) {
 	repoIDStr := c.Param("id")
 	repoID, err := uuid.Parse(repoIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid repository ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	count, err := h.stackService.AutoDetectStacks(c.Request.Context(), repoID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to detect stacks")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 

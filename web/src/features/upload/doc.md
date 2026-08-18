@@ -58,6 +58,10 @@ The browser fingerprint mirrors backend BLAKE3 policy: full content through
 chunks. Size accompanies the hash during duplicate checks. Per-file success,
 duplicate, transport failure, and ingest failure remain distinct so retryable
 `File` objects stay in the queue while completed files leave it.
+Fetch/XHR transport and materialization polling preserve shared Problem or
+Problem Reference values. [useUploadProcess](./modules/process/useUploadProcess.tsx) localizes them against
+the current language at the queue boundary, so persisted server prose never
+becomes per-file display state.
 
 The feature root is the narrow public entry for application-level queue UI
 and upload state. Hashing, transport, progress, and lifecycle helpers remain

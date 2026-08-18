@@ -40,7 +40,7 @@ export function AssetSimilarRail({
   const query = useQuery({
     queryKey: ["post", "/api/v1/assets/search", { similar: queryAssetId, preview: true }],
     queryFn: async ({ signal }) => {
-      const { data, error, response } = await client.POST("/api/v1/assets/search", {
+      const { data, error } = await client.POST("/api/v1/assets/search", {
         body: {
           similar_to_asset_id: queryAssetId,
           pagination: { limit: PREVIEW_LIMIT, offset: 0 },
@@ -49,7 +49,7 @@ export function AssetSimilarRail({
         },
         signal,
       });
-      if (error) throwSearchError(error, response.status);
+      if (error) throwSearchError(error);
       return data;
     },
     enabled: open && Boolean(queryAssetId),

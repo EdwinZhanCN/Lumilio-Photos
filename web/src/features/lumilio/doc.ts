@@ -54,7 +54,9 @@
  * {@link streamAgent} opens authenticated SSE for chat/resume.
  * `session_info` binds a run, text becomes {@link TextBlock}, tool/widget side
  * channels become {@link ToolBlock}/{@link WidgetBlock}, and interrupts become
- * {@link ConfirmBlock}. {@link cancelAgentRun} targets the exact thread/run;
+ * {@link ConfirmBlock}. Stream failures carry a generated Problem Reference;
+ * {@link ChatDock} localizes that reference from current i18n state instead of
+ * storing display copy. {@link cancelAgentRun} targets the exact thread/run;
  * {@link cancelActiveBlocks} preserves partial text while marking unfinished
  * blocks stopped.
  *

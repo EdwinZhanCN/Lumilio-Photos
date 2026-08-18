@@ -16,6 +16,7 @@ import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { CollectionErrorAlert } from "@/components/collection";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useEvents } from "@/features/events";
 import { useLocationClusters } from "@/features/assets/map";
 import { usePeople } from "@/features/people";
@@ -103,8 +104,7 @@ function CollectionsContent() {
           {isAlbumsError && (
             <CollectionErrorAlert
               message={t("collections.messages.loadAlbumsError", {
-                message:
-                  albumsError instanceof Error ? albumsError.message : t("home.errors.unknown"),
+                message: localizeAPIProblem(albumsError, t, t("home.errors.unknown")),
               })}
             />
           )}
@@ -142,8 +142,7 @@ function CollectionsContent() {
           {isPeopleError && (
             <CollectionErrorAlert
               message={t("collections.messages.loadPeopleError", {
-                message:
-                  peopleError instanceof Error ? peopleError.message : t("home.errors.unknown"),
+                message: localizeAPIProblem(peopleError, t, t("home.errors.unknown")),
               })}
             />
           )}

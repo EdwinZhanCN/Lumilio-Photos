@@ -63,7 +63,9 @@
  * configuration and is display-only.
  *
  * {@link useBackups} owns the backup list and temporary post-create polling;
- * {@link useRestoreBackup} performs catalog replacement. Cloud tabs consume
+ * {@link useRestoreBackup} performs catalog replacement. Restore polling keeps
+ * the durable Problem Reference and {@link BackupSection} localizes it only at
+ * presentation, allowing a language change during recovery. Cloud tabs consume
  * the Cloud public entry, and user/account tabs consume Users/Auth public
  * entries. The Settings root `index.ts` exposes only preference effects and
  * the narrow preference hook required by application composition.

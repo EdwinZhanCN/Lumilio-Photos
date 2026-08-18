@@ -3,6 +3,8 @@ package dto
 import (
 	"encoding/json"
 	"time"
+
+	"server/internal/api/problem"
 )
 
 type CreateRepositoryRequestDTO struct {
@@ -70,19 +72,6 @@ type CreateRepositoryResponseDTO struct {
 	// Warnings are non-fatal notes about the chosen location, such as it being
 	// inside a cloud-sync folder. The repository was created regardless.
 	Warnings []string `json:"warnings,omitempty"`
-}
-
-// RepositoryConflictDTO describes a Create/Open recovery fact. ConflictType
-// determines whether the marker should be opened, diagnosed, relocated, or
-// registered as a separate repository.
-type RepositoryConflictDTO struct {
-	Code           int      `json:"code" example:"409"`
-	Message        string   `json:"message" example:"Repository identity is already registered"`
-	ConflictType   string   `json:"conflict_type" example:"repository_identity"`
-	RepositoryID   string   `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RegisteredPath string   `json:"registered_path,omitempty" example:"/Volumes/OldDrive/Photos"`
-	RequestedPath  string   `json:"requested_path,omitempty" example:"/Volumes/NewDrive/Photos"`
-	Actions        []string `json:"actions,omitempty" example:"relocate,copy"`
 }
 
 type RepositoryRootDTO struct {
@@ -228,23 +217,22 @@ type RepositoryScanQueuedDTO struct {
 }
 
 type RepositoryScanRunDTO struct {
-	ScanID          string     `json:"scan_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RepositoryID    string     `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Mode            string     `json:"mode" example:"manual"`
-	RequestedBy     *string    `json:"requested_by,omitempty" example:"edwin"`
-	Status          string     `json:"status" example:"completed"`
-	StartedAt       time.Time  `json:"started_at"`
-	FinishedAt      *time.Time `json:"finished_at,omitempty"`
-	DiscoveredCount int64      `json:"discovered_count" example:"10"`
-	UpdatedCount    int64      `json:"updated_count" example:"2"`
-	MovedCount      int64      `json:"moved_count" example:"1"`
-	DeletedCount    int64      `json:"deleted_count" example:"1"`
-	SkippedCount    int64      `json:"skipped_count" example:"4"`
-	DeferredCount   int64      `json:"deferred_count" example:"1"`
-	AmbiguousCount  int64      `json:"ambiguous_count" example:"0"`
-	Authoritative   bool       `json:"authoritative" example:"true"`
-	PartialReason   *string    `json:"partial_reason,omitempty"`
-	Error           *string    `json:"error,omitempty"`
+	ScanID          string             `json:"scan_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RepositoryID    string             `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Mode            string             `json:"mode" example:"manual"`
+	RequestedBy     *string            `json:"requested_by,omitempty" example:"edwin"`
+	Status          string             `json:"status" example:"completed"`
+	StartedAt       time.Time          `json:"started_at"`
+	FinishedAt      *time.Time         `json:"finished_at,omitempty"`
+	DiscoveredCount int64              `json:"discovered_count" example:"10"`
+	UpdatedCount    int64              `json:"updated_count" example:"2"`
+	MovedCount      int64              `json:"moved_count" example:"1"`
+	DeletedCount    int64              `json:"deleted_count" example:"1"`
+	SkippedCount    int64              `json:"skipped_count" example:"4"`
+	DeferredCount   int64              `json:"deferred_count" example:"1"`
+	AmbiguousCount  int64              `json:"ambiguous_count" example:"0"`
+	Authoritative   bool               `json:"authoritative" example:"true"`
+	Problem         *problem.Reference `json:"problem,omitempty"`
 }
 
 type RepositoryScanRunListDTO struct {

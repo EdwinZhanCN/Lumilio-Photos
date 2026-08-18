@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ImageOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
+import { localizeAPIProblem, readProblemResponse } from "@/lib/http-commons/problem";
 import { usePublicShareView } from "../../api/usePublicShareView";
 import { PublicShareHeader } from "./PublicShareHeader";
 import { PublicShareGrid } from "./PublicShareGrid";
@@ -34,7 +35,7 @@ export function PublicShare(): ReactNode {
         body: JSON.stringify({}),
       });
       if (!response.ok) {
-        throw new Error(`Download failed with status ${response.status}`);
+        throw await readProblemResponse(response);
       }
       const blob = await response.blob();
       const filename =
@@ -45,7 +46,11 @@ export function PublicShare(): ReactNode {
       console.error("Failed to download share:", error);
       showMessage(
         "error",
-        t("share.public.header.downloadError", "Download failed. Please try again."),
+        localizeAPIProblem(
+          error,
+          t,
+          t("share.public.header.downloadError", "Download failed. Please try again."),
+        ),
       );
     } finally {
       setIsDownloading(false);

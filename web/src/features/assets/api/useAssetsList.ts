@@ -38,7 +38,7 @@ type AssetsListQueryResult = {
   fetchMore: () => Promise<void>;
   refetch: () => Promise<void>;
   isFetched: boolean;
-  error: string | null;
+  error: unknown;
   viewKey: string;
   pageInfo: { cursor?: string; page: number; total?: number };
 };
@@ -119,12 +119,7 @@ function useAssetsListQuery(
   const browseItems = useMemo(() => flattenBrowseGroups(browseGroups), [browseGroups]);
   const browseAssets = useMemo(() => flattenBrowseGroupsToAssets(browseGroups), [browseGroups]);
   const lastPage = pages.at(-1);
-  const error =
-    query.error instanceof Error
-      ? query.error.message
-      : query.error
-        ? (JSON.stringify(query.error) ?? "Unknown error")
-        : null;
+  const error = query.error ?? null;
 
   return {
     assets,

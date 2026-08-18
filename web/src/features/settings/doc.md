@@ -62,7 +62,9 @@ command. [useRuntimeInfo](./api/useRuntimeInfo.ts) reports effective manifest-de
 configuration and is display-only.
 
 [useBackups](./api/useBackups.ts) owns the backup list and temporary post-create polling;
-[useRestoreBackup](./api/useBackups.ts) performs catalog replacement. Cloud tabs consume
+[useRestoreBackup](./api/useBackups.ts) performs catalog replacement. Restore polling keeps
+the durable Problem Reference and [BackupSection](./flows/server/BackupSection.tsx) localizes it only at
+presentation, allowing a language change during recovery. Cloud tabs consume
 the Cloud public entry, and user/account tabs consume Users/Auth public
 entries. The Settings root `index.ts` exposes only preference effects and
 the narrow preference hook required by application composition.

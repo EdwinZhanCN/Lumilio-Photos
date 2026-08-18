@@ -14,10 +14,10 @@ func (h *AlbumHandler) getAuthorizedAlbum(c *gin.Context, albumID int32, unautho
 	album, err := h.queries.GetAlbumByID(c.Request.Context(), albumID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Album not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return nil, false
 		}
-		api.GinInternalError(c, err, "Failed to access album")
+		api.WriteProblem(c, api.Internal(err))
 		return nil, false
 	}
 

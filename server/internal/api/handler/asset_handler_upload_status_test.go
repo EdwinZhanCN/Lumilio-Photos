@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 )
 
 func TestUploadJobStatusForCallerEnforcesOwnershipAndTerminalState(t *testing.T) {
@@ -26,8 +27,9 @@ func TestUploadJobStatusForCallerEnforcesOwnershipAndTerminalState(t *testing.T)
 	require.Equal(t, "photo.jpg", status.FileName)
 	require.True(t, status.Terminal)
 	require.False(t, status.Success)
-	require.NotNil(t, status.Error)
-	require.Equal(t, "materialization failed", *status.Error)
+	require.NotNil(t, status.Problem)
+	require.Equal(t, problem.UploadProcessingFailed.Type, status.Problem.Type)
+	require.Equal(t, problem.StableInstance(problem.UploadProcessingFailed, "river-job:42"), status.Problem.Instance)
 }
 
 func TestUploadJobStatusForCallerReportsRunningAsNonTerminal(t *testing.T) {

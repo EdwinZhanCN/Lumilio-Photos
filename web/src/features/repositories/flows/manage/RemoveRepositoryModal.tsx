@@ -3,6 +3,7 @@ import { ArchiveX, CloudDownload, Database, FolderHeart, ListTodo, X } from "luc
 import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useRemoveRepository } from "../../api/useRemoveRepository";
 import type { RepositoryOption } from "../../types";
 
@@ -52,9 +53,11 @@ export default function RemoveRepositoryModal({
     } catch (error) {
       showMessage(
         "error",
-        error instanceof Error
-          ? error.message
-          : t("manage.repositories.removeFailed", "Could not remove this Repository."),
+        localizeAPIProblem(
+          error,
+          t,
+          t("manage.repositories.removeFailed", "Could not remove this Repository."),
+        ),
       );
     }
   };

@@ -2,8 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
 import client from "@/lib/http-commons/client";
+import type { components } from "@/lib/http-commons/schema";
 import { useI18n } from "@/lib/i18n";
 import { useMessage } from "@/features/notifications";
+import {
+  localizeAPIProblem,
+  normalizeProblem,
+  readProblemResponse,
+} from "@/lib/http-commons/problem";
 import { extractFrameExif, type FrameExif } from "../../modules/frame/frameExif";
 import {
   DEFAULT_STUDIO_ADJUSTMENTS,
@@ -86,10 +92,7 @@ type StudioEditorProps = {
   initialTab?: EditorTab;
 };
 
-const apiClient = client as typeof client & {
-  GET: (url: string, init?: unknown) => Promise<{ data?: unknown; error?: unknown }>;
-  PUT: (url: string, init?: unknown) => Promise<{ data?: unknown; error?: unknown }>;
-};
+type StudioSidecarRequest = components["schemas"]["dto.LumilioSidecarV1DTO"];
 
 // The working source is fetched at up to this long edge — the export ceiling.
 // 8192 covers the full resolution of essentially every camera (a 45MP frame is
@@ -197,6 +200,39 @@ function createSidecar(
     canvas: composition.canvas,
     layers: composition.layers,
     updated_at: new Date().toISOString(),
+  };
+}
+
+function toSidecarRequest(sidecar: LumilioSidecarV1): StudioSidecarRequest {
+  return {
+    ...sidecar,
+    source: {
+      ...sidecar.source,
+      hash: sidecar.source.hash ?? undefined,
+      width: sidecar.source.width ?? undefined,
+      height: sidecar.source.height ?? undefined,
+    },
+    adjustments: {
+      ...sidecar.adjustments,
+      crop: sidecar.adjustments.crop ?? undefined,
+    },
+    canvas: sidecar.canvas
+      ? { ...sidecar.canvas, scrim: sidecar.canvas.scrim ?? undefined }
+      : undefined,
+    layers: sidecar.layers.map((layer) =>
+      layer.type === "text"
+        ? {
+            ...layer,
+            shadow: layer.shadow ?? undefined,
+            stroke: layer.stroke ?? undefined,
+            background: layer.background ?? undefined,
+          }
+        : {
+            ...layer,
+            shadow: layer.shadow ?? undefined,
+            color: layer.color ?? undefined,
+          },
+    ),
   };
 }
 
@@ -476,12 +512,16 @@ export function StudioEditor({
         const assetResponse = await client.GET("/api/v1/assets/{id}", {
           params: { path: { id: assetId } },
         });
+        if (assetResponse.error) throw normalizeProblem(assetResponse.error);
         const loadedAsset = unwrapData(assetResponse.data, isAsset);
-        if (!loadedAsset) throw new Error("Asset response did not include a photo");
+        if (!loadedAsset) throw normalizeProblem(undefined);
 
-        const sidecarResponse = await apiClient.GET("/api/v1/assets/{id}/sidecar", {
+        const sidecarResponse = await client.GET("/api/v1/assets/{id}/sidecar", {
           params: { path: { id: assetId } },
         });
+        if (sidecarResponse.error && sidecarResponse.response.status !== 404) {
+          throw normalizeProblem(sidecarResponse.error);
+        }
         const loadedSidecar = unwrapData(sidecarResponse.data, isSidecarResponse);
         const nextAdjustments = normalizeStudioAdjustments(loadedSidecar?.sidecar.adjustments);
         const nextComposition = normalizeStudioComposition(loadedSidecar?.sidecar);
@@ -494,7 +534,7 @@ export function StudioEditor({
         ]);
 
         if (!imageResponse.ok) {
-          throw new Error(`Failed to load Studio source image (${imageResponse.status})`);
+          throw await readProblemResponse(imageResponse);
         }
 
         const imageBlob = await imageResponse.blob();
@@ -582,8 +622,11 @@ export function StudioEditor({
         });
       } catch (loadError) {
         if (cancelled) return;
-        const message =
-          loadError instanceof Error ? loadError.message : "Failed to load Studio asset";
+        const message = localizeAPIProblem(
+          loadError,
+          t,
+          t("studio.editor.loadFailed", "Failed to load the Studio asset."),
+        );
         setError(message);
         showMessage("error", message);
       } finally {
@@ -644,7 +687,13 @@ export function StudioEditor({
         })
         .catch((renderError) => {
           if (generation !== renderGenerationRef.current) return;
-          setError(renderError instanceof Error ? renderError.message : "Failed to render preview");
+          setError(
+            localizeAPIProblem(
+              renderError,
+              t,
+              t("studio.editor.renderFailed", "Failed to render the preview."),
+            ),
+          );
         })
         .finally(() => {
           if (generation === renderGenerationRef.current) setIsRendering(false);
@@ -684,11 +733,11 @@ export function StudioEditor({
     setError(null);
     try {
       const sidecar = createSidecar(asset, adjustments, currentComposition);
-      const response = await apiClient.PUT("/api/v1/assets/{id}/sidecar", {
+      const response = await client.PUT("/api/v1/assets/{id}/sidecar", {
         params: { path: { id: asset.asset_id } },
-        body: sidecar,
+        body: toSidecarRequest(sidecar),
       });
-      if (response.error) throw new Error("Failed to save sidecar");
+      if (response.error) throw normalizeProblem(response.error);
 
       lastSavedSignatureRef.current = currentSignature;
       setJustSaved(true);
@@ -703,7 +752,11 @@ export function StudioEditor({
         height: asset.height ?? imageSize?.height ?? null,
       });
     } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : "Failed to save sidecar";
+      const message = localizeAPIProblem(
+        saveError,
+        t,
+        t("studio.editor.saveFailed", "Failed to save the sidecar."),
+      );
       setError(message);
       showMessage("error", message);
     } finally {
@@ -756,9 +809,11 @@ export function StudioEditor({
       setDepthStatus("error");
       showMessage(
         "error",
-        depthError instanceof Error
-          ? depthError.message
-          : t("studio.depth.failed", { defaultValue: "Depth estimation failed" }),
+        localizeAPIProblem(
+          depthError,
+          t,
+          t("studio.depth.failed", { defaultValue: "Depth estimation failed" }),
+        ),
       );
     }
   }, [adjustments, depthFeather, callWorker, depthUnavailableReason, showMessage, t]);
@@ -827,7 +882,11 @@ export function StudioEditor({
         );
       }
     } catch (exportError) {
-      const message = exportError instanceof Error ? exportError.message : "Failed to export image";
+      const message = localizeAPIProblem(
+        exportError,
+        t,
+        t("studio.export.failed", "Failed to export the image."),
+      );
       setError(message);
       showMessage("error", message);
     } finally {

@@ -2,6 +2,7 @@ import { HardDrive, X } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { formatBytes } from "@/lib/utils/formatters";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useRemoveStorageLocation } from "../../api/useRemoveStorageLocation";
 import { getStorageEntityDisplayName } from "../../model/storageEntities";
 import type { StorageLocationOption } from "../../types";
@@ -34,12 +35,14 @@ export default function RemoveStorageLocationModal({
     } catch (reason: unknown) {
       showMessage(
         "error",
-        reason instanceof Error
-          ? reason.message
-          : t(
-              "manage.repositories.storageLocationRemoveFailed",
-              "Storage Location could not be removed.",
-            ),
+        localizeAPIProblem(
+          reason,
+          t,
+          t(
+            "manage.repositories.storageLocationRemoveFailed",
+            "Storage Location could not be removed.",
+          ),
+        ),
       );
     }
   };

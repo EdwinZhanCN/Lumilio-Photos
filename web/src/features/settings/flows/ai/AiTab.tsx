@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { useAISettingsDraft, type AISettingsDraft } from "./useAISettingsDraft";
 import {
   BirdIcon,
@@ -21,16 +22,6 @@ import { SettingsSaveBar } from "../../components/SettingsSaveBar";
 type AgentProvider = AISettingsDraft["llm"]["provider"];
 
 type FeedbackState = { tone: "success" | "error"; message: string } | null;
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
-}
 
 const ML_META = {
   semanticEnabled: {
@@ -81,7 +72,7 @@ export default function AiTab() {
     if (saveError) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(saveError, t("settings.aiSettings.saveError")),
+        message: localizeProblem(saveError, t, t("settings.aiSettings.saveError")),
       });
     }
   }, [saveError, t]);
@@ -128,7 +119,7 @@ export default function AiTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(error, t("settings.aiSettings.validationError")),
+        message: localizeProblem(error, t, t("settings.aiSettings.validationError")),
       });
     }
   };

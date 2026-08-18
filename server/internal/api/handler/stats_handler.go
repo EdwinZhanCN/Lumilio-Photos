@@ -100,8 +100,8 @@ const (
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} FocalLengthDistributionResponse
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/stats/focal-length [get]
 func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 	repositoryID, ok := parseOptionalRepositoryUUID(c)
@@ -111,7 +111,7 @@ func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 
 	rows, err := h.queries.GetFocalLengthDistribution(c.Request.Context(), repositoryID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to fetch focal length distribution")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -142,15 +142,15 @@ func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 // @Param limit query int false "Number of results to return" default(20)
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} CameraLensStatsResponse
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/stats/camera-lens [get]
 func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 	// Parse limit parameter
 	limitStr := c.DefaultQuery("limit", "20")
 	limit, err := strconv.ParseInt(limitStr, 10, 32)
 	if err != nil || limit <= 0 {
-		api.GinBadRequest(c, err, "Invalid limit parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -164,7 +164,7 @@ func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 		Limit:        limit,
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to fetch camera lens stats")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -208,8 +208,8 @@ func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 // @Param type query string false "Distribution type: hourly or monthly" default(hourly) Enums(hourly, monthly)
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} TimeDistributionResponse
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/stats/time-distribution [get]
 func (h *StatsHandler) GetTimeDistribution(c *gin.Context) {
 	distType := c.DefaultQuery("type", "hourly")
@@ -227,12 +227,12 @@ func (h *StatsHandler) GetTimeDistribution(c *gin.Context) {
 	case "monthly":
 		data, err = h.getMonthlyDistribution(c, repositoryID)
 	default:
-		api.GinBadRequest(c, nil, "Invalid type parameter. Must be 'hourly' or 'monthly'")
+		api.WriteProblem(c, api.BadRequest(nil))
 		return
 	}
 
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to fetch time distribution")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -300,13 +300,13 @@ func (h *StatsHandler) getMonthlyDistribution(c *gin.Context, repositoryID inter
 // @Param days query int false "Deprecated fallback: number of days to look back (used only when year/start_date/end_date are absent)"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} HeatmapResponse
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/stats/daily-activity [get]
 func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 	startDate, endDate, err := resolveHeatmapRange(c, time.Now())
 	if err != nil {
-		api.GinBadRequest(c, err, err.Error())
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -323,7 +323,7 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 
 	rows, err := h.queries.GetDailyActivityHeatmap(c.Request.Context(), params)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to fetch daily activity heatmap")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -410,8 +410,8 @@ func resolveHeatmapRange(c *gin.Context, now time.Time) (time.Time, time.Time, e
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} AvailableYearsResponse
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/stats/available-years [get]
 func (h *StatsHandler) GetAvailableYears(c *gin.Context) {
 	repositoryID, ok := parseOptionalRepositoryUUID(c)
@@ -421,7 +421,7 @@ func (h *StatsHandler) GetAvailableYears(c *gin.Context) {
 
 	rows, err := h.queries.GetAvailableYears(c.Request.Context(), repositoryID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to fetch available years")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -445,7 +445,7 @@ func parseOptionalRepositoryUUID(c *gin.Context) (uuid.NullUUID, bool) {
 
 	repositoryID, err := uuid.Parse(rawRepositoryID)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid repository_id parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return uuid.NullUUID{}, false
 	}
 

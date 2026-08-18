@@ -50,6 +50,10 @@ implementations. Route files only re-export their owning flows.
 one failed request from a clone captured before body consumption.
 [registerSessionExpiredHandler](../../lib/http-commons/sessionEvents.ts) reports transport refresh exhaustion
 back to React without coupling the HTTP client to routing.
+Auth and bootstrap flows preserve generated Problem objects until their
+presentation boundary calls [localizeAPIProblem](../../lib/http-commons/problem.ts) with the current
+language and an operation-specific fallback. Session recovery branches on
+HTTP status or exact Problem type, never on localized or server-authored copy.
 
 Reusable auth queries and mutations live in `api/`; browser WebAuthn
 conversion stays in [getPasskeySupport](./modules/webauthn/webauthn.ts), and deterministic account

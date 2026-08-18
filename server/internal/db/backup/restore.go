@@ -15,6 +15,8 @@ import (
 	"server/internal/db"
 )
 
+var ErrRestoreInProgress = errors.New("another restore is already in progress")
+
 const (
 	pendingStateStaged            = "staged"
 	pendingStatePreviousPreserved = "previous_preserved"
@@ -112,7 +114,7 @@ func StageRestoreTracked(
 
 	markerPath := PendingRestorePath(activePath)
 	if _, err := os.Stat(markerPath); err == nil {
-		return RestoreOperation{}, errors.New("another restore is already in progress")
+		return RestoreOperation{}, ErrRestoreInProgress
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return RestoreOperation{}, fmt.Errorf("inspect pending restore marker: %w", err)
 	}
@@ -789,7 +791,7 @@ func writePendingRestore(path string, marker PendingRestore, exclusive bool) err
 	tmpPath := path + TmpSuffix
 	if exclusive {
 		if _, err := os.Stat(path); err == nil {
-			return errors.New("another restore is already in progress")
+			return ErrRestoreInProgress
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("inspect pending restore marker: %w", err)
 		}

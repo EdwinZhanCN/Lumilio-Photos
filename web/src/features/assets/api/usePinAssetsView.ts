@@ -325,11 +325,9 @@ export function usePinAssetsView(
 
   const activeQuery = isSearchActive ? searchQuery : listQuery;
   const activeError = activeQuery.error ?? pinMetaQuery.error;
-  const errorMessage = useMemo<string | null>(() => {
+  const errorMessage = useMemo<unknown>(() => {
     if (!enabled || !activeError) return null;
-    if (activeError instanceof Error) return activeError.message;
-    if (typeof activeError === "string") return activeError;
-    return JSON.stringify(activeError) ?? "Unknown error";
+    return activeError;
   }, [activeError, enabled]);
 
   const listLastPage = listPages.length > 0 ? listPages[listPages.length - 1] : undefined;

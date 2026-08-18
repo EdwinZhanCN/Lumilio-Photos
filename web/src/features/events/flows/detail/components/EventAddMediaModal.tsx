@@ -3,6 +3,7 @@ import Modal from "@/components/ui/Modal";
 import { PhotoPicker } from "@/features/assets";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 
 type EventAddMediaModalProps = {
   open: boolean;
@@ -38,7 +39,7 @@ export default function EventAddMediaModal({
       showMessage(
         "error",
         t("events.addMediaError", "Failed to add media: {{message}}", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
       throw error;

@@ -31,16 +31,16 @@ func NewSpeciesHandler(speciesReferenceService service.SpeciesReferenceService) 
 // @Param common_name query string false "Common name fallback" example("Barasingha")
 // @Param locale query string false "iNaturalist locale for localized common names and wiki summaries" example("zh")
 // @Success 200 {object} dto.SpeciesReferenceResponseDTO "Species reference retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid query"
-// @Failure 404 {object} api.ErrorResponse "Species reference not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid query"
+// @Failure 404 {object} api.ProblemResponse "Species reference not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/species/reference [get]
 func (h *SpeciesHandler) GetSpeciesReference(c *gin.Context) {
 	scientificName := strings.TrimSpace(c.Query("scientific_name"))
 	commonName := strings.TrimSpace(c.Query("common_name"))
 	locale := strings.TrimSpace(c.Query("locale"))
 	if scientificName == "" && commonName == "" {
-		api.GinBadRequest(c, errors.New("scientific_name or common_name is required"), "Scientific name or common name is required")
+		api.WriteProblem(c, api.BadRequest(errors.New("scientific_name or common_name is required")))
 		return
 	}
 
@@ -51,10 +51,10 @@ func (h *SpeciesHandler) GetSpeciesReference(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrSpeciesReferenceNotFound) {
-			api.GinNotFound(c, err, "Species reference not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to fetch species reference")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 

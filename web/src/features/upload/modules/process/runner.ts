@@ -33,9 +33,6 @@ export interface UploadProcessRunnerDependencies
   config: UploadTransportConfig;
 }
 
-const getErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof Error ? error.message : fallback;
-
 export const runUploadProcess = async (
   files: FileList | File[],
   dependencies: UploadProcessRunnerDependencies,
@@ -103,7 +100,7 @@ export const runUploadProcess = async (
     return transport.getResult();
   } catch (error) {
     await Promise.allSettled(uploadTasks);
-    const message = getErrorMessage(error, dependencies.messages.processFailed);
+    const message = dependencies.localizeProblem(error, dependencies.messages.processFailed);
     plannedSessions.forEach((session) =>
       dependencies.updateFileProgress(session.sessionId, {
         status: "failed",

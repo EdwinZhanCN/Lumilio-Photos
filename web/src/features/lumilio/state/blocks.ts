@@ -153,16 +153,12 @@ export const setConfirmSubmitting = (
     ),
   }));
 
-export const failConfirm = (
-  messages: ChatMessage[],
-  interruptId: string,
-  error: string,
-): ChatMessage[] =>
+export const failConfirm = (messages: ChatMessage[], interruptId: string): ChatMessage[] =>
   messages.map((message) => ({
     ...message,
     blocks: message.blocks.map((block) =>
       mapsConfirmation(block, interruptId)
-        ? { ...block, state: "failed", error, receipt: undefined }
+        ? { ...block, state: "failed", error: undefined, receipt: undefined }
         : block,
     ),
   }));
@@ -210,9 +206,7 @@ export const applyDroppedMentions = (
         const rejected = dropped.find(
           (candidate) => candidate.type === mention.type && candidate.id === mention.id,
         );
-        return rejected
-          ? { ...mention, status: "dropped", reason: rejected.reason }
-          : mention;
+        return rejected ? { ...mention, status: "dropped", reason: rejected.reason } : mention;
       }),
     },
   };

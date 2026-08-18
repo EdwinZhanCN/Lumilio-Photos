@@ -1,4 +1,5 @@
 import { client } from "@/lib/http-commons/queryClient";
+import { normalizeProblem, normalizeProblemReference } from "@/lib/http-commons/problem";
 
 const TERMINAL_SCAN_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
@@ -16,17 +17,17 @@ export const waitForRepositoryScan = async (
       params: { path: { id: repositoryId } },
     });
     if (error && response.status !== 404) {
-      throw new Error(error.error || error.message || "Failed to load Repository scan status");
+      throw normalizeProblem(error);
     }
     const startedAt = data?.started_at ? Date.parse(data.started_at) : 0;
     const belongsToRequest = startedAt >= requestedAt - 2_000;
     if (belongsToRequest && data?.status && TERMINAL_SCAN_STATUSES.has(data.status)) {
       if (data.status !== "completed") {
-        throw new Error(data.error || `Repository scan ${data.status}`);
+        throw normalizeProblemReference(data.problem) ?? normalizeProblem(undefined);
       }
       return data;
     }
     await wait(options.intervalMs ?? 750);
   }
-  throw new Error("Timed out waiting for Repository scan completion");
+  throw normalizeProblem(undefined);
 };

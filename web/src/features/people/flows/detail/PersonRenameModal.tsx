@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ScanFace, UserRound, Users } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import Modal from "@/components/ui/Modal";
 import PersonFacesPanel from "./PersonFacesPanel";
 import PersonPicker from "./PersonPicker";
@@ -79,7 +80,7 @@ export function PersonRenameModal({
       showMessage(
         "error",
         t("people.hidden.error", "Failed to update person: {{message}}", {
-          message: err instanceof Error ? err.message : String(err),
+          message: localizeAPIProblem(err, t, t("home.errors.unknown")),
         }),
       );
       setIsHidden(!nextHidden);
@@ -96,7 +97,7 @@ export function PersonRenameModal({
       showMessage(
         "error",
         t("people.merge.error", "Failed to merge people: {{message}}", {
-          message: err instanceof Error ? err.message : String(err),
+          message: localizeAPIProblem(err, t, t("home.errors.unknown")),
         }),
       );
     }

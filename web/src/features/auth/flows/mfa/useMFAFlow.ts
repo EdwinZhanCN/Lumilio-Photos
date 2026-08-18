@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { useAuth } from "../../state/useAuth.ts";
 import {
   useBeginTOTPSetup,
@@ -19,18 +20,6 @@ type ReturnState = {
     hash?: string;
   };
 };
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
-}
 
 export function useMFAFlow() {
   const { t } = useI18n();
@@ -112,8 +101,9 @@ export function useMFAFlow() {
       }
     } catch (cause) {
       setError(
-        getErrorMessage(
+        localizeProblem(
           cause,
+          t,
           t("settings.account.mfa.setupError", {
             defaultValue: "Failed to start TOTP setup.",
           }),
@@ -155,8 +145,9 @@ export function useMFAFlow() {
       clearFlowParams("mfa", "action");
     } catch (cause) {
       setError(
-        getErrorMessage(
+        localizeProblem(
           cause,
+          t,
           t("settings.account.mfa.enableError", {
             defaultValue: "Failed to enable TOTP.",
           }),
@@ -187,8 +178,9 @@ export function useMFAFlow() {
       setRecoveryCodes([]);
     } catch (cause) {
       setError(
-        getErrorMessage(
+        localizeProblem(
           cause,
+          t,
           t("settings.account.mfa.disableError", {
             defaultValue: "Failed to disable TOTP.",
           }),
@@ -221,8 +213,9 @@ export function useMFAFlow() {
       clearFlowParams("action");
     } catch (cause) {
       setError(
-        getErrorMessage(
+        localizeProblem(
           cause,
+          t,
           t("settings.account.mfa.regenerateError", {
             defaultValue: "Failed to regenerate recovery codes.",
           }),

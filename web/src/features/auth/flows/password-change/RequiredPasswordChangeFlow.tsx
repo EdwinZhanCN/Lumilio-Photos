@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { AlertCircle, KeyRound, ShieldCheck } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../../state/useAuth.ts";
 import { takeRequiredPasswordChangeChallenge } from "../../state/passwordChangeChallenge.ts";
@@ -12,15 +13,6 @@ import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_PATTERN,
 } from "../../model/credentialPolicy.ts";
-
-function apiMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const value = error as { message?: string; error?: string };
-    return value.message || value.error || fallback;
-  }
-  return fallback;
-}
 
 export default function RequiredPasswordChangeFlow(): React.ReactNode {
   const { t } = useI18n();
@@ -57,8 +49,9 @@ export default function RequiredPasswordChangeFlow(): React.ReactNode {
       void navigate(challenge.redirectTo || "/", { replace: true });
     } catch (cause) {
       setError(
-        apiMessage(
+        localizeProblem(
           cause,
+          t,
           t("auth.requiredPasswordChange.error", "Unable to set the new password."),
         ),
       );
