@@ -27,6 +27,13 @@ type auditingChatModel struct {
 	path  string
 }
 
+func (m *auditingChatModel) GetType() string {
+	if typed, ok := m.inner.(interface{ GetType() string }); ok {
+		return typed.GetType()
+	}
+	return ""
+}
+
 type auditEntry struct {
 	Timestamp time.Time         `json:"ts"`
 	Op        string            `json:"op"`

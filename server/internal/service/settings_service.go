@@ -71,16 +71,17 @@ func (s LLMSettings) EffectiveProvider() string {
 
 func (s LLMSettings) IsConfigured() bool {
 	provider := s.EffectiveProvider()
-	if !settings.IsSupportedLLMProvider(provider) || strings.TrimSpace(s.ModelName) == "" {
+	descriptor, ok := settings.LookupLLMProvider(provider)
+	if !ok || strings.TrimSpace(s.ModelName) == "" {
 		return false
 	}
-	if provider == "ollama" {
-		return strings.TrimSpace(s.BaseURL) != ""
-	}
-	if provider == "deepseek" && strings.TrimSpace(s.BaseURL) == "" {
+	if descriptor.BaseURLRequired && strings.TrimSpace(s.BaseURL) == "" {
 		return false
 	}
-	return s.APIKeyConfigured
+	if descriptor.APIKeyRequired && !s.APIKeyConfigured {
+		return false
+	}
+	return true
 }
 
 type MLSettings struct {

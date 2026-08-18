@@ -15,7 +15,10 @@ Device-local preferences live in the lower shared
 Rich server-backed editors use [useDraftSettings](./hooks/useDraftSettings.ts): a local draft,
 dirty/reset/save state, and explicit commit through
 [SettingsSaveBar](./components/SettingsSaveBar.tsx). [useAISettingsDraft](./flows/ai/useAISettingsDraft.ts) adapts LLM credentials
-and semantic, video-semantic, BioCLIP, OCR, and face switches. Server facts
+and semantic, video-semantic, BioCLIP, OCR, and face switches. Its provider
+dropdown and required-field checks consume the Server-advertised descriptor
+contract through [normalizeProviderDescriptors](./model/llmProviders.ts); the Web keeps only
+the exhaustive localized label boundary for known product IDs. Server facts
 remain Query data and are not copied into the preferences store.
 [useGeocodingSettingsDraft](./flows/server/useGeocodingSettingsDraft.ts) gives the Server tab an explicit local
 draft for the provider, endpoint, language, and User-Agent aggregate.

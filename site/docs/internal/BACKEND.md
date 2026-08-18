@@ -355,6 +355,29 @@ calls SDK defaults or env loading. ML and LLM feature settings remain
 runtime-mutable catalog settings and do not belong in `AppConfig`. Zero-shot
 classifier preview is exposed through `/api/v1/classifiers/preview`.
 
+LLM provider identity and configuration requirements are owned by the
+deterministic registry in `internal/settings`. The system-settings response
+publishes only each provider ID plus whether its API key and base URL are
+required; request DTOs defer membership checks to that registry. The supported
+classic `ToolCallingChatModel` adapters are Ark, OpenAI, DeepSeek, Ollama,
+Claude, Gemini, Qwen, and OpenRouter. `internal/llm` validates the complete
+database-backed setting before constructing the named official Eino-ext
+adapter, so an empty setting cannot fall through to SDK environment variables,
+credential files, or cloud profiles. Ollama is the only keyless provider;
+DeepSeek, Ollama, and Qwen require explicit endpoints. Claude uses only the
+direct Anthropic path, Gemini uses an explicitly constructed Developer API
+client, and DeepSeek uses its native adapter. Qianfan and hosted cloud variants
+remain outside this boundary because their credential shapes or ambient state
+do not fit the single encrypted-key aggregate.
+
+Provider SDK failures are classified at `internal/llm` before they reach HTTP
+or Agent request logging. Ordinary logs never include provider response bodies,
+Authorization values, or prompts reflected by a remote service; full prompt
+capture remains confined to the explicitly configured `--agent-audit-log`.
+Agent confirmation checkpoints are timestamped SQLite rows keyed by user and
+thread, and the compatibility fixture locks targeted resume from Eino `v0.9.6`
+onto the current ADK path.
+
 The SDK owns the continuous Lumen runtime pipeline: bounded DNS-SD scans,
 strict service correlation, source-owned snapshot reconciliation, gRPC
 transport state, and the in-band capability verdict. Failed scans preserve

@@ -1,15 +1,17 @@
-import type {
-  UpdateSystemSettings,
-  ValidateLLMDraft,
-} from "../../api/useSystemSettings";
+import type { UpdateSystemSettings, ValidateLLMDraft } from "../../api/useSystemSettings";
 import {
   useSystemSettings,
   useUpdateSystemSettings,
   useValidateLLMSettings,
 } from "../../api/useSystemSettings";
 import { useDraftSettings, type DraftSettings } from "../../hooks/useDraftSettings";
-
-type AgentProvider = "none" | "ark" | "openai" | "deepseek" | "ollama";
+import {
+  findProviderDescriptor,
+  normalizeProvider,
+  normalizeProviderDescriptors,
+  type AgentProvider,
+  type LLMProviderDescriptor,
+} from "../../model/llmProviders";
 
 export interface AISettingsDraft {
   llm: {
@@ -27,18 +29,6 @@ export interface AISettingsDraft {
     ocrEnabled: boolean;
     faceEnabled: boolean;
   };
-}
-
-function normalizeProvider(value: string | undefined): AgentProvider {
-  switch (value) {
-    case "openai":
-    case "deepseek":
-    case "ollama":
-    case "ark":
-      return value;
-    default:
-      return "none";
-  }
 }
 
 function buildPayload(draft: AISettingsDraft): UpdateSystemSettings {
@@ -72,6 +62,7 @@ export function buildValidationPayload(
   draft: AISettingsDraft,
   apiKeyConfigured: boolean,
   storedProvider: AgentProvider,
+  supportedProviders: readonly LLMProviderDescriptor[],
 ): ValidateLLMDraft {
   if (draft.llm.provider === "none") {
     throw new Error("Select an LLM provider before validation");
@@ -79,10 +70,12 @@ export function buildValidationPayload(
   if (!draft.llm.modelName.trim()) {
     throw new Error("Enter a model name before validation");
   }
-  if (
-    (draft.llm.provider === "ollama" || draft.llm.provider === "deepseek") &&
-    !draft.llm.baseURL.trim()
-  ) {
+
+  const descriptor = findProviderDescriptor(supportedProviders, draft.llm.provider);
+  if (!descriptor) {
+    throw new Error("The selected LLM provider is not supported by this server");
+  }
+  if (descriptor.baseURLRequired && !draft.llm.baseURL.trim()) {
     throw new Error("Enter the provider base URL before validation");
   }
   const apiKey = draft.llm.clearStoredKey ? "" : draft.llm.apiKey.trim();
@@ -91,7 +84,7 @@ export function buildValidationPayload(
     !draft.llm.clearStoredKey &&
     apiKeyConfigured &&
     draft.llm.provider === storedProvider;
-  if (draft.llm.provider !== "ollama" && !apiKey && !canUseStoredKey) {
+  if (descriptor.apiKeyRequired && !apiKey && !canUseStoredKey) {
     throw new Error("Enter an API key for the selected provider before validation");
   }
   return {
@@ -128,6 +121,7 @@ function toServerDraft(
 
 export function useAISettingsDraft(): DraftSettings<AISettingsDraft> & {
   apiKeyConfigured: boolean;
+  supportedProviders: LLMProviderDescriptor[];
   query: ReturnType<typeof useSystemSettings>;
   isValidating: boolean;
   validateDraft: () => Promise<void>;
@@ -138,6 +132,7 @@ export function useAISettingsDraft(): DraftSettings<AISettingsDraft> & {
   const server = query.data ? toServerDraft(query.data) : undefined;
   const apiKeyConfigured = Boolean(query.data?.llm?.api_key_configured);
   const storedProvider = normalizeProvider(query.data?.llm?.provider);
+  const supportedProviders = normalizeProviderDescriptors(query.data?.llm?.supported_providers);
 
   const draftSettings = useDraftSettings<AISettingsDraft>({
     server,
@@ -147,7 +142,7 @@ export function useAISettingsDraft(): DraftSettings<AISettingsDraft> & {
     onSave: async (draft) => {
       if (draft.llm.agentEnabled) {
         await validateMutation.mutateAsync(
-          buildValidationPayload(draft, apiKeyConfigured, storedProvider),
+          buildValidationPayload(draft, apiKeyConfigured, storedProvider, supportedProviders),
         );
       }
       await saveMutation.mutateAsync({ body: buildPayload(draft) });
@@ -157,12 +152,18 @@ export function useAISettingsDraft(): DraftSettings<AISettingsDraft> & {
   return {
     ...draftSettings,
     apiKeyConfigured,
+    supportedProviders,
     query,
     isValidating: validateMutation.isPending,
     validateDraft: async () => {
       if (!draftSettings.draft) return;
       await validateMutation.mutateAsync(
-        buildValidationPayload(draftSettings.draft, apiKeyConfigured, storedProvider),
+        buildValidationPayload(
+          draftSettings.draft,
+          apiKeyConfigured,
+          storedProvider,
+          supportedProviders,
+        ),
       );
     },
   };

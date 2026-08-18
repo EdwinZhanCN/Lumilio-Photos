@@ -16,7 +16,10 @@
  * Rich server-backed editors use {@link useDraftSettings}: a local draft,
  * dirty/reset/save state, and explicit commit through
  * {@link SettingsSaveBar}. {@link useAISettingsDraft} adapts LLM credentials
- * and semantic, video-semantic, BioCLIP, OCR, and face switches. Server facts
+ * and semantic, video-semantic, BioCLIP, OCR, and face switches. Its provider
+ * dropdown and required-field checks consume the Server-advertised descriptor
+ * contract through {@link normalizeProviderDescriptors}; the Web keeps only
+ * the exhaustive localized label boundary for known product IDs. Server facts
  * remain Query data and are not copied into the preferences store.
  * {@link useGeocodingSettingsDraft} gives the Server tab an explicit local
  * draft for the provider, endpoint, language, and User-Agent aggregate.
@@ -89,6 +92,7 @@ import type { useGeocodingSettingsDraft } from "./flows/server/useGeocodingSetti
 import type Settings from "./flows/shell/SettingsPageFlow.tsx";
 import type SettingsShell from "./flows/shell/SettingsShell.tsx";
 import type { useDraftSettings } from "./hooks/useDraftSettings.ts";
+import type { normalizeProviderDescriptors } from "./model/llmProviders.ts";
 import type { PREFERENCES_STORAGE_KEY } from "./state/registry.ts";
 import type {
   useDebouncedPreference,

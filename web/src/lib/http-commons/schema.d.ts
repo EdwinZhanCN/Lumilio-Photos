@@ -14577,6 +14577,12 @@ export interface components {
             /** @example openai */
             provider?: string;
         };
+        "dto.LLMProviderDescriptorDTO": {
+            api_key_required?: boolean;
+            base_url_required?: boolean;
+            /** @example openai */
+            id?: string;
+        };
         "dto.LLMSettingsDTO": {
             agent_enabled?: boolean;
             api_key_configured?: boolean;
@@ -14586,6 +14592,7 @@ export interface components {
             model_name?: string;
             /** @example openai */
             provider?: string;
+            supported_providers?: components["schemas"]["dto.LLMProviderDescriptorDTO"][];
         };
         "dto.LifecycleAuditEventDTO": {
             action?: string;
@@ -16073,8 +16080,7 @@ export interface components {
             api_key?: string;
             base_url?: string;
             model_name?: string;
-            /** @enum {string} */
-            provider?: "none" | "ark" | "openai" | "deepseek" | "ollama";
+            provider?: string;
         };
         "dto.UpdateLikeRequestDTO": {
             /** @example true */
@@ -16226,11 +16232,8 @@ export interface components {
             base_url?: string;
             /** @example gpt-4.1-mini */
             model_name: string;
-            /**
-             * @example openai
-             * @enum {string}
-             */
-            provider: "ark" | "openai" | "deepseek" | "ollama";
+            /** @example openai */
+            provider: string;
             use_stored_api_key?: boolean;
         };
         "dto.ValidateLLMSettingsResponseDTO": {

@@ -6,14 +6,7 @@ import type { Schemas } from "./types";
 
 export type SystemSettings = Schemas["dto.SystemSettingsDTO"];
 export type UpdateSystemSettings = Schemas["dto.UpdateSystemSettingsDTO"];
-
-export interface ValidateLLMDraft {
-  provider: "ark" | "openai" | "deepseek" | "ollama";
-  model_name: string;
-  base_url?: string;
-  api_key?: string;
-  use_stored_api_key?: boolean;
-}
+export type ValidateLLMDraft = Schemas["dto.ValidateLLMSettingsRequestDTO"];
 
 export const systemSettingsQueryKey = ["get", "/api/v1/settings/system"] as const;
 

@@ -108,6 +108,35 @@ func TestSettingsServiceDoesNotReuseCredentialAcrossProviders(t *testing.T) {
 	config, err := settingsService.GetLLMConfig(ctx)
 	require.NoError(t, err)
 	require.Empty(t, config.APIKey)
+
+	provider = "ollama"
+	baseURL := "http://127.0.0.1:11434"
+	updated, err = settingsService.UpdateSystemSettings(ctx, UpdateSystemSettingsInput{LLM: &UpdateLLMSettingsInput{
+		Provider: &provider,
+		BaseURL:  &baseURL,
+	}})
+	require.NoError(t, err)
+	require.Equal(t, "ollama", updated.LLM.Provider)
+	require.False(t, updated.LLM.APIKeyConfigured)
+	require.True(t, updated.LLM.IsConfigured())
+
+	config, err = settingsService.GetLLMConfig(ctx)
+	require.NoError(t, err)
+	require.Empty(t, config.APIKey)
+
+	unknownProvider := "future-provider"
+	_, err = settingsService.UpdateSystemSettings(ctx, UpdateSystemSettingsInput{LLM: &UpdateLLMSettingsInput{
+		Provider: &unknownProvider,
+	}})
+	require.ErrorContains(t, err, "unsupported llm provider")
+	persisted, err := settingsService.GetSystemSettings(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "ollama", persisted.LLM.Provider)
+	require.ErrorContains(t, settingsService.ValidateLLMDraft(ctx, ValidateLLMDraftInput{
+		Provider:  unknownProvider,
+		ModelName: "fixture-model",
+		APIKey:    "fixture-secret",
+	}), "unsupported llm provider")
 }
 
 func TestSettingsServiceRejectsEnablingIncompleteAgentConfiguration(t *testing.T) {
