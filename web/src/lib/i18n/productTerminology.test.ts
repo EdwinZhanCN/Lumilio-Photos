@@ -28,10 +28,10 @@ describe("canonical product terminology", () => {
     expect(zh.manage.repositories.description).toBe(
       "存储位置是可容纳多个资源库的已授权父级位置；资源库是各自拥有独立身份的具体媒体单元。",
     );
-    expect(en.manage.repositories.storageLocationDefault).toBe("Default Storage Location");
-    expect(zh.manage.repositories.storageLocationDefault).toBe("默认存储位置");
-    expect(en.manage.repositories.primaryBadge).toBe("Primary Repository");
-    expect(zh.manage.repositories.primaryBadge).toBe("主资源库");
+    expect(en.productTerms.defaultStorageLocation).toBe("Default Storage Location");
+    expect(zh.productTerms.defaultStorageLocation).toBe("默认存储位置");
+    expect(en.productTerms.primaryRepository).toBe("Primary Repository");
+    expect(zh.productTerms.primaryRepository).toBe("主资源库");
     expect(en.auth.primaryRepository.root).toBe("Default Storage Location");
     expect(zh.auth.primaryRepository.root).toBe("默认存储位置");
 

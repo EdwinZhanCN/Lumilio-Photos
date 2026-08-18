@@ -33,7 +33,7 @@ export default function RemoveRepositoryModal({
   if (!isOpen) return null;
 
   const impact = impactQuery.data;
-  const confirmed = confirmationName === repository.name;
+  const confirmed = confirmationName === repository.rawName;
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!confirmed || removal.isPending) return;
@@ -44,7 +44,7 @@ export default function RemoveRepositoryModal({
         t(
           "manage.repositories.removeSuccess",
           'Removed "{{name}}" from Lumilio. Files on disk were preserved.',
-          { name: repository.name },
+          { name: repository.rawName },
         ),
       );
       setConfirmationName("");
@@ -71,7 +71,7 @@ export default function RemoveRepositoryModal({
               <h3 className="text-base font-semibold">
                 {t("manage.repositories.removeTitle", "Remove from Lumilio")}
               </h3>
-              <p className="text-sm text-base-content/60">{repository.name}</p>
+              <p className="text-sm text-base-content/60">{repository.rawName}</p>
             </div>
           </div>
           <button
@@ -136,7 +136,7 @@ export default function RemoveRepositoryModal({
           <label className="fieldset w-full gap-1" htmlFor="remove-repository-confirmation">
             <span className="fieldset-legend p-0 text-sm font-medium">
               {t("manage.repositories.removeConfirmationLabel", 'Type "{{name}}" to confirm', {
-                name: repository.name,
+                name: repository.rawName,
               })}
             </span>
             <input

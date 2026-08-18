@@ -6,6 +6,60 @@ import RepositoryGrid from "./RepositoryGrid";
 import RepositoryRow from "./RepositoryRow";
 
 describe("RepositoryGrid", () => {
+  it("uses the canonical product name for the default Storage Location", async () => {
+    worker.use(
+      http.get("*/api/v1/host-actions/native-capability", () =>
+        HttpResponse.json({ available: false }),
+      ),
+      http.get("*/api/v1/repository-roots", () =>
+        HttpResponse.json({
+          roots: [
+            {
+              id: "8df0b4a5-5c67-44d9-80d0-ea4119ae26f9",
+              name: "legacy default name",
+              path: "/storage",
+              kind: "default",
+              status: "active",
+              writable: true,
+              repository_count: 0,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const noop = vi.fn();
+    const screen = await renderWithProviders(
+      <RepositoryGrid
+        repositories={[]}
+        repositoryIds={[]}
+        isLoading={false}
+        isError={false}
+        isScanning={false}
+        isRebuildingEvents={false}
+        isRebuildingPeople={false}
+        scanningIds={new Set()}
+        detectingIds={new Set()}
+        rebuildingLocationId={null}
+        onScanRepository={noop}
+        onDetectStacks={noop}
+        onDuplicateScan={noop}
+        onLocationRebuild={noop}
+        onCloudImport={noop}
+        onScanAll={noop}
+        onRebuildEvents={noop}
+        onRebuildPeople={noop}
+      />,
+    );
+
+    await expect
+      .element(screen.getByText(t("productTerms.defaultStorageLocation"), { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("legacy default name", { exact: true }))
+      .not.toBeInTheDocument();
+  });
+
   it("shows unfinished native host actions without requiring a modal to be open", async () => {
     worker.use(
       http.get("*/api/v1/host-actions/native-capability", () =>
@@ -88,14 +142,14 @@ describe("RepositoryRow", () => {
       <ul className="list">
         <RepositoryRow
           repository={{
+            entityType: "repository",
             id: "9ae85f87-adc0-44e0-92de-37380b217ce5",
-            name: "Before",
+            rawName: "Before",
             path: "/storage/stable-folder",
             role: "regular",
             rootId: "a8bdfcf7-f7cf-47fe-bf2e-cce5ea4236a9",
             reachability: "active",
             activity: "idle",
-            isPrimary: false,
           }}
           rootStatus="active"
           isScanning={false}

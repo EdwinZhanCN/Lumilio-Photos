@@ -96,6 +96,56 @@ type createRepositoryManagerStub struct {
 	createErr    error
 }
 
+type storageDiagnosticsManagerStub struct {
+	storage.RepositoryManager
+	roots        []repo.RepositoryRoot
+	repositories []*repo.Repository
+}
+
+func (s *storageDiagnosticsManagerStub) ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error) {
+	return s.roots, nil
+}
+
+func (s *storageDiagnosticsManagerStub) ListRepositories() ([]*repo.Repository, error) {
+	return s.repositories, nil
+}
+
+func TestStorageDiagnosticsCarriesStorageEntitySemantics(t *testing.T) {
+	rootID := uuid.MustParse("8df0b4a5-5c67-44d9-80d0-ea4119ae26f9")
+	repositoryID := uuid.MustParse("6fd24928-9c5c-4b03-a8cc-84971654144c")
+	manager := &storageDiagnosticsManagerStub{
+		roots: []repo.RepositoryRoot{{
+			RootID: rootID,
+			Name:   "legacy default name",
+			Path:   t.TempDir(),
+			Kind:   dbtypes.RepositoryRootKindDefault,
+			Status: dbtypes.RepositoryRootStatusActive,
+		}},
+		repositories: []*repo.Repository{{
+			RepoID:       repositoryID,
+			RootID:       rootID,
+			Name:         "legacy primary name",
+			Path:         t.TempDir(),
+			Role:         dbtypes.RepoRolePrimary,
+			Reachability: dbtypes.RepositoryReachabilityActive,
+		}},
+	}
+
+	items, err := NewRepositoryScanHandler(nil, manager).storageDiagnostics(context.Background(), false)
+	if err != nil {
+		t.Fatalf("storage diagnostics: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("diagnostic count = %d, want 2", len(items))
+	}
+	if items[0].Kind != string(dbtypes.RepositoryRootKindDefault) || items[0].Role != "" {
+		t.Fatalf("Storage Location semantics = kind %q role %q", items[0].Kind, items[0].Role)
+	}
+	if items[1].Kind != "" || items[1].Role != string(dbtypes.RepoRolePrimary) {
+		t.Fatalf("Repository semantics = kind %q role %q", items[1].Kind, items[1].Role)
+	}
+}
+
 func (s *createRepositoryManagerStub) HostOwnerID(context.Context) (*int32, error) {
 	return s.hostOwnerID, nil
 }

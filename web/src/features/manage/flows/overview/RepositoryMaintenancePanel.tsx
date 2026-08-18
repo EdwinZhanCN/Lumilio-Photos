@@ -4,7 +4,7 @@ import { useDetectDuplicates } from "@/features/collections";
 import { useEventRebuild, useEventRebuildStatus } from "@/features/events";
 import { useRebuildPeopleClusters } from "@/features/people";
 import {
-  getRepositoryDisplayName,
+  getStorageEntityDisplayName,
   RepositoryGrid,
   type RepositoryOption,
   useRepositoryOptions,
@@ -48,7 +48,7 @@ export default function RepositoryMaintenancePanel() {
       try {
         const result = await scanRepository(repository.id);
         const summaryValues = {
-          name: getRepositoryDisplayName(repository, t),
+          name: getStorageEntityDisplayName(repository, t),
           discovered: result.discovered_count ?? 0,
           updated: result.updated_count ?? 0,
           moved: result.moved_count ?? 0,
@@ -87,7 +87,7 @@ export default function RepositoryMaintenancePanel() {
         showMessage(
           "success",
           t("manage.repositories.detectStacksCompleted", {
-            name: getRepositoryDisplayName(repository, t),
+            name: getStorageEntityDisplayName(repository, t),
             count: created,
           }),
         );
@@ -170,7 +170,7 @@ export default function RepositoryMaintenancePanel() {
         showMessage(
           "success",
           t("manage.repositories.cloudImportStarted", {
-            name: getRepositoryDisplayName(repository, t),
+            name: getStorageEntityDisplayName(repository, t),
           }),
         );
       } catch (error) {

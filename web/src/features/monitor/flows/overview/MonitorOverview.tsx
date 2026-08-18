@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import PageHeader from "@/components/ui/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
-import { useRepositoryOptions } from "@/features/repositories";
+import { getStorageEntityDisplayName, useRepositoryOptions } from "@/features/repositories";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
 import { LifecycleHistory } from "./LifecycleHistory";
 import { MLMonitor } from "./MLMonitor";
@@ -83,7 +83,7 @@ export default function MonitorOverview() {
               </option>
               {repositories.map((repo) => (
                 <option key={repo.id} value={repo.id}>
-                  {repo.name || repo.path}
+                  {getStorageEntityDisplayName(repo, t)}
                 </option>
               ))}
             </select>

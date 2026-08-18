@@ -1,8 +1,50 @@
-export type RepositoryOption = {
-  id: string;
-  name: string;
+import type { components } from "@/lib/http-commons/schema";
+
+type RepositoryRootDTO = components["schemas"]["dto.RepositoryRootDTO"];
+type StorageDiagnosticDTO = components["schemas"]["dto.StorageDiagnosticDTO"];
+
+export type StorageLocationKind = "default" | "external" | "unknown";
+export type RepositoryRole = "primary" | "regular" | "unknown";
+
+export type StorageLocationEntity = {
+  entityType: "storage_location";
+  kind: StorageLocationKind;
+  rawName: string;
   path: string;
-  role: string;
+};
+
+export type RepositoryEntity = {
+  entityType: "repository";
+  role: RepositoryRole;
+  rawName: string;
+  path: string;
+};
+
+export type UnknownStorageEntity = {
+  entityType: "unknown";
+  rawName: string;
+  path: string;
+};
+
+export type StorageEntity = StorageLocationEntity | RepositoryEntity | UnknownStorageEntity;
+
+export type StorageLocationOption = Omit<RepositoryRootDTO, "kind" | "name" | "path"> &
+  StorageLocationEntity;
+
+export type RepositoryRootsResponse = {
+  roots?: StorageLocationOption[];
+};
+
+export type StorageDiagnostic = Omit<StorageDiagnosticDTO, "kind" | "name" | "path" | "role"> &
+  StorageEntity;
+
+export type StorageDiagnosticsResponse = {
+  generated_at?: string;
+  items?: StorageDiagnostic[];
+};
+
+export type RepositoryOption = RepositoryEntity & {
+  id: string;
   rootId: string;
   /**
    * Reachability of the repository's on-disk location. Offline and invalid
@@ -11,7 +53,6 @@ export type RepositoryOption = {
   reachability: RepositoryReachability;
   /** Work is orthogonal to reachability and never hides an unavailable state. */
   activity: RepositoryActivity;
-  isPrimary: boolean;
 };
 
 export type RepositoryReachability =

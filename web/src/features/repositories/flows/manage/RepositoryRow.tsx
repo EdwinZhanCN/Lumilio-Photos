@@ -17,7 +17,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 import type { RepositoryOption } from "../../types";
 import { useRepositoryAssetCount } from "../../api/useRepositoryAssetCount";
-import { getRepositoryDisplayName } from "../../model/repositoryDisplayName";
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
 import { getRepositoryEffectiveState } from "../../model/repositoryOptions";
 import RemoveRepositoryModal from "./RemoveRepositoryModal";
 import RenameRepositoryModal from "./RenameRepositoryModal";
@@ -65,7 +65,7 @@ export default function RepositoryRow({
   const latestScan = scanQuery.data;
   const cloudStatus = cloudStatusQuery.data;
   const latestRun = cloudStatus?.latest_run;
-  const name = getRepositoryDisplayName(repository, t);
+  const name = getStorageEntityDisplayName(repository, t);
   const [expanded, setExpanded] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
@@ -101,11 +101,6 @@ export default function RepositoryRow({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="truncate text-sm font-medium text-base-content">{name}</span>
-              {repository.isPrimary && (
-                <span className="badge badge-primary badge-sm badge-soft">
-                  {t("manage.repositories.primaryBadge", "Primary Repository")}
-                </span>
-              )}
               {hasCloudBinding && (
                 <span className="badge badge-info badge-sm badge-soft">
                   {t("manage.repositories.sourceCloud")}
@@ -162,16 +157,18 @@ export default function RepositoryRow({
               className="dropdown-content menu menu-sm z-dropdown mb-1 w-60 rounded-box border border-base-300 bg-base-100 shadow-xl"
             >
               <li className="menu-title">{t("manage.repositories.menuGroupManage", "Manage")}</li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => setRenameOpen(true)}
-                  disabled={isBusy || isUnavailable}
-                >
-                  <Pencil size={15} />
-                  {t("manage.repositories.rename", "Rename Repository")}
-                </button>
-              </li>
+              {repository.role !== "primary" ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setRenameOpen(true)}
+                    disabled={isBusy || isUnavailable}
+                  >
+                    <Pencil size={15} />
+                    {t("manage.repositories.rename", "Rename Repository")}
+                  </button>
+                </li>
+              ) : null}
               <li>
                 <button
                   type="button"
@@ -272,7 +269,7 @@ export default function RepositoryRow({
                   </button>
                 </li>
               )}
-              {!repository.isPrimary && (
+              {repository.role !== "primary" && (
                 <>
                   <li className="menu-title">
                     {t("manage.repositories.menuGroupDanger", "Danger zone")}
@@ -381,11 +378,13 @@ export default function RepositoryRow({
         </div>
       ) : null}
 
-      <RenameRepositoryModal
-        repository={repository}
-        isOpen={renameOpen}
-        onClose={() => setRenameOpen(false)}
-      />
+      {repository.role !== "primary" ? (
+        <RenameRepositoryModal
+          repository={repository}
+          isOpen={renameOpen}
+          onClose={() => setRenameOpen(false)}
+        />
+      ) : null}
       <RemoveRepositoryModal
         repository={repository}
         isOpen={removeOpen}

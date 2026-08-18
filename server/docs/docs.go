@@ -6498,6 +6498,14 @@ const docTemplate = `{
                     "inode": {
                         "type": "integer"
                     },
+                    "kind": {
+                        "enum": [
+                            "default",
+                            "external"
+                        ],
+                        "example": "default",
+                        "type": "string"
+                    },
                     "last_coordination": {
                         "type": "string"
                     },
@@ -6546,6 +6554,14 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    },
+                    "role": {
+                        "enum": [
+                            "primary",
+                            "regular"
+                        ],
+                        "example": "primary",
+                        "type": "string"
                     },
                     "target_id": {
                         "type": "string"

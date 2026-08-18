@@ -1,4 +1,5 @@
 import { $api } from "@/lib/http-commons/queryClient";
+import { normalizeRepositoryRootsResponse } from "../model/storageEntities";
 
 export function useRepositoryRoots() {
   return $api.useQuery(
@@ -8,6 +9,7 @@ export function useRepositoryRoots() {
     {
       staleTime: 30_000,
       refetchOnWindowFocus: true,
+      select: normalizeRepositoryRootsResponse,
     },
   );
 }

@@ -15781,6 +15781,11 @@ export interface components {
             effective_uid?: string;
             filesystem?: string;
             inode?: number;
+            /**
+             * @example default
+             * @enum {string}
+             */
+            kind?: "default" | "external";
             last_coordination?: string;
             lock_holder?: string;
             marker_uuid?: string;
@@ -15796,6 +15801,11 @@ export interface components {
             registered_mount_fingerprint?: string;
             removable_likely?: boolean;
             risk_warnings?: string[];
+            /**
+             * @example primary
+             * @enum {string}
+             */
+            role?: "primary" | "regular";
             target_id?: string;
             target_type?: string;
             total_bytes?: number;

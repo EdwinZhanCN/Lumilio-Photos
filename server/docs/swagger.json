@@ -6491,6 +6491,14 @@
                     "inode": {
                         "type": "integer"
                     },
+                    "kind": {
+                        "enum": [
+                            "default",
+                            "external"
+                        ],
+                        "example": "default",
+                        "type": "string"
+                    },
                     "last_coordination": {
                         "type": "string"
                     },
@@ -6539,6 +6547,14 @@
                         },
                         "type": "array",
                         "uniqueItems": false
+                    },
+                    "role": {
+                        "enum": [
+                            "primary",
+                            "regular"
+                        ],
+                        "example": "primary",
+                        "type": "string"
                     },
                     "target_id": {
                         "type": "string"

@@ -25,6 +25,7 @@ import {
   type RepositoryDirectoryNameError,
   type RepositoryNameError,
 } from "../../model/repositorySetup";
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
 
 type CreateRepositoryStep = 0 | 1 | 2 | 3;
 
@@ -414,13 +415,7 @@ export default function AddRepositoryModal({
                         value={root.id}
                         disabled={root.status !== "active" || root.writable === false}
                       >
-                        {root.name}
-                        {root.kind === "default"
-                          ? ` · ${t(
-                              "manage.repositories.storageLocationDefault",
-                              "Default Storage Location",
-                            )}`
-                          : ""}
+                        {getStorageEntityDisplayName(root, t)}
                         {root.status !== "active"
                           ? ` · ${t("manage.repositories.storageLocationOffline", "Offline")}`
                           : ""}
@@ -441,7 +436,9 @@ export default function AddRepositoryModal({
                         <HardDrive size={18} />
                       </span>
                       <div className="min-w-0">
-                        <div className="font-medium">{selectedRoot.name}</div>
+                        <div className="font-medium">
+                          {getStorageEntityDisplayName(selectedRoot, t)}
+                        </div>
                         <div className="mt-0.5 break-all font-mono text-xs text-base-content/55">
                           {selectedRoot.path}
                         </div>
@@ -535,7 +532,7 @@ export default function AddRepositoryModal({
                   />
                   <ReviewRow
                     label={t("manage.repositories.storageLocationLabel", "Storage Location")}
-                    value={selectedRoot?.name || "—"}
+                    value={selectedRoot ? getStorageEntityDisplayName(selectedRoot, t) : "—"}
                     detail={selectedRoot?.path}
                   />
                   <ReviewRow

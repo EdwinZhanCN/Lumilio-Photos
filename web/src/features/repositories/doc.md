@@ -62,17 +62,23 @@ come through the Cloud public entry rather than being reimplemented here.
 ## Data
 
 [useRepositoryOptions](./api/useRepositoryOptions.ts) adapts the server repository list through
-[normalizeRepositoryOptions](./model/repositoryOptions.ts). [useRepositoryRoots](./api/useRepositoryRoots.ts) reads
-admin-visible Storage Locations. [useRepositoryAssetCount](./api/useRepositoryAssetCount.ts) provides the
-row-sized typed asset count.
+[normalizeRepositoryOptions](./model/repositoryOptions.ts). [useRepositoryRoots](./api/useRepositoryRoots.ts) reads and
+normalizes admin-visible Storage Locations. Both expose the discriminated
+[StorageEntity](./types.ts) presentation contract: transport `name` becomes
+explicit `rawName`, while stable Storage Location `kind` and Repository
+`role` determine reserved product names through
+[getStorageEntityDisplayName](./model/storageEntities.ts). UI consumers never infer identity from
+seeded English names. [useRepositoryAssetCount](./api/useRepositoryAssetCount.ts) provides the row-sized
+typed asset count.
 [useNativeHostCapability](./api/useNativeHostActions.ts) gates Desktop handoff entry points and
 [useNativeHostAction](./api/useNativeHostActions.ts) resumes an outstanding task after refresh.
 [useRepositoryCandidates](./api/useRepositoryCandidates.ts) provides the bounded standalone directory
 classification surface.
 [useStorageDiagnostics](./api/useStorageDiagnostics.ts), lifecycle audit, and support-bundle queries
 are exported for the admin-only Server Monitor storage view. Diagnostics
-carry the owning Storage Location id for each repository so the monitor does
-not infer filesystem hierarchy from path strings.
+carry the owning Storage Location id plus Storage Location `kind` or
+Repository `role`, so the monitor neither infers filesystem hierarchy from
+path strings nor renders transport names as product copy.
 
 [useRepositoryScan](./api/useRepositoryScan.ts) starts scans and stack detection.
 [waitForRepositoryScan](./api/waitForRepositoryScan.ts) follows a scan run to a terminal state before

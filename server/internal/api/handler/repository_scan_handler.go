@@ -102,6 +102,7 @@ func (h *RepositoryScanHandler) storageDiagnostics(ctx context.Context, redact b
 	for _, root := range roots {
 		info := storage.InspectStoragePath(root.Path)
 		item := storageDiagnosticDTO("storage_location", root.RootID.String(), "", root.Name, root.Path, string(root.Status), root.RootID.String(), info, redact)
+		item.Kind = string(root.Kind)
 		item.RegisteredMountFingerprint = root.MountFingerprint
 		item.MountFingerprintChanged = root.MountFingerprint != "" && info.MountFingerprint != "" && root.MountFingerprint != info.MountFingerprint
 		if item.MountFingerprintChanged {
@@ -111,7 +112,9 @@ func (h *RepositoryScanHandler) storageDiagnostics(ctx context.Context, redact b
 	}
 	for _, repository := range repositories {
 		info := storage.InspectStoragePath(repository.Path)
-		items = append(items, storageDiagnosticDTO("repository", repository.RepoID.String(), repository.RootID.String(), repository.Name, repository.Path, string(repository.Reachability), repository.RepoID.String(), info, redact))
+		item := storageDiagnosticDTO("repository", repository.RepoID.String(), repository.RootID.String(), repository.Name, repository.Path, string(repository.Reachability), repository.RepoID.String(), info, redact)
+		item.Role = string(repository.Role)
+		items = append(items, item)
 	}
 	return items, nil
 }

@@ -139,6 +139,8 @@ type StorageDiagnosticDTO struct {
 	TargetType                 string     `json:"target_type"`
 	TargetID                   string     `json:"target_id"`
 	ParentTargetID             string     `json:"parent_target_id,omitempty"`
+	Kind                       string     `json:"kind,omitempty" example:"default" enums:"default,external"`
+	Role                       string     `json:"role,omitempty" example:"primary" enums:"primary,regular"`
 	Name                       string     `json:"name"`
 	Path                       string     `json:"path"`
 	CanonicalPath              string     `json:"canonical_path"`

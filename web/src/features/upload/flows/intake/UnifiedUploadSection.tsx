@@ -34,7 +34,7 @@ function UnifiedUploadSection(): React.JSX.Element {
     getRepositoryLabel,
   } = useWorkingRepository();
   const primaryRepository = useMemo(
-    () => repositories.find((repository) => repository.isPrimary),
+    () => repositories.find((repository) => repository.role === "primary"),
     [repositories],
   );
   const uploadTargetRepository = selectedRepository ?? primaryRepository;

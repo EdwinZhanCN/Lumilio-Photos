@@ -1462,7 +1462,6 @@
       "menuGroupManage": "Manage",
       "moreCreateOptions": "More ways to add Repositories",
       "offlineBadge": "Offline",
-      "primaryBadge": "Primary Repository",
       "rebuildLocation": "Rebuild location clusters",
       "rebuildLocationQueued": "Location cluster rebuild queued.",
       "recoveryRequiredBadge": "Recovery required",
@@ -1505,7 +1504,6 @@
       "storageLocationAvailable": "available",
       "storageLocationCapacity": "{{available}} of {{total}} available",
       "storageLocationCapacityUnknown": "Capacity unavailable",
-      "storageLocationDefault": "Default Storage Location",
       "storageLocationEmpty": "No writable location",
       "storageLocationError": "Storage Locations are unavailable.",
       "storageLocationErrorBadge": "Storage Location needs attention",
@@ -1907,7 +1905,6 @@
     },
     "repository": {
       "all": "All Repositories",
-      "primary": "Primary Repository",
       "unavailable": "Repository options unavailable"
     }
   },
@@ -2010,6 +2007,10 @@
       "bulkTitle": "Remove selected faces"
     },
     "unnamed": "Unnamed"
+  },
+  "productTerms": {
+    "defaultStorageLocation": "Default Storage Location",
+    "primaryRepository": "Primary Repository"
   },
   "rating": {
     "none": "No rating",

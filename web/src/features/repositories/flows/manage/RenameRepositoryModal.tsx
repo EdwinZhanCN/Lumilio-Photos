@@ -20,18 +20,18 @@ export default function RenameRepositoryModal({
   const showMessage = useMessage();
   const queryClient = useQueryClient();
   const renameMutation = $api.useMutation("post", "/api/v1/repositories/{id}/rename");
-  const [name, setName] = useState(repository.name);
+  const [name, setName] = useState(repository.rawName);
   const nameError = validateRepositoryName(name);
 
   useEffect(() => {
-    if (isOpen) setName(repository.name);
-  }, [isOpen, repository.name]);
+    if (isOpen) setName(repository.rawName);
+  }, [isOpen, repository.rawName]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (nameError || renameMutation.isPending || name === repository.name) return;
+    if (nameError || renameMutation.isPending || name === repository.rawName) return;
     try {
       await renameMutation.mutateAsync({
         params: { path: { id: repository.id } },
@@ -67,7 +67,7 @@ export default function RenameRepositoryModal({
               <h3 className="text-base font-semibold">
                 {t("manage.repositories.renameTitle", "Rename Repository")}
               </h3>
-              <p className="mt-0.5 text-sm text-base-content/60">{repository.name}</p>
+              <p className="mt-0.5 text-sm text-base-content/60">{repository.rawName}</p>
             </div>
           </div>
           <button
@@ -128,7 +128,9 @@ export default function RenameRepositoryModal({
             <button
               type="submit"
               className="btn btn-primary gap-2"
-              disabled={nameError !== null || name === repository.name || renameMutation.isPending}
+              disabled={
+                nameError !== null || name === repository.rawName || renameMutation.isPending
+              }
             >
               {renameMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs" />

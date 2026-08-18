@@ -1448,7 +1448,6 @@
       "menuGroupManage": "管理",
       "moreCreateOptions": "更多添加资源库的方式",
       "offlineBadge": "离线",
-      "primaryBadge": "主资源库",
       "rebuildLocation": "重建位置聚类",
       "rebuildLocationQueued": "位置聚类重建已加入队列。",
       "recoveryRequiredBadge": "需要恢复",
@@ -1491,7 +1490,6 @@
       "storageLocationAvailable": "可用",
       "storageLocationCapacity": "可用 {{available}}，总计 {{total}}",
       "storageLocationCapacityUnknown": "容量不可用",
-      "storageLocationDefault": "默认存储位置",
       "storageLocationEmpty": "没有可写的位置",
       "storageLocationError": "无法获取存储位置。",
       "storageLocationErrorBadge": "存储位置需要处理",
@@ -1890,7 +1888,6 @@
     },
     "repository": {
       "all": "全部资源库",
-      "primary": "主资源库",
       "unavailable": "资源库选项暂时不可用"
     }
   },
@@ -1988,6 +1985,10 @@
       "bulkTitle": "移除所选人脸"
     },
     "unnamed": "未命名"
+  },
+  "productTerms": {
+    "defaultStorageLocation": "默认存储位置",
+    "primaryRepository": "主资源库"
   },
   "rating": {
     "none": "无评分",

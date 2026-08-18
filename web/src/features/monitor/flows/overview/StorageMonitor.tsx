@@ -11,12 +11,14 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import type { components } from "@/lib/http-commons/schema";
 import { useI18n } from "@/lib/i18n";
-import { useStorageDiagnostics, useStorageSupportBundle } from "@/features/repositories";
+import {
+  getStorageEntityDisplayName,
+  type StorageDiagnostic,
+  useStorageDiagnostics,
+  useStorageSupportBundle,
+} from "@/features/repositories";
 import { StorageStatusDot, StorageTargetDetail, storageItemSeverity } from "./StorageTargetDetail";
-
-type StorageDiagnostic = components["schemas"]["dto.StorageDiagnosticDTO"];
 
 export function StorageMonitor() {
   const { t } = useI18n();
@@ -24,12 +26,12 @@ export function StorageMonitor() {
 
   const hierarchy = useMemo(() => {
     const items = diagnostics.data?.items ?? [];
-    const locations = items.filter((item) => item.target_type === "storage_location");
+    const locations = items.filter((item) => item.entityType === "storage_location");
     const repositoriesByLocation = new Map<string, StorageDiagnostic[]>();
     const unlinkedRepositories: StorageDiagnostic[] = [];
     const locationIDs = new Set(locations.map((location) => location.target_id));
 
-    for (const repository of items.filter((item) => item.target_type === "repository")) {
+    for (const repository of items.filter((item) => item.entityType === "repository")) {
       const parentID = repository.parent_target_id;
       if (!parentID || !locationIDs.has(parentID)) {
         unlinkedRepositories.push(repository);
@@ -146,7 +148,7 @@ export function StorageMonitor() {
                 aria-controls="mobile-storage-targets"
                 onClick={() => setMobileTreeOpen(true)}
               >
-                {selected?.target_type === "repository" ? (
+                {selected?.entityType === "repository" ? (
                   <BookImage className="size-4 shrink-0 text-base-content/55" aria-hidden />
                 ) : (
                   <Folder className="size-4 shrink-0 text-base-content/55" aria-hidden />
@@ -156,7 +158,7 @@ export function StorageMonitor() {
                     {t("monitor.storage.navLabel", "Storage targets")}
                   </span>
                   <span className="block truncate text-sm font-medium">
-                    {selected?.name || t("common.na")}
+                    {selected ? getStorageEntityDisplayName(selected, t) : t("common.na")}
                   </span>
                 </span>
                 <ChevronDown className="size-4 shrink-0 text-base-content/45" aria-hidden />
@@ -189,7 +191,7 @@ export function StorageMonitor() {
                         {t("monitor.storage.navLabel", "Storage targets")}
                       </h2>
                       <p className="mt-0.5 truncate text-xs text-base-content/50">
-                        {selected?.name || t("common.na")}
+                        {selected ? getStorageEntityDisplayName(selected, t) : t("common.na")}
                       </p>
                     </div>
                     <button
@@ -225,7 +227,7 @@ export function StorageMonitor() {
                 <StorageTargetDetail
                   item={selected}
                   repositories={
-                    selected.target_type === "storage_location"
+                    selected.entityType === "storage_location"
                       ? (hierarchy.repositoriesByLocation.get(selected.target_id ?? "") ?? [])
                       : []
                   }
@@ -378,6 +380,7 @@ function TargetNav({
           const repositories = hierarchy.repositoriesByLocation.get(targetID) ?? [];
           const isOpen = openLocations.has(targetID);
           const isSelected = targetID === selectedID;
+          const locationName = getStorageEntityDisplayName(location, t);
           return (
             <li key={targetID}>
               {/* 整行一个按钮：点击 chevron 图标展开/收起，点击其他区域只选中 */}
@@ -396,7 +399,7 @@ function TargetNav({
                     : "hover:bg-base-content/10"
                 }`}
                 aria-expanded={isOpen}
-                aria-label={location.name}
+                aria-label={locationName}
                 aria-current={isSelected ? "true" : undefined}
               >
                 {isOpen ? (
@@ -419,13 +422,14 @@ function TargetNav({
                 ) : (
                   <Folder className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
                 )}
-                <span className="min-w-0 truncate">{location.name}</span>
+                <span className="min-w-0 truncate">{locationName}</span>
                 <StorageStatusDot item={location} className="ml-auto" />
               </button>
               {isOpen && repositories.length > 0 ? (
                 <ul className="ml-4 border-l border-base-content/10 pl-2 lg:ml-3.5">
                   {repositories.map((repository) => {
                     const isRepoSelected = repository.target_id === selectedID;
+                    const repositoryName = getStorageEntityDisplayName(repository, t);
                     return (
                       <li key={repository.target_id}>
                         <button
@@ -439,7 +443,7 @@ function TargetNav({
                           aria-current={isRepoSelected ? "true" : undefined}
                         >
                           <BookImage className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
-                          <span className="min-w-0 truncate">{repository.name}</span>
+                          <span className="min-w-0 truncate">{repositoryName}</span>
                           <StorageStatusDot item={repository} className="ml-auto" />
                         </button>
                       </li>
@@ -460,6 +464,7 @@ function TargetNav({
             </li>
             {hierarchy.unlinkedRepositories.map((repository) => {
               const isRepoSelected = repository.target_id === selectedID;
+              const repositoryName = getStorageEntityDisplayName(repository, t);
               return (
                 <li key={repository.target_id}>
                   <button
@@ -473,7 +478,7 @@ function TargetNav({
                     aria-current={isRepoSelected ? "true" : undefined}
                   >
                     <BookImage className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
-                    <span className="min-w-0 truncate">{repository.name}</span>
+                    <span className="min-w-0 truncate">{repositoryName}</span>
                     <StorageStatusDot item={repository} className="ml-auto" />
                   </button>
                 </li>

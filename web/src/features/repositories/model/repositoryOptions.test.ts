@@ -24,24 +24,24 @@ describe("normalizeRepositoryOptions", () => {
       }),
     ).toEqual([
       {
+        entityType: "repository",
         id: "primary-by-role",
-        name: "Primary",
+        rawName: "Primary",
         path: "/photos/primary",
         role: "primary",
         rootId: "root-1",
         reachability: "offline",
         activity: "scanning",
-        isPrimary: true,
       },
       {
+        entityType: "repository",
         id: "primary-by-flag",
-        name: "",
+        rawName: "",
         path: "",
-        role: "regular",
+        role: "primary",
         rootId: "",
         reachability: "recovery_required",
         activity: "idle",
-        isPrimary: true,
       },
     ]);
   });
