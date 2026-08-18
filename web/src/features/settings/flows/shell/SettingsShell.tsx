@@ -175,7 +175,7 @@ export default function SettingsShell() {
         <div
           role="tablist"
           aria-label={t("settings.title")}
-          className="tabs tabs-box mx-auto max-w-7xl flex-wrap !bg-transparent px-4"
+          className="tabs tabs-box mx-auto max-w-7xl flex-nowrap overflow-x-auto overscroll-x-contain !bg-transparent px-4"
         >
           {tabs.map((tab) => (
             <button
@@ -183,7 +183,7 @@ export default function SettingsShell() {
               type="button"
               role="tab"
               aria-selected={activeTab === tab.key}
-              className={`tab gap-2 ${activeTab === tab.key ? "tab-active" : ""}`}
+              className={`tab shrink-0 gap-2 ${activeTab === tab.key ? "tab-active" : ""}`}
               onClick={() => setActiveTab(tab.key)}
             >
               <tab.icon className="size-4" />
