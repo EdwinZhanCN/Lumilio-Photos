@@ -4911,6 +4911,21 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.LLMProviderDescriptorDTO": {
+                "properties": {
+                    "api_key_required": {
+                        "type": "boolean"
+                    },
+                    "base_url_required": {
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "example": "openai",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.LLMSettingsDTO": {
                 "properties": {
                     "agent_enabled": {
@@ -4930,6 +4945,13 @@ const docTemplate = `{
                     "provider": {
                         "example": "openai",
                         "type": "string"
+                    },
+                    "supported_providers": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.LLMProviderDescriptorDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -8730,13 +8752,6 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "provider": {
-                        "enum": [
-                            "none",
-                            "ark",
-                            "openai",
-                            "deepseek",
-                            "ollama"
-                        ],
                         "type": "string"
                     }
                 },
@@ -9145,12 +9160,6 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "provider": {
-                        "enum": [
-                            "ark",
-                            "openai",
-                            "deepseek",
-                            "ollama"
-                        ],
                         "example": "openai",
                         "type": "string"
                     },

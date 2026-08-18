@@ -3,9 +3,41 @@ package settings
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestSupportedLLMProviders(t *testing.T) {
+	t.Parallel()
+
+	want := []LLMProviderDescriptor{
+		{ID: LLMProviderArk, APIKeyRequired: true},
+		{ID: LLMProviderOpenAI, APIKeyRequired: true},
+		{ID: LLMProviderDeepSeek, APIKeyRequired: true, BaseURLRequired: true},
+		{ID: LLMProviderOllama, BaseURLRequired: true},
+		{ID: LLMProviderClaude, APIKeyRequired: true},
+		{ID: LLMProviderGemini, APIKeyRequired: true},
+		{ID: LLMProviderQwen, APIKeyRequired: true, BaseURLRequired: true},
+		{ID: LLMProviderOpenRouter, APIKeyRequired: true},
+	}
+
+	got := SupportedLLMProviders()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("SupportedLLMProviders() = %#v, want %#v", got, want)
+	}
+	got[0].ID = "mutated"
+	if next := SupportedLLMProviders(); !reflect.DeepEqual(next, want) {
+		t.Fatalf("registry was mutable through its returned slice: %#v", next)
+	}
+
+	for _, descriptor := range want {
+		found, ok := LookupLLMProvider("  " + strings.ToUpper(descriptor.ID) + "  ")
+		if !ok || found != descriptor {
+			t.Fatalf("LookupLLMProvider(%q) = %#v, %t", descriptor.ID, found, ok)
+		}
+	}
+}
 
 func TestLLMConfigurationRequiresExplicitSupportedProvider(t *testing.T) {
 	t.Parallel()
@@ -17,11 +49,17 @@ func TestLLMConfigurationRequiresExplicitSupportedProvider(t *testing.T) {
 	}{
 		{name: "empty provider", cfg: LLM{APIKey: "secret", ModelName: "model"}},
 		{name: "unknown provider", cfg: LLM{Provider: "other", APIKey: "secret", ModelName: "model"}},
+		{name: "ark", cfg: LLM{Provider: "ark", APIKey: "secret", ModelName: "model"}, ok: true},
 		{name: "openai", cfg: LLM{Provider: "openai", APIKey: "secret", ModelName: "model"}, ok: true},
 		{name: "deepseek requires URL", cfg: LLM{Provider: "deepseek", APIKey: "secret", ModelName: "model"}},
 		{name: "deepseek", cfg: LLM{Provider: "deepseek", APIKey: "secret", ModelName: "model", BaseURL: "https://deepseek.example/v1"}, ok: true},
 		{name: "ollama requires URL", cfg: LLM{Provider: "ollama", ModelName: "model"}},
 		{name: "ollama", cfg: LLM{Provider: " OLLAMA ", ModelName: "model", BaseURL: "http://localhost:11434"}, ok: true},
+		{name: "claude", cfg: LLM{Provider: "claude", APIKey: "secret", ModelName: "model"}, ok: true},
+		{name: "gemini", cfg: LLM{Provider: "gemini", APIKey: "secret", ModelName: "model"}, ok: true},
+		{name: "qwen requires URL", cfg: LLM{Provider: "qwen", APIKey: "secret", ModelName: "model"}},
+		{name: "qwen", cfg: LLM{Provider: "qwen", APIKey: "secret", ModelName: "model", BaseURL: "https://dashscope.example/v1"}, ok: true},
+		{name: "openrouter", cfg: LLM{Provider: "openrouter", APIKey: "secret", ModelName: "model"}, ok: true},
 	}
 
 	for _, tt := range tests {

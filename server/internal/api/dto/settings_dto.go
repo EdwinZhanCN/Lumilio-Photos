@@ -5,6 +5,7 @@ import (
 
 	"server/config"
 	"server/internal/service"
+	settingsdomain "server/internal/settings"
 )
 
 type SystemSettingsDTO struct {
@@ -30,11 +31,18 @@ type GeocodingSettingsDTO struct {
 }
 
 type LLMSettingsDTO struct {
-	AgentEnabled     bool   `json:"agent_enabled"`
-	Provider         string `json:"provider" example:"openai"`
-	ModelName        string `json:"model_name" example:"gpt-4.1-mini"`
-	BaseURL          string `json:"base_url,omitempty" example:"https://api.openai.com/v1"`
-	APIKeyConfigured bool   `json:"api_key_configured"`
+	AgentEnabled       bool                       `json:"agent_enabled"`
+	Provider           string                     `json:"provider" example:"openai"`
+	ModelName          string                     `json:"model_name" example:"gpt-4.1-mini"`
+	BaseURL            string                     `json:"base_url,omitempty" example:"https://api.openai.com/v1"`
+	APIKeyConfigured   bool                       `json:"api_key_configured"`
+	SupportedProviders []LLMProviderDescriptorDTO `json:"supported_providers"`
+}
+
+type LLMProviderDescriptorDTO struct {
+	ID              string `json:"id" example:"openai"`
+	APIKeyRequired  bool   `json:"api_key_required"`
+	BaseURLRequired bool   `json:"base_url_required"`
 }
 
 type MLSettingsDTO struct {
@@ -77,7 +85,7 @@ type UpdateGeocodingSettingsDTO struct {
 
 type UpdateLLMSettingsDTO struct {
 	AgentEnabled *bool   `json:"agent_enabled,omitempty"`
-	Provider     *string `json:"provider,omitempty" binding:"omitempty,oneof=none ark openai deepseek ollama"`
+	Provider     *string `json:"provider,omitempty"`
 	ModelName    *string `json:"model_name,omitempty"`
 	BaseURL      *string `json:"base_url,omitempty"`
 	APIKey       *string `json:"api_key,omitempty"`
@@ -95,7 +103,7 @@ type UpdateMLSettingsDTO struct {
 }
 
 type ValidateLLMSettingsRequestDTO struct {
-	Provider        string `json:"provider" binding:"required,oneof=ark openai deepseek ollama" example:"openai"`
+	Provider        string `json:"provider" binding:"required" example:"openai"`
 	ModelName       string `json:"model_name" binding:"required" example:"gpt-4.1-mini"`
 	BaseURL         string `json:"base_url,omitempty" example:"https://api.openai.com/v1"`
 	APIKey          string `json:"api_key,omitempty"`
@@ -169,13 +177,24 @@ func (info *RuntimeInfoDTO) ApplyCertificateRuntime(certificate CertificateRunti
 }
 
 func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
+	providers := settingsdomain.SupportedLLMProviders()
+	providerDTOs := make([]LLMProviderDescriptorDTO, 0, len(providers))
+	for _, provider := range providers {
+		providerDTOs = append(providerDTOs, LLMProviderDescriptorDTO{
+			ID:              provider.ID,
+			APIKeyRequired:  provider.APIKeyRequired,
+			BaseURLRequired: provider.BaseURLRequired,
+		})
+	}
+
 	return SystemSettingsDTO{
 		LLM: LLMSettingsDTO{
-			AgentEnabled:     settings.LLM.AgentEnabled,
-			Provider:         settings.LLM.Provider,
-			ModelName:        settings.LLM.ModelName,
-			BaseURL:          settings.LLM.BaseURL,
-			APIKeyConfigured: settings.LLM.APIKeyConfigured,
+			AgentEnabled:       settings.LLM.AgentEnabled,
+			Provider:           settings.LLM.Provider,
+			ModelName:          settings.LLM.ModelName,
+			BaseURL:            settings.LLM.BaseURL,
+			APIKeyConfigured:   settings.LLM.APIKeyConfigured,
+			SupportedProviders: providerDTOs,
 		},
 		ML: MLSettingsDTO{
 			SemanticEnabled:           settings.ML.SemanticEnabled,

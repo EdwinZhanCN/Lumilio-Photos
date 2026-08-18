@@ -156,26 +156,14 @@ type LLM struct {
 	BaseURL      string
 }
 
-func NormalizeLLMProvider(raw string) string {
-	return strings.ToLower(strings.TrimSpace(raw))
-}
-
-func IsSupportedLLMProvider(provider string) bool {
-	switch NormalizeLLMProvider(provider) {
-	case "ark", "openai", "deepseek", "ollama":
-		return true
-	default:
-		return false
-	}
-}
-
 func (c LLM) EffectiveProvider() string {
 	return NormalizeLLMProvider(c.Provider)
 }
 
 func (c LLM) ValidateConfiguration() error {
 	provider := c.EffectiveProvider()
-	if !IsSupportedLLMProvider(provider) {
+	descriptor, ok := LookupLLMProvider(provider)
+	if !ok {
 		if provider == "" {
 			return fmt.Errorf("llm provider is required")
 		}
@@ -184,15 +172,10 @@ func (c LLM) ValidateConfiguration() error {
 	if strings.TrimSpace(c.ModelName) == "" {
 		return fmt.Errorf("llm model name is required")
 	}
-	if provider == "ollama" || provider == "deepseek" {
-		if strings.TrimSpace(c.BaseURL) == "" {
-			return fmt.Errorf("%s base URL is required", provider)
-		}
-		if provider == "ollama" {
-			return nil
-		}
+	if descriptor.BaseURLRequired && strings.TrimSpace(c.BaseURL) == "" {
+		return fmt.Errorf("%s base URL is required", provider)
 	}
-	if strings.TrimSpace(c.APIKey) == "" {
+	if descriptor.APIKeyRequired && strings.TrimSpace(c.APIKey) == "" {
 		return fmt.Errorf("llm API key is required for provider %q", provider)
 	}
 	return nil

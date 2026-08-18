@@ -18,6 +18,7 @@ import {
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import { SettingsDropdown } from "../../components/SettingsDropdown";
 import { SettingsSaveBar } from "../../components/SettingsSaveBar";
+import type { LLMProvider } from "../../model/llmProviders";
 
 type AgentProvider = AISettingsDraft["llm"]["provider"];
 
@@ -55,12 +56,23 @@ export default function AiTab() {
     saveError,
     justSaved,
     apiKeyConfigured,
+    supportedProviders,
     query: settingsQuery,
     isValidating,
     validateDraft,
   } = useAISettingsDraft();
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [showAPIKey, setShowAPIKey] = useState(false);
+  const providerLabels: Record<LLMProvider, string> = {
+    ark: t("settings.aiSettings.providerOptions.ark", "Ark"),
+    openai: t("settings.aiSettings.providerOptions.openai", "OpenAI"),
+    deepseek: t("settings.aiSettings.providerOptions.deepseek", "DeepSeek"),
+    ollama: t("settings.aiSettings.providerOptions.ollama", "Ollama"),
+    claude: t("settings.aiSettings.providerOptions.claude", "Claude"),
+    gemini: t("settings.aiSettings.providerOptions.gemini", "Gemini"),
+    qwen: t("settings.aiSettings.providerOptions.qwen", "Qwen"),
+    openrouter: t("settings.aiSettings.providerOptions.openrouter", "OpenRouter"),
+  };
 
   useEffect(() => {
     if (justSaved) {
@@ -184,10 +196,10 @@ export default function AiTab() {
               value={draft.llm.provider}
               options={[
                 { value: "none", label: t("settings.aiSettings.providerOptions.unset") },
-                { value: "ark", label: t("settings.aiSettings.providerOptions.ark") },
-                { value: "openai", label: t("settings.aiSettings.providerOptions.openai") },
-                { value: "deepseek", label: t("settings.aiSettings.providerOptions.deepseek") },
-                { value: "ollama", label: t("settings.aiSettings.providerOptions.ollama") },
+                ...supportedProviders.map(({ id }) => ({
+                  value: id,
+                  label: providerLabels[id],
+                })),
               ]}
               onChange={(provider) => {
                 setFeedback(null);

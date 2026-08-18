@@ -1,0 +1,122 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/schema"
+)
+
+type checkpointStore struct{ data map[string][]byte }
+
+func (s *checkpointStore) Get(_ context.Context, key string) ([]byte, bool, error) {
+	data, ok := s.data[key]
+	return append([]byte(nil), data...), ok, nil
+}
+
+func (s *checkpointStore) Set(_ context.Context, key string, data []byte) error {
+	s.data[key] = append([]byte(nil), data...)
+	return nil
+}
+
+type checkpointModel struct{}
+
+func (checkpointModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
+	return nil, errors.New("unexpected Generate call")
+}
+
+func (checkpointModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	return schema.StreamReaderFromArray([]*schema.Message{
+		schema.AssistantMessage("", []schema.ToolCall{{
+			ID: "call-confirm", Type: "function",
+			Function: schema.FunctionCall{Name: "confirm_fixture", Arguments: `{}`},
+		}}),
+	}), nil
+}
+
+func (m checkpointModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	return m, nil
+}
+
+type confirmationTool struct{}
+
+func (confirmationTool) Info(context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{Name: "confirm_fixture", Desc: "requires confirmation"}, nil
+}
+
+func (confirmationTool) InvokableRun(ctx context.Context, _ string, _ ...tool.Option) (string, error) {
+	return "", compose.StatefulInterrupt(ctx, "approval required", "pending action")
+}
+
+func main() {
+	if len(os.Args) != 2 {
+		panic("usage: fixture-generator OUTPUT")
+	}
+	ctx := context.Background()
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name: "confirmation", Description: "checkpoint compatibility seam", Model: checkpointModel{},
+		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
+			Tools: []tool.BaseTool{confirmationTool{}},
+		}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	store := &checkpointStore{data: make(map[string][]byte)}
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{
+		Agent: agent, EnableStreaming: true, CheckPointStore: store,
+	})
+	const checkpointID = "u:7:t:pre-upgrade-confirm"
+	var rootInterruptID string
+	iter := runner.Run(ctx, []*schema.Message{
+		schema.UserMessage("perform confirmed action"),
+	}, adk.WithCheckPointID(checkpointID))
+	for {
+		event, ok := iter.Next()
+		if !ok {
+			break
+		}
+		if event.Err != nil {
+			panic(event.Err)
+		}
+		if event.Action != nil && event.Action.Interrupted != nil {
+			for _, interrupt := range event.Action.Interrupted.InterruptContexts {
+				if interrupt.IsRootCause {
+					rootInterruptID = interrupt.ID
+				}
+			}
+		}
+		if event.Output == nil || event.Output.MessageOutput == nil || event.Output.MessageOutput.MessageStream == nil {
+			continue
+		}
+		stream := event.Output.MessageOutput.MessageStream
+		for {
+			_, recvErr := stream.Recv()
+			if errors.Is(recvErr, io.EOF) {
+				break
+			}
+			if recvErr != nil {
+				panic(recvErr)
+			}
+		}
+		stream.Close()
+	}
+	data := store.data[checkpointID]
+	if len(data) == 0 || rootInterruptID == "" {
+		panic("checkpoint or root interrupt ID was not emitted")
+	}
+	if err := os.WriteFile(os.Args[1], data, 0o644); err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile(os.Args[1]+".root-id", []byte(rootInterruptID+"\n"), 0o644); err != nil {
+		panic(err)
+	}
+	fmt.Printf("wrote Eino v0.9.6 checkpoint: %d bytes\n", len(data))
+}
