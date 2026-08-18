@@ -177,7 +177,9 @@ breaking browse/playback.
    id `{asset_id}#{seq}`, fields `asset_id`, `text` (same CJK tokenization
    strategy as OCR), stored `start_ms`.
 2. Outbox drain worker + queue (`transcript_index`, `MaxWorkers: 1`) mirroring
-   `search_ocr_outbox_worker.go`; startup rebuild parity with the OCR sidecar.
+   `search_ocr_outbox_worker.go`; reuse OCR's mutation-signaled coalescer and
+   one-minute recovery drain rather than adding an unconditional one-second
+   River job; startup rebuild parity with the OCR sidecar.
 3. `SourceTranscript = "transcript"` retriever: max-pool per asset, best
    segment's `start_ms` → `Candidate.BestTsMs`; initial RRF weight equal to
    `SourceOCR`. Wire into aggregate retrievers, `setretrieve` (agent), and

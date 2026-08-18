@@ -304,6 +304,7 @@ func run(
 		}
 	}()
 	ocrIndexWriter := bleveocr.NewWriter(sqlDB, queries, ocrIndex)
+	ocrIndexTrigger := bleveocr.NewOutboxTrigger()
 
 	// River must exist before settings construction: geocoding settings writes
 	// reset location projections and insert the revisioned resolver job through
@@ -411,7 +412,7 @@ func run(
 	})
 	faceService := service.NewFaceService(queries, repositoryFiles, sqlDB)
 
-	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, queries, workers, appLogger, lumenLogger, settingsService, faceService, repositoryFiles)
+	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, queries, workers, appLogger, lumenLogger, settingsService, faceService, repositoryFiles, ocrIndexTrigger)
 	if err != nil {
 		return fmt.Errorf("initialize ML services: %w", err)
 	}
@@ -431,6 +432,7 @@ func run(
 		embeddingService,
 		ocrIndex,
 		queueClient,
+		ocrIndexTrigger,
 		appLogger.Named("asset_service"),
 	)
 	if err != nil {
@@ -646,8 +648,11 @@ func run(
 		&river.PeriodicJobOpts{ID: "schedule_event_rebuilds", RunOnStart: true},
 	))
 	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
-		river.PeriodicInterval(time.Second),
+		river.PeriodicInterval(bleveocr.DefaultOutboxWakeInterval),
 		func() (river.JobArgs, *river.InsertOpts) {
+			if !ocrIndexTrigger.ShouldSchedule(time.Now(), bleveocr.DefaultOutboxRecoveryInterval) {
+				return nil, nil
+			}
 			return jobs.ProcessOCROutboxArgs{}, nil
 		},
 		&river.PeriodicJobOpts{ID: "ocr_index_outbox", RunOnStart: true},
@@ -1026,6 +1031,7 @@ func initMLServices(
 	settingsService service.SettingsService,
 	faceService service.FaceService,
 	repositoryFiles *storage.RepositoryFSFactory,
+	ocrIndexNotifier service.OCRIndexNotifier,
 ) (service.LumenService, service.EmbeddingService, service.ClassifierService, error) {
 	appLogger.Info("initializing ML services", zap.String("operation", "ml.init"))
 
@@ -1045,7 +1051,7 @@ func initMLServices(
 
 	embeddingService := service.NewEmbeddingService(queries, sqlDB)
 	speciesService := service.NewSpeciesService(queries)
-	ocrService := service.NewOCRService(queries, sqlDB)
+	ocrService := service.NewOCRServiceWithNotifier(queries, sqlDB, ocrIndexNotifier)
 	imageLoader := queue.NewDBMLImageLoader(queries, repositoryFiles)
 
 	river.AddWorker[queue.ProcessSemanticArgs](workers, &queue.ProcessSemanticWorker{

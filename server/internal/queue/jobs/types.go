@@ -157,8 +157,9 @@ func (ProcessOcrArgs) InsertOpts() river.InsertOpts {
 	return mlProcessInsertOpts()
 }
 
-// ProcessOCROutboxArgs is the periodic trigger for applying authoritative
-// SQLite OCR mutations to the rebuildable Bleve sidecar.
+// ProcessOCROutboxArgs applies authoritative SQLite OCR mutations to the
+// rebuildable Bleve sidecar. Mutation wakeups are coalesced before insertion;
+// ByPeriod still permits a follower when a previous drain runs across ticks.
 type ProcessOCROutboxArgs struct{}
 
 func (ProcessOCROutboxArgs) Kind() string { return "process_ocr_outbox" }

@@ -224,8 +224,11 @@ absences separated by the configured settle interval.
 - OCR search lives at
   `<sqlite-directory>/indexes/bleve/ocr-v1/`. `ocr_results` and
   `ocr_text_items` remain authoritative; a revisioned SQLite outbox drives
-  Bleve batch updates. Missing, corrupt, mapping-mismatched, and post-restore
-  indexes are deleted and rebuilt before HTTP starts.
+  Bleve batch updates. Successful OCR result, Trash, and restore commits signal
+  a process-local coalescer; its one-second tick inserts a River drain only
+  after a signal, with one unconditional recovery drain per minute and on
+  startup. Missing, corrupt, mapping-mismatched, and post-restore indexes are
+  deleted and rebuilt before HTTP starts.
 - Migrations live in `server/migrations`. The application migration ledger
   records SHA-256 for every applied SQL file; version, name, and checksum must
   continue to match embedded history, so historical migrations are immutable.

@@ -296,6 +296,7 @@ type assetService struct {
 	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error)
 	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
 	eventQueue             *river.Client[*sql.Tx]
+	ocrIndexNotifier       OCRIndexNotifier
 }
 
 func NewAssetService(
@@ -346,10 +347,11 @@ func NewAssetService(
 	return svc, nil
 }
 
-// NewAssetServiceWithQueue is the runtime constructor.  The queue is kept
-// optional so unit tests and embedded callers can still exercise asset CRUD;
-// when present, Event fact invalidation and the deduplicated rebuild enqueue
-// commit in the same SQLite transaction.
+// NewAssetServiceWithQueue is the runtime constructor. The queue and OCR index
+// notifier are kept optional so unit tests and embedded callers can still
+// exercise asset CRUD. Event fact invalidation and its rebuild enqueue commit
+// in the same SQLite transaction; the OCR notifier fires only after commit
+// because the durable outbox owns crash recovery.
 func NewAssetServiceWithQueue(
 	q *repo.Queries,
 	pool *sql.DB,
@@ -357,6 +359,7 @@ func NewAssetServiceWithQueue(
 	e EmbeddingService,
 	ocrIndex *bleveocr.Index,
 	queueClient *river.Client[*sql.Tx],
+	ocrIndexNotifier OCRIndexNotifier,
 	loggers ...*zap.Logger,
 ) (AssetService, error) {
 	created, err := NewAssetService(q, pool, l, e, ocrIndex, loggers...)
@@ -365,6 +368,7 @@ func NewAssetServiceWithQueue(
 	}
 	if concrete, ok := created.(*assetService); ok {
 		concrete.eventQueue = queueClient
+		concrete.ocrIndexNotifier = ocrIndexNotifier
 	}
 	return created, nil
 }
@@ -730,6 +734,9 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit asset Trash transaction: %w", err)
 	}
+	if s.ocrIndexNotifier != nil {
+		s.ocrIndexNotifier.Notify()
+	}
 	return nil
 }
 
@@ -766,6 +773,9 @@ func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit asset restore transaction: %w", err)
+	}
+	if s.ocrIndexNotifier != nil {
+		s.ocrIndexNotifier.Notify()
 	}
 	return nil
 }

@@ -26,9 +26,17 @@ type OCRResultWithItems struct {
 	Items  []repo.OcrTextItem
 }
 
+// OCRIndexNotifier is a best-effort wake hint for the durable OCR index
+// outbox. Implementations may coalesce notifications because the outbox, not
+// the notification, owns recovery after a crash or missed wakeup.
+type OCRIndexNotifier interface {
+	Notify()
+}
+
 type ocrService struct {
-	queries *repo.Queries
-	pool    *sql.DB
+	queries       *repo.Queries
+	pool          *sql.DB
+	indexNotifier OCRIndexNotifier
 }
 
 // NewOCRService creates OCR service instance
@@ -36,6 +44,17 @@ func NewOCRService(queries *repo.Queries, pool *sql.DB) OCRService {
 	return &ocrService{
 		queries: queries,
 		pool:    pool,
+	}
+}
+
+// NewOCRServiceWithNotifier is the runtime constructor. The notifier is kept
+// optional so package tests and embedded callers can exercise OCR persistence
+// without starting the queue runtime.
+func NewOCRServiceWithNotifier(queries *repo.Queries, pool *sql.DB, notifier OCRIndexNotifier) OCRService {
+	return &ocrService{
+		queries:       queries,
+		pool:          pool,
+		indexNotifier: notifier,
 	}
 }
 
@@ -92,6 +111,9 @@ func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrR
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit OCR result transaction: %w", err)
 	}
+	if s.indexNotifier != nil {
+		s.indexNotifier.Notify()
+	}
 	return nil
 }
 
@@ -129,6 +151,9 @@ func (s *ocrService) DeleteOCRResults(ctx context.Context, assetID uuid.UUID) er
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit OCR delete transaction: %w", err)
+	}
+	if s.indexNotifier != nil {
+		s.indexNotifier.Notify()
 	}
 	return nil
 }
