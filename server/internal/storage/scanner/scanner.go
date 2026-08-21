@@ -38,6 +38,8 @@ const (
 	indexStateMissing   = "missing"
 	indexStateAmbiguous = "ambiguous"
 	indexStateDeferred  = "deferred"
+
+	scanTerminalWriteTimeout = 5 * time.Second
 )
 
 type EnqueueResult struct {
@@ -56,6 +58,7 @@ type Scanner struct {
 	cfg              config.RepositoryScanConfig
 	logger           *zap.Logger
 	beforeScanInsert func()
+	beforeReconcile  func()
 }
 
 type scanCounters struct {
@@ -301,7 +304,9 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 	counters, scanRun, scanErr := s.scanRepository(ctx, repository, scanID, startedAt, args.Force)
 	if scanErr != nil {
 		finishedAt := dbtypes.NewTimestamp(time.Now().UTC())
-		_, failErr := s.queries.FailRepositoryScanRun(ctx, repo.FailRepositoryScanRunParams{
+		terminalCtx, cancelTerminalWrite := context.WithTimeout(context.WithoutCancel(ctx), scanTerminalWriteTimeout)
+		defer cancelTerminalWrite()
+		_, failErr := s.queries.FailRepositoryScanRun(terminalCtx, repo.FailRepositoryScanRunParams{
 			ScanID:          scanID,
 			FinishedAt:      finishedAt,
 			DiscoveredCount: counters.discovered,
@@ -694,6 +699,9 @@ func (s *Scanner) scanRepository(
 
 	var completed repo.RepositoryScanRun
 	finishedAt := dbtypes.NewTimestamp(time.Now().UTC())
+	if s.beforeReconcile != nil {
+		s.beforeReconcile()
+	}
 	err = s.database.WithTx(ctx, func(tx *sql.Tx, queries *repo.Queries) error {
 		for _, storagePath := range sortedKeys(upserts) {
 			if _, err := queries.UpsertRepositoryFileObservation(ctx, upsertParams(repository.RepoID, upserts[storagePath], finishedAt)); err != nil {

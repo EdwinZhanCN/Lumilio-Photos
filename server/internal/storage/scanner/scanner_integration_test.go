@@ -89,6 +89,43 @@ func TestScanEnqueueHoldsRepositoryGateAgainstRemoval(t *testing.T) {
 	}
 }
 
+func TestCancelledScanMarksRunFailedAndAllowsNextScan(t *testing.T) {
+	fixture := newScannerFixture(t, 0)
+	ctx, cancel := context.WithCancel(fixture.ctx)
+	fixture.scanner.beforeReconcile = cancel
+
+	err := fixture.scanner.ProcessScanRepository(ctx, jobs.ScanRepositoryArgs{
+		RepositoryID: fixture.repository.RepoID.String(),
+		Mode:         jobs.RepositoryScanModeManual,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled scan error = %v, want context.Canceled", err)
+	}
+	fixture.scanner.beforeReconcile = nil
+
+	failed, err := fixture.scanner.GetLatestScanRun(fixture.ctx, fixture.repository.RepoID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failed.Status != ScanStatusFailed || failed.FinishedAt.Time.IsZero() {
+		t.Fatalf("cancelled scan receipt = %+v, want terminal failed receipt", failed)
+	}
+
+	if err := fixture.scanner.ProcessScanRepository(fixture.ctx, jobs.ScanRepositoryArgs{
+		RepositoryID: fixture.repository.RepoID.String(),
+		Mode:         jobs.RepositoryScanModeManual,
+	}); err != nil {
+		t.Fatalf("scan after cancellation failed: %v", err)
+	}
+	succeeded, err := fixture.scanner.GetLatestScanRun(fixture.ctx, fixture.repository.RepoID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if succeeded.Status != ScanStatusCompleted {
+		t.Fatalf("scan after cancellation receipt = %+v, want completed", succeeded)
+	}
+}
+
 func newScannerFixture(t *testing.T, settleSeconds int) *scannerFixture {
 	t.Helper()
 	ctx := context.Background()

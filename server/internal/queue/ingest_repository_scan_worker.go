@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"server/internal/queue/jobs"
 
@@ -17,6 +18,12 @@ type ScanRepositoryWorker struct {
 	river.WorkerDefaults[ScanRepositoryArgs]
 
 	ProcessScan func(ctx context.Context, args ScanRepositoryArgs) error
+}
+
+// Timeout disables River's fixed job deadline because scan duration depends on
+// repository size. River still cancels the context when the client shuts down.
+func (w *ScanRepositoryWorker) Timeout(*river.Job[ScanRepositoryArgs]) time.Duration {
+	return -1
 }
 
 func (w *ScanRepositoryWorker) Work(ctx context.Context, job *river.Job[ScanRepositoryArgs]) error {
