@@ -36,7 +36,7 @@ func RunSupervisorMode(args []string) (bool, error) {
 		return true, errors.New("Lumen supervisor parent contract is missing")
 	}
 
-	command := exec.Command(hubBinary, "--config", configPath)
+	command := newSupervisedHubCommand(hubBinary, configPath)
 	command.Stdin = nil
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
@@ -71,4 +71,10 @@ func RunSupervisorMode(args []string) (bool, error) {
 		<-done
 		return true, nil
 	}
+}
+
+func newSupervisedHubCommand(hubBinary, configPath string) *exec.Cmd {
+	command := exec.Command(hubBinary, "--config", configPath)
+	configureHiddenProcess(command)
+	return command
 }

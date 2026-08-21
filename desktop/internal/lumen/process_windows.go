@@ -10,8 +10,23 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const createNoWindow = 0x08000000
+
+// configureHiddenProcess prevents console-subsystem children from opening a
+// window when they are launched by the Windows GUI Desktop binary. Preserve
+// existing creation flags because the supervised process also owns a process
+// group used by the lifecycle controller.
+func configureHiddenProcess(command *exec.Cmd) {
+	if command.SysProcAttr == nil {
+		command.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	command.SysProcAttr.HideWindow = true
+	command.SysProcAttr.CreationFlags |= createNoWindow
+}
+
 func configureProcessGroup(command *exec.Cmd) {
-	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP}
+	configureHiddenProcess(command)
+	command.SysProcAttr.CreationFlags |= syscall.CREATE_NEW_PROCESS_GROUP
 }
 
 func attachProcessGroup(command *exec.Cmd) (func() error, error) {
