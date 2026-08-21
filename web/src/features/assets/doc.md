@@ -30,6 +30,7 @@ flowchart TD
     BROWSER --> SOURCE["catalog or pin source"]
     BROWSER --> GALLERY["Justified / Square gallery"]
     GALLERY --> VIEWER["AssetViewer"]
+    VIEWER --> OCR["stored OCR inspection"]
     VIEWER --> EXPORT["AssetExportDialog"]
     VIEWER --> SPECIES["BioCLIP species reference"]
     PICKER["PhotoPicker"] --> SCOPE
@@ -41,9 +42,12 @@ surfaces pass a constraint or source instead. [JustifiedGallery](./flows/browse/
 [SquareGallery](./flows/browse/gallery/SquareGallery/SquareGallery.tsx) share the same browse model and virtualize the mounted
 viewport. [AssetViewer](./flows/viewer/AssetViewer.tsx) keeps the logical primary as the carousel item
 while allowing the active RAW/JPEG physical component to drive metadata and
-actions. [AssetSimilarRail](./flows/viewer/AssetSimilarRail.tsx) previews visually similar media for the
-current asset from the share/export menu; See all opens the main Repository view
-with `?similar=`.
+actions. [FullScreenBasicInfo](./flows/viewer/info/FullScreenBasicInfo.tsx) owns the active PHOTO's bounded relation
+query while its panel is mounted, and [OCRTextSection](./flows/viewer/info/OCRTextSection.tsx) presents stored
+OCR Text Recognition output without triggering inference.
+[AssetSimilarRail](./flows/viewer/AssetSimilarRail.tsx) previews visually similar media for the current
+asset from the share/export menu; See all opens the main Repository view with
+`?similar=`.
 [SearchFAB](./flows/browse/SearchFAB.tsx) defaults to text search. Image mode keeps the same-width
 slot as a repository [PhotoPicker](./picker/PhotoPicker.tsx) primary button and a circular local-file
 control. The text input uses the same height as the FAB close control so the
@@ -70,6 +74,10 @@ visual-search recovery branches on exact Problem type rather than message
 text.
 
 [useAssetMediaItem](./api/useAssetMediaItem.ts) resolves RAW/JPEG and Live Photo components.
+[useAssetOCR](./api/useAssetOCR.ts) reads the generated asset-detail contract with only
+`include_ocr=true`; SQLite relation data remains server state, and changing
+the active physical component rekeys the query instead of copying OCR into
+viewer-local state.
 [useStackCarouselAssets](./api/useStackCarouselAssets.ts) resolves one logical primary per burst/manual
 stack member, and [MediaCompositionBadges](./flows/browse/gallery/media/MediaCompositionBadges.tsx) distinguishes composition
 from stacking. BioCLIP output is normalized by

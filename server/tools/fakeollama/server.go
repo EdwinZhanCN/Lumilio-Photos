@@ -19,6 +19,7 @@ const (
 	plainResponse      = "Deterministic Agent runtime response."
 	confirmationResult = "Deterministic album update completed."
 	rejectionResult    = "Deterministic album update declined."
+	readOCRResult      = "Stored OCR: Lumilio OCR first line / Lumilio OCR second line."
 )
 
 type fixtureScenario struct {
@@ -67,6 +68,8 @@ type fixtureMetrics struct {
 	ConfirmationAdd    uint64 `json:"confirmation_add"`
 	ConfirmationFinal  uint64 `json:"confirmation_final"`
 	ConfirmationReject uint64 `json:"confirmation_rejected"`
+	ReadOCRCall        uint64 `json:"read_ocr_call"`
+	ReadOCRFinal       uint64 `json:"read_ocr_final"`
 	SlowStarted        uint64 `json:"slow_started"`
 	SlowCancelled      uint64 `json:"slow_cancelled"`
 	ProviderErrors     uint64 `json:"provider_errors"`
@@ -82,6 +85,8 @@ type fixtureCounters struct {
 	confirmationAdd    atomic.Uint64
 	confirmationFinal  atomic.Uint64
 	confirmationReject atomic.Uint64
+	readOCRCall        atomic.Uint64
+	readOCRFinal       atomic.Uint64
 	slowStarted        atomic.Uint64
 	slowCancelled      atomic.Uint64
 	providerErrors     atomic.Uint64
@@ -119,6 +124,8 @@ func (s *fixtureServer) metrics() fixtureMetrics {
 		ConfirmationAdd:    s.counters.confirmationAdd.Load(),
 		ConfirmationFinal:  s.counters.confirmationFinal.Load(),
 		ConfirmationReject: s.counters.confirmationReject.Load(),
+		ReadOCRCall:        s.counters.readOCRCall.Load(),
+		ReadOCRFinal:       s.counters.readOCRFinal.Load(),
 		SlowStarted:        s.counters.slowStarted.Load(),
 		SlowCancelled:      s.counters.slowCancelled.Load(),
 		ProviderErrors:     s.counters.providerErrors.Load(),
@@ -170,6 +177,8 @@ func (s *fixtureServer) serveChat(w http.ResponseWriter, r *http.Request) {
 		writeTextStream(w, plainResponse)
 	case "confirm-add-to-album":
 		s.serveConfirmation(w, request, scenario)
+	case "read-ocr":
+		s.serveReadOCR(w, request)
 	case "slow-stream":
 		s.serveSlowStream(w, r.Context())
 	case "provider-error":
@@ -179,6 +188,38 @@ func (s *fixtureServer) serveChat(w http.ResponseWriter, r *http.Request) {
 		})
 	default:
 		s.protocolError(w, http.StatusBadRequest, "unknown fixture scenario")
+	}
+}
+
+func (s *fixtureServer) serveReadOCR(w http.ResponseWriter, request ollamaRequest) {
+	if err := requireTools(request.Tools, "read_ocr"); err != nil {
+		s.protocolError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	refID, err := attachedRefIDFromMessages(request.Messages)
+	if err != nil {
+		s.protocolError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+
+	results := toolResults(request.Messages)
+	switch len(results) {
+	case 0:
+		s.counters.readOCRCall.Add(1)
+		writeToolCall(w, "read_ocr", map[string]any{"ref_id": refID})
+	case 1:
+		if results[0].name != "read_ocr" {
+			s.protocolError(w, http.StatusUnprocessableEntity, "OCR reader tool order mismatch")
+			return
+		}
+		if err := validateReadOCRResult(results[0].content, refID); err != nil {
+			s.protocolError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		s.counters.readOCRFinal.Add(1)
+		writeTextStream(w, readOCRResult)
+	default:
+		s.protocolError(w, http.StatusUnprocessableEntity, "OCR reader scenario has too many tool results")
 	}
 }
 
@@ -379,6 +420,59 @@ func refIDFromResult(content string) (string, error) {
 		return "", errors.New("filter_assets result must contain exactly one asset")
 	}
 	return result.Receipt.RefID, nil
+}
+
+func attachedRefIDFromMessages(messages []ollamaMessage) (string, error) {
+	const prefix = "UNTRUSTED_CONTEXT_DATA_JSON:\n"
+	for _, message := range messages {
+		if !strings.HasPrefix(message.Content, prefix) {
+			continue
+		}
+		var payload struct {
+			AttachedRefs []struct {
+				RefID string `json:"ref_id"`
+				Count int    `json:"count"`
+			} `json:"attached_refs"`
+		}
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(message.Content, prefix)), &payload); err != nil {
+			return "", errors.New("invalid attached context payload")
+		}
+		if len(payload.AttachedRefs) != 1 || payload.AttachedRefs[0].Count != 1 || strings.TrimSpace(payload.AttachedRefs[0].RefID) == "" {
+			return "", errors.New("OCR reader requires exactly one attached asset ref")
+		}
+		return payload.AttachedRefs[0].RefID, nil
+	}
+	return "", errors.New("OCR reader attached context is missing")
+}
+
+func validateReadOCRResult(content, expectedRefID string) error {
+	var result struct {
+		RefID     string `json:"ref_id"`
+		Documents []struct {
+			Position    int      `json:"position"`
+			Filename    string   `json:"filename"`
+			Status      string   `json:"status"`
+			RegionCount int      `json:"region_count"`
+			Lines       []string `json:"lines"`
+			Truncated   bool     `json:"truncated"`
+		} `json:"documents"`
+		Error any `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(content), &result); err != nil {
+		return errors.New("invalid read_ocr result")
+	}
+	if result.Error != nil || result.RefID != expectedRefID || len(result.Documents) != 1 {
+		return errors.New("read_ocr result does not match the attached ref")
+	}
+	document := result.Documents[0]
+	if document.Position != 1 || strings.TrimSpace(document.Filename) == "" || document.Status != "available" || document.RegionCount != 2 || document.Truncated {
+		return errors.New("read_ocr document metadata mismatch")
+	}
+	wantLines := []string{"Lumilio OCR first line", "Lumilio OCR second line"}
+	if len(document.Lines) != len(wantLines) || document.Lines[0] != wantLines[0] || document.Lines[1] != wantLines[1] {
+		return errors.New("read_ocr text order mismatch")
+	}
+	return nil
 }
 
 func mutationOutcomeFromResult(content string) (string, error) {

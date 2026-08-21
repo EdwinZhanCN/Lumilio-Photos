@@ -391,6 +391,16 @@ tools without an external provider or API key. Resume creates a
 completes the awaiting run, activates the replacement, and repoints the thread
 only after Eino accepts the checkpoint.
 
+Agent OCR reads use a bounded observer rather than the search sidecar or HTTP.
+`search_text` uses Bleve only to produce an OCR-matching ref; `read_ocr` accepts
+a non-empty ref of at most two assets and reads authoritative ordered
+`ocr_results` / `ocr_text_items` rows through the owner-bound
+`AuthorizedLibrary`. The structured result restores ref and provider insertion
+order, distinguishes unsupported media, missing results, and stored zero-item
+results, and exposes only sanitized filenames, status, region count, and text
+lines. It never returns UUIDs, repository paths, confidence, geometry, or model
+identity; text is capped per region and across the complete tool response.
+
 The SDK owns the continuous Lumen runtime pipeline: bounded DNS-SD scans,
 strict service correlation, source-owned snapshot reconciliation, gRPC
 transport state, and the in-band capability verdict. Failed scans preserve

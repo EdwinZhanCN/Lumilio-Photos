@@ -54,6 +54,9 @@ type Querier interface {
 	AgentRankAssetIDsByTime(ctx context.Context, arg AgentRankAssetIDsByTimeParams) ([]uuid.UUID, error)
 	// Owner-scoped "recently added" order for Agent refs.
 	AgentRankAssetIDsByUploadTime(ctx context.Context, arg AgentRankAssetIDsByUploadTimeParams) ([]uuid.UUID, error)
+	// read_ocr observer: authoritative OCR result and ordered text rows for a
+	// bounded ref. Go restores ref order and formats per-document statuses.
+	AgentReadOCRDocuments(ctx context.Context, arg AgentReadOCRDocumentsParams) ([]AgentReadOCRDocumentsRow, error)
 	AgentRunHasCommittedEffect(ctx context.Context, arg AgentRunHasCommittedEffectParams) (int64, error)
 	// Applies merged rating/liked/description on top of the existing keeper values.
 	// Rating uses MAX, liked is OR'd, description is set only when keeper currently

@@ -12,6 +12,7 @@ export const AGENT_CONFIRMATION_RESPONSE = "Deterministic album update completed
 export const AGENT_REJECTION_RESPONSE = "Deterministic album update declined.";
 export const AGENT_COMMITTED_RECEIPT = "Added 1 photos to album";
 export const AGENT_REJECTED_RECEIPT = "Album update was not applied: the user declined.";
+export const AGENT_OCR_RESPONSE = "Stored OCR: Lumilio OCR first line / Lumilio OCR second line.";
 export const AGENT_PROVIDER_PRIVATE_MARKER = "fixture-upstream-private-marker";
 
 const scenarioPrefix = "LUMILIO_E2E_SCENARIO:";
@@ -27,13 +28,14 @@ const compose = [
 ];
 
 type Scenario =
-  | { name: "plain" | "slow-stream" | "provider-error" }
+  | { name: "plain" | "slow-stream" | "provider-error" | "read-ocr" }
   | { name: "confirm-add-to-album"; filename: string; album_title: string };
 
 type BrowseResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
 type Album = components["schemas"]["dto.GetAlbumResponseDTO"];
 type AlbumAssets = components["schemas"]["dto.AlbumAssetsResponseDTO"];
 type User = components["schemas"]["dto.UserDTO"];
+type AssetDetail = components["schemas"]["dto.AssetDetailDTO"];
 
 export type AgentModelMetrics = {
   requests_total: number;
@@ -43,6 +45,8 @@ export type AgentModelMetrics = {
   confirmation_add: number;
   confirmation_final: number;
   confirmation_rejected: number;
+  read_ocr_call: number;
+  read_ocr_final: number;
   slow_started: number;
   slow_cancelled: number;
   provider_errors: number;
@@ -55,6 +59,12 @@ export type AgentAlbumFixture = {
   albumTitle: string;
   assetId: string;
   filename: string;
+};
+
+export type AgentOCRFixture = {
+  assetId: string;
+  filename: string;
+  lines: string[];
 };
 
 export type AgentStreamFacts = {
@@ -218,6 +228,58 @@ export async function prepareAgentAlbumFixture(
   };
 }
 
+export async function prepareAgentOCRFixture(
+  workspace: Workspace,
+  identity: string,
+): Promise<AgentOCRFixture> {
+  const filename = `agent-ocr-${workspace.username}-${identity}.jpg`;
+  await setOCREnabled(workspace.token, true);
+  try {
+    await uploadOwnedAsset(workspace, filename);
+    const user = await api<User>("/api/v1/auth/me", { token: workspace.token });
+    if (!user.user_id) throw new Error("agent OCR runtime worker user has no id");
+
+    let assetId = "";
+    await poll(async () => {
+      const response = await api<BrowseResponse>("/api/v1/assets/list", {
+        method: "POST",
+        token: workspace.token,
+        body: JSON.stringify({
+          query: filename,
+          search_type: "filename",
+          filter: { repository_id: workspace.repositoryId },
+          pagination: { limit: 20, offset: 0 },
+          stack_mode: "expanded",
+        }),
+      });
+      const asset = response.items
+        ?.map((item) => item.media_item?.primary_asset)
+        .find((candidate) => candidate?.original_filename === filename);
+      if (asset?.owner_id !== user.user_id) {
+        throw new Error(
+          `agent OCR asset owner ${String(asset?.owner_id)} did not match worker ${user.user_id}`,
+        );
+      }
+      assetId = asset?.asset_id ?? "";
+      return Boolean(assetId);
+    });
+
+    const lines = ["Lumilio OCR first line", "Lumilio OCR second line"];
+    await poll(async () => {
+      const detail = await api<AssetDetail>(
+        `/api/v1/assets/${assetId}?include_albums=false&include_faces=false&include_ocr=true&include_species=false&include_tags=false&include_thumbnails=false`,
+        { token: workspace.token },
+      );
+      const actual = detail.ocr_result?.text_items?.map((item) => item.text_content) ?? [];
+      return actual.length === lines.length && actual.every((line, index) => line === lines[index]);
+    });
+
+    return { assetId, filename, lines };
+  } finally {
+    await setOCREnabled(workspace.token, false);
+  }
+}
+
 export async function albumAssets(token: string, albumId: number): Promise<AlbumAssets> {
   return api<AlbumAssets>(`/api/v1/albums/${albumId}/assets`, { token });
 }
@@ -246,6 +308,14 @@ async function uploadOwnedAsset(workspace: Workspace, filename: string): Promise
   if (!response.ok) {
     throw new Error(`POST /api/v1/assets: ${response.status} ${JSON.stringify(body)}`);
   }
+}
+
+async function setOCREnabled(token: string, enabled: boolean): Promise<void> {
+  await api("/api/v1/settings/system", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ ml: { ocr_enabled: enabled } }),
+  });
 }
 
 async function poll(check: () => Promise<boolean>, timeout = 60_000): Promise<void> {

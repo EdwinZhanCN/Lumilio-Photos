@@ -396,6 +396,14 @@
       "unknown_type": "未知类型",
       "video_title": "视频"
     },
+    "ocr": {
+      "empty": "未识别出文本。",
+      "loadFailed": "无法加载 OCR文字识别结果。",
+      "loading": "正在加载 OCR文字识别结果",
+      "regions_other": "{{count}} 个文本区域",
+      "title": "OCR文字识别",
+      "unavailable": "没有可用的已存储 OCR文字识别结果。"
+    },
     "photoInfoView": {
       "ev_suffix": "EV",
       "exposure_suffix": "秒",

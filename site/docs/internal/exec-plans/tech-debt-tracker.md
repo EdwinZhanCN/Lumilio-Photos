@@ -4,7 +4,7 @@ Keep this list short. Each item must describe current behavior, name a concrete
 owner path, and explain the user or release impact. Completed history belongs in
 the relevant exec plan, not in this file.
 
-Last aligned with the codebase: 2026-08-20.
+Last aligned with the codebase: 2026-08-21.
 
 ## Product paths
 
@@ -20,3 +20,10 @@ Last aligned with the codebase: 2026-08-20.
   effect status and can leave the outcome ambiguous until the user inspects
   the affected resource. Reconcile pending confirmation identity through the
   scoped effect-status endpoint without replaying the mutation.
+- **Populated Person Recognition relations can be dropped by timestamp decoding.**
+  Owner: `server/internal/api/dto/asset_dto.go` and
+  `server/internal/db/repo/queries/relationships.sql`. SQLite relation JSON
+  emits Unix-microsecond integers for face-result timestamps, while
+  `AssetFaceResultDTO` currently unmarshals them directly into `time.Time`.
+  Mirror the internal aggregate conversion now used by OCR and add a focused
+  relation test before relying on `include_faces=true` in a user-facing flow.

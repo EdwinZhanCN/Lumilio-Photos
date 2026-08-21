@@ -669,6 +669,18 @@ type AssetOCRResultDTO struct {
 	TextItems        []AssetOCRTextItemDTO `json:"text_items"`
 }
 
+// assetOCRResultAggregate is the SQLite JSON-aggregate shape. Timestamps are
+// stored as Unix microseconds and must be converted before constructing the
+// RFC3339/time-based public DTO.
+type assetOCRResultAggregate struct {
+	ModelID          string                `json:"model_id"`
+	TotalCount       *int32                `json:"total_count,omitempty"`
+	ProcessingTimeMs *int32                `json:"processing_time_ms,omitempty"`
+	CreatedAt        *int64                `json:"created_at,omitempty"`
+	UpdatedAt        *int64                `json:"updated_at,omitempty"`
+	TextItems        []AssetOCRTextItemDTO `json:"text_items"`
+}
+
 // AssetFaceItemDTO mirrors one detected face produced by GetAssetWithRelations.
 // BoundingBox and Expression are freeform JSON and are left untyped.
 type AssetFaceItemDTO struct {
@@ -824,9 +836,16 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		}
 	}
 	if inc.OCR {
-		var ocr AssetOCRResultDTO
-		if unmarshalJSONColumn(r.OcrResult, &ocr) {
-			detail.OcrResult = &ocr
+		var aggregate assetOCRResultAggregate
+		if unmarshalJSONColumn(r.OcrResult, &aggregate) {
+			detail.OcrResult = &AssetOCRResultDTO{
+				ModelID:          aggregate.ModelID,
+				TotalCount:       aggregate.TotalCount,
+				ProcessingTimeMs: aggregate.ProcessingTimeMs,
+				CreatedAt:        timeFromUnixMicro(aggregate.CreatedAt),
+				UpdatedAt:        timeFromUnixMicro(aggregate.UpdatedAt),
+				TextItems:        aggregate.TextItems,
+			}
 		}
 	}
 	if inc.Faces {
@@ -837,6 +856,14 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 	}
 
 	return detail
+}
+
+func timeFromUnixMicro(value *int64) *time.Time {
+	if value == nil {
+		return nil
+	}
+	converted := time.UnixMicro(*value).UTC()
+	return &converted
 }
 
 func unmarshalJSONColumn(value any, target any) bool {

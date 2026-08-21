@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -219,6 +220,18 @@ func TestReplayFallbackShapesForOtherTasks(t *testing.T) {
 		t.Fatalf("face fallback should be an empty result, got %+v (%s)", faceResult, face.GetResultMime())
 	}
 
+	ocr, err := infer(t, client, types.TaskOCR, []byte{1, 2, 3}, "image/webp")
+	if err != nil {
+		t.Fatalf("OCR fallback: %v", err)
+	}
+	ocrResult := types.OCRV1{}
+	if err := json.Unmarshal(ocr.GetResult(), &ocrResult); err != nil {
+		t.Fatalf("OCR fallback must be valid ocr_v1 JSON: %v", err)
+	}
+	if ocrResult.Count != 2 || len(ocrResult.Items) != 2 || ocrResult.Items[0].Text != "Lumilio OCR first line" {
+		t.Fatalf("OCR fallback should contain ordered deterministic text, got %+v", ocrResult)
+	}
+
 	_, err = infer(t, client, "text_generation", []byte("prompt"), "text/plain")
 	if status.Code(err) != codes.Unimplemented {
 		t.Fatalf("unknown task should stay Unimplemented, got %v", err)
@@ -237,6 +250,25 @@ func TestBuiltinCapabilityWithoutFixtures(t *testing.T) {
 	}
 	if capability.GetServiceName() != types.ServiceSigLIP {
 		t.Fatalf("builtin capability should advertise siglip, got %q", capability.GetServiceName())
+	}
+
+	stream, err := client.StreamCapabilities(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf("stream capabilities: %v", err)
+	}
+	var services []string
+	for {
+		capability, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("receive capability: %v", err)
+		}
+		services = append(services, capability.GetServiceName())
+	}
+	if !slices.Contains(services, types.ServiceOCR) {
+		t.Fatalf("builtin capabilities should advertise OCR, got %v", services)
 	}
 }
 

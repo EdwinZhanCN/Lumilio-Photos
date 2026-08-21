@@ -84,6 +84,12 @@ func TestModeHasTool(t *testing.T) {
 	if !ModeHasTool("organize", "peek") {
 		t.Error("organize should expose peek (place/person grouping verification)")
 	}
+	if !ModeHasTool("analyze", "read_ocr") {
+		t.Error("analyze should expose read_ocr")
+	}
+	if ModeHasTool("review", "read_ocr") {
+		t.Error("review must not expose read_ocr")
+	}
 	if !ModeHasTool("curate", "dedupe") {
 		t.Error("curate should expose dedupe")
 	}

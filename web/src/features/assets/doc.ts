@@ -31,6 +31,7 @@
  *     BROWSER --> SOURCE["catalog or pin source"]
  *     BROWSER --> GALLERY["Justified / Square gallery"]
  *     GALLERY --> VIEWER["AssetViewer"]
+ *     VIEWER --> OCR["stored OCR inspection"]
  *     VIEWER --> EXPORT["AssetExportDialog"]
  *     VIEWER --> SPECIES["BioCLIP species reference"]
  *     PICKER["PhotoPicker"] --> SCOPE
@@ -42,9 +43,12 @@
  * {@link SquareGallery} share the same browse model and virtualize the mounted
  * viewport. {@link AssetViewer} keeps the logical primary as the carousel item
  * while allowing the active RAW/JPEG physical component to drive metadata and
- * actions. {@link AssetSimilarRail} previews visually similar media for the
- * current asset from the share/export menu; See all opens the main Repository view
- * with `?similar=`.
+ * actions. {@link FullScreenBasicInfo} owns the active PHOTO's bounded relation
+ * query while its panel is mounted, and {@link OCRTextSection} presents stored
+ * OCR Text Recognition output without triggering inference.
+ * {@link AssetSimilarRail} previews visually similar media for the current
+ * asset from the share/export menu; See all opens the main Repository view with
+ * `?similar=`.
  * {@link SearchFAB} defaults to text search. Image mode keeps the same-width
  * slot as a repository {@link PhotoPicker} primary button and a circular local-file
  * control. The text input uses the same height as the FAB close control so the
@@ -71,6 +75,10 @@
  * text.
  *
  * {@link useAssetMediaItem} resolves RAW/JPEG and Live Photo components.
+ * {@link useAssetOCR} reads the generated asset-detail contract with only
+ * `include_ocr=true`; SQLite relation data remains server state, and changing
+ * the active physical component rekeys the query instead of copying OCR into
+ * viewer-local state.
  * {@link useStackCarouselAssets} resolves one logical primary per burst/manual
  * stack member, and {@link MediaCompositionBadges} distinguishes composition
  * from stacking. BioCLIP output is normalized by
@@ -88,6 +96,7 @@
  */
 import type { useAssetActions } from "./api/useAssetActions.ts";
 import type { useAssetMediaItem } from "./api/useAssetMediaItem.ts";
+import type { useAssetOCR } from "./api/useAssetOCR.ts";
 import type { useAssetsList } from "./api/useAssetsList.ts";
 import type { usePinAssetsView } from "./api/usePinAssetsView.ts";
 import type { useStackCarouselAssets } from "./api/useStackCarouselAssets.ts";
@@ -108,6 +117,8 @@ import type Assets from "./flows/library/AssetsFlow.tsx";
 import type AssetsTrash from "./flows/trash/AssetsTrashFlow.tsx";
 import type { AssetSimilarRail } from "./flows/viewer/AssetSimilarRail.tsx";
 import type AssetViewer from "./flows/viewer/AssetViewer.tsx";
+import type FullScreenBasicInfo from "./flows/viewer/info/FullScreenBasicInfo.tsx";
+import type { OCRTextSection } from "./flows/viewer/info/OCRTextSection.tsx";
 import type { SpeciesReferenceTrigger } from "./flows/viewer/SpeciesReferenceTrigger.tsx";
 import type { parseSpeciesPrediction } from "./flows/viewer/fieldGuide.ts";
 import type {

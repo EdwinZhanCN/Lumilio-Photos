@@ -11,6 +11,10 @@ import { assetToPhotoLocation } from "../../../map/assetLocation";
 import { formatCaptureTime } from "@/lib/format/dateTime";
 import type { Asset, PhotoSpecificMetadata } from "@/lib/http-commons";
 import { isPhotoMetadata } from "@/lib/http-commons";
+import type { components } from "@/lib/http-commons/schema.d.ts";
+import { OCRTextSection } from "./OCRTextSection";
+
+type OCRResult = components["schemas"]["dto.AssetOCRResultDTO"];
 
 interface PhotoInfoViewProps {
   asset: Asset;
@@ -18,6 +22,10 @@ interface PhotoInfoViewProps {
   onClose: () => void;
   onExtractExif: () => void;
   isLoadingExif: boolean;
+  ocrResult?: OCRResult;
+  isLoadingOCR: boolean;
+  ocrError: unknown;
+  onRetryOCR: () => void;
 }
 
 export default function PhotoInfoView({
@@ -26,6 +34,10 @@ export default function PhotoInfoView({
   onClose,
   onExtractExif,
   isLoadingExif,
+  ocrResult,
+  isLoadingOCR,
+  ocrError,
+  onRetryOCR,
 }: PhotoInfoViewProps) {
   const { t } = useI18n();
   const [isPending, startTransition] = useTransition();
@@ -241,6 +253,13 @@ export default function PhotoInfoView({
                 className="text-sm min-h-[1.5rem]"
               />
             </div>
+
+            <OCRTextSection
+              result={ocrResult}
+              isLoading={isLoadingOCR}
+              error={ocrError}
+              onRetry={onRetryOCR}
+            />
 
             {/* GPS Coordinates and Location */}
             {hasGPS && (

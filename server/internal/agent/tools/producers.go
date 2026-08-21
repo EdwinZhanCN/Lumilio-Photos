@@ -133,7 +133,7 @@ func RegisterSearchText() {
 		Name: "search_text",
 		Desc: "Find all photos containing specific text (signs, menus, documents, screenshots) via OCR " +
 			"full-text search. Text matching defines membership, so the ref is the complete matching set, " +
-			"ordered by relevance.",
+			"ordered by relevance. Use read_ocr on a narrowed ref to read the stored OCR Text Recognition output.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {

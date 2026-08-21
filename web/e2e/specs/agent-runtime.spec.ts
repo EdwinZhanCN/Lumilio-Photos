@@ -6,6 +6,7 @@ import {
   AGENT_COMMITTED_RECEIPT,
   AGENT_CONFIRMATION_RESPONSE,
   AGENT_FIXTURE_MODEL,
+  AGENT_OCR_RESPONSE,
   AGENT_PLAIN_RESPONSE,
   AGENT_PROVIDER_PRIVATE_MARKER,
   AGENT_REJECTED_RECEIPT,
@@ -18,6 +19,7 @@ import {
   albumAssets,
   e2eServerLogsSince,
   prepareAgentAlbumFixture,
+  prepareAgentOCRFixture,
 } from "../support/agentRuntime";
 import { api } from "../support/api";
 import { t } from "../support/i18n";
@@ -97,6 +99,65 @@ test("@agent-runtime context-free chat crosses the real keyless SSE runtime", as
   expect(after.plain_completed).toBe(before.plain_completed + 1);
   expect(after.auth_rejections).toBe(before.auth_rejections);
   expect(after.protocol_errors).toBe(before.protocol_errors);
+});
+
+test("@agent-runtime viewer context reads stored OCR without crossing owners", async ({
+  page,
+  runtimeWorkspace: workspace,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const fixture = await prepareAgentOCRFixture(
+    workspace,
+    `${Date.now()}-${testInfo.repeatEachIndex}-${testInfo.retry}`,
+  );
+  const before = await agentModelMetrics();
+
+  await new LoginPage(page).signIn(workspace.username, workspace.password);
+  await page.goto(`/assets/${fixture.assetId}`);
+  const askFromViewer = page.getByRole("button", {
+    name: t("lumilio.viewer.ask"),
+    exact: true,
+  });
+  await expect(askFromViewer).toBeVisible({ timeout: 30_000 });
+  await askFromViewer.click();
+  await expect(page.getByText(t("lumilio.context.viewing"), { exact: true })).toBeVisible();
+
+  const chatResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/v1/agent/chat",
+  );
+  await page.locator("textarea").fill(agentScenarioPrompt({ name: "read-ocr" }));
+  await page.getByRole("button", { name: t("lumilio.input.send"), exact: true }).click();
+
+  const response = await chatResponse;
+  expect(response.status()).toBe(200);
+  await expect(page.getByText(AGENT_OCR_RESPONSE, { exact: true })).toBeVisible();
+  const afterRead = await agentModelMetrics();
+  expect(afterRead.read_ocr_call).toBe(before.read_ocr_call + 1);
+  expect(afterRead.read_ocr_final).toBe(before.read_ocr_final + 1);
+  expect(afterRead.protocol_errors).toBe(before.protocol_errors);
+
+  const other = await provisionWorkspace(workspace.runtimeIndex + 1);
+  const crossOwner = await agentAPIResponse(other.token, "/api/v1/agent/chat", {
+    method: "POST",
+    body: {
+      query: agentScenarioPrompt({ name: "read-ocr" }),
+      mode: "free",
+      context: [
+        {
+          type: "viewing",
+          label: t("lumilio.context.viewing"),
+          asset_ids: [fixture.assetId],
+        },
+      ],
+    },
+  });
+  expect(crossOwner.status).not.toBe(200);
+  expect(await crossOwner.text()).not.toContain(fixture.lines.join(" "));
+  const afterIsolationAttempt = await agentModelMetrics();
+  expect(afterIsolationAttempt.read_ocr_call).toBe(afterRead.read_ocr_call);
+  expect(afterIsolationAttempt.read_ocr_final).toBe(afterRead.read_ocr_final);
 });
 
 test("@agent-runtime approved album mutation commits exactly once through resume", async ({

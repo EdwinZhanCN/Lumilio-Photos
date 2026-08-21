@@ -215,6 +215,12 @@ func (l *AuthorizedLibrary) InspectAssets(ctx context.Context, ids []uuid.UUID) 
 	})
 }
 
+func (l *AuthorizedLibrary) ReadOCRDocuments(ctx context.Context, ids []uuid.UUID) ([]repo.AgentReadOCRDocumentsRow, error) {
+	return l.queries.AgentReadOCRDocuments(ctx, repo.AgentReadOCRDocumentsParams{
+		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,
+	})
+}
+
 func (l *AuthorizedLibrary) PeekAssets(ctx context.Context, ids []uuid.UUID) ([]repo.AgentPeekAssetsRow, error) {
 	return l.queries.AgentPeekAssets(ctx, repo.AgentPeekAssetsParams{
 		AssetIds: dbtypes.UUIDsJSONParam(ids), UserID: &l.userID,

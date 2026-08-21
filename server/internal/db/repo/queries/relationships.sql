@@ -129,7 +129,7 @@ SELECT
                     SELECT ocr_ti.*
                     FROM ocr_text_items ocr_ti
                     WHERE ocr_ti.asset_id = a.asset_id
-                    ORDER BY ocr_ti.confidence DESC, ocr_ti.text_length DESC, ocr_ti.id DESC
+                    ORDER BY ocr_ti.id ASC
                 ) AS ordered
             ), '[]')
         )
