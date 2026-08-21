@@ -324,6 +324,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
+                /** @description Missing or stale confirmation */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
                 /** @description Internal server error */
                 500: {
                     headers: {

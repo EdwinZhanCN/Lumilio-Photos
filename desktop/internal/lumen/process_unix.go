@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+func configureHiddenProcess(*exec.Cmd) {}
+
 func configureProcessGroup(command *exec.Cmd) {
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }

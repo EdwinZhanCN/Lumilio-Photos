@@ -132,6 +132,7 @@ jobs:
                           - 'web/e2e/pages/**'
                           - 'web/e2e/support/**'
                           - 'web/e2e/specs/agent-trust.spec.ts'
+                          - 'web/e2e/specs/agent-runtime.spec.ts'
                           - 'web/src/app/**'
                           - 'web/src/components/assistant/**'
                           - 'web/src/features/auth/modules/access/**'
@@ -146,6 +147,8 @@ jobs:
                           - 'server/internal/api/dto/capabilities_dto.go'
                           - 'server/internal/settings/**'
                           - 'server/internal/service/settings_service*.go'
+                          - 'server/internal/llm/**'
+                          - 'server/tools/fakeollama/**'
                           - 'server/migrations/**'
 
                       video_e2e:
@@ -369,6 +372,10 @@ jobs:
             - name: Run Lumilio Agent trust-contract regression
               if: needs.changes.outputs.agent_e2e == 'true'
               run: task web:test:agent-trust
+
+            - name: Run Lumilio Agent runtime regression
+              if: needs.changes.outputs.agent_e2e == 'true'
+              run: task web:test:agent-runtime
 
             - name: Run video semantic regression
               if: needs.changes.outputs.video_e2e == 'true'

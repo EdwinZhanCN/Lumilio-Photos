@@ -66,6 +66,7 @@ Each regression slice is one Task target wrapping a Playwright tag:
 | `task web:test:auth-hardening` | `@auth-hardening` | |
 | `task web:test:auth-totp` | `@auth-totp` | runs **before** seeding: the browser must own the first-admin ceremony on a fresh instance |
 | `task web:test:agent-trust` | `@agent-trust` | deterministic agent trust contract |
+| `task web:test:agent-runtime` | `@agent-runtime` | keyless fake Ollama through real SSE, SQLite, tools, confirmation, cancel, and recovery; one worker, but a distinct user/repository per test and repeat |
 | `task web:test:video-semantic` | `@video-regression` | video-semantic seed profile; asserts fakelumen metrics |
 | `task web:test:backup-recovery` | `@backup-recovery` | |
 
@@ -92,8 +93,22 @@ same `web:*` targets — there are no `ci:web:e2e:*` wrappers.
   (`LUMILIO_E2E_LUMEN_METRICS_URL`). `video-semantic-regression.spec.ts`
   waits on `semantic_image` counts; a recording miss that falls back to the
   builtin vector still increments those counters.
+- The shared seed configures the keyless `ollama` provider at the internal
+  `http://agent-model-fixture:11434` address with model
+  `lumilio-agent-e2e-v1`. Do not supply an API key. The fixture rejects provider
+  authentication headers and exposes only bounded counters at
+  `http://127.0.0.1:16659/metrics`
+  (`LUMILIO_E2E_AGENT_MODEL_METRICS_URL`). A ready Server does not prove this
+  contract by itself: the runtime slice also checks the real capabilities and
+  settings responses.
+- For Agent runtime failures, inspect both `lumilio` and
+  `agent-model-fixture` with `vp run e2e:logs`. A fixture `protocol_errors`
+  increment means the pinned Eino Ollama message/tool dialect or scenario
+  order drifted; an `auth_rejections` increment means a credential crossed the
+  keyless boundary. The fixture never logs request bodies.
 
 ## Report
 
 Report the slice(s) run, the stack state left behind (`up` or torn down),
-any seed profile used, and whether fakelumen was in replay or record mode.
+any seed profile used, whether fakelumen was in replay or record mode, and for
+`@agent-runtime` that the keyless fake Ollama fixture was used.

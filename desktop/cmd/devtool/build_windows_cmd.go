@@ -139,7 +139,7 @@ func collectWindowsDLLs(ctx context.Context, binary, dest string) error {
 			continue
 		}
 		seen[p] = true
-		u, err := outputCmd(ctx, "", nil, "cygpath", "-u", p)
+		u, err := outputCmd(ctx, "", nil, "cygpath", "-w", p)
 		if err != nil {
 			continue
 		}

@@ -18,7 +18,7 @@ import {
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import { SettingsDropdown } from "../../components/SettingsDropdown";
 import { SettingsSaveBar } from "../../components/SettingsSaveBar";
-import type { LLMProvider } from "../../model/llmProviders";
+import { findProviderDescriptor, type LLMProvider } from "../../model/llmProviders";
 
 type AgentProvider = AISettingsDraft["llm"]["provider"];
 
@@ -152,8 +152,16 @@ export default function AiTab() {
     );
   }
 
+  const selectedProviderDescriptor = findProviderDescriptor(supportedProviders, draft.llm.provider);
+
   return (
-    <div className="w-full space-y-8 lg:space-y-10">
+    <form
+      className="w-full space-y-8 lg:space-y-10"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleValidate();
+      }}
+    >
       {feedback && (
         <div
           className={`rounded-xl px-4 py-3 text-sm ${
@@ -249,6 +257,7 @@ export default function AiTab() {
             className="input input-bordered input-sm mt-2 w-full"
             autoComplete="off"
             spellCheck={false}
+            required={selectedProviderDescriptor?.baseURLRequired}
             value={draft.llm.baseURL}
             onChange={(event) => {
               setFeedback(null);
@@ -256,7 +265,12 @@ export default function AiTab() {
             }}
           />
           <p className="mt-1.5 text-xs text-base-content/55">
-            {t("settings.aiSettings.baseUrlDescription")}
+            {selectedProviderDescriptor?.baseURLRequired
+              ? t(
+                  "settings.aiSettings.baseUrlRequiredDescription",
+                  "Required for the selected provider.",
+                )
+              : t("settings.aiSettings.baseUrlDescription")}
           </p>
         </SettingsBlock>
         <SettingsBlock>
@@ -376,16 +390,11 @@ export default function AiTab() {
           reset();
         }}
         extraAction={
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={isBusy}
-            onClick={() => void handleValidate()}
-          >
+          <button type="submit" className="btn btn-ghost btn-sm" disabled={isBusy}>
             {isValidating ? t("common.loading") : t("settings.aiSettings.validate")}
           </button>
         }
       />
-    </div>
+    </form>
   );
 }

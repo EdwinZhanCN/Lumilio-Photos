@@ -6,6 +6,7 @@ sql:
       # catalog; migration files are runtime assets, not query inputs.
       schema:
           - "migrations/000009_auth_security_baseline.up.sql"
+          - "migrations/000010_agent_resume_preparation.up.sql"
       gen:
           go:
               package: "repo"

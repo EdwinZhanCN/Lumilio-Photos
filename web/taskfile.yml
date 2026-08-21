@@ -129,6 +129,14 @@ tasks:
       - task: e2e:seed
       - vp run e2e:test --grep @agent-trust --workers=1
 
+  test:agent-runtime:
+    desc: Run the keyless real Lumilio Agent runtime regression
+    env:
+      CI: "1"
+    cmds:
+      - task: e2e:seed
+      - vp run e2e:test --grep @agent-runtime --workers=1
+
   test:backup-recovery:
     desc: Run the database backup and recovery regression
     env:

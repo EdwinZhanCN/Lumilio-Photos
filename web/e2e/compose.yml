@@ -1,6 +1,18 @@
 name: lumilio-photos-e2e
 
 services:
+  agent-model-fixture:
+    build:
+      context: ../..
+      dockerfile: web/e2e/support/fakeollama.Dockerfile
+    ports:
+      - "127.0.0.1:${LUMILIO_E2E_AGENT_MODEL_PORT:-16659}:11434"
+    healthcheck:
+      test: ["CMD", "/fakeollama", "-health-check", "http://127.0.0.1:11434/healthz"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
   lumen-fixture:
     build:
       context: ../..
@@ -20,6 +32,8 @@ services:
       secrets:
         - npmrc
     depends_on:
+      agent-model-fixture:
+        condition: service_healthy
       lumen-fixture:
         condition: service_healthy
     volumes:

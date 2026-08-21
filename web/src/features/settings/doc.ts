@@ -19,8 +19,11 @@
  * and semantic, video-semantic, BioCLIP, OCR, and face switches. Its provider
  * dropdown and required-field checks consume the Server-advertised descriptor
  * contract through {@link normalizeProviderDescriptors}; the Web keeps only
- * the exhaustive localized label boundary for known product IDs. Server facts
- * remain Query data and are not copied into the preferences store.
+ * the exhaustive localized label boundary for known product IDs. Optional
+ * endpoints remain empty so the pinned provider adapter applies its
+ * deterministic default; the Web does not duplicate provider endpoint
+ * defaults. Server facts remain Query data and are not copied into the
+ * preferences store.
  * {@link useGeocodingSettingsDraft} gives the Server tab an explicit local
  * draft for the provider, endpoint, language, and User-Agent aggregate.
  *

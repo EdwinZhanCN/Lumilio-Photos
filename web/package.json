@@ -32,6 +32,7 @@
     "test:auth-hardening": "vp run e2e:test --grep @auth-hardening --workers=1",
     "test:auth-totp": "vp run e2e:test --grep @auth-totp --workers=1",
     "test:agent-trust": "vp run e2e:test --grep @agent-trust --workers=1",
+    "test:agent-runtime": "vp run e2e:test --grep @agent-runtime --workers=1",
     "test:video-semantic": "vp run e2e:test --grep @video-regression --workers=1",
     "test:backup-recovery": "vp run e2e:test --grep @backup-recovery --workers=1",
     "test:bundle": "vp build && node scripts/check-bundle-budget.ts",

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import { userEvent } from "vitest/browser";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
 import { t } from "@test/i18n";
@@ -17,7 +18,7 @@ const settingsResponse = {
     supported_providers: [
       { id: "ark", api_key_required: true, base_url_required: false },
       { id: "openai", api_key_required: true, base_url_required: false },
-      { id: "deepseek", api_key_required: true, base_url_required: true },
+      { id: "deepseek", api_key_required: true, base_url_required: false },
       { id: "ollama", api_key_required: false, base_url_required: true },
       { id: "claude", api_key_required: true, base_url_required: false },
       { id: "gemini", api_key_required: true, base_url_required: false },
@@ -78,6 +79,9 @@ describe("AiTab provider contract", () => {
       .element(screen.getByRole("button", { name: "future-provider" }))
       .not.toBeInTheDocument();
     await screen.getByRole("button", { name: "Qwen" }).click();
+    await expect
+      .element(screen.getByText(t("settings.aiSettings.baseUrlRequiredDescription")))
+      .toBeVisible();
     await screen.getByLabelText(t("settings.aiSettings.modelName")).fill("qwen-plus");
     await screen
       .getByLabelText(t("settings.aiSettings.baseUrl"))
@@ -99,5 +103,43 @@ describe("AiTab provider contract", () => {
     await expect
       .element(screen.getByText(t("settings.aiSettings.validationSuccess")))
       .toBeVisible();
+  });
+
+  it("uses DeepSeek's adapter endpoint and submits credentials through the form", async () => {
+    let validationBody: unknown;
+    worker.use(
+      http.get("*/api/v1/settings/system", () => HttpResponse.json(settingsResponse)),
+      http.post("*/api/v1/settings/system/validate-llm", async ({ request }) => {
+        validationBody = await request.json();
+        return HttpResponse.json({ valid: true });
+      }),
+    );
+
+    const screen = await renderWithProviders(<AiTab />);
+    const providerControl = screen.getByRole("button", {
+      name: t("settings.aiSettings.provider"),
+    });
+    await providerControl.click();
+    await screen.getByRole("button", { name: "DeepSeek" }).click();
+    await expect
+      .element(screen.getByText(t("settings.aiSettings.baseUrlDescription")))
+      .toBeVisible();
+    await screen.getByLabelText(t("settings.aiSettings.modelName")).fill("deepseek-v4-flash");
+    const apiKey = screen.getByRole("textbox", {
+      name: t("settings.aiSettings.apiKey"),
+      exact: true,
+    });
+    await apiKey.fill("draft-secret");
+    await userEvent.keyboard("{Enter}");
+
+    await vi.waitFor(() => {
+      expect(validationBody).toEqual({
+        provider: "deepseek",
+        model_name: "deepseek-v4-flash",
+        base_url: "",
+        api_key: "draft-secret",
+        use_stored_api_key: false,
+      });
+    });
   });
 });

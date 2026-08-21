@@ -100,7 +100,7 @@ func reconcileSetupConfig(ctx context.Context, hubBinary string, intent SetupInt
 }
 
 func executeConfigRenderer(ctx context.Context, hubBinary string, intent SetupIntent) ([]byte, error) {
-	command := exec.CommandContext(ctx, hubBinary, configRenderArgs(intent)...)
+	command := newConfigRendererCommand(ctx, hubBinary, intent)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	output, err := command.Output()
@@ -112,6 +112,12 @@ func executeConfigRenderer(ctx context.Context, hubBinary string, intent SetupIn
 		return nil, fmt.Errorf("render managed Lumen config with %s: %s", filepath.Base(hubBinary), message)
 	}
 	return output, nil
+}
+
+func newConfigRendererCommand(ctx context.Context, hubBinary string, intent SetupIntent) *exec.Cmd {
+	command := exec.CommandContext(ctx, hubBinary, configRenderArgs(intent)...)
+	configureHiddenProcess(command)
+	return command
 }
 
 func configRenderArgs(intent SetupIntent) []string {

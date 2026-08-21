@@ -79,6 +79,7 @@ type AgentRun struct {
 	FinishedAt        dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
 	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	ActivationState   string            `db:"activation_state" json:"activation_state"`
 }
 
 type AgentThread struct {
