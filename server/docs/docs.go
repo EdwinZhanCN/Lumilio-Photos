@@ -9998,6 +9998,16 @@ const docTemplate = `{
                         },
                         "description": "Unauthorized"
                     },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Missing or stale confirmation"
+                    },
                     "500": {
                         "content": {
                             "application/problem+json": {

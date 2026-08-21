@@ -96,6 +96,7 @@ func (q *Queries) CancelPendingAgentEffects(ctx context.Context, arg CancelPendi
 const clearAwaitingAgentRun = `-- name: ClearAwaitingAgentRun :exec
 UPDATE agent_runs
 SET status = 'completed',
+    activation_state = 'terminal',
     finished_at = COALESCE(finished_at, ?1),
     updated_at = ?1
 WHERE run_id = ?2
@@ -129,7 +130,7 @@ VALUES (
     ?1, ?2, ?3, 'running',
     ?4, ?5, ?6
 )
-RETURNING run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at
+RETURNING run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at, activation_state
 `
 
 type CreateAgentRunParams struct {
@@ -161,6 +162,7 @@ func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) 
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ActivationState,
 	)
 	return i, err
 }
@@ -237,6 +239,53 @@ func (q *Queries) CreatePendingAgentEffect(ctx context.Context, arg CreatePendin
 	return i, err
 }
 
+const createPreparedAgentRun = `-- name: CreatePreparedAgentRun :one
+INSERT INTO agent_runs (
+    run_id, user_id, thread_id, status, started_at, created_at, updated_at,
+    activation_state
+)
+VALUES (
+    ?1, ?2, ?3, 'running',
+    ?4, ?5, ?6,
+    'prepared_resume'
+)
+RETURNING run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at, activation_state
+`
+
+type CreatePreparedAgentRunParams struct {
+	RunID     uuid.UUID         `db:"run_id" json:"run_id"`
+	UserID    int32             `db:"user_id" json:"user_id"`
+	ThreadID  string            `db:"thread_id" json:"thread_id"`
+	StartedAt dbtypes.Timestamp `db:"started_at" json:"started_at"`
+	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreatePreparedAgentRun(ctx context.Context, arg CreatePreparedAgentRunParams) (AgentRun, error) {
+	row := q.db.QueryRowContext(ctx, createPreparedAgentRun,
+		arg.RunID,
+		arg.UserID,
+		arg.ThreadID,
+		arg.StartedAt,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i AgentRun
+	err := row.Scan(
+		&i.RunID,
+		&i.UserID,
+		&i.ThreadID,
+		&i.Status,
+		&i.CancelRequestedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ActivationState,
+	)
+	return i, err
+}
+
 const deleteAgentThreadRefs = `-- name: DeleteAgentThreadRefs :exec
 DELETE FROM agent_refs
 WHERE user_id = ?1 AND thread_id = ?2
@@ -299,6 +348,10 @@ func (q *Queries) DeleteTerminalPendingAgentEffects(ctx context.Context, arg Del
 const finishAgentRun = `-- name: FinishAgentRun :exec
 UPDATE agent_runs
 SET status = ?1,
+    activation_state = CASE
+        WHEN ?1 IN ('cancelled', 'completed', 'failed') THEN 'terminal'
+        ELSE activation_state
+    END,
     finished_at = CASE
         WHEN ?1 IN ('cancelled', 'completed', 'failed')
             THEN COALESCE(finished_at, ?2)
@@ -368,7 +421,7 @@ func (q *Queries) FinishAgentThread(ctx context.Context, arg FinishAgentThreadPa
 }
 
 const getActiveAgentRun = `-- name: GetActiveAgentRun :one
-SELECT r.run_id, r.user_id, r.thread_id, r.status, r.cancel_requested_at, r.started_at, r.finished_at, r.created_at, r.updated_at
+SELECT r.run_id, r.user_id, r.thread_id, r.status, r.cancel_requested_at, r.started_at, r.finished_at, r.created_at, r.updated_at, r.activation_state
 FROM agent_runs r
 JOIN agent_threads t
   ON t.user_id = r.user_id
@@ -397,6 +450,7 @@ func (q *Queries) GetActiveAgentRun(ctx context.Context, arg GetActiveAgentRunPa
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ActivationState,
 	)
 	return i, err
 }
@@ -455,7 +509,7 @@ func (q *Queries) GetAgentRef(ctx context.Context, arg GetAgentRefParams) (Agent
 }
 
 const getAgentRun = `-- name: GetAgentRun :one
-SELECT run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at FROM agent_runs
+SELECT run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at, activation_state FROM agent_runs
 WHERE run_id = ?1 AND user_id = ?2 AND thread_id = ?3
 `
 
@@ -478,6 +532,7 @@ func (q *Queries) GetAgentRun(ctx context.Context, arg GetAgentRunParams) (Agent
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ActivationState,
 	)
 	return i, err
 }
@@ -651,7 +706,7 @@ WHERE run_id = ?2
   AND user_id = ?3
   AND thread_id = ?4
   AND status IN ('running', 'cancel_requested', 'awaiting_confirmation')
-RETURNING run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at
+RETURNING run_id, user_id, thread_id, status, cancel_requested_at, started_at, finished_at, created_at, updated_at, activation_state
 `
 
 type RequestAgentRunCancelParams struct {
@@ -679,6 +734,7 @@ func (q *Queries) RequestAgentRunCancel(ctx context.Context, arg RequestAgentRun
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ActivationState,
 	)
 	return i, err
 }

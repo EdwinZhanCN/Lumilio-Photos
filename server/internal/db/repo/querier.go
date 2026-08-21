@@ -151,6 +151,7 @@ type Querier interface {
 	CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemParams) (OcrTextItem, error)
 	CreatePendingAgentEffect(ctx context.Context, arg CreatePendingAgentEffectParams) (AgentPendingEffect, error)
 	CreatePendingTOTPEnrollment(ctx context.Context, arg CreatePendingTOTPEnrollmentParams) (PendingTotpEnrollment, error)
+	CreatePreparedAgentRun(ctx context.Context, arg CreatePreparedAgentRunParams) (AgentRun, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateRepositoryScanRun(ctx context.Context, arg CreateRepositoryScanRunParams) (RepositoryScanRun, error)

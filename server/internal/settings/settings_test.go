@@ -8,13 +8,13 @@ import (
 	"testing"
 )
 
-func TestSupportedLLMProviders(t *testing.T) {
+func TestSupportedLLMProvidersMatchPinnedAdapterRequirements(t *testing.T) {
 	t.Parallel()
 
 	want := []LLMProviderDescriptor{
 		{ID: LLMProviderArk, APIKeyRequired: true},
 		{ID: LLMProviderOpenAI, APIKeyRequired: true},
-		{ID: LLMProviderDeepSeek, APIKeyRequired: true, BaseURLRequired: true},
+		{ID: LLMProviderDeepSeek, APIKeyRequired: true},
 		{ID: LLMProviderOllama, BaseURLRequired: true},
 		{ID: LLMProviderClaude, APIKeyRequired: true},
 		{ID: LLMProviderGemini, APIKeyRequired: true},
@@ -51,8 +51,7 @@ func TestLLMConfigurationRequiresExplicitSupportedProvider(t *testing.T) {
 		{name: "unknown provider", cfg: LLM{Provider: "other", APIKey: "secret", ModelName: "model"}},
 		{name: "ark", cfg: LLM{Provider: "ark", APIKey: "secret", ModelName: "model"}, ok: true},
 		{name: "openai", cfg: LLM{Provider: "openai", APIKey: "secret", ModelName: "model"}, ok: true},
-		{name: "deepseek requires URL", cfg: LLM{Provider: "deepseek", APIKey: "secret", ModelName: "model"}},
-		{name: "deepseek", cfg: LLM{Provider: "deepseek", APIKey: "secret", ModelName: "model", BaseURL: "https://deepseek.example/v1"}, ok: true},
+		{name: "deepseek uses adapter URL", cfg: LLM{Provider: "deepseek", APIKey: "secret", ModelName: "model"}, ok: true},
 		{name: "ollama requires URL", cfg: LLM{Provider: "ollama", ModelName: "model"}},
 		{name: "ollama", cfg: LLM{Provider: " OLLAMA ", ModelName: "model", BaseURL: "http://localhost:11434"}, ok: true},
 		{name: "claude", cfg: LLM{Provider: "claude", APIKey: "secret", ModelName: "model"}, ok: true},

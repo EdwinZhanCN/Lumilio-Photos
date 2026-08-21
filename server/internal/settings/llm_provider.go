@@ -22,10 +22,14 @@ type LLMProviderDescriptor struct {
 	BaseURLRequired bool
 }
 
+// Requirements match the explicit configuration shape Lumilio passes to the
+// pinned Eino adapters. A false BaseURLRequired means the adapter owns a
+// deterministic provider endpoint, never that ambient configuration may fill
+// the field.
 var supportedLLMProviders = [...]LLMProviderDescriptor{
 	{ID: LLMProviderArk, APIKeyRequired: true},
 	{ID: LLMProviderOpenAI, APIKeyRequired: true},
-	{ID: LLMProviderDeepSeek, APIKeyRequired: true, BaseURLRequired: true},
+	{ID: LLMProviderDeepSeek, APIKeyRequired: true},
 	{ID: LLMProviderOllama, BaseURLRequired: true},
 	{ID: LLMProviderClaude, APIKeyRequired: true},
 	{ID: LLMProviderGemini, APIKeyRequired: true},

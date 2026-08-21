@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -91,12 +92,8 @@ func (s *agentService) EnsureThread(ctx context.Context, userID int32, threadID,
 	if !IsValidMode(mode) {
 		return repo.AgentThread{}, fmt.Errorf("invalid agent mode %q", mode)
 	}
-	if len(bindings.Context) == 0 {
-		bindings.Context = json.RawMessage("[]")
-	}
-	if len(bindings.Mentions) == 0 {
-		bindings.Mentions = json.RawMessage("[]")
-	}
+	bindings.Context = normalizeThreadBinding(bindings.Context)
+	bindings.Mentions = normalizeThreadBinding(bindings.Mentions)
 	return s.queries.UpsertAgentThread(ctx, repo.UpsertAgentThreadParams{
 		UserID: userID, ThreadID: threadID, CheckpointKey: CheckpointKey(userID, threadID),
 		Mode: mode, ContextBindings: dbtypes.JSON(bindings.Context), MentionBindings: dbtypes.JSON(bindings.Mentions),
@@ -104,6 +101,14 @@ func (s *agentService) EnsureThread(ctx context.Context, userID int32, threadID,
 		CreatedAt:     dbtypes.NewTimestamp(time.Now()),
 		UpdatedAt:     dbtypes.NewTimestamp(time.Now()),
 	})
+}
+
+func normalizeThreadBinding(binding json.RawMessage) json.RawMessage {
+	trimmed := bytes.TrimSpace(binding)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return json.RawMessage("[]")
+	}
+	return binding
 }
 
 func (s *agentService) GetAvailableTools() []*schema.ToolInfo { return s.registry.GetAllToolInfos() }
@@ -206,6 +211,18 @@ func (s *agentService) createRunRecord(ctx context.Context, thread repo.AgentThr
 	return row.RunID, nil
 }
 
+func (s *agentService) createPreparedRunRecord(ctx context.Context, thread repo.AgentThread) (uuid.UUID, error) {
+	now := dbtypes.NewTimestamp(time.Now())
+	row, err := s.queries.CreatePreparedAgentRun(ctx, repo.CreatePreparedAgentRunParams{
+		RunID: uuid.New(), UserID: thread.UserID, ThreadID: thread.ThreadID,
+		StartedAt: now, CreatedAt: now, UpdatedAt: now,
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return row.RunID, nil
+}
+
 func (s *agentService) bindRun(ctx context.Context, thread repo.AgentThread, runID uuid.UUID) error {
 	result, err := s.pool.ExecContext(ctx, `UPDATE agent_threads
 		SET active_run_id = ?, status = 'active', updated_at = ?
@@ -231,8 +248,10 @@ func (s *agentService) transitionAwaitingRun(ctx context.Context, thread repo.Ag
 	defer tx.Rollback()
 	now := dbtypes.NewTimestamp(time.Now())
 	result, err := tx.ExecContext(ctx, `UPDATE agent_runs
-		SET status = 'completed', finished_at = COALESCE(finished_at, ?), updated_at = ?
-		WHERE run_id = ? AND user_id = ? AND thread_id = ? AND status = 'awaiting_confirmation'`,
+		SET status = 'completed', activation_state = 'terminal',
+			finished_at = COALESCE(finished_at, ?), updated_at = ?
+		WHERE run_id = ? AND user_id = ? AND thread_id = ?
+			AND status = 'awaiting_confirmation' AND activation_state = 'active'`,
 		now, now, oldRunID.String(), thread.UserID, thread.ThreadID)
 	if err != nil {
 		return fmt.Errorf("finish awaiting agent run: %w", err)
@@ -241,7 +260,21 @@ func (s *agentService) transitionAwaitingRun(ctx context.Context, thread repo.Ag
 		if err != nil {
 			return fmt.Errorf("finish awaiting agent run: %w", err)
 		}
-		return errors.New("awaiting agent run changed concurrently")
+		return sql.ErrNoRows
+	}
+	result, err = tx.ExecContext(ctx, `UPDATE agent_runs
+		SET activation_state = 'active', updated_at = ?
+		WHERE run_id = ? AND user_id = ? AND thread_id = ?
+			AND status = 'running' AND activation_state = 'prepared_resume'`,
+		now, newRunID.String(), thread.UserID, thread.ThreadID)
+	if err != nil {
+		return fmt.Errorf("activate prepared agent run: %w", err)
+	}
+	if changed, err := result.RowsAffected(); err != nil || changed != 1 {
+		if err != nil {
+			return fmt.Errorf("activate prepared agent run: %w", err)
+		}
+		return errors.New("prepared agent run changed concurrently")
 	}
 	result, err = tx.ExecContext(ctx, `UPDATE agent_threads
 		SET active_run_id = ?, status = 'active', updated_at = ?
@@ -254,7 +287,7 @@ func (s *agentService) transitionAwaitingRun(ctx context.Context, thread repo.Ag
 		if err != nil {
 			return fmt.Errorf("transition active agent run: %w", err)
 		}
-		return errors.New("awaiting agent run changed concurrently")
+		return sql.ErrNoRows
 	}
 	return tx.Commit()
 }
@@ -321,7 +354,7 @@ func (s *agentService) ResumeAgent(ctx context.Context, userID int32, threadID s
 		return nil, sql.ErrNoRows
 	}
 	oldRunID := thread.ActiveRunID.UUID
-	runID, err := s.createRunRecord(ctx, thread)
+	runID, err := s.createPreparedRunRecord(ctx, thread)
 	if err != nil {
 		return nil, err
 	}

@@ -43,8 +43,8 @@ Run every row the diff touches, nothing more:
 | Taskfiles or workflows | [lumilio-add-task-target](../lumilio-add-task-target/SKILL.md); path filters update in the same PR |
 
 Browser E2E slices (`task web:test:browser`, `web:test:auth-hardening`,
-`web:test:auth-totp`, `web:test:agent-trust`, `web:test:video-semantic`,
-`web:test:backup-recovery`) need Docker and the E2E stack
+`web:test:auth-totp`, `web:test:agent-trust`, `web:test:agent-runtime`,
+`web:test:video-semantic`, `web:test:backup-recovery`) need Docker and the E2E stack
 ([lumilio-e2e-environment](../lumilio-e2e-environment/SKILL.md)). Run only the
 slice whose behavior the diff reaches; CI runs the matching slices.
 

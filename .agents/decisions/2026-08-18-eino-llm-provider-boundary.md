@@ -34,10 +34,13 @@ clears the prior stored key unless the same update supplies its replacement.
 
 Complete Lumilio settings are validated before an adapter or underlying SDK is
 constructed. Runtime code does not use environment variables, credential
-files, provider singletons, or default credential chains to repair incomplete
-settings. Adapter errors are normalized at the provider boundary so ordinary
-logs cannot contain raw response bodies, authorization headers, credentials,
-or full prompts.
+files, provider singletons, or default credential chains to repair missing
+credentials or model identity. The descriptor requirements match the pinned
+adapter configuration: Ollama and Qwen require caller-supplied endpoints;
+Ark, OpenAI, DeepSeek, Claude, Gemini, and OpenRouter may use their adapter's
+deterministic default endpoint. Adapter errors are normalized at the provider
+boundary so ordinary logs cannot contain raw response bodies, authorization
+headers, credentials, or full prompts.
 
 Repository support is proven by deterministic, provider-shaped tests for all
 eight adapters, including generation, streaming, and a streamed tool-call and
@@ -65,9 +68,12 @@ DeepSeek-specific response behavior.
 OpenAPI, generated Web types, UI choices, and validation requirements can
 drift. One Server registry gives every consumer the same safe descriptor.
 
-**Let SDK defaults or environment variables fill missing settings** — rejected
-because ambient state bypasses Lumilio's encrypted settings ownership and can
-change behavior between processes or deployments.
+**Let environment variables, credential files, or default credential chains
+fill missing settings** — rejected because ambient state bypasses Lumilio's
+encrypted settings ownership and can change behavior between processes or
+deployments. Non-secret provider endpoint defaults exposed by the pinned
+adapter are accepted; copying them into Lumilio would create a second contract
+that drifts from Eino.
 
 **Adopt Eino `v0.10` alpha or migrate to AgenticModel while adding providers**
 — rejected because it would combine a persisted-message/API migration with a

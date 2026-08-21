@@ -2218,6 +2218,7 @@
       "apiKeyPlaceholder": "输入新的 API Key",
       "baseUrl": "Base URL",
       "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
+      "baseUrlRequiredDescription": "当前提供方要求填写。",
       "clearStoredKey": "清除已保存的 API Key",
       "hideApiKey": "隐藏 API Key",
       "loadError": "加载 AI 设置失败。",

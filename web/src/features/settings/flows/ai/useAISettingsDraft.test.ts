@@ -5,7 +5,7 @@ import type { LLMProviderDescriptor } from "../../model/llmProviders";
 const providers: LLMProviderDescriptor[] = [
   { id: "ark", apiKeyRequired: true, baseURLRequired: false },
   { id: "openai", apiKeyRequired: true, baseURLRequired: false },
-  { id: "deepseek", apiKeyRequired: true, baseURLRequired: true },
+  { id: "deepseek", apiKeyRequired: true, baseURLRequired: false },
   { id: "ollama", apiKeyRequired: false, baseURLRequired: true },
   { id: "claude", apiKeyRequired: true, baseURLRequired: false },
   { id: "gemini", apiKeyRequired: true, baseURLRequired: false },
@@ -70,15 +70,20 @@ describe("buildValidationPayload", () => {
       buildValidationPayload(draft({ provider: "none" }), false, "none", providers),
     ).toThrow(/Select an LLM provider/);
   });
-  it("requires an explicit endpoint for DeepSeek", () => {
-    expect(() =>
+  it("lets DeepSeek use its adapter-owned endpoint", () => {
+    expect(
       buildValidationPayload(
-        draft({ provider: "deepseek", modelName: "deepseek-chat", baseURL: "" }),
+        draft({
+          provider: "deepseek",
+          modelName: "deepseek-v4-flash",
+          baseURL: "",
+          apiKey: "secret",
+        }),
         false,
         "none",
         providers,
       ),
-    ).toThrow(/base URL/);
+    ).toMatchObject({ provider: "deepseek", base_url: "", use_stored_api_key: false });
   });
 
   it("uses the server descriptor for Qwen requirements", () => {

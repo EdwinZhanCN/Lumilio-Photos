@@ -364,11 +364,13 @@ Claude, Gemini, Qwen, and OpenRouter. `internal/llm` validates the complete
 database-backed setting before constructing the named official Eino-ext
 adapter, so an empty setting cannot fall through to SDK environment variables,
 credential files, or cloud profiles. Ollama is the only keyless provider;
-DeepSeek, Ollama, and Qwen require explicit endpoints. Claude uses only the
-direct Anthropic path, Gemini uses an explicitly constructed Developer API
-client, and DeepSeek uses its native adapter. Qianfan and hosted cloud variants
-remain outside this boundary because their credential shapes or ambient state
-do not fit the single encrypted-key aggregate.
+Ollama and Qwen require explicit endpoints because their selected adapters do
+not supply one. Ark, OpenAI, DeepSeek, Claude, Gemini, and OpenRouter accept an
+empty Base URL and use the pinned adapter's deterministic provider endpoint.
+Claude uses only the direct Anthropic path, Gemini uses an explicitly
+constructed Developer API client, and DeepSeek uses its native adapter. Qianfan
+and hosted cloud variants remain outside this boundary because their credential
+shapes or ambient state do not fit the single encrypted-key aggregate.
 
 Provider SDK failures are classified at `internal/llm` before they reach HTTP
 or Agent request logging. Ordinary logs never include provider response bodies,
@@ -377,6 +379,17 @@ capture remains confined to the explicitly configured `--agent-audit-log`.
 Agent confirmation checkpoints are timestamped SQLite rows keyed by user and
 thread, and the compatibility fixture locks targeted resume from Eino `v0.9.6`
 onto the current ADK path.
+
+The browser E2E stack adds a keyless `agent-model-fixture` at the Ollama HTTP
+boundary. Its deterministic Go implementation accepts only the pinned model,
+known scenarios, and the real Eino tool-call dialect; it rejects authentication
+headers and exposes bounded counters instead of request bodies. The
+`@agent-runtime` slice therefore crosses the built Web app, authenticated SSE,
+Agent service, migrated SQLite state, checkpoints/effects, and real Lumilio
+tools without an external provider or API key. Resume creates a
+`prepared_resume` run outside the one-active-run index, then atomically
+completes the awaiting run, activates the replacement, and repoints the thread
+only after Eino accepts the checkpoint.
 
 The SDK owns the continuous Lumen runtime pipeline: bounded DNS-SD scans,
 strict service correlation, source-owned snapshot reconciliation, gRPC

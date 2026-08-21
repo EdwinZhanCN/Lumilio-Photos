@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -181,6 +182,7 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 // @Success 200 {string} string "SSE stream"
 // @Failure 400 {object} api.ProblemResponse "Invalid request"
 // @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Missing or stale confirmation"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/agent/chat/resume [post]
 func (h *AgentHandler) ResumeChat(c *gin.Context) {
@@ -204,7 +206,11 @@ func (h *AgentHandler) ResumeChat(c *gin.Context) {
 
 	run, err := h.agentService.ResumeAgent(c.Request.Context(), int32(user.UserID), req.ThreadID, params, sideChannel)
 	if err != nil {
-		api.WriteProblem(c, api.NotFound(err))
+		if errors.Is(err, sql.ErrNoRows) {
+			api.WriteProblem(c, api.NotFound(err))
+		} else {
+			api.WriteProblem(c, api.Internal(err))
+		}
 		return
 	}
 	flusher, err := h.prepareSSE(c)

@@ -2242,6 +2242,7 @@
       "apiKeyPlaceholder": "Enter a new API key",
       "baseUrl": "Base URL",
       "baseUrlDescription": "Optional override for provider-compatible endpoints.",
+      "baseUrlRequiredDescription": "Required for the selected provider.",
       "clearStoredKey": "Clear stored API key",
       "hideApiKey": "Hide API key",
       "loadError": "Failed to load AI settings.",

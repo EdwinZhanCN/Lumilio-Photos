@@ -3,12 +3,15 @@ package handler
 import (
 	"bytes"
 	"context"
+	"database/sql"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"server/internal/agent/core"
+	"server/internal/api"
 	"server/internal/db/repo"
 	"server/internal/service"
 
@@ -25,7 +28,10 @@ type flushableResponseWriter struct {
 
 func (w *flushableResponseWriter) Flush() {}
 
-type streamTestAgentService struct{}
+type streamTestAgentService struct {
+	resumeRun *core.AgentRun
+	resumeErr error
+}
 
 func (streamTestAgentService) EnsureThread(context.Context, int32, string, string, core.ThreadBindings) (repo.AgentThread, error) {
 	return repo.AgentThread{}, nil
@@ -33,8 +39,8 @@ func (streamTestAgentService) EnsureThread(context.Context, int32, string, strin
 func (streamTestAgentService) AskAgent(context.Context, int32, string, string, string, ...chan<- *core.SideChannelEvent) (*core.AgentRun, error) {
 	return nil, nil
 }
-func (streamTestAgentService) ResumeAgent(context.Context, int32, string, *adk.ResumeParams, ...chan<- *core.SideChannelEvent) (*core.AgentRun, error) {
-	return nil, nil
+func (s streamTestAgentService) ResumeAgent(context.Context, int32, string, *adk.ResumeParams, ...chan<- *core.SideChannelEvent) (*core.AgentRun, error) {
+	return s.resumeRun, s.resumeErr
 }
 func (streamTestAgentService) CancelRun(context.Context, int32, string, uuid.UUID) (string, error) {
 	return "cancelled", nil
@@ -65,6 +71,31 @@ func TestChatRequiresKnownExplicitMode(t *testing.T) {
 
 			NewAgentHandler(nil, nil, nil, nil, nil).Chat(c)
 			require.Equal(t, http.StatusBadRequest, recorder.Code)
+		})
+	}
+}
+
+func TestResumeChatClassifiesOnlyMissingOrStaleIdentityAsNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for name, testCase := range map[string]struct {
+		err    error
+		status int
+	}{
+		"missing":  {err: sql.ErrNoRows, status: http.StatusNotFound},
+		"internal": {err: errors.New("checkpoint backend failed"), status: http.StatusInternalServerError},
+	} {
+		t.Run(name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/agent/chat/resume", bytes.NewBufferString(`{
+				"thread_id":"thread-1","targets":{}
+			}`))
+			c.Request.Header.Set("Content-Type", "application/json")
+			c.Set("current_user", &service.UserResponse{UserID: 1, Username: "tester"})
+
+			NewAgentHandler(streamTestAgentService{resumeErr: testCase.err}, nil, nil, nil, nil).ResumeChat(c)
+			require.Equal(t, testCase.status, recorder.Code)
+			require.Equal(t, api.ProblemMediaType, recorder.Header().Get("Content-Type"))
 		})
 	}
 }

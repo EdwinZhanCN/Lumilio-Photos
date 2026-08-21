@@ -105,6 +105,12 @@ await request("/api/v1/settings/system", {
   method: "PATCH",
   headers,
   body: JSON.stringify({
+    llm: {
+      agent_enabled: true,
+      provider: "ollama",
+      model_name: "lumilio-agent-e2e-v1",
+      base_url: "http://agent-model-fixture:11434",
+    },
     ml: {
       semantic_enabled: true,
       bioclip_enabled: false,
@@ -117,6 +123,27 @@ await request("/api/v1/settings/system", {
     },
   }),
 });
+
+const runtimeSettings = await request<{
+  llm?: {
+    agent_enabled?: boolean;
+    provider?: string;
+    model_name?: string;
+    base_url?: string;
+    api_key_configured?: boolean;
+  };
+}>("/api/v1/settings/system", { headers });
+if (
+  runtimeSettings.llm?.agent_enabled !== true ||
+  runtimeSettings.llm.provider !== "ollama" ||
+  runtimeSettings.llm.model_name !== "lumilio-agent-e2e-v1" ||
+  runtimeSettings.llm.base_url !== "http://agent-model-fixture:11434" ||
+  runtimeSettings.llm.api_key_configured !== false
+) {
+  throw new Error(
+    `keyless Agent runtime settings were not persisted: ${JSON.stringify(runtimeSettings.llm)}`,
+  );
+}
 
 // Per-worker users, repositories and fixtures are provisioned by the
 // worker-scoped `workspace` fixture, not here: this layer only has to leave a
