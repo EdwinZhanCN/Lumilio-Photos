@@ -92,7 +92,7 @@ SELECT
                     SELECT ocr_ti.id, ocr_ti.asset_id, ocr_ti.text_content, ocr_ti.confidence, ocr_ti.bounding_box, ocr_ti.text_length, ocr_ti.area_pixels, ocr_ti.created_at
                     FROM ocr_text_items ocr_ti
                     WHERE ocr_ti.asset_id = a.asset_id
-                    ORDER BY ocr_ti.confidence DESC, ocr_ti.text_length DESC, ocr_ti.id DESC
+                    ORDER BY ocr_ti.id ASC
                 ) AS ordered
             ), '[]')
         )

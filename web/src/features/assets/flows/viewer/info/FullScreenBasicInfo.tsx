@@ -11,6 +11,7 @@ import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import PhotoInfoView from "./PhotoInfoView";
 import VideoInfoView from "./VideoInfoView";
 import AudioInfoView from "./AudioInfoView";
+import { useAssetOCR } from "../../../api/useAssetOCR";
 
 type Schemas = components["schemas"];
 type AssetExifResponse = Schemas["dto.AssetExifResponseDTO"];
@@ -35,6 +36,7 @@ export default function FullScreenBasicInfo({ asset, onAssetUpdate }: FullScreen
       retry: 1,
     },
   ) as UseQueryResult<AssetExifResponse, unknown>;
+  const ocrQuery = useAssetOCR(asset?.asset_id, asset?.type === "PHOTO");
 
   const rawExif = (exifQuery.data?.exif_raw as Record<string, unknown> | undefined) ?? null;
   const rawExifForDisplay =
@@ -92,6 +94,10 @@ export default function FullScreenBasicInfo({ asset, onAssetUpdate }: FullScreen
           onClose={closeInfo}
           onExtractExif={handleViewExif}
           isLoadingExif={isLoadingExif}
+          ocrResult={ocrQuery.data?.ocr_result}
+          isLoadingOCR={ocrQuery.isLoading}
+          ocrError={ocrQuery.error}
+          onRetryOCR={() => void ocrQuery.refetch()}
         />
         <dialog id="exif_modal" className="modal">
           <div className="modal-box">

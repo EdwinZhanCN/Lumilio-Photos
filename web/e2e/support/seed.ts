@@ -98,9 +98,10 @@ if (!primary) {
   primary = created.repository;
 }
 
-// Keep the E2E ML surface deliberate. The deterministic external fixture only
-// implements the two semantic contracts under test; unrelated OCR, face and
-// BioCLIP workers stay disabled instead of accumulating retries.
+// Keep the E2E ML surface deliberate. The deterministic external fixture
+// advertises semantic plus OCR for the isolated Agent reader scenario, but
+// general seeding leaves OCR, face and BioCLIP workers disabled instead of
+// adding inference work to every browser fixture.
 await request("/api/v1/settings/system", {
   method: "PATCH",
   headers,

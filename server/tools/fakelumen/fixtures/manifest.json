@@ -1,4 +1,4 @@
 {
   "schemaVersion": 1,
-  "note": "No recorded Lumen fixtures yet. Replay advertises the builtin deterministic SigLIP capability and serves one constant 768-dim embedding for every semantic request. Record real model fixtures per .agents/skills/lumilio-lumen-fixtures/SKILL.md; recording overwrites this manifest with the upstream capability set."
+  "note": "No recorded Lumen fixtures yet. Replay advertises deterministic SigLIP and OCR capabilities, serves one constant 768-dim embedding for semantic requests, and two stable ordered OCR lines for the Agent runtime slice. General seeding keeps OCR disabled. Record real model fixtures per .agents/skills/lumilio-lumen-fixtures/SKILL.md; recording overwrites this manifest with the upstream capability set."
 }

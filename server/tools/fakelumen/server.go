@@ -105,9 +105,9 @@ func newRecordServer(store *fixtureStore, upstream pb.InferenceClient, upstreamA
 	}
 }
 
-// builtinCapability is the deterministic default advertised when no recorded
-// capability set exists: SigLIP semantic embedding only, matching the
-// historical constant-vector fixture.
+// builtinCapability is the deterministic SigLIP default advertised when no
+// recorded capability set exists, matching the historical constant-vector
+// fixture.
 func builtinCapability() *pb.Capability {
 	return &pb.Capability{
 		ServiceName:     types.ServiceSigLIP,
@@ -133,11 +133,30 @@ func builtinCapability() *pb.Capability {
 	}
 }
 
+// builtinOCRCapability keeps the keyless Agent runtime slice on the real OCR
+// queue/storage path. General E2E seeding leaves OCR disabled; the dedicated
+// fixture enables it only while uploading its owned photo.
+func builtinOCRCapability() *pb.Capability {
+	return &pb.Capability{
+		ServiceName:     types.ServiceOCR,
+		ModelIds:        []string{builtinModelID},
+		Runtime:         "e2e-deterministic",
+		MaxConcurrency:  2,
+		Precisions:      []string{"fp32"},
+		ProtocolVersion: "1.0.0",
+		Tasks: []*pb.IOTask{{
+			Name:        types.TaskOCR,
+			InputMimes:  []string{"image/jpeg", "image/png", "image/webp"},
+			OutputMimes: []string{"application/json;schema=ocr_v1"},
+		}},
+	}
+}
+
 func (s *inferenceServer) advertisedCapabilities() []*pb.Capability {
 	if recorded := s.store.capabilities(); len(recorded) > 0 {
 		return recorded
 	}
-	return []*pb.Capability{builtinCapability()}
+	return []*pb.Capability{builtinCapability(), builtinOCRCapability()}
 }
 
 func (s *inferenceServer) GetCapabilities(ctx context.Context, _ *emptypb.Empty) (*pb.Capability, error) {
@@ -252,10 +271,11 @@ func (s *inferenceServer) replay(stream grpc.BidiStreamingServer[pb.InferRequest
 	})
 }
 
-// builtinResponse is the deterministic no-fixture fallback per task. The two
-// semantic tasks return the historical constant embedding; the other Photos
-// tasks return valid empty results so a partially recorded fixture set
-// degrades visibly (miss counters) instead of failing pipelines.
+// builtinResponse is the deterministic no-fixture fallback per task. Semantic
+// tasks return the historical constant embedding. OCR returns two stable lines
+// for the dedicated Agent runtime path; other Photos tasks return valid empty
+// results so a partially recorded fixture set degrades visibly instead of
+// failing pipelines.
 func builtinResponse(task string) (result []byte, resultMime string, err error) {
 	switch task {
 	case types.TaskSemanticTextEmbed, types.TaskSemanticImageEmbed:
@@ -270,7 +290,13 @@ func builtinResponse(task string) (result []byte, resultMime string, err error) 
 		result, err = json.Marshal(types.FaceV1{Faces: []types.Face{}, Count: 0, ModelID: builtinModelID})
 		return result, "application/json;schema=face_v1", err
 	case types.TaskOCR:
-		result, err = json.Marshal(types.OCRV1{Items: []types.OCRItem{}, Count: 0, ModelID: builtinModelID})
+		result, err = json.Marshal(types.OCRV1{
+			Items: []types.OCRItem{
+				{Box: [][]int{{0, 0}, {100, 0}, {100, 20}, {0, 20}}, Text: "Lumilio OCR first line", Confidence: 0.41},
+				{Box: [][]int{{0, 30}, {140, 30}, {140, 50}, {0, 50}}, Text: "Lumilio OCR second line", Confidence: 0.99},
+			},
+			Count: 2, ModelID: builtinModelID,
+		})
 		return result, "application/json;schema=ocr_v1", err
 	default:
 		return nil, "", status.Errorf(codes.Unimplemented, "unsupported task %q", task)

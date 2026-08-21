@@ -398,6 +398,15 @@
       "unknown_type": "Unknown type",
       "video_title": "Video"
     },
+    "ocr": {
+      "empty": "No text was recognized.",
+      "loadFailed": "OCR Text Recognition result could not be loaded.",
+      "loading": "Loading OCR Text Recognition result",
+      "regions_one": "{{count}} text regions",
+      "regions_other": "{{count}} text regions",
+      "title": "OCR Text Recognition",
+      "unavailable": "No stored OCR Text Recognition result is available."
+    },
     "photoInfoView": {
       "ev_suffix": "ev",
       "exposure_suffix": "s",

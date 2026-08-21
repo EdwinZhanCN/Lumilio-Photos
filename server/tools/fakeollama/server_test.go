@@ -89,6 +89,28 @@ func TestFixtureConfirmationRejectionUsesPinnedEinoOllamaDialect(t *testing.T) {
 	}
 }
 
+func TestFixtureReadOCRRoundTripUsesAttachedRef(t *testing.T) {
+	chatModel := fixtureChatModel(t)
+	withTools, err := chatModel.WithTools([]*schema.ToolInfo{fixtureTool("read_ocr", "ref_id")})
+	if err != nil {
+		t.Fatalf("WithTools() error = %v", err)
+	}
+
+	messages := []*schema.Message{
+		schema.UserMessage(`UNTRUSTED_CONTEXT_DATA_JSON:
+{"attached_refs":[{"ref_id":"r1_viewing","context_type":"viewing","label":"Viewing photo","count":1}],"bound_entities":[],"schema":"agent-context/v1","trust":"untrusted_data"}`),
+		schema.UserMessage(scenarioPrompt(fixtureScenario{Name: "read-ocr"})),
+	}
+	read := collectStream(t, streamModel(t, withTools, messages))
+	assertToolCall(t, read, "read_ocr", `{"ref_id":"r1_viewing"}`)
+	messages = append(messages, read, schema.ToolMessage(`{"ref_id":"r1_viewing","documents":[{"position":1,"filename":"receipt.jpg","status":"available","region_count":2,"lines":["Lumilio OCR first line","Lumilio OCR second line"],"truncated":false}]}`, ""))
+
+	final := collectStream(t, streamModel(t, withTools, messages))
+	if final.Content != readOCRResult {
+		t.Fatalf("OCR response = %q, want %q", final.Content, readOCRResult)
+	}
+}
+
 func TestFixtureRejectsProviderAuthenticationWithoutEchoingIt(t *testing.T) {
 	for _, header := range []string{"Authorization", "X-Api-Key", "X-Goog-Api-Key"} {
 		t.Run(header, func(t *testing.T) {
