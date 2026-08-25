@@ -20,9 +20,9 @@ cancelled the worker context. The final transaction returned
 the same reason because it reused that context.
 
 The partial unique index allowing only one `running` scan receipt then rejected
-new receipts. `ProcessScanRepository` intentionally treats that conflict as a
-successful no-op for genuine concurrent scans, so subsequent jobs completed
-without doing any work and without repairing the stale receipt.
+new receipts. The former scan worker treated that conflict as a successful
+no-op for genuine concurrent scans, so subsequent jobs completed without doing
+any work and without repairing the stale receipt.
 
 ## Why every net missed it
 
@@ -38,10 +38,16 @@ without doing any work and without repairing the stale receipt.
 
 ## Guardrails added
 
-- [The worker timeout regression test](../../server/internal/queue/ingest_repository_scan_worker_test.go)
-  locks scan jobs to an explicit infinite River timeout instead of the implicit
-  one-minute default.
-- [The cancelled-scan integration test](../../server/internal/storage/scanner/scanner_integration_test.go)
-  cancels immediately before reconciliation, verifies a terminal failed receipt,
-  and proves the next scan completes.
-- Both tests run under the existing [`server:test` task](../../taskfile.yml).
+The old scan-wide worker and scanner were removed by the Repository Observation
+Engine cutover. Their replacement makes a scan a sequence of bounded, durable
+controller turns rather than one long River execution:
+
+- [The controller receipt test](../../server/internal/storage/roe/controller/controller_integration_test.go)
+  proves repeat requests coalesce onto a stable operation while observations
+  publish progressively.
+- [The cancellation recovery test](../../server/internal/storage/roe/controller/controller_integration_test.go)
+  proves cancellation preserves unverified Locations and that a later recovery
+  operation converges.
+- [The expired-lease outbox test](../../server/internal/storage/roe/controller/pipeline_integration_test.go)
+  proves a crash-style delivery replay remains idempotent.
+- These tests run under the existing [`server:test` task](../../taskfile.yml).

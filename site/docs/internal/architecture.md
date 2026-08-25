@@ -52,11 +52,44 @@ useful; implementation plans belong in `exec-plans/`.
   asset browse may omit `OwnerID` to view the whole library, but an
   owner-scoped topology such as Event must always carry its resolved owner into
   downstream asset queries. `nil` must never be used to infer an Event owner.
-- `server/internal/storage`: repository layout, staging, scanner, repository config.
-- `server/internal/sourcing`: unified ingest materialization for upload, scan, and cloud flows.
-- `server/internal/db` and `server/migrations`: the single-writer SQLite runtime,
-  application/River migrations, Online Backup snapshots, FTS5, and the
-  statically linked SQLite Vec1 derived semantic index.
+- `server/internal/storage`: RepositoryFS, repository layout/configuration,
+  staging, and the Repository Observation Engine (ROE). ROE persists a node
+  graph, resumable directory frontiers, native change cursors, revisioned
+  observations and Locations, exact content identity, and a transactional
+  outbox. Its `C0 → crawl → fixed C1 → dirty verification → finalize` protocol
+  never treats a watcher hint as absence authority.
+- `server/internal/sourcing`: recoverable staged materialization for upload and
+  cloud flows. A committed source publishes the same node/content/Location
+  facts as repository observation.
+- `server/internal/db` and `server/migrations`: exactly one physical SQLite
+  writer shared by application mutations and River, plus four query-only WAL
+  readers used by default for non-transactional queries and Online Backup.
+  Planning snapshots are short; filesystem, media, network, and unbounded CPU
+  work never occurs inside write transactions. Large atomic changes are
+  set-based and restartable derived projections publish in bounded,
+  revision-fenced turns. Automatic WAL checkpoints are disabled; one runtime
+  monitor observes writer wait/WAL growth and requests explicit passive
+  checkpoints through the sole writer. This boundary also owns
+  application/River migrations, verified snapshots, FTS5, and the statically
+  linked SQLite Vec1 semantic index.
+- `server/internal/db/catalogtx`: the closed, compile-time named transaction
+  and observed-connector boundary. It measures writer/reader admission,
+  bounded transaction/statement/cursor lifetimes, outcomes, cancellations,
+  and `DBStats` reconciliation. An AST inventory prevents raw transaction or
+  standalone writer escape hatches from reappearing in production code.
+- `server/tools/sqlitepressure`: host-side mixed-load, real-Chromium startup,
+  recovery, and post-stop integrity controller. The pressure Compose overlay
+  bind-mounts all mutable bytes into one marked run-id directory with explicit
+  disk guards; qualification histograms are never pooled across runs or
+  platforms.
+- Foreground bootstrap/setup/status and repository-list requests are strictly
+  read-only. Incomplete bootstrap gates are derived through query-only readers;
+  repository reachability is a cached projection refreshed at boot and by the
+  portable background reconciler. HTTP reads never trigger reconciliation or
+  expiry writes merely to render current state.
+- River periodic constructors never access SQLite. Cancellable reader probes
+  observe durable pending state and arm coalesced in-memory hints; bounded
+  backlog continuations snooze the same active unique job between writer turns.
 - `server/internal/search/bleveocr`: rebuildable OCR search sidecar. SQLite OCR
   rows remain authoritative; a revision outbox feeds
   `<sqlite-directory>/indexes/bleve/ocr-v1/`.
@@ -112,11 +145,18 @@ useful; implementation plans belong in `exec-plans/`.
   must be configured outside `storage.path`. Repository staging remains inside
   its repository under `.lumilio/staging`.
 - Registered repository I/O is rooted by `internal/storage.RepositoryFS` and
-  serialized against repository relocation/removal. Durable asset and job paths
-  are canonical repository-relative values; native codecs receive absolute
-  filenames only through the explicit local-path adapter.
-- The application SQLite catalog owns the rebuildable `repository_file_index`.
-  Scans include `inbox/`, exclude `.lumilio/`, preserve asset identity only for
-  unique full-BLAKE3 move matches, and require two authoritative absences before
-  soft deletion.
+  serialized against repository relocation/removal. Assets own logical
+  owner/content identity, not paths; versioned Locations bind them to
+  repository nodes. Durable jobs carry stable IDs and expected revisions.
+  Native codecs receive absolute filenames only through the explicit
+  local-path adapter after resolving an active Location.
+- ROE streams bounded directory pages including `inbox/` and excluding
+  `.lumilio/`. Healthy native cursors make unchanged passes independent of tree
+  size. Gaps, overflow, offline volumes, access errors, cancellation, and
+  incomplete coverage preserve existing Locations until an authoritative
+  caught-up child set proves absence.
+- Full BLAKE3 plus size is immutable exact content identity. SQL uniqueness
+  enforces one Asset per owner/content pair and allows any number of active
+  Locations. Revisioned outbox consumers are leased, bounded, at-least-once,
+  and idempotent.
 - ML/Lumen paths should degrade when features are disabled; media management should remain usable without external ML.

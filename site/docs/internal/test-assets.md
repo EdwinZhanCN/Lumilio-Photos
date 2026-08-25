@@ -33,4 +33,3 @@ not touch the catalog directly. They wait for **ingestion only, not ML**.
 `search_embeddings` / semantic search populate asynchronously afterward and
 only when a Lumen Hub (or fakelumen) is online. Business endpoints return
 `409 app_not_initialized` until admin + exactly one primary repository exist.
-`server/tools/uploadbench` deliberately excludes ML.

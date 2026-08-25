@@ -5,7 +5,7 @@ page_id: "getting-started/import-first-media"
 audience: "所有用户"
 platform: "Desktop、Server"
 baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-08-06"
+last_verified: "2026-08-22"
 verification_status: "verified"
 ---
 
@@ -14,7 +14,7 @@ code-evidence:
 - web/src/features/manage
 - server/internal/api/handler/asset_handler.go
 - server/internal/sourcing/materializer.go
-- server/internal/storage/scanner/scanner.go
+- server/internal/storage/roe/controller/controller.go
 - server/internal/cloud/icloud
 -->
 
@@ -25,7 +25,7 @@ code-evidence:
 ## 选择方式
 
 - **上传**：浏览器把文件写入资源库暂存区，服务计算哈希后提交到 `inbox/` 布局，并登记数据库。
-- **扫描**：管理员让流明集发现已经位于资源库可扫描区域中的普通文件。扫描会忽略 `.lumilio/` 和 `inbox/`。
+- **扫描**：管理员让流明集观察已经位于资源库中的普通文件。观察范围包括 `inbox/`，但排除应用私有的 `.lumilio/`。
 - **云导入**：当前只实现 iCloud 提供方，需要单独连接凭据和启动导入。
 
 个人第一次使用优先选择上传，因为路径最可控。已有大型目录时，先阅读[上传、扫描与云导入](../concepts/upload-scan-cloud.md)，再决定是否把目录放入资源库可扫描区域。
@@ -34,7 +34,7 @@ code-evidence:
 
 1. 在“管理”中确认目标资源库在线。
 2. 上传一小批副本。
-3. 等待上传状态从等待、上传和处理进入完成；重复文件可能显示为重复。
+3. 等待上传状态从等待、上传和处理进入完成；相同字节会复用已有资产身份，并保留实际文件位置。
 4. 在资源库中打开媒体，检查缩略图、原件信息和播放。
 5. 在磁盘中确认原件最终位置符合所选布局。
 

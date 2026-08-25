@@ -87,8 +87,6 @@ same `web:*` targets — there are no `ci:web:e2e:*` wrappers.
   a separate regular repository when a primary already exists.
 - Frontend upload completion means the River ingest job reached a terminal
   state, not that multipart transport returned 2xx.
-- `server/tools/uploadbench` deliberately excludes ML — it benchmarks the
-  pipeline and cannot validate embeddings.
 - fakelumen metrics live at `http://127.0.0.1:16658/metrics`
   (`LUMILIO_E2E_LUMEN_METRICS_URL`). `video-semantic-regression.spec.ts`
   waits on `semantic_image` counts; a recording miss that falls back to the
