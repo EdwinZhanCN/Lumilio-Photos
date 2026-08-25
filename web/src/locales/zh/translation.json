@@ -1409,6 +1409,8 @@
       "activityProcessing": "正在处理",
       "activityScanning": "正在扫描",
       "assetCount": "资源数量",
+      "cancelScan": "取消验证",
+      "cancelScanFailed": "无法请求取消验证。",
       "candidates": {
         "addSeparateConfirm": "是，作为独立资源库添加",
         "copyAdded": "已添加独立资源库。",
@@ -1553,19 +1555,27 @@
       "scanAll": "扫描全部资源库",
       "scanAllQueued_one": "已为 {{count}} 个库添加扫描队列。",
       "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
-      "scanAmbiguousHelp": "Lumilio 未猜测文件身份。请移除多余副本或恢复为一一对应的布局，然后再次扫描。",
-      "scanAuthoritative": "扫描完成",
-      "scanCompletedSummary": "{{name}} 扫描完成：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个，删除 {{deleted}} 个。",
-      "scanCountAmbiguous": "歧义",
-      "scanCountDeferred": "暂缓",
-      "scanCountDeleted": "删除",
-      "scanCountDiscovered": "发现",
-      "scanCountMoved": "移动",
-      "scanCountUpdated": "更新",
+      "scanAuthoritative": "验证完成",
+      "scanBytesHashed": "已哈希字节数",
+      "scanBytesQueued": "已排队字节数",
+      "scanCancellationRequested": "已请求取消。当前处理步骤将安全完成。",
+      "scanCancellationRequestedAction": "已请求取消",
+      "scanCoalesced": "{{name}} 已有扫描任务在运行；此次请求已并入现有操作。",
+      "scanCountDirectories": "已观察目录",
+      "scanCountFiles": "已观察文件",
+      "scanDirectoryErrors": "目录错误",
       "scanFailed": "加入扫描队列失败。",
-      "scanPartial": "部分扫描",
-      "scanPartialSummary": "{{name}} 本轮扫描不完整：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个。本轮未确认缺失文件。",
-      "scanStatusRunning": "扫描正在进行或已排队，结果会显示在这里。",
+      "scanOutboxDepth": "待处理任务",
+      "scanPartial": "验证不完整",
+      "scanPartialHelp": "部分目录无法验证。此前有效的文件仍然可用。",
+      "scanPhaseCatchingUp": "正在同步变更",
+      "scanPhaseCrawling": "正在观察文件",
+      "scanPhaseFinalizing": "正在完成验证",
+      "scanPhaseQueued": "已排队",
+      "scanQueued": "已为 {{name}} 加入扫描队列。扫描运行时，你仍可继续使用流明集。",
+      "scanStatusCancelled": "验证已取消。此前有效的文件仍然可用。",
+      "scanStatusFailed": "验证因稳定错误而停止。此前有效的文件仍然可用。",
+      "scanStatusRunning": "扫描阶段：{{phase}}。后台任务运行时，你仍可继续使用流明集。",
       "sourceCloud": "云导入",
       "storageLocationAvailable": "可用",
       "storageLocationCapacity": "可用 {{available}}，总计 {{total}}",
@@ -1717,10 +1727,12 @@
         "classify_zeroshot": "匹配已保存分类器",
         "database_backup": "创建数据库备份",
         "detect_stacks": "查找关联原片",
-        "discover_asset": "导入扫描发现的文件",
+        "drain_repository_outbox": "分发资源库任务",
+        "hash_repository_node": "检查资源库文件内容",
         "ingest_asset": "导入上传文件",
         "match_live_photo": "匹配 Live Photo",
         "metadata_asset": "读取媒体信息",
+        "observe_repository": "监测资源库",
         "process_bioclip": "识别自然与物种",
         "process_face": "识别人像",
         "process_ocr": "识别图片文字",
@@ -1732,7 +1744,6 @@
         "rebuild_location_clusters": "刷新地点",
         "reindex_assets": "重建 AI 索引",
         "retry_asset": "重试媒体处理",
-        "scan_repository": "扫描资源库文件夹",
         "schedule_event_rebuilds": "安排事件重建",
         "schedule_repository_scans": "安排资源库扫描",
         "thumbnail_asset": "生成预览图",
@@ -1768,13 +1779,13 @@
           "description": "查找 RAW+JPEG 以及相关媒体堆叠。",
           "name": "堆叠检测"
         },
-        "discover_asset": {
-          "description": "整理资源库扫描时发现的文件。",
-          "name": "扫描发现"
-        },
         "event_scheduler": {
           "description": "在后台投影需要刷新时安排事件重建。",
           "name": "事件调度"
+        },
+        "hash_repository_node": {
+          "description": "读取发生变化的资源库文件，并验证其精确内容标识。",
+          "name": "资源库内容检查"
         },
         "ingest_asset": {
           "description": "安全地把上传媒体放入资源库。",
@@ -1787,6 +1798,10 @@
         "metadata_asset": {
           "description": "读取 EXIF、拍摄时间、相机、位置和媒体信息。",
           "name": "媒体信息"
+        },
+        "observe_repository": {
+          "description": "分批发现并协调资源库文件。",
+          "name": "资源库监测"
         },
         "ocr_index": {
           "description": "让提取出的 OCR 文字可用于搜索。",
@@ -1828,13 +1843,13 @@
           "description": "为已有照片补齐 AI 索引。",
           "name": "AI 重建索引"
         },
+        "repository_outbox": {
+          "description": "将已提交的资源库任务分发给受限的后台处理器。",
+          "name": "资源库任务分发"
+        },
         "retry_asset": {
           "description": "在处理失败后重新尝试。",
           "name": "重试"
-        },
-        "scan_repository": {
-          "description": "扫描资源库文件夹中的新增、变更或移除文件。",
-          "name": "资源库扫描"
         },
         "thumbnail_asset": {
           "description": "生成媒体界面使用的预览图。",

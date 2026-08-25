@@ -189,7 +189,9 @@ function createSidecar(
     asset_id: asset.asset_id ?? "",
     source: {
       original_filename: asset.original_filename ?? "",
-      storage_path: asset.storage_path ?? "",
+      // The Server replaces source metadata from a freshly resolved active
+      // Location before persisting the sidecar; Asset identity carries no path.
+      storage_path: "",
       mime_type: asset.mime_type ?? "",
       file_size: asset.file_size ?? 0,
       hash: asset.hash ?? null,

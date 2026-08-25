@@ -10921,6 +10921,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories/{id}/scans/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get repository scan operation
+         * @description Return one durable Repository scan operation by immutable operation ID.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan operation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/scans/{operation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel repository scan operation
+         * @description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan cancellation requested */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories/{id}/scans/latest": {
         parameters: {
             query?: never;
@@ -13484,6 +13590,7 @@ export interface components {
             added_time?: string;
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             file_size?: number;
@@ -13498,12 +13605,10 @@ export interface components {
             owner_id?: number;
             position?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             taken_time?: string;
             type?: string;
             upload_time?: string;
@@ -13542,6 +13647,7 @@ export interface components {
         "dto.AssetDTO": {
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             file_size?: number;
@@ -13555,12 +13661,10 @@ export interface components {
             original_filename?: string;
             owner_id?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             taken_time?: string;
             type?: string;
             upload_time?: string;
@@ -13570,6 +13674,7 @@ export interface components {
             albums?: components["schemas"]["dto.AssetAlbumRefDTO"][];
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             face_result?: components["schemas"]["dto.AssetFaceResultDTO"];
@@ -13585,12 +13690,10 @@ export interface components {
             original_filename?: string;
             owner_id?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             tags?: components["schemas"]["dto.AssetTagDTO"][];
             taken_time?: string;
             thumbnails?: components["schemas"]["dto.AssetThumbnailDTO"][];
@@ -15374,10 +15477,14 @@ export interface components {
             writable?: boolean;
         };
         "dto.RepositoryScanQueuedDTO": {
-            /** @example 12345 */
-            job_id?: number;
+            /** @example false */
+            coalesced?: boolean;
+            /** @example true */
+            inserted?: boolean;
             /** @example manual */
             mode?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example queued */
@@ -15388,35 +15495,42 @@ export interface components {
             force?: boolean;
         };
         "dto.RepositoryScanRunDTO": {
-            /** @example 0 */
-            ambiguous_count?: number;
-            /** @example true */
-            authoritative?: boolean;
+            /** @example 8 */
+            authoritative_directories?: number;
+            /** @example 524288 */
+            bytes_hashed?: number;
+            /** @example 1048576 */
+            bytes_queued?: number;
+            /** @example false */
+            cancellation_requested?: boolean;
             /** @example 1 */
-            deferred_count?: number;
-            /** @example 1 */
-            deleted_count?: number;
+            coalesced_count?: number;
+            created_at?: string;
             /** @example 10 */
-            discovered_count?: number;
+            directories_observed?: number;
+            /** @example 1 */
+            error_directories?: number;
+            /** @example 120 */
+            files_observed?: number;
             finished_at?: string;
             /** @example manual */
             mode?: string;
-            /** @example 1 */
-            moved_count?: number;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
+            /** @example 12 */
+            outbox_depth?: number;
+            /** @example true */
+            partial_coverage?: boolean;
             problem?: components["schemas"]["api.ProblemReference"];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example edwin */
             requested_by?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            scan_id?: string;
-            /** @example 4 */
-            skipped_count?: number;
+            /** @example 2 */
+            requested_epoch?: number;
             started_at?: string;
             /** @example completed */
             status?: string;
-            /** @example 2 */
-            updated_count?: number;
         };
         "dto.RepositoryScanRunListDTO": {
             scans?: components["schemas"]["dto.RepositoryScanRunDTO"][];

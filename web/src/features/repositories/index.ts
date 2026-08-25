@@ -44,4 +44,3 @@ export {
   type RepositoryDirectoryNameError,
   type RepositoryNameError,
 } from "./model/repositorySetup";
-export { waitForRepositoryScan } from "./api/waitForRepositoryScan";

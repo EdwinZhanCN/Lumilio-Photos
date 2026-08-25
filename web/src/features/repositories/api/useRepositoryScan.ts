@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import { waitForRepositoryScan } from "./waitForRepositoryScan";
 
 const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await Promise.all([
@@ -31,8 +30,7 @@ export function useRepositoryScan() {
     async (repositoryId: string) => {
       setScanningIds((current) => new Set(current).add(repositoryId));
       try {
-        const requestedAt = Date.now();
-        await scanMutation.mutateAsync({
+        const result = await scanMutation.mutateAsync({
           params: {
             path: {
               id: repositoryId,
@@ -42,7 +40,6 @@ export function useRepositoryScan() {
             force: false,
           },
         });
-        const result = await waitForRepositoryScan(repositoryId, requestedAt);
         await invalidateRepositoryAwareQueries(queryClient);
         return result;
       } finally {
@@ -94,8 +91,7 @@ export function useRepositoryScan() {
       try {
         await Promise.all(
           uniqueIds.map(async (repositoryId) => {
-            const requestedAt = Date.now();
-            await scanMutation.mutateAsync({
+            return scanMutation.mutateAsync({
               params: {
                 path: {
                   id: repositoryId,
@@ -105,7 +101,6 @@ export function useRepositoryScan() {
                 force: false,
               },
             });
-            return waitForRepositoryScan(repositoryId, requestedAt);
           }),
         );
         await invalidateRepositoryAwareQueries(queryClient);

@@ -41,14 +41,15 @@ type QueueCopy = {
 
 const QUEUE_PRESENTATION: Record<string, QueuePresentation> = {
   ingest_asset: { icon: ImageIcon, tone: "text-primary bg-primary/10" },
-  discover_asset: { icon: FileSearch, tone: "text-info bg-info/10" },
+  observe_repository: { icon: FolderSearch, tone: "text-info bg-info/10" },
+  hash_repository_node: { icon: FileSearch, tone: "text-warning bg-warning/10" },
+  repository_outbox: { icon: Layers3, tone: "text-secondary bg-secondary/10" },
   metadata_asset: { icon: ScanSearch, tone: "text-secondary bg-secondary/10" },
   thumbnail_asset: { icon: Sparkles, tone: "text-success bg-success/10" },
   transcode_asset: { icon: Video, tone: "text-accent bg-accent/10" },
   retry_asset: { icon: RefreshCw, tone: "text-warning bg-warning/10" },
   reindex_assets: { icon: Brain, tone: "text-primary bg-primary/10" },
   rebuild_location_clusters: { icon: MapPinned, tone: "text-info bg-info/10" },
-  scan_repository: { icon: FolderSearch, tone: "text-info bg-info/10" },
   detect_stacks: { icon: Layers3, tone: "text-secondary bg-secondary/10" },
   match_live_photo: { icon: Layers3, tone: "text-success bg-success/10" },
   process_semantic: { icon: Brain, tone: "text-primary bg-primary/10" },
@@ -91,9 +92,29 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
       name: t("monitor.queueSummary.queues.detect_stacks.name"),
       description: t("monitor.queueSummary.queues.detect_stacks.description"),
     },
-    discover_asset: {
-      name: t("monitor.queueSummary.queues.discover_asset.name"),
-      description: t("monitor.queueSummary.queues.discover_asset.description"),
+    observe_repository: {
+      name: t("monitor.queueSummary.queues.observe_repository.name", {
+        defaultValue: "Repository observation",
+      }),
+      description: t("monitor.queueSummary.queues.observe_repository.description", {
+        defaultValue: "Discovers and reconciles Repository files in bounded turns.",
+      }),
+    },
+    hash_repository_node: {
+      name: t("monitor.queueSummary.queues.hash_repository_node.name", {
+        defaultValue: "Repository content inspection",
+      }),
+      description: t("monitor.queueSummary.queues.hash_repository_node.description", {
+        defaultValue: "Reads changed Repository files and verifies their exact content identity.",
+      }),
+    },
+    repository_outbox: {
+      name: t("monitor.queueSummary.queues.repository_outbox.name", {
+        defaultValue: "Repository work delivery",
+      }),
+      description: t("monitor.queueSummary.queues.repository_outbox.description", {
+        defaultValue: "Delivers committed Repository work to bounded background processors.",
+      }),
     },
     event_scheduler: {
       name: t("monitor.queueSummary.queues.event_scheduler.name", {
@@ -179,10 +200,6 @@ function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
       name: t("monitor.queueSummary.queues.retry_asset.name"),
       description: t("monitor.queueSummary.queues.retry_asset.description"),
     },
-    scan_repository: {
-      name: t("monitor.queueSummary.queues.scan_repository.name"),
-      description: t("monitor.queueSummary.queues.scan_repository.description"),
-    },
     thumbnail_asset: {
       name: t("monitor.queueSummary.queues.thumbnail_asset.name"),
       description: t("monitor.queueSummary.queues.thumbnail_asset.description"),
@@ -201,7 +218,15 @@ function getKindLabels(t: TFunction): Record<string, string> {
       defaultValue: "Create database backup",
     }),
     detect_stacks: t("monitor.queueSummary.kinds.detect_stacks"),
-    discover_asset: t("monitor.queueSummary.kinds.discover_asset"),
+    observe_repository: t("monitor.queueSummary.kinds.observe_repository", {
+      defaultValue: "Observe Repository",
+    }),
+    hash_repository_node: t("monitor.queueSummary.kinds.hash_repository_node", {
+      defaultValue: "Inspect Repository file content",
+    }),
+    drain_repository_outbox: t("monitor.queueSummary.kinds.drain_repository_outbox", {
+      defaultValue: "Deliver Repository work",
+    }),
     ingest_asset: t("monitor.queueSummary.kinds.ingest_asset"),
     match_live_photo: t("monitor.queueSummary.kinds.match_live_photo"),
     metadata_asset: t("monitor.queueSummary.kinds.metadata_asset"),
@@ -222,7 +247,6 @@ function getKindLabels(t: TFunction): Record<string, string> {
     rebuild_location_clusters: t("monitor.queueSummary.kinds.rebuild_location_clusters"),
     reindex_assets: t("monitor.queueSummary.kinds.reindex_assets"),
     retry_asset: t("monitor.queueSummary.kinds.retry_asset"),
-    scan_repository: t("monitor.queueSummary.kinds.scan_repository"),
     schedule_repository_scans: t("monitor.queueSummary.kinds.schedule_repository_scans"),
     schedule_event_rebuilds: t("monitor.queueSummary.kinds.schedule_event_rebuilds", {
       defaultValue: "Schedule Event rebuilds",
