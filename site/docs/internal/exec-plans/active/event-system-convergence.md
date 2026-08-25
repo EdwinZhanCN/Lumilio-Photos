@@ -1,8 +1,11 @@
 # Event System Convergence and Correctness
 
-Status: active. Core convergence implementation landed on 2026-08-10; the
-correction command/version contract and production recovery run remain before
-this plan can complete.
+Status: active. Implementation is complete as of 2026-08-25: correction
+algebra and frontend convergence landed with the repository lifecycle/SQLite
+work, the temporary write capability flag is removed, and architecture docs
+name the revision lifecycle and shared resolver. The seven-media fixture
+(Phase 0), the legacy-data recovery run (Phase 6), and the repository gates
+remain before this plan can complete.
 
 Primary owners: `server/internal/event`, `server/internal/queue`,
 `server/internal/sourcing`, `server/internal/service`, `server/internal/api`, and
@@ -381,10 +384,16 @@ workflow path filters in the same change.
 - [x] Phase 2 — Atomic topology publish.
 - [x] Phase 3 — Resolver and API convergence (including Browse Scope, shares,
   relations, and Agent Event asset resolution).
-- [ ] Phase 4 — Correction algebra.
-- [ ] Phase 5 — Frontend convergence (core projection and async status polling
-  are landed; picker/search and bulk command UX still need the final pass).
-- [ ] Phase 6 — Recovery and gates.
+- [x] Phase 4 — Correction algebra (landed 2026-08-25 with the repository
+  lifecycle work): merge/split/move/add/remove are atomic named transactions
+  in `server/internal/event/service.go`;
+  `TestRebuildOwnerPublishesAndRetainsStableIdentity` covers corrections
+  followed by rebuild with redirect resolution.
+- [x] Phase 5 — Frontend convergence (landed 2026-08-25): EventPicker search,
+  merge/move/add-media modals, `useEventBulkActions`, and total/projected
+  counts; the temporary write capability flag is removed.
+- [ ] Phase 6 — Recovery and gates (OpenAPI/i18n regeneration and architecture
+  docs are done; the legacy-data recovery run remains).
 
 Validation evidence for this implementation slice:
 
@@ -394,6 +403,9 @@ Validation evidence for this implementation slice:
 - `task dto` regenerated OpenAPI, TypeScript, and ReDoc artifacts.
 - The E2E fixture image is pinned to the repository Go toolchain (`1.25.12`);
   the previous image/toolchain mismatch was removed before the next browser run.
+- 2026-08-25: phase status aligned with the committed code (correction algebra
+  and frontend convergence verified against `server/internal/event` and
+  `web/src/features/events`); repository gates were not re-run on this date.
 
 ## Decision log
 
