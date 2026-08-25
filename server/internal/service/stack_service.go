@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
@@ -71,17 +72,23 @@ type StackService interface {
 type stackService struct {
 	queries       *repo.Queries
 	pool          *sql.DB
+	writer        *catalogtx.Writer
+	readerPool    *sql.DB
 	logger        *zap.Logger
 	auditProvider logging.RepositoryAuditProvider
 	eventQueue    *river.Client[*sql.Tx]
 }
 
 func NewStackService(queries *repo.Queries, pool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider) StackService {
-	return &stackService{queries: queries, pool: pool, logger: logger, auditProvider: auditProvider}
+	return &stackService{queries: queries, pool: pool, writer: catalogtx.NewWriter(pool, nil), readerPool: pool, logger: logger, auditProvider: auditProvider}
 }
 
 func NewStackServiceWithQueue(queries *repo.Queries, pool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider, queueClient *river.Client[*sql.Tx]) StackService {
-	return &stackService{queries: queries, pool: pool, logger: logger, auditProvider: auditProvider, eventQueue: queueClient}
+	return NewStackServiceWithQueueAndReader(queries, pool, catalogtx.NewWriter(pool, nil), pool, logger, auditProvider, queueClient)
+}
+
+func NewStackServiceWithQueueAndReader(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, readerPool *sql.DB, logger *zap.Logger, auditProvider logging.RepositoryAuditProvider, queueClient *river.Client[*sql.Tx]) StackService {
+	return &stackService{queries: queries, pool: pool, writer: writer, readerPool: readerPool, logger: logger, auditProvider: auditProvider, eventQueue: queueClient}
 }
 
 const stackMaxTimeGap = 5 * time.Second
@@ -206,7 +213,7 @@ func timeCluster(candidates []repo.FindCandidatesForStackingByNameRow) []structu
 //     mutation point; items reconciled in step 1 are normalized at the end)
 func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.UUID) (int, error) {
 	repositoryUUID := uuid.NullUUID{UUID: repositoryID, Valid: true}
-	candidates, err := s.queries.FindCandidatesForStackingByName(ctx, repositoryUUID)
+	candidates, err := s.queries.FindCandidatesForStackingByName(ctx, repositoryID)
 	if err != nil {
 		return 0, fmt.Errorf("find structural media candidates: %w", err)
 	}
@@ -286,7 +293,7 @@ func (s *stackService) reconcileComponentRelations(ctx context.Context, candidat
 // ran before the pair finished metadata extraction. Pairs with more than one
 // still or motion candidate stay untouched, matching MatchLivePhotoStack.
 func (s *stackService) runLivePhotoConsistency(ctx context.Context, repositoryID uuid.NullUUID) error {
-	rows, err := s.queries.FindUnmatchedLivePhotoPairs(ctx, repositoryID)
+	rows, err := s.queries.FindUnmatchedLivePhotoPairs(ctx, repositoryID.UUID)
 	if err != nil {
 		return err
 	}
@@ -450,12 +457,12 @@ func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey st
 	if len(members) < 2 {
 		return nil
 	}
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationStackStructuralMerge, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 
 	// The merge target keeps its media item record, so prefer the JPEG
 	// component's item for determinism. The canonical primary asset is
@@ -546,7 +553,7 @@ func (s *stackService) mergeStructuralMediaItem(ctx context.Context, groupKey st
 		}
 	}
 	if primary.OwnerID != nil {
-		if err := s.markEventFactsChangedTx(ctx, tx, *primary.OwnerID, "logical_media_merged"); err != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx.Raw(), *primary.OwnerID, "logical_media_merged"); err != nil {
 			return err
 		}
 	}
@@ -649,12 +656,12 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 	if len(cluster.Members) == 0 {
 		return false, nil
 	}
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationStackBurstPublish, nil)
 	if err != nil {
 		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 
 	existing, err := qtx.GetBurstStackByGroupKey(ctx, &cluster.GroupKey)
 	if err == nil {
@@ -676,7 +683,7 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 			return false, err
 		}
 		if cluster.Members[0].OwnerID != nil {
-			if err := s.markEventFactsChangedTx(ctx, tx, *cluster.Members[0].OwnerID, "stack_extended"); err != nil {
+			if err := s.markEventFactsChangedTx(ctx, tx.Raw(), *cluster.Members[0].OwnerID, "stack_extended"); err != nil {
 				return false, err
 			}
 		}
@@ -720,7 +727,7 @@ func (s *stackService) persistBurstCluster(ctx context.Context, cluster burstClu
 		return false, err
 	}
 	if cluster.Members[0].OwnerID != nil {
-		if err := s.markEventFactsChangedTx(ctx, tx, *cluster.Members[0].OwnerID, "stack_created"); err != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx.Raw(), *cluster.Members[0].OwnerID, "stack_created"); err != nil {
 			return false, err
 		}
 	}
@@ -753,12 +760,12 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 		return nil, ErrAssetAlreadyStacked
 	}
 
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationStackManualCreate, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 	stackID := uuid.New()
 	now := dbtypes.NewTimestamp(time.Now())
 	if _, err := qtx.CreateAssetStack(ctx, repo.CreateAssetStackParams{
@@ -786,7 +793,7 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 		return nil, err
 	}
 	if items[0].OwnerID != nil {
-		if err := s.markEventFactsChangedTx(ctx, tx, *items[0].OwnerID, "stack_created"); err != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx.Raw(), *items[0].OwnerID, "stack_created"); err != nil {
 			return nil, err
 		}
 	}
@@ -840,12 +847,12 @@ func (s *stackService) RemoveFromStack(ctx context.Context, assetID uuid.UUID) e
 	if err != nil {
 		return err
 	}
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationStackRemoveMember, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 	if err := qtx.RemoveStackMemberByAssetID(ctx, assetID); err != nil {
 		return err
 	}
@@ -854,7 +861,7 @@ func (s *stackService) RemoveFromStack(ctx context.Context, assetID uuid.UUID) e
 	}
 	var ownerID int32
 	if err := tx.QueryRowContext(ctx, `SELECT owner_id FROM media_items WHERE media_item_id=?`, membership.MediaItemID).Scan(&ownerID); err == nil {
-		if err := s.markEventFactsChangedTx(ctx, tx, ownerID, "stack_member_removed"); err != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx.Raw(), ownerID, "stack_member_removed"); err != nil {
 			return err
 		}
 	}
@@ -863,19 +870,19 @@ func (s *stackService) RemoveFromStack(ctx context.Context, assetID uuid.UUID) e
 
 func (s *stackService) DeleteStack(ctx context.Context, stackID uuid.UUID) error {
 	var ownerID sql.NullInt64
-	if err := s.pool.QueryRowContext(ctx, `SELECT owner_id FROM asset_stacks WHERE stack_id=?`, stackID).Scan(&ownerID); err != nil {
+	if err := s.readerPool.QueryRowContext(ctx, `SELECT owner_id FROM asset_stacks WHERE stack_id=?`, stackID).Scan(&ownerID); err != nil {
 		return err
 	}
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationStackDelete, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err := s.queries.WithTx(tx).DeleteStack(ctx, stackID); err != nil {
+	if err := s.queries.WithTx(tx.Raw()).DeleteStack(ctx, stackID); err != nil {
 		return err
 	}
 	if ownerID.Valid {
-		if err := s.markEventFactsChangedTx(ctx, tx, int32(ownerID.Int64), "stack_deleted"); err != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx.Raw(), int32(ownerID.Int64), "stack_deleted"); err != nil {
 			return err
 		}
 	}
@@ -927,12 +934,12 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 // normalizes the affected primary component and presentation stacks. It is
 // shared by the per-asset matcher and the repository-wide consistency sweep.
 func (s *stackService) matchLivePhotoPair(ctx context.Context, photoID, videoID uuid.UUID, identifier string) error {
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationStackLivePhotoMatch, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 
 	photoItem, err := qtx.GetMediaItemByAssetID(ctx, photoID)
 	if err != nil {
@@ -996,7 +1003,7 @@ func (s *stackService) matchLivePhotoPair(ctx context.Context, photoID, videoID 
 		}
 	}
 	if photoItem.OwnerID != nil {
-		if err := s.markEventFactsChangedTx(ctx, tx, *photoItem.OwnerID, "live_photo_merged"); err != nil {
+		if err := s.markEventFactsChangedTx(ctx, tx.Raw(), *photoItem.OwnerID, "live_photo_merged"); err != nil {
 			return err
 		}
 	}

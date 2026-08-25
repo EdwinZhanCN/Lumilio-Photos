@@ -3,6 +3,7 @@ package handler
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,11 +17,32 @@ import (
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/roe/locations"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+type zipTestResolver struct {
+	factory    *storage.RepositoryFSFactory
+	repository repo.Repository
+	paths      map[uuid.UUID]storage.RepositoryPath
+}
+
+func (r *zipTestResolver) OpenAsset(_ context.Context, assetID uuid.UUID) (*locations.OpenedMedia, error) {
+	repositoryFS, err := r.factory.Open(r.repository)
+	if err != nil {
+		return nil, err
+	}
+	repositoryPath := r.paths[assetID]
+	file, err := repositoryFS.OpenMedia(repositoryPath)
+	if err != nil {
+		_ = repositoryFS.Close()
+		return nil, err
+	}
+	return &locations.OpenedMedia{File: file, Repository: repositoryFS, Catalog: r.repository, Path: repositoryPath}, nil
+}
 
 func TestAssetHandlerDownloadAssets_RejectsEmptyAssetIDs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -91,15 +113,15 @@ func TestAssetHandlerWriteAssetToZip_UsesOriginalFilenames(t *testing.T) {
 	require.NoError(t, err)
 	secondRepositoryPath, err := storage.ParseUserMediaPath("second.bin")
 	require.NoError(t, err)
-	require.NoError(t, writeAssetToZip(factory, zipWriter, archiveNames, assetDownloadFile{
-		asset:      repo.Asset{OriginalFilename: "IMG_0001.jpg"},
-		repository: repository,
-		path:       firstRepositoryPath,
+	firstID, secondID := uuid.New(), uuid.New()
+	resolver := &zipTestResolver{factory: factory, repository: repository, paths: map[uuid.UUID]storage.RepositoryPath{
+		firstID: firstRepositoryPath, secondID: secondRepositoryPath,
+	}}
+	require.NoError(t, writeAssetToZip(context.Background(), resolver, zipWriter, archiveNames, assetDownloadFile{
+		asset: repo.Asset{AssetID: firstID, OriginalFilename: "IMG_0001.jpg"},
 	}))
-	require.NoError(t, writeAssetToZip(factory, zipWriter, archiveNames, assetDownloadFile{
-		asset:      repo.Asset{OriginalFilename: "IMG_0001.jpg"},
-		repository: repository,
-		path:       secondRepositoryPath,
+	require.NoError(t, writeAssetToZip(context.Background(), resolver, zipWriter, archiveNames, assetDownloadFile{
+		asset: repo.Asset{AssetID: secondID, OriginalFilename: "IMG_0001.jpg"},
 	}))
 	require.NoError(t, zipWriter.Close())
 

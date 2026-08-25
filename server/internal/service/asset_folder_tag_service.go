@@ -12,9 +12,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// FolderSummary describes one repository-relative folder derived from
-// assets.storage_path (there is no folders table). Counts are recursive
-// over descendants.
+// FolderSummary describes one repository-relative directory projected from
+// the repository node graph. Counts include active Locations on descendants.
 type FolderSummary struct {
 	RepositoryID   string
 	RepositoryName string
@@ -117,7 +116,7 @@ func (s *assetService) ListFolderSummaries(ctx context.Context, ownerID *int32, 
 		repoUUID = uuid.NullUUID{UUID: parsed, Valid: true}
 	}
 
-	rows, err := s.queries.GetFolderChildSummaries(ctx, repo.GetFolderChildSummariesParams{
+	rows, err := s.readQueries.GetFolderChildSummaries(ctx, repo.GetFolderChildSummariesParams{
 		ParentPath:   parentPath,
 		OwnerID:      ownerID,
 		RepositoryID: repoUUID,
@@ -166,11 +165,9 @@ func (s *assetService) GetFolderSummary(ctx context.Context, ownerID *int32, rep
 	if err != nil {
 		return FolderSummary{}, fmt.Errorf("invalid repository ID: %w", err)
 	}
-	repoUUID := uuid.NullUUID{UUID: parsed, Valid: true}
-
-	row, err := s.queries.GetFolderSummary(ctx, repo.GetFolderSummaryParams{
+	row, err := s.readQueries.GetFolderSummary(ctx, repo.GetFolderSummaryParams{
 		OwnerID:      ownerID,
-		RepositoryID: repoUUID,
+		RepositoryID: parsed,
 		FolderPath:   folderPath,
 	})
 	if err != nil {
@@ -211,7 +208,7 @@ func (s *assetService) ListTagSummaries(ctx context.Context, ownerID *int32, rep
 		repoUUID = uuid.NullUUID{UUID: parsed, Valid: true}
 	}
 
-	rows, err := s.queries.GetTagSummaries(ctx, repo.GetTagSummariesParams{
+	rows, err := s.readQueries.GetTagSummaries(ctx, repo.GetTagSummariesParams{
 		OwnerID:      ownerID,
 		RepositoryID: repoUUID,
 		Source:       source,
@@ -240,7 +237,7 @@ func (s *assetService) ListTagSummaries(ctx context.Context, ownerID *int32, rep
 // repositoryNamesByID builds a repo_id -> name lookup for enriching folder
 // summaries without an absolute path leak (repositories.path is never read here).
 func (s *assetService) repositoryNamesByID(ctx context.Context) (map[string]string, error) {
-	repos, err := s.queries.ListRepositories(ctx)
+	repos, err := s.readQueries.ListRepositories(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list repositories: %w", err)
 	}

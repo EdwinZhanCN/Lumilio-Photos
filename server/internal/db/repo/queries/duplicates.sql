@@ -10,49 +10,38 @@ SELECT mia.asset_id, COALESCE(asm.stack_id, mia.media_item_id) AS stack_id
 FROM media_item_assets mia
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
 INNER JOIN assets a ON a.asset_id = mia.asset_id
-WHERE a.repository_id = sqlc.arg('repository_id')
-  AND a.is_deleted = false;
-
--- name: GetExactDuplicateCandidates :many
--- Returns assets in a repository that share the exact same (content_hash, file_size)
--- with at least one other asset of the same owner. Only photos are considered,
--- and only non-deleted assets. Results are ordered so members of the same
--- duplicate set (owner included in the grouping key) are adjacent.
-SELECT a.asset_id, a.owner_id, a.content_hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
-FROM assets a
 WHERE a.is_deleted = false
-  AND a.type = 'PHOTO'
-  AND a.repository_id = sqlc.arg('repository_id')
   AND EXISTS (
-    SELECT 1 FROM assets b
-    WHERE b.is_deleted = false
-      AND b.type = 'PHOTO'
-      AND b.repository_id = a.repository_id
-      AND b.owner_id IS a.owner_id
-      AND b.content_hash = a.content_hash
-      AND b.file_size = a.file_size
-      AND b.asset_id <> a.asset_id
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.arg('repository_id')
   )
-ORDER BY a.owner_id, a.content_hash, a.file_size, a.asset_id;
+;
 
 -- name: ListPHashEmbeddingsForRepository :many
 -- Loads pHash embeddings for every non-deleted photo in a repository so the
 -- service layer can build a similarity graph in-memory. owner_id is included
 -- because duplicate edges never cross owners.
-SELECT a.asset_id, a.owner_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+SELECT a.asset_id, a.owner_id, content.file_size, a.taken_time, a.upload_time, a.rating, e.vector
 FROM assets a
+JOIN content_objects content ON content.content_id = a.content_id
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.repository_id = sqlc.arg('repository_id')
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.arg('repository_id')
+  )
   AND e.embedding_type = 'phash'
   AND e.is_primary = true;
 
 -- name: GetPHashEmbeddingsByAssetIDs :many
 -- Ref-scoped variant of ListPHashEmbeddingsForRepository: pHash embeddings for
 -- a specific asset set, for the agent dedupe tool's in-memory similarity graph.
-SELECT a.asset_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+SELECT a.asset_id, content.file_size, a.taken_time, a.upload_time, a.rating, e.vector
 FROM assets a
+JOIN content_objects content ON content.content_id = a.content_id
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'

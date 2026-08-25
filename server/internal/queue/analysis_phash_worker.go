@@ -2,8 +2,13 @@ package queue
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"os"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
 	"server/internal/db/repo"
@@ -27,23 +32,20 @@ type ProcessPHashWorker struct {
 }
 
 func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHashArgs]) error {
-	asset, err := w.Queries.GetAssetByID(ctx, job.Args.AssetID)
+	asset, err := validateCurrentAssetWork(ctx, w.Queries, job.Args.AssetID, job.Args.ExpectedContentID)
+	if errors.Is(err, ErrAssetWorkStale) {
+		return nil
+	}
 	if err != nil {
-		return fmt.Errorf("get asset: %w", err)
+		return err
 	}
-	if !asset.RepositoryID.Valid {
-		return fmt.Errorf("asset %s has no repository", asset.AssetID.String())
-	}
-
-	repository, err := w.Queries.GetRepository(ctx, asset.RepositoryID.UUID)
-	if err != nil {
-		return fmt.Errorf("get repository: %w", err)
-	}
-
 	thumbnail, err := w.Queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
 		AssetID: job.Args.AssetID,
 		Size:    "small",
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return river.JobSnooze(time.Second)
+	}
 	if err != nil {
 		return fmt.Errorf("get small thumbnail: %w", err)
 	}
@@ -55,12 +57,22 @@ func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHa
 	if err := validateThumbnailContent(asset, "small", thumbnailPath); err != nil {
 		return err
 	}
+	if thumbnail.RepositoryID == uuid.Nil {
+		return fmt.Errorf("small thumbnail has no repository")
+	}
+	repository, err := w.Queries.GetRepository(ctx, thumbnail.RepositoryID)
+	if err != nil {
+		return fmt.Errorf("get thumbnail repository: %w", err)
+	}
 	repositoryFS, err := w.Files.Open(repository)
 	if err != nil {
 		return err
 	}
 	defer repositoryFS.Close()
 	file, err := repositoryFS.OpenPrivate(thumbnailPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return river.JobSnooze(time.Second)
+	}
 	if err != nil {
 		return fmt.Errorf("open small thumbnail: %w", err)
 	}
@@ -72,6 +84,11 @@ func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHa
 	}
 
 	vector := phash.ToVector(hash)
+	if _, err := validateCurrentAssetWork(ctx, w.Queries, job.Args.AssetID, job.Args.ExpectedContentID); errors.Is(err, ErrAssetWorkStale) {
+		return nil
+	} else if err != nil {
+		return err
+	}
 
 	if err := w.EmbeddingService.SaveEmbedding(ctx, job.Args.AssetID,
 		service.EmbeddingTypePHash, phash.ModelDCTPHashV1, vector, true); err != nil {

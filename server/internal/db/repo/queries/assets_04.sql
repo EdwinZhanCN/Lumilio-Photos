@@ -45,23 +45,28 @@ eligible AS (
       OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
     )
     AND (sqlc.narg('owner_id') IS NULL OR facts.owner_id = sqlc.narg('owner_id'))
-    AND (sqlc.narg('repository_id') IS NULL OR facts.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = pa.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
     AND (
       sqlc.narg('folder_path') IS NULL
-      OR (
-        CASE
-          WHEN sqlc.narg('folder_path') = '' THEN
-            CASE WHEN COALESCE(sqlc.narg('folder_recursive'), true) THEN true
-              ELSE instr(pa.storage_path, '/') = 0
-            END
-          ELSE
-            CASE WHEN COALESCE(sqlc.narg('folder_recursive'), true) THEN
-              pa.storage_path LIKE sqlc.narg('folder_path') || '/%'
+      OR EXISTS (
+        SELECT 1 FROM active_asset_occurrence_paths occurrence_path
+        WHERE occurrence_path.asset_id = pa.asset_id
+          AND (sqlc.narg('repository_id') IS NULL OR occurrence_path.repository_id = sqlc.narg('repository_id'))
+          AND CASE
+            WHEN sqlc.narg('folder_path') = '' THEN
+              COALESCE(sqlc.narg('folder_recursive'), true)
+              OR instr(occurrence_path.relative_path, '/') = 0
             ELSE
-              pa.storage_path LIKE sqlc.narg('folder_path') || '/%'
-              AND pa.storage_path NOT LIKE sqlc.narg('folder_path') || '/%/%'
-            END
-        END
+              occurrence_path.relative_path LIKE sqlc.narg('folder_path') || '/%'
+              AND (
+                COALESCE(sqlc.narg('folder_recursive'), true)
+                OR instr(substr(occurrence_path.relative_path, length(sqlc.narg('folder_path')) + 2), '/') = 0
+              )
+          END
       )
     )
     AND (

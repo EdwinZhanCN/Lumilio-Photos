@@ -23,7 +23,11 @@ SELECT
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   AND (?2 IS NULL OR a.owner_id = ?2)
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL

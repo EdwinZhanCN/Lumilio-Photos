@@ -21,7 +21,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-	"server/internal/storage/scanner"
+	roecontroller "server/internal/storage/roe/controller"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -234,9 +234,11 @@ func redactSupportPath(path string) string {
 }
 
 type RepositoryScanService interface {
-	EnqueueManualScan(ctx context.Context, repositoryID string, requestedBy string, force bool) (scanner.EnqueueResult, error)
+	EnqueueManualScan(ctx context.Context, repositoryID string, requestedBy string, force bool) (roecontroller.Receipt, error)
+	GetScanRun(ctx context.Context, repositoryID string, operationID string) (repo.RepositoryScanRun, error)
 	GetLatestScanRun(ctx context.Context, repositoryID string) (repo.RepositoryScanRun, error)
 	ListScanRuns(ctx context.Context, repositoryID string, limit, offset int32) ([]repo.RepositoryScanRun, error)
+	CancelScanRun(ctx context.Context, repositoryID string, operationID string) (repo.RepositoryScanRun, error)
 }
 
 type RepositoryScanHandler struct {
@@ -563,11 +565,69 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 	}
 
 	api.JSONOK(c, dto.RepositoryScanQueuedDTO{
-		JobID:        result.JobID,
-		RepositoryID: result.RepositoryID,
+		OperationID:  result.OperationID.String(),
+		RepositoryID: result.RepositoryID.String(),
 		Mode:         result.Mode,
 		Status:       result.Status,
+		Inserted:     result.Inserted,
+		Coalesced:    result.Coalesced,
 	})
+}
+
+// GetRepositoryScan returns one durable scan operation by immutable ID.
+// @Summary Get repository scan operation
+// @Description Return one durable Repository scan operation by immutable operation ID.
+// @Tags repositories
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Repository UUID"
+// @Param operation_id path string true "Scan operation UUID"
+// @Success 200 {object} dto.RepositoryScanRunDTO "Repository scan operation retrieved successfully"
+// @Failure 404 {object} api.ProblemResponse "Scan operation not found"
+// @Router /api/v1/repositories/{id}/scans/{operation_id} [get]
+func (h *RepositoryScanHandler) GetRepositoryScan(c *gin.Context) {
+	scanRun, err := h.scanService.GetScanRun(
+		c.Request.Context(),
+		strings.TrimSpace(c.Param("id")),
+		strings.TrimSpace(c.Param("operation_id")),
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			api.WriteProblem(c, api.NotFound(err))
+			return
+		}
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	api.JSONOK(c, toRepositoryScanRunDTO(scanRun))
+}
+
+// CancelRepositoryScan durably requests cancellation of one exact operation.
+// @Summary Cancel repository scan operation
+// @Description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+// @Tags repositories
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Repository UUID"
+// @Param operation_id path string true "Scan operation UUID"
+// @Success 200 {object} dto.RepositoryScanRunDTO "Repository scan cancellation requested"
+// @Failure 404 {object} api.ProblemResponse "Scan operation not found"
+// @Router /api/v1/repositories/{id}/scans/{operation_id}/cancel [post]
+func (h *RepositoryScanHandler) CancelRepositoryScan(c *gin.Context) {
+	scanRun, err := h.scanService.CancelScanRun(
+		c.Request.Context(),
+		strings.TrimSpace(c.Param("id")),
+		strings.TrimSpace(c.Param("operation_id")),
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			api.WriteProblem(c, api.NotFound(err))
+			return
+		}
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	api.JSONOK(c, toRepositoryScanRunDTO(scanRun))
 }
 
 // GetLatestRepositoryScan returns the latest scan run for a repository.
@@ -628,10 +688,6 @@ func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 // @Success 200 {object} dto.ListRepositoriesResponseDTO "Repositories retrieved successfully"
 // @Router /api/v1/repositories [get]
 func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
-	if err := h.repoManager.ReconcileAll(c.Request.Context()); err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
 	repos, err := h.repoManager.ListRepositories()
 	if err != nil {
 		api.WriteProblem(c, api.Internal(err))
@@ -925,7 +981,12 @@ func parseInt32Query(c *gin.Context, key string, fallback int32) int32 {
 }
 
 func toRepositoryScanRunDTO(scanRun repo.RepositoryScanRun) dto.RepositoryScanRunDTO {
-	startedAt := scanRun.StartedAt.Time
+	createdAt := scanRun.CreatedAt.Time
+	var startedAt *time.Time
+	if scanRun.StartedAt.Valid {
+		t := scanRun.StartedAt.Time
+		startedAt = &t
+	}
 	var finishedAt *time.Time
 	if scanRun.FinishedAt.Valid {
 		t := scanRun.FinishedAt.Time
@@ -934,28 +995,23 @@ func toRepositoryScanRunDTO(scanRun repo.RepositoryScanRun) dto.RepositoryScanRu
 	var operationProblem *problem.Reference
 	switch {
 	case scanRun.Status == "failed":
-		value := problem.ReferenceFor(problem.RepositoryScanFailed, scanRun.ScanID.String(), true)
+		value := problem.ReferenceFor(problem.RepositoryScanFailed, scanRun.RunID.String(), true)
 		operationProblem = &value
-	case scanRun.Status == "completed" && scanRun.PartialReason != nil:
-		value := problem.ReferenceFor(problem.RepositoryScanIncomplete, scanRun.ScanID.String(), true)
+	case scanRun.Status == "partial":
+		value := problem.ReferenceFor(problem.RepositoryScanIncomplete, scanRun.RunID.String(), true)
 		operationProblem = &value
 	}
 	return dto.RepositoryScanRunDTO{
-		ScanID:          scanRun.ScanID.String(),
-		RepositoryID:    scanRun.RepositoryID.String(),
-		Mode:            scanRun.Mode,
-		RequestedBy:     scanRun.RequestedBy,
-		Status:          scanRun.Status,
-		StartedAt:       startedAt,
-		FinishedAt:      finishedAt,
-		DiscoveredCount: scanRun.DiscoveredCount,
-		UpdatedCount:    scanRun.UpdatedCount,
-		MovedCount:      scanRun.MovedCount,
-		DeletedCount:    scanRun.DeletedCount,
-		SkippedCount:    scanRun.SkippedCount,
-		DeferredCount:   scanRun.DeferredCount,
-		AmbiguousCount:  scanRun.AmbiguousCount,
-		Authoritative:   scanRun.Authoritative,
-		Problem:         operationProblem,
+		OperationID: scanRun.RunID.String(), RepositoryID: scanRun.RepositoryID.String(),
+		RequestedEpoch: scanRun.RequestedEpoch, Mode: scanRun.Mode, RequestedBy: scanRun.RequestedBy,
+		CoalescedCount: scanRun.CoalescedCount, Status: scanRun.Status,
+		CreatedAt: createdAt, StartedAt: startedAt, FinishedAt: finishedAt,
+		DirectoriesObserved: scanRun.DirectoriesObserved, FilesObserved: scanRun.FilesObserved,
+		BytesQueued: scanRun.BytesQueued, BytesHashed: scanRun.BytesHashed,
+		AuthoritativeDirectories: scanRun.AuthoritativeDirectories,
+		ErrorDirectories:         scanRun.ErrorDirectories, OutboxDepth: scanRun.OutboxDepth,
+		PartialCoverage:       scanRun.PartialCoverage != 0,
+		CancellationRequested: scanRun.CancellationRequested != 0,
+		Problem:               operationProblem,
 	}
 }

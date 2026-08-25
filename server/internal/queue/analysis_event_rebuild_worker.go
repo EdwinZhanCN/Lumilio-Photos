@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/event"
 	"server/internal/queue/jobs"
 
@@ -19,7 +20,7 @@ type ScheduleEventRebuildsArgs = jobs.ScheduleEventRebuildsArgs
 
 type EventRebuildWorker struct {
 	river.WorkerDefaults[EventRebuildArgs]
-	DB      *sql.DB
+	Writer  *catalogtx.Writer
 	Service *event.Service
 }
 
@@ -28,14 +29,14 @@ func (w *EventRebuildWorker) Timeout(*river.Job[EventRebuildArgs]) time.Duration
 }
 
 func (w *EventRebuildWorker) Work(ctx context.Context, job *river.Job[EventRebuildArgs]) error {
-	if w.DB == nil || w.Service == nil {
+	if w.Writer == nil || w.Service == nil {
 		return errors.New("Event rebuild worker not configured")
 	}
 	now := time.Now().UTC().UnixMicro()
 	token := uuid.NewString()
 	var runID string
 	var sourceRevision, publishedRevision int64
-	tx, err := w.DB.BeginTx(ctx, nil)
+	tx, err := w.Writer.BeginTx(ctx, catalogtx.OperationEventRebuildClaim, nil)
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ UPDATE event_rebuild_runs SET state='running',started_at=? WHERE run_id=?`, now,
 	default:
 	}
 	finish := time.Now().UTC().UnixMicro()
-	finalize, finalizeErr := w.DB.BeginTx(ctx, nil)
+	finalize, finalizeErr := w.Writer.BeginTx(ctx, catalogtx.OperationEventRebuildFinalize, nil)
 	if finalizeErr != nil {
 		return finalizeErr
 	}
@@ -133,7 +134,11 @@ UPDATE event_rebuild_runs SET state='running',started_at=? WHERE run_id=?`, now,
 			return err
 		}
 		if errors.Is(rebuildErr, event.ErrStaleRevision) {
-			return nil
+			// River requires unique jobs to include the running state, so an
+			// invalidation arriving during this run coalesces into this durable
+			// row instead of inserting a follower. Snooze the same job and read
+			// the new source revision on its next turn.
+			return river.JobSnooze(0)
 		}
 		return fmt.Errorf("rebuild owner Events: %w", rebuildErr)
 	}
@@ -160,7 +165,13 @@ UPDATE event_owner_state SET rebuild_lease_token=NULL,rebuild_lease_expires_at=N
 WHERE owner_id=? AND rebuild_lease_token=?`, finish, job.Args.OwnerID, token); err != nil {
 		return err
 	}
-	return finalize.Commit()
+	if err := finalize.Commit(); err != nil {
+		return err
+	}
+	if currentSource != sourceRevision {
+		return river.JobSnooze(0)
+	}
+	return nil
 }
 
 func errorCode(err error) string {
@@ -185,7 +196,7 @@ func (w *EventRebuildWorker) renewOwnerLease(ctx context.Context, ownerID int32,
 			return
 		case <-ticker.C:
 			now := time.Now().UTC().UnixMicro()
-			tx, err := w.DB.BeginTx(ctx, nil)
+			tx, err := w.Writer.BeginTx(ctx, catalogtx.OperationEventRebuildLeaseRenew, nil)
 			if err != nil {
 				result <- err
 				return
@@ -219,20 +230,30 @@ WHERE owner_id=? AND rebuild_lease_token=?`,
 
 type ScheduleEventRebuildsWorker struct {
 	river.WorkerDefaults[ScheduleEventRebuildsArgs]
-	DB *sql.DB
+	DB     *sql.DB
+	Writer *catalogtx.Writer
+	ReadDB *sql.DB
 }
 
 func (w *ScheduleEventRebuildsWorker) Work(ctx context.Context, _ *river.Job[ScheduleEventRebuildsArgs]) error {
 	if w.DB == nil {
 		return errors.New("Event rebuild scheduler not configured")
 	}
+	writer := w.Writer
+	if writer == nil {
+		writer = catalogtx.NewWriter(w.DB, nil)
+	}
 	now := time.Now().UTC().UnixMicro()
-	if _, err := w.DB.ExecContext(ctx, `
+	if _, err := writer.ExecContext(ctx, catalogtx.OperationEventSchedulerLeaseCleanup, `
 UPDATE event_owner_state SET rebuild_lease_token=NULL,rebuild_lease_expires_at=NULL,updated_at=?
 WHERE rebuild_lease_expires_at IS NOT NULL AND rebuild_lease_expires_at<?`, now, now); err != nil {
 		return err
 	}
-	ownerIDs, err := pendingEventOwnerIDsConverged(ctx, w.DB)
+	readDB := w.ReadDB
+	if readDB == nil {
+		readDB = w.DB
+	}
+	ownerIDs, err := pendingEventOwnerIDsConverged(ctx, readDB)
 	if err != nil {
 		return err
 	}

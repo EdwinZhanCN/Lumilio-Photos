@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"server/internal/classify"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 
 	"github.com/google/uuid"
@@ -80,6 +81,8 @@ type ClassifierService interface {
 
 type classifierService struct {
 	pool       *sql.DB
+	readerPool *sql.DB
+	writer     *catalogtx.Writer
 	lumen      LumenService
 	embeddings EmbeddingService
 	logger     *zap.Logger
@@ -92,11 +95,21 @@ type classifierService struct {
 }
 
 func NewClassifierService(pool *sql.DB, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
+	return NewClassifierServiceWithReader(pool, pool, lumen, embeddings, logger)
+}
+
+func NewClassifierServiceWithReader(pool, readerPool *sql.DB, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
+	return NewClassifierServiceWithCatalog(pool, readerPool, catalogtx.NewWriter(pool, nil), lumen, embeddings, logger)
+}
+
+func NewClassifierServiceWithCatalog(pool, readerPool *sql.DB, writer *catalogtx.Writer, lumen LumenService, embeddings EmbeddingService, logger *zap.Logger) ClassifierService {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	return &classifierService{
 		pool:       pool,
+		readerPool: readerPool,
+		writer:     writer,
 		lumen:      lumen,
 		embeddings: embeddings,
 		logger:     logger,
@@ -311,7 +324,7 @@ ORDER BY score DESC, asset_id DESC
 LIMIT ?
 `
 
-	rows, err := s.pool.QueryContext(ctx, query, negVec, posVec, space.ID, threshold, limit)
+	rows, err := s.readerPool.QueryContext(ctx, query, negVec, posVec, space.ID, threshold, limit)
 	if err != nil {
 		return nil, fmt.Errorf("preview query: %w", err)
 	}
@@ -379,7 +392,7 @@ WHERE %s
 ORDER BY id
 `, where)
 
-	rows, err := s.pool.QueryContext(ctx, query)
+	rows, err := s.readerPool.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("load classifier definitions: %w", err)
 	}
@@ -428,7 +441,7 @@ func (s *classifierService) savePrototypes(ctx context.Context, id int32, positi
 		negArg = dbtypes.NewVector(negative)
 	}
 	now := dbtypes.NewTimestamp(time.Now())
-	_, err := s.pool.ExecContext(ctx, `
+	_, err := s.writer.ExecContext(ctx, catalogtx.OperationClassifierSavePrototypes, `
 UPDATE classifier_definitions
 SET positive_prototype = ?,
     negative_prototype = ?,

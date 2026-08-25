@@ -13,7 +13,7 @@ import (
 
 // ProcessTranscodeTask handles video/audio transcoding.
 func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.TranscodeArgs) error {
-	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ObservationToken, args.ExpectedContentHash)
+	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ExpectedContentID)
 	if err != nil {
 		if errors.Is(err, ErrAssetSourceStale) {
 			return nil
@@ -40,7 +40,7 @@ func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.Tr
 				if err := ap.transcodeVideoSmart(ctx, source.files, source.path, asset, source.localPath, info, ap.transcodeConfig); err != nil {
 					return err
 				}
-				if err := ap.enqueueVideoFramesJob(ctx, asset.AssetID); err != nil {
+				if err := ap.enqueueVideoFramesJob(ctx, asset.AssetID, asset.ContentID); err != nil {
 					if ap.logger != nil {
 						ap.logger.Warn("enqueue video frames after transcode failed",
 							zap.String("asset_id", asset.AssetID.String()),

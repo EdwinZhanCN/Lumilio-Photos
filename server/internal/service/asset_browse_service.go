@@ -157,17 +157,17 @@ func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsP
 		return BrowseQueryResult{}, err
 	}
 
-	totalMediaItems, err := s.queries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
+	totalMediaItems, err := s.readQueries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
 	if err != nil {
 		return BrowseQueryResult{}, fmt.Errorf("failed to count media items: %w", err)
 	}
-	totalFiles, err := s.queries.CountMediaItemFilesUnified(ctx, countMediaItemFilesUnifiedParams(params, in))
+	totalFiles, err := s.readQueries.CountMediaItemFilesUnified(ctx, countMediaItemFilesUnifiedParams(params, in))
 	if err != nil {
 		return BrowseQueryResult{}, fmt.Errorf("failed to count media item files: %w", err)
 	}
 
 	if params.StackMode == StackModeExpanded {
-		rows, err := s.queries.GetMediaItemsUnified(ctx, getMediaItemsUnifiedParams(params, in))
+		rows, err := s.readQueries.GetMediaItemsUnified(ctx, getMediaItemsUnifiedParams(params, in))
 		if err != nil {
 			return BrowseQueryResult{}, err
 		}
@@ -180,11 +180,11 @@ func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsP
 		}, nil
 	}
 
-	totalVisible, err := s.queries.CountCollapsedBrowseItemsUnified(ctx, countCollapsedBrowseItemsUnifiedParams(params, in))
+	totalVisible, err := s.readQueries.CountCollapsedBrowseItemsUnified(ctx, countCollapsedBrowseItemsUnifiedParams(params, in))
 	if err != nil {
 		return BrowseQueryResult{}, fmt.Errorf("failed to count collapsed browse items: %w", err)
 	}
-	rows, err := s.queries.GetCollapsedBrowseItemsUnified(ctx, getCollapsedBrowseItemsUnifiedParams(params, in))
+	rows, err := s.readQueries.GetCollapsedBrowseItemsUnified(ctx, getCollapsedBrowseItemsUnifiedParams(params, in))
 	if err != nil {
 		return BrowseQueryResult{}, err
 	}
@@ -216,11 +216,11 @@ func (s *assetService) QueryMediaItems(ctx context.Context, params QueryAssetsPa
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.queries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
+	total, err := s.readQueries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count media items: %w", err)
 	}
-	rows, err := s.queries.GetMediaItemsUnified(ctx, getMediaItemsUnifiedParams(params, in))
+	rows, err := s.readQueries.GetMediaItemsUnified(ctx, getMediaItemsUnifiedParams(params, in))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -245,7 +245,7 @@ func (s *assetService) CountMediaItems(ctx context.Context, params QueryAssetsPa
 	if err != nil {
 		return 0, err
 	}
-	return s.queries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
+	return s.readQueries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
 }
 
 // CountMediaItemFiles counts the component files of matching media items.
@@ -262,7 +262,7 @@ func (s *assetService) CountMediaItemFiles(ctx context.Context, params QueryAsse
 	if err != nil {
 		return 0, err
 	}
-	return s.queries.CountMediaItemFilesUnified(ctx, countMediaItemFilesUnifiedParams(params, in))
+	return s.readQueries.CountMediaItemFilesUnified(ctx, countMediaItemFilesUnifiedParams(params, in))
 }
 
 // SearchBrowseItems is the browse-tier face of the unified search pipeline
@@ -435,7 +435,7 @@ func (s *assetService) resolveMediaRefsInOrder(ctx context.Context, assetIDs []u
 	if len(assetIDs) == 0 {
 		return []mediaRef{}, map[uuid.UUID]uuid.UUID{}, nil
 	}
-	rows, err := s.queries.GetMediaItemsByAssetIDs(ctx, assetIDs)
+	rows, err := s.readQueries.GetMediaItemsByAssetIDs(ctx, assetIDs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve media items: %w", err)
 	}
@@ -556,9 +556,9 @@ func (s *assetService) pageMediaRefsBySort(ctx context.Context, refs []mediaRef,
 	var orderedAsc []uuid.UUID
 	var err error
 	if sortBy == "recently_added" {
-		orderedAsc, err = s.queries.RankAssetIDsByUploadTime(ctx, primaryIDs)
+		orderedAsc, err = s.readQueries.RankAssetIDsByUploadTime(ctx, primaryIDs)
 	} else {
-		orderedAsc, err = s.queries.RankAssetIDsByTime(ctx, primaryIDs)
+		orderedAsc, err = s.readQueries.RankAssetIDsByTime(ctx, primaryIDs)
 	}
 	if err != nil {
 		return nil, err
@@ -623,7 +623,7 @@ func (s *assetService) collapseRefsToBrowseItems(ctx context.Context, refs []med
 	kindByStack := make(map[uuid.UUID]dbtypes.StackKind, len(stackOrder))
 	coverItemByStack := make(map[uuid.UUID]uuid.UUID, len(stackOrder))
 	if len(stackOrder) > 0 {
-		rows, err := s.queries.GetStackKindsByIDs(ctx, stackOrder)
+		rows, err := s.readQueries.GetStackKindsByIDs(ctx, stackOrder)
 		if err != nil {
 			return nil, fmt.Errorf("get browse stack kinds: %w", err)
 		}
@@ -637,7 +637,7 @@ func (s *assetService) collapseRefsToBrowseItems(ctx context.Context, refs []med
 
 	membersByStack := make(map[uuid.UUID][]BrowseStackMember, len(stackOrder))
 	for _, stackID := range stackOrder {
-		memberRows, err := s.queries.GetStackMembers(ctx, repo.GetStackMembersParams{
+		memberRows, err := s.readQueries.GetStackMembers(ctx, repo.GetStackMembersParams{
 			StackID: stackID,
 			OwnerID: ownerID,
 		})
@@ -764,7 +764,7 @@ func (s *assetService) mediaItemFactsByIDs(ctx context.Context, mediaItemIDs []u
 	if len(mediaItemIDs) == 0 {
 		return facts, nil
 	}
-	rows, err := s.queries.GetMediaItemBrowseFactsByIDs(ctx, mediaItemIDs)
+	rows, err := s.readQueries.GetMediaItemBrowseFactsByIDs(ctx, mediaItemIDs)
 	if err != nil {
 		return nil, fmt.Errorf("get media item browse facts: %w", err)
 	}
@@ -783,9 +783,9 @@ func (s *assetService) assetsByIDsMap(ctx context.Context, ids []uuid.UUID, isDe
 	var rows []repo.Asset
 	var err error
 	if queryIncludesDeletedAssets(isDeleted) {
-		rows, err = s.queries.GetAssetsByIDsAny(ctx, ids)
+		rows, err = s.readQueries.GetAssetsByIDsAny(ctx, ids)
 	} else {
-		rows, err = s.queries.GetAssetsByIDs(ctx, ids)
+		rows, err = s.readQueries.GetAssetsByIDs(ctx, ids)
 	}
 	if err != nil {
 		return nil, err

@@ -16,7 +16,11 @@ SELECT
 FROM assets a
 WHERE
     a.is_deleted = false
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+      SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = ?1
+    ))
     AND json_type(a.specific_metadata, char(36) || '.focal_length') IN ('integer', 'real')
     AND json_extract(a.specific_metadata, char(36) || '.focal_length') > 0
 GROUP BY focal_length

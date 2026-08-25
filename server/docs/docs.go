@@ -2034,6 +2034,9 @@ const docTemplate = `{
                     "capture_offset_minutes": {
                         "type": "integer"
                     },
+                    "content_id": {
+                        "type": "string"
+                    },
                     "deleted_at": {
                         "type": "string"
                     },
@@ -2076,9 +2079,6 @@ const docTemplate = `{
                     "rating": {
                         "type": "integer"
                     },
-                    "repository_id": {
-                        "type": "string"
-                    },
                     "species_predictions": {
                         "items": {
                             "$ref": "#/components/schemas/dbtypes.SpeciesPredictionMeta"
@@ -2109,9 +2109,6 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
-                    },
-                    "storage_path": {
-                        "type": "string"
                     },
                     "taken_time": {
                         "type": "string"
@@ -2230,6 +2227,9 @@ const docTemplate = `{
                     "capture_offset_minutes": {
                         "type": "integer"
                     },
+                    "content_id": {
+                        "type": "string"
+                    },
                     "deleted_at": {
                         "type": "string"
                     },
@@ -2269,9 +2269,6 @@ const docTemplate = `{
                     "rating": {
                         "type": "integer"
                     },
-                    "repository_id": {
-                        "type": "string"
-                    },
                     "species_predictions": {
                         "items": {
                             "$ref": "#/components/schemas/dbtypes.SpeciesPredictionMeta"
@@ -2303,9 +2300,6 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
-                    "storage_path": {
-                        "type": "string"
-                    },
                     "taken_time": {
                         "type": "string"
                     },
@@ -2335,6 +2329,9 @@ const docTemplate = `{
                     },
                     "capture_offset_minutes": {
                         "type": "integer"
+                    },
+                    "content_id": {
+                        "type": "string"
                     },
                     "deleted_at": {
                         "type": "string"
@@ -2381,9 +2378,6 @@ const docTemplate = `{
                     "rating": {
                         "type": "integer"
                     },
-                    "repository_id": {
-                        "type": "string"
-                    },
                     "species_predictions": {
                         "items": {
                             "$ref": "#/components/schemas/dbtypes.SpeciesPredictionMeta"
@@ -2414,9 +2408,6 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
-                    },
-                    "storage_path": {
-                        "type": "string"
                     },
                     "tags": {
                         "items": {
@@ -7022,12 +7013,20 @@ const docTemplate = `{
             },
             "dto.RepositoryScanQueuedDTO": {
                 "properties": {
-                    "job_id": {
-                        "example": 12345,
-                        "type": "integer"
+                    "coalesced": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "inserted": {
+                        "example": true,
+                        "type": "boolean"
                     },
                     "mode": {
                         "example": "manual",
+                        "type": "string"
+                    },
+                    "operation_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
                     "repository_id": {
@@ -7052,24 +7051,39 @@ const docTemplate = `{
             },
             "dto.RepositoryScanRunDTO": {
                 "properties": {
-                    "ambiguous_count": {
-                        "example": 0,
+                    "authoritative_directories": {
+                        "example": 8,
                         "type": "integer"
                     },
-                    "authoritative": {
-                        "example": true,
+                    "bytes_hashed": {
+                        "example": 524288,
+                        "type": "integer"
+                    },
+                    "bytes_queued": {
+                        "example": 1048576,
+                        "type": "integer"
+                    },
+                    "cancellation_requested": {
+                        "example": false,
                         "type": "boolean"
                     },
-                    "deferred_count": {
+                    "coalesced_count": {
                         "example": 1,
                         "type": "integer"
                     },
-                    "deleted_count": {
-                        "example": 1,
-                        "type": "integer"
+                    "created_at": {
+                        "type": "string"
                     },
-                    "discovered_count": {
+                    "directories_observed": {
                         "example": 10,
+                        "type": "integer"
+                    },
+                    "error_directories": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "files_observed": {
+                        "example": 120,
                         "type": "integer"
                     },
                     "finished_at": {
@@ -7079,9 +7093,17 @@ const docTemplate = `{
                         "example": "manual",
                         "type": "string"
                     },
-                    "moved_count": {
-                        "example": 1,
+                    "operation_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "outbox_depth": {
+                        "example": 12,
                         "type": "integer"
+                    },
+                    "partial_coverage": {
+                        "example": true,
+                        "type": "boolean"
                     },
                     "problem": {
                         "$ref": "#/components/schemas/api.ProblemReference"
@@ -7094,12 +7116,8 @@ const docTemplate = `{
                         "example": "edwin",
                         "type": "string"
                     },
-                    "scan_id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    },
-                    "skipped_count": {
-                        "example": 4,
+                    "requested_epoch": {
+                        "example": 2,
                         "type": "integer"
                     },
                     "started_at": {
@@ -7108,10 +7126,6 @@ const docTemplate = `{
                     "status": {
                         "example": "completed",
                         "type": "string"
-                    },
-                    "updated_count": {
-                        "example": 2,
-                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -21263,6 +21277,118 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Get latest repository scan",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/scans/{operation_id}": {
+            "get": {
+                "description": "Return one durable Repository scan operation by immutable operation ID.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Scan operation UUID",
+                        "in": "path",
+                        "name": "operation_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository scan operation retrieved successfully"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Scan operation not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get repository scan operation",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/scans/{operation_id}/cancel": {
+            "post": {
+                "description": "Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Scan operation UUID",
+                        "in": "path",
+                        "name": "operation_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository scan cancellation requested"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Scan operation not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Cancel repository scan operation",
                 "tags": [
                     "repositories"
                 ]

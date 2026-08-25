@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,13 @@ func TestFullReprocessStatusAndJobsShareTransaction(t *testing.T) {
 	if err := catalog.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
+	owner, err := catalog.Queries.CreateUser(ctx, repo.CreateUserParams{
+		Username: "handler-retry-owner", Password: "unused", DisplayName: "Handler Retry Owner", Role: "admin",
+		WebauthnUserHandle: []byte("handler-retry-owner"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	failed := status.AssetStatus{State: status.StateFailed, Tasks: map[string]status.TaskStatus{
 		"metadata_asset": {State: status.TaskFailed},
 	}}
@@ -43,10 +51,18 @@ func TestFullReprocessStatusAndJobsShareTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	assetID := uuid.New()
+	now := dbtypes.NewTimestamp(time.Now().UTC())
+	content, err := catalog.Queries.InsertContentObject(ctx, repo.InsertContentObjectParams{
+		ContentID: uuid.New(), HashAlgorithm: "blake3-v1", FullHash: strings.Repeat("a", 64),
+		FileSize: 1, CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	rating := int64(0)
 	if _, err := catalog.Queries.CreateAsset(ctx, repo.CreateAssetParams{
-		AssetID: assetID, Type: string(dbtypes.AssetTypePhoto), OriginalFilename: "retry.jpg", MimeType: "image/jpeg",
-		FileSize: 1, ContentHash: "hash", TakenTime: dbtypes.NewTimestamp(time.Now().UTC()),
+		AssetID: assetID, OwnerID: &owner.UserID, ContentID: content.ContentID,
+		Type: string(dbtypes.AssetTypePhoto), OriginalFilename: "retry.jpg", MimeType: "image/jpeg", TakenTime: now,
 		SpecificMetadata: dbtypes.SpecificMetadata([]byte("{}")), Rating: &rating, Status: encoded,
 	}); err != nil {
 		t.Fatal(err)
@@ -64,7 +80,8 @@ func TestFullReprocessStatusAndJobsShareTransaction(t *testing.T) {
 	if _, err := catalog.Queries.WithTx(tx).ResetAssetStatusForRetry(ctx, assetID); err != nil {
 		t.Fatal(err)
 	}
-	metadata := jobs.MetadataArgs{AssetID: assetID, ObservationToken: "observation", ExpectedContentHash: "hash"}
+	effectID := uuid.New()
+	metadata := jobs.MetadataArgs{AssetID: assetID, ExpectedContentID: content.ContentID, EffectID: effectID}
 	if err := insertReprocessJobTx(ctx, queueClient, tx, metadata, "metadata_asset"); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +117,7 @@ func TestFullReprocessStatusAndJobsShareTransaction(t *testing.T) {
 		if err := insertReprocessJobTx(ctx, queueClient, tx, metadata, "metadata_asset"); err != nil {
 			return err
 		}
-		thumbnail := jobs.ThumbnailArgs{AssetID: assetID, ObservationToken: "observation", ExpectedContentHash: "hash"}
+		thumbnail := jobs.ThumbnailArgs{AssetID: assetID, ExpectedContentID: content.ContentID, EffectID: effectID}
 		if err := insertReprocessJobTx(ctx, queueClient, tx, thumbnail, "thumbnail_asset"); err != nil {
 			return err
 		}

@@ -48,23 +48,28 @@ WHERE pa.is_deleted = COALESCE(?1, false)
     OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
   )
   AND (?4 IS NULL OR facts.owner_id = ?4)
-  AND (?5 IS NULL OR facts.repository_id = ?5)
+  AND (?5 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = pa.asset_id
+      AND occurrence.repository_id = ?5
+  ))
   AND (
     ?6 IS NULL
-    OR (
-      CASE
-        WHEN ?6 = '' THEN
-          CASE WHEN COALESCE(?7, true) THEN true
-            ELSE instr(pa.storage_path, '/') = 0
-          END
-        ELSE
-          CASE WHEN COALESCE(?7, true) THEN
-            pa.storage_path LIKE ?6 || '/%'
+    OR EXISTS (
+      SELECT 1 FROM active_asset_occurrence_paths occurrence_path
+      WHERE occurrence_path.asset_id = pa.asset_id
+        AND (?5 IS NULL OR occurrence_path.repository_id = ?5)
+        AND CASE
+          WHEN ?6 = '' THEN
+            COALESCE(?7, true)
+            OR instr(occurrence_path.relative_path, '/') = 0
           ELSE
-            pa.storage_path LIKE ?6 || '/%'
-            AND pa.storage_path NOT LIKE ?6 || '/%/%'
-          END
-      END
+            occurrence_path.relative_path LIKE ?6 || '/%'
+            AND (
+              COALESCE(?7, true)
+              OR instr(substr(occurrence_path.relative_path, length(?6) + 2), '/') = 0
+            )
+        END
     )
   )
   AND (

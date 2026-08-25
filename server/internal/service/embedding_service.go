@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/db/vectorindex"
@@ -45,8 +46,10 @@ type PrimaryEmbedding struct {
 }
 
 type embeddingService struct {
-	queries *repo.Queries
-	pool    *sql.DB
+	queries    *repo.Queries
+	pool       *sql.DB
+	writer     *catalogtx.Writer
+	readerPool *sql.DB
 }
 
 type EmbeddingType string
@@ -66,9 +69,19 @@ type EmbeddingInfo struct {
 }
 
 func NewEmbeddingService(queries *repo.Queries, pool *sql.DB) EmbeddingService {
+	return NewEmbeddingServiceWithReader(queries, pool, pool)
+}
+
+func NewEmbeddingServiceWithReader(queries *repo.Queries, pool, readerPool *sql.DB) EmbeddingService {
+	return NewEmbeddingServiceWithCatalog(queries, catalogtx.NewWriter(pool, nil), readerPool)
+}
+
+func NewEmbeddingServiceWithCatalog(queries *repo.Queries, writer *catalogtx.Writer, readerPool *sql.DB) EmbeddingService {
 	return &embeddingService{
-		queries: queries,
-		pool:    pool,
+		queries:    queries,
+		pool:       writer.Pool(),
+		writer:     writer,
+		readerPool: readerPool,
 	}
 }
 
@@ -86,13 +99,13 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID uuid.UUID,
 		vector = canonicalizeSemanticVector(vector)
 	}
 
-	tx, err := e.pool.BeginTx(ctx, nil)
+	tx, err := e.writer.BeginTx(ctx, catalogtx.OperationEmbeddingSave, nil)
 	if err != nil {
 		return fmt.Errorf("begin embedding transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	queries := e.queries.WithTx(tx)
+	queries := e.queries.WithTx(tx.Raw())
 
 	space, err := e.upsertEmbeddingSpace(ctx, queries, embeddingType, model, len(vector))
 	if err != nil {
@@ -176,13 +189,13 @@ func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID
 		})
 	}
 
-	tx, err := e.pool.BeginTx(ctx, nil)
+	tx, err := e.writer.BeginTx(ctx, catalogtx.OperationVideoFrameEmbeddingSave, nil)
 	if err != nil {
 		return fmt.Errorf("begin video frame embedding transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	queries := e.queries.WithTx(tx)
+	queries := e.queries.WithTx(tx.Raw())
 
 	space, err := e.upsertEmbeddingSpace(ctx, queries, EmbeddingTypeSemantic, model, len(canonical[0].Vector))
 	if err != nil {
@@ -223,7 +236,7 @@ func (e *embeddingService) SaveVideoFrameEmbeddings(ctx context.Context, assetID
 }
 
 func (e *embeddingService) maintainSemanticIndex(ctx context.Context) error {
-	if err := vectorindex.Maintain(ctx, e.pool); err != nil {
+	if err := vectorindex.Maintain(ctx, e.writer, e.readerPool); err != nil {
 		return fmt.Errorf("maintain semantic Vec1 index: %w", err)
 	}
 	return nil
@@ -247,13 +260,13 @@ func (e *embeddingService) ResolveDefaultSearchSpace(ctx context.Context, embedd
 		return repo.EmbeddingSpace{}, fmt.Errorf("invalid embedding dimensions: %d", dimensions)
 	}
 
-	tx, err := e.pool.BeginTx(ctx, nil)
+	tx, err := e.writer.BeginTx(ctx, catalogtx.OperationEmbeddingSearchSpaceResolve, nil)
 	if err != nil {
 		return repo.EmbeddingSpace{}, fmt.Errorf("begin embedding space transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	queries := e.queries.WithTx(tx)
+	queries := e.queries.WithTx(tx.Raw())
 
 	space, err := e.upsertEmbeddingSpace(ctx, queries, embeddingType, model, dimensions)
 	if err != nil {

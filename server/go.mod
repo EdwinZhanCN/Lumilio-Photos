@@ -15,6 +15,7 @@ require (
 )
 
 require (
+	github.com/HdrHistogram/hdrhistogram-go v1.2.0
 	github.com/blevesearch/bleve/v2 v2.4.4
 	github.com/caddyserver/certmagic v0.25.3
 	github.com/chyroc/gorequests v0.33.0

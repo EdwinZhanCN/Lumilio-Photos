@@ -2,12 +2,44 @@ package queue
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"runtime"
+	"sort"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver"
 	"github.com/riverqueue/river/riverdriver/riversqlite"
+
+	"server/internal/queue/jobs"
 )
+
+// riverSQLiteSplitDriver keeps every River mutation and transaction on the
+// catalog's sole writer while moving riversqlite's notification outbox polling
+// onto the query-only reader pool. riversqlite otherwise uses the same *sql.DB
+// for its executor and its 50ms NotificationGetAfter SELECT loop, needlessly
+// admitting read polling through the sole writer connection.
+//
+// Embedding the pinned upstream driver deliberately inherits its unstable
+// interface; the compile-time assertion and held-writer test make a River
+// upgrade fail locally if that delegation boundary changes.
+type riverSQLiteSplitDriver struct {
+	*riversqlite.Driver
+	listenerDriver *riversqlite.Driver
+}
+
+var _ riverdriver.Driver[*sql.Tx] = (*riverSQLiteSplitDriver)(nil)
+
+func newRiverSQLiteSplitDriver(writerPool, readerPool *sql.DB) *riverSQLiteSplitDriver {
+	return &riverSQLiteSplitDriver{
+		Driver:         riversqlite.New(writerPool),
+		listenerDriver: riversqlite.New(readerPool),
+	}
+}
+
+func (d *riverSQLiteSplitDriver) GetListener(params *riverdriver.GetListenenerParams) riverdriver.Listener {
+	return d.listenerDriver.GetListener(params)
+}
 
 func clampWorkers(value, min, max int) int {
 	if value < min {
@@ -41,35 +73,87 @@ func queueWorkerCounts() (ingestWorkers int, thumbnailWorkers int, phashWorkers 
 	return queueWorkerCountsForCPU(runtime.NumCPU())
 }
 
-func New(dbpool *sql.DB, workers *river.Workers, logger *slog.Logger) (*river.Client[*sql.Tx], error) {
-	ingestWorkers, thumbnailWorkers, phashWorkers := queueWorkerCounts()
+func runtimeQueueConfigsForCPU(cpuCount int) map[string]river.QueueConfig {
+	workers := RuntimeQueueWorkerCountsForCPU(cpuCount)
+	queues := make(map[string]river.QueueConfig, len(workers))
+	for name, count := range workers {
+		queues[name] = river.QueueConfig{MaxWorkers: count}
+	}
+	return queues
+}
 
-	queues := map[string]river.QueueConfig{
-		"ingest_asset":              {MaxWorkers: ingestWorkers},
-		"discover_asset":            {MaxWorkers: 20},
-		"metadata_asset":            {MaxWorkers: 20},
-		"thumbnail_asset":           {MaxWorkers: thumbnailWorkers},
-		"transcode_asset":           {MaxWorkers: 1},
-		"retry_asset":               {MaxWorkers: 2},
-		"reindex_assets":            {MaxWorkers: 1},
-		"rebuild_location_clusters": {MaxWorkers: 1},
-		"rebuild_events":            {MaxWorkers: 4},
-		"event_scheduler":           {MaxWorkers: 1},
-		"scan_repository":           {MaxWorkers: 1},
-		"db_backup":                 {MaxWorkers: 1},
-		"detect_stacks":             {MaxWorkers: 1},
-		"match_live_photo":          {MaxWorkers: 2},
-		"process_semantic":          {MaxWorkers: 2},
-		"process_bioclip":           {MaxWorkers: 1},
-		"process_ocr":               {MaxWorkers: 2},
-		"ocr_index":                 {MaxWorkers: 1},
-		"process_face":              {MaxWorkers: 1},
-		"process_video_frames":      {MaxWorkers: 1},
-		"classify_zeroshot":         {MaxWorkers: 2},
-		"process_phash":             {MaxWorkers: phashWorkers},
+// RuntimeQueueWorkerCountsForCPU is the closed queue concurrency manifest used
+// by both River construction and the host-side qualification run manifest.
+// Returning a fresh map prevents diagnostic callers from mutating runtime
+// configuration.
+func RuntimeQueueWorkerCountsForCPU(cpuCount int) map[string]int {
+	ingestWorkers, thumbnailWorkers, phashWorkers := queueWorkerCountsForCPU(cpuCount)
+	return map[string]int{
+		jobs.QueueIngestAsset:           ingestWorkers,
+		jobs.QueueMetadataAsset:         20,
+		jobs.QueueThumbnailAsset:        thumbnailWorkers,
+		jobs.QueueTranscodeAsset:        1,
+		jobs.QueueRetryAsset:            2,
+		jobs.QueueReindexAssets:         1,
+		jobs.QueueRebuildLocations:      1,
+		jobs.QueueRebuildEvents:         4,
+		jobs.QueueEventScheduler:        1,
+		jobs.QueueObserveRepository:     4,
+		jobs.QueueHashRepositoryNode:    4,
+		jobs.QueueRepositoryOutbox:      1,
+		jobs.QueueDatabaseBackup:        1,
+		jobs.QueueDetectStacks:          1,
+		jobs.QueueMatchLivePhoto:        2,
+		jobs.QueueProcessSemantic:       2,
+		jobs.QueueProcessBioClip:        1,
+		jobs.QueueProcessOCR:            2,
+		jobs.QueueOCRIndex:              1,
+		jobs.QueueProcessFace:           1,
+		jobs.QueueProcessVideoFrames:    1,
+		jobs.QueueClassifyZeroShot:      2,
+		jobs.QueueProcessPerceptualHash: phashWorkers,
+	}
+}
+
+func validateRuntimeQueueConfigs(queues map[string]river.QueueConfig) error {
+	required := make(map[string]struct{})
+	for _, job := range jobs.RuntimeJobCatalog() {
+		queue := job.InsertOpts().Queue
+		if queue == "" || queue == river.QueueDefault {
+			return fmt.Errorf("job kind %q routes to forbidden implicit queue %q", job.Kind(), queue)
+		}
+		required[queue] = struct{}{}
+	}
+	missing := make([]string, 0)
+	for queue := range required {
+		if _, ok := queues[queue]; !ok {
+			missing = append(missing, queue)
+		}
+	}
+	extra := make([]string, 0)
+	for queue := range queues {
+		if _, ok := required[queue]; !ok {
+			extra = append(extra, queue)
+		}
+	}
+	if len(missing) == 0 && len(extra) == 0 {
+		return nil
+	}
+	sort.Strings(missing)
+	sort.Strings(extra)
+	return fmt.Errorf("runtime queue catalog drift: missing=%v extra=%v", missing, extra)
+}
+
+func New(writerPool, readerPool *sql.DB, workers *river.Workers, logger *slog.Logger) (*river.Client[*sql.Tx], error) {
+	if writerPool == nil || readerPool == nil {
+		return nil, fmt.Errorf("River SQLite requires writer and query-only listener pools")
+	}
+	queues := runtimeQueueConfigsForCPU(runtime.NumCPU())
+	if err := validateRuntimeQueueConfigs(queues); err != nil {
+		return nil, err
 	}
 
-	client, err := river.NewClient(riversqlite.New(dbpool), &river.Config{
+	client, err := river.NewClient(newRiverSQLiteSplitDriver(writerPool, readerPool), &river.Config{
 		Queues:  queues,
 		Workers: workers,
 		Logger:  logger,

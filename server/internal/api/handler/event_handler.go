@@ -12,6 +12,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/catalogtx"
 	"server/internal/event"
 	"server/internal/queue/jobs"
 	"server/internal/service"
@@ -24,15 +25,21 @@ import (
 type EventHandler struct {
 	service   *event.Service
 	db        *sql.DB
+	writer    *catalogtx.Writer
+	reader    *sql.DB
 	shares    service.ResolvedSnapshotShareService
 	relations *event.RelationService
 	queue     *river.Client[*sql.Tx]
 }
 
 func NewEventHandler(eventService *event.Service, db *sql.DB, shares service.ResolvedSnapshotShareService, queues ...*river.Client[*sql.Tx]) *EventHandler {
+	return NewEventHandlerWithReader(eventService, db, catalogtx.NewWriter(db, nil), db, shares, queues...)
+}
+
+func NewEventHandlerWithReader(eventService *event.Service, db *sql.DB, writer *catalogtx.Writer, reader *sql.DB, shares service.ResolvedSnapshotShareService, queues ...*river.Client[*sql.Tx]) *EventHandler {
 	handler := &EventHandler{
-		service: eventService, db: db, shares: shares,
-		relations: event.NewRelationService(db),
+		service: eventService, db: db, writer: writer, reader: reader, shares: shares,
+		relations: event.NewRelationService(reader),
 	}
 	if len(queues) > 0 {
 		handler.queue = queues[0]
@@ -93,7 +100,7 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 			return
 		}
 	}
-	rows, err := h.db.QueryContext(c, `
+	rows, err := h.reader.QueryContext(c, `
 SELECT e.event_id FROM events e
 WHERE e.owner_id=? AND e.status='active' AND (? OR e.is_hidden=0)
 AND (?='' OR EXISTS (
@@ -101,7 +108,15 @@ AND (?='' OR EXISTS (
   FROM event_media_items emi
   JOIN media_items mi
     ON mi.media_item_id=emi.media_item_id AND mi.owner_id=emi.owner_id
-  WHERE emi.event_id=e.event_id AND emi.owner_id=e.owner_id AND mi.repository_id=?
+  WHERE emi.event_id=e.event_id AND emi.owner_id=e.owner_id
+    AND EXISTS (
+      SELECT 1
+      FROM media_item_assets scoped_membership
+      JOIN active_asset_occurrences occurrence
+        ON occurrence.asset_id=scoped_membership.asset_id
+      WHERE scoped_membership.media_item_id=mi.media_item_id
+        AND occurrence.repository_id=?
+    )
 ))
 AND (?='' OR e.start_at<? OR (e.start_at=? AND e.event_id<?))
 ORDER BY e.start_at DESC,e.event_id DESC LIMIT ?`,
@@ -290,7 +305,7 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 	if request.IsHidden != nil {
 		hidden = *request.IsHidden
 	}
-	result, err := h.db.ExecContext(c, `
+	result, err := h.writer.ExecContext(c, catalogtx.OperationEventPatch, `
 UPDATE events SET title_override=?,cover_override_media_item_id=?,is_hidden=?,updated_at=?
 WHERE event_id=? AND owner_id=? AND status='active'`,
 		title, cover, hidden, apiNowMicros(), summary.EventID, ownerID)
@@ -341,7 +356,7 @@ func (h *EventHandler) RebuildEvents(c *gin.Context) {
 		return
 	}
 	now := apiNowMicros()
-	tx, err := h.db.BeginTx(c, nil)
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventRebuildRequest, nil)
 	if err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
@@ -378,7 +393,7 @@ VALUES(?,?, 'queued',?,?)`, runID, ownerID, requestedRevision, now); err != nil 
 	}
 	args := jobs.EventRebuildArgs{OwnerID: ownerID, Force: true}
 	opts := args.InsertOpts()
-	if _, err := h.queue.InsertTx(c, tx, args, &opts); err != nil {
+	if _, err := h.queue.InsertTx(c, tx.Raw(), args, &opts); err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
@@ -403,7 +418,7 @@ func (h *EventHandler) GetRebuildStatus(c *gin.Context) {
 	}
 	var response dto.EventRebuildStatusDTO
 	var paused int
-	err := h.db.QueryRowContext(c, `
+	err := h.reader.QueryRowContext(c, `
 SELECT active_algorithm_version,automatic_rebuild_paused,revision,source_revision,published_revision,
  (SELECT count(*) FROM event_dirty_ranges WHERE owner_id=?)
 FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
@@ -420,7 +435,7 @@ FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
 	}
 	response.Initialized, response.Paused = true, paused != 0
 	response.Pending = response.SourceRevision > response.PublishedRevision
-	rows, rowsErr := h.db.QueryContext(c, `
+	rows, rowsErr := h.reader.QueryContext(c, `
 SELECT run_id,state,COALESCE(error_code,'') FROM event_rebuild_runs
 WHERE owner_id=? ORDER BY requested_at DESC,run_id DESC LIMIT 20`, ownerID)
 	if rowsErr != nil {
@@ -486,7 +501,7 @@ func (h *EventHandler) SetRebuildState(c *gin.Context) {
 		ownerID = *request.OwnerID
 	}
 	now := apiNowMicros()
-	tx, err := h.db.BeginTx(c, nil)
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventRebuildState, nil)
 	if err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
@@ -519,7 +534,7 @@ updated_at=excluded.updated_at`, ownerID, event.AlgorithmVersion, now, request.P
 			}
 			args := jobs.EventRebuildArgs{OwnerID: ownerID}
 			opts := args.InsertOpts()
-			if _, err := h.queue.InsertTx(c, tx, args, &opts); err != nil {
+			if _, err := h.queue.InsertTx(c, tx.Raw(), args, &opts); err != nil {
 				api.WriteProblem(c, api.Internal(err))
 				return
 			}
@@ -552,18 +567,18 @@ func (h *EventHandler) ShareEvent(c *gin.Context) {
 		return
 	}
 	ownerID := int32(user.UserID)
-	tx, err := h.db.BeginTx(c, &sql.TxOptions{ReadOnly: false})
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventShare, &sql.TxOptions{ReadOnly: false})
 	if err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	defer tx.Rollback()
-	summary, err := event.ResolveTx(c, tx, ownerID, c.Param("id"))
+	summary, err := event.ResolveTx(c, tx.Raw(), ownerID, c.Param("id"))
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
-	assets, _, err := event.OrderedAssetsTx(c, tx, ownerID, summary.EventID, service.ShareLinkMaxAssets+1)
+	assets, _, err := event.OrderedAssetsTx(c, tx.Raw(), ownerID, summary.EventID, service.ShareLinkMaxAssets+1)
 	if err != nil {
 		h.respondError(c, err)
 		return
@@ -581,7 +596,7 @@ func (h *EventHandler) ShareEvent(c *gin.Context) {
 		}
 		ids = append(ids, id)
 	}
-	link, token, err := h.shares.CreateResolvedSnapshotTx(c, tx, service.ShareLinkCreateParams{
+	link, token, err := h.shares.CreateResolvedSnapshotTx(c, tx.Raw(), service.ShareLinkCreateParams{
 		OwnerID: ownerID, OwnerScope: &ownerID, Title: request.Title,
 		Description: request.Description, ExpiresInDays: request.ExpiresInDays,
 		AllowDownload: request.AllowDownload, IncludeOriginals: request.IncludeOriginals,
@@ -780,7 +795,7 @@ func (h *EventHandler) AddEventMembers(c *gin.Context) {
 
 func (h *EventHandler) pending(c *gin.Context, ownerID int32) bool {
 	var pending bool
-	_ = h.db.QueryRowContext(c, `
+	_ = h.reader.QueryRowContext(c, `
 SELECT source_revision>published_revision FROM event_owner_state WHERE owner_id=?`, ownerID).Scan(&pending)
 	return pending
 }

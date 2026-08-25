@@ -19,7 +19,11 @@ WHERE (sqlc.arg('include_hidden') OR COALESCE(fc.is_hidden, false) = false)
       )
       AND (
         sqlc.narg('repository_id') IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
+        OR EXISTS (
+          SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a.asset_id
+            AND occurrence.repository_id = sqlc.narg('repository_id')
+        )
       )
 );
 
@@ -41,7 +45,11 @@ WITH page_people AS (
       )
       AND (
         sqlc.narg('repository_id') IS NULL
-        OR a.repository_id = sqlc.narg('repository_id')
+        OR EXISTS (
+          SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a.asset_id
+            AND occurrence.repository_id = sqlc.narg('repository_id')
+        )
       )
     GROUP BY fc.cluster_id, fc.is_confirmed, fc.updated_at
     ORDER BY
@@ -52,18 +60,23 @@ WITH page_people AS (
     LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
 ),
 representative_faces AS (
-    SELECT fi.id, fi.face_image_path, fi.asset_id
+    SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
     FROM face_items fi
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
       AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+      AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+        SELECT 1 FROM active_asset_occurrences occurrence
+        WHERE occurrence.asset_id = a.asset_id
+          AND occurrence.repository_id = sqlc.narg('repository_id')
+      ))
 ),
 ranked_faces AS (
     SELECT
         fcm.cluster_id,
         fi.face_image_path,
         fi.asset_id,
+        fi.repository_id,
         ROW_NUMBER() OVER (
             PARTITION BY fcm.cluster_id
             ORDER BY COALESCE(fi.is_primary, false) DESC,
@@ -76,7 +89,11 @@ ranked_faces AS (
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
       AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+      AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+        SELECT 1 FROM active_asset_occurrences occurrence
+        WHERE occurrence.asset_id = a.asset_id
+          AND occurrence.repository_id = sqlc.narg('repository_id')
+      ))
 )
 SELECT
     fc.cluster_id,
@@ -88,6 +105,7 @@ SELECT
     pp.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
     COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
+    COALESCE(rep.repository_id, best.repository_id) AS cover_repository_id,
     fc.created_at,
     fc.updated_at
 FROM page_people pp
@@ -110,21 +128,30 @@ WITH scoped AS (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
-      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+      AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+        SELECT 1 FROM active_asset_occurrences occurrence
+        WHERE occurrence.asset_id = a.asset_id
+          AND occurrence.repository_id = sqlc.narg('repository_id')
+      ))
     GROUP BY fcm.cluster_id
 ),
 representative_faces AS (
-    SELECT fi.id, fi.face_image_path, fi.asset_id
+    SELECT fi.id, fi.face_image_path, fi.asset_id, fi.repository_id
     FROM face_items fi
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
-      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+      AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+        SELECT 1 FROM active_asset_occurrences occurrence
+        WHERE occurrence.asset_id = a.asset_id
+          AND occurrence.repository_id = sqlc.narg('repository_id')
+      ))
 ),
 ranked_faces AS (
     SELECT
         fcm.cluster_id,
         fi.face_image_path,
         fi.asset_id,
+        fi.repository_id,
         ROW_NUMBER() OVER (
             PARTITION BY fcm.cluster_id
             ORDER BY COALESCE(fi.is_primary, false) DESC,
@@ -136,7 +163,11 @@ ranked_faces AS (
     JOIN face_items fi ON fi.id = fcm.face_id
     JOIN assets a ON a.asset_id = fi.asset_id
     WHERE a.is_deleted = false
-      AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+      AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+        SELECT 1 FROM active_asset_occurrences occurrence
+        WHERE occurrence.asset_id = a.asset_id
+          AND occurrence.repository_id = sqlc.narg('repository_id')
+      ))
 )
 SELECT
     fc.cluster_id,
@@ -148,6 +179,7 @@ SELECT
     scoped.asset_count,
     COALESCE(rep.face_image_path, best.face_image_path) AS cover_face_image_path,
     COALESCE(rep.asset_id, best.asset_id) AS representative_asset_id,
+    COALESCE(rep.repository_id, best.repository_id) AS cover_repository_id,
     fc.created_at,
     fc.updated_at
 FROM face_clusters fc

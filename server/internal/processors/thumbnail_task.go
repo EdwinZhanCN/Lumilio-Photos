@@ -24,7 +24,7 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 			zap.Duration("duration", time.Since(start)),
 		)
 	}()
-	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ObservationToken, args.ExpectedContentHash)
+	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ExpectedContentID)
 	if err != nil {
 		if errors.Is(err, ErrAssetSourceStale) {
 			return nil
@@ -35,7 +35,7 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 	asset := source.asset
 	assetType := dbtypes.AssetType(asset.Type)
 
-	needsPHashFallback := false
+	needsPHashJob := false
 	if err := ap.runTrackedAssetTask(
 		ctx,
 		args.AssetID,
@@ -45,8 +45,8 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 		func() error {
 			switch assetType {
 			case dbtypes.AssetTypePhoto:
-				fallback, err := ap.generatePhotoThumbnails(ctx, source.localPath, asset.OriginalFilename, source.files, asset)
-				needsPHashFallback = fallback
+				queuePHash, err := ap.generatePhotoThumbnails(ctx, source.localPath, asset.OriginalFilename, source.files, asset)
+				needsPHashJob = queuePHash
 				return err
 			case dbtypes.AssetTypeVideo:
 				info, err := ap.getVideoInfo(source.localPath)
@@ -66,8 +66,8 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 	}
 
 	if assetType == dbtypes.AssetTypePhoto {
-		if needsPHashFallback {
-			if err := ap.enqueuePHashJob(ctx, args.AssetID); err != nil {
+		if needsPHashJob {
+			if err := ap.enqueuePHashJob(ctx, args.AssetID, asset.ContentID); err != nil {
 				return err
 			}
 		}

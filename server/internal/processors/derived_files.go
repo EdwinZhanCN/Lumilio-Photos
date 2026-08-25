@@ -11,21 +11,21 @@ import (
 )
 
 func (ap *AssetProcessor) saveThumbnail(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, size string) error {
-	privatePath, err := derivedPath("thumbnails", size, fmt.Sprintf("%s_%s.webp", asset.ContentHash, size))
+	privatePath, err := derivedPath("thumbnails", size, fmt.Sprintf("%s_%s.webp", asset.ContentID, size))
 	if err != nil {
 		return err
 	}
 	if err := writeDerived(files, privatePath, reader); err != nil {
 		return err
 	}
-	if _, err := ap.assetService.CreateThumbnail(ctx, asset.AssetID, size, privatePath.String()); err != nil {
+	if _, err := ap.assetService.CreateThumbnail(ctx, asset.AssetID, files.RepositoryID(), size, privatePath.String()); err != nil {
 		return fmt.Errorf("record thumbnail: %w", err)
 	}
 	return nil
 }
 
 func saveVideoVersion(files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, version string) error {
-	privatePath, err := derivedPath("videos", version, fmt.Sprintf("%s_%s.mp4", asset.ContentHash, version))
+	privatePath, err := derivedPath("videos", version, fmt.Sprintf("%s_%s.mp4", asset.ContentID, version))
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func saveVideoVersion(files *storage.RepositoryFS, reader io.Reader, asset *repo
 }
 
 func saveAudioVersion(files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, version string) error {
-	privatePath, err := derivedPath("audios", version, fmt.Sprintf("%s_%s.mp3", asset.ContentHash, version))
+	privatePath, err := derivedPath("audios", version, fmt.Sprintf("%s_%s.mp3", asset.ContentID, version))
 	if err != nil {
 		return err
 	}

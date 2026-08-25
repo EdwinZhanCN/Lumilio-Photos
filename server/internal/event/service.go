@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
+	"server/internal/db/catalogtx"
 	"server/internal/queue/jobs"
 )
 
@@ -23,12 +24,28 @@ var (
 
 type Service struct {
 	db       *sql.DB
+	reader   *sql.DB
+	writer   *catalogtx.Writer
+	snapshot *catalogtx.Reader
 	resolver *Resolver
 	queue    *river.Client[*sql.Tx]
 }
 
 func NewService(db *sql.DB, queues ...*river.Client[*sql.Tx]) *Service {
-	service := &Service{db: db, resolver: NewResolver(db)}
+	return NewServiceWithReader(db, db, queues...)
+}
+
+func NewServiceWithReader(db, reader *sql.DB, queues ...*river.Client[*sql.Tx]) *Service {
+	return NewServiceWithCatalog(catalogtx.NewWriter(db, nil), catalogtx.NewReader(reader, nil), queues...)
+}
+
+// NewServiceWithCatalog wires the measured writer and read-snapshot
+// capabilities owned by the live catalog.
+func NewServiceWithCatalog(writer *catalogtx.Writer, snapshot *catalogtx.Reader, queues ...*river.Client[*sql.Tx]) *Service {
+	service := &Service{
+		db: writer.Pool(), reader: snapshot.Pool(), writer: writer, snapshot: snapshot,
+		resolver: NewResolver(snapshot.Pool()),
+	}
 	if len(queues) > 0 {
 		service.queue = queues[0]
 	}
@@ -68,7 +85,7 @@ INSERT INTO event_dirty_ranges(
 // InitializeBackfill records events-v1 exactly once per owner and creates a
 // factual initial range only when that owner has candidate media.
 func (s *Service) InitializeBackfill(ctx context.Context) ([]int32, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT user_id FROM users ORDER BY user_id`)
+	rows, err := s.reader.QueryContext(ctx, `SELECT user_id FROM users ORDER BY user_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +103,7 @@ func (s *Service) InitializeBackfill(ctx context.Context) ([]int32, error) {
 	}
 	var queued []int32
 	for _, ownerID := range owners {
-		tx, err := s.db.BeginTx(ctx, nil)
+		tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventInitializeBackfill, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -152,19 +169,44 @@ func (s *Service) rebuildOwner(ctx context.Context, ownerID int32, dryRun bool, 
 }
 
 func (s *Service) rebuildOwnerWithLease(ctx context.Context, ownerID int32, dryRun bool, expectedRevision *int64, leaseToken *string) (RebuildPreview, error) {
-	candidates, err := s.loadCandidates(ctx, ownerID)
+	readTx, err := s.snapshot.BeginTx(ctx, catalogtx.OperationEventRebuildSnapshot)
+	if err != nil {
+		return RebuildPreview{}, fmt.Errorf("begin Event rebuild snapshot: %w", err)
+	}
+	defer readTx.Rollback()
+	candidates, err := loadCandidates(ctx, readTx, ownerID)
 	if err != nil {
 		return RebuildPreview{}, err
 	}
-	constraints, err := s.loadConstraints(ctx, ownerID)
+	constraints, err := loadConstraints(ctx, readTx, ownerID)
 	if err != nil {
 		return RebuildPreview{}, err
 	}
+	old, err := loadPublished(ctx, readTx, ownerID)
+	if err != nil {
+		return RebuildPreview{}, err
+	}
+	var snapshotRevision int64
+	if err := readTx.QueryRowContext(ctx, `
+SELECT COALESCE((
+ SELECT source_revision FROM event_owner_state WHERE owner_id=?
+),0)`, ownerID).Scan(&snapshotRevision); err != nil {
+		return RebuildPreview{}, fmt.Errorf("read Event rebuild revision: %w", err)
+	}
+	if err := readTx.Commit(); err != nil {
+		return RebuildPreview{}, fmt.Errorf("close Event rebuild snapshot: %w", err)
+	}
+	if expectedRevision != nil && snapshotRevision != *expectedRevision {
+		return RebuildPreview{}, ErrStaleRevision
+	}
+	if expectedRevision == nil {
+		expectedRevision = &snapshotRevision
+	}
+
+	// Segmentation and reconciliation can be CPU-heavy for a large owner. They
+	// run after the stable reader snapshot is released and before the short
+	// compare-and-swap writer transaction begins.
 	segments, err := SegmentCandidates(candidates, constraints, V1)
-	if err != nil {
-		return RebuildPreview{}, err
-	}
-	old, err := s.loadPublished(ctx, ownerID)
 	if err != nil {
 		return RebuildPreview{}, err
 	}
@@ -192,7 +234,7 @@ func (s *Service) rebuildOwnerWithLease(ctx context.Context, ownerID int32, dryR
 	return preview, nil
 }
 
-func (s *Service) loadCandidates(ctx context.Context, ownerID int32) ([]Candidate, error) {
+func loadCandidates(ctx context.Context, database queryer, ownerID int32) ([]Candidate, error) {
 	const query = `
 SELECT mi.media_item_id,
        COALESCE(capture.taken_time, upload.upload_time, mi.created_at),
@@ -220,7 +262,7 @@ LEFT JOIN assets component ON component.asset_id = (
  WHEN 'alternative' THEN 5 WHEN 'component' THEN 6 WHEN 'live_photo_video' THEN 7 ELSE 8 END,
  mia.position, mia.asset_id LIMIT 1)
 WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
-	rows, err := s.db.QueryContext(ctx, query, ownerID)
+	rows, err := database.QueryContext(ctx, query, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("load Event candidates: %w", err)
 	}
@@ -255,8 +297,8 @@ WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
 	return result, rows.Err()
 }
 
-func (s *Service) loadConstraints(ctx context.Context, ownerID int32) ([]Constraint, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func loadConstraints(ctx context.Context, database queryer, ownerID int32) ([]Constraint, error) {
+	rows, err := database.QueryContext(ctx, `
 SELECT kind, event_id, left_media_item_id, right_media_item_id
 FROM event_constraints WHERE owner_id=?
 ORDER BY kind, event_id, left_media_item_id, right_media_item_id`, ownerID)
@@ -280,8 +322,8 @@ ORDER BY kind, event_id, left_media_item_id, right_media_item_id`, ownerID)
 	return result, rows.Err()
 }
 
-func (s *Service) loadPublished(ctx context.Context, ownerID int32) ([]PublishedEvent, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func loadPublished(ctx context.Context, database queryer, ownerID int32) ([]PublishedEvent, error) {
+	rows, err := database.QueryContext(ctx, `
 SELECT e.event_id, e.start_at, e.end_at, e.cover_override_media_item_id,
        e.title_override, e.is_hidden, e.created_at,
        emi.media_item_id
@@ -325,7 +367,127 @@ ORDER BY e.created_at, e.event_id, emi.position, emi.media_item_id`, ownerID)
 }
 
 func (s *Service) publish(ctx context.Context, ownerID int32, segments []Segment, old []PublishedEvent, result ReconcileResult, expectedRevision *int64, leaseToken *string) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+	// Prepare and validate the complete membership replacement before acquiring
+	// SQLite's sole writer. The final publish remains one atomic transaction,
+	// as required by the Event convergence contract, but membership persistence
+	// is one set operation instead of one driver round trip per media item.
+	type membershipRow struct {
+		EventID     string `json:"event_id"`
+		MediaItemID string `json:"media_item_id"`
+		Position    int    `json:"position"`
+	}
+	type eventPublishRow struct {
+		EventID       string  `json:"event_id"`
+		StartAt       int64   `json:"start_at"`
+		EndAt         int64   `json:"end_at"`
+		Timezone      *string `json:"timezone"`
+		TitleOverride *string `json:"title_override"`
+		Hidden        bool    `json:"hidden"`
+	}
+	type eventCoverRow struct {
+		EventID        string  `json:"event_id"`
+		GeneratedCover *string `json:"generated_cover"`
+		CoverOverride  *string `json:"cover_override"`
+	}
+	type eventRedirectRow struct {
+		OldEventID string `json:"old_event_id"`
+		NewEventID string `json:"new_event_id"`
+	}
+	memberships := make([]membershipRow, 0)
+	seenMedia := make(map[string]string)
+	for _, assignment := range result.Assignments {
+		if assignment.SegmentIndex < 0 || assignment.SegmentIndex >= len(segments) {
+			return fmt.Errorf("Event assignment segment index %d is out of range", assignment.SegmentIndex)
+		}
+		segment := segments[assignment.SegmentIndex]
+		for position, mediaID := range segment.MediaItemIDs {
+			if priorEvent, exists := seenMedia[mediaID]; exists {
+				return fmt.Errorf("media item %s assigned to Events %s and %s", mediaID, priorEvent, assignment.EventID)
+			}
+			seenMedia[mediaID] = assignment.EventID
+			memberships = append(memberships, membershipRow{
+				EventID: assignment.EventID, MediaItemID: mediaID, Position: position,
+			})
+		}
+	}
+	membershipPayload, err := json.Marshal(memberships)
+	if err != nil {
+		return fmt.Errorf("encode Event membership publish: %w", err)
+	}
+	derivationRunID := uuid.NewString()
+	evidence, err := json.Marshal(map[string]any{
+		"algorithm_version": AlgorithmVersion,
+		"derivation_run_id": derivationRunID,
+	})
+	if err != nil {
+		return fmt.Errorf("encode Event derivation evidence: %w", err)
+	}
+	oldByID := make(map[string]PublishedEvent, len(old))
+	for _, previous := range old {
+		oldByID[previous.EventID] = previous
+	}
+	assigned := make(map[string]bool, len(result.Assignments))
+	eventRows := make([]eventPublishRow, 0, len(result.Assignments))
+	coverRows := make([]eventCoverRow, 0, len(result.Assignments))
+	assignedIDs := make([]string, 0, len(result.Assignments))
+	for _, assignment := range result.Assignments {
+		if assigned[assignment.EventID] {
+			return fmt.Errorf("Event reconciliation assigned Event %s more than once", assignment.EventID)
+		}
+		assigned[assignment.EventID] = true
+		assignedIDs = append(assignedIDs, assignment.EventID)
+		segment := segments[assignment.SegmentIndex]
+		previous, retained := oldByID[assignment.EventID]
+		eventRow := eventPublishRow{
+			EventID: assignment.EventID, StartAt: segment.StartAt.UnixMicro(),
+			EndAt: segment.EndAt.UnixMicro(), Timezone: optionalString(segment.Timezone),
+		}
+		if retained {
+			eventRow.TitleOverride = previous.TitleOverride
+			eventRow.Hidden = previous.Hidden
+		}
+		eventRows = append(eventRows, eventRow)
+
+		coverRow := eventCoverRow{EventID: assignment.EventID}
+		if len(segment.MediaItemIDs) > 0 {
+			coverRow.GeneratedCover = optionalString(segment.MediaItemIDs[0])
+		}
+		if retained && previous.CoverOverrideID != "" && contains(segment.MediaItemIDs, previous.CoverOverrideID) {
+			coverRow.CoverOverride = optionalString(previous.CoverOverrideID)
+		}
+		coverRows = append(coverRows, coverRow)
+	}
+	redirectRows := make([]eventRedirectRow, 0, len(result.Redirects))
+	for _, redirect := range result.Redirects {
+		redirectRows = append(redirectRows, eventRedirectRow{
+			OldEventID: redirect.OldEventID,
+			NewEventID: redirect.NewEventID,
+		})
+	}
+	eventPayload, err := json.Marshal(eventRows)
+	if err != nil {
+		return fmt.Errorf("encode Event row publish: %w", err)
+	}
+	coverPayload, err := json.Marshal(coverRows)
+	if err != nil {
+		return fmt.Errorf("encode Event cover publish: %w", err)
+	}
+	assignedPayload, err := json.Marshal(assignedIDs)
+	if err != nil {
+		return fmt.Errorf("encode Event active identity publish: %w", err)
+	}
+	redirectPayload, err := json.Marshal(redirectRows)
+	if err != nil {
+		return fmt.Errorf("encode Event redirect publish: %w", err)
+	}
+	retiredCount := 0
+	for _, previous := range old {
+		if !assigned[previous.EventID] {
+			retiredCount++
+		}
+	}
+
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventPublishOwnerSnapshot, nil)
 	if err != nil {
 		return err
 	}
@@ -374,90 +536,118 @@ WHERE owner_id=? AND status='active'`, now, ownerID); err != nil {
 		return err
 	}
 
-	oldByID := make(map[string]PublishedEvent, len(old))
-	for _, previous := range old {
-		oldByID[previous.EventID] = previous
+	eventResult, err := tx.ExecContext(ctx, `
+INSERT INTO events(
+ event_id,owner_id,status,start_at,end_at,timezone,title_override,is_hidden,
+ algorithm_version,created_at,updated_at
+)
+SELECT
+ json_extract(value,'$.event_id'),?,'active',
+ json_extract(value,'$.start_at'),json_extract(value,'$.end_at'),
+ json_extract(value,'$.timezone'),json_extract(value,'$.title_override'),
+ json_extract(value,'$.hidden'),?,?,?
+FROM json_each(?)
+WHERE true
+ON CONFLICT(event_id) DO UPDATE SET
+ status='active',start_at=excluded.start_at,end_at=excluded.end_at,
+ timezone=excluded.timezone,generated_title=NULL,
+ title_override=excluded.title_override,is_hidden=excluded.is_hidden,
+ algorithm_version=excluded.algorithm_version,updated_at=excluded.updated_at
+WHERE events.owner_id=excluded.owner_id`,
+		ownerID, AlgorithmVersion, now, now, eventPayload)
+	if err != nil {
+		return fmt.Errorf("bulk publish Event rows: %w", err)
 	}
-	assigned := make(map[string]bool, len(result.Assignments))
-	derivationRunID := uuid.NewString()
-	evidence, _ := json.Marshal(map[string]any{
-		"algorithm_version": AlgorithmVersion,
-		"derivation_run_id": derivationRunID,
-	})
-	for _, assignment := range result.Assignments {
-		segment := segments[assignment.SegmentIndex]
-		assigned[assignment.EventID] = true
-		previous, retained := oldByID[assignment.EventID]
-		if !retained {
-			if _, err := tx.ExecContext(ctx, `
-INSERT INTO events(event_id,owner_id,status,start_at,end_at,timezone,is_hidden,algorithm_version,created_at,updated_at)
-VALUES(?,?,'active',?,?,?,?,?, ?,?)`,
-				assignment.EventID, ownerID, segment.StartAt.UnixMicro(), segment.EndAt.UnixMicro(),
-				nullString(segment.Timezone), false, AlgorithmVersion, now, now); err != nil {
-				return err
-			}
-		} else if _, err := tx.ExecContext(ctx, `
-UPDATE events SET status='active',start_at=?,end_at=?,timezone=?,generated_title=NULL,
- title_override=?,is_hidden=?,algorithm_version=?,updated_at=?
-WHERE event_id=? AND owner_id=?`,
-			segment.StartAt.UnixMicro(), segment.EndAt.UnixMicro(), nullString(segment.Timezone),
-			previous.TitleOverride, previous.Hidden, AlgorithmVersion, now, assignment.EventID, ownerID); err != nil {
-			return err
-		}
-		for position, mediaID := range segment.MediaItemIDs {
-			if _, err := tx.ExecContext(ctx, `
-INSERT INTO event_media_items(event_id,owner_id,media_item_id,position,source,evidence,derivation_run_id,created_at)
-VALUES(?,?,?,?,'automatic',?,?,?)`,
-				assignment.EventID, ownerID, mediaID, position, string(evidence), derivationRunID, now); err != nil {
-				return err
-			}
-		}
-		cover := any(nil)
-		if len(segment.MediaItemIDs) > 0 {
-			cover = segment.MediaItemIDs[0]
-		}
-		var coverOverride any
-		if retained && previous.CoverOverrideID != "" && contains(segment.MediaItemIDs, previous.CoverOverrideID) {
-			coverOverride = previous.CoverOverrideID
-		}
-		if _, err := tx.ExecContext(ctx, `
-UPDATE events SET start_at=?,end_at=?,timezone=?,generated_title=NULL,
- generated_cover_media_item_id=?,cover_override_media_item_id=?,algorithm_version=?,updated_at=?
-WHERE event_id=? AND owner_id=? AND status='active'`,
-			segment.StartAt.UnixMicro(), segment.EndAt.UnixMicro(), nullString(segment.Timezone),
-			cover, coverOverride, AlgorithmVersion, now, assignment.EventID, ownerID); err != nil {
-			return err
-		}
+	if affected, affectedErr := eventResult.RowsAffected(); affectedErr != nil {
+		return fmt.Errorf("count bulk-published Event rows: %w", affectedErr)
+	} else if affected != int64(len(eventRows)) {
+		return fmt.Errorf("bulk publish Event rows affected %d rows, want %d", affected, len(eventRows))
+	}
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO event_media_items(
+ event_id,owner_id,media_item_id,position,source,evidence,derivation_run_id,created_at
+)
+SELECT
+ json_extract(value,'$.event_id'),?,json_extract(value,'$.media_item_id'),
+ json_extract(value,'$.position'),'automatic',?,?,?
+FROM json_each(?)`, ownerID, string(evidence), derivationRunID, now, membershipPayload); err != nil {
+		return fmt.Errorf("bulk publish Event memberships: %w", err)
+	}
+	// Cover membership is enforced by SQLite, so publish covers only after the
+	// complete member set exists in this same transaction.
+	coverResult, err := tx.ExecContext(ctx, `
+WITH incoming AS (
+ SELECT
+  json_extract(value,'$.event_id') AS event_id,
+  json_extract(value,'$.generated_cover') AS generated_cover,
+  json_extract(value,'$.cover_override') AS cover_override
+ FROM json_each(?)
+)
+UPDATE events
+SET generated_cover_media_item_id=incoming.generated_cover,
+    cover_override_media_item_id=incoming.cover_override,
+    updated_at=?
+FROM incoming
+WHERE events.event_id=incoming.event_id
+  AND events.owner_id=?
+  AND events.status='active'`, coverPayload, now, ownerID)
+	if err != nil {
+		return fmt.Errorf("bulk publish Event covers: %w", err)
+	}
+	if affected, affectedErr := coverResult.RowsAffected(); affectedErr != nil {
+		return fmt.Errorf("count bulk-published Event covers: %w", affectedErr)
+	} else if affected != int64(len(coverRows)) {
+		return fmt.Errorf("bulk publish Event covers affected %d rows, want %d", affected, len(coverRows))
 	}
 	// Events that no longer have a partition are retired.  A redirect is only
 	// written for an actual overlap; unrelated old identities must not be
 	// redirected to an arbitrary new Event.
-	for _, previous := range old {
-		if assigned[previous.EventID] {
-			continue
-		}
-		if _, err := tx.ExecContext(ctx, `
+	retireResult, err := tx.ExecContext(ctx, `
 UPDATE events SET status='retired',generated_cover_media_item_id=NULL,
  cover_override_media_item_id=NULL,updated_at=?
-WHERE event_id=? AND owner_id=?`, now, previous.EventID, ownerID); err != nil {
-			return err
-		}
+WHERE owner_id=? AND status='active'
+  AND NOT EXISTS (
+    SELECT 1 FROM json_each(?) AS assigned
+    WHERE assigned.value=events.event_id
+  )`, now, ownerID, assignedPayload)
+	if err != nil {
+		return fmt.Errorf("bulk retire replaced Events: %w", err)
 	}
-	for _, redirect := range result.Redirects {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM event_redirects WHERE old_event_id=? AND owner_id=?`, redirect.OldEventID, ownerID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE events SET status='redirected',updated_at=? WHERE event_id=? AND owner_id=?`,
-			now, redirect.OldEventID, ownerID); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `
+	if affected, affectedErr := retireResult.RowsAffected(); affectedErr != nil {
+		return fmt.Errorf("count bulk-retired Events: %w", affectedErr)
+	} else if affected != int64(retiredCount) {
+		return fmt.Errorf("bulk retire Events affected %d rows, want %d", affected, retiredCount)
+	}
+	redirectStatusResult, err := tx.ExecContext(ctx, `
+UPDATE events SET status='redirected',updated_at=?
+WHERE owner_id=? AND event_id IN (
+ SELECT json_extract(value,'$.old_event_id') FROM json_each(?)
+)`, now, ownerID, redirectPayload)
+	if err != nil {
+		return fmt.Errorf("bulk mark redirected Events: %w", err)
+	}
+	if affected, affectedErr := redirectStatusResult.RowsAffected(); affectedErr != nil {
+		return fmt.Errorf("count bulk-redirected Events: %w", affectedErr)
+	} else if affected != int64(len(redirectRows)) {
+		return fmt.Errorf("bulk mark redirected Events affected %d rows, want %d", affected, len(redirectRows))
+	}
+	redirectResult, err := tx.ExecContext(ctx, `
 INSERT INTO event_redirects(old_event_id,owner_id,new_event_id,reason,created_at)
-VALUES(?,?,?,'automatic_reconciliation',?)
-ON CONFLICT(old_event_id) DO UPDATE SET new_event_id=excluded.new_event_id,reason=excluded.reason`,
-			redirect.OldEventID, ownerID, redirect.NewEventID, now); err != nil {
-			return err
-		}
+
+SELECT json_extract(value,'$.old_event_id'),?,json_extract(value,'$.new_event_id'),
+       'automatic_reconciliation',?
+FROM json_each(?)
+WHERE true
+ON CONFLICT(old_event_id) DO UPDATE SET
+ new_event_id=excluded.new_event_id,reason=excluded.reason
+WHERE event_redirects.owner_id=excluded.owner_id`, ownerID, now, redirectPayload)
+	if err != nil {
+		return fmt.Errorf("bulk publish Event redirects: %w", err)
+	}
+	if affected, affectedErr := redirectResult.RowsAffected(); affectedErr != nil {
+		return fmt.Errorf("count bulk-published Event redirects: %w", affectedErr)
+	} else if affected != int64(len(redirectRows)) {
+		return fmt.Errorf("bulk publish Event redirects affected %d rows, want %d", affected, len(redirectRows))
 	}
 	stateResult, err := tx.ExecContext(ctx, `
 UPDATE event_owner_state SET active_algorithm_version=?,last_full_rebuild_at=?,
@@ -475,11 +665,11 @@ WHERE owner_id=? AND source_revision=?
 	return tx.Commit()
 }
 
-func nullString(value string) any {
+func optionalString(value string) *string {
 	if value == "" {
 		return nil
 	}
-	return value
+	return &value
 }
 
 func leaseTokenValue(value *string) string {
@@ -493,7 +683,7 @@ func (s *Service) Merge(ctx context.Context, ownerID int32, eventIDs []string, s
 	if len(eventIDs) < 2 || !contains(eventIDs, survivorID) {
 		return Summary{}, ErrConstraintConflict
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventMerge, nil)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -588,10 +778,10 @@ VALUES(?,?,?,'manual_merge',?)`, eventID, ownerID, survivorID, now); err != nil 
 			}
 		}
 	}
-	if err := repairEventTx(ctx, tx, ownerID, survivorID, now); err != nil {
+	if err := repairEventTx(ctx, tx.Raw(), ownerID, survivorID, now); err != nil {
 		return Summary{}, err
 	}
-	if err := s.markDirtyTx(ctx, tx, ownerID, survivorID, "manual_merge", now); err != nil {
+	if err := s.markDirtyTx(ctx, tx.Raw(), ownerID, survivorID, "manual_merge", now); err != nil {
 		return Summary{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -601,7 +791,7 @@ VALUES(?,?,?,'manual_merge',?)`, eventID, ownerID, survivorID, now); err != nil 
 }
 
 func (s *Service) Split(ctx context.Context, ownerID int32, eventID, beforeMediaID string) (Summary, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventSplit, nil)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -674,10 +864,10 @@ INSERT OR IGNORE INTO event_constraints(
 				return Summary{}, err
 			}
 		}
-		if err := repairEventTx(ctx, tx, ownerID, pair.eventID, now); err != nil {
+		if err := repairEventTx(ctx, tx.Raw(), ownerID, pair.eventID, now); err != nil {
 			return Summary{}, err
 		}
-		if err := s.markDirtyTx(ctx, tx, ownerID, pair.eventID, "manual_split", now); err != nil {
+		if err := s.markDirtyTx(ctx, tx.Raw(), ownerID, pair.eventID, "manual_split", now); err != nil {
 			return Summary{}, err
 		}
 	}
@@ -688,7 +878,7 @@ INSERT OR IGNORE INTO event_constraints(
 }
 
 func (s *Service) RemoveMember(ctx context.Context, ownerID int32, eventID, mediaID string) (Summary, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventRemoveMember, nil)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -717,10 +907,10 @@ INSERT OR IGNORE INTO event_constraints(
 ) VALUES(?,?,'exclude',?,?,?,?)`, uuid.NewString(), ownerID, eventID, mediaID, now, now); err != nil {
 		return Summary{}, err
 	}
-	if err := repairEventTx(ctx, tx, ownerID, eventID, now); err != nil {
+	if err := repairEventTx(ctx, tx.Raw(), ownerID, eventID, now); err != nil {
 		return Summary{}, err
 	}
-	if err := s.markDirtyTx(ctx, tx, ownerID, eventID, "member_removed", now); err != nil {
+	if err := s.markDirtyTx(ctx, tx.Raw(), ownerID, eventID, "member_removed", now); err != nil {
 		return Summary{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -733,7 +923,7 @@ func (s *Service) AddAssets(ctx context.Context, ownerID int32, eventID string, 
 	if len(assetIDs) == 0 {
 		return Summary{}, ErrConstraintConflict
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventAddAssets, nil)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -790,10 +980,10 @@ INSERT OR IGNORE INTO event_constraints(
 ) VALUES(?,?,'exclude',?,?,?,?)`, uuid.NewString(), ownerID, sourceEvent.String, mediaID, now, now); err != nil {
 				return Summary{}, err
 			}
-			if err := repairEventTx(ctx, tx, ownerID, sourceEvent.String, now); err != nil {
+			if err := repairEventTx(ctx, tx.Raw(), ownerID, sourceEvent.String, now); err != nil {
 				return Summary{}, err
 			}
-			if err := s.markDirtyTx(ctx, tx, ownerID, sourceEvent.String, "member_moved", now); err != nil {
+			if err := s.markDirtyTx(ctx, tx.Raw(), ownerID, sourceEvent.String, "member_moved", now); err != nil {
 				return Summary{}, err
 			}
 		}
@@ -815,10 +1005,10 @@ INSERT OR IGNORE INTO event_constraints(
 			return Summary{}, err
 		}
 	}
-	if err := repairEventTx(ctx, tx, ownerID, eventID, now); err != nil {
+	if err := repairEventTx(ctx, tx.Raw(), ownerID, eventID, now); err != nil {
 		return Summary{}, err
 	}
-	if err := s.markDirtyTx(ctx, tx, ownerID, eventID, "members_added", now); err != nil {
+	if err := s.markDirtyTx(ctx, tx.Raw(), ownerID, eventID, "members_added", now); err != nil {
 		return Summary{}, err
 	}
 	if err := tx.Commit(); err != nil {

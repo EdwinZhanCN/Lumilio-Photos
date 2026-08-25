@@ -24,18 +24,14 @@ type StorageRuntimeStatus struct {
 	Reason string
 }
 
-// StorageRuntimeStatus reconciles disk identity before deriving the global
-// state. Ordinary repository failures are local; only the configured default
-// Storage Location or its fixed primary child can degrade the instance.
+// StorageRuntimeStatus derives the global state from the latest reconciled
+// catalog projection. Startup and the background storage reconciler own disk
+// inspection and projection writes; this foreground status read never waits for
+// SQLite's sole writer. Ordinary repository failures are local; only the
+// configured default Storage Location or its fixed primary child can degrade
+// the instance.
 func (rm *DefaultRepositoryManager) StorageRuntimeStatus(ctx context.Context) (StorageRuntimeStatus, error) {
-	if err := rm.ReconcileRepositoryRoots(ctx); err != nil {
-		return StorageRuntimeStatus{}, fmt.Errorf("reconcile storage locations: %w", err)
-	}
-	if err := rm.ReconcileAll(ctx); err != nil {
-		return StorageRuntimeStatus{}, fmt.Errorf("reconcile repositories: %w", err)
-	}
-
-	defaultRoot, err := rm.queries.GetDefaultRepositoryRoot(ctx)
+	defaultRoot, err := rm.readerQueries.GetDefaultRepositoryRoot(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return degradedStorageRuntimeStatus(), nil
@@ -46,7 +42,7 @@ func (rm *DefaultRepositoryManager) StorageRuntimeStatus(ctx context.Context) (S
 		return degradedStorageRuntimeStatus(), nil
 	}
 
-	primary, err := rm.queries.GetPrimaryRepositoryRecord(ctx)
+	primary, err := rm.readerQueries.GetPrimaryRepositoryRecord(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return degradedStorageRuntimeStatus(), nil

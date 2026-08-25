@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,13 @@ type StagingManager interface {
 
 type DefaultStagingManager struct {
 	files *RepositoryFSFactory
+}
+
+// StagingQuarantine records one recoverable preflight move. Both paths are
+// repository-private paths; no host path becomes a durable payload.
+type StagingQuarantine struct {
+	Before string
+	After  string
 }
 
 func NewStagingManager(files *RepositoryFSFactory) *DefaultStagingManager {
@@ -200,6 +208,80 @@ func (sm *DefaultStagingManager) MoveStagingToFailed(repository repo.Repository,
 	}
 	stagingFile.PrivatePath = failed.String()
 	return nil
+}
+
+// QuarantineUnresolvedStaging validates the complete private staging tree
+// before it moves any file, then moves every regular file outside the existing
+// failed subtree into that explicit recoverable area. A symlink, special file,
+// nested repository error, or unavailable Repository aborts the destructive
+// catalog preflight.
+func (sm *DefaultStagingManager) QuarantineUnresolvedStaging(
+	ctx context.Context,
+	repository repo.Repository,
+) ([]StagingQuarantine, error) {
+	if sm == nil || sm.files == nil {
+		return nil, errors.New("staging manager is unavailable")
+	}
+	repositoryFS, err := sm.files.OpenContext(ctx, repository)
+	if err != nil {
+		return nil, err
+	}
+	var candidates []*StagingFile
+	walkErr := fs.WalkDir(repositoryFS.root.FS(), DefaultStructure.StagingDir, func(
+		privatePath string,
+		entry fs.DirEntry,
+		walkErr error,
+	) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			if privatePath == DefaultStructure.FailedDir {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("unresolved staging entry %q is not a regular file", privatePath)
+		}
+		parsed, err := ParsePrivateRepositoryPath(privatePath)
+		if err != nil {
+			return err
+		}
+		filename, err := portableBase(path.Base(parsed.String()))
+		if err != nil {
+			return err
+		}
+		candidates = append(candidates, &StagingFile{
+			ID: uuid.NewString(), RepositoryID: repository.RepoID,
+			PrivatePath: parsed.String(), Filename: filename, CreatedAt: info.ModTime().UTC(),
+		})
+		return nil
+	})
+	closeErr := repositoryFS.Close()
+	if errors.Is(walkErr, fs.ErrNotExist) {
+		return []StagingQuarantine{}, closeErr
+	}
+	if err := errors.Join(walkErr, closeErr); err != nil {
+		return nil, fmt.Errorf("inspect unresolved staging: %w", err)
+	}
+
+	quarantined := make([]StagingQuarantine, 0, len(candidates))
+	for _, candidate := range candidates {
+		before := candidate.PrivatePath
+		if err := sm.MoveStagingToFailed(repository, candidate); err != nil {
+			return quarantined, fmt.Errorf("quarantine unresolved staging %q: %w", before, err)
+		}
+		quarantined = append(quarantined, StagingQuarantine{
+			Before: before,
+			After:  candidate.PrivatePath,
+		})
+	}
+	return quarantined, nil
 }
 
 func (sm *DefaultStagingManager) CleanupStaging(repository repo.Repository, maxAge time.Duration) error {

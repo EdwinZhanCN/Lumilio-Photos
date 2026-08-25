@@ -8,16 +8,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
-	"go.uber.org/zap"
 
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
-	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
-	"server/internal/utils/phash"
 )
 
 // Thumbnail target sizes reused across photo and video thumbnail generation.
@@ -40,7 +36,9 @@ func (ap *AssetProcessor) createEXIFConfig() *exif.Config {
 }
 
 // generateThumbnails builds all configured thumbnail sizes from the provided
-// image stream and opportunistically stores pHash from the generated small WebP.
+// image stream. pHash publication deliberately stays on its own River queue so
+// CPU work, retries, and the final SQLite write are independently observable
+// and cannot extend the thumbnail worker's catalog footprint.
 func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Reader, files *storage.RepositoryFS, asset *repo.Asset) (bool, error) {
 	outputs := make(map[string]io.Writer, len(thumbnailSizes))
 	buffers := make(map[string]*bytes.Buffer, len(thumbnailSizes))
@@ -55,11 +53,6 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 		return false, fmt.Errorf("generate_thumbnails: %w", err)
 	}
 
-	var smallBytes []byte
-	if small, ok := buffers["small"]; ok && small.Len() > 0 {
-		smallBytes = append([]byte(nil), small.Bytes()...)
-	}
-
 	for name, buf := range buffers {
 		if buf.Len() == 0 {
 			continue
@@ -69,45 +62,16 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 		}
 	}
 
-	if len(smallBytes) == 0 {
-		return true, nil
-	}
-	if err := ap.savePHashEmbeddingFromReader(ctx, asset.AssetID, bytes.NewReader(smallBytes)); err != nil {
-		if ap.logger != nil {
-			ap.logger.Warn("inline pHash failed; falling back to process_phash",
-				zap.String("asset_id", asset.AssetID.String()),
-				zap.Error(err),
-			)
-		}
-		return true, nil
-	}
-
-	return false, nil
+	return true, nil
 }
 
-func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID uuid.UUID) error {
+func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID, expectedContentID uuid.UUID) error {
 	if _, err := ap.queueClient.Insert(ctx, jobs.ProcessPHashArgs{
-		AssetID: assetID,
-	}, &river.InsertOpts{Queue: "process_phash"}); err != nil {
+		AssetID: assetID, ExpectedContentID: expectedContentID,
+	}, nil); err != nil {
 		return fmt.Errorf("enqueue pHash: %w", err)
 	}
 
-	return nil
-}
-
-func (ap *AssetProcessor) savePHashEmbeddingFromReader(ctx context.Context, assetID uuid.UUID, reader io.Reader) error {
-	if ap.embeddingService == nil {
-		return fmt.Errorf("embedding service is not configured")
-	}
-
-	hash, err := phash.ComputeFromReader(reader)
-	if err != nil {
-		return err
-	}
-
-	if err := ap.embeddingService.SaveEmbedding(ctx, assetID, service.EmbeddingTypePHash, phash.ModelDCTPHashV1, phash.ToVector(hash), true); err != nil {
-		return fmt.Errorf("save phash embedding: %w", err)
-	}
 	return nil
 }
 
@@ -128,8 +92,9 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 		if ap.lumenService == nil || ap.lumenService.IsTaskAvailable("semantic_image_embed") {
 			_, err = ap.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
 				AssetID:           asset.AssetID,
+				ExpectedContentID: asset.ContentID,
 				PreprocessVersion: jobs.MLPreprocessVersionV1,
-			}, &river.InsertOpts{Queue: "process_semantic"})
+			}, nil)
 			if err != nil {
 				return fmt.Errorf("enqueue semantic: %w", err)
 			}
@@ -143,8 +108,9 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 		if ap.lumenService == nil || ap.lumenService.IsTaskAvailable("ocr") {
 			_, err = ap.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
 				AssetID:           asset.AssetID,
+				ExpectedContentID: asset.ContentID,
 				PreprocessVersion: jobs.MLPreprocessVersionV1,
-			}, &river.InsertOpts{Queue: "process_ocr"})
+			}, nil)
 			if err != nil {
 				return fmt.Errorf("enqueue OCR: %w", err)
 			}
@@ -155,8 +121,9 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 		if ap.lumenService == nil || ap.lumenService.IsTaskAvailable("face_recognition") {
 			_, err = ap.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
 				AssetID:           asset.AssetID,
+				ExpectedContentID: asset.ContentID,
 				PreprocessVersion: jobs.MLPreprocessVersionV1,
-			}, &river.InsertOpts{Queue: "process_face"})
+			}, nil)
 			if err != nil {
 				return fmt.Errorf("enqueue face: %w", err)
 			}

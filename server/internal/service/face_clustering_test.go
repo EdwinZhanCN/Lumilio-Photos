@@ -23,14 +23,12 @@ func TestDecidePendingFaceRecognition(t *testing.T) {
 func TestCollectPendingFaceRecognitionScopesDeduplicatesByModel(t *testing.T) {
 	t.Parallel()
 
-	repositoryID := uuid.NullUUID{UUID: uuid.UUID{1, 2, 3, 4}, Valid: true}
 	ownerID := int32(42)
 	modelA := "model-a"
 	modelB := "model-b"
 
 	scopes := collectPendingFaceRecognitionScopes(repo.Asset{
-		RepositoryID: repositoryID,
-		OwnerID:      &ownerID,
+		OwnerID: &ownerID,
 	}, []repo.FaceItem{
 		{ID: 1, Confidence: 0.95, Embedding: testVectorPtr([]float32{1, 0}), EmbeddingModel: &modelA},
 		{ID: 2, Confidence: 0.90, Embedding: testVectorPtr([]float32{1, 0}), EmbeddingModel: &modelA},
@@ -48,7 +46,7 @@ func TestCollectPendingFaceRecognitionScopesDeduplicatesByModel(t *testing.T) {
 func TestCollectFaceClusteringScopesDeduplicatesByScope(t *testing.T) {
 	t.Parallel()
 
-	repositoryID := uuid.NullUUID{UUID: uuid.UUID{9, 8, 7, 6}, Valid: true}
+	repositoryID := uuid.UUID{9, 8, 7, 6}
 	ownerID := int32(7)
 	modelA := "model-a"
 	modelB := "model-b"

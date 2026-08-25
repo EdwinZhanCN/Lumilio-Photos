@@ -48,15 +48,32 @@ func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[Process
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
 	}
+	current, err := validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("validate semantic asset work: %w", err)
+	}
+	if !current {
+		return nil
+	}
 
 	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeSemantic, args.PreprocessVersion)
 	if err != nil {
+		if handled, result := handleDerivedAssetError(err); handled {
+			return result
+		}
 		return fmt.Errorf("load semantic image: %w", err)
 	}
 
 	embedding, err := w.LumenService.SemanticImageEmbed(ctx, imageData)
 	if err != nil {
 		return fmt.Errorf("failed to generate semantic embedding: %w", err)
+	}
+	current, err = validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("revalidate semantic asset work: %w", err)
+	}
+	if !current {
+		return nil
 	}
 
 	err = w.EmbeddingService.SaveEmbedding(ctx, assetID,
@@ -79,7 +96,9 @@ func (w *ProcessSemanticWorker) Work(ctx context.Context, job *river.Job[Process
 	// costly re-embed, and the next reindex will recover it.
 	if classifyEnabled, cfgErr := isMLTaskEnabled(ctx, w.ConfigProvider, "classify_zeroshot"); cfgErr == nil && classifyEnabled {
 		if client, clientErr := river.ClientFromContextSafely[*sql.Tx](ctx); clientErr == nil {
-			_, _ = client.Insert(ctx, jobs.ZeroshotClassifyArgs{AssetID: assetID}, &river.InsertOpts{Queue: "classify_zeroshot"})
+			_, _ = client.Insert(ctx, jobs.ZeroshotClassifyArgs{
+				AssetID: assetID, ExpectedContentID: args.ExpectedContentID,
+			}, nil)
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
@@ -18,13 +19,14 @@ const (
 
 type Writer struct {
 	pool       *sql.DB
+	writer     *catalogtx.Writer
 	queries    *repo.Queries
 	index      *Index
 	afterApply func() error
 }
 
-func NewWriter(pool *sql.DB, queries *repo.Queries, index *Index) *Writer {
-	return &Writer{pool: pool, queries: queries, index: index}
+func NewWriter(pool *sql.DB, writer *catalogtx.Writer, queries *repo.Queries, index *Index) *Writer {
+	return &Writer{pool: pool, writer: writer, queries: queries, index: index}
 }
 
 func (w *Writer) Drain(ctx context.Context, batchSize, maxBatches int) (int, error) {
@@ -97,12 +99,12 @@ func (w *Writer) ProcessBatch(ctx context.Context, batchSize int) (int, error) {
 		}
 	}
 
-	tx, err := w.pool.BeginTx(ctx, nil)
+	tx, err := w.writer.BeginTx(ctx, catalogtx.OperationOCRIndexBatch, nil)
 	if err != nil {
 		return 0, fmt.Errorf("begin OCR outbox acknowledgement: %w", err)
 	}
 	defer tx.Rollback()
-	txQueries := w.queries.WithTx(tx)
+	txQueries := w.queries.WithTx(tx.Raw())
 	for _, event := range events {
 		if _, err := txQueries.AcknowledgeOCRIndexOutbox(ctx, repo.AcknowledgeOCRIndexOutboxParams{
 			AssetID:  event.AssetID,
@@ -132,8 +134,8 @@ func groupPendingDocuments(rows []repo.GetOCRDocumentsByAssetIDsRow) map[string]
 			if row.OwnerID != nil {
 				source.OwnerID = *row.OwnerID
 			}
-			if row.RepositoryID.Valid {
-				source.RepositoryID = row.RepositoryID.UUID.String()
+			if repositoryID := repositoryIDString(row.RepositoryID); repositoryID != "" {
+				source.RepositoryID = repositoryID
 			}
 		}
 		if row.TextContent != nil {

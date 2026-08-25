@@ -110,6 +110,45 @@ func TestRepositoryFSWalkStopsAtNestedRepositoryBoundary(t *testing.T) {
 	}
 }
 
+func TestRepositoryFSReadDirectoryResumesInBoundedPages(t *testing.T) {
+	t.Parallel()
+
+	repository := createRepositoryFSTestRoot(t)
+	for _, name := range []string{"a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg", "f.jpg", "g.jpg"} {
+		writeRepositoryFSTestFile(t, repository.Path, filepath.Join("wide", name), []byte(name))
+	}
+	repositoryFS := openRepositoryFSTestFS(t, repository)
+	offset := int64(0)
+	observed := make(map[string]bool)
+	for turns := 0; ; turns++ {
+		if turns > 8 {
+			t.Fatal("bounded directory reader did not reach EOF")
+		}
+		batch, err := repositoryFS.ReadUserMediaDirectory(context.Background(), DirectoryReadOptions{
+			Directory: "wide", Offset: offset, Limit: 2, ScanID: uuid.New(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(batch.Entries) > 2 {
+			t.Fatalf("batch entries = %d, want at most 2", len(batch.Entries))
+		}
+		for _, entry := range batch.Entries {
+			observed[entry.Observation.Path.String()] = true
+		}
+		if batch.Done {
+			break
+		}
+		if batch.NextOffset <= offset {
+			t.Fatalf("offset did not advance: %d -> %d", offset, batch.NextOffset)
+		}
+		offset = batch.NextOffset
+	}
+	if len(observed) != 7 {
+		t.Fatalf("observed entries = %d, want 7: %#v", len(observed), observed)
+	}
+}
+
 func TestRepositoryFSSymlinkPolicyAndHardLinkIdentity(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation requires optional Windows privileges")

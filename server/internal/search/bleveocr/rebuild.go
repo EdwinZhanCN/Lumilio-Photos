@@ -180,8 +180,8 @@ func sourceFromRebuildRow(row repo.GetOCRDocumentsForRebuildRow) SourceDocument 
 	if row.OwnerID != nil {
 		source.OwnerID = *row.OwnerID
 	}
-	if row.RepositoryID.Valid {
-		source.RepositoryID = row.RepositoryID.UUID.String()
+	if repositoryID := repositoryIDString(row.RepositoryID); repositoryID != "" {
+		source.RepositoryID = repositoryID
 	}
 	if row.TextContent != nil {
 		source.TextItems = []string{*row.TextContent}

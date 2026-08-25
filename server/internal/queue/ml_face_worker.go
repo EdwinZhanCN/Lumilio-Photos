@@ -2,6 +2,8 @@ package queue
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
@@ -47,9 +49,19 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
 	}
+	current, err := validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("validate face asset work: %w", err)
+	}
+	if !current {
+		return nil
+	}
 
 	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeFace, args.PreprocessVersion)
 	if err != nil {
+		if handled, result := handleDerivedAssetError(err); handled {
+			return result
+		}
 		return fmt.Errorf("load face image: %w", err)
 	}
 
@@ -61,6 +73,13 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	if err != nil {
 		return fmt.Errorf("failed to perform face detection: %w", err)
 	}
+	current, err = validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("revalidate face asset work: %w", err)
+	}
+	if !current {
+		return nil
+	}
 
 	// Calculate processing time
 	processingTimeMs := int(time.Since(startTime).Milliseconds())
@@ -68,6 +87,9 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	// Save face results using FaceService (conversion, crops, clustering, and cleanup happen there).
 	err = w.FaceService.SaveFaceResults(ctx, assetID, faceV1, imageData.EncodedSource, processingTimeMs)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
 		return fmt.Errorf("failed to save face results: %w", err)
 	}
 

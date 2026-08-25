@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"server/internal/agent/ref"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/llm"
@@ -55,6 +56,7 @@ type AgentService interface {
 type agentService struct {
 	queries        *repo.Queries
 	pool           *sql.DB
+	writer         *catalogtx.Writer
 	registry       *ToolRegistry
 	configProvider LLMConfigProvider
 	store          *CheckpointStore
@@ -66,12 +68,12 @@ type agentService struct {
 	auditLogPath   string
 }
 
-func NewAgentService(queries *repo.Queries, pool *sql.DB, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string) AgentService {
+func NewAgentService(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, configProvider LLMConfigProvider, refStore ref.Store, libraries *AuthorizedLibraryFactory, conversations *ConversationStore, auditLogPath string) AgentService {
 	registry := GetRegistry()
 	return &agentService{
-		queries: queries, pool: pool, registry: registry, configProvider: configProvider,
+		queries: queries, pool: pool, writer: writer, registry: registry, configProvider: configProvider,
 		store: NewCheckpointStore(queries), refStore: refStore, libraries: libraries,
-		effects: NewEffectRuntime(pool, queries, registry), runs: NewRunRegistry(),
+		effects: NewEffectRuntime(pool, writer, queries, registry), runs: NewRunRegistry(),
 		conversations: conversations, auditLogPath: strings.TrimSpace(auditLogPath),
 	}
 }
@@ -224,7 +226,7 @@ func (s *agentService) createPreparedRunRecord(ctx context.Context, thread repo.
 }
 
 func (s *agentService) bindRun(ctx context.Context, thread repo.AgentThread, runID uuid.UUID) error {
-	result, err := s.pool.ExecContext(ctx, `UPDATE agent_threads
+	result, err := s.writer.ExecContext(ctx, catalogtx.OperationAgentBindRun, `UPDATE agent_threads
 		SET active_run_id = ?, status = 'active', updated_at = ?
 		WHERE user_id = ? AND thread_id = ? AND active_run_id IS NULL`,
 		runID.String(), time.Now().UnixMilli(), thread.UserID, thread.ThreadID)
@@ -241,7 +243,7 @@ func (s *agentService) bindRun(ctx context.Context, thread repo.AgentThread, run
 }
 
 func (s *agentService) transitionAwaitingRun(ctx context.Context, thread repo.AgentThread, oldRunID, newRunID uuid.UUID) error {
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAgentTransitionAwaitingRun, nil)
 	if err != nil {
 		return err
 	}
@@ -464,12 +466,12 @@ func (s *agentService) FinishRun(ctx context.Context, userID int32, threadID str
 		}
 	}
 	now := dbtypes.NewTimestamp(time.Now())
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAgentFinishRun, nil)
 	if err != nil {
 		return "", err
 	}
 	defer tx.Rollback()
-	q := s.queries.WithTx(tx)
+	q := s.queries.WithTx(tx.Raw())
 	if err := q.FinishAgentRun(ctx, repo.FinishAgentRunParams{
 		Status: status, UpdatedAt: now, RunID: runID,
 		UserID: userID, ThreadID: threadID,

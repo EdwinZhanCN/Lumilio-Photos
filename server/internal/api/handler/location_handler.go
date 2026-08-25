@@ -138,9 +138,7 @@ func (h *LocationHandler) RebuildLocationClusters(c *gin.Context) {
 	args := jobs.RebuildLocationClustersArgs{
 		RepositoryID: repositoryID,
 	}
-	opts := args.InsertOpts()
-	opts.Queue = "rebuild_location_clusters"
-	jobResult, err := h.queueClient.Insert(c.Request.Context(), args, &opts)
+	jobResult, err := h.queueClient.Insert(c.Request.Context(), args, nil)
 	if err != nil {
 		log.Printf("Failed to enqueue location cluster rebuild: %v", err)
 		api.WriteProblem(c, api.Internal(err))

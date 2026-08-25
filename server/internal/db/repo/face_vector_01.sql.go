@@ -14,7 +14,7 @@ import (
 
 const getSimilarFaces = `-- name: GetSimilarFaces :many
 SELECT
-    fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at,
+    fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id,
     CAST(1.0 - vec1_cos_distance(fi.embedding, ?1) AS REAL) AS similarity
 FROM face_items fi
 WHERE fi.id != ?2
@@ -51,6 +51,7 @@ type GetSimilarFacesRow struct {
 	BlurScore      *float64          `db:"blur_score" json:"blur_score"`
 	PoseAngles     dbtypes.JSON      `db:"pose_angles" json:"pose_angles"`
 	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	RepositoryID   uuid.UUID         `db:"repository_id" json:"repository_id"`
 	Similarity     float64           `db:"similarity" json:"similarity"`
 }
 
@@ -87,6 +88,7 @@ func (q *Queries) GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 			&i.Similarity,
 		); err != nil {
 			return nil, err

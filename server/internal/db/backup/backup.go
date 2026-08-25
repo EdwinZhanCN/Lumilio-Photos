@@ -19,7 +19,7 @@ import (
 	"server/internal/db"
 	"server/platform/fsprivacy"
 
-	sqlite3 "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 )
 
 const manifestFormatVersion = 2
@@ -187,39 +187,16 @@ func onlineBackup(ctx context.Context, source *sql.DB, destinationPath string) e
 	defer destinationConn.Close()
 
 	err = sourceConn.Raw(func(sourceDriverConn any) error {
-		sourceSQLite, ok := sourceDriverConn.(*sqlite3.SQLiteConn)
+		sourceSQLite, ok := db.SQLiteDriverConnection(sourceDriverConn)
 		if !ok {
 			return fmt.Errorf("backup source driver is %T, want *sqlite3.SQLiteConn", sourceDriverConn)
 		}
 		return destinationConn.Raw(func(destinationDriverConn any) error {
-			destinationSQLite, ok := destinationDriverConn.(*sqlite3.SQLiteConn)
+			destinationSQLite, ok := db.SQLiteDriverConnection(destinationDriverConn)
 			if !ok {
 				return fmt.Errorf("backup destination driver is %T, want *sqlite3.SQLiteConn", destinationDriverConn)
 			}
-			backup, err := destinationSQLite.Backup("main", sourceSQLite, "main")
-			if err != nil {
-				return fmt.Errorf("initialize SQLite online backup: %w", err)
-			}
-			for {
-				done, stepErr := backup.Step(256)
-				if stepErr != nil {
-					_ = backup.Close()
-					return fmt.Errorf("copy SQLite snapshot pages: %w", stepErr)
-				}
-				if done {
-					break
-				}
-				select {
-				case <-ctx.Done():
-					_ = backup.Close()
-					return ctx.Err()
-				case <-time.After(10 * time.Millisecond):
-				}
-			}
-			if err := backup.Close(); err != nil {
-				return fmt.Errorf("finalize SQLite online backup: %w", err)
-			}
-			return nil
+			return copyOnlineBackup(ctx, destinationSQLite, sourceSQLite)
 		})
 	})
 	if err != nil {
@@ -259,6 +236,61 @@ func onlineBackup(ctx context.Context, source *sql.DB, destinationPath string) e
 	if err := removeSQLiteSidecars(destinationPath); err != nil {
 		return err
 	}
+	return nil
+}
+
+// copyOnlineBackup pins one bounded WAL read snapshot for the page-copy phase.
+// Without that snapshot SQLite restarts an incremental backup whenever another
+// connection commits, so a sustained write stream can erase progress forever.
+// WAL writers remain concurrent; only checkpoint truncation waits for this
+// reader, and the snapshot is released before validation, hashing, or fsync.
+func copyOnlineBackup(ctx context.Context, destination, source *sqlite3.SQLiteConn) (returnErr error) {
+	if _, err := source.Exec("BEGIN", nil); err != nil {
+		return fmt.Errorf("begin SQLite backup read snapshot: %w", err)
+	}
+	snapshotOpen := true
+	defer func() {
+		if !snapshotOpen {
+			return
+		}
+		if _, err := source.Exec("ROLLBACK", nil); err != nil && returnErr == nil {
+			returnErr = fmt.Errorf("release SQLite backup read snapshot: %w", err)
+		}
+	}()
+	// A deferred BEGIN does not establish its snapshot until the first read.
+	// Execute a bounded schema read on this exact native connection before
+	// initializing the Online Backup handle.
+	if _, err := source.Exec("SELECT schema_version FROM pragma_schema_version", nil); err != nil {
+		return fmt.Errorf("establish SQLite backup read snapshot: %w", err)
+	}
+
+	backup, err := destination.Backup("main", source, "main")
+	if err != nil {
+		return fmt.Errorf("initialize SQLite online backup: %w", err)
+	}
+	for {
+		done, stepErr := backup.Step(256)
+		if stepErr != nil {
+			_ = backup.Close()
+			return fmt.Errorf("copy SQLite snapshot pages: %w", stepErr)
+		}
+		if done {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			_ = backup.Close()
+			return ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if err := backup.Close(); err != nil {
+		return fmt.Errorf("finalize SQLite online backup: %w", err)
+	}
+	if _, err := source.Exec("ROLLBACK", nil); err != nil {
+		return fmt.Errorf("release SQLite backup read snapshot: %w", err)
+	}
+	snapshotOpen = false
 	return nil
 }
 

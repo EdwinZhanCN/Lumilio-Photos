@@ -41,23 +41,22 @@ func (ap *AssetProcessor) ProcessVideoFramesTask(ctx context.Context, args jobs.
 		return fmt.Errorf("embedding service unavailable")
 	}
 
-	asset, repository, err := ap.loadAssetAndRepo(ctx, args.AssetID)
+	asset, repository, err := ap.loadAssetAndRepoForContent(ctx, args.AssetID, args.ExpectedContentID)
+	if errors.Is(err, ErrAssetSourceStale) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	if dbtypes.AssetType(asset.Type) != dbtypes.AssetTypeVideo {
 		return fmt.Errorf("asset %s is not a video: %s", asset.AssetID.String(), asset.Type)
 	}
-	if asset.ContentHash == "" {
-		return fmt.Errorf("asset content hash is required")
-	}
-
 	repositoryFS, err := ap.files.Open(repository)
 	if err != nil {
 		return err
 	}
 	defer repositoryFS.Close()
-	privatePath, err := derivedPath("videos", "web", fmt.Sprintf("%s_web.mp4", asset.ContentHash))
+	privatePath, err := derivedPath("videos", "web", fmt.Sprintf("%s_web.mp4", asset.ContentID))
 	if err != nil {
 		return err
 	}
@@ -112,6 +111,11 @@ func (ap *AssetProcessor) ProcessVideoFramesTask(ctx context.Context, args jobs.
 		})
 	}
 
+	if _, _, err := ap.loadAssetAndRepoForContent(ctx, args.AssetID, args.ExpectedContentID); errors.Is(err, ErrAssetSourceStale) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("revalidate video asset work: %w", err)
+	}
 	if err := ap.embeddingService.SaveVideoFrameEmbeddings(ctx, args.AssetID, modelID, frameEmbeddings); err != nil {
 		return fmt.Errorf("save video frame embeddings: %w", err)
 	}
@@ -128,7 +132,7 @@ func (ap *AssetProcessor) ProcessVideoFramesTask(ctx context.Context, args jobs.
 
 // enqueueVideoFramesJob inserts a process_video_frames job when video semantic
 // indexing is enabled. Best-effort: failures are logged by the caller.
-func (ap *AssetProcessor) enqueueVideoFramesJob(ctx context.Context, assetID uuid.UUID) error {
+func (ap *AssetProcessor) enqueueVideoFramesJob(ctx context.Context, assetID, expectedContentID uuid.UUID) error {
 	if ap == nil || ap.queueClient == nil {
 		return fmt.Errorf("queue client unavailable")
 	}
@@ -141,7 +145,8 @@ func (ap *AssetProcessor) enqueueVideoFramesJob(ctx context.Context, assetID uui
 	}
 	_, err = ap.queueClient.Insert(ctx, jobs.ProcessVideoFramesArgs{
 		AssetID:           assetID,
+		ExpectedContentID: expectedContentID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_video_frames"})
+	}, nil)
 	return err
 }

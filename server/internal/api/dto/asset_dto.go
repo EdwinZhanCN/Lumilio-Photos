@@ -245,13 +245,12 @@ type UploadJobStatusResponseDTO struct {
 type AssetDTO struct {
 	AssetID              string                          `json:"asset_id"`
 	OwnerID              *int32                          `json:"owner_id"`
-	RepositoryID         *string                         `json:"repository_id,omitempty"`
+	ContentID            string                          `json:"content_id"`
 	Type                 string                          `json:"type"`
 	OriginalFilename     string                          `json:"original_filename"`
-	StoragePath          string                          `json:"storage_path"`
 	MimeType             string                          `json:"mime_type"`
-	FileSize             int64                           `json:"file_size"`
-	Hash                 *string                         `json:"hash"`
+	FileSize             *int64                          `json:"file_size,omitempty"`
+	Hash                 *string                         `json:"hash,omitempty"`
 	Width                *int32                          `json:"width"`
 	Height               *int32                          `json:"height"`
 	Duration             *float64                        `json:"duration"`
@@ -481,10 +480,6 @@ type AssetGroupDTO struct {
 // ToAssetDTO converts a repo.Asset to AssetDTO
 func ToAssetDTO(a repo.Asset) AssetDTO {
 	id := a.AssetID.String()
-	var storagePath string
-	if a.StoragePath != nil {
-		storagePath = *a.StoragePath
-	}
 	var uploadTime time.Time
 	if a.UploadTime.Valid {
 		uploadTime = a.UploadTime.Time
@@ -493,11 +488,6 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	if a.DeletedAt.Valid {
 		t := a.DeletedAt.Time
 		deletedAt = &t
-	}
-	var repositoryID *string
-	if a.RepositoryID.Valid {
-		repoUUID := a.RepositoryID.UUID.String()
-		repositoryID = &repoUUID
 	}
 	var takenTime *time.Time
 	if a.TakenTime.Valid {
@@ -529,13 +519,10 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	return AssetDTO{
 		AssetID:              id,
 		OwnerID:              a.OwnerID,
-		RepositoryID:         repositoryID,
+		ContentID:            a.ContentID.String(),
 		Type:                 a.Type,
 		OriginalFilename:     a.OriginalFilename,
-		StoragePath:          storagePath,
 		MimeType:             a.MimeType,
-		FileSize:             a.FileSize,
-		Hash:                 stringPtr(a.ContentHash),
 		Width:                width,
 		Height:               height,
 		Duration:             a.Duration,
@@ -736,10 +723,6 @@ type AssetDetailIncludes struct {
 // raw JSON ([]byte); malformed or empty blobs degrade to nil rather than erroring.
 func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) AssetDetailDTO {
 	id := r.AssetID.String()
-	var storagePath string
-	if r.StoragePath != nil {
-		storagePath = *r.StoragePath
-	}
 	var uploadTime time.Time
 	if r.UploadTime.Valid {
 		uploadTime = r.UploadTime.Time
@@ -753,11 +736,6 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 	if r.DeletedAt.Valid {
 		t := r.DeletedAt.Time
 		deletedAt = &t
-	}
-	var repositoryID *string
-	if r.RepositoryID.Valid {
-		repoUUID := r.RepositoryID.UUID.String()
-		repositoryID = &repoUUID
 	}
 	var width *int32
 	if r.Width != nil {
@@ -785,12 +763,11 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 	base := AssetDTO{
 		AssetID:              id,
 		OwnerID:              r.OwnerID,
-		RepositoryID:         repositoryID,
+		ContentID:            r.ContentID.String(),
 		Type:                 r.Type,
 		OriginalFilename:     r.OriginalFilename,
-		StoragePath:          storagePath,
 		MimeType:             r.MimeType,
-		FileSize:             r.FileSize,
+		FileSize:             &r.FileSize,
 		Hash:                 stringPtr(r.ContentHash),
 		Width:                width,
 		Height:               height,

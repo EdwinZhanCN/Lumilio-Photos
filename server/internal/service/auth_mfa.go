@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
@@ -179,7 +180,7 @@ func (s *AuthService) EnableTOTP(ctx context.Context, userID int, input EnableTO
 		return RecoveryCodesResponse{}, ErrInvalidMFAToken
 	}
 
-	pending, err := s.queries.GetPendingTOTPEnrollment(ctx, repo.GetPendingTOTPEnrollmentParams{
+	pending, err := s.readQueries.GetPendingTOTPEnrollment(ctx, repo.GetPendingTOTPEnrollmentParams{
 		EnrollmentID: enrollmentID.String(),
 		UserID:       user.UserID,
 		AuthVersion:  user.AuthVersion,
@@ -602,7 +603,7 @@ func (s *AuthService) issueLoginMFAChallenge(user repo.User, status MFAStatus) (
 }
 
 func (s *AuthService) getMFAStatusByUserID(ctx context.Context, userID int32) (MFAStatus, error) {
-	row, err := s.queries.GetUserMFAStatus(ctx, userID)
+	row, err := s.readQueries.GetUserMFAStatus(ctx, userID)
 	if err != nil {
 		return MFAStatus{}, fmt.Errorf("get mfa status: %w", err)
 	}
@@ -663,7 +664,7 @@ func optionalDBTimestamp(value dbtypes.Timestamp) *time.Time {
 }
 
 func (s *AuthService) getActiveUserByID(ctx context.Context, userID int) (repo.User, error) {
-	user, err := s.queries.GetUserByID(ctx, int32(userID))
+	user, err := s.readQueries.GetUserByID(ctx, int32(userID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return repo.User{}, ErrUserNotFound
@@ -852,13 +853,13 @@ func (s *AuthService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 		return fn(s.queries)
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAuthMutation, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	if err := fn(s.queries.WithTx(tx)); err != nil {
+	if err := fn(s.queries.WithTx(tx.Raw())); err != nil {
 		return err
 	}
 

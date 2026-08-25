@@ -64,23 +64,28 @@ page_items AS (
       OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
     )
     AND (?9 IS NULL OR facts.owner_id = ?9)
-    AND (?10 IS NULL OR facts.repository_id = ?10)
+    AND (?10 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = pa.asset_id
+      AND occurrence.repository_id = ?10
+  ))
     AND (
       ?11 IS NULL
-      OR (
-        CASE
-          WHEN ?11 = '' THEN
-            CASE WHEN COALESCE(?12, true) THEN true
-              ELSE instr(pa.storage_path, '/') = 0
-            END
-          ELSE
-            CASE WHEN COALESCE(?12, true) THEN
-              pa.storage_path LIKE ?11 || '/%'
+      OR EXISTS (
+        SELECT 1 FROM active_asset_occurrence_paths occurrence_path
+        WHERE occurrence_path.asset_id = pa.asset_id
+          AND (?10 IS NULL OR occurrence_path.repository_id = ?10)
+          AND CASE
+            WHEN ?11 = '' THEN
+              COALESCE(?12, true)
+              OR instr(occurrence_path.relative_path, '/') = 0
             ELSE
-              pa.storage_path LIKE ?11 || '/%'
-              AND pa.storage_path NOT LIKE ?11 || '/%/%'
-            END
-        END
+              occurrence_path.relative_path LIKE ?11 || '/%'
+              AND (
+                COALESCE(?12, true)
+                OR instr(substr(occurrence_path.relative_path, length(?11) + 2), '/') = 0
+              )
+          END
       )
     )
     AND (
@@ -215,7 +220,7 @@ SELECT
   p.stack_id,
   p.stack_position,
   p.stack_kind,
-  pa.asset_id, pa.owner_id, pa.type, pa.original_filename, pa.storage_path, pa.mime_type, pa.file_size, pa.content_hash, pa.quick_fingerprint, pa.quick_fingerprint_version, pa.width, pa.height, pa.duration, pa.upload_time, pa.taken_time, pa.capture_offset_minutes, pa.is_deleted, pa.deleted_at, pa.specific_metadata, pa.rating, pa.liked, pa.repository_id, pa.status, pa.updated_at, pa.gps_latitude, pa.gps_longitude, pa.gps_geohash_5, pa.gps_geohash_7, pa.exif_raw
+  pa.asset_id, pa.owner_id, pa.content_id, pa.type, pa.original_filename, pa.mime_type, pa.width, pa.height, pa.duration, pa.upload_time, pa.taken_time, pa.capture_offset_minutes, pa.is_deleted, pa.deleted_at, pa.specific_metadata, pa.rating, pa.liked, pa.status, pa.updated_at, pa.gps_latitude, pa.gps_longitude, pa.gps_geohash_5, pa.gps_geohash_7, pa.exif_raw
 FROM page_items p
 JOIN assets pa ON pa.asset_id = p.primary_asset_id
 ORDER BY p.sort_time DESC, p.media_item_id DESC
@@ -327,14 +332,10 @@ func (q *Queries) GetMediaItemsUnified(ctx context.Context, arg GetMediaItemsUni
 			&i.StackKind,
 			&i.Asset.AssetID,
 			&i.Asset.OwnerID,
+			&i.Asset.ContentID,
 			&i.Asset.Type,
 			&i.Asset.OriginalFilename,
-			&i.Asset.StoragePath,
 			&i.Asset.MimeType,
-			&i.Asset.FileSize,
-			&i.Asset.ContentHash,
-			&i.Asset.QuickFingerprint,
-			&i.Asset.QuickFingerprintVersion,
 			&i.Asset.Width,
 			&i.Asset.Height,
 			&i.Asset.Duration,
@@ -346,7 +347,6 @@ func (q *Queries) GetMediaItemsUnified(ctx context.Context, arg GetMediaItemsUni
 			&i.Asset.SpecificMetadata,
 			&i.Asset.Rating,
 			&i.Asset.Liked,
-			&i.Asset.RepositoryID,
 			&i.Asset.Status,
 			&i.Asset.UpdatedAt,
 			&i.Asset.GpsLatitude,

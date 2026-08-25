@@ -239,8 +239,10 @@ type RepositoryScanControllerInterface interface {
 	RenameRepository(c *gin.Context)
 	DeleteRepository(c *gin.Context)
 	QueueRepositoryScan(c *gin.Context)
+	GetRepositoryScan(c *gin.Context)
 	GetLatestRepositoryScan(c *gin.Context)
 	ListRepositoryScans(c *gin.Context)
+	CancelRepositoryScan(c *gin.Context)
 }
 
 type HostActionControllerInterface interface {
@@ -469,6 +471,8 @@ func NewRouter(
 			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
 			repositories.POST("/:id/scan", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
+			repositories.GET("/:id/scans/:operation_id", appInitializedMiddleware, repositoryScanController.GetRepositoryScan)
+			repositories.POST("/:id/scans/:operation_id/cancel", appInitializedMiddleware, repositoryScanController.CancelRepositoryScan)
 			repositories.GET("/:id/scans", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
 			repositories.POST("/:id/stacks/detect", appInitializedMiddleware, assetController.AutoDetectStacks)
 		}

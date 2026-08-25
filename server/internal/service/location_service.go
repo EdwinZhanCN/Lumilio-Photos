@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
@@ -29,10 +32,21 @@ const (
 	maxProviderAttempts       = 8
 	maxReverseGeocodeBody     = 1 << 20
 	reverseGeocodeCacheTTL    = 30 * 24 * time.Hour
+
+	// Each reconciliation transaction performs at most this many indexed
+	// membership statements plus one cluster-row mutation. Eight transactions
+	// per River turn yield between quanta so other foreground and background
+	// writers retain admission opportunities.
+	maxLocationMembershipMutationsPerTransaction = 16
+	maxLocationWriteTransactionsPerTurn          = 8
 )
 
+var errLocationClusterSnapshotChanged = errors.New("location cluster source revision changed")
+
 type LocationService interface {
-	RebuildLocationClusters(ctx context.Context, repositoryID *string, ownerID *int32) error
+	// RebuildLocationClusters performs one bounded River turn. MoreWork asks the
+	// worker to snooze the same unique job instead of completing it.
+	RebuildLocationClusters(ctx context.Context, repositoryID *string, ownerID *int32) (moreWork bool, err error)
 	ResolveLocationClusters(ctx context.Context, geocodingRevision int64) (time.Duration, error)
 	ListLocationClusters(ctx context.Context, params ListLocationClustersParams) ([]LocationCluster, int64, error)
 }
@@ -78,96 +92,468 @@ type ReverseGeocoder interface {
 }
 
 type locationService struct {
-	queries *repo.Queries
-	pool    *sql.DB
-	queue   RiverJobInserter
-	pacer   *requestPacer
+	queries  *repo.Queries
+	writer   *catalogtx.Writer
+	snapshot *catalogtx.Reader
+	queue    RiverJobInserter
+	pacer    *requestPacer
 }
 
 func NewLocationService(queries *repo.Queries, pool *sql.DB, queue RiverJobInserter) LocationService {
+	return NewLocationServiceWithCatalog(
+		queries,
+		catalogtx.NewWriter(pool, nil),
+		catalogtx.NewReader(pool, nil),
+		queue,
+	)
+}
+
+func NewLocationServiceWithWriter(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, queue RiverJobInserter) LocationService {
+	return NewLocationServiceWithCatalog(queries, writer, catalogtx.NewReader(pool, nil), queue)
+}
+
+// NewLocationServiceWithCatalog wires the live catalog's explicit writer and
+// query-only snapshot capabilities. Planning a topology never consumes the
+// sole writer connection.
+func NewLocationServiceWithCatalog(
+	queries *repo.Queries,
+	writer *catalogtx.Writer,
+	snapshot *catalogtx.Reader,
+	queue RiverJobInserter,
+) LocationService {
 	return &locationService{
-		queries: queries,
-		pool:    pool,
-		queue:   queue,
-		pacer:   &requestPacer{},
+		queries: queries, writer: writer, snapshot: snapshot, queue: queue,
+		pacer: &requestPacer{},
 	}
 }
 
-// RebuildLocationClusters owns only deterministic topology. The settings
-// snapshot and resolver enqueue share this transaction, so a rebuild cannot
-// publish work for a revision that was not current when its clusters were
-// created.
-func (s *locationService) RebuildLocationClusters(ctx context.Context, repositoryID *string, ownerID *int32) error {
+type desiredLocationCluster struct {
+	geohash      string
+	latitudeSum  float64
+	longitudeSum float64
+	assetIDs     map[uuid.UUID]struct{}
+}
+
+func (cluster *desiredLocationCluster) centroidLatitude() float64 {
+	return cluster.latitudeSum / float64(len(cluster.assetIDs))
+}
+
+func (cluster *desiredLocationCluster) centroidLongitude() float64 {
+	return cluster.longitudeSum / float64(len(cluster.assetIDs))
+}
+
+type storedLocationCluster struct {
+	row      repo.LocationCluster
+	assetIDs map[uuid.UUID]struct{}
+}
+
+type locationClusterMutation struct {
+	clusterID            uuid.UUID
+	desired              *desiredLocationCluster
+	create               bool
+	deleteAssetIDs       []uuid.UUID
+	insertAssetIDs       []uuid.UUID
+	updateTopology       bool
+	deleteClusterOnEmpty bool
+}
+
+type locationRebuildPlan struct {
+	repositoryID      uuid.UUID
+	ownerID           int32
+	sourceRevision    int64
+	publishedRevision int64
+	mutations         []*locationClusterMutation
+}
+
+// RebuildLocationClusters performs a bounded, revision-fenced reconciliation
+// turn. A nil owner is a manual coordinator request: it advances each matching
+// concrete scope and transactionally enqueues the child jobs. Concrete jobs
+// plan from one query-only WAL snapshot, mutate at most fixed row/transaction
+// quanta, and publish only if the source revision is still current.
+func (s *locationService) RebuildLocationClusters(ctx context.Context, repositoryID *string, ownerID *int32) (bool, error) {
 	repositoryUUID, err := parseOptionalUUID(repositoryID)
 	if err != nil {
-		return err
+		return false, err
+	}
+	if ownerID == nil {
+		return false, s.requestLocationClusterRebuilds(ctx, repositoryUUID)
+	}
+	if !repositoryUUID.Valid {
+		return false, errors.New("concrete location rebuild requires a repository")
 	}
 
-	tx, err := s.pool.BeginTx(ctx, nil)
+	for attempt := 0; attempt < 3; attempt++ {
+		plan, planErr := s.loadLocationRebuildPlan(ctx, repositoryUUID.UUID, *ownerID)
+		if planErr != nil {
+			return false, planErr
+		}
+		if plan == nil {
+			return false, nil
+		}
+		if plan.sourceRevision <= plan.publishedRevision && len(plan.mutations) == 0 {
+			return false, nil
+		}
+		moreWork, applyErr := s.applyLocationRebuildPlan(ctx, plan)
+		if errors.Is(applyErr, errLocationClusterSnapshotChanged) {
+			continue
+		}
+		return moreWork, applyErr
+	}
+	// Continuous factual churn is expected during import. Yield the River turn
+	// instead of consuming retry attempts; the same unique job will re-plan.
+	return true, nil
+}
+
+func (s *locationService) requestLocationClusterRebuilds(ctx context.Context, repositoryID uuid.NullUUID) error {
+	if s.queue == nil {
+		return errors.New("location rebuild queue is not configured")
+	}
+	var repositoryFilter any
+	if repositoryID.Valid {
+		repositoryFilter = repositoryID.UUID
+	}
+	scopes, err := s.queries.ListLocationProjectionScopes(ctx, repositoryFilter)
 	if err != nil {
-		return fmt.Errorf("begin location cluster rebuild: %w", err)
+		return fmt.Errorf("list location projection scopes: %w", err)
+	}
+	for _, scope := range scopes {
+		tx, err := s.writer.BeginTx(ctx, catalogtx.OperationLocationRebuildRequest, nil)
+		if err != nil {
+			return fmt.Errorf("begin location rebuild request: %w", err)
+		}
+		qtx := s.queries.WithTx(tx.Raw())
+		affected, err := qtx.MarkLocationProjectionScopeDirty(ctx, repo.MarkLocationProjectionScopeDirtyParams{
+			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()), RepositoryID: scope.RepositoryID, OwnerID: scope.OwnerID,
+		})
+		if err == nil && affected != 1 {
+			err = fmt.Errorf("mark location projection scope dirty: affected=%d", affected)
+		}
+		if err == nil {
+			repositoryText := scope.RepositoryID.String()
+			owner := scope.OwnerID
+			args := jobs.RebuildLocationClustersArgs{RepositoryID: &repositoryText, OwnerID: &owner}
+			opts := args.InsertOpts()
+			_, err = s.queue.InsertTx(ctx, tx.Raw(), args, &opts)
+		}
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			_ = tx.Rollback()
+		}
+		if err != nil {
+			return fmt.Errorf("request location rebuild for %s/%d: %w", scope.RepositoryID, scope.OwnerID, err)
+		}
+	}
+	return nil
+}
+
+func (s *locationService) loadLocationRebuildPlan(ctx context.Context, repositoryID uuid.UUID, ownerID int32) (*locationRebuildPlan, error) {
+	readTx, err := s.snapshot.BeginTx(ctx, catalogtx.OperationLocationRebuildSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("begin location rebuild snapshot: %w", err)
+	}
+	defer readTx.Rollback()
+	qtx := s.queries.WithTx(readTx.Raw())
+
+	state, err := qtx.GetLocationProjectionState(ctx, repo.GetLocationProjectionStateParams{
+		RepositoryID: repositoryID, OwnerID: ownerID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		if err := readTx.Commit(); err != nil {
+			return nil, fmt.Errorf("close empty location rebuild snapshot: %w", err)
+		}
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read location projection revision: %w", err)
+	}
+
+	owner := ownerID
+	desiredRows, err := qtx.ListDesiredLocationClusterMembersForScope(ctx, repo.ListDesiredLocationClusterMembersForScopeParams{
+		RepositoryID: repositoryID, OwnerID: &owner,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list desired location cluster members: %w", err)
+	}
+	storedRows, err := qtx.ListStoredLocationClustersForScope(ctx, repo.ListStoredLocationClustersForScopeParams{
+		RepositoryID: repositoryID, OwnerID: &owner,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list stored location clusters: %w", err)
+	}
+	membershipRows, err := qtx.ListStoredLocationClusterAssetsForScope(ctx, repo.ListStoredLocationClusterAssetsForScopeParams{
+		RepositoryID: repositoryID, OwnerID: &owner,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list stored location cluster members: %w", err)
+	}
+	if err := readTx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit location rebuild snapshot: %w", err)
+	}
+
+	desired := make(map[string]*desiredLocationCluster)
+	for _, row := range desiredRows {
+		if row.Geohash == nil || row.Latitude == nil || row.Longitude == nil {
+			return nil, errors.New("location candidate contains an unexpected null GPS fact")
+		}
+		cluster := desired[*row.Geohash]
+		if cluster == nil {
+			cluster = &desiredLocationCluster{geohash: *row.Geohash, assetIDs: make(map[uuid.UUID]struct{})}
+			desired[*row.Geohash] = cluster
+		}
+		if _, duplicate := cluster.assetIDs[row.AssetID]; duplicate {
+			continue
+		}
+		cluster.assetIDs[row.AssetID] = struct{}{}
+		cluster.latitudeSum += *row.Latitude
+		cluster.longitudeSum += *row.Longitude
+	}
+
+	storedByGeohash := make(map[string]*storedLocationCluster, len(storedRows))
+	storedByID := make(map[uuid.UUID]*storedLocationCluster, len(storedRows))
+	for _, row := range storedRows {
+		if _, duplicate := storedByGeohash[row.Geohash]; duplicate {
+			return nil, fmt.Errorf("duplicate stored location cluster for geohash %q", row.Geohash)
+		}
+		cluster := &storedLocationCluster{row: row, assetIDs: make(map[uuid.UUID]struct{})}
+		storedByGeohash[row.Geohash] = cluster
+		storedByID[row.ClusterID] = cluster
+	}
+	for _, membership := range membershipRows {
+		cluster := storedByID[membership.ClusterID]
+		if cluster == nil {
+			return nil, fmt.Errorf("stored location membership references unknown cluster %s", membership.ClusterID)
+		}
+		cluster.assetIDs[membership.AssetID] = struct{}{}
+	}
+
+	keys := make([]string, 0, len(desired)+len(storedByGeohash))
+	seen := make(map[string]struct{}, len(desired)+len(storedByGeohash))
+	for key := range desired {
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	for key := range storedByGeohash {
+		if _, exists := seen[key]; !exists {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+
+	plan := &locationRebuildPlan{
+		repositoryID: repositoryID, ownerID: ownerID,
+		sourceRevision: state.SourceRevision, publishedRevision: state.PublishedRevision,
+	}
+	for _, key := range keys {
+		desiredCluster := desired[key]
+		storedCluster := storedByGeohash[key]
+		mutation := &locationClusterMutation{desired: desiredCluster}
+		switch {
+		case desiredCluster == nil:
+			mutation.clusterID = storedCluster.row.ClusterID
+			mutation.deleteAssetIDs = sortedLocationAssetIDs(storedCluster.assetIDs)
+			mutation.deleteClusterOnEmpty = true
+		case storedCluster == nil:
+			mutation.clusterID = uuid.New()
+			mutation.create = true
+			mutation.insertAssetIDs = sortedLocationAssetIDs(desiredCluster.assetIDs)
+		case desiredCluster != nil:
+			mutation.clusterID = storedCluster.row.ClusterID
+			mutation.deleteAssetIDs = sortedLocationAssetDifference(storedCluster.assetIDs, desiredCluster.assetIDs)
+			mutation.insertAssetIDs = sortedLocationAssetDifference(desiredCluster.assetIDs, storedCluster.assetIDs)
+			mutation.updateTopology = len(mutation.deleteAssetIDs) > 0 || len(mutation.insertAssetIDs) > 0 ||
+				storedCluster.row.PhotoCount != int64(len(desiredCluster.assetIDs)) ||
+				math.Abs(storedCluster.row.CentroidLatitude-desiredCluster.centroidLatitude()) > 1e-12 ||
+				math.Abs(storedCluster.row.CentroidLongitude-desiredCluster.centroidLongitude()) > 1e-12
+		}
+		if mutation.create || mutation.deleteClusterOnEmpty || mutation.updateTopology ||
+			len(mutation.deleteAssetIDs) > 0 || len(mutation.insertAssetIDs) > 0 {
+			plan.mutations = append(plan.mutations, mutation)
+		}
+	}
+	return plan, nil
+}
+
+func sortedLocationAssetIDs(values map[uuid.UUID]struct{}) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(values))
+	for id := range values {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
+	return ids
+}
+
+func sortedLocationAssetDifference(left, right map[uuid.UUID]struct{}) []uuid.UUID {
+	values := make(map[uuid.UUID]struct{})
+	for id := range left {
+		if _, exists := right[id]; !exists {
+			values[id] = struct{}{}
+		}
+	}
+	return sortedLocationAssetIDs(values)
+}
+
+func nextLocationMembershipBatch(deletes, inserts []uuid.UUID) ([]uuid.UUID, []uuid.UUID) {
+	deleteCount := min(len(deletes), maxLocationMembershipMutationsPerTransaction)
+	remaining := maxLocationMembershipMutationsPerTransaction - deleteCount
+	insertCount := min(len(inserts), remaining)
+	return deletes[:deleteCount], inserts[:insertCount]
+}
+
+func (s *locationService) applyLocationRebuildPlan(ctx context.Context, plan *locationRebuildPlan) (bool, error) {
+	transactions := 0
+	for len(plan.mutations) > 0 && transactions < maxLocationWriteTransactionsPerTurn {
+		complete, err := s.applyLocationClusterMutation(ctx, plan, plan.mutations[0])
+		if err != nil {
+			return false, err
+		}
+		transactions++
+		if complete {
+			plan.mutations = plan.mutations[1:]
+		}
+	}
+	if len(plan.mutations) > 0 {
+		return true, nil
+	}
+	if err := s.publishLocationProjection(ctx, plan); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func (s *locationService) applyLocationClusterMutation(
+	ctx context.Context,
+	plan *locationRebuildPlan,
+	mutation *locationClusterMutation,
+) (bool, error) {
+	deleteBatch, insertBatch := nextLocationMembershipBatch(mutation.deleteAssetIDs, mutation.insertAssetIDs)
+	membersComplete := len(deleteBatch) == len(mutation.deleteAssetIDs) && len(insertBatch) == len(mutation.insertAssetIDs)
+	createdThisTurn := mutation.create
+
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationLocationRebuildApplyBatch, nil)
+	if err != nil {
+		return false, fmt.Errorf("begin location rebuild batch: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
+	state, err := qtx.GetLocationProjectionState(ctx, repo.GetLocationProjectionStateParams{
+		RepositoryID: plan.repositoryID, OwnerID: plan.ownerID,
+	})
+	if err != nil {
+		return false, fmt.Errorf("validate location source revision: %w", err)
+	}
+	if state.SourceRevision != plan.sourceRevision {
+		return false, errLocationClusterSnapshotChanged
+	}
 
+	now := dbtypes.NewTimestamp(time.Now().UTC())
+	if mutation.create {
+		provider, status, err := locationTopologyGeocodingState(ctx, qtx)
+		if err != nil {
+			return false, err
+		}
+		owner := plan.ownerID
+		if _, err := qtx.CreateLocationCluster(ctx, repo.CreateLocationClusterParams{
+			ClusterID: mutation.clusterID, OwnerID: &owner, RepositoryID: plan.repositoryID,
+			Geohash: mutation.desired.geohash, Precision: 7,
+			CentroidLatitude: mutation.desired.centroidLatitude(), CentroidLongitude: mutation.desired.centroidLongitude(),
+			PhotoCount: int64(len(mutation.desired.assetIDs)), Provider: provider, GeocodeStatus: status,
+			CreatedAt: now, UpdatedAt: now,
+		}); err != nil {
+			return false, fmt.Errorf("create location cluster: %w", err)
+		}
+	}
+	for _, assetID := range deleteBatch {
+		if _, err := qtx.DeleteLocationClusterAsset(ctx, repo.DeleteLocationClusterAssetParams{
+			ClusterID: mutation.clusterID, AssetID: assetID,
+		}); err != nil {
+			return false, fmt.Errorf("delete location cluster member: %w", err)
+		}
+	}
+	for _, assetID := range insertBatch {
+		if _, err := qtx.InsertLocationClusterAsset(ctx, repo.InsertLocationClusterAssetParams{
+			ClusterID: mutation.clusterID, AssetID: assetID, CreatedAt: now,
+		}); err != nil {
+			return false, fmt.Errorf("insert location cluster member: %w", err)
+		}
+	}
+	if membersComplete && mutation.deleteClusterOnEmpty {
+		affected, err := qtx.DeleteLocationClusterIfEmpty(ctx, mutation.clusterID)
+		if err != nil {
+			return false, fmt.Errorf("delete stale location cluster: %w", err)
+		}
+		if affected != 1 {
+			return false, fmt.Errorf("delete stale location cluster %s: affected=%d", mutation.clusterID, affected)
+		}
+	}
+	if membersComplete && mutation.updateTopology && !createdThisTurn {
+		provider, status, err := locationTopologyGeocodingState(ctx, qtx)
+		if err != nil {
+			return false, err
+		}
+		affected, err := qtx.UpdateLocationClusterTopology(ctx, repo.UpdateLocationClusterTopologyParams{
+			CentroidLatitude: mutation.desired.centroidLatitude(), CentroidLongitude: mutation.desired.centroidLongitude(),
+			PhotoCount: int64(len(mutation.desired.assetIDs)), Provider: provider, GeocodeStatus: status,
+			UpdatedAt: now, ClusterID: mutation.clusterID,
+		})
+		if err != nil {
+			return false, fmt.Errorf("update location cluster topology: %w", err)
+		}
+		if affected != 1 {
+			return false, fmt.Errorf("update location cluster %s: affected=%d", mutation.clusterID, affected)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit location rebuild batch: %w", err)
+	}
+
+	mutation.create = false
+	mutation.deleteAssetIDs = mutation.deleteAssetIDs[len(deleteBatch):]
+	mutation.insertAssetIDs = mutation.insertAssetIDs[len(insertBatch):]
+	return membersComplete, nil
+}
+
+func locationTopologyGeocodingState(ctx context.Context, qtx *repo.Queries) (*string, string, error) {
 	settingsRow, err := qtx.GetSettings(ctx)
 	if err != nil {
-		return fmt.Errorf("read geocoding settings for location rebuild: %w", err)
+		return nil, "", fmt.Errorf("read geocoding settings for location topology: %w", err)
 	}
 	geocoding, err := normalizeStoredGeocoding(settingsRow)
 	if err != nil {
-		return fmt.Errorf("read geocoding settings for location rebuild: %w", err)
+		return nil, "", fmt.Errorf("normalize geocoding settings for location topology: %w", err)
 	}
-	geocodeStatus := "pending"
-	var provider *string
-	if !geocoding.IsEnabled() {
-		geocodeStatus = "disabled"
-		value := geocoderProviderDisabled
-		provider = &value
+	if geocoding.IsEnabled() {
+		return nil, "pending", nil
 	}
+	provider := geocoderProviderDisabled
+	return &provider, "disabled", nil
+}
 
-	scope := repo.DeleteLocationClustersForScopeParams{
-		RepositoryID: repositoryUUID,
-		OwnerID:      ownerID,
+func (s *locationService) publishLocationProjection(ctx context.Context, plan *locationRebuildPlan) error {
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationLocationRebuildPublish, nil)
+	if err != nil {
+		return fmt.Errorf("begin location projection publish: %w", err)
 	}
-	if err := qtx.DeleteLocationClustersForScope(ctx, scope); err != nil {
-		return fmt.Errorf("delete old location clusters: %w", err)
-	}
-	candidates, err := qtx.ListLocationClusterCandidatesForScope(ctx, repo.ListLocationClusterCandidatesForScopeParams{
-		RepositoryID: repositoryUUID,
-		OwnerID:      ownerID,
+	defer tx.Rollback()
+	qtx := s.queries.WithTx(tx.Raw())
+	affected, err := qtx.PublishLocationProjectionRevision(ctx, repo.PublishLocationProjectionRevisionParams{
+		SourceRevision: plan.sourceRevision, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		RepositoryID: plan.repositoryID, OwnerID: plan.ownerID,
 	})
 	if err != nil {
-		return fmt.Errorf("list location cluster candidates: %w", err)
+		return fmt.Errorf("publish location projection revision: %w", err)
 	}
-	now := dbtypes.NewTimestamp(time.Now().UTC())
-	for _, candidate := range candidates {
-		if !candidate.RepositoryID.Valid || candidate.Geohash == nil ||
-			candidate.CentroidLatitude == nil || candidate.CentroidLongitude == nil {
-			return fmt.Errorf("location cluster candidate contains unexpected null aggregate")
-		}
-		if _, err := qtx.CreateLocationCluster(ctx, repo.CreateLocationClusterParams{
-			ClusterID:         uuid.New(),
-			OwnerID:           candidate.OwnerID,
-			RepositoryID:      candidate.RepositoryID.UUID,
-			Geohash:           *candidate.Geohash,
-			Precision:         7,
-			CentroidLatitude:  *candidate.CentroidLatitude,
-			CentroidLongitude: *candidate.CentroidLongitude,
-			PhotoCount:        candidate.PhotoCount,
-			Provider:          provider,
-			GeocodeStatus:     geocodeStatus,
-			CreatedAt:         now,
-			UpdatedAt:         now,
-		}); err != nil {
-			return fmt.Errorf("insert location cluster: %w", err)
-		}
+	if affected != 1 {
+		return errLocationClusterSnapshotChanged
 	}
-	if err := qtx.InsertLocationClusterAssetsForScope(ctx, repo.InsertLocationClusterAssetsForScopeParams{
-		RepositoryID: repositoryUUID,
-		OwnerID:      ownerID,
-	}); err != nil {
-		return fmt.Errorf("insert location cluster memberships: %w", err)
+
+	settingsRow, err := qtx.GetSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("read geocoding settings for location publish: %w", err)
+	}
+	geocoding, err := normalizeStoredGeocoding(settingsRow)
+	if err != nil {
+		return fmt.Errorf("normalize geocoding settings for location publish: %w", err)
 	}
 	if geocoding.IsEnabled() {
 		if s.queue == nil {
@@ -175,13 +561,12 @@ func (s *locationService) RebuildLocationClusters(ctx context.Context, repositor
 		}
 		args := jobs.ResolveLocationClustersArgs{GeocodingRevision: settingsRow.GeocodingRevision}
 		opts := args.InsertOpts()
-		if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
+		if _, err := s.queue.InsertTx(ctx, tx.Raw(), args, &opts); err != nil {
 			return fmt.Errorf("enqueue location cluster resolution: %w", err)
 		}
 	}
-
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit location cluster rebuild: %w", err)
+		return fmt.Errorf("commit location projection publish: %w", err)
 	}
 	return nil
 }
@@ -385,12 +770,12 @@ func (s *locationService) publishClusterResult(ctx context.Context, revision int
 }
 
 func (s *locationService) publishRemoteResult(ctx context.Context, revision int64, geocoding settings.Geocoding, cluster repo.LocationCluster, result ReverseGeocodeResult) (bool, error) {
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationLocationRemotePublish, nil)
 	if err != nil {
 		return false, fmt.Errorf("begin reverse geocode publication: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 	current, err := qtx.GetSettings(ctx)
 	if err != nil {
 		return false, fmt.Errorf("check geocoding revision before publication: %w", err)

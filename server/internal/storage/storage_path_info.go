@@ -40,7 +40,21 @@ type StoragePathInfo struct {
 }
 
 func InspectStoragePath(path string) StoragePathInfo {
-	info := StoragePathInfo{Writable: directoryWritable(path)}
+	return inspectStoragePath(path, true)
+}
+
+// InspectStoragePathReadOnly returns mount identity and classification without
+// creating permission/case probe files. Observation change feeds use it so
+// taking a cursor never generates its own filesystem event.
+func InspectStoragePathReadOnly(path string) StoragePathInfo {
+	return inspectStoragePath(path, false)
+}
+
+func inspectStoragePath(path string, probeMutability bool) StoragePathInfo {
+	info := StoragePathInfo{}
+	if probeMutability {
+		info.Writable = directoryWritable(path)
+	}
 	total, available, filesystem, err := inspectVolume(path)
 	if err != nil {
 		return info
@@ -60,7 +74,9 @@ func InspectStoragePath(path string) StoragePathInfo {
 	info.Inode = platform.Inode
 	info.EffectiveUID = platform.EffectiveUID
 	info.EffectiveGID = platform.EffectiveGID
-	info.CaseBehaviorKnown, info.CaseSensitive = inspectCaseBehavior(path)
+	if probeMutability {
+		info.CaseBehaviorKnown, info.CaseSensitive = inspectCaseBehavior(path)
+	}
 	info.NetworkFilesystem = isNetworkFilesystem(filesystem)
 	clean := strings.ToLower(strings.ReplaceAll(info.CanonicalPath, `\`, "/"))
 	info.RemovableLikely = strings.HasPrefix(clean, "/media/") || strings.HasPrefix(clean, "/run/media/") || strings.HasPrefix(clean, "/volumes/")

@@ -134,7 +134,7 @@ func (s *assetService) searchAssetsFusedSet(ctx context.Context, params SearchAs
 	// Candidates are media-item primary assets: one contribution per logical
 	// media item.
 	if s.queries != nil {
-		if rows, err := s.queries.GetMediaItemRefsUnified(ctx, filenameMembershipParams(params.QueryAssetsParams)); err == nil {
+		if rows, err := s.readQueries.GetMediaItemRefsUnified(ctx, filenameMembershipParams(params.QueryAssetsParams)); err == nil {
 			ran++
 			set.Sources = append(set.Sources, SourceFilename)
 			rank := 1
@@ -175,9 +175,9 @@ func (s *assetService) hydrateAssetsInOrder(ctx context.Context, ids []uuid.UUID
 	var rows []repo.Asset
 	var err error
 	if queryIncludesDeletedAssets(isDeleted) {
-		rows, err = s.queries.GetAssetsByIDsAny(ctx, ids)
+		rows, err = s.readQueries.GetAssetsByIDsAny(ctx, ids)
 	} else {
-		rows, err = s.queries.GetAssetsByIDs(ctx, ids)
+		rows, err = s.readQueries.GetAssetsByIDs(ctx, ids)
 	}
 	if err != nil {
 		return nil, err
@@ -215,9 +215,9 @@ func (s *assetService) pageAssetsBySort(ctx context.Context, ids []uuid.UUID, so
 	var orderedAsc []uuid.UUID
 	var err error
 	if sortBy == "recently_added" {
-		orderedAsc, err = s.queries.RankAssetIDsByUploadTime(ctx, ids)
+		orderedAsc, err = s.readQueries.RankAssetIDsByUploadTime(ctx, ids)
 	} else {
-		orderedAsc, err = s.queries.RankAssetIDsByTime(ctx, ids)
+		orderedAsc, err = s.readQueries.RankAssetIDsByTime(ctx, ids)
 	}
 	if err != nil {
 		return nil, err

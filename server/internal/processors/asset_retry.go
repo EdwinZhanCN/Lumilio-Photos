@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
@@ -18,12 +19,16 @@ import (
 
 // ProcessRetryTask is the entry point for the retry worker. It handles AssetRetryPayload.
 func (ap *AssetProcessor) ProcessRetryTask(ctx context.Context, payload jobs.AssetRetryPayload) error {
-	return ap.RetryAsset(ctx, payload.AssetID, payload.RetryTasks)
+	return ap.retryAsset(ctx, payload.AssetID, payload.RetryTasks, payload.EffectID)
 }
 
 // RetryAsset handles selective retry of failed asset processing tasks by re-enqueueing
 // them to the appropriate per-task queues.
 func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, retryTasks []string) error {
+	return ap.retryAsset(ctx, assetIDStr, retryTasks, uuid.New())
+}
+
+func (ap *AssetProcessor) retryAsset(ctx context.Context, assetIDStr string, retryTasks []string, effectID uuid.UUID) error {
 	// Parse asset ID
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
@@ -35,7 +40,7 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	if err != nil {
 		return fmt.Errorf("asset not found: %w", err)
 	}
-	if !asset.RepositoryID.Valid || ap.repositories == nil {
+	if ap.repositories == nil {
 		return fmt.Errorf("asset retry repository gate unavailable")
 	}
 	// Parse current status
@@ -47,11 +52,11 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 		}
 	}
 
-	source, err := ap.resolveCurrentAssetSource(ctx, assetID, "", "")
+	source, err := ap.resolveCurrentAssetSource(ctx, assetID, asset.ContentID)
 	if err != nil {
 		return err
 	}
-	observationToken := source.observation.ObservationToken
+	repositoryID := source.repository.RepoID
 	if err := source.Close(); err != nil {
 		return fmt.Errorf("close asset source: %w", err)
 	}
@@ -60,7 +65,7 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 	// current file. Acquire the mutation lease only after that handle is closed;
 	// taking the leases in the opposite order self-deadlocks on the same
 	// repository.
-	_, releaseWork, err := ap.repositories.BeginRepositoryWork(ctx, asset.RepositoryID.UUID.String(), dbtypes.RepositoryActivityProcessing)
+	_, releaseWork, err := ap.repositories.BeginRepositoryWork(ctx, repositoryID.String(), dbtypes.RepositoryActivityProcessing)
 	if err != nil {
 		return err
 	}
@@ -91,12 +96,12 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 		}
 	}
 
-	tx, err := ap.database.BeginTx(ctx, nil)
+	tx, err := ap.writer.BeginTx(ctx, catalogtx.OperationAssetRetry, nil)
 	if err != nil {
 		return fmt.Errorf("begin asset retry transaction: %w", err)
 	}
 	defer tx.Rollback()
-	txQueries := ap.queries.WithTx(tx)
+	txQueries := ap.queries.WithTx(tx.Raw())
 	err = txQueries.MutateAssetStatus(ctx, asset.AssetID, func(current status.AssetStatus) (status.AssetStatus, error) {
 		current.EnsureTasks(tasksToRetry)
 		for _, taskName := range tasksToRetry {
@@ -110,7 +115,7 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 
 	// Re-enqueue tasks based on failed task names (using queue names as canonical task names)
 	log.Printf("Retrying %d tasks for %s asset %s: %v", len(tasksToRetry), assetType, asset.AssetID.String(), tasksToRetry)
-	if err := ap.enqueueRetryTasks(ctx, tx, &asset, assetType, tasksToRetry, observationToken, mlConfig); err != nil {
+	if err := ap.enqueueRetryTasks(ctx, tx.Raw(), &asset, assetType, tasksToRetry, mlConfig, effectID); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -127,8 +132,8 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	asset *repo.Asset,
 	assetType dbtypes.AssetType,
 	tasksToRetry []string,
-	observationToken string,
 	mlConfig settings.ML,
+	effectID uuid.UUID,
 ) error {
 	// Build queue set from task/queue names (they are the same in our bijection)
 	queueSet := make(map[string]bool)
@@ -137,13 +142,9 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	}
 
 	// Prepare common job arguments
-	commonMeta := jobs.MetadataArgs{AssetID: asset.AssetID, ObservationToken: observationToken, ExpectedContentHash: asset.ContentHash}
-	commonThumb := jobs.ThumbnailArgs{
-		AssetID: asset.AssetID, ObservationToken: observationToken, ExpectedContentHash: asset.ContentHash,
-	}
-	commonTranscode := jobs.TranscodeArgs{
-		AssetID: asset.AssetID, ObservationToken: observationToken, ExpectedContentHash: asset.ContentHash,
-	}
+	commonMeta := jobs.MetadataArgs{AssetID: asset.AssetID, ExpectedContentID: asset.ContentID, EffectID: effectID}
+	commonThumb := jobs.ThumbnailArgs{AssetID: asset.AssetID, ExpectedContentID: asset.ContentID, EffectID: effectID}
+	commonTranscode := jobs.TranscodeArgs{AssetID: asset.AssetID, ExpectedContentID: asset.ContentID, EffectID: effectID}
 
 	// Enqueue tasks based on queue names (bijection: queue name = task name)
 	// Available queues: metadata_asset, thumbnail_asset, transcode_asset,
@@ -219,7 +220,8 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	if assetType == dbtypes.AssetTypeVideo && queueSet["process_video_frames"] {
 		if mlConfig.SemanticEnabled && mlConfig.VideoSemanticEnabled {
 			err := ap.insertRetryJob(ctx, tx, jobs.ProcessVideoFramesArgs{
-				AssetID: asset.AssetID, PreprocessVersion: jobs.MLPreprocessVersionV1,
+				AssetID: asset.AssetID, ExpectedContentID: asset.ContentID,
+				PreprocessVersion: jobs.MLPreprocessVersionV1,
 			}, "process_video_frames")
 			if err != nil {
 				return fmt.Errorf("enqueue process_video_frames retry: %w", err)
@@ -237,6 +239,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *re
 	if taskSet["process_semantic"] && mlConfig.SemanticEnabled {
 		err = ap.insertRetryJob(ctx, tx, jobs.ProcessSemanticArgs{
 			AssetID:           asset.AssetID,
+			ExpectedContentID: asset.ContentID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, "process_semantic")
 		if err != nil {
@@ -247,6 +250,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *re
 	if taskSet["process_bioclip"] && mlConfig.BioCLIPEnabled {
 		err = ap.insertRetryJob(ctx, tx, jobs.ProcessBioClipArgs{
 			AssetID:           asset.AssetID,
+			ExpectedContentID: asset.ContentID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, "process_bioclip")
 		if err != nil {
@@ -257,6 +261,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *re
 	if taskSet["process_ocr"] && mlConfig.OCREnabled {
 		err = ap.insertRetryJob(ctx, tx, jobs.ProcessOcrArgs{
 			AssetID:           asset.AssetID,
+			ExpectedContentID: asset.ContentID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, "process_ocr")
 		if err != nil {
@@ -267,6 +272,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, tx *sql.Tx, asset *re
 	if taskSet["process_face"] && mlConfig.FaceEnabled {
 		err = ap.insertRetryJob(ctx, tx, jobs.ProcessFaceArgs{
 			AssetID:           asset.AssetID,
+			ExpectedContentID: asset.ContentID,
 			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, "process_face")
 		if err != nil {

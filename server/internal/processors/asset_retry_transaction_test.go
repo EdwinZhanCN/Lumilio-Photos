@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,13 @@ func TestSelectiveRetryStatusAndJobsAreAtomicAndIdempotent(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
 	if err := catalog.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := catalog.Queries.CreateUser(ctx, repo.CreateUserParams{
+		Username: "retry-owner", Password: "unused", DisplayName: "Retry Owner", Role: "admin",
+		WebauthnUserHandle: []byte("retry-owner"),
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -74,11 +82,18 @@ func TestSelectiveRetryStatusAndJobsAreAtomicAndIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	assetID := uuid.New()
+	content, err := catalog.Queries.InsertContentObject(ctx, repo.InsertContentObjectParams{
+		ContentID: uuid.New(), HashAlgorithm: "blake3-v1", FullHash: strings.Repeat("c", 64),
+		FileSize: 1, CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	rating := int64(0)
 	asset, err := catalog.Queries.CreateAsset(ctx, repo.CreateAssetParams{
-		AssetID: assetID, Type: string(dbtypes.AssetTypePhoto), OriginalFilename: "retry.jpg", MimeType: "image/jpeg",
-		FileSize: 1, ContentHash: "hash", TakenTime: now, SpecificMetadata: dbtypes.SpecificMetadata([]byte("{}")),
-		Rating: &rating, RepositoryID: uuid.NullUUID{UUID: repositoryID, Valid: true}, Status: encodedStatus,
+		AssetID: assetID, OwnerID: &owner.UserID, ContentID: content.ContentID,
+		Type: string(dbtypes.AssetTypePhoto), OriginalFilename: "retry.jpg", MimeType: "image/jpeg",
+		TakenTime: now, SpecificMetadata: dbtypes.SpecificMetadata([]byte("{}")), Rating: &rating, Status: encodedStatus,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -87,8 +102,9 @@ func TestSelectiveRetryStatusAndJobsAreAtomicAndIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	processor := &AssetProcessor{database: catalog.SQL, queries: catalog.Queries, queueClient: queueClient}
+	processor := &AssetProcessor{database: catalog.SQL, writer: catalog.Writer, queries: catalog.Queries, queueClient: queueClient}
 	tasks := []string{"metadata_asset", "thumbnail_asset"}
+	effectID := uuid.New()
 
 	run := func() error {
 		tx, err := catalog.SQL.BeginTx(ctx, nil)
@@ -106,7 +122,7 @@ func TestSelectiveRetryStatusAndJobsAreAtomicAndIdempotent(t *testing.T) {
 		}); err != nil {
 			return err
 		}
-		if err := processor.enqueueRetryTasks(ctx, tx, &asset, dbtypes.AssetTypePhoto, tasks, "observation", settings.ML{}); err != nil {
+		if err := processor.enqueueRetryTasks(ctx, tx, &asset, dbtypes.AssetTypePhoto, tasks, settings.ML{}, effectID); err != nil {
 			return err
 		}
 		return tx.Commit()

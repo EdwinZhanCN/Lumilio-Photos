@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -29,7 +30,22 @@ const migrationTable = "lumilio_schema_migrations"
 const (
 	schemaGeneration                 = 7
 	currentGenerationBaselineVersion = 9
+	currentApplicationMigration      = 13
+	destructiveCutoverStartVersion   = 11
+	destructiveCutoverVersion        = 12
 )
+
+var ErrDestructiveMigrationPreflightRequired = errors.New("destructive catalog migration preflight is required")
+
+// DestructiveMigrationPlan identifies the immutable migration boundary for a
+// populated catalog. The callback runs before River or application migrations
+// can change the catalog.
+type DestructiveMigrationPlan struct {
+	FromApplicationMigration int64
+	ToApplicationMigration   int64
+}
+
+type DestructiveMigrationPreflight func(context.Context, DestructiveMigrationPlan) error
 
 type embeddedMigration struct {
 	version  int64
@@ -44,25 +60,97 @@ type appliedMigration struct {
 	checksum string
 }
 
-// Migrate applies Lumilio's embedded transactional migrations followed by
-// River's official SQLite migrations against the same single-writer pool.
+// Migrate applies migrations for a new or already-current catalog. An existing
+// catalog that still needs the destructive ROE cutover must use
+// MigrateWithPreflight so the caller can establish the filesystem and backup
+// recovery boundary first.
 func (d *DB) Migrate(ctx context.Context) error {
+	return d.MigrateWithPreflight(ctx, nil)
+}
+
+// MigrateWithPreflight runs the required recovery callback before any schema
+// change to an existing pre-cutover catalog. River is migrated before the
+// application cutover so obsolete jobs can be deleted in the same transaction
+// that replaces the media catalog.
+func (d *DB) MigrateWithPreflight(ctx context.Context, preflight DestructiveMigrationPreflight) error {
 	if err := assertSchemaGeneration(ctx, d.SQL); err != nil {
 		return err
+	}
+	plan, err := pendingDestructiveMigration(ctx, d.SQL)
+	if err != nil {
+		return fmt.Errorf("plan Lumilio migration: %w", err)
+	}
+	if plan != nil {
+		if preflight == nil {
+			return fmt.Errorf(
+				"%w: application migration %d -> %d",
+				ErrDestructiveMigrationPreflightRequired,
+				plan.FromApplicationMigration,
+				plan.ToApplicationMigration,
+			)
+		}
+		if err := preflight(ctx, *plan); err != nil {
+			return fmt.Errorf("destructive catalog migration preflight: %w", err)
+		}
+	}
+	if err := migrateRiver(ctx, d.SQL); err != nil {
+		return fmt.Errorf("migrate River schema: %w", err)
 	}
 	if err := migrateApplication(ctx, d.SQL); err != nil {
 		return fmt.Errorf("migrate Lumilio schema: %w", err)
 	}
-	if err := vectorindex.Reconcile(ctx, d.SQL); err != nil {
+	if err := vectorindex.Reconcile(ctx, d.Writer, d.ReaderSQL); err != nil {
 		return fmt.Errorf("reconcile semantic Vec1 index: %w", err)
-	}
-	if err := migrateRiver(ctx, d.SQL); err != nil {
-		return fmt.Errorf("migrate River schema: %w", err)
 	}
 	if err := d.Check(ctx); err != nil {
 		return fmt.Errorf("post-migration integrity check: %w", err)
 	}
 	return nil
+}
+
+func pendingDestructiveMigration(ctx context.Context, database *sql.DB) (*DestructiveMigrationPlan, error) {
+	var ledgerExists int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM sqlite_schema
+		WHERE type = 'table' AND name = ?
+	`, migrationTable).Scan(&ledgerExists); err != nil {
+		return nil, fmt.Errorf("inspect migration ledger: %w", err)
+	}
+	if ledgerExists == 0 {
+		return nil, nil
+	}
+	all, err := loadEmbeddedMigrations()
+	if err != nil {
+		return nil, err
+	}
+	available, err := currentGenerationMigrations(all)
+	if err != nil {
+		return nil, err
+	}
+	applied, err := readAppliedMigrations(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateAppliedMigrations(available, applied); err != nil {
+		return nil, err
+	}
+	if len(applied) == 0 {
+		return nil, nil
+	}
+	if _, complete := applied[destructiveCutoverVersion]; complete {
+		return nil, nil
+	}
+	from := int64(0)
+	for version := range applied {
+		from = max(from, version)
+	}
+	if from >= destructiveCutoverVersion {
+		return nil, nil
+	}
+	return &DestructiveMigrationPlan{
+		FromApplicationMigration: from,
+		ToApplicationMigration:   destructiveCutoverVersion,
+	}, nil
 }
 
 // assertSchemaGeneration refuses to start against a catalog written by an
@@ -120,6 +208,48 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if err := validateAppliedMigrations(available, applied); err != nil {
+		return err
+	}
+
+	for index := 0; index < len(available); {
+		migration := available[index]
+		if _, ok := applied[migration.version]; ok {
+			index++
+			continue
+		}
+
+		group := []embeddedMigration{migration}
+		next := index + 1
+		if migration.version >= destructiveCutoverStartVersion && migration.version <= destructiveCutoverVersion {
+			group = group[:0]
+			for next = index; next < len(available) && available[next].version <= destructiveCutoverVersion; next++ {
+				candidate := available[next]
+				if _, ok := applied[candidate.version]; !ok {
+					group = append(group, candidate)
+				}
+			}
+		}
+
+		started := time.Now()
+		if err := applyMigrationGroup(ctx, database, group); err != nil {
+			return err
+		}
+		for _, appliedMigration := range group {
+			applied[appliedMigration.version] = structToApplied(appliedMigration)
+			log.Printf(
+				"Lumilio migration applied: version=%06d name=%s duration=%s",
+				appliedMigration.version,
+				appliedMigration.name,
+				time.Since(started),
+			)
+		}
+		index = next
+	}
+	return nil
+}
+
+func validateAppliedMigrations(available []embeddedMigration, applied map[int64]appliedMigration) error {
 	known := make(map[int64]embeddedMigration, len(available))
 	for _, migration := range available {
 		known[migration.version] = migration
@@ -147,23 +277,20 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 			)
 		}
 	}
-
-	for _, migration := range available {
-		if _, ok := applied[migration.version]; ok {
-			continue
+	if _, cutoverApplied := applied[destructiveCutoverVersion]; cutoverApplied {
+		if _, schemaApplied := applied[destructiveCutoverStartVersion]; !schemaApplied {
+			return fmt.Errorf(
+				"catalog migration %06d is recorded without required migration %06d",
+				destructiveCutoverVersion,
+				destructiveCutoverStartVersion,
+			)
 		}
-		started := time.Now()
-		if err := applyMigration(ctx, database, migration); err != nil {
-			return err
-		}
-		log.Printf(
-			"Lumilio migration applied: version=%06d name=%s duration=%s",
-			migration.version,
-			migration.name,
-			time.Since(started),
-		)
 	}
 	return nil
+}
+
+func structToApplied(migration embeddedMigration) appliedMigration {
+	return appliedMigration{name: migration.name, checksum: migration.checksum}
 }
 
 // currentGenerationMigrations excludes destructive baselines from older
@@ -260,25 +387,39 @@ func readAppliedMigrations(ctx context.Context, database *sql.DB) (map[int64]app
 }
 
 func applyMigration(ctx context.Context, database *sql.DB, migration embeddedMigration) error {
+	return applyMigrationGroup(ctx, database, []embeddedMigration{migration})
+}
+
+func applyMigrationGroup(ctx context.Context, database *sql.DB, migrations []embeddedMigration) error {
+	if len(migrations) == 0 {
+		return nil
+	}
 	tx, err := database.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin migration %s: %w", migration.file, err)
+		return fmt.Errorf("begin migration group at %s: %w", migrations[0].file, err)
 	}
 	defer func() {
 		_ = tx.Rollback()
 	}()
 
-	if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
-		return fmt.Errorf("execute migration %s: %w", migration.file, err)
-	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO lumilio_schema_migrations (version, name, checksum, applied_at)
-		VALUES (?, ?, ?, ?)
-	`, migration.version, migration.name, migration.checksum, time.Now().UTC().UnixMicro()); err != nil {
-		return fmt.Errorf("record migration %s: %w", migration.file, err)
+	for _, migration := range migrations {
+		if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
+			return fmt.Errorf("execute migration %s: %w", migration.file, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO lumilio_schema_migrations (version, name, checksum, applied_at)
+			VALUES (?, ?, ?, ?)
+		`, migration.version, migration.name, migration.checksum, time.Now().UTC().UnixMicro()); err != nil {
+			return fmt.Errorf("record migration %s: %w", migration.file, err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit migration %s: %w", migration.file, err)
+		return fmt.Errorf(
+			"commit migration group %s..%s: %w",
+			migrations[0].file,
+			migrations[len(migrations)-1].file,
+			err,
+		)
 	}
 	return nil
 }

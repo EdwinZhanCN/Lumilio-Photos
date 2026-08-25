@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"server/internal/db/repo"
@@ -137,12 +138,18 @@ type workerImageLoaderStub struct {
 	called        int
 	purpose       imagesource.Purpose
 	version       string
+	loadErr       error
+	validationErr error
+	validations   int
 }
 
 func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
 	s.called++
 	s.purpose = purpose
 	s.version = preprocessVersion
+	if s.loadErr != nil {
+		return nil, s.loadErr
+	}
 	encodedSource := s.encodedSource
 	if encodedSource == nil {
 		encodedSource = s.data
@@ -157,6 +164,11 @@ func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ uuid.UUID, purp
 		DType:         "uint8",
 		ColorSpace:    "RGB",
 	}, nil
+}
+
+func (s *workerImageLoaderStub) ValidateAssetWork(context.Context, uuid.UUID, uuid.UUID) error {
+	s.validations++
+	return s.validationErr
 }
 
 func TestProcessSemanticWorkerSavesImageEmbedding(t *testing.T) {
@@ -220,5 +232,44 @@ func TestProcessSemanticWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	}
 	if embeddingSvc.savedType != service.EmbeddingTypeSemantic {
 		t.Fatalf("expected semantic embedding to be saved even without task check")
+	}
+}
+
+func TestProcessSemanticWorkerCompletesStaleRevisionWithoutInference(t *testing.T) {
+	t.Parallel()
+
+	assetID := uuid.MustParse("66666666-6666-6666-6666-666666666666")
+	imageLoader := &workerImageLoaderStub{validationErr: ErrAssetWorkStale}
+	embeddingSvc := &semanticWorkerEmbeddingStub{}
+	worker := &ProcessSemanticWorker{
+		LumenService:     &semanticWorkerLumenStub{},
+		EmbeddingService: embeddingSvc,
+		ImageLoader:      imageLoader,
+	}
+	if err := worker.Work(context.Background(), &river.Job[ProcessSemanticArgs]{
+		Args: ProcessSemanticArgs{AssetID: assetID, ExpectedContentID: uuid.New()},
+	}); err != nil {
+		t.Fatalf("stale work returned error: %v", err)
+	}
+	if imageLoader.called != 0 || embeddingSvc.savedModel != "" {
+		t.Fatalf("stale work performed side effects: loads=%d model=%q", imageLoader.called, embeddingSvc.savedModel)
+	}
+}
+
+func TestProcessSemanticWorkerSnoozesMissingDerivedInput(t *testing.T) {
+	t.Parallel()
+
+	assetID := uuid.MustParse("77777777-7777-7777-7777-777777777777")
+	worker := &ProcessSemanticWorker{
+		LumenService:     &semanticWorkerLumenStub{},
+		EmbeddingService: &semanticWorkerEmbeddingStub{},
+		ImageLoader:      &workerImageLoaderStub{loadErr: ErrDerivedAssetNotReady},
+	}
+	err := worker.Work(context.Background(), &river.Job[ProcessSemanticArgs]{
+		Args: ProcessSemanticArgs{AssetID: assetID},
+	})
+	var snooze *river.JobSnoozeError
+	if !errors.As(err, &snooze) {
+		t.Fatalf("derived dependency error = %v, want River snooze", err)
 	}
 }

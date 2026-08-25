@@ -38,8 +38,9 @@ var (
 type EntryKind string
 
 const (
-	EntryKindRegular EntryKind = "regular"
-	EntryKindSymlink EntryKind = "symlink"
+	EntryKindRegular   EntryKind = "regular"
+	EntryKindSymlink   EntryKind = "symlink"
+	EntryKindDirectory EntryKind = "directory"
 )
 
 type HashMode uint8
@@ -86,6 +87,34 @@ type WalkSummary struct {
 	Skipped       int64
 	Authoritative bool
 	PartialReason string
+}
+
+// DirectoryReadOptions identifies one bounded verifier page. Offset counts raw
+// directory entries, including markers and unsupported files, so a resumed
+// frontier never depends on the number of catalog-worthy observations.
+type DirectoryReadOptions struct {
+	Directory string
+	Offset    int64
+	Limit     int
+	ScanID    uuid.UUID
+	Settle    time.Duration
+	Now       time.Time
+}
+
+// DirectoryReadBatch is bounded by DirectoryReadOptions.Limit. Entries are
+// positive observations only; Authoritative states whether the completed
+// child set may later finalize absences.
+type DirectoryReadBatch struct {
+	Entries       []DirectoryReadEntry
+	Issues        []WalkIssue
+	NextOffset    int64
+	Done          bool
+	Authoritative bool
+}
+
+type DirectoryReadEntry struct {
+	Observation FileObservation
+	NextOffset  int64
 }
 
 type RepositoryFSFactory struct {
@@ -711,7 +740,7 @@ func (r *RepositoryFS) WalkUserMedia(ctx context.Context, options WalkOptions) (
 			summary.Skipped++
 			return nil
 		}
-		observation, inspectErr := r.inspectMediaWithHeldRoot(ctx, root, repositoryPath, HashNone)
+		observation, inspectErr := r.observeMediaWithHeldRoot(ctx, root, repositoryPath)
 		if inspectErr != nil {
 			if errors.Is(inspectErr, ErrRepositoryEntryUnsupported) || entry.Type()&os.ModeSymlink != 0 {
 				summary.Skipped++
@@ -738,9 +767,168 @@ func (r *RepositoryFS) WalkUserMedia(ctx context.Context, options WalkOptions) (
 	return summary, nil
 }
 
-// inspectMediaWithHeldRoot avoids reacquiring the RepositoryFS mutex while a
-// walk already holds it.
-func (r *RepositoryFS) inspectMediaWithHeldRoot(ctx context.Context, root *os.Root, repositoryPath RepositoryPath, mode HashMode) (FileObservation, error) {
+// ReadUserMediaDirectory enumerates one bounded page without recursively
+// walking or reading file contents. A resumed page reopens the directory and
+// discards Offset entries in bounded chunks; change capture and the final
+// verifier, rather than directory ordering, provide convergence across edits.
+func (r *RepositoryFS) ReadUserMediaDirectory(ctx context.Context, options DirectoryReadOptions) (DirectoryReadBatch, error) {
+	batch := DirectoryReadBatch{Authoritative: true, NextOffset: options.Offset}
+	if err := ctx.Err(); err != nil {
+		return batch, err
+	}
+	if options.Offset < 0 {
+		return batch, fmt.Errorf("directory offset must be non-negative")
+	}
+	if options.Limit <= 0 || options.Limit > 256 {
+		return batch, fmt.Errorf("directory limit must be between 1 and 256")
+	}
+	if options.Now.IsZero() {
+		options.Now = time.Now().UTC()
+	}
+	directory := "."
+	if options.Directory != "" {
+		parsed, err := ParseUserMediaPath(options.Directory)
+		if err != nil {
+			return batch, err
+		}
+		directory, err = parsed.local()
+		if err != nil {
+			return batch, err
+		}
+	}
+
+	root, done, err := r.withRoot()
+	if err != nil {
+		return batch, err
+	}
+	defer done()
+	opened, err := root.Open(directory)
+	if err != nil {
+		return batch, classifyRepositoryEntryError(options.Directory, err)
+	}
+	defer opened.Close()
+	info, err := opened.Stat()
+	if err != nil {
+		return batch, err
+	}
+	if !info.IsDir() {
+		return batch, fmt.Errorf("%w: %s is not a directory", ErrRepositoryEntryUnsupported, options.Directory)
+	}
+
+	remaining := options.Offset
+	for remaining > 0 {
+		if err := ctx.Err(); err != nil {
+			return batch, err
+		}
+		pageSize := options.Limit
+		if int64(pageSize) > remaining {
+			pageSize = int(remaining)
+		}
+		skipped, readErr := opened.ReadDir(pageSize)
+		remaining -= int64(len(skipped))
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return batch, readErr
+		}
+		if len(skipped) == 0 || errors.Is(readErr, io.EOF) {
+			batch.Done = true
+			return batch, nil
+		}
+	}
+
+	entries, readErr := opened.ReadDir(options.Limit)
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return batch, readErr
+	}
+	batch.NextOffset += int64(len(entries))
+	batch.Done = errors.Is(readErr, io.EOF) || len(entries) == 0
+	batch.Entries = make([]DirectoryReadEntry, 0, len(entries))
+	for index, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return batch, err
+		}
+		name := entry.Name()
+		child := name
+		if options.Directory != "" {
+			child = path.Join(options.Directory, name)
+		}
+		if child == ".lumilio" || child == ".lumiliorepo" || child == ".lumilioroot" {
+			continue
+		}
+		if entry.IsDir() {
+			if _, markerErr := root.Stat(path.Join(child, ".lumiliorepo")); markerErr == nil {
+				batch.Authoritative = false
+				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "nested_repository", Err: ErrNestedRepository})
+				continue
+			} else if !errors.Is(markerErr, fs.ErrNotExist) {
+				batch.Authoritative = false
+				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "nested_repository_check", Err: markerErr})
+				continue
+			}
+		}
+		repositoryPath, parseErr := ParseUserMediaPath(child)
+		if parseErr != nil {
+			batch.Authoritative = false
+			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "invalid_path", Err: parseErr})
+			continue
+		}
+		if !entry.IsDir() && !fileutil.IsSupportedExtension(path.Ext(repositoryPath.String())) {
+			continue
+		}
+		observation, observeErr := r.observeNodeWithHeldRoot(ctx, root, repositoryPath, entry.IsDir())
+		if observeErr != nil {
+			if errors.Is(observeErr, ErrRepositoryEntryUnsupported) {
+				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "unsupported_entry", Err: observeErr})
+				continue
+			}
+			batch.Authoritative = false
+			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "inspect_error", Err: observeErr})
+			continue
+		}
+		observation.ScanID = options.ScanID
+		if !entry.IsDir() && options.Settle > 0 && options.Now.Sub(time.Unix(0, observation.ModTimeNS)) < options.Settle {
+			batch.Authoritative = false
+			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "settling"})
+			continue
+		}
+		batch.Entries = append(batch.Entries, DirectoryReadEntry{
+			Observation: observation,
+			NextOffset:  options.Offset + int64(index) + 1,
+		})
+	}
+	return batch, nil
+}
+
+func (r *RepositoryFS) observeNodeWithHeldRoot(
+	ctx context.Context,
+	root *os.Root,
+	repositoryPath RepositoryPath,
+	directory bool,
+) (FileObservation, error) {
+	if !directory {
+		return r.observeMediaWithHeldRoot(ctx, root, repositoryPath)
+	}
+	local, err := repositoryPath.local()
+	if err != nil {
+		return FileObservation{}, err
+	}
+	opened, err := root.Open(local)
+	if err != nil {
+		return FileObservation{}, err
+	}
+	defer opened.Close()
+	info, err := opened.Stat()
+	if err != nil || !info.IsDir() {
+		return FileObservation{}, ErrRepositoryEntryUnsupported
+	}
+	identityKind, identity, changeTime := platformFileIdentity(opened, info)
+	return newFileObservation(r.repositoryID, repositoryPath, EntryKindDirectory, info, identityKind, identity, changeTime), nil
+}
+
+// observeMediaWithHeldRoot avoids reacquiring the RepositoryFS mutex while a
+// walk already holds it. The walk performs no content read between metadata
+// snapshots, so one opened-handle snapshot is sufficient; content consumers
+// compare the observation token again before committing their work.
+func (r *RepositoryFS) observeMediaWithHeldRoot(ctx context.Context, root *os.Root, repositoryPath RepositoryPath) (FileObservation, error) {
 	local, err := repositoryPath.local()
 	if err != nil {
 		return FileObservation{}, err
@@ -768,16 +956,7 @@ func (r *RepositoryFS) inspectMediaWithHeldRoot(ctx context.Context, root *os.Ro
 		return FileObservation{}, ErrRepositoryEntryUnsupported
 	}
 	identityKind, identity, changeTime := platformFileIdentity(opened, before)
-	observation := newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime)
-	after, err := opened.Stat()
-	if err != nil {
-		return FileObservation{}, err
-	}
-	afterKind, afterIdentity, afterChange := platformFileIdentity(opened, after)
-	if observation.ObservationToken != newFileObservation(r.repositoryID, repositoryPath, kind, after, afterKind, afterIdentity, afterChange).ObservationToken {
-		return FileObservation{}, ErrRepositoryFileUnstable
-	}
-	return observation, nil
+	return newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime), nil
 }
 
 func (s *WalkSummary) markPartial(repositoryPath, reason string, err error) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
@@ -487,11 +488,11 @@ func (rm *DefaultRepositoryManager) relocateRepositoryRoot(ctx context.Context, 
 	// Commit the maintenance barrier before changing any paths. HTTP reads and
 	// every BeginRepositoryActivity caller can now observe/refuse this root and
 	// its children, instead of maintenance existing only inside the final tx.
-	maintenanceTx, err := rm.database.BeginTx(ctx, nil)
+	maintenanceTx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRootRelocateMaintenance, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin Storage Location maintenance: %w", err)
 	}
-	maintenanceQueries := rm.queries.WithTx(maintenanceTx)
+	maintenanceQueries := rm.queries.WithTx(maintenanceTx.Raw())
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	if _, err := maintenanceQueries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
 		RootID: rootID, Name: registered.Name,
@@ -532,12 +533,12 @@ func (rm *DefaultRepositoryManager) relocateRepositoryRoot(ctx context.Context, 
 		}
 	}()
 
-	tx, err := rm.database.BeginTx(ctx, nil)
+	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRootRelocate, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin Storage Location relocate: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	queries := rm.queries.WithTx(tx)
+	queries := rm.queries.WithTx(tx.Raw())
 	now = dbtypes.NewTimestamp(time.Now().UTC())
 	for _, move := range moves {
 		updated, updateErr := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
@@ -660,13 +661,12 @@ func (rm *DefaultRepositoryManager) registerRepositoryRoot(
 	return &registered, nil
 }
 
-// ListRepositoryRoots refreshes reachability before returning server facts to
-// the Web UI, so a drive unplugged after boot is not advertised as writable.
+// ListRepositoryRoots returns the latest reconciled reachability projection.
+// Startup and the portable background reconciler own disk inspection and
+// writes; a foreground list must remain available while SQLite's writer is
+// busy.
 func (rm *DefaultRepositoryManager) ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error) {
-	if err := rm.ReconcileRepositoryRoots(ctx); err != nil {
-		return nil, err
-	}
-	roots, err := rm.queries.ListRepositoryRoots(ctx)
+	roots, err := rm.readerQueries.ListRepositoryRoots(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list storage locations: %w", err)
 	}
@@ -674,7 +674,7 @@ func (rm *DefaultRepositoryManager) ListRepositoryRoots(ctx context.Context) ([]
 }
 
 func (rm *DefaultRepositoryManager) ReconcileRepositoryRoots(ctx context.Context) error {
-	roots, err := rm.queries.ListRepositoryRoots(ctx)
+	roots, err := rm.readerQueries.ListRepositoryRoots(ctx)
 	if err != nil {
 		return fmt.Errorf("list storage locations for reconcile: %w", err)
 	}
@@ -730,12 +730,12 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRootRemoval(ctx context.Con
 	impact := RepositoryRootRemovalImpact{
 		RootID: root.RootID.String(), RootName: root.Name, Kind: root.Kind, FilesPreserved: true,
 	}
-	if err := rm.database.QueryRowContext(ctx,
+	if err := rm.readerDatabase.QueryRowContext(ctx,
 		"SELECT count(*) FROM repositories WHERE root_id = ?", rootID,
 	).Scan(&impact.RepositoryCount); err != nil {
 		return RepositoryRootRemovalImpact{}, fmt.Errorf("count Storage Location repositories: %w", err)
 	}
-	if err := rm.database.QueryRowContext(ctx, `
+	if err := rm.readerDatabase.QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_operations
 		WHERE target_type = 'storage_location' AND target_id = ? AND status = 'running'
 	`, rootID.String()).Scan(&impact.ActiveOperationCount); err != nil {
@@ -782,12 +782,12 @@ func (rm *DefaultRepositoryManager) DeleteRepositoryRoot(ctx context.Context, id
 	if impact.ActiveOperationCount != 0 {
 		return fmt.Errorf("%w: Storage Location has an active lifecycle operation", ErrRepositoryBusy)
 	}
-	tx, err := rm.database.BeginTx(ctx, nil)
+	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRootDelete, nil)
 	if err != nil {
 		return fmt.Errorf("begin Storage Location removal: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	queries := rm.queries.WithTx(tx)
+	queries := rm.queries.WithTx(tx.Raw())
 	deleted, err := queries.DeleteExternalRepositoryRoot(ctx, rootID)
 	if err != nil {
 		return fmt.Errorf("remove storage location: %w", err)

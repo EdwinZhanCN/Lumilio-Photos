@@ -228,7 +228,7 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 		database.Queries,
 		runtimesettings.Default("production"),
 		filepath.Join(catalogDir, "lumilio_secret_key"),
-		SettingsRuntime{DB: database.SQL, Queue: queue},
+		SettingsRuntime{DB: database.SQL, Writer: database.Writer, Queue: queue},
 	)
 
 	row, err := database.Queries.GetSettings(ctx)

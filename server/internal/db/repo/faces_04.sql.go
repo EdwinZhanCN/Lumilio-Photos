@@ -19,7 +19,11 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = ?1
   AND COALESCE(a.is_deleted, false) = false
-  AND (?2 IS NULL OR a.repository_id = ?2)
+  AND (?2 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?2
+  ))
   AND (?3 IS NULL OR a.owner_id = ?3)
 `
 
@@ -119,13 +123,18 @@ SELECT
     fi.asset_id,
     fi.confidence,
     fi.face_image_path,
-    a.repository_id,
+    fi.repository_id,
     a.owner_id
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fi.id = ?1
   AND COALESCE(a.is_deleted, false) = false
-  AND (?2 IS NULL OR a.repository_id = ?2)
+	AND fi.repository_id IS NOT NULL
+	AND (?2 IS NULL OR EXISTS (
+	  SELECT 1 FROM active_asset_occurrences occurrence
+	  WHERE occurrence.asset_id = a.asset_id
+	    AND occurrence.repository_id = ?2
+	))
   AND (?3 IS NULL OR a.owner_id = ?3)
 `
 
@@ -136,12 +145,12 @@ type GetFaceForCorrectionScopedParams struct {
 }
 
 type GetFaceForCorrectionScopedRow struct {
-	ID            int32         `db:"id" json:"id"`
-	AssetID       uuid.UUID     `db:"asset_id" json:"asset_id"`
-	Confidence    float64       `db:"confidence" json:"confidence"`
-	FaceImagePath *string       `db:"face_image_path" json:"face_image_path"`
-	RepositoryID  uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	OwnerID       *int32        `db:"owner_id" json:"owner_id"`
+	ID            int32     `db:"id" json:"id"`
+	AssetID       uuid.UUID `db:"asset_id" json:"asset_id"`
+	Confidence    float64   `db:"confidence" json:"confidence"`
+	FaceImagePath *string   `db:"face_image_path" json:"face_image_path"`
+	RepositoryID  uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID       *int32    `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetFaceForCorrectionScoped(ctx context.Context, arg GetFaceForCorrectionScopedParams) (GetFaceForCorrectionScopedRow, error) {
@@ -169,7 +178,11 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE COALESCE(fcm.is_manual, false) = true
   AND COALESCE(a.is_deleted, false) = false
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   AND (?2 IS NULL OR a.owner_id = ?2)
 `
 
@@ -220,7 +233,7 @@ SELECT
     fi.confidence,
     fi.is_primary,
     fi.face_image_path,
-    a.repository_id,
+    fi.repository_id,
     a.owner_id
 FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
@@ -228,7 +241,12 @@ JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = ?1
   AND fi.id = ?2
   AND COALESCE(a.is_deleted, false) = false
-  AND (?3 IS NULL OR a.repository_id = ?3)
+	AND fi.repository_id IS NOT NULL
+	AND (?3 IS NULL OR EXISTS (
+	  SELECT 1 FROM active_asset_occurrences occurrence
+	  WHERE occurrence.asset_id = a.asset_id
+	    AND occurrence.repository_id = ?3
+	))
   AND (?4 IS NULL OR a.owner_id = ?4)
 `
 
@@ -240,13 +258,13 @@ type GetPersonFaceScopedParams struct {
 }
 
 type GetPersonFaceScopedRow struct {
-	ID            int32         `db:"id" json:"id"`
-	AssetID       uuid.UUID     `db:"asset_id" json:"asset_id"`
-	Confidence    float64       `db:"confidence" json:"confidence"`
-	IsPrimary     bool          `db:"is_primary" json:"is_primary"`
-	FaceImagePath *string       `db:"face_image_path" json:"face_image_path"`
-	RepositoryID  uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	OwnerID       *int32        `db:"owner_id" json:"owner_id"`
+	ID            int32     `db:"id" json:"id"`
+	AssetID       uuid.UUID `db:"asset_id" json:"asset_id"`
+	Confidence    float64   `db:"confidence" json:"confidence"`
+	IsPrimary     bool      `db:"is_primary" json:"is_primary"`
+	FaceImagePath *string   `db:"face_image_path" json:"face_image_path"`
+	RepositoryID  uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID       *int32    `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) GetPersonFaceScoped(ctx context.Context, arg GetPersonFaceScopedParams) (GetPersonFaceScopedRow, error) {
@@ -285,7 +303,11 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = ?1
   AND COALESCE(a.is_deleted, false) = false
-  AND (?2 IS NULL OR a.repository_id = ?2)
+  AND (?2 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?2
+  ))
   AND (?3 IS NULL OR a.owner_id = ?3)
 ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
 LIMIT ?5 OFFSET ?4

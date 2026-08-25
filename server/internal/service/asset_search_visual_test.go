@@ -17,6 +17,7 @@ import (
 	"server/internal/db"
 	"server/internal/db/dbtypes"
 	aggregatesearch "server/internal/search"
+	"server/internal/testutil"
 	"server/internal/utils/imagesource"
 	"server/internal/utils/imaging"
 
@@ -257,12 +258,14 @@ func openVisualSearchCatalog(t *testing.T) *db.DB {
 
 	insertAsset := func(id, filename, assetType string) {
 		t.Helper()
-		if _, err := catalog.SQL.ExecContext(ctx, `
-			INSERT INTO assets (
-				asset_id, owner_id, type, original_filename, mime_type, file_size,
-				content_hash, upload_time, repository_id, is_deleted, updated_at
-			) VALUES (?, 1, ?, ?, 'image/jpeg', 1, ?, 1, ?, 0, 1)
-		`, id, assetType, filename, filename, repoID); err != nil {
+		mimeType := "image/jpeg"
+		if assetType == "VIDEO" {
+			mimeType = "video/mp4"
+		}
+		if _, err := testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
+			AssetID: uuid.MustParse(id), RepositoryID: uuid.MustParse(repoID), OwnerID: 1,
+			AssetType: assetType, Filename: filename, MIMEType: mimeType, FileSize: 1,
+		}); err != nil {
 			t.Fatal(err)
 		}
 	}

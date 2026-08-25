@@ -11,8 +11,8 @@ import (
 
 type ScheduleRepositoryScansArgs = jobs.ScheduleRepositoryScansArgs
 
-// ScheduleRepositoryScansWorker fans out periodic scan jobs: it lists all
-// active repositories and enqueues a ScanRepositoryArgs for each one.
+// ScheduleRepositoryScansWorker fans out durable observation requests for all
+// active repositories.
 type ScheduleRepositoryScansWorker struct {
 	river.WorkerDefaults[ScheduleRepositoryScansArgs]
 

@@ -16,8 +16,8 @@
 //     the file operations over them (commit, trash, recover, sidecar I/O).
 //   - StagingManager (staging_manager.go): transient staging files used while an
 //     asset is being ingested, before it is committed into a repository.
-//   - scanner (subpackage): periodic filesystem scans that reconcile a
-//     repository's on-disk contents with the database.
+//   - roe (subpackage): bounded, resumable repository observation, native
+//     change hints, exact-content identity, Locations, and outbox delivery.
 //   - repocfg (subpackage): a single repository's own configuration — the
 //     .lumiliorepo file and the DB config column (storage strategy, filename
 //     preservation, duplicate handling). This is per-repository mutable

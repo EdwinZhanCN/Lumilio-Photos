@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,5 +131,64 @@ func TestStagingHandleRejectsWrongRepository(t *testing.T) {
 	other.RepoID = uuid.New()
 	if _, err := manager.OpenStagingFile(other, staged); err == nil {
 		t.Fatal("cross-repository staging handle accepted")
+	}
+}
+
+func TestCutoverPreflightQuarantinesEveryIncomingByte(t *testing.T) {
+	manager, repository := newStagingTestRepository(t, "flat", "rename")
+	first := createStagedContent(t, manager, repository, "first.jpg", "first-bytes")
+	second := createStagedContent(t, manager, repository, "second.mov", "second-bytes")
+
+	legacyPath := filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.StagingDir), "legacy.bin")
+	if err := os.WriteFile(legacyPath, []byte("legacy-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	moves, err := manager.QuarantineUnresolvedStaging(context.Background(), repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(moves) != 3 {
+		t.Fatalf("quarantine moves = %+v, want 3", moves)
+	}
+	for _, staged := range []*StagingFile{first, second} {
+		if _, err := os.Stat(filepath.Join(repository.Path, filepath.FromSlash(staged.PrivatePath))); !os.IsNotExist(err) {
+			t.Fatalf("incoming staging %q remains: %v", staged.PrivatePath, err)
+		}
+	}
+	want := map[string]bool{"first-bytes": false, "second-bytes": false, "legacy-bytes": false}
+	entries, err := os.ReadDir(filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.FailedDir)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		content, err := os.ReadFile(filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.FailedDir), entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := want[string(content)]; ok {
+			want[string(content)] = true
+		}
+	}
+	for content, found := range want {
+		if !found {
+			t.Fatalf("quarantined content %q was not preserved", content)
+		}
+	}
+}
+
+func TestCutoverPreflightValidatesAllIncomingEntriesBeforeMoving(t *testing.T) {
+	manager, repository := newStagingTestRepository(t, "flat", "rename")
+	regular := createStagedContent(t, manager, repository, "regular.jpg", "regular-bytes")
+	symlink := filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.IncomingDir), "unsupported-link")
+	if err := os.Symlink("regular.jpg", symlink); err != nil {
+		t.Skipf("create staging symlink: %v", err)
+	}
+
+	if _, err := manager.QuarantineUnresolvedStaging(context.Background(), repository); err == nil {
+		t.Fatal("unsupported staging entry did not abort preflight")
+	}
+	content, err := os.ReadFile(filepath.Join(repository.Path, filepath.FromSlash(regular.PrivatePath)))
+	if err != nil || string(content) != "regular-bytes" {
+		t.Fatalf("validated regular staging moved before abort: content=%q err=%v", content, err)
 	}
 }

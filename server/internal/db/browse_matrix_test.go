@@ -11,6 +11,7 @@ import (
 
 	"server/config"
 	"server/internal/db/repo"
+	"server/internal/testutil"
 
 	"github.com/google/uuid"
 )
@@ -143,13 +144,13 @@ func (f *browseFixture) insertItem(index int, item fixtureItem) {
 			assetType, mime, extension = "VIDEO", "video/quicktime", ".mov"
 		}
 
-		f.exec(`
-			INSERT INTO assets (
-				asset_id, owner_id, type, original_filename, mime_type, file_size,
-				content_hash, upload_time, taken_time, repository_id, updated_at, is_deleted
-			) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 1, 0)
-		`, assetID, f.ownerID, assetType, namePrefix+extension, mime,
-			assetID.String(), takenTime, takenTime, f.repositoryID)
+		if _, err := testutil.InsertAssetOccurrence(f.ctx, f.db.SQL, testutil.AssetOccurrenceParams{
+			AssetID: assetID, RepositoryID: f.repositoryID, OwnerID: f.ownerID,
+			AssetType: assetType, Filename: namePrefix + extension, MIMEType: mime,
+			FileSize: 1, UploadTime: takenTime, TakenTime: &takenTime,
+		}); err != nil {
+			f.t.Fatalf("insert normalized asset occurrence: %v", err)
+		}
 
 	}
 	f.assetIDs[item.name] = assetIDs

@@ -12,8 +12,8 @@ const (
 )
 
 // OutboxTrigger turns best-effort mutation notifications into coalesced drain
-// requests. The SQLite outbox remains authoritative: a periodic recovery drain
-// runs even when a notification is missed or the process restarts.
+// requests. The SQLite outbox remains authoritative: an asynchronous reader
+// probe calls Notify when a notification is missed or the process restarts.
 type OutboxTrigger struct {
 	pending atomic.Bool
 
@@ -33,6 +33,14 @@ func (t *OutboxTrigger) Notify() {
 	}
 }
 
+// ConsumePending is the non-blocking scheduler boundary. Durable recovery
+// probes run outside River's PeriodicJobConstructor and call Notify only after
+// observing authoritative outbox work; the constructor only consumes this
+// process-local hint.
+func (t *OutboxTrigger) ConsumePending() bool {
+	return t != nil && t.pending.Swap(false)
+}
+
 // ShouldSchedule consumes one pending wakeup or requests a recovery drain when
 // the fallback interval has elapsed. Calls are safe from concurrent periodic
 // scheduler callbacks, though River currently invokes a constructor serially.
@@ -44,7 +52,7 @@ func (t *OutboxTrigger) ShouldSchedule(now time.Time, recoveryInterval time.Dura
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	woken := t.pending.Swap(false)
+	woken := t.ConsumePending()
 	recoveryDue := t.lastScheduled.IsZero() || recoveryInterval <= 0 || !now.Before(t.lastScheduled.Add(recoveryInterval))
 	if !woken && !recoveryDue {
 		return false

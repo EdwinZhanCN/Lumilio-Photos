@@ -39,8 +39,9 @@ func enqueueBioClipAsset(ctx context.Context, queueClient *river.Client[*sql.Tx]
 
 	_, err := queueClient.Insert(ctx, jobs.ProcessBioClipArgs{
 		AssetID:           asset.AssetID,
+		ExpectedContentID: asset.ContentID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_bioclip"})
+	}, nil)
 	if err != nil {
 		return fmt.Errorf("enqueue BioCLIP job: %w", err)
 	}

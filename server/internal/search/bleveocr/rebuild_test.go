@@ -12,6 +12,7 @@ import (
 	"server/config"
 	"server/internal/db"
 	"server/internal/db/repo"
+	"server/internal/testutil"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/google/uuid"
@@ -68,7 +69,7 @@ func TestOutboxCrashAfterBleveBatchRetriesIdempotently(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
 
 	replaceOCRText(t, database, assetID, "updated crash recovery")
-	writer := NewWriter(database.SQL, database.Queries, index)
+	writer := NewWriter(database.SQL, database.Writer, database.Queries, index)
 	crash := errors.New("simulated crash before SQLite acknowledgement")
 	writer.afterApply = func() error { return crash }
 	_, err = writer.ProcessBatch(ctx, 16)
@@ -107,10 +108,14 @@ INSERT INTO repository_roots (
 INSERT INTO repositories (
     repo_id, name, path, created_at, updated_at, default_owner_id, root_id
 ) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, mime_type, file_size,
-    content_hash, upload_time, repository_id, updated_at
-) VALUES (?, 1, 'PHOTO', 'ocr.jpg', 'image/jpeg', 1, 'hash', 1, ?, 1);
+`, rootID, repositoryID, rootID)
+	require.NoError(t, err)
+	_, err = testutil.InsertAssetOccurrence(ctx, database.SQL, testutil.AssetOccurrenceParams{
+		AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1,
+		AssetType: "PHOTO", Filename: "ocr.jpg", MIMEType: "image/jpeg", FileSize: 1,
+	})
+	require.NoError(t, err)
+	_, err = database.SQL.ExecContext(ctx, `
 INSERT INTO ocr_results (
     asset_id, model_id, total_count, processing_time_ms, created_at, updated_at
 ) VALUES (?, 'fixture', 1, 1, 1, 1);
@@ -121,7 +126,7 @@ INSERT INTO ocr_index_metadata (asset_id, revision, updated_at)
 VALUES (?, 1, 1);
 INSERT INTO ocr_index_outbox (asset_id, revision, updated_at)
 VALUES (?, 1, 1);
-`, rootID, repositoryID, rootID, assetID, repositoryID, assetID, assetID, text, text, assetID, assetID)
+`, assetID, assetID, text, text, assetID, assetID)
 	require.NoError(t, err)
 	return database, assetID
 }

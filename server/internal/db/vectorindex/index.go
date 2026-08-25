@@ -10,7 +10,10 @@ import (
 	"log"
 	"math"
 	"runtime"
+	"sync"
 	"time"
+
+	"server/internal/db/catalogtx"
 )
 
 const (
@@ -25,6 +28,11 @@ const (
 )
 
 const flatConfig = `{"index":"flat","distance":"l2"}`
+
+var (
+	errTrainingSnapshotChanged = errors.New("semantic Vec1 training snapshot changed")
+	maintenanceMu              sync.Mutex
+)
 
 type state struct {
 	mode            string
@@ -60,9 +68,9 @@ func CurrentMode(ctx context.Context, database *sql.DB) (string, error) {
 
 // Reconcile verifies authoritative/derived row parity at startup, repairs the
 // Vec1 table if needed, then applies the flat/ANN size policy.
-func Reconcile(ctx context.Context, database *sql.DB) error {
+func Reconcile(ctx context.Context, writer *catalogtx.Writer, reader *sql.DB) error {
 	var authoritativeRows, derivedRows int64
-	if err := database.QueryRowContext(ctx, `
+	if err := reader.QueryRowContext(ctx, `
 		SELECT
 			(SELECT count(*) FROM search_embeddings),
 			(SELECT count(*) FROM search_embeddings_vec)
@@ -70,17 +78,17 @@ func Reconcile(ctx context.Context, database *sql.DB) error {
 		return fmt.Errorf("count semantic Vec1 rows: %w", err)
 	}
 
-	current, err := readState(ctx, database)
+	current, err := readState(ctx, reader)
 	if err != nil {
 		return err
 	}
 	if authoritativeRows != derivedRows {
-		if err := repairDerivedRows(ctx, database, authoritativeRows); err != nil {
+		if err := repairDerivedRows(ctx, writer, authoritativeRows); err != nil {
 			return err
 		}
 		current.rebuildPending = true
 	} else if current.rowCount != authoritativeRows {
-		if _, err := database.ExecContext(ctx, `
+		if _, err := writer.ExecContext(ctx, catalogtx.OperationVectorStateRepair, `
 			UPDATE semantic_vector_index_state
 			SET row_count = ?, rebuild_pending = 1
 			WHERE id = 1
@@ -89,13 +97,27 @@ func Reconcile(ctx context.Context, database *sql.DB) error {
 		}
 		current.rebuildPending = true
 	}
-	return Maintain(ctx, database)
+	return Maintain(ctx, writer, reader)
 }
 
 // Maintain applies a pending policy transition. It is intentionally cheap
 // when no transition is due, so embedding writes can call it after commit.
-func Maintain(ctx context.Context, database *sql.DB) error {
-	current, err := readState(ctx, database)
+func Maintain(ctx context.Context, writer *catalogtx.Writer, reader *sql.DB) error {
+	current, err := readState(ctx, reader)
+	if err != nil {
+		return err
+	}
+	if !current.rebuildPending {
+		return nil
+	}
+
+	// ANN training is deliberately outside the SQLite writer transaction, but
+	// only one process-local maintainer should spend CPU building a model at a
+	// time. Re-read after acquiring the gate because another caller may already
+	// have completed the transition.
+	maintenanceMu.Lock()
+	defer maintenanceMu.Unlock()
+	current, err = readState(ctx, reader)
 	if err != nil {
 		return err
 	}
@@ -106,22 +128,22 @@ func Maintain(ctx context.Context, database *sql.DB) error {
 	switch {
 	case current.rowCount < annRowThreshold:
 		if current.mode == ModeFlat {
-			return clearPending(ctx, database)
+			return clearPending(ctx, writer)
 		}
-		return rebuildFlat(ctx, database, current.rowCount)
+		return rebuildFlat(ctx, writer, current.rowCount)
 
 	case current.mode == ModeFlat:
-		return trainWithFlatFallback(ctx, database, current.rowCount)
+		return trainWithFlatFallback(ctx, writer, reader, current.rowCount)
 
 	case current.trainedRowCount <= 0,
 		current.rowCount >= current.trainedRowCount*2,
 		current.rowCount*2 < current.trainedRowCount:
-		return trainWithFlatFallback(ctx, database, current.rowCount)
+		return trainWithFlatFallback(ctx, writer, reader, current.rowCount)
 
 	default:
 		// A transient delete+insert replacement may have set pending while
 		// leaving the final population inside the current ANN training band.
-		return clearPending(ctx, database)
+		return clearPending(ctx, writer)
 	}
 }
 
@@ -142,8 +164,8 @@ func readState(ctx context.Context, database *sql.DB) (state, error) {
 	return current, nil
 }
 
-func repairDerivedRows(ctx context.Context, database *sql.DB, rowCount int64) error {
-	tx, err := database.BeginTx(ctx, nil)
+func repairDerivedRows(ctx context.Context, writer *catalogtx.Writer, rowCount int64) error {
+	tx, err := writer.BeginTx(ctx, catalogtx.OperationVectorRepairDerived, nil)
 	if err != nil {
 		return fmt.Errorf("begin semantic Vec1 repair: %w", err)
 	}
@@ -176,8 +198,8 @@ func repairDerivedRows(ctx context.Context, database *sql.DB, rowCount int64) er
 	return nil
 }
 
-func clearPending(ctx context.Context, database *sql.DB) error {
-	if _, err := database.ExecContext(ctx, `
+func clearPending(ctx context.Context, writer *catalogtx.Writer) error {
+	if _, err := writer.ExecContext(ctx, catalogtx.OperationVectorClearPending, `
 		UPDATE semantic_vector_index_state
 		SET rebuild_pending = 0
 		WHERE id = 1
@@ -187,8 +209,13 @@ func clearPending(ctx context.Context, database *sql.DB) error {
 	return nil
 }
 
-func trainWithFlatFallback(ctx context.Context, database *sql.DB, rowCount int64) error {
-	if err := trainANN(ctx, database, rowCount); err == nil {
+func trainWithFlatFallback(ctx context.Context, writer *catalogtx.Writer, reader *sql.DB, rowCount int64) error {
+	if err := trainANN(ctx, writer, reader, rowCount); err == nil {
+		return nil
+	} else if errors.Is(err, errTrainingSnapshotChanged) {
+		// Inserts/deletes raced the reader-side training snapshot. The trigger
+		// leaves rebuild_pending set, so a later maintainer can retry without
+		// installing a model trained for an obsolete population.
 		return nil
 	} else {
 		log.Printf(
@@ -196,16 +223,16 @@ func trainWithFlatFallback(ctx context.Context, database *sql.DB, rowCount int64
 			rowCount,
 			err,
 		)
-		if flatErr := rebuildFlat(ctx, database, rowCount); flatErr != nil {
+		if flatErr := rebuildFlat(ctx, writer, rowCount); flatErr != nil {
 			return errors.Join(err, flatErr)
 		}
 		return nil
 	}
 }
 
-func rebuildFlat(ctx context.Context, database *sql.DB, rowCount int64) error {
+func rebuildFlat(ctx context.Context, writer *catalogtx.Writer, rowCount int64) error {
 	started := time.Now()
-	tx, err := database.BeginTx(ctx, nil)
+	tx, err := writer.BeginTx(ctx, catalogtx.OperationVectorRebuildFlat, nil)
 	if err != nil {
 		return fmt.Errorf("begin semantic Vec1 flat rebuild: %w", err)
 	}
@@ -236,7 +263,7 @@ func rebuildFlat(ctx context.Context, database *sql.DB, rowCount int64) error {
 	return nil
 }
 
-func trainANN(ctx context.Context, database *sql.DB, rowCount int64) error {
+func trainANN(ctx context.Context, writer *catalogtx.Writer, reader *sql.DB, rowCount int64) error {
 	started := time.Now()
 	sampleStep := max(int64(1), (rowCount+maxTrainingRows-1)/maxTrainingRows)
 	sampleRows := (rowCount + sampleStep - 1) / sampleStep
@@ -255,14 +282,16 @@ func trainANN(ctx context.Context, database *sql.DB, rowCount int64) error {
 		return fmt.Errorf("encode semantic Vec1 training config: %w", err)
 	}
 
-	tx, err := database.BeginTx(ctx, nil)
+	// vec1_config is connection-local, so configure and train through one
+	// query-only reader connection. This is the expensive part (up to 100k
+	// vectors) and must not consume the process's sole writer connection.
+	readerConn, err := reader.Conn(ctx)
 	if err != nil {
-		return fmt.Errorf("begin semantic Vec1 ANN training: %w", err)
+		return fmt.Errorf("acquire semantic Vec1 training reader: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
-
+	defer readerConn.Close()
 	var configuredThreads int
-	if err := tx.QueryRowContext(
+	if err := readerConn.QueryRowContext(
 		ctx,
 		"SELECT vec1_config('nthread', ?)",
 		threads,
@@ -271,7 +300,7 @@ func trainANN(ctx context.Context, database *sql.DB, rowCount int64) error {
 	}
 
 	var model []byte
-	if err := tx.QueryRowContext(ctx, `
+	if err := readerConn.QueryRowContext(ctx, `
 		SELECT vec1_train(vector, ?)
 		FROM (
 			SELECT vector
@@ -289,6 +318,37 @@ func trainANN(ctx context.Context, database *sql.DB, rowCount int64) error {
 	}
 	if len(model) == 0 {
 		return fmt.Errorf("train semantic Vec1 ANN model: empty model")
+	}
+	if err := readerConn.Close(); err != nil {
+		return fmt.Errorf("release semantic Vec1 training reader: %w", err)
+	}
+
+	// Installing a trained model mutates the Vec1 virtual table and therefore
+	// belongs on the writer. The state check makes the reader-side snapshot a
+	// compare-and-swap boundary: never publish a model after the authoritative
+	// population changed underneath its training query.
+	tx, err := writer.BeginTx(ctx, catalogtx.OperationVectorTrainANN, nil)
+	if err != nil {
+		return fmt.Errorf("begin semantic Vec1 ANN install: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var currentRows int64
+	var rebuildPending bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT row_count, rebuild_pending
+		FROM semantic_vector_index_state
+		WHERE id = 1
+	`).Scan(&currentRows, &rebuildPending); err != nil {
+		return fmt.Errorf("validate semantic Vec1 training snapshot: %w", err)
+	}
+	if currentRows != rowCount || !rebuildPending {
+		return fmt.Errorf(
+			"%w: trained rows=%d current rows=%d pending=%t",
+			errTrainingSnapshotChanged,
+			rowCount,
+			currentRows,
+			rebuildPending,
+		)
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO search_embeddings_vec (cmd, arg)
@@ -309,7 +369,7 @@ func trainANN(ctx context.Context, database *sql.DB, rowCount int64) error {
 		return fmt.Errorf("record semantic Vec1 ANN model: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit semantic Vec1 ANN training: %w", err)
+		return fmt.Errorf("commit semantic Vec1 ANN install: %w", err)
 	}
 
 	log.Printf(

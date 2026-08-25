@@ -31,7 +31,7 @@ type AudioInfo struct {
 }
 
 // extractAudioMetadata updates the asset with ffprobe/EXIF-derived metadata.
-func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.Asset, reader io.Reader, audioInfo *AudioInfo) error {
+func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.Asset, fileSize int64, reader io.Reader, audioInfo *AudioInfo) error {
 	config := &exif.Config{
 		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
 		MaxFileSize:  2 * 1024 * 1024 * 1024, // 2GB
@@ -47,7 +47,7 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 		Reader:    reader,
 		AssetType: dbtypes.AssetTypeAudio,
 		Filename:  asset.OriginalFilename,
-		Size:      asset.FileSize,
+		Size:      fileSize,
 	}
 
 	result, err := extractor.ExtractFromStream(ctx, req)
@@ -119,28 +119,37 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 		targetBitrate = "128k"
 	}
 
-	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(),
-		"-i", inputPath,
-		"-c:a", "libmp3lame",
-		"-b:a", targetBitrate,
-		"-q:a", "2",
-		"-ar", "44100",
-		"-ac", "2",
-		"-f", "mp3",
-		"-y",
+	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), buildAudioTranscodeArgs(
+		inputPath,
 		outputPath,
-	)
+		targetBitrate,
+		audioInfo.Channels,
+	)...)
 	sysproc.HideConsole(cmd)
-
-	if audioInfo.Channels == 1 {
-		cmd.Args[len(cmd.Args)-4] = "1" // keep mono if source is mono
-	}
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ffmpeg audio transcode failed: %w", err)
 	}
 
 	return outputPath, nil
+}
+
+func buildAudioTranscodeArgs(inputPath, outputPath, targetBitrate string, sourceChannels int) []string {
+	channels := "2"
+	if sourceChannels == 1 {
+		channels = "1"
+	}
+	return []string{
+		"-i", inputPath,
+		"-c:a", "libmp3lame",
+		"-b:a", targetBitrate,
+		"-q:a", "2",
+		"-ar", "44100",
+		"-ac", channels,
+		"-f", "mp3",
+		"-y",
+		outputPath,
+	}
 }
 
 // copyAudioForWeb saves the provided audio file as the web version.

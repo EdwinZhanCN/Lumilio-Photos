@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	statusdb "server/internal/db/dbtypes/status"
 
@@ -17,8 +18,8 @@ FROM assets
 WHERE asset_id = ?1 AND is_deleted = false
 `
 
-type txStarter interface {
-	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+type writeTxRunner interface {
+	Transact(context.Context, catalogtx.Operation, *sql.TxOptions, func(*sql.Tx) error) error
 }
 
 // MutateAssetStatus applies a status mutation under a transaction so concurrent
@@ -28,25 +29,57 @@ func (q *Queries) MutateAssetStatus(
 	assetID uuid.UUID,
 	mutator func(statusdb.AssetStatus) (statusdb.AssetStatus, error),
 ) error {
-	starter, ok := q.db.(txStarter)
+	return q.withAssetStatusMutation(ctx, func(queries *Queries) error {
+		return q.mutateAssetStatus(ctx, queries, assetID, mutator)
+	})
+}
+
+// MutateAssetRating applies a foreground user-state write under the named
+// asset mutation operation so writer admission is observable independently
+// from background catalog work.
+func (q *Queries) MutateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error {
+	return q.withAssetStatusMutation(ctx, func(queries *Queries) error {
+		return queries.UpdateAssetRating(ctx, arg)
+	})
+}
+
+// MutateAssetLike applies a foreground user-state write under the named asset
+// mutation operation.
+func (q *Queries) MutateAssetLike(ctx context.Context, arg UpdateAssetLikeParams) error {
+	return q.withAssetStatusMutation(ctx, func(queries *Queries) error {
+		return queries.UpdateAssetLike(ctx, arg)
+	})
+}
+
+// MutateAssetRatingAndLike applies the combined foreground user-state write
+// atomically under the named asset mutation operation.
+func (q *Queries) MutateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error {
+	return q.withAssetStatusMutation(ctx, func(queries *Queries) error {
+		return queries.UpdateAssetRatingAndLike(ctx, arg)
+	})
+}
+
+// MutateAssetDescription applies a foreground description edit under the
+// named asset mutation operation.
+func (q *Queries) MutateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error {
+	return q.withAssetStatusMutation(ctx, func(queries *Queries) error {
+		return queries.UpdateAssetDescription(ctx, arg)
+	})
+}
+
+func (q *Queries) withAssetStatusMutation(ctx context.Context, body func(*Queries) error) error {
+	runner, ok := q.db.(writeTxRunner)
 	if !ok {
-		return q.mutateAssetStatus(ctx, q, assetID, mutator)
+		pool, isPool := q.db.(*sql.DB)
+		if !isPool {
+			return body(q)
+		}
+		runner = catalogtx.NewWriter(pool, nil)
 	}
 
-	tx, err := starter.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin asset status tx: %w", err)
-	}
-	defer tx.Rollback()
-
-	if err := q.mutateAssetStatus(ctx, q.WithTx(tx), assetID, mutator); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit asset status tx: %w", err)
-	}
-	return nil
+	return runner.Transact(ctx, catalogtx.OperationAssetStatusMutate, nil, func(tx *sql.Tx) error {
+		return body(q.WithTx(tx))
+	})
 }
 
 func (q *Queries) mutateAssetStatus(

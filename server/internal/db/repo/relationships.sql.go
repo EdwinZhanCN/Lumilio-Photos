@@ -14,7 +14,9 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    content.full_hash AS content_hash,
+    content.file_size,
     COALESCE((
         SELECT json_group_array(json_object(
             'thumbnail_id', ordered.thumbnail_id,
@@ -23,7 +25,7 @@ SELECT
             'mime_type', ordered.mime_type
         ))
         FROM (
-            SELECT t.thumbnail_id, t.asset_id, t.size, t.storage_path, t.mime_type, t.created_at
+            SELECT t.thumbnail_id, t.asset_id, t.size, t.storage_path, t.mime_type, t.created_at, t.repository_id
             FROM thumbnails t
             WHERE t.asset_id = a.asset_id
             ORDER BY CASE t.size
@@ -121,7 +123,7 @@ SELECT
                     'cluster_name', ordered.cluster_name
                 ))
                 FROM (
-                    SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fcm.cluster_id, fc.cluster_name
+                    SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id, fcm.cluster_id, fc.cluster_name
                     FROM face_items fi
                     LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
                     LEFT JOIN face_clusters fc ON fcm.cluster_id = fc.cluster_id
@@ -134,45 +136,43 @@ SELECT
         WHERE fr.asset_id = a.asset_id
     ) AS face_result
 FROM assets a
+JOIN content_objects content ON content.content_id = a.content_id
 WHERE a.asset_id = ?1
 `
 
 type GetAssetWithRelationsRow struct {
-	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
-	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
-	Type                    string                   `db:"type" json:"type"`
-	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
-	StoragePath             *string                  `db:"storage_path" json:"storage_path"`
-	MimeType                string                   `db:"mime_type" json:"mime_type"`
-	FileSize                int64                    `db:"file_size" json:"file_size"`
-	ContentHash             string                   `db:"content_hash" json:"content_hash"`
-	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int64                   `db:"width" json:"width"`
-	Height                  *int64                   `db:"height" json:"height"`
-	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
-	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int64                   `db:"rating" json:"rating"`
-	Liked                   bool                     `db:"liked" json:"liked"`
-	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
-	Status                  dbtypes.JSON             `db:"status" json:"status"`
-	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
-	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
-	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
-	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
-	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
-	Thumbnails              interface{}              `db:"thumbnails" json:"thumbnails"`
-	Tags                    interface{}              `db:"tags" json:"tags"`
-	Albums                  interface{}              `db:"albums" json:"albums"`
-	SpeciesPredictions      interface{}              `db:"species_predictions" json:"species_predictions"`
-	OcrResult               interface{}              `db:"ocr_result" json:"ocr_result"`
-	FaceResult              interface{}              `db:"face_result" json:"face_result"`
+	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	ContentID            uuid.UUID                `db:"content_id" json:"content_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	Width                *int64                   `db:"width" json:"width"`
+	Height               *int64                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int64                   `db:"rating" json:"rating"`
+	Liked                bool                     `db:"liked" json:"liked"`
+	Status               dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt            dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	ContentHash          string                   `db:"content_hash" json:"content_hash"`
+	FileSize             int64                    `db:"file_size" json:"file_size"`
+	Thumbnails           interface{}              `db:"thumbnails" json:"thumbnails"`
+	Tags                 interface{}              `db:"tags" json:"tags"`
+	Albums               interface{}              `db:"albums" json:"albums"`
+	SpeciesPredictions   interface{}              `db:"species_predictions" json:"species_predictions"`
+	OcrResult            interface{}              `db:"ocr_result" json:"ocr_result"`
+	FaceResult           interface{}              `db:"face_result" json:"face_result"`
 }
 
 func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) (GetAssetWithRelationsRow, error) {
@@ -181,14 +181,10 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) 
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -200,7 +196,6 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) 
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,
@@ -208,6 +203,8 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) 
 		&i.GpsGeohash5,
 		&i.GpsGeohash7,
 		&i.ExifRaw,
+		&i.ContentHash,
+		&i.FileSize,
 		&i.Thumbnails,
 		&i.Tags,
 		&i.Albums,
@@ -220,7 +217,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID uuid.UUID) 
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
         SELECT json_group_array(
             json_object(
@@ -244,36 +241,31 @@ WHERE a.asset_id = ?1
 `
 
 type GetAssetWithTagsRow struct {
-	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
-	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
-	Type                    string                   `db:"type" json:"type"`
-	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
-	StoragePath             *string                  `db:"storage_path" json:"storage_path"`
-	MimeType                string                   `db:"mime_type" json:"mime_type"`
-	FileSize                int64                    `db:"file_size" json:"file_size"`
-	ContentHash             string                   `db:"content_hash" json:"content_hash"`
-	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int64                   `db:"width" json:"width"`
-	Height                  *int64                   `db:"height" json:"height"`
-	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
-	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int64                   `db:"rating" json:"rating"`
-	Liked                   bool                     `db:"liked" json:"liked"`
-	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
-	Status                  dbtypes.JSON             `db:"status" json:"status"`
-	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
-	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
-	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
-	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
-	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
-	Tags                    interface{}              `db:"tags" json:"tags"`
+	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	ContentID            uuid.UUID                `db:"content_id" json:"content_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	Width                *int64                   `db:"width" json:"width"`
+	Height               *int64                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int64                   `db:"rating" json:"rating"`
+	Liked                bool                     `db:"liked" json:"liked"`
+	Status               dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt            dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	Tags                 interface{}              `db:"tags" json:"tags"`
 }
 
 func (q *Queries) GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetAssetWithTagsRow, error) {
@@ -282,14 +274,10 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetA
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -301,7 +289,6 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetA
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,
@@ -316,7 +303,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID uuid.UUID) (GetA
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
         SELECT json_group_array(
             json_object(
@@ -328,7 +315,7 @@ SELECT
             )
         )
         FROM (
-            SELECT t.thumbnail_id, t.asset_id, t.size, t.storage_path, t.mime_type, t.created_at
+            SELECT t.thumbnail_id, t.asset_id, t.size, t.storage_path, t.mime_type, t.created_at, t.repository_id
             FROM thumbnails t
             WHERE t.asset_id = a.asset_id
             ORDER BY CASE t.size
@@ -343,36 +330,31 @@ WHERE a.asset_id = ?1
 `
 
 type GetAssetWithThumbnailsRow struct {
-	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
-	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
-	Type                    string                   `db:"type" json:"type"`
-	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
-	StoragePath             *string                  `db:"storage_path" json:"storage_path"`
-	MimeType                string                   `db:"mime_type" json:"mime_type"`
-	FileSize                int64                    `db:"file_size" json:"file_size"`
-	ContentHash             string                   `db:"content_hash" json:"content_hash"`
-	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int64                   `db:"width" json:"width"`
-	Height                  *int64                   `db:"height" json:"height"`
-	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
-	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int64                   `db:"rating" json:"rating"`
-	Liked                   bool                     `db:"liked" json:"liked"`
-	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
-	Status                  dbtypes.JSON             `db:"status" json:"status"`
-	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
-	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
-	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
-	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
-	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
-	Thumbnails              interface{}              `db:"thumbnails" json:"thumbnails"`
+	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	ContentID            uuid.UUID                `db:"content_id" json:"content_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	Width                *int64                   `db:"width" json:"width"`
+	Height               *int64                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int64                   `db:"rating" json:"rating"`
+	Liked                bool                     `db:"liked" json:"liked"`
+	Status               dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt            dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	Thumbnails           interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
 func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID uuid.UUID) (GetAssetWithThumbnailsRow, error) {
@@ -381,14 +363,10 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID uuid.UUID)
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -400,7 +378,6 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID uuid.UUID)
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,

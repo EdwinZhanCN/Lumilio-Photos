@@ -12,6 +12,7 @@ import (
 
 	"server/config"
 	"server/internal/db/repo"
+	"server/internal/testutil"
 
 	"github.com/google/uuid"
 )
@@ -119,13 +120,13 @@ func seedBrowseScaleCatalog(t *testing.T) (*DB, context.Context, int32, uuid.UUI
 			if relation == "live_photo_video" {
 				assetType, mime = "VIDEO", "video/quicktime"
 			}
-			mustExec(`
-				INSERT INTO assets (
-					asset_id, owner_id, type, original_filename, mime_type, file_size,
-					content_hash, upload_time, taken_time, repository_id, updated_at, is_deleted
-				) VALUES (?, ?, ?, ?, ?, 1024, ?, ?, ?, ?, 1, 0)
-			`, assetID, user.UserID, assetType, fmt.Sprintf("IMG_%05d%s", index, relation),
-				mime, assetID.String(), takenTime, takenTime, repositoryID)
+			if _, err := testutil.InsertAssetOccurrence(ctx, tx, testutil.AssetOccurrenceParams{
+				AssetID: assetID, RepositoryID: repositoryID, OwnerID: user.UserID,
+				AssetType: assetType, Filename: fmt.Sprintf("IMG_%05d%s", index, relation),
+				MIMEType: mime, FileSize: 1024, UploadTime: takenTime, TakenTime: &takenTime,
+			}); err != nil {
+				t.Fatalf("insert normalized plan asset occurrence: %v", err)
+			}
 		}
 
 		mustExec(`

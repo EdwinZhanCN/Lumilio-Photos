@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -126,6 +127,118 @@ func TestCreateSnapshotIsStandaloneAndChecksumProtected(t *testing.T) {
 	}
 	if _, _, err := ValidateSnapshot(context.Background(), snapshot.Path, compatibility); err == nil || !strings.Contains(err.Error(), "checksum") {
 		t.Fatalf("corrupt snapshot error = %v, want checksum rejection", err)
+	}
+}
+
+func TestCreateSnapshotFromReaderDoesNotWaitForWriterTransaction(t *testing.T) {
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+
+	// Hold SQLite's sole writer and its only database/sql connection. WAL
+	// readers must remain usable, and Online Backup must consume one of those
+	// reader connections instead of queuing behind the writer.
+	tx, err := catalog.SQL.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(context.Background(), `
+		UPDATE system_state
+		SET updated_at = updated_at
+		WHERE id = 1
+	`); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := CreateSnapshot(
+		ctx,
+		catalog.ReaderSQL,
+		filepath.Join(root, "backups"),
+		"",
+		SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
+		t.Logf,
+	); err != nil {
+		t.Fatalf("reader-backed snapshot waited for writer: %v", err)
+	}
+}
+
+func TestCreateSnapshotMakesProgressDuringContinuousWriterCommits(t *testing.T) {
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+
+	if _, err := catalog.SQL.ExecContext(context.Background(), `
+		CREATE TABLE backup_pressure (id INTEGER PRIMARY KEY, payload BLOB NOT NULL);
+		INSERT INTO backup_pressure (id, payload) VALUES (1, zeroblob(16777216));
+	`); err != nil {
+		t.Fatal(err)
+	}
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	writerErrors := make(chan error, 1)
+	var commits atomic.Int64
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(2 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				if _, err := catalog.SQL.ExecContext(context.Background(), `
+					UPDATE system_state SET updated_at = updated_at + 1 WHERE id = 1
+				`); err != nil {
+					select {
+					case writerErrors <- err:
+					default:
+					}
+					return
+				}
+				commits.Add(1)
+			}
+		}
+	}()
+	defer func() {
+		close(stop)
+		<-done
+	}()
+	deadline := time.Now().Add(time.Second)
+	for commits.Load() < 5 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if commits.Load() < 5 {
+		t.Fatal("continuous writer did not establish load")
+	}
+
+	before := commits.Load()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	snapshot, err := CreateSnapshot(
+		ctx,
+		catalog.ReaderSQL,
+		filepath.Join(root, "backups"),
+		"",
+		SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 2},
+		t.Logf,
+	)
+	if err != nil {
+		t.Fatalf("reader snapshot was starved by continuous commits: %v", err)
+	}
+	if commits.Load()-before < 10 {
+		t.Fatalf("only %d writers committed during snapshot; WAL concurrency was not exercised", commits.Load()-before)
+	}
+	select {
+	case err := <-writerErrors:
+		t.Fatalf("continuous writer failed while backup held a read snapshot: %v", err)
+	default:
+	}
+	if snapshot.Manifest.QuickCheck != "ok" || snapshot.Manifest.DatabaseSize == 0 {
+		t.Fatalf("snapshot manifest = %#v", snapshot.Manifest)
 	}
 }
 

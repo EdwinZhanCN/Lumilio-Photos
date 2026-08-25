@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/service"
 
@@ -26,6 +27,7 @@ type ZeroshotClassifyWorker struct {
 	ClassifierService service.ClassifierService
 	AITagService      service.AIGeneratedTagService
 	ConfigProvider    MLConfigProvider
+	Queries           *repo.Queries
 }
 
 func (w *ZeroshotClassifyWorker) Work(ctx context.Context, job *river.Job[ZeroshotClassifyArgs]) error {
@@ -37,6 +39,13 @@ func (w *ZeroshotClassifyWorker) Work(ctx context.Context, job *river.Job[Zerosh
 	}
 	if !enabled {
 		return nil
+	}
+	if w.Queries != nil {
+		if _, err := validateCurrentAssetWork(ctx, w.Queries, assetID, job.Args.ExpectedContentID); errors.Is(err, ErrAssetWorkStale) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("validate zero-shot asset work: %w", err)
+		}
 	}
 
 	embedding, err := w.EmbeddingService.GetPrimaryEmbeddingVector(ctx, assetID, service.EmbeddingTypeSemantic)
@@ -51,6 +60,13 @@ func (w *ZeroshotClassifyWorker) Work(ctx context.Context, job *river.Job[Zerosh
 	hits, err := w.ClassifierService.Classify(ctx, embedding)
 	if err != nil {
 		return fmt.Errorf("classify asset: %w", err)
+	}
+	if w.Queries != nil {
+		if _, err := validateCurrentAssetWork(ctx, w.Queries, assetID, job.Args.ExpectedContentID); errors.Is(err, ErrAssetWorkStale) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("revalidate zero-shot asset work: %w", err)
+		}
 	}
 
 	tags := make([]service.AIGeneratedTag, 0, len(hits))

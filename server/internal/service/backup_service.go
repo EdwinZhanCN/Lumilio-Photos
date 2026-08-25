@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -89,8 +88,7 @@ func (s *backupService) List(_ context.Context) ([]BackupEntry, error) {
 			continue
 		}
 		name := entry.Name()
-		base, restorePoint := trimRestorePoint(name)
-		info, ok := backup.ParseName(base)
+		info, ok := backup.ParseSnapshotName(name)
 		if !ok {
 			continue
 		}
@@ -108,7 +106,7 @@ func (s *backupService) List(_ context.Context) ([]BackupEntry, error) {
 			CreatedAt:     info.CreatedAt,
 			AppVersion:    manifest.AppVersion,
 			SQLiteVersion: manifest.SQLiteVersion,
-			RestorePoint:  restorePoint,
+			RestorePoint:  backup.IsProtectedSnapshotName(name),
 		})
 	}
 	sortBackupEntries(out)
@@ -124,8 +122,7 @@ func (s *backupService) TriggerNow(ctx context.Context) error {
 }
 
 func (s *backupService) ResolvePath(name string) (string, error) {
-	base, _ := trimRestorePoint(name)
-	if _, ok := backup.ParseName(base); !ok || filepath.Base(name) != name {
+	if _, ok := backup.ParseSnapshotName(name); !ok || filepath.Base(name) != name {
 		return "", fmt.Errorf("%w: %q", ErrInvalidBackupName, name)
 	}
 	return filepath.Join(s.rt.Dir, name), nil
@@ -215,10 +212,6 @@ func (s *backupService) GetRestoreOperation(_ context.Context, operationID strin
 
 func (s *backupService) LatestRestoreOperation(_ context.Context) (backup.RestoreOperation, error) {
 	return backup.ReadLatestRestoreOperation(s.rt.ActivePath)
-}
-
-func trimRestorePoint(name string) (string, bool) {
-	return strings.CutPrefix(name, backup.RestorePointPrefix)
 }
 
 func sortBackupEntries(entries []BackupEntry) {

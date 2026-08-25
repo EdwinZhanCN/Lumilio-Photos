@@ -4,11 +4,13 @@ import (
 	"database/sql"
 
 	"server/config"
+	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/service"
 	"server/internal/sourcing"
 	"server/internal/storage"
+	"server/internal/storage/roe/locations"
 
 	"github.com/riverqueue/river"
 	"go.uber.org/zap"
@@ -17,9 +19,12 @@ import (
 // AssetProcessor holds shared dependencies for per-task processors.
 type AssetProcessor struct {
 	database          *sql.DB
+	writer            *catalogtx.Writer
+	readerDatabase    *sql.DB
 	assetService      service.AssetService
 	queries           *repo.Queries
 	files             *storage.RepositoryFSFactory
+	locationResolver  *locations.Resolver
 	repositories      storage.RepositoryManager
 	materializer      *sourcing.SourceMaterializer
 	queueClient       *river.Client[*sql.Tx]
@@ -33,9 +38,52 @@ type AssetProcessor struct {
 	beforeRetryInsert func(queue string) error
 }
 
+func (ap *AssetProcessor) SetLocationResolver(resolver *locations.Resolver) {
+	ap.locationResolver = resolver
+}
+
 // NewAssetProcessor constructs the processor with required dependencies.
 func NewAssetProcessor(
 	database *sql.DB,
+	writer *catalogtx.Writer,
+	assetService service.AssetService,
+	queries *repo.Queries,
+	materializer *sourcing.SourceMaterializer,
+	queueClient *river.Client[*sql.Tx],
+	settingsService service.SettingsService,
+	embeddingService service.EmbeddingService,
+	lumenService service.LumenService,
+	transcodeConfig config.TranscodeConfig,
+	toolsConfig config.ToolsConfig,
+	logger *zap.Logger,
+	auditProvider logging.RepositoryAuditProvider,
+	files *storage.RepositoryFSFactory,
+	repositories storage.RepositoryManager,
+) *AssetProcessor {
+	return NewAssetProcessorWithReader(
+		database,
+		writer,
+		database,
+		assetService,
+		queries,
+		materializer,
+		queueClient,
+		settingsService,
+		embeddingService,
+		lumenService,
+		transcodeConfig,
+		toolsConfig,
+		logger,
+		auditProvider,
+		files,
+		repositories,
+	)
+}
+
+func NewAssetProcessorWithReader(
+	database *sql.DB,
+	writer *catalogtx.Writer,
+	readerDatabase *sql.DB,
 	assetService service.AssetService,
 	queries *repo.Queries,
 	materializer *sourcing.SourceMaterializer,
@@ -58,6 +106,8 @@ func NewAssetProcessor(
 	}
 	return &AssetProcessor{
 		database:         database,
+		writer:           writer,
+		readerDatabase:   readerDatabase,
 		assetService:     assetService,
 		queries:          queries,
 		files:            files,

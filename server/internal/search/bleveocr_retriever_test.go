@@ -11,6 +11,7 @@ import (
 	"server/config"
 	"server/internal/db"
 	"server/internal/search/bleveocr"
+	"server/internal/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -133,11 +134,13 @@ func insertRetrieverOCRAsset(
 ) uuid.UUID {
 	t.Helper()
 	assetID := uuid.New()
-	_, err := database.SQL.Exec(`
-INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, mime_type, file_size,
-    content_hash, upload_time, repository_id, is_deleted, updated_at
-) VALUES (?, ?, 'PHOTO', ?, 'image/jpeg', 1, ?, 1, ?, ?, 1);
+	_, err := testutil.InsertAssetOccurrence(context.Background(), database.SQL, testutil.AssetOccurrenceParams{
+		AssetID: assetID, RepositoryID: repositoryID, OwnerID: ownerID,
+		AssetType: "PHOTO", Filename: assetID.String() + ".jpg", MIMEType: "image/jpeg",
+		FileSize: 1, IsDeleted: isDeleted,
+	})
+	require.NoError(t, err)
+	_, err = database.SQL.Exec(`
 INSERT INTO ocr_results (
     asset_id, model_id, total_count, processing_time_ms, created_at, updated_at
 ) VALUES (?, 'fixture', 1, 1, 1, 1);
@@ -148,8 +151,7 @@ INSERT INTO ocr_index_metadata (asset_id, revision, updated_at)
 VALUES (?, 1, 1);
 INSERT INTO ocr_index_outbox (asset_id, revision, updated_at)
 VALUES (?, 1, 1);
-`, assetID, ownerID, assetID.String()+".jpg", assetID.String(), repositoryID, isDeleted,
-		assetID, assetID, text, text, assetID, assetID)
+`, assetID, assetID, text, text, assetID, assetID)
 	require.NoError(t, err)
 	return assetID
 }

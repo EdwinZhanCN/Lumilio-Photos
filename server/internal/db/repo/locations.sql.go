@@ -120,20 +120,41 @@ func (q *Queries) CreateLocationCluster(ctx context.Context, arg CreateLocationC
 	return i, err
 }
 
-const deleteLocationClustersForScope = `-- name: DeleteLocationClustersForScope :exec
-DELETE FROM location_clusters
-WHERE (?1 IS NULL OR repository_id = ?1)
-  AND (?2 IS NULL OR owner_id = ?2)
+const deleteLocationClusterAsset = `-- name: DeleteLocationClusterAsset :execrows
+DELETE FROM location_cluster_assets
+WHERE cluster_id = ?1
+  AND asset_id = ?2
 `
 
-type DeleteLocationClustersForScopeParams struct {
-	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
-	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+type DeleteLocationClusterAssetParams struct {
+	ClusterID uuid.UUID `db:"cluster_id" json:"cluster_id"`
+	AssetID   uuid.UUID `db:"asset_id" json:"asset_id"`
 }
 
-func (q *Queries) DeleteLocationClustersForScope(ctx context.Context, arg DeleteLocationClustersForScopeParams) error {
-	_, err := q.db.ExecContext(ctx, deleteLocationClustersForScope, arg.RepositoryID, arg.OwnerID)
-	return err
+func (q *Queries) DeleteLocationClusterAsset(ctx context.Context, arg DeleteLocationClusterAssetParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteLocationClusterAsset, arg.ClusterID, arg.AssetID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteLocationClusterIfEmpty = `-- name: DeleteLocationClusterIfEmpty :execrows
+DELETE FROM location_clusters
+WHERE cluster_id = ?1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM location_cluster_assets membership
+    WHERE membership.cluster_id = location_clusters.cluster_id
+  )
+`
+
+func (q *Queries) DeleteLocationClusterIfEmpty(ctx context.Context, clusterID uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteLocationClusterIfEmpty, clusterID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const disableUnresolvedLocationClusters = `-- name: DisableUnresolvedLocationClusters :exec
@@ -148,6 +169,31 @@ WHERE geocode_status IN ('pending', 'failed')
 func (q *Queries) DisableUnresolvedLocationClusters(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, disableUnresolvedLocationClusters)
 	return err
+}
+
+const getLocationProjectionState = `-- name: GetLocationProjectionState :one
+SELECT repository_id, owner_id, source_revision, published_revision, updated_at
+FROM location_projection_state
+WHERE repository_id = ?1
+  AND owner_id = ?2
+`
+
+type GetLocationProjectionStateParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      int32     `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetLocationProjectionState(ctx context.Context, arg GetLocationProjectionStateParams) (LocationProjectionState, error) {
+	row := q.db.QueryRowContext(ctx, getLocationProjectionState, arg.RepositoryID, arg.OwnerID)
+	var i LocationProjectionState
+	err := row.Scan(
+		&i.RepositoryID,
+		&i.OwnerID,
+		&i.SourceRevision,
+		&i.PublishedRevision,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getPendingLocationClusterSchedule = `-- name: GetPendingLocationClusterSchedule :one
@@ -219,88 +265,77 @@ func (q *Queries) GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeoc
 	return i, err
 }
 
-const insertLocationClusterAssetsForScope = `-- name: InsertLocationClusterAssetsForScope :exec
+const insertLocationClusterAsset = `-- name: InsertLocationClusterAsset :execrows
 INSERT INTO location_cluster_assets (cluster_id, asset_id, created_at)
-SELECT
-  lc.cluster_id,
-  a.asset_id,
-  CAST(unixepoch('subsec') * 1000000 AS INTEGER) AS created_at
-FROM assets a
-JOIN location_clusters lc
-  ON lc.owner_id IS a.owner_id
- AND lc.repository_id = a.repository_id
- AND lc.geohash = a.gps_geohash_7
-WHERE a.is_deleted = false
-  AND a.type = 'PHOTO'
-  AND a.repository_id IS NOT NULL
-  AND a.gps_latitude IS NOT NULL
-  AND a.gps_longitude IS NOT NULL
-  AND a.gps_geohash_7 IS NOT NULL
-  AND (?1 IS NULL OR a.repository_id = ?1)
-  AND (?2 IS NULL OR a.owner_id = ?2)
+VALUES (
+  ?1,
+  ?2,
+  ?3
+)
 ON CONFLICT (cluster_id, asset_id) DO NOTHING
 `
 
-type InsertLocationClusterAssetsForScopeParams struct {
-	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
-	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+type InsertLocationClusterAssetParams struct {
+	ClusterID uuid.UUID         `db:"cluster_id" json:"cluster_id"`
+	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
+	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
-func (q *Queries) InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error {
-	_, err := q.db.ExecContext(ctx, insertLocationClusterAssetsForScope, arg.RepositoryID, arg.OwnerID)
-	return err
+func (q *Queries) InsertLocationClusterAsset(ctx context.Context, arg InsertLocationClusterAssetParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, insertLocationClusterAsset, arg.ClusterID, arg.AssetID, arg.CreatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const listLocationClusterCandidatesForScope = `-- name: ListLocationClusterCandidatesForScope :many
+const listDesiredLocationClusterMembersForScope = `-- name: ListDesiredLocationClusterMembersForScope :many
 SELECT
-  a.owner_id,
-  a.repository_id,
+  a.asset_id,
   a.gps_geohash_7 AS geohash,
-  AVG(a.gps_latitude) AS centroid_latitude,
-  AVG(a.gps_longitude) AS centroid_longitude,
-  COUNT(*) AS photo_count
+  a.gps_latitude AS latitude,
+  a.gps_longitude AS longitude
 FROM assets a
-WHERE a.is_deleted = false
+JOIN (
+  SELECT DISTINCT asset_id
+  FROM active_asset_occurrences
+  WHERE repository_id = ?1
+) active_occurrence ON active_occurrence.asset_id = a.asset_id
+WHERE a.owner_id = ?2
+  AND a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.repository_id IS NOT NULL
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL
   AND a.gps_geohash_7 IS NOT NULL
-  AND (?1 IS NULL OR a.repository_id = ?1)
-  AND (?2 IS NULL OR a.owner_id = ?2)
-GROUP BY a.owner_id, a.repository_id, a.gps_geohash_7
+ORDER BY a.gps_geohash_7, a.asset_id
 `
 
-type ListLocationClusterCandidatesForScopeParams struct {
-	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
-	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+type ListDesiredLocationClusterMembersForScopeParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32    `db:"owner_id" json:"owner_id"`
 }
 
-type ListLocationClusterCandidatesForScopeRow struct {
-	OwnerID           *int32        `db:"owner_id" json:"owner_id"`
-	RepositoryID      uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	Geohash           *string       `db:"geohash" json:"geohash"`
-	CentroidLatitude  *float64      `db:"centroid_latitude" json:"centroid_latitude"`
-	CentroidLongitude *float64      `db:"centroid_longitude" json:"centroid_longitude"`
-	PhotoCount        int64         `db:"photo_count" json:"photo_count"`
+type ListDesiredLocationClusterMembersForScopeRow struct {
+	AssetID   uuid.UUID `db:"asset_id" json:"asset_id"`
+	Geohash   *string   `db:"geohash" json:"geohash"`
+	Latitude  *float64  `db:"latitude" json:"latitude"`
+	Longitude *float64  `db:"longitude" json:"longitude"`
 }
 
-func (q *Queries) ListLocationClusterCandidatesForScope(ctx context.Context, arg ListLocationClusterCandidatesForScopeParams) ([]ListLocationClusterCandidatesForScopeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listLocationClusterCandidatesForScope, arg.RepositoryID, arg.OwnerID)
+func (q *Queries) ListDesiredLocationClusterMembersForScope(ctx context.Context, arg ListDesiredLocationClusterMembersForScopeParams) ([]ListDesiredLocationClusterMembersForScopeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDesiredLocationClusterMembersForScope, arg.RepositoryID, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListLocationClusterCandidatesForScopeRow
+	var items []ListDesiredLocationClusterMembersForScopeRow
 	for rows.Next() {
-		var i ListLocationClusterCandidatesForScopeRow
+		var i ListDesiredLocationClusterMembersForScopeRow
 		if err := rows.Scan(
-			&i.OwnerID,
-			&i.RepositoryID,
+			&i.AssetID,
 			&i.Geohash,
-			&i.CentroidLatitude,
-			&i.CentroidLongitude,
-			&i.PhotoCount,
+			&i.Latitude,
+			&i.Longitude,
 		); err != nil {
 			return nil, err
 		}
@@ -382,6 +417,42 @@ func (q *Queries) ListLocationClusters(ctx context.Context, arg ListLocationClus
 	return items, nil
 }
 
+const listLocationProjectionScopes = `-- name: ListLocationProjectionScopes :many
+SELECT repository_id, owner_id
+FROM location_projection_state
+WHERE ?1 IS NULL
+   OR repository_id = ?1
+ORDER BY repository_id, owner_id
+`
+
+type ListLocationProjectionScopesRow struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      int32     `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) ListLocationProjectionScopes(ctx context.Context, repositoryID interface{}) ([]ListLocationProjectionScopesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLocationProjectionScopes, repositoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLocationProjectionScopesRow
+	for rows.Next() {
+		var i ListLocationProjectionScopesRow
+		if err := rows.Scan(&i.RepositoryID, &i.OwnerID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingLocationClusters = `-- name: ListPendingLocationClusters :many
 SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, geocode_attempt_count, geocode_next_attempt_at
 FROM location_clusters
@@ -446,6 +517,207 @@ func (q *Queries) ListPendingLocationClusters(ctx context.Context, arg ListPendi
 		return nil, err
 	}
 	return items, nil
+}
+
+const listPendingLocationProjectionScopes = `-- name: ListPendingLocationProjectionScopes :many
+SELECT repository_id, owner_id
+FROM location_projection_state
+WHERE source_revision > published_revision
+ORDER BY updated_at, repository_id, owner_id
+LIMIT ?1
+`
+
+type ListPendingLocationProjectionScopesRow struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      int32     `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) ListPendingLocationProjectionScopes(ctx context.Context, limit int64) ([]ListPendingLocationProjectionScopesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingLocationProjectionScopes, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPendingLocationProjectionScopesRow
+	for rows.Next() {
+		var i ListPendingLocationProjectionScopesRow
+		if err := rows.Scan(&i.RepositoryID, &i.OwnerID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStoredLocationClusterAssetsForScope = `-- name: ListStoredLocationClusterAssetsForScope :many
+SELECT cluster.cluster_id, membership.asset_id
+FROM location_clusters cluster
+JOIN location_cluster_assets membership
+  ON membership.cluster_id = cluster.cluster_id
+WHERE cluster.repository_id = ?1
+  AND cluster.owner_id = ?2
+ORDER BY cluster.geohash, membership.asset_id
+`
+
+type ListStoredLocationClusterAssetsForScopeParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32    `db:"owner_id" json:"owner_id"`
+}
+
+type ListStoredLocationClusterAssetsForScopeRow struct {
+	ClusterID uuid.UUID `db:"cluster_id" json:"cluster_id"`
+	AssetID   uuid.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) ListStoredLocationClusterAssetsForScope(ctx context.Context, arg ListStoredLocationClusterAssetsForScopeParams) ([]ListStoredLocationClusterAssetsForScopeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listStoredLocationClusterAssetsForScope, arg.RepositoryID, arg.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListStoredLocationClusterAssetsForScopeRow
+	for rows.Next() {
+		var i ListStoredLocationClusterAssetsForScopeRow
+		if err := rows.Scan(&i.ClusterID, &i.AssetID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStoredLocationClustersForScope = `-- name: ListStoredLocationClustersForScope :many
+SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, geocode_attempt_count, geocode_next_attempt_at
+FROM location_clusters
+WHERE repository_id = ?1
+  AND owner_id = ?2
+ORDER BY geohash, cluster_id
+`
+
+type ListStoredLocationClustersForScopeParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID      *int32    `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) ListStoredLocationClustersForScope(ctx context.Context, arg ListStoredLocationClustersForScopeParams) ([]LocationCluster, error) {
+	rows, err := q.db.QueryContext(ctx, listStoredLocationClustersForScope, arg.RepositoryID, arg.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LocationCluster
+	for rows.Next() {
+		var i LocationCluster
+		if err := rows.Scan(
+			&i.ClusterID,
+			&i.OwnerID,
+			&i.RepositoryID,
+			&i.Geohash,
+			&i.Precision,
+			&i.CentroidLatitude,
+			&i.CentroidLongitude,
+			&i.PhotoCount,
+			&i.Label,
+			&i.Country,
+			&i.Region,
+			&i.City,
+			&i.Provider,
+			&i.GeocodeStatus,
+			&i.GeocodedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.GeocodeAttemptCount,
+			&i.GeocodeNextAttemptAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const locationProjectionWorkPending = `-- name: LocationProjectionWorkPending :one
+SELECT EXISTS (
+  SELECT 1
+  FROM location_projection_state
+  WHERE source_revision > published_revision
+) AS pending
+`
+
+func (q *Queries) LocationProjectionWorkPending(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, locationProjectionWorkPending)
+	var pending int64
+	err := row.Scan(&pending)
+	return pending, err
+}
+
+const markLocationProjectionScopeDirty = `-- name: MarkLocationProjectionScopeDirty :execrows
+UPDATE location_projection_state
+SET source_revision = source_revision + 1,
+    updated_at = ?1
+WHERE repository_id = ?2
+  AND owner_id = ?3
+`
+
+type MarkLocationProjectionScopeDirtyParams struct {
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+	OwnerID      int32             `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) MarkLocationProjectionScopeDirty(ctx context.Context, arg MarkLocationProjectionScopeDirtyParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markLocationProjectionScopeDirty, arg.UpdatedAt, arg.RepositoryID, arg.OwnerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const publishLocationProjectionRevision = `-- name: PublishLocationProjectionRevision :execrows
+UPDATE location_projection_state
+SET published_revision = ?1,
+    updated_at = ?2
+WHERE repository_id = ?3
+  AND owner_id = ?4
+  AND source_revision = ?1
+`
+
+type PublishLocationProjectionRevisionParams struct {
+	SourceRevision int64             `db:"source_revision" json:"source_revision"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	RepositoryID   uuid.UUID         `db:"repository_id" json:"repository_id"`
+	OwnerID        int32             `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) PublishLocationProjectionRevision(ctx context.Context, arg PublishLocationProjectionRevisionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, publishLocationProjectionRevision,
+		arg.SourceRevision,
+		arg.UpdatedAt,
+		arg.RepositoryID,
+		arg.OwnerID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const resetLocationClustersForGeocodingSource = `-- name: ResetLocationClustersForGeocodingSource :exec
@@ -565,6 +837,50 @@ func (q *Queries) UpdateLocationClusterRetryIfRevision(ctx context.Context, arg 
 		arg.GeocodedAt,
 		arg.ClusterID,
 		arg.GeocodingRevision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateLocationClusterTopology = `-- name: UpdateLocationClusterTopology :execrows
+UPDATE location_clusters
+SET centroid_latitude = ?1,
+    centroid_longitude = ?2,
+    photo_count = ?3,
+    label = NULL,
+    country = NULL,
+    region = NULL,
+    city = NULL,
+    provider = ?4,
+    geocode_status = ?5,
+    geocoded_at = NULL,
+    geocode_attempt_count = 0,
+    geocode_next_attempt_at = NULL,
+    updated_at = ?6
+WHERE cluster_id = ?7
+`
+
+type UpdateLocationClusterTopologyParams struct {
+	CentroidLatitude  float64           `db:"centroid_latitude" json:"centroid_latitude"`
+	CentroidLongitude float64           `db:"centroid_longitude" json:"centroid_longitude"`
+	PhotoCount        int64             `db:"photo_count" json:"photo_count"`
+	Provider          *string           `db:"provider" json:"provider"`
+	GeocodeStatus     string            `db:"geocode_status" json:"geocode_status"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	ClusterID         uuid.UUID         `db:"cluster_id" json:"cluster_id"`
+}
+
+func (q *Queries) UpdateLocationClusterTopology(ctx context.Context, arg UpdateLocationClusterTopologyParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateLocationClusterTopology,
+		arg.CentroidLatitude,
+		arg.CentroidLongitude,
+		arg.PhotoCount,
+		arg.Provider,
+		arg.GeocodeStatus,
+		arg.UpdatedAt,
+		arg.ClusterID,
 	)
 	if err != nil {
 		return 0, err

@@ -8,12 +8,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
+	roecontroller "server/internal/storage/roe/controller"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -100,6 +102,73 @@ type storageDiagnosticsManagerStub struct {
 	storage.RepositoryManager
 	roots        []repo.RepositoryRoot
 	repositories []*repo.Repository
+}
+
+type repositoryScanServiceStub struct {
+	cancelled    repo.RepositoryScanRun
+	cancelErr    error
+	repositoryID string
+	operationID  string
+}
+
+func (*repositoryScanServiceStub) EnqueueManualScan(context.Context, string, string, bool) (roecontroller.Receipt, error) {
+	return roecontroller.Receipt{}, nil
+}
+
+func (*repositoryScanServiceStub) GetScanRun(context.Context, string, string) (repo.RepositoryScanRun, error) {
+	return repo.RepositoryScanRun{}, nil
+}
+
+func (*repositoryScanServiceStub) GetLatestScanRun(context.Context, string) (repo.RepositoryScanRun, error) {
+	return repo.RepositoryScanRun{}, nil
+}
+
+func (*repositoryScanServiceStub) ListScanRuns(context.Context, string, int32, int32) ([]repo.RepositoryScanRun, error) {
+	return nil, nil
+}
+
+func (stub *repositoryScanServiceStub) CancelScanRun(_ context.Context, repositoryID, operationID string) (repo.RepositoryScanRun, error) {
+	stub.repositoryID = repositoryID
+	stub.operationID = operationID
+	return stub.cancelled, stub.cancelErr
+}
+
+func TestCancelRepositoryScanReturnsDurableCancellationState(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repositoryID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	operationID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	stub := &repositoryScanServiceStub{cancelled: repo.RepositoryScanRun{
+		RunID: operationID, RepositoryID: repositoryID, RequestedEpoch: 2,
+		Mode: "manual", Status: roecontroller.StatusCrawling,
+		CancellationRequested: 1, CreatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}}
+	handler := NewRepositoryScanHandler(stub, nil)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories/"+repositoryID.String()+"/scans/"+operationID.String()+"/cancel", nil)
+	ctx.Params = gin.Params{
+		{Key: "id", Value: repositoryID.String()},
+		{Key: "operation_id", Value: operationID.String()},
+	}
+
+	handler.CancelRepositoryScan(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if stub.repositoryID != repositoryID.String() || stub.operationID != operationID.String() {
+		t.Fatalf("cancel scope = %q/%q", stub.repositoryID, stub.operationID)
+	}
+	var response struct {
+		OperationID           string `json:"operation_id"`
+		CancellationRequested bool   `json:"cancellation_requested"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.OperationID != operationID.String() || !response.CancellationRequested {
+		t.Fatalf("cancel response = %+v", response)
+	}
 }
 
 func (s *storageDiagnosticsManagerStub) ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error) {

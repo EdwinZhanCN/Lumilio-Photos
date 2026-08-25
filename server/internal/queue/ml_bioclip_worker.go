@@ -56,15 +56,32 @@ func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessB
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
 	}
+	current, err := validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("validate BioCLIP asset work: %w", err)
+	}
+	if !current {
+		return nil
+	}
 
 	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeBioClip, args.PreprocessVersion)
 	if err != nil {
+		if handled, result := handleDerivedAssetError(err); handled {
+			return result
+		}
 		return fmt.Errorf("load BioCLIP image: %w", err)
 	}
 
 	labels, err := w.LumenService.BioClipClassify(ctx, imageData, 3)
 	if err != nil {
 		return fmt.Errorf("failed to classify image with BioCLIP: %w", err)
+	}
+	current, err = validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("revalidate BioCLIP asset work: %w", err)
+	}
+	if !current {
+		return nil
 	}
 
 	if err := w.SpeciesService.SaveSpeciesPredictions(ctx, assetID, labelsToSpeciesPredictions(labels)); err != nil {

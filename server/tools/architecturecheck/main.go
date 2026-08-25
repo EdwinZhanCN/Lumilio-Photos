@@ -38,6 +38,16 @@ func main() {
 	}
 	fmt.Println("SQLite SQL checks passed")
 
+	if err := checkSQLiteConnectionArchitecture(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("SQLite connection architecture checks passed")
+
+	if err := checkSQLiteTransactionInventory(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("SQLite transaction inventory checks passed")
+
 	if err := checkBrowseArchitecture(root); err != nil {
 		fail(err)
 	}
@@ -149,6 +159,149 @@ func checkSQLiteSQL(root string) error {
 		return fmt.Errorf(
 			"SQLite SQL check found a generated sqlc slice query mixed with fixed parameters:\n%s\nUse a JSON1 list parameter instead; sqlc numbered placeholders are invalid after dynamic slice expansion.",
 			strings.Join(mixed, "\n"),
+		)
+	}
+	return nil
+}
+
+func checkSQLiteConnectionArchitecture(root string) error {
+	databasePath := filepath.Join(root, "server/internal/db/db.go")
+	databaseSource, err := os.ReadFile(databasePath)
+	if err != nil {
+		return fmt.Errorf("read SQLite connection boundary: %w", err)
+	}
+	databaseText := string(databaseSource)
+	for _, requirement := range []struct {
+		name    string
+		snippet string
+	}{
+		{name: "one physical writer", snippet: "database.SetMaxOpenConns(1)"},
+		{name: "read-only reader DSN", snippet: `"mode":          {"ro"}`},
+		{name: "query-only reader guard", snippet: `"_query_only":   {"on"}`},
+		{name: "bounded reader pool", snippet: "reader.SetMaxOpenConns(4)"},
+		{name: "default generated query router", snippet: "Queries:       repo.New(newQueryRouter(database, reader, writerCapability, readerCapability))"},
+		{name: "named writer capability", snippet: "Writer:        writerCapability"},
+		{name: "named reader capability", snippet: "Reader:        readerCapability"},
+		{name: "explicit checkpoint policy", snippet: `"PRAGMA wal_autocheckpoint = 0"`},
+	} {
+		if !strings.Contains(databaseText, requirement.snippet) {
+			return fmt.Errorf(
+				"SQLite connection architecture lost %s (%q); preserve one writer, query-only WAL readers, routed generated reads, and explicit checkpoint ownership",
+				requirement.name,
+				requirement.snippet,
+			)
+		}
+	}
+
+	appPath := filepath.Join(root, "server/app/app.go")
+	appSource, err := os.ReadFile(appPath)
+	if err != nil {
+		return fmt.Errorf("read production SQLite wiring: %w", err)
+	}
+	appText := string(appSource)
+	for _, requirement := range []struct {
+		name    string
+		snippet string
+	}{
+		{name: "River executor on writer and listener on readers", snippet: "queue.New(sqlDB, database.ReaderSQL, workers"},
+		{name: "writer wait and WAL monitor", snippet: "monitorSQLiteWriter(ctx, database"},
+		{name: "idle WAL checkpoint suppression", snippet: "walStateAlreadyCheckpointed(walState, checkpointedWAL"},
+		{name: "backup source reader", snippet: "Source:   database.ReaderSQL"},
+		{name: "repository outbox idle-read gate", snippet: "repositoryOutboxWorkPending(probeCtx, database.ReaderSQL"},
+		{name: "Event maintenance idle-read gate", snippet: "eventMaintenanceWorkPending(probeCtx, database.ReaderSQL"},
+		{name: "OCR outbox idle-read gate", snippet: "ocrIndexWorkPending(probeCtx, database.ReaderSQL"},
+		{name: "asynchronous durable-work probes", snippet: "go monitorPendingWork("},
+		{name: "non-blocking repository outbox constructor", snippet: "if !signal.ConsumePending()"},
+		{name: "non-blocking Event constructor", snippet: "if !eventMaintenanceSignal.ConsumePending()"},
+		{name: "non-blocking OCR constructor", snippet: "if !ocrIndexTrigger.ConsumePending()"},
+		{name: "queue status reader", snippet: "handler.NewQueueHandler(database.ReaderSQL)"},
+		{name: "event planning reader", snippet: "event.NewServiceWithCatalog(database.Writer, database.Reader"},
+		{name: "event HTTP catalog capabilities", snippet: "handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL"},
+		{name: "agent library reader", snippet: "core.NewAuthorizedLibraryFactory(queries, assetService, database.ReaderSQL)"},
+		{name: "classifier catalog capabilities", snippet: "service.NewClassifierServiceWithCatalog(sqlDB, readerDB, writer"},
+	} {
+		if !strings.Contains(appText, requirement.snippet) {
+			return fmt.Errorf(
+				"production SQLite wiring lost %s (%q); foreground/background planning reads must use the query-only pool",
+				requirement.name,
+				requirement.snippet,
+			)
+		}
+	}
+
+	for _, forbidden := range []struct {
+		name    string
+		pattern *regexp.Regexp
+	}{
+		{name: "raw production read on the writer", pattern: regexp.MustCompile(`\b(?:sqlDB|database\.SQL)\.(?:Query|QueryRow|Prepare)(?:Context)?\(`)},
+		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*\)`)},
+		{name: "backup copy bound to the writer", pattern: regexp.MustCompile(`Source:\s+sqlDB\b`)},
+		{name: "agent library bound to the writer", pattern: regexp.MustCompile(`NewAuthorizedLibraryFactory\(queries, assetService, sqlDB\)`)},
+	} {
+		if location := forbidden.pattern.FindStringIndex(appText); location != nil {
+			line := 1 + strings.Count(appText[:location[0]], "\n")
+			return fmt.Errorf(
+				"SQLite connection architecture found %s at server/app/app.go:%d; bind non-transactional reads to database.ReaderSQL or the routed database.Queries surface",
+				forbidden.name,
+				line,
+			)
+		}
+	}
+
+	bootstrapPath := filepath.Join(root, "server/internal/service/bootstrap_service.go")
+	bootstrapSource, err := os.ReadFile(bootstrapPath)
+	if err != nil {
+		return fmt.Errorf("read bootstrap SQLite boundary: %w", err)
+	}
+	bootstrapText := string(bootstrapSource)
+	if !strings.Contains(bootstrapText, "return s.compute(ctx)") {
+		return errors.New("bootstrap Phase lost its read-only derivation; setup status and initialization middleware must not wait for SQLite's writer")
+	}
+	if strings.Contains(bootstrapText, "return s.Reconcile(ctx)") {
+		return errors.New("bootstrap Phase calls Reconcile; foreground initialization reads must never persist through SQLite's sole writer")
+	}
+
+	runtimeStatusSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/runtime_status.go"))
+	if err != nil {
+		return fmt.Errorf("read storage runtime status boundary: %w", err)
+	}
+	if strings.Contains(string(runtimeStatusSource), "rm.Reconcile") {
+		return errors.New("storage runtime status performs reconciliation; GET/setup status must read the cached projection without acquiring SQLite's writer")
+	}
+
+	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/repository_roots.go"))
+	if err != nil {
+		return fmt.Errorf("read Storage Location list boundary: %w", err)
+	}
+	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error) {\n\tif err := rm.ReconcileRepositoryRoots(ctx)") {
+		return errors.New("ListRepositoryRoots reconciles on a foreground read; background storage reconciliation owns projection writes")
+	}
+
+	hostActionSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/host_action.go"))
+	if err != nil {
+		return fmt.Errorf("read host action list boundary: %w", err)
+	}
+	for _, forbidden := range []string{
+		"func (rm *DefaultRepositoryManager) ListPendingHostActions(ctx context.Context) ([]HostAction, error) {\n\tif err := rm.expirePendingHostActions(ctx)",
+		"func (rm *DefaultRepositoryManager) ListHostActionsForActor(ctx context.Context, actorUserID int32) ([]HostAction, error) {\n\tif err := rm.expirePendingHostActions(ctx)",
+	} {
+		if strings.Contains(string(hostActionSource), forbidden) {
+			return errors.New("host action list persists expiry on a foreground read; materialize expiry while reading and persist cleanup only at an explicit maintenance boundary")
+		}
+	}
+	handlerReconcile, err := scanGoLines(root, "server/internal/api/handler", func(relative, line string) bool {
+		if strings.HasSuffix(relative, "_test.go") {
+			return false
+		}
+		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileRepositoryRoots(")
+	})
+	if err != nil {
+		return err
+	}
+	if len(handlerReconcile) > 0 {
+		return fmt.Errorf(
+			"foreground HTTP handler performs storage reconciliation:\n%s\nStartup/background controllers own projection writes; GET handlers consume the latest reader projection",
+			strings.Join(handlerReconcile, "\n"),
 		)
 	}
 	return nil

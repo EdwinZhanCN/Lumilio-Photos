@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 	"server/internal/db/vectorindex"
 	"server/internal/logging"
@@ -94,6 +95,8 @@ type assetIndexingService struct {
 	runtimeChecker  LumenService
 	queueClient     *river.Client[*sql.Tx]
 	dbpool          *sql.DB
+	writer          *catalogtx.Writer
+	readerPool      *sql.DB
 	logger          *zap.Logger
 	auditProvider   logging.RepositoryAuditProvider
 	files           *storage.RepositoryFSFactory
@@ -114,6 +117,32 @@ func NewAssetIndexingService(
 	auditProvider logging.RepositoryAuditProvider,
 	files *storage.RepositoryFSFactory,
 ) AssetIndexingService {
+	return NewAssetIndexingServiceWithReader(
+		queries,
+		settingsService,
+		runtimeChecker,
+		queueClient,
+		dbpool,
+		catalogtx.NewWriter(dbpool, nil),
+		dbpool,
+		logger,
+		auditProvider,
+		files,
+	)
+}
+
+func NewAssetIndexingServiceWithReader(
+	queries *repo.Queries,
+	settingsService SettingsService,
+	runtimeChecker LumenService,
+	queueClient *river.Client[*sql.Tx],
+	dbpool *sql.DB,
+	writer *catalogtx.Writer,
+	readerPool *sql.DB,
+	logger *zap.Logger,
+	auditProvider logging.RepositoryAuditProvider,
+	files *storage.RepositoryFSFactory,
+) AssetIndexingService {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -126,6 +155,8 @@ func NewAssetIndexingService(
 		runtimeChecker:  runtimeChecker,
 		queueClient:     queueClient,
 		dbpool:          dbpool,
+		writer:          writer,
+		readerPool:      readerPool,
 		logger:          logger.With(zap.String("component", "indexing")),
 		auditProvider:   auditProvider,
 		files:           files,
@@ -287,7 +318,7 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 		Limit:         input.Limit,
 		MissingOnly:   input.MissingOnly,
 		ResetSemantic: input.ResetSemantic,
-	}, &river.InsertOpts{Queue: "reindex_assets"})
+	}, nil)
 	if err != nil {
 		return ReindexAssetsJobResult{}, fmt.Errorf("enqueue reindex job: %w", err)
 	}
@@ -340,7 +371,7 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		if err := s.queries.ClearDefaultSearchSpaceByType(ctx, string(EmbeddingTypeSemantic)); err != nil {
 			return fmt.Errorf("reset semantic index: clear default space: %w", err)
 		}
-		if err := vectorindex.Maintain(ctx, s.dbpool); err != nil {
+		if err := vectorindex.Maintain(ctx, s.writer, s.readerPool); err != nil {
 			return fmt.Errorf("reset semantic index: rebuild Vec1 flat index: %w", err)
 		}
 		// Video frame rows were wiped with the table; ensure videos are
@@ -368,12 +399,11 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		return nil
 	}
 
-	repositoryCache := make(map[string]repo.Repository)
 	queuedJobs := 0
 	failedAssets := 0
 
 	for _, candidate := range candidates {
-		queued, enqueueErr := s.enqueueAssetIndexingTasks(ctx, candidate, repositoryCache)
+		queued, enqueueErr := s.enqueueAssetIndexingTasks(ctx, candidate)
 		if enqueueErr != nil {
 			failedAssets++
 			s.logger.Warn("reindex failed to queue asset",
@@ -423,7 +453,7 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 			Limit:        input.Limit,
 			Offset:       input.Offset + input.Limit,
 			MissingOnly:  false,
-		}, &river.InsertOpts{Queue: "reindex_assets"}); err != nil {
+		}, nil); err != nil {
 			s.logger.Warn("reindex failed to enqueue next page",
 				zap.String("operation", "reindex.process"),
 				zap.Int("next_offset", input.Offset+input.Limit),
@@ -591,45 +621,18 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 func (s *assetIndexingService) enqueueAssetIndexingTasks(
 	ctx context.Context,
 	candidate reindexCandidate,
-	repositoryCache map[string]repo.Repository,
 ) (int, error) {
-	if candidate.asset.RepositoryID.Valid == false {
-		return 0, errors.New("asset repository is missing")
+	// A queued ML worker resolves and validates an active Location immediately
+	// before opening media. Here we only reject catalog-orphaned Assets; carrying
+	// a path or repository through the River payload would reintroduce the stale
+	// work race that the observation engine removes.
+	if _, err := s.queries.GetPreferredActiveAssetOccurrence(ctx, candidate.asset.AssetID); err != nil {
+		return 0, fmt.Errorf("asset has no active location: %w", err)
 	}
-	if candidate.asset.StoragePath == nil || *candidate.asset.StoragePath == "" {
-		return 0, errors.New("asset storage path is missing")
-	}
-
-	repositoryID := candidate.asset.RepositoryID.UUID.String()
-	repository, ok := repositoryCache[repositoryID]
-	if !ok {
-		var err error
-		repository, err = s.queries.GetRepository(ctx, candidate.asset.RepositoryID.UUID)
-		if err != nil {
-			return 0, fmt.Errorf("get repository: %w", err)
-		}
-		repositoryCache[repositoryID] = repository
-	}
-
-	repositoryPath, err := storage.ParseUserMediaPath(*candidate.asset.StoragePath)
-	if err != nil {
-		return 0, fmt.Errorf("parse asset file path: %w", err)
-	}
-	repositoryFS, err := s.files.Open(repository)
-	if err != nil {
-		return 0, fmt.Errorf("open repository: %w", err)
-	}
-	opened, err := repositoryFS.OpenMedia(repositoryPath)
-	if err != nil {
-		_ = repositoryFS.Close()
-		return 0, fmt.Errorf("open asset file: %w", err)
-	}
-	_ = opened.Close()
-	_ = repositoryFS.Close()
 
 	queued := 0
 	if candidate.tasks[AssetIndexingTaskSemanticImage] {
-		inserted, err := s.enqueueSemanticTask(ctx, candidate.asset.AssetID)
+		inserted, err := s.enqueueSemanticTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
 		if err != nil {
 			return queued, err
 		}
@@ -638,7 +641,7 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		}
 	}
 	if candidate.tasks[AssetIndexingTaskOCR] {
-		inserted, err := s.enqueueOCRTask(ctx, candidate.asset.AssetID)
+		inserted, err := s.enqueueOCRTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
 		if err != nil {
 			return queued, err
 		}
@@ -647,7 +650,7 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		}
 	}
 	if candidate.tasks[AssetIndexingTaskFaceRecognition] {
-		inserted, err := s.enqueueFaceTask(ctx, candidate.asset.AssetID)
+		inserted, err := s.enqueueFaceTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
 		if err != nil {
 			return queued, err
 		}
@@ -656,7 +659,7 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		}
 	}
 	if candidate.tasks[AssetIndexingTaskVideoSemantic] {
-		inserted, err := s.enqueueVideoFramesTask(ctx, candidate.asset.AssetID)
+		inserted, err := s.enqueueVideoFramesTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
 		if err != nil {
 			return queued, err
 		}
@@ -670,12 +673,13 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 
 func (s *assetIndexingService) enqueueSemanticTask(
 	ctx context.Context,
-	assetID uuid.UUID,
+	assetID, expectedContentID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
 		AssetID:           assetID,
+		ExpectedContentID: expectedContentID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_semantic"})
+	}, nil)
 	if err != nil {
 		return false, fmt.Errorf("enqueue semantic job: %w", err)
 	}
@@ -684,12 +688,13 @@ func (s *assetIndexingService) enqueueSemanticTask(
 
 func (s *assetIndexingService) enqueueOCRTask(
 	ctx context.Context,
-	assetID uuid.UUID,
+	assetID, expectedContentID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
 		AssetID:           assetID,
+		ExpectedContentID: expectedContentID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_ocr"})
+	}, nil)
 	if err != nil {
 		return false, fmt.Errorf("enqueue OCR job: %w", err)
 	}
@@ -698,12 +703,13 @@ func (s *assetIndexingService) enqueueOCRTask(
 
 func (s *assetIndexingService) enqueueFaceTask(
 	ctx context.Context,
-	assetID uuid.UUID,
+	assetID, expectedContentID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
 		AssetID:           assetID,
+		ExpectedContentID: expectedContentID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_face"})
+	}, nil)
 	if err != nil {
 		return false, fmt.Errorf("enqueue face job: %w", err)
 	}
@@ -712,12 +718,13 @@ func (s *assetIndexingService) enqueueFaceTask(
 
 func (s *assetIndexingService) enqueueVideoFramesTask(
 	ctx context.Context,
-	assetID uuid.UUID,
+	assetID, expectedContentID uuid.UUID,
 ) (bool, error) {
 	res, err := s.queueClient.Insert(ctx, jobs.ProcessVideoFramesArgs{
 		AssetID:           assetID,
+		ExpectedContentID: expectedContentID,
 		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_video_frames"})
+	}, nil)
 	if err != nil {
 		return false, fmt.Errorf("enqueue video frames job: %w", err)
 	}
@@ -725,7 +732,7 @@ func (s *assetIndexingService) enqueueVideoFramesTask(
 }
 
 func (s *assetIndexingService) countPendingQueueJobs(ctx context.Context, queueName string) int64 {
-	if s.dbpool == nil {
+	if s.readerPool == nil {
 		return 0
 	}
 
@@ -737,7 +744,7 @@ WHERE queue = $1
 `
 
 	var count int64
-	if err := s.dbpool.QueryRowContext(ctx, query, queueName).Scan(&count); err != nil {
+	if err := s.readerPool.QueryRowContext(ctx, query, queueName).Scan(&count); err != nil {
 		s.logger.Warn("indexing stats queue count failed",
 			zap.String("operation", "indexing.stats"),
 			zap.String("queue", queueName),

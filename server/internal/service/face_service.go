@@ -11,8 +11,10 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
@@ -86,6 +88,7 @@ type Person struct {
 	AssetCount            int64
 	CoverFaceImagePath    *string
 	RepresentativeAssetID *string
+	CoverRepositoryID     *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
@@ -126,16 +129,20 @@ type FaceClusterRebuildResult struct {
 }
 
 type faceService struct {
-	queries *repo.Queries
-	pool    *sql.DB
-	files   *storage.RepositoryFSFactory
+	queries           *repo.Queries
+	pool              *sql.DB
+	writer            *catalogtx.Writer
+	files             *storage.RepositoryFSFactory
+	clusterRebuildMu  sync.RWMutex
+	afterRebuildReset func()
 }
 
 // NewFaceService creates face service instance.
-func NewFaceService(queries *repo.Queries, files *storage.RepositoryFSFactory, database *sql.DB) FaceService {
+func NewFaceService(queries *repo.Queries, files *storage.RepositoryFSFactory, database *sql.DB, writer *catalogtx.Writer) FaceService {
 	return &faceService{
 		queries: queries,
 		pool:    database,
+		writer:  writer,
 		files:   files,
 	}
 }
@@ -145,13 +152,13 @@ func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 		return fn(s.queries)
 	}
 
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationFaceMutation, nil)
 	if err != nil {
 		return fmt.Errorf("begin face clustering transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	if err := fn(s.queries.WithTx(tx)); err != nil {
+	if err := fn(s.queries.WithTx(tx.Raw())); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -162,6 +169,9 @@ func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 
 // SaveFaceResults saves face detection results, persists crops, and updates recognition clusters.
 func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	if faceV1 == nil {
 		return fmt.Errorf("face result payload is required")
 	}
@@ -245,6 +255,7 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, fa
 			QualityScore:   nil,
 			BlurScore:      nil,
 			PoseAngles:     dbtypes.JSON(landmarksJSON),
+			RepositoryID:   repository.RepoID,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create face item %d: %w", i, err)
@@ -310,14 +321,15 @@ func (s *faceService) resolveAssetRepository(ctx context.Context, assetID uuid.U
 	if err != nil {
 		return repo.Repository{}, nil, fmt.Errorf("failed to load asset for face processing: %w", err)
 	}
-	if !asset.RepositoryID.Valid {
-		return repo.Repository{}, nil, fmt.Errorf("asset %s does not have a repository", assetID)
-	}
 	if s.files == nil {
 		return repo.Repository{}, nil, fmt.Errorf("face repository filesystem is unavailable")
 	}
+	occurrence, err := s.queries.GetPreferredActiveAssetOccurrence(ctx, assetID)
+	if err != nil {
+		return repo.Repository{}, nil, fmt.Errorf("asset %s has no active location: %w", assetID, err)
+	}
 
-	repository, err := s.queries.GetRepository(ctx, asset.RepositoryID.UUID)
+	repository, err := s.queries.GetRepository(ctx, occurrence.RepositoryID)
 	if err != nil {
 		return repo.Repository{}, nil, fmt.Errorf("failed to resolve repository for asset %s: %w", assetID, err)
 	}
@@ -587,6 +599,9 @@ func (s *faceService) GetFaceResults(ctx context.Context, assetID uuid.UUID) (*F
 
 // DeleteFaceResults deletes face results for specified asset, including crops and cluster memberships.
 func (s *faceService) DeleteFaceResults(ctx context.Context, assetID uuid.UUID) error {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	repository, _, err := s.resolveAssetRepository(ctx, assetID)
 	if err != nil {
 		return err
@@ -739,6 +754,9 @@ func (s *faceService) FindSimilarFaces(ctx context.Context, embeddingVector []fl
 }
 
 func (s *faceService) UpdateFaceEmbedding(ctx context.Context, faceID int32, embedding []float32, modelID string) (*repo.FaceItem, error) {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	var embeddingVector dbtypes.Vector
 	if len(embedding) > 0 {
 		embeddingVector = dbtypes.NewVector(embedding)
@@ -799,6 +817,9 @@ func (s *faceService) GetPerson(ctx context.Context, clusterID int32, repository
 }
 
 func (s *faceService) RenamePerson(ctx context.Context, clusterID int32, name string) (*repo.FaceCluster, error) {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
 		return nil, fmt.Errorf("person name cannot be empty")
@@ -897,13 +918,9 @@ func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID i
 	if row.FaceImagePath == nil || strings.TrimSpace(*row.FaceImagePath) == "" {
 		return nil, sql.ErrNoRows
 	}
-	if !row.RepositoryID.Valid {
-		return nil, fmt.Errorf("face %d has no repository", faceID)
-	}
-
 	return &PersonFaceCrop{
 		FaceID:        row.ID,
-		RepositoryID:  row.RepositoryID.UUID.String(),
+		RepositoryID:  row.RepositoryID.String(),
 		FaceImagePath: *row.FaceImagePath,
 	}, nil
 }
@@ -913,6 +930,9 @@ func (s *faceService) GetPersonFaceCrop(ctx context.Context, clusterID, faceID i
 // recognition, and empty source clusters are deleted. The target name,
 // confirmation and hidden state are preserved.
 func (s *faceService) MergePeople(ctx context.Context, targetClusterID int32, sourceClusterIDs []int32, ownerID *int32) error {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	target, err := s.authorizePerson(ctx, targetClusterID, ownerID)
 	if err != nil {
 		return err
@@ -958,6 +978,9 @@ func (s *faceService) MergePeople(ctx context.Context, targetClusterID int32, so
 
 // MoveFace reassigns a single face to another person as a manual correction.
 func (s *faceService) MoveFace(ctx context.Context, faceID, targetClusterID int32, ownerID *int32) error {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	target, err := s.authorizePerson(ctx, targetClusterID, ownerID)
 	if err != nil {
 		return err
@@ -1008,6 +1031,9 @@ func (s *faceService) MoveFace(ctx context.Context, faceID, targetClusterID int3
 // RemoveFaceFromPerson detaches a face from a person, leaving it unclustered so
 // it can be recovered by a later rebuild or correction. The asset is unchanged.
 func (s *faceService) RemoveFaceFromPerson(ctx context.Context, faceID, clusterID int32, ownerID *int32) error {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	if _, err := s.authorizePerson(ctx, clusterID, ownerID); err != nil {
 		return err
 	}
@@ -1033,6 +1059,9 @@ func (s *faceService) RemoveFaceFromPerson(ctx context.Context, faceID, clusterI
 // SetPersonCover marks a face as the representative cover. The face must belong
 // to the person.
 func (s *faceService) SetPersonCover(ctx context.Context, clusterID, faceID int32, ownerID *int32) error {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	if _, err := s.authorizePerson(ctx, clusterID, ownerID); err != nil {
 		return err
 	}
@@ -1060,6 +1089,9 @@ func (s *faceService) SetPersonCover(ctx context.Context, clusterID, faceID int3
 // SetPersonHidden hides or unhides a person from default people views without
 // touching face assignments, names or assets.
 func (s *faceService) SetPersonHidden(ctx context.Context, clusterID int32, hidden bool, ownerID *int32) (*Person, error) {
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+
 	if _, err := s.authorizePerson(ctx, clusterID, ownerID); err != nil {
 		return nil, err
 	}
@@ -1083,6 +1115,7 @@ func personFromListRow(row repo.ListPeopleScopedRow) Person {
 		AssetCount:            row.AssetCount,
 		CoverFaceImagePath:    row.CoverFaceImagePath,
 		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
+		CoverRepositoryID:     optionalStringFromSQLiteUUID(row.CoverRepositoryID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}
@@ -1099,6 +1132,7 @@ func personFromDetailRow(row repo.GetPersonByIDScopedRow) Person {
 		AssetCount:            row.AssetCount,
 		CoverFaceImagePath:    row.CoverFaceImagePath,
 		RepresentativeAssetID: uuidToOptionalStringValue(row.RepresentativeAssetID),
+		CoverRepositoryID:     optionalStringFromSQLiteUUID(row.CoverRepositoryID),
 		CreatedAt:             row.CreatedAt.Time,
 		UpdatedAt:             row.UpdatedAt.Time,
 	}

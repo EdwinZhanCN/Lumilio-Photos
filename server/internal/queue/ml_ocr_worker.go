@@ -47,9 +47,19 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
 	}
+	current, err := validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("validate OCR asset work: %w", err)
+	}
+	if !current {
+		return nil
+	}
 
 	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeOCR, args.PreprocessVersion)
 	if err != nil {
+		if handled, result := handleDerivedAssetError(err); handled {
+			return result
+		}
 		return fmt.Errorf("load OCR image: %w", err)
 	}
 
@@ -57,6 +67,13 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	ocrResult, err := w.LumenService.OCR(ctx, imageData)
 	if err != nil {
 		return fmt.Errorf("failed to perform OCR: %w", err)
+	}
+	current, err = validateLoaderAssetWork(ctx, w.ImageLoader, assetID, args.ExpectedContentID)
+	if err != nil {
+		return fmt.Errorf("revalidate OCR asset work: %w", err)
+	}
+	if !current {
+		return nil
 	}
 
 	// Save OCR results using OCRService

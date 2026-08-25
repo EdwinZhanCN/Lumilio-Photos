@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/roe/locations"
 
 	"github.com/google/uuid"
 )
@@ -16,6 +16,7 @@ var ErrAssetSourceStale = errors.New("asset source observation is stale")
 
 type currentAssetSource struct {
 	asset       *repo.Asset
+	content     repo.ContentObject
 	repository  repo.Repository
 	files       *storage.RepositoryFS
 	path        storage.RepositoryPath
@@ -30,53 +31,54 @@ func (source *currentAssetSource) Close() error {
 	return source.files.Close()
 }
 
-func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID uuid.UUID, expectedToken, expectedHash string) (*currentAssetSource, error) {
-	asset, repository, err := ap.loadAssetAndRepo(ctx, assetID)
+// resolveCurrentAssetSource verifies immutable logical content identity, then
+// leases and opens one active Location immediately before native media access.
+// No queue fact or Asset row carries a path or repository context.
+func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID, expectedContentID uuid.UUID) (*currentAssetSource, error) {
+	if ap == nil || ap.locationResolver == nil {
+		return nil, locations.ErrAssetUnavailable
+	}
+	asset, err := ap.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return nil, err
 	}
-	if asset.IsDeleted || asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+	if asset.IsDeleted || (expectedContentID != uuid.Nil && asset.ContentID != expectedContentID) {
 		return nil, ErrAssetSourceStale
 	}
-	repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
+	content, err := ap.queries.GetContentObjectByID(ctx, asset.ContentID)
 	if err != nil {
 		return nil, err
 	}
-	indexed, err := ap.queries.GetRepositoryFileIndexEntry(ctx, repo.GetRepositoryFileIndexEntryParams{
-		RepositoryID: repository.RepoID,
-		StoragePath:  repositoryPath.String(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("load current asset file index: %w", err)
-	}
-	if !indexed.AssetID.Valid || indexed.AssetID.UUID != assetID || indexed.State != "present" {
-		return nil, ErrAssetSourceStale
-	}
-	repositoryFS, err := ap.files.Open(repository)
+	opened, localPath, err := ap.locationResolver.LocalAssetPath(ctx, assetID)
 	if err != nil {
 		return nil, err
 	}
-	observation, err := repositoryFS.InspectMedia(ctx, repositoryPath, storage.HashNone)
-	if err != nil {
-		_ = repositoryFS.Close()
-		return nil, err
-	}
-	if observation.ObservationToken != indexed.ObservationToken {
-		_ = repositoryFS.Close()
-		return nil, ErrAssetSourceStale
-	}
-	if expectedToken != "" && expectedToken != observation.ObservationToken {
-		movedSameContent := expectedHash != "" && indexed.ContentHash != nil &&
-			strings.EqualFold(*indexed.ContentHash, expectedHash) && strings.EqualFold(asset.ContentHash, expectedHash)
-		if !movedSameContent {
-			_ = repositoryFS.Close()
-			return nil, ErrAssetSourceStale
+	if opened.File != nil {
+		if err := opened.File.Close(); err != nil {
+			_ = opened.Close()
+			return nil, err
 		}
+		opened.File = nil
 	}
-	localPath, err := repositoryFS.LocalMediaPath(repositoryPath)
+	observation, err := opened.Repository.InspectMedia(ctx, opened.Path, storage.HashNone)
 	if err != nil {
-		_ = repositoryFS.Close()
+		_ = opened.Close()
 		return nil, err
 	}
-	return &currentAssetSource{asset: asset, repository: repository, files: repositoryFS, path: repositoryPath, localPath: localPath, observation: observation}, nil
+	if observation.Size != content.FileSize || opened.Node.StabilityToken == nil ||
+		observation.ObservationToken != *opened.Node.StabilityToken {
+		_ = opened.Close()
+		return nil, ErrAssetSourceStale
+	}
+	source := &currentAssetSource{
+		asset: &asset, content: content, repository: opened.Catalog,
+		files: opened.Repository, path: opened.Path, localPath: localPath,
+		observation: observation,
+	}
+	opened.Repository = nil
+	if err := opened.Close(); err != nil {
+		_ = source.Close()
+		return nil, fmt.Errorf("release source capability: %w", err)
+	}
+	return source, nil
 }

@@ -13,6 +13,7 @@ import (
 	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/testutil"
 
 	"github.com/google/uuid"
 )
@@ -59,24 +60,31 @@ func TestEmbeddingRetrieverUsesVec1FiltersAndExactReranking(t *testing.T) {
 			'repo', '/media/repo', 1, 1, 1,
 			'00000000-0000-0000-0000-000000000001'
 		);
-		INSERT INTO assets (
-			asset_id, owner_id, type, original_filename, mime_type, file_size,
-			content_hash, upload_time, repository_id, is_deleted, updated_at
-		) VALUES
-			(?, 1, 'PHOTO', 'owner.jpg', 'image/jpeg', 1, 'h1', 1,
-			 '00000000-0000-0000-0000-000000000002', 0, 1),
-			(?, 2, 'PHOTO', 'other.jpg', 'image/jpeg', 1, 'h2', 1,
-			 '00000000-0000-0000-0000-000000000002', 0, 1),
-			(?, 1, 'PHOTO', 'deleted.jpg', 'image/jpeg', 1, 'h3', 1,
-			 '00000000-0000-0000-0000-000000000002', 1, 1),
-			(?, 1, 'VIDEO', 'far.mp4', 'video/mp4', 1, 'h4', 1,
-			 '00000000-0000-0000-0000-000000000002', 0, 1);
 		INSERT INTO embedding_spaces (
 			id, embedding_type, model_id, dimensions, distance_metric,
 			search_enabled, is_default_search, created_at, updated_at
 		) VALUES (1, 'semantic', 'fixture', 768, 'l2', 1, 1, 1, 1);
-	`, ownerAsset, otherAsset, deletedAsset, farAsset); err != nil {
+	`); err != nil {
 		t.Fatal(err)
+	}
+	repositoryID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	for _, fixture := range []struct {
+		id, filename, assetType, mime string
+		ownerID                       int32
+		deleted                       bool
+	}{
+		{id: ownerAsset, filename: "owner.jpg", assetType: "PHOTO", mime: "image/jpeg", ownerID: 1},
+		{id: otherAsset, filename: "other.jpg", assetType: "PHOTO", mime: "image/jpeg", ownerID: 2},
+		{id: deletedAsset, filename: "deleted.jpg", assetType: "PHOTO", mime: "image/jpeg", ownerID: 1, deleted: true},
+		{id: farAsset, filename: "far.mp4", assetType: "VIDEO", mime: "video/mp4", ownerID: 1},
+	} {
+		if _, err := testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
+			AssetID: uuid.MustParse(fixture.id), RepositoryID: repositoryID, OwnerID: fixture.ownerID,
+			AssetType: fixture.assetType, Filename: fixture.filename, MIMEType: fixture.mime,
+			FileSize: 1, IsDeleted: fixture.deleted,
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	queryVector := unitVector768(0)

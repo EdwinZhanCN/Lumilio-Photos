@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
@@ -39,6 +40,7 @@ type metrics struct {
 	hits     map[string]uint64
 	misses   map[string]uint64
 	recorded map[string]uint64
+	injected map[string]uint64
 }
 
 func newMetrics() *metrics {
@@ -47,6 +49,7 @@ func newMetrics() *metrics {
 		hits:     map[string]uint64{},
 		misses:   map[string]uint64{},
 		recorded: map[string]uint64{},
+		injected: map[string]uint64{},
 	}
 }
 
@@ -64,22 +67,89 @@ func (m *metrics) snapshot(mode string, fixturesLoaded int) map[string]any {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return map[string]any{
-		"semantic_image":  m.requests[types.TaskSemanticImageEmbed],
-		"semantic_text":   m.requests[types.TaskSemanticTextEmbed],
-		"mode":            mode,
-		"fixtures_loaded": fixturesLoaded,
-		"requests":        snapshotCounts(m.requests),
-		"fixture_hits":    snapshotCounts(m.hits),
-		"fixture_misses":  snapshotCounts(m.misses),
-		"recorded":        snapshotCounts(m.recorded),
+		"semantic_image":    m.requests[types.TaskSemanticImageEmbed],
+		"semantic_text":     m.requests[types.TaskSemanticTextEmbed],
+		"mode":              mode,
+		"fixtures_loaded":   fixturesLoaded,
+		"requests":          snapshotCounts(m.requests),
+		"fixture_hits":      snapshotCounts(m.hits),
+		"fixture_misses":    snapshotCounts(m.misses),
+		"recorded":          snapshotCounts(m.recorded),
+		"injected_failures": snapshotCounts(m.injected),
 	}
+}
+
+type faultInjector struct {
+	mu    sync.Mutex
+	armed map[string]uint64
+}
+
+func newFaultInjector() *faultInjector {
+	return &faultInjector{armed: map[string]uint64{}}
+}
+
+func (f *faultInjector) arm(task string, count uint64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.armed[task] += count
+}
+
+func (f *faultInjector) consume(task string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.armed[task] == 0 {
+		return false
+	}
+	f.armed[task]--
+	if f.armed[task] == 0 {
+		delete(f.armed, task)
+	}
+	return true
+}
+
+func (f *faultInjector) snapshot() map[string]uint64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return snapshotCounts(f.armed)
 }
 
 func metricsHandler(server *inferenceServer) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(server.metrics.snapshot(server.mode, server.store.size()))
+		snapshot := server.metrics.snapshot(server.mode, server.store.size())
+		snapshot["armed_failures"] = server.faults.snapshot()
+		_ = json.NewEncoder(w).Encode(snapshot)
+	})
+	mux.HandleFunc("POST /fail-next", func(w http.ResponseWriter, r *http.Request) {
+		if server.mode != modeReplay {
+			http.Error(w, "failure injection is replay-only", http.StatusConflict)
+			return
+		}
+		var request struct {
+			Task  string `json:"task"`
+			Count uint64 `json:"count"`
+		}
+		decoder := json.NewDecoder(io.LimitReader(r.Body, 4<<10))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			http.Error(w, "invalid failure request", http.StatusBadRequest)
+			return
+		}
+		request.Task = strings.TrimSpace(request.Task)
+		if request.Count == 0 {
+			request.Count = 1
+		}
+		if request.Task == "" || request.Count > 100 {
+			http.Error(w, "task is required and count must be at most 100", http.StatusBadRequest)
+			return
+		}
+		server.faults.arm(request.Task, request.Count)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"task": request.Task, "count": request.Count,
+		})
 	})
 	return mux
 }
@@ -90,17 +160,21 @@ type inferenceServer struct {
 	strict       bool
 	store        *fixtureStore
 	metrics      *metrics
+	faults       *faultInjector
 	upstream     pb.InferenceClient // record mode only
 	upstreamAddr string
 }
 
 func newReplayServer(store *fixtureStore, strict bool) *inferenceServer {
-	return &inferenceServer{mode: modeReplay, strict: strict, store: store, metrics: newMetrics()}
+	return &inferenceServer{
+		mode: modeReplay, strict: strict, store: store,
+		metrics: newMetrics(), faults: newFaultInjector(),
+	}
 }
 
 func newRecordServer(store *fixtureStore, upstream pb.InferenceClient, upstreamAddr string) *inferenceServer {
 	return &inferenceServer{
-		mode: modeRecord, store: store, metrics: newMetrics(),
+		mode: modeRecord, store: store, metrics: newMetrics(), faults: newFaultInjector(),
 		upstream: upstream, upstreamAddr: upstreamAddr,
 	}
 }
@@ -152,11 +226,47 @@ func builtinOCRCapability() *pb.Capability {
 	}
 }
 
+func builtinBioCLIPCapability() *pb.Capability {
+	return &pb.Capability{
+		ServiceName:     types.ServiceBioCLIP,
+		ModelIds:        []string{builtinModelID},
+		Runtime:         "e2e-deterministic",
+		MaxConcurrency:  4,
+		Precisions:      []string{"fp32"},
+		ProtocolVersion: "1.0.0",
+		Tasks: []*pb.IOTask{{
+			Name:                    types.TaskBioCLIPClassify,
+			InputMimes:              []string{"image/jpeg", "image/png", "image/webp", types.DefaultTensorMIME},
+			OutputMimes:             []string{"application/json;schema=labels_v1"},
+			TensorPreprocessId:      types.PreprocessBioCLIP224Image,
+			TensorBatchingSupported: true,
+		}},
+	}
+}
+
+func builtinFaceCapability() *pb.Capability {
+	return &pb.Capability{
+		ServiceName:     types.ServiceFace,
+		ModelIds:        []string{builtinModelID},
+		Runtime:         "e2e-deterministic",
+		MaxConcurrency:  2,
+		Precisions:      []string{"fp32"},
+		ProtocolVersion: "1.0.0",
+		Tasks: []*pb.IOTask{{
+			Name:        types.TaskFaceRecognition,
+			InputMimes:  []string{"image/jpeg", "image/png", "image/webp"},
+			OutputMimes: []string{"application/json;schema=face_v1"},
+		}},
+	}
+}
+
 func (s *inferenceServer) advertisedCapabilities() []*pb.Capability {
 	if recorded := s.store.capabilities(); len(recorded) > 0 {
 		return recorded
 	}
-	return []*pb.Capability{builtinCapability(), builtinOCRCapability()}
+	return []*pb.Capability{
+		builtinCapability(), builtinBioCLIPCapability(), builtinOCRCapability(), builtinFaceCapability(),
+	}
 }
 
 func (s *inferenceServer) GetCapabilities(ctx context.Context, _ *emptypb.Empty) (*pb.Capability, error) {
@@ -236,6 +346,12 @@ func (s *inferenceServer) Infer(stream grpc.BidiStreamingServer[pb.InferRequest,
 
 func (s *inferenceServer) replay(stream grpc.BidiStreamingServer[pb.InferRequest, pb.InferResponse], request *pb.InferRequest) error {
 	task := request.GetTask()
+	if s.faults.consume(task) {
+		s.metrics.mu.Lock()
+		bump(s.metrics.injected, task)
+		s.metrics.mu.Unlock()
+		return status.Errorf(codes.Unavailable, "controlled one-shot failure for task %q", task)
+	}
 	if record, ok := s.store.lookup(task, payloadDigest(request.GetPayload())); ok {
 		result, err := record.resultBytes()
 		if err != nil {

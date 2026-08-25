@@ -16,6 +16,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
+	roelocations "server/internal/storage/roe/locations"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,6 +31,13 @@ type ShareLinkHandler struct {
 	assetService service.AssetService
 	queries      *repo.Queries
 	files        *storage.RepositoryFSFactory
+	locations    *roelocations.Resolver
+}
+
+func (h *ShareLinkHandler) SetLocationResolver(resolver *roelocations.Resolver) {
+	if h != nil {
+		h.locations = resolver
+	}
 }
 
 // NewShareLinkHandler constructs the share link handler.
@@ -433,12 +441,12 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 		return
 	}
 
-	repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
+	repository, err := h.queries.GetRepository(c.Request.Context(), thumbnail.RepositoryID)
 	if err != nil {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, thumbnail.StoragePath)
+	repositoryFS, file, err := openRepositoryPrivate(h.files, repository, thumbnail.StoragePath)
 	if err != nil {
 		api.WriteProblem(c, api.NotFound(err))
 		return
@@ -495,18 +503,7 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, d
 		api.WriteProblem(c, api.BadRequest(fmt.Errorf("asset is not %s", strings.ToLower(assetType))))
 		return
 	}
-	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.WriteProblem(c, api.NotFound(errors.New("asset storage path is empty")))
-		return
-	}
-
-	repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
-	if err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-
-	repositoryFS, file, err := openWebOrOriginal(h.files, *repository, asset, derivedKind, webSuffix)
+	repositoryFS, file, err := openWebOrOriginal(c.Request.Context(), h.locations, asset, derivedKind, webSuffix)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -547,17 +544,7 @@ func (h *ShareLinkHandler) GetPublicShareOriginal(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.WriteProblem(c, api.NotFound(errors.New("asset storage path is empty")))
-		return
-	}
-
-	repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
-	if err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-	repositoryFS, file, err := openRepositoryMedia(h.files, *repository, *asset.StoragePath)
+	opened, err := h.locations.OpenAsset(c.Request.Context(), asset.AssetID)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -570,7 +557,7 @@ func (h *ShareLinkHandler) GetPublicShareOriginal(c *gin.Context) {
 	c.Header("Cache-Control", "private, max-age=0, no-store")
 	c.Header("Content-Type", asset.MimeType)
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", asset.OriginalFilename))
-	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
+	serveRepositoryFile(c, opened.Repository, opened.File, asset.OriginalFilename)
 }
 
 // DownloadPublicShare serves the share's assets (or a requested subset) as a
@@ -620,29 +607,12 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 		if err != nil {
 			continue
 		}
-		if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-			continue
-		}
-		repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
-		if err != nil {
-			continue
-		}
-		repositoryPath, parseErr := storage.ParseUserMediaPath(*asset.StoragePath)
-		if parseErr != nil {
-			continue
-		}
-		repositoryFS, openErr := h.files.Open(*repository)
+		opened, openErr := h.locations.OpenAsset(c.Request.Context(), asset.AssetID)
 		if openErr != nil {
-			continue
-		}
-		opened, openErr := repositoryFS.OpenMedia(repositoryPath)
-		if openErr != nil {
-			_ = repositoryFS.Close()
 			continue
 		}
 		_ = opened.Close()
-		_ = repositoryFS.Close()
-		files = append(files, assetDownloadFile{asset: *asset, repository: *repository, path: repositoryPath})
+		files = append(files, assetDownloadFile{asset: *asset})
 	}
 
 	if len(files) == 0 {
@@ -659,7 +629,7 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 	zipWriter := zip.NewWriter(c.Writer)
 	archiveNames := make(map[string]int, len(files))
 	for _, file := range files {
-		if err := writeAssetToZip(h.files, zipWriter, archiveNames, file); err != nil {
+		if err := writeAssetToZip(c.Request.Context(), h.locations, zipWriter, archiveNames, file); err != nil {
 			log.Printf("Failed to write share asset to zip: %v", err)
 			_ = zipWriter.Close()
 			return

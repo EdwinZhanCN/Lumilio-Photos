@@ -4,7 +4,11 @@ SELECT COUNT(*) as count
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL

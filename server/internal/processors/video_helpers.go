@@ -35,7 +35,7 @@ type VideoInfo struct {
 }
 
 // extractVideoMetadata updates the asset with ffprobe/EXIF-derived metadata.
-func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.Asset, reader io.Reader, videoInfo *VideoInfo) error {
+func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.Asset, fileSize int64, reader io.Reader, videoInfo *VideoInfo) error {
 	config := &exif.Config{
 		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
 		MaxFileSize:  20 * 1024 * 1024 * 1024, // 20GB
@@ -51,7 +51,7 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 		Reader:    reader,
 		AssetType: dbtypes.AssetTypeVideo,
 		Filename:  asset.OriginalFilename,
-		Size:      asset.FileSize,
+		Size:      fileSize,
 	}
 
 	result, err := extractor.ExtractFromStream(ctx, req)

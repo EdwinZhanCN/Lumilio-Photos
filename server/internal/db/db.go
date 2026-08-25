@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"server/config"
+	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 	"server/internal/db/vec1ext"
 	"server/platform/fsprivacy"
@@ -24,23 +25,45 @@ import (
 )
 
 const (
-	applicationID    = 0x4c554d49 // "LUMI"
-	fileMode         = 0o600
-	directoryMode    = 0o700
-	sqliteDriverName = "lumilio_sqlite3"
+	applicationID = 0x4c554d49 // "LUMI"
+	fileMode      = 0o600
+	directoryMode = 0o700
 )
 
-var (
-	registerVec1Extension sync.Once
-	registerSQLiteDriver  sync.Once
-)
+var registerVec1Extension sync.Once
 
-// DB is the single SQLite runtime boundary used by application queries, River,
-// and short application transactions.
+const sqliteWriteTransactionBudget = 25 * time.Millisecond
+
+// DB owns the SQLite catalog's explicit connection roles. SQL is the sole
+// writer pool shared by application writes and River. ReaderSQL is a bounded,
+// query-only WAL pool for foreground reads and controller snapshots.
 type DB struct {
-	SQL     *sql.DB
-	Queries *repo.Queries
-	Path    string
+	SQL           *sql.DB
+	Queries       *repo.Queries
+	ReaderSQL     *sql.DB
+	ReaderQueries *repo.Queries
+	Writer        *catalogtx.Writer
+	Reader        *catalogtx.Reader
+	Path          string
+
+	transactionRecorder *catalogtx.Recorder
+}
+
+type openOptions struct {
+	transactionObserver catalogtx.Observer
+}
+
+// OpenOption customizes internal catalog diagnostics without changing the
+// schema-versioned runtime manifest.
+type OpenOption func(*openOptions)
+
+// WithTransactionObserver adds a process-local observer to the always-on,
+// bounded HDR recorder. It is intended for tests and host-side harness wiring;
+// it does not publish an HTTP debug surface.
+func WithTransactionObserver(observer catalogtx.Observer) OpenOption {
+	return func(options *openOptions) {
+		options.transactionObserver = observer
+	}
 }
 
 // CatalogInfo is the independently verified identity and schema state of a
@@ -57,10 +80,40 @@ type CatalogInfo struct {
 	ForeignKeyViolationCount int
 }
 
+// CheckpointResult describes one explicit PASSIVE WAL checkpoint. PASSIVE is
+// intentionally non-blocking with respect to active readers; a later pass can
+// finish pages pinned by an older read snapshot.
+type CheckpointResult struct {
+	Busy         int
+	LogPages     int
+	Checkpointed int
+	Duration     time.Duration
+}
+
+// WALState is a cheap filesystem observation used to avoid repeating a
+// completed PASSIVE checkpoint merely because SQLite retained the allocated
+// WAL file for reuse.
+type WALState struct {
+	SizeBytes  int64
+	ModifiedAt time.Time
+}
+
 // Open creates or opens the configured library catalog and applies the fixed
 // policy to every physical connection. DSN parameters own pragmas supported by
 // go-sqlite3; the driver hook owns the remaining connection-local settings.
-func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
+func Open(ctx context.Context, cfg config.DatabaseConfig, suppliedOptions ...OpenOption) (*DB, error) {
+	options := openOptions{}
+	for _, option := range suppliedOptions {
+		if option != nil {
+			option(&options)
+		}
+	}
+	transactionRecorder := catalogtx.NewRecorder()
+	transactionObserver := catalogtx.JoinObservers(
+		transactionRecorder,
+		options.transactionObserver,
+		catalogLogObserver{},
+	)
 	path, err := normalizePath(cfg.Path)
 	if err != nil {
 		return nil, err
@@ -70,23 +123,16 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	}
 
 	registerVec1Extension.Do(vec1ext.Auto)
-	registerSQLiteDriver.Do(func() {
-		sql.Register(sqliteDriverName, &sqlite3.SQLiteDriver{
-			ConnectHook: configureSQLiteConnection,
-		})
-	})
+	sqliteDriver := &sqlite3.SQLiteDriver{ConnectHook: configureSQLiteConnection}
 
-	query := url.Values{
+	writerQuery := url.Values{
 		"_busy_timeout": {"5000"},
 		"_foreign_keys": {"on"},
 		"_journal_mode": {"WAL"},
 		"_synchronous":  {"NORMAL"},
 	}
-	dsn := sqliteuri.DSN(path, query)
-	database, err := sql.Open(sqliteDriverName, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open SQLite catalog %s: %w", safeLocation(path), err)
-	}
+	writerDSN := sqliteuri.DSN(path, writerQuery)
+	database := sql.OpenDB(catalogtx.NewConnector(sqliteDriver, writerDSN, catalogtx.RoleWriter, transactionObserver))
 	database.SetMaxOpenConns(1)
 	database.SetMaxIdleConns(1)
 	database.SetConnMaxLifetime(0)
@@ -115,46 +161,215 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 		return closeOnError("secure", err)
 	}
 
+	readerQuery := url.Values{
+		"mode":          {"ro"},
+		"_busy_timeout": {"5000"},
+		"_foreign_keys": {"on"},
+		"_query_only":   {"on"},
+		"_synchronous":  {"NORMAL"},
+	}
+	reader := sql.OpenDB(catalogtx.NewConnector(
+		sqliteDriver,
+		sqliteuri.DSN(path, readerQuery),
+		catalogtx.RoleReader,
+		transactionObserver,
+	))
+	reader.SetMaxOpenConns(4)
+	reader.SetMaxIdleConns(4)
+	reader.SetConnMaxLifetime(0)
+	reader.SetConnMaxIdleTime(0)
+	closeBothOnError := func(operation string, cause error) (*DB, error) {
+		_ = reader.Close()
+		return closeOnError(operation, cause)
+	}
+	if err := reader.PingContext(ctx); err != nil {
+		return closeBothOnError("open query-only reader for", err)
+	}
+	if err := verifyReaderPragmas(ctx, reader); err != nil {
+		return closeBothOnError("verify query-only reader policy for", err)
+	}
+
 	var sqliteVersion, vec1Info string
 	if err := database.QueryRowContext(ctx, "SELECT sqlite_version(), vec1_info()").Scan(&sqliteVersion, &vec1Info); err != nil {
-		return closeOnError("probe versions for", err)
+		return closeBothOnError("probe versions for", err)
 	}
 	if _, err := parseVec1Version(vec1Info); err != nil {
-		return closeOnError("probe Vec1 version for", err)
+		return closeBothOnError("probe Vec1 version for", err)
 	}
 	log.Printf(
-		"SQLite catalog opened: location=%s sqlite=%s vec1=%s writer_connections=1",
+		"SQLite catalog opened: location=%s sqlite=%s vec1=%s writer_connections=1 reader_connections=4",
 		safeLocation(path),
 		sqliteVersion,
 		vec1Info,
 	)
+	writerCapability := catalogtx.NewWriter(database, transactionObserver)
+	readerCapability := catalogtx.NewReader(reader, transactionObserver)
 
 	return &DB{
-		SQL:     database,
-		Queries: repo.New(database),
-		Path:    path,
+		SQL:           database,
+		Queries:       repo.New(newQueryRouter(database, reader, writerCapability, readerCapability)),
+		ReaderSQL:     reader,
+		ReaderQueries: repo.New(reader),
+		Writer:        writerCapability,
+		Reader:        readerCapability,
+		Path:          path,
+
+		transactionRecorder: transactionRecorder,
 	}, nil
 }
 
-// WithTx runs fn in a short write transaction shared by application queries
-// and River InsertTx calls.
-func (d *DB) WithTx(ctx context.Context, fn func(*sql.Tx, *repo.Queries) error) error {
-	started := time.Now()
-	tx, err := d.SQL.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin SQLite transaction: %w", err)
+// WithTx runs fn in one named, measured write transaction shared by
+// application queries and River InsertTx calls.
+func (d *DB) WithTx(
+	ctx context.Context,
+	operation catalogtx.Operation,
+	fn func(*sql.Tx, *repo.Queries) error,
+) error {
+	if d == nil || d.Writer == nil {
+		return catalogtx.ErrNilPool
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	return d.Writer.Transact(ctx, operation, nil, func(tx *sql.Tx) error {
+		return fn(tx, d.Queries.WithTx(tx))
+	})
+}
 
-	if err := fn(tx, d.Queries.WithTx(tx)); err != nil {
-		return err
+// TransactionReport returns a bounded in-memory HDR summary. It contains only
+// compile-time operation names and durations, never entity identifiers.
+func (d *DB) TransactionReport() catalogtx.Report {
+	if d == nil || d.transactionRecorder == nil {
+		return catalogtx.Report{}
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit SQLite transaction after %s: %w", time.Since(started), err)
+	return d.transactionRecorder.Report()
+}
+
+// TransactionIntervalReport atomically rotates an exact mergeable HDR
+// interval while preserving TransactionReport's process-lifetime totals.
+func (d *DB) TransactionIntervalReport() (catalogtx.Report, error) {
+	if d == nil || d.transactionRecorder == nil {
+		return catalogtx.Report{}, nil
 	}
-	return nil
+	return d.transactionRecorder.IntervalReport()
+}
+
+func logSlowCatalogTransaction(sample catalogtx.TransactionSample) {
+	hold := sample.Total - sample.Admission
+	if sample.Role != catalogtx.RoleWriter || hold <= sqliteWriteTransactionBudget {
+		return
+	}
+	log.Printf(
+		"SQLite write transaction exceeded hold budget: operation=%s admission=%s hold=%s body=%s commit=%s total=%s outcome=%s cancellation=%s budget=%s",
+		sample.OperationName,
+		sample.Admission,
+		hold,
+		sample.Body,
+		sample.Commit,
+		sample.Total,
+		sample.Outcome,
+		sample.Cancellation,
+		sqliteWriteTransactionBudget,
+	)
+}
+
+type catalogLogObserver struct{}
+
+func (catalogLogObserver) ObserveTransaction(sample catalogtx.TransactionSample) {
+	logSlowCatalogTransaction(sample)
+}
+
+func (catalogLogObserver) ObserveStatement(sample catalogtx.StatementSample) {
+	hold := sample.Total - sample.Admission
+	if sample.Outcome == catalogtx.StatementOutcomeFailed {
+		log.Printf(
+			"SQLite statement failed: operation=%s query_name=%s query_fingerprint=%s role=%s admission=%s hold=%s total=%s cancellation=%s",
+			sample.OperationName,
+			sample.QueryName,
+			sample.QueryFingerprint,
+			sample.Role,
+			sample.Admission,
+			hold,
+			sample.Total,
+			sample.Cancellation,
+		)
+	}
+	if sample.Role != catalogtx.RoleWriter || hold <= sqliteWriteTransactionBudget {
+		return
+	}
+	log.Printf(
+		"SQLite writer statement exceeded hold budget: operation=%s admission=%s hold=%s execution=%s rows_lifetime=%s total=%s outcome=%s cancellation=%s budget=%s",
+		sample.OperationName,
+		sample.Admission,
+		hold,
+		sample.Execution,
+		sample.RowsLifetime,
+		sample.Total,
+		sample.Outcome,
+		sample.Cancellation,
+		sqliteWriteTransactionBudget,
+	)
+}
+
+func (catalogLogObserver) ObserveRows(catalogtx.RowsEvent) {}
+
+// TelemetrySnapshot aligns bounded catalog histograms with database/sql's
+// aggregate wait counters. Per-operation p99 comes from Catalog; DBStats is a
+// reconciliation signal and is never divided into a synthetic percentile.
+type TelemetrySnapshot struct {
+	ObservedAt time.Time        `json:"observed_at"`
+	Writer     sql.DBStats      `json:"writer"`
+	Reader     sql.DBStats      `json:"reader"`
+	Catalog    catalogtx.Report `json:"catalog"`
+}
+
+func (d *DB) TelemetrySnapshot() TelemetrySnapshot {
+	result := TelemetrySnapshot{ObservedAt: time.Now().UTC(), Catalog: d.TransactionReport()}
+	if d == nil {
+		return result
+	}
+	if d.SQL != nil {
+		result.Writer = d.SQL.Stats()
+	}
+	if d.ReaderSQL != nil {
+		result.Reader = d.ReaderSQL.Stats()
+	}
+	return result
+}
+
+// PassiveCheckpoint performs the runtime WAL maintenance that is deliberately
+// disabled on foreground commits. It uses the same single writer pool as all
+// other writes, so checkpoint work is serialized rather than racing a second
+// write-capable connection.
+func (d *DB) PassiveCheckpoint(ctx context.Context) (CheckpointResult, error) {
+	started := time.Now()
+	var result CheckpointResult
+	if err := d.Writer.QueryRowContext(ctx, catalogtx.OperationSQLitePassiveCheckpoint, "PRAGMA wal_checkpoint(PASSIVE)").Scan(
+		&result.Busy,
+		&result.LogPages,
+		&result.Checkpointed,
+	); err != nil {
+		return CheckpointResult{}, fmt.Errorf("passive SQLite WAL checkpoint: %w", err)
+	}
+	result.Duration = time.Since(started)
+	return result, nil
+}
+
+// InspectWAL returns the currently allocated live WAL file version. A missing
+// WAL means the catalog has no accumulated frames and is reported as zero.
+func (d *DB) InspectWAL() (WALState, error) {
+	info, err := os.Stat(d.Path + "-wal")
+	if errors.Is(err, os.ErrNotExist) {
+		return WALState{}, nil
+	}
+	if err != nil {
+		return WALState{}, fmt.Errorf("inspect SQLite WAL: %w", err)
+	}
+	return WALState{SizeBytes: info.Size(), ModifiedAt: info.ModTime()}, nil
+}
+
+// WALSize returns the allocated WAL bytes for callers that do not need its
+// file version.
+func (d *DB) WALSize() (int64, error) {
+	state, err := d.InspectWAL()
+	return state.SizeBytes, err
 }
 
 // Check validates the live catalog after migrations or before a destructive
@@ -272,19 +487,24 @@ func parseVec1Version(info string) (string, error) {
 	return version, nil
 }
 
-// Close performs bounded maintenance after HTTP and River have drained, then
-// closes the sole connection.
+// Close releases readers before bounded writer maintenance so no lingering
+// read snapshot can hold WAL checkpoint progress.
 func (d *DB) Close(ctx context.Context) error {
 	if d == nil || d.SQL == nil {
 		return nil
 	}
 
 	var maintenanceErr error
-	if _, err := d.SQL.ExecContext(ctx, "PRAGMA optimize"); err != nil {
+	if d.ReaderSQL != nil {
+		if err := d.ReaderSQL.Close(); err != nil {
+			maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf("close SQLite reader pool: %w", err))
+		}
+	}
+	if _, err := d.Writer.ExecContext(ctx, catalogtx.OperationSQLiteOptimize, "PRAGMA optimize"); err != nil {
 		maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf("optimize SQLite catalog: %w", err))
 	}
 	var busy, logPages, checkpointed int
-	if err := d.SQL.QueryRowContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logPages, &checkpointed); err != nil {
+	if err := d.Writer.QueryRowContext(ctx, catalogtx.OperationSQLiteTruncateCheckpoint, "PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logPages, &checkpointed); err != nil {
 		maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf("checkpoint SQLite catalog: %w", err))
 	} else if busy != 0 {
 		maintenanceErr = errors.Join(maintenanceErr, fmt.Errorf(
@@ -300,6 +520,14 @@ func (d *DB) Close(ctx context.Context) error {
 		log.Printf("SQLite catalog closed: location=%s", safeLocation(d.Path))
 	}
 	return maintenanceErr
+}
+
+// SQLiteDriverConnection unwraps catalog observation and returns the native
+// connection required by SQLite-specific APIs such as Online Backup and
+// sqlite3_stmt_readonly.
+func SQLiteDriverConnection(connection any) (*sqlite3.SQLiteConn, bool) {
+	native, ok := catalogtx.UnwrapDriverConnection(connection).(*sqlite3.SQLiteConn)
+	return native, ok
 }
 
 func normalizePath(value string) (string, error) {
@@ -353,7 +581,10 @@ func ensurePrivateParent(path string) error {
 func configureSQLiteConnection(connection *sqlite3.SQLiteConn) error {
 	statements := []string{
 		"PRAGMA temp_store = MEMORY",
-		"PRAGMA wal_autocheckpoint = 1000",
+		// Runtime maintenance owns checkpoint timing. SQLite's default
+		// auto-checkpoint otherwise charges an arbitrary foreground commit
+		// for all checkpoint work when it crosses the page threshold.
+		"PRAGMA wal_autocheckpoint = 0",
 	}
 	for _, statement := range statements {
 		if _, err := connection.Exec(statement, nil); err != nil {
@@ -380,7 +611,7 @@ func verifyPragmas(ctx context.Context, database *sql.DB) error {
 		{name: "synchronous", want: 1},
 		{name: "busy_timeout", want: 5000},
 		{name: "temp_store", want: 2},
-		{name: "wal_autocheckpoint", want: 1000},
+		{name: "wal_autocheckpoint", want: 0},
 	}
 	for _, check := range checks {
 		var got int
@@ -390,6 +621,20 @@ func verifyPragmas(ctx context.Context, database *sql.DB) error {
 		if got != check.want {
 			return fmt.Errorf("PRAGMA %s = %d, want %d", check.name, got, check.want)
 		}
+	}
+	return nil
+}
+
+func verifyReaderPragmas(ctx context.Context, database *sql.DB) error {
+	if err := verifyPragmas(ctx, database); err != nil {
+		return err
+	}
+	var queryOnly int
+	if err := database.QueryRowContext(ctx, "PRAGMA query_only").Scan(&queryOnly); err != nil {
+		return fmt.Errorf("read query_only: %w", err)
+	}
+	if queryOnly != 1 {
+		return fmt.Errorf("PRAGMA query_only = %d, want 1", queryOnly)
 	}
 	return nil
 }

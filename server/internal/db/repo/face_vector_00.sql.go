@@ -10,13 +10,17 @@ import (
 )
 
 const getUnclusteredFacesInScope = `-- name: GetUnclusteredFacesInScope :many
-SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at
+SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
 WHERE fcm.face_id IS NULL
   AND COALESCE(a.is_deleted, false) = false
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   AND COALESCE(a.owner_id, -1) = COALESCE(?2, -1)
   AND COALESCE(fi.embedding_model, '') = COALESCE(?3, '')
   AND fi.embedding IS NOT NULL
@@ -67,6 +71,7 @@ func (q *Queries) GetUnclusteredFacesInScope(ctx context.Context, arg GetUnclust
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}

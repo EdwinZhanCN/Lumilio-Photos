@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 	"server/internal/llm"
 	"server/internal/queue/jobs"
@@ -31,8 +32,9 @@ type RiverJobInserter interface {
 }
 
 type SettingsRuntime struct {
-	DB    *sql.DB
-	Queue RiverJobInserter
+	DB     *sql.DB
+	Writer *catalogtx.Writer
+	Queue  RiverJobInserter
 }
 
 type SystemSettings struct {
@@ -158,6 +160,7 @@ type SettingsService interface {
 type settingsService struct {
 	queries          *repo.Queries
 	db               *sql.DB
+	writer           *catalogtx.Writer
 	queue            RiverJobInserter
 	secretPath       string
 	defaults         settings.Settings
@@ -177,6 +180,7 @@ func NewSettingsServiceWithRuntime(queries *repo.Queries, defaults settings.Sett
 	return &settingsService{
 		queries:    queries,
 		db:         runtime.DB,
+		writer:     runtime.Writer,
 		queue:      runtime.Queue,
 		secretPath: strings.TrimSpace(secretKeyPath),
 		defaults:   defaults,
@@ -459,12 +463,12 @@ func (s *settingsService) updateGeocodingSettings(
 		return SystemSettings{}, errors.New("geocoding settings runtime dependencies are not configured")
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationSettingsGeocodingUpdate, nil)
 	if err != nil {
 		return SystemSettings{}, fmt.Errorf("begin geocoding settings update: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 
 	updated, err := qtx.UpsertSettings(ctx, params)
 	if err != nil {
@@ -493,7 +497,7 @@ func (s *settingsService) updateGeocodingSettings(
 	if candidateEnabled {
 		args := jobs.ResolveLocationClustersArgs{GeocodingRevision: params.GeocodingRevision}
 		opts := args.InsertOpts()
-		if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
+		if _, err := s.queue.InsertTx(ctx, tx.Raw(), args, &opts); err != nil {
 			return SystemSettings{}, fmt.Errorf("enqueue location cluster resolution: %w", err)
 		}
 	}

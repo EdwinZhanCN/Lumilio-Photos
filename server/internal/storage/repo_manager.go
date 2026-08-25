@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/logging"
@@ -112,8 +113,8 @@ type RepositoryManager interface {
 	ReconcileRepositoryRoots(ctx context.Context) error
 
 	// RelocateRepository points an existing repository at a new on-disk
-	// location. Assets are untouched because assets.storage_path is
-	// repository-relative.
+	// location. Assets and Locations are untouched because repository node paths
+	// are relative graph projections.
 	RelocateRepository(ctx context.Context, id string, newPath string, request ...LifecycleRequest) (*repo.Repository, error)
 
 	// RegisterRepositoryCopy registers a duplicated repository directory as an
@@ -192,7 +193,10 @@ type RepositoryManager interface {
 // DefaultRepositoryManager implements the RepositoryManager interface
 type DefaultRepositoryManager struct {
 	database                   *sql.DB
+	writer                     *catalogtx.Writer
+	readerDatabase             *sql.DB
 	queries                    *repo.Queries
+	readerQueries              *repo.Queries
 	dirManager                 DirectoryManager
 	files                      *RepositoryFSFactory
 	logger                     *zap.Logger
@@ -226,6 +230,29 @@ func NewRepositoryManager(
 	auditProvider logging.RepositoryAuditProvider,
 	files *RepositoryFSFactory,
 ) (*DefaultRepositoryManager, error) {
+	return NewRepositoryManagerWithReader(database, database, queries, logger, auditProvider, files)
+}
+
+func NewRepositoryManagerWithReader(
+	database *sql.DB,
+	readerDatabase *sql.DB,
+	queries *repo.Queries,
+	logger *zap.Logger,
+	auditProvider logging.RepositoryAuditProvider,
+	files *RepositoryFSFactory,
+) (*DefaultRepositoryManager, error) {
+	return NewRepositoryManagerWithCatalog(database, catalogtx.NewWriter(database, nil), readerDatabase, queries, logger, auditProvider, files)
+}
+
+func NewRepositoryManagerWithCatalog(
+	database *sql.DB,
+	writer *catalogtx.Writer,
+	readerDatabase *sql.DB,
+	queries *repo.Queries,
+	logger *zap.Logger,
+	auditProvider logging.RepositoryAuditProvider,
+	files *RepositoryFSFactory,
+) (*DefaultRepositoryManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -233,13 +260,20 @@ func NewRepositoryManager(
 		files = NewRepositoryFSFactory(nil, queries)
 	}
 
+	readerQueries := queries
+	if readerDatabase != nil {
+		readerQueries = repo.New(readerDatabase)
+	}
 	rm := &DefaultRepositoryManager{
-		database:      database,
-		queries:       queries,
-		dirManager:    NewDirectoryManager(),
-		files:         files,
-		logger:        logger.With(zap.String("component", "repository")),
-		auditProvider: auditProvider,
+		database:       database,
+		writer:         writer,
+		readerDatabase: readerDatabase,
+		queries:        queries,
+		readerQueries:  readerQueries,
+		dirManager:     NewDirectoryManager(),
+		files:          files,
+		logger:         logger.With(zap.String("component", "repository")),
+		auditProvider:  auditProvider,
 	}
 	return rm, nil
 }
@@ -788,35 +822,57 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 	impact := RepositoryRemovalImpact{
 		RepositoryID: existing.RepoID.String(), RepositoryName: existing.Name,
 	}
-	if err := rm.database.QueryRowContext(ctx, `
+	if err := rm.readerDatabase.QueryRowContext(ctx, `
+		WITH repository_assets AS (
+			SELECT occurrence.asset_id, max(occurrence.file_size) AS file_size
+			FROM active_asset_occurrences occurrence
+			WHERE occurrence.repository_id = ?
+			GROUP BY occurrence.asset_id
+		)
 		SELECT count(*), coalesce(sum(file_size), 0)
-		FROM assets WHERE repository_id = ?
+		FROM repository_assets
 	`, repoUUID).Scan(&impact.AssetCount, &impact.CatalogMediaBytes); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository assets: %w", err)
 	}
-	if err := rm.database.QueryRowContext(ctx, `
+	if err := rm.readerDatabase.QueryRowContext(ctx, `
 		SELECT count(DISTINCT album_assets.album_id)
 		FROM album_assets
-		JOIN assets ON assets.asset_id = album_assets.asset_id
-		WHERE assets.repository_id = ?
+		JOIN active_asset_occurrences occurrence
+		  ON occurrence.asset_id = album_assets.asset_id
+		WHERE occurrence.repository_id = ?
 	`, repoUUID).Scan(&impact.AlbumCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count affected albums: %w", err)
 	}
-	if err := rm.database.QueryRowContext(ctx, `
+	if err := rm.readerDatabase.QueryRowContext(ctx, `
 		SELECT count(*) FROM river_job
 		WHERE (
 			json_extract(args, '$.repositoryId') = ?
 			OR EXISTS (
-				SELECT 1 FROM assets
-				WHERE assets.asset_id = json_extract(river_job.args, '$.assetId')
-				  AND assets.repository_id = ?
+				SELECT 1 FROM repository_nodes node
+				WHERE node.node_id = json_extract(river_job.args, '$.nodeId')
+				  AND node.repository_id = ?
+			)
+			OR EXISTS (
+				SELECT 1 FROM repository_staging_commits staging
+				WHERE staging.commit_id = json_extract(river_job.args, '$.commitId')
+				  AND staging.repository_id = ?
+			)
+			OR EXISTS (
+				SELECT 1 FROM active_asset_occurrences target
+				WHERE target.asset_id = json_extract(river_job.args, '$.assetId')
+				  AND target.repository_id = ?
+				  AND NOT EXISTS (
+					SELECT 1 FROM active_asset_occurrences survivor
+					WHERE survivor.asset_id = target.asset_id
+					  AND survivor.repository_id <> ?
+				  )
 			)
 		)
 		  AND state IN ('available', 'scheduled', 'retryable', 'pending', 'running')
-	`, repoUUID.String(), repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
+	`, repoUUID.String(), repoUUID, repoUUID, repoUUID, repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository tasks: %w", err)
 	}
-	if err := rm.database.QueryRowContext(ctx, `
+	if err := rm.readerDatabase.QueryRowContext(ctx, `
 		SELECT count(*) FROM cloud_import_runs WHERE repository_id = ?
 	`, repoUUID).Scan(&impact.CloudImportCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository cloud import receipts: %w", err)
@@ -866,7 +922,7 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		return err
 	}
 	var runningOperations int
-	if err := rm.database.QueryRowContext(ctx, `
+	if err := rm.readerDatabase.QueryRowContext(ctx, `
 		SELECT count(*) FROM lifecycle_operations
 		WHERE target_type = 'repository' AND target_id = ? AND status = 'running'
 	`, repoUUID.String()).Scan(&runningOperations); err != nil {
@@ -897,23 +953,38 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		rm.beforeRepositoryJobCleanup()
 	}
 
-	tx, err := rm.database.BeginTx(ctx, nil)
+	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRemove, nil)
 	if err != nil {
 		return fmt.Errorf("begin repository removal: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	queries := rm.queries.WithTx(tx)
+	queries := rm.queries.WithTx(tx.Raw())
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM river_job
 		WHERE (
 			json_extract(args, '$.repositoryId') = ?
 			OR EXISTS (
-				SELECT 1 FROM assets
-				WHERE assets.asset_id = json_extract(river_job.args, '$.assetId')
-				  AND assets.repository_id = ?
+				SELECT 1 FROM repository_nodes node
+				WHERE node.node_id = json_extract(river_job.args, '$.nodeId')
+				  AND node.repository_id = ?
+			)
+			OR EXISTS (
+				SELECT 1 FROM repository_staging_commits staging
+				WHERE staging.commit_id = json_extract(river_job.args, '$.commitId')
+				  AND staging.repository_id = ?
+			)
+			OR EXISTS (
+				SELECT 1 FROM active_asset_occurrences target
+				WHERE target.asset_id = json_extract(river_job.args, '$.assetId')
+				  AND target.repository_id = ?
+				  AND NOT EXISTS (
+					SELECT 1 FROM active_asset_occurrences survivor
+					WHERE survivor.asset_id = target.asset_id
+					  AND survivor.repository_id <> ?
+				  )
 			)
 		) AND state <> 'running'
-	`, repoUUID.String(), repoUUID); err != nil {
+	`, repoUUID.String(), repoUUID, repoUUID, repoUUID, repoUUID); err != nil {
 		return fmt.Errorf("remove queued repository jobs: %w", err)
 	}
 	// The maintenance row blocks all repository-aware enqueuers. Delete queued
@@ -926,12 +997,27 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		WHERE (
 			json_extract(args, '$.repositoryId') = ?
 			OR EXISTS (
-				SELECT 1 FROM assets
-				WHERE assets.asset_id = json_extract(river_job.args, '$.assetId')
-				  AND assets.repository_id = ?
+				SELECT 1 FROM repository_nodes node
+				WHERE node.node_id = json_extract(river_job.args, '$.nodeId')
+				  AND node.repository_id = ?
+			)
+			OR EXISTS (
+				SELECT 1 FROM repository_staging_commits staging
+				WHERE staging.commit_id = json_extract(river_job.args, '$.commitId')
+				  AND staging.repository_id = ?
+			)
+			OR EXISTS (
+				SELECT 1 FROM active_asset_occurrences target
+				WHERE target.asset_id = json_extract(river_job.args, '$.assetId')
+				  AND target.repository_id = ?
+				  AND NOT EXISTS (
+					SELECT 1 FROM active_asset_occurrences survivor
+					WHERE survivor.asset_id = target.asset_id
+					  AND survivor.repository_id <> ?
+				  )
 			)
 		) AND state = 'running'
-	`, repoUUID.String(), repoUUID).Scan(&runningJobs); err != nil {
+	`, repoUUID.String(), repoUUID, repoUUID, repoUUID, repoUUID).Scan(&runningJobs); err != nil {
 		return fmt.Errorf("inspect running repository jobs: %w", err)
 	}
 	if runningJobs != 0 {
@@ -941,21 +1027,110 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		DELETE FROM share_links
 		WHERE EXISTS (
 			SELECT 1 FROM json_each(share_links.asset_ids) selected
-			JOIN assets ON assets.asset_id = selected.value
-			WHERE assets.repository_id = ?
+			JOIN active_asset_occurrences target ON target.asset_id = selected.value
+			WHERE target.repository_id = ?
+			  AND NOT EXISTS (
+				SELECT 1 FROM active_asset_occurrences survivor
+				WHERE survivor.asset_id = target.asset_id
+				  AND survivor.repository_id <> ?
+			  )
 		)
-	`, repoUUID); err != nil {
+	`, repoUUID, repoUUID); err != nil {
 		return fmt.Errorf("remove repository share links: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM agent_pins
 		WHERE EXISTS (
 			SELECT 1 FROM json_each(agent_pins.asset_ids) selected
-			JOIN assets ON assets.asset_id = selected.value
-			WHERE assets.repository_id = ?
+			JOIN active_asset_occurrences target ON target.asset_id = selected.value
+			WHERE target.repository_id = ?
+			  AND NOT EXISTS (
+				SELECT 1 FROM active_asset_occurrences survivor
+				WHERE survivor.asset_id = target.asset_id
+				  AND survivor.repository_id <> ?
+			  )
 		)
-	`, repoUUID); err != nil {
+	`, repoUUID, repoUUID); err != nil {
 		return fmt.Errorf("remove repository agent pins: %w", err)
+	}
+	// Logical media and stacks are projections of Assets, not repository-owned
+	// filesystem entries. Rehome them before deleting the repository whenever a
+	// member still has an active Location elsewhere; otherwise the repository
+	// foreign-key cascade would discard a valid exact-copy projection.
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE media_items AS item
+		SET repository_id = (
+			SELECT occurrence.repository_id
+			FROM active_asset_occurrences occurrence
+			WHERE occurrence.repository_id <> ?
+			  AND (
+				occurrence.asset_id = item.primary_asset_id
+				OR EXISTS (
+					SELECT 1 FROM media_item_assets member
+					WHERE member.media_item_id = item.media_item_id
+					  AND member.asset_id = occurrence.asset_id
+				)
+			  )
+			ORDER BY occurrence.repository_id
+			LIMIT 1
+		)
+		WHERE item.repository_id = ?
+		  AND EXISTS (
+			SELECT 1 FROM active_asset_occurrences occurrence
+			WHERE occurrence.repository_id <> ?
+			  AND (
+				occurrence.asset_id = item.primary_asset_id
+				OR EXISTS (
+					SELECT 1 FROM media_item_assets member
+					WHERE member.media_item_id = item.media_item_id
+					  AND member.asset_id = occurrence.asset_id
+				)
+			  )
+		  )
+	`, repoUUID, repoUUID, repoUUID); err != nil {
+		return fmt.Errorf("rehome repository media items: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE asset_stacks AS stack
+		SET repository_id = (
+			SELECT item.repository_id
+			FROM asset_stack_members member
+			JOIN media_items item ON item.media_item_id = member.media_item_id
+			WHERE member.stack_id = stack.stack_id
+			  AND item.repository_id IS NOT NULL
+			  AND item.repository_id <> ?
+			ORDER BY item.repository_id
+			LIMIT 1
+		)
+		WHERE stack.repository_id = ?
+		  AND EXISTS (
+			SELECT 1
+			FROM asset_stack_members member
+			JOIN media_items item ON item.media_item_id = member.media_item_id
+			WHERE member.stack_id = stack.stack_id
+			  AND item.repository_id IS NOT NULL
+			  AND item.repository_id <> ?
+		  )
+	`, repoUUID, repoUUID, repoUUID); err != nil {
+		return fmt.Errorf("rehome repository asset stacks: %w", err)
+	}
+	// Repository removal is the explicit catalog-GC boundary. Delete an Asset
+	// only when every active physical occurrence belongs to this repository.
+	// Assets with an exact-copy Location elsewhere survive the node cascade.
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM assets
+		WHERE EXISTS (
+			SELECT 1 FROM active_asset_occurrences target
+			WHERE target.asset_id = assets.asset_id
+			  AND target.repository_id = ?
+		)
+		  AND NOT EXISTS (
+			SELECT 1 FROM active_asset_occurrences survivor
+			WHERE survivor.asset_id = assets.asset_id
+			  AND survivor.repository_id <> ?
+		  )
+	`, repoUUID, repoUUID); err != nil {
+		return fmt.Errorf("garbage-collect repository assets: %w", err)
 	}
 	if err := queries.DeleteRepository(ctx, repoUUID); err != nil {
 		return fmt.Errorf("delete repository catalog: %w", err)
@@ -1009,9 +1184,16 @@ func directoryTreeSize(root string) (int64, error) {
 	return total, err
 }
 
-// BeginRepositoryWork establishes both the in-process mutation lease and the
-// persistent activity gate used by lifecycle maintenance. Callers must invoke
-// the returned release function after their write or queue-enqueue section.
+// BeginRepositoryWork establishes the parent identity lease and persistent
+// activity gate used by lifecycle maintenance. Its callers publish only
+// catalog/queue intent, so they deliberately do not take the repository's
+// filesystem mutation lease: waiting for active media readers would put an
+// unbounded filesystem operation on a synchronous request path. The activity
+// compare-and-swap serializes enqueue with repository removal, and the worker
+// resolves the current Location again before execution.
+//
+// Callers must invoke the returned release function after their catalog write
+// or queue-enqueue section.
 func (rm *DefaultRepositoryManager) BeginRepositoryWork(ctx context.Context, id string, activity dbtypes.RepositoryActivity) (*repo.Repository, func() error, error) {
 	repositoryID, err := uuid.Parse(strings.TrimSpace(id))
 	if err != nil {
@@ -1026,13 +1208,7 @@ func (rm *DefaultRepositoryManager) BeginRepositoryWork(ctx context.Context, id 
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
 	}
-	releaseRepository, err := coordinator.AcquireMutationsContext(ctx, []uuid.UUID{repositoryID})
-	if err != nil {
-		releaseRoot()
-		return nil, nil, fmt.Errorf("%w: repository is busy: %v", ErrRepositoryBusy, err)
-	}
 	fail := func(cause error) (*repo.Repository, func() error, error) {
-		releaseRepository()
 		releaseRoot()
 		return nil, nil, cause
 	}
@@ -1061,7 +1237,6 @@ func (rm *DefaultRepositoryManager) BeginRepositoryWork(ctx context.Context, id 
 		_, finishErr := rm.queries.FinishRepositoryActivity(context.Background(), repo.FinishRepositoryActivityParams{
 			RepoID: repositoryID, Activity: activity, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 		})
-		releaseRepository()
 		releaseRoot()
 		return finishErr
 	}
