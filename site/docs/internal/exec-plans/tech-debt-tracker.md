@@ -9,17 +9,10 @@ Last aligned with the codebase: 2026-08-25.
 ## Product paths
 
 - **No platform p99 certification for the SQLite runtime.**
-  Owner: a future release/performance certification on a pinned Linux host;
-  the pressure harness was removed at close-out, so
-  `server/tools/sqlitepressure` and the Compose overrides must be rebuilt
-  first (see `.agents/decisions/2026-08-25-sqlite-write-concurrency.md`).
+  Owner: a future release/performance certification on a pinned Linux host.
   The write-concurrency implementation has deterministic coverage and the
-  full Server gate, but steady-state p99 was never certified on any platform:
-  the one current-image qualification recorded eight background writer-hold
-  p99 violations and one initialization maximum above target, and its retry
-  was invalidated by host/OrbStack CPU interference. Until a clean
-  qualification passes, release notes must not claim p99 latency targets for
-  the catalog runtime.
+  full Server gate, but steady-state p99 was never certified on any platform,
+  so release notes must not claim p99 latency targets for the catalog runtime.
 
 - **AgentBoard has no mobile column reflow.** Owner:
   `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one
