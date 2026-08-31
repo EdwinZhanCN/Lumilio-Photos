@@ -31,7 +31,7 @@ notes: [vite-plus.md](vite-plus.md).
 
 Every user-facing string goes through the i18n layer. Translation JSON is
 never hand-edited beyond filling values the extractor created. Procedure:
-[lumilio-frontend-i18n](../../../.agents/skills/lumilio-frontend-i18n/SKILL.md).
+[lumilio-frontend-i18n](../.agents/skills/lumilio-frontend-i18n/SKILL.md).
 
 ## Source Layout
 
@@ -66,7 +66,7 @@ Feature roots use one optional vocabulary:
 - `utils/`: legacy/general pure helpers without domain vocabulary; prefer `model/` or a named lower-layer `lib/` owner for new code.
 - `doc.ts`: the feature architecture source; generated `doc.md` stays beside it
   at the feature root. Authoring:
-  [lumilio-feature-doc](../../../.agents/skills/lumilio-feature-doc/SKILL.md).
+  [lumilio-feature-doc](../.agents/skills/lumilio-feature-doc/SKILL.md).
 
 Directories are optional. Do not create placeholders or alternate roots, and do
 not leave compatibility re-exports at old internal paths. Inside a feature use
@@ -86,7 +86,7 @@ OpenAPI is the source of truth for HTTP contracts.
 The checked-in fetch/query runtime comes from the official `openapi-fetch`,
 `openapi-react-query`, and `openapi-typescript-helpers` packages. Regeneration,
 cast triage, and the swag empty-object quirk:
-[lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
+[lumilio-api-contract-change](../.agents/skills/lumilio-api-contract-change/SKILL.md).
 
 All request failures remain structured until presentation.
 `src/lib/http-commons/problem.ts` consumes the generated RFC 9457 Problem and
@@ -213,14 +213,14 @@ The production web image uses Caddy:
 Decorative overlays use DOM order; component-internal overlap uses
 `isolation: isolate`; cross-component floating layers use the token scale in
 `App.css`. Application procedure:
-[lumilio-z-index](../../../.agents/skills/lumilio-z-index/SKILL.md).
+[lumilio-z-index](../.agents/skills/lumilio-z-index/SKILL.md).
 
 ## Test layers
 
 Pick the layer by what the test must exercise; the file name and directory pick
 the runner (`web/vite.config.ts` `test.projects`). Do not invent other
 conventions. Placement, GPU self-skip, and proving a guard can fail:
-[lumilio-write-a-test](../../../.agents/skills/lumilio-write-a-test/SKILL.md).
+[lumilio-write-a-test](../.agents/skills/lumilio-write-a-test/SKILL.md).
 
 | Layer | File | Runner / Vitest project | Answers |
 | --- | --- | --- | --- |
@@ -234,11 +234,11 @@ The `unit` project excludes `*.browser.test.ts` and `src/workers/**` so an
 accidental browser dependency fails instead of hiding; `integration` and
 `browser` run real Chromium via the Playwright provider. Core-browsing UI is
 assigned to Playwright by the
-[test-layer assignment decision](../../../.agents/decisions/2026-08-14-frontend-test-layer-assignment.md).
+[test-layer assignment decision](../.agents/decisions/2026-08-14-frontend-test-layer-assignment.md).
 
-Flow specs: [lumilio-integration-spec](../../../.agents/skills/lumilio-integration-spec/SKILL.md).
-Playwright specs: [lumilio-e2e-spec](../../../.agents/skills/lumilio-e2e-spec/SKILL.md).
-E2E stack: [lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md).
+Flow specs: [lumilio-integration-spec](../.agents/skills/lumilio-integration-spec/SKILL.md).
+Playwright specs: [lumilio-e2e-spec](../.agents/skills/lumilio-e2e-spec/SKILL.md).
+E2E stack: [lumilio-e2e-environment](../.agents/skills/lumilio-e2e-environment/SKILL.md).
 
 ## Quality Gate
 
@@ -250,4 +250,4 @@ That is typecheck, lint, source-boundary check, and the Vitest
 unit/integration/browser projects. Playwright slices are separate Task
 targets and need Docker; CI selects them through path filters. Map a diff to
 the narrowest evidence with
-[lumilio-select-checks](../../../.agents/skills/lumilio-select-checks/SKILL.md).
+[lumilio-select-checks](../.agents/skills/lumilio-select-checks/SKILL.md).

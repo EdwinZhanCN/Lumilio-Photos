@@ -349,6 +349,41 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	_ = opened.Close()
 }
 
+func TestRepositoryFSImmutablePrivateWriteNeverReplacesExistingContent(t *testing.T) {
+	t.Parallel()
+
+	repository := createRepositoryFSTestRoot(t)
+	repositoryFS := openRepositoryFSTestFS(t, repository)
+	destination, err := ParsePrivateRepositoryPath(".lumilio/assets/thumbnails/v1/asset_small.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory, err := ParsePrivateRepositoryPath(filepath.Dir(destination.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repositoryFS.MkdirAllPrivate(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if written, err := repositoryFS.WritePrivateFileImmutable(destination, bytes.NewReader([]byte("first")), 0o644); err != nil || written != 5 {
+		t.Fatalf("first immutable write = %d/%v", written, err)
+	}
+	if written, err := repositoryFS.WritePrivateFileImmutable(destination, bytes.NewReader([]byte("first")), 0o644); err != nil || written != 5 {
+		t.Fatalf("identical retry = %d/%v", written, err)
+	}
+	if _, err := repositoryFS.WritePrivateFileImmutable(destination, bytes.NewReader([]byte("second")), 0o644); !errors.Is(err, ErrRepositoryImmutableConflict) {
+		t.Fatalf("different retry error = %v, want immutable conflict", err)
+	}
+	contents, err := repositoryFS.ReadPrivateFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "first" {
+		t.Fatalf("immutable content = %q, want first", contents)
+	}
+}
+
 func createRepositoryFSTestRoot(t *testing.T) repo.Repository {
 	t.Helper()
 	repositoryID := uuid.New()

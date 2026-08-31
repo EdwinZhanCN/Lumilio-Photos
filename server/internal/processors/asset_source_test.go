@@ -2,6 +2,7 @@ package processors
 
 import (
 	"context"
+	"database/sql"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,8 +11,10 @@ import (
 
 	"server/config"
 	"server/internal/db"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/roe/locations"
@@ -83,7 +86,8 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repositoryPath, filepath.FromSlash(oldPath)), content, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	files := storage.NewRepositoryFSFactory(nil, catalog.Queries)
+	access := storage.NewRepositoryAccessCoordinator()
+	files := storage.NewRepositoryFSFactory(access, catalog.Queries)
 	inspect := func(relative string) storage.FileObservation {
 		t.Helper()
 		repositoryFS, err := files.Open(repository)
@@ -101,13 +105,21 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 		}
 		return observation
 	}
-	materializer := roematerializer.NewHashMaterializer(catalog, files)
+	materializer := roematerializer.NewHashApplier()
 	publish := func(eventKey, relative string, observation storage.FileObservation) roematerializer.Result {
 		t.Helper()
-		result, err := materializer.PublishKnownContent(ctx, roematerializer.KnownContent{
-			RepositoryID: repositoryID, OwnerID: owner.UserID, Source: "upload", SourceEventKey: eventKey,
-			RelativePath: relative, OriginalFilename: "queued.jpg", MimeType: "image/jpeg", AssetType: "PHOTO",
-			FullHash: *observation.ContentHash, FileSize: observation.Size, Observation: observation,
+		var result roematerializer.Result
+		err := catalog.WithTx(ctx, catalogtx.OperationRepositoryMaterializeKnownContent, func(tx *sql.Tx, queries *repo.Queries) error {
+			applied, err := materializer.ApplyKnownContent(ctx, tx, roematerializer.KnownContent{
+				RepositoryID: repositoryID, OwnerID: owner.UserID, Source: "upload", SourceEventKey: eventKey,
+				RelativePath: relative, OriginalFilename: "queued.jpg", MimeType: "image/jpeg", AssetType: "PHOTO",
+				FullHash: *observation.ContentHash, FileSize: observation.Size, Observation: observation,
+			})
+			if err != nil {
+				return err
+			}
+			result = applied
+			return service.ApplyAssetActivationTx(ctx, tx, queries, result.RepositoryID, result.NodeID, result.AssetID, result.ContentID)
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -129,12 +141,14 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 		t.Fatalf("exact location did not reuse logical asset: first=%+v second=%+v", first, second)
 	}
 
-	processor := &AssetProcessor{queries: catalog.Queries, locationResolver: locations.NewResolver(catalog, files)}
+	processor := &AssetProcessor{
+		reader:           catalog.ReaderQueries,
+		locationResolver: locations.NewResolver(catalog.ReaderQueries, catalog.ReaderSQL, files),
+	}
 	source, err := processor.resolveCurrentAssetSource(ctx, first.AssetID, first.ContentID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer source.Close()
 	if source.path.String() != newPath || source.observation.ObservationToken != newObservation.ObservationToken {
 		t.Fatalf("resolved source = %s/%s, want %s/%s", source.path.String(), source.observation.ObservationToken, newPath, newObservation.ObservationToken)
 	}
@@ -150,4 +164,21 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 	if string(got) != string(content) {
 		t.Fatalf("resolved media = %q, want %q", got, content)
 	}
+	if err := source.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	work, err := processor.LoadThumbnailTask(ctx, ThumbnailArgs{
+		AssetID: first.AssetID, ExpectedContentID: first.ContentID, PipelineVersion: "lease-boundary-v1",
+	})
+	if err != nil || work == nil {
+		t.Fatalf("load thumbnail task: work=%v err=%v", work, err)
+	}
+	mutationCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	releaseMutation, err := access.AcquireMutationsContext(mutationCtx, []uuid.UUID{repositoryID})
+	if err != nil {
+		t.Fatalf("thumbnail load retained repository lease across admission boundary: %v", err)
+	}
+	releaseMutation()
 }

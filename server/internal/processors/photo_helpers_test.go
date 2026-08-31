@@ -2,83 +2,25 @@ package processors
 
 import (
 	"bytes"
-	"context"
 	"image"
 	"image/color"
 	"image/jpeg"
-	"testing"
-
-	"github.com/google/uuid"
-
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/service"
-	"server/internal/storage"
-	"server/internal/storage/repocfg"
 	"server/internal/utils/imaging"
+	"testing"
 )
 
-type thumbnailAssetServiceStub struct {
-	service.AssetService
-
-	saved map[string][]byte
-}
-
-func (s *thumbnailAssetServiceStub) CreateThumbnail(_ context.Context, _, _ uuid.UUID, size, thumbnailPath string) (*repo.Thumbnail, error) {
-	if s.saved == nil {
-		s.saved = make(map[string][]byte)
-	}
-	s.saved[size] = []byte(thumbnailPath)
-	return &repo.Thumbnail{}, nil
-}
-
-func TestGenerateThumbnailsDefersPHashAndKeepsAllSizes(t *testing.T) {
+func TestGenerateThumbnailsKeepsAllSizes(t *testing.T) {
 	imaging.StartVips()
 
-	asset := &repo.Asset{
-		AssetID:   uuid.New(),
-		ContentID: uuid.New(),
-	}
-	assetSvc := &thumbnailAssetServiceStub{}
-	ap := &AssetProcessor{
-		assetService: assetSvc,
-	}
-
-	queuePHash, err := ap.generateThumbnails(context.Background(), bytes.NewReader(testJPEG(t)), openProcessorRepositoryFS(t), asset)
+	outputs, err := thumbnailBuffers(bytes.NewReader(testJPEG(t)))
 	if err != nil {
-		t.Fatalf("generateThumbnails: %v", err)
+		t.Fatalf("thumbnailBuffers: %v", err)
 	}
-	if !queuePHash {
-		t.Fatal("successful photo thumbnails must enqueue the dedicated pHash worker")
-	}
-
 	for _, size := range []string{"small", "medium", "large"} {
-		if len(assetSvc.saved[size]) == 0 {
-			t.Fatalf("expected %s thumbnail to be saved", size)
+		if len(outputs[size]) == 0 {
+			t.Fatalf("expected %s thumbnail codec output", size)
 		}
 	}
-}
-
-func openProcessorRepositoryFS(t *testing.T) *storage.RepositoryFS {
-	t.Helper()
-	repositoryID := uuid.New()
-	repositoryPath := t.TempDir()
-	config := repocfg.NewRepositoryConfig("processor test")
-	config.ID = repositoryID.String()
-	if err := config.SaveConfigToFile(repositoryPath); err != nil {
-		t.Fatal(err)
-	}
-	files, err := storage.NewRepositoryFSFactory(nil, nil).Open(repo.Repository{
-		RepoID:       repositoryID,
-		Path:         repositoryPath,
-		Reachability: dbtypes.RepositoryReachabilityActive,
-		Config:       *config,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = files.Close() })
-	return files
 }
 
 func testJPEG(t *testing.T) []byte {

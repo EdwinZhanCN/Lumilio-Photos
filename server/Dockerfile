@@ -13,8 +13,7 @@ RUN apt-get update \
 WORKDIR /web
 
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
-RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 COPY web/. .
 
@@ -63,7 +62,7 @@ RUN go build -o /out/lumilio-entrypoint ./docker-entrypoint.go
 ############################################
 # Runtime
 ############################################
-FROM debian:trixie-slim AS runtime
+FROM debian:trixie-slim AS runtime-base
 
 ARG TARGETARCH
 
@@ -144,3 +143,15 @@ HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=20s CMD \
 
 ENTRYPOINT ["lumilio-entrypoint"]
 CMD ["server", "--config", "/app/config/docker-http.toml"]
+
+############################################
+# E2E runtime
+############################################
+FROM runtime-base AS e2e
+
+COPY --chown=app:app web/e2e/support/server.e2e.toml /app/config/server.e2e.toml
+
+############################################
+# Production runtime
+############################################
+FROM runtime-base AS runtime

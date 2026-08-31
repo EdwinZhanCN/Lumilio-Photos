@@ -3,7 +3,7 @@
 `docts` keeps a feature's architecture prose honest by making it fail the build
 when it drifts — the TypeScript answer to Go's `doc.go`. Package:
 [`@edwinzhancn/docts`](https://github.com/EdwinZhanCN/docts). Authoring
-procedure: [lumilio-feature-doc](../../../.agents/skills/lumilio-feature-doc/SKILL.md).
+procedure: [lumilio-feature-doc](../.agents/skills/lumilio-feature-doc/SKILL.md).
 
 ## The convention
 
@@ -38,5 +38,4 @@ cannot land.
 
 `web/vite.config.ts` registers `@edwinzhancn/docts/oxlint` and
 `docts/link-needs-import: error`. `doc.ts` turns `no-unused-vars` off because
-tsc already counts `{@link}` as a use and the linter does not. The
-`@edwinzhancn` scope is mapped to GitHub Packages in `web/.npmrc`.
+tsc already counts `{@link}` as a use and the linter does not. `@edwinzhancn/docts` resolves directly from the public npm registry.

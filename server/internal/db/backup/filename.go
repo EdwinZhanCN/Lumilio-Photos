@@ -12,9 +12,6 @@ const (
 	// RestorePointPrefix marks the snapshot taken after the runtime has drained
 	// but before a staged restore replaces the active catalog.
 	RestorePointPrefix = "restore-point-"
-	// CutoverPointPrefix marks the verified snapshot created before a
-	// destructive application migration. Retention never treats it as routine.
-	CutoverPointPrefix = "cutover-point-"
 	// TmpSuffix marks an artifact that has not passed validation and atomic
 	// finalization yet.
 	TmpSuffix  = ".tmp"
@@ -62,11 +59,11 @@ func IsRoutineName(name string) bool {
 	return ok
 }
 
-// ParseSnapshotName accepts routine snapshots and protected restore/cutover
-// points while preserving the timestamp encoded by the common base name.
+// ParseSnapshotName accepts routine snapshots and protected restore points
+// while preserving the timestamp encoded by the common base name.
 func ParseSnapshotName(name string) (Info, bool) {
 	base := name
-	for _, prefix := range []string{RestorePointPrefix, CutoverPointPrefix} {
+	for _, prefix := range []string{RestorePointPrefix} {
 		if value, ok := strings.CutPrefix(name, prefix); ok {
 			base = value
 			break
@@ -76,7 +73,7 @@ func ParseSnapshotName(name string) (Info, bool) {
 }
 
 func IsProtectedSnapshotName(name string) bool {
-	for _, prefix := range []string{RestorePointPrefix, CutoverPointPrefix} {
+	for _, prefix := range []string{RestorePointPrefix} {
 		if base, ok := strings.CutPrefix(name, prefix); ok {
 			_, valid := ParseName(base)
 			return valid

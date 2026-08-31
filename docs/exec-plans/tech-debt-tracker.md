@@ -4,15 +4,9 @@ Keep this list short. Each item must describe current behavior, name a concrete
 owner path, and explain the user or release impact. Completed history belongs in
 the relevant exec plan, not in this file.
 
-Last aligned with the codebase: 2026-08-25.
+Last aligned with the codebase: 2026-08-30.
 
 ## Product paths
-
-- **No platform p99 certification for the SQLite runtime.**
-  Owner: a future release/performance certification on a pinned Linux host.
-  The write-concurrency implementation has deterministic coverage and the
-  full Server gate, but steady-state p99 was never certified on any platform,
-  so release notes must not claim p99 latency targets for the catalog runtime.
 
 - **AgentBoard has no mobile column reflow.** Owner:
   `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one

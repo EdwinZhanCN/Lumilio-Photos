@@ -523,6 +523,7 @@ const listPendingLocationProjectionScopes = `-- name: ListPendingLocationProject
 SELECT repository_id, owner_id
 FROM location_projection_state
 WHERE source_revision > published_revision
+  AND terminal_error IS NULL
 ORDER BY updated_at, repository_id, owner_id
 LIMIT ?1
 `
@@ -659,6 +660,7 @@ SELECT EXISTS (
   SELECT 1
   FROM location_projection_state
   WHERE source_revision > published_revision
+    AND terminal_error IS NULL
 ) AS pending
 `
 
@@ -672,6 +674,7 @@ func (q *Queries) LocationProjectionWorkPending(ctx context.Context) (int64, err
 const markLocationProjectionScopeDirty = `-- name: MarkLocationProjectionScopeDirty :execrows
 UPDATE location_projection_state
 SET source_revision = source_revision + 1,
+    terminal_error = NULL,
     updated_at = ?1
 WHERE repository_id = ?2
   AND owner_id = ?3

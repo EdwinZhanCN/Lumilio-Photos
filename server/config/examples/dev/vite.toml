@@ -1,5 +1,5 @@
 #:schema ../../schema/lumilio-server.schema.json
-# Lumilio Photos runtime manifest, schema v4.
+# Lumilio Photos runtime manifest, schema v6.
 # Local development behind the Vite development proxy.
 #
 # Scenario: dynamic request origin development
@@ -17,7 +17,7 @@
 
 # Manifest format version. The loader accepts exactly this version and
 # never migrates an older file in place.
-schema_version = 4
+schema_version = 6
 
 # Deployment environment. Selects test-only affordances; it does not relax
 # runtime manifest validation.
@@ -28,6 +28,10 @@ environment = "development"
 # SQLite catalog file. Relative paths resolve from the manifest directory.
 # ":memory:" is rejected because the catalog must survive a restart.
 path = "../state/library.sqlite3"
+
+# Independent River execution-state file. Relative paths resolve from the
+# manifest directory and the file must differ from path.
+queue_path = "../state/river.sqlite3"
 
 [server]
 # Local socket the application listener binds, as host:port or :port.
@@ -102,20 +106,11 @@ cloud_state_path = "../state/cloud"
 backups_path = "../state/backups"
 
 [repository_scan]
-# Whether to periodically reconcile repositories against the catalog.
-enabled = true
-
 # Seconds between scan sweeps.
 interval_seconds = 300
 
 # Seconds a file must stay unmodified before it is considered complete.
 settle_seconds = 5
-
-# Repositories scanned concurrently.
-max_concurrent_repos = 1
-
-# Files per scan batch.
-batch_size = 500
 
 [auth]
 # Path to the token-signing key. This is a path, never the secret itself;
@@ -221,3 +216,34 @@ ffmpeg_path = "ffmpeg"
 
 # ffprobe binary, resolved by the same rule.
 ffprobe_path = "ffprobe"
+
+[execution]
+# Bound on concurrent CPU-intensive pipeline execution.
+cpu = 3
+
+# Bound on concurrent disk IO operations during pipeline steps.
+disk_io = 4
+
+# Bound on concurrent image decoding and encoding operations.
+image_codec = 2
+
+# Bound on concurrent video decoding and transcode operations.
+video_codec = 1
+
+# Bound on concurrent machine-learning model inference tasks.
+inference = 2
+
+# Total memory limit in MiB allocated for bounded pipeline execution.
+memory_mib = 768
+
+# Maximum number of concurrent River macro workers.
+macro_workers = 16
+
+# Maximum number of admitted tasks queued waiting for execution resources.
+max_waiting = 256
+
+# Number of threads allocated for video transcode processes.
+ffmpeg_threads = 3
+
+# FFmpeg software transcode preset speed.
+ffmpeg_software_preset = "veryfast"

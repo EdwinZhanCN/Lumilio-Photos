@@ -2,7 +2,7 @@
 
 Only unfinished implementation plans live here — there is no completed
 archive. Follow the
-[lumilio-exec-plan](../../../../../.agents/skills/lumilio-exec-plan/SKILL.md)
+[lumilio-exec-plan](../../../.agents/skills/lumilio-exec-plan/SKILL.md)
 skill for when a piece of work earns a plan, the plan skeleton, and
 maintenance.
 

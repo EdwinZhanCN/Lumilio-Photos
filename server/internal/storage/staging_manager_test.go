@@ -134,7 +134,7 @@ func TestStagingHandleRejectsWrongRepository(t *testing.T) {
 	}
 }
 
-func TestCutoverPreflightQuarantinesEveryIncomingByte(t *testing.T) {
+func TestRecoveryQuarantinePreservesEveryIncomingByte(t *testing.T) {
 	manager, repository := newStagingTestRepository(t, "flat", "rename")
 	first := createStagedContent(t, manager, repository, "first.jpg", "first-bytes")
 	second := createStagedContent(t, manager, repository, "second.mov", "second-bytes")
@@ -176,7 +176,7 @@ func TestCutoverPreflightQuarantinesEveryIncomingByte(t *testing.T) {
 	}
 }
 
-func TestCutoverPreflightValidatesAllIncomingEntriesBeforeMoving(t *testing.T) {
+func TestRecoveryQuarantineValidatesAllIncomingEntriesBeforeMoving(t *testing.T) {
 	manager, repository := newStagingTestRepository(t, "flat", "rename")
 	regular := createStagedContent(t, manager, repository, "regular.jpg", "regular-bytes")
 	symlink := filepath.Join(repository.Path, filepath.FromSlash(DefaultStructure.IncomingDir), "unsupported-link")

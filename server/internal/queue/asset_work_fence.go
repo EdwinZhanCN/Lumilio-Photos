@@ -5,12 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 )
 
 var (
@@ -30,16 +28,21 @@ type assetWorkValidator interface {
 	ValidateAssetWork(context.Context, uuid.UUID, uuid.UUID) error
 }
 
+type AssetWorkReader interface {
+	GetAssetByID(context.Context, uuid.UUID) (repo.Asset, error)
+	GetPreferredActiveAssetOccurrence(context.Context, uuid.UUID) (repo.ActiveAssetOccurrence, error)
+}
+
 func validateCurrentAssetWork(
 	ctx context.Context,
-	queries *repo.Queries,
+	reader AssetWorkReader,
 	assetID uuid.UUID,
 	expectedContentID uuid.UUID,
 ) (repo.Asset, error) {
-	if queries == nil {
+	if reader == nil {
 		return repo.Asset{}, fmt.Errorf("asset work validator has no catalog queries")
 	}
-	asset, err := queries.GetAssetByID(ctx, assetID)
+	asset, err := reader.GetAssetByID(ctx, assetID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return repo.Asset{}, ErrAssetWorkStale
 	}
@@ -49,7 +52,7 @@ func validateCurrentAssetWork(
 	if expectedContentID != uuid.Nil && asset.ContentID != expectedContentID {
 		return repo.Asset{}, ErrAssetWorkStale
 	}
-	if _, err := queries.GetPreferredActiveAssetOccurrence(ctx, assetID); errors.Is(err, sql.ErrNoRows) {
+	if _, err := reader.GetPreferredActiveAssetOccurrence(ctx, assetID); errors.Is(err, sql.ErrNoRows) {
 		return repo.Asset{}, ErrAssetWorkStale
 	} else if err != nil {
 		return repo.Asset{}, fmt.Errorf("validate active asset occurrence: %w", err)
@@ -77,15 +80,4 @@ func validateLoaderAssetWork(
 		return false, err
 	}
 	return true, nil
-}
-
-func handleDerivedAssetError(err error) (handled bool, result error) {
-	switch {
-	case errors.Is(err, ErrAssetWorkStale):
-		return true, nil
-	case errors.Is(err, ErrDerivedAssetNotReady):
-		return true, river.JobSnooze(time.Second)
-	default:
-		return false, nil
-	}
 }

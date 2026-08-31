@@ -302,78 +302,6 @@ func (q *Queries) ClaimRepositoryObservationController(ctx context.Context, arg 
 	return i, err
 }
 
-const claimRepositoryOutboxBatch = `-- name: ClaimRepositoryOutboxBatch :many
-UPDATE repository_outbox
-SET status = 'delivering',
-    lease_id = ?1,
-    lease_expires_at = ?2,
-    attempt_count = attempt_count + 1,
-    updated_at = ?3
-WHERE outbox_id IN (
-    SELECT candidate.outbox_id
-    FROM repository_outbox AS candidate
-    WHERE candidate.effect_kind = ?4
-      AND (candidate.status = 'pending'
-       OR (candidate.status = 'delivering' AND candidate.lease_expires_at < ?3))
-    ORDER BY candidate.created_at, candidate.outbox_id
-    LIMIT ?5
-)
-RETURNING outbox_id, repository_id, effect_key, effect_kind, entity_id, expected_revision, payload, status, attempt_count, lease_id, lease_expires_at, last_failure_code, created_at, delivered_at, updated_at
-`
-
-type ClaimRepositoryOutboxBatchParams struct {
-	LeaseID        *string           `db:"lease_id" json:"lease_id"`
-	LeaseExpiresAt *int64            `db:"lease_expires_at" json:"lease_expires_at"`
-	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-	EffectKind     string            `db:"effect_kind" json:"effect_kind"`
-	Limit          int64             `db:"limit" json:"limit"`
-}
-
-func (q *Queries) ClaimRepositoryOutboxBatch(ctx context.Context, arg ClaimRepositoryOutboxBatchParams) ([]RepositoryOutbox, error) {
-	rows, err := q.db.QueryContext(ctx, claimRepositoryOutboxBatch,
-		arg.LeaseID,
-		arg.LeaseExpiresAt,
-		arg.UpdatedAt,
-		arg.EffectKind,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []RepositoryOutbox
-	for rows.Next() {
-		var i RepositoryOutbox
-		if err := rows.Scan(
-			&i.OutboxID,
-			&i.RepositoryID,
-			&i.EffectKey,
-			&i.EffectKind,
-			&i.EntityID,
-			&i.ExpectedRevision,
-			&i.Payload,
-			&i.Status,
-			&i.AttemptCount,
-			&i.LeaseID,
-			&i.LeaseExpiresAt,
-			&i.LastFailureCode,
-			&i.CreatedAt,
-			&i.DeliveredAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const claimRepositoryScanFrontier = `-- name: ClaimRepositoryScanFrontier :one
 UPDATE repository_scan_frontier
 SET state = 'leased',
@@ -646,41 +574,6 @@ func (q *Queries) CompleteRepositoryObservationCAS(ctx context.Context, arg Comp
 	return i, err
 }
 
-const completeRepositoryOutboxEffect = `-- name: CompleteRepositoryOutboxEffect :execrows
-UPDATE repository_outbox
-SET status = ?3,
-    lease_id = NULL,
-    lease_expires_at = NULL,
-    last_failure_code = ?4,
-    delivered_at = CASE WHEN ?3 = 'delivered' THEN ?5 ELSE delivered_at END,
-    updated_at = ?5
-WHERE outbox_id = ?1
-  AND lease_id = ?2
-  AND status = 'delivering'
-`
-
-type CompleteRepositoryOutboxEffectParams struct {
-	OutboxID        uuid.UUID         `db:"outbox_id" json:"outbox_id"`
-	LeaseID         *string           `db:"lease_id" json:"lease_id"`
-	Status          string            `db:"status" json:"status"`
-	LastFailureCode *string           `db:"last_failure_code" json:"last_failure_code"`
-	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-}
-
-func (q *Queries) CompleteRepositoryOutboxEffect(ctx context.Context, arg CompleteRepositoryOutboxEffectParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, completeRepositoryOutboxEffect,
-		arg.OutboxID,
-		arg.LeaseID,
-		arg.Status,
-		arg.LastFailureCode,
-		arg.UpdatedAt,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const completeRepositoryScanFrontier = `-- name: CompleteRepositoryScanFrontier :one
 UPDATE repository_scan_frontier
 SET state = CASE WHEN ?4 IS NULL THEN 'completed' ELSE 'error' END,
@@ -868,13 +761,32 @@ func (q *Queries) CountOpenRepositoryScanFrontier(ctx context.Context, runID uui
 	return count, err
 }
 
-const countPendingRepositoryOutbox = `-- name: CountPendingRepositoryOutbox :one
-SELECT count(*) FROM repository_outbox
-WHERE repository_id = ?1 AND status IN ('pending', 'delivering')
+const countPendingRepositoryMaterialization = `-- name: CountPendingRepositoryMaterialization :one
+SELECT count(*)
+FROM repository_nodes node
+WHERE node.repository_id = ?1
+  AND node.lifecycle = 'active'
+  AND node.kind = 'file'
+  AND EXISTS (
+      SELECT 1
+      FROM repository_observations observation
+      WHERE observation.repository_id = node.repository_id
+        AND observation.mapped_node_id = node.node_id
+        AND observation.revision = node.observation_revision
+        AND observation.resolved_owner_id IS NOT NULL
+        AND observation.processing_state = 'applied'
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM asset_locations location
+      WHERE location.node_id = node.node_id
+        AND location.unbound_observation_revision IS NULL
+        AND location.bound_observation_revision >= node.observation_revision
+  )
 `
 
-func (q *Queries) CountPendingRepositoryOutbox(ctx context.Context, repositoryID uuid.UUID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countPendingRepositoryOutbox, repositoryID)
+func (q *Queries) CountPendingRepositoryMaterialization(ctx context.Context, repositoryID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPendingRepositoryMaterialization, repositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -1844,59 +1756,6 @@ func (q *Queries) InsertRepositoryObservation(ctx context.Context, arg InsertRep
 	return i, err
 }
 
-const insertRepositoryOutboxEffect = `-- name: InsertRepositoryOutboxEffect :one
-INSERT INTO repository_outbox (
-    outbox_id, repository_id, effect_key, effect_kind, entity_id,
-    expected_revision, payload, status, created_at, updated_at
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8)
-ON CONFLICT (effect_key) DO UPDATE SET
-    updated_at = repository_outbox.updated_at
-RETURNING outbox_id, repository_id, effect_key, effect_kind, entity_id, expected_revision, payload, status, attempt_count, lease_id, lease_expires_at, last_failure_code, created_at, delivered_at, updated_at
-`
-
-type InsertRepositoryOutboxEffectParams struct {
-	OutboxID         uuid.UUID         `db:"outbox_id" json:"outbox_id"`
-	RepositoryID     uuid.UUID         `db:"repository_id" json:"repository_id"`
-	EffectKey        string            `db:"effect_key" json:"effect_key"`
-	EffectKind       string            `db:"effect_kind" json:"effect_kind"`
-	EntityID         string            `db:"entity_id" json:"entity_id"`
-	ExpectedRevision int64             `db:"expected_revision" json:"expected_revision"`
-	Payload          string            `db:"payload" json:"payload"`
-	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
-}
-
-func (q *Queries) InsertRepositoryOutboxEffect(ctx context.Context, arg InsertRepositoryOutboxEffectParams) (RepositoryOutbox, error) {
-	row := q.db.QueryRowContext(ctx, insertRepositoryOutboxEffect,
-		arg.OutboxID,
-		arg.RepositoryID,
-		arg.EffectKey,
-		arg.EffectKind,
-		arg.EntityID,
-		arg.ExpectedRevision,
-		arg.Payload,
-		arg.CreatedAt,
-	)
-	var i RepositoryOutbox
-	err := row.Scan(
-		&i.OutboxID,
-		&i.RepositoryID,
-		&i.EffectKey,
-		&i.EffectKind,
-		&i.EntityID,
-		&i.ExpectedRevision,
-		&i.Payload,
-		&i.Status,
-		&i.AttemptCount,
-		&i.LeaseID,
-		&i.LeaseExpiresAt,
-		&i.LastFailureCode,
-		&i.CreatedAt,
-		&i.DeliveredAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const insertRepositoryRootNode = `-- name: InsertRepositoryRootNode :one
 INSERT INTO repository_nodes (
     node_id, repository_id, parent_node_id, name, name_key, kind,
@@ -2224,6 +2083,65 @@ func (q *Queries) ListPendingRepositoryObservations(ctx context.Context, arg Lis
 			&i.CreatedAt,
 			&i.ProcessedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRepositoryMaterializationCandidates = `-- name: ListRepositoryMaterializationCandidates :many
+SELECT node.node_id, node.observation_revision
+FROM repository_nodes node
+WHERE node.repository_id = ?1
+  AND node.lifecycle = 'active'
+  AND node.kind = 'file'
+  AND EXISTS (
+      SELECT 1
+      FROM repository_observations observation
+      WHERE observation.repository_id = node.repository_id
+        AND observation.mapped_node_id = node.node_id
+        AND observation.revision = node.observation_revision
+        AND observation.resolved_owner_id IS NOT NULL
+        AND observation.processing_state = 'applied'
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM asset_locations location
+      WHERE location.node_id = node.node_id
+        AND location.unbound_observation_revision IS NULL
+        AND location.bound_observation_revision >= node.observation_revision
+  )
+ORDER BY node.observation_revision, node.node_id
+LIMIT ?2
+`
+
+type ListRepositoryMaterializationCandidatesParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	Limit        int64     `db:"limit" json:"limit"`
+}
+
+type ListRepositoryMaterializationCandidatesRow struct {
+	NodeID              uuid.UUID `db:"node_id" json:"node_id"`
+	ObservationRevision int64     `db:"observation_revision" json:"observation_revision"`
+}
+
+func (q *Queries) ListRepositoryMaterializationCandidates(ctx context.Context, arg ListRepositoryMaterializationCandidatesParams) ([]ListRepositoryMaterializationCandidatesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRepositoryMaterializationCandidates, arg.RepositoryID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRepositoryMaterializationCandidatesRow
+	for rows.Next() {
+		var i ListRepositoryMaterializationCandidatesRow
+		if err := rows.Scan(&i.NodeID, &i.ObservationRevision); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -2576,6 +2494,7 @@ const requestRepositoryObservationEpoch = `-- name: RequestRepositoryObservation
 UPDATE repository_observation_state
 SET desired_epoch = desired_epoch + 1,
     full_verification_required = CASE WHEN ?2 THEN 1 ELSE full_verification_required END,
+    terminal_error = NULL,
     updated_at = ?3
 WHERE repository_id = ?1
 RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at

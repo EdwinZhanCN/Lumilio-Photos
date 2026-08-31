@@ -15,6 +15,7 @@ ORDER BY repository_id, owner_id;
 SELECT repository_id, owner_id
 FROM location_projection_state
 WHERE source_revision > published_revision
+  AND terminal_error IS NULL
 ORDER BY updated_at, repository_id, owner_id
 LIMIT sqlc.arg('limit');
 
@@ -23,11 +24,13 @@ SELECT EXISTS (
   SELECT 1
   FROM location_projection_state
   WHERE source_revision > published_revision
+    AND terminal_error IS NULL
 ) AS pending;
 
 -- name: MarkLocationProjectionScopeDirty :execrows
 UPDATE location_projection_state
 SET source_revision = source_revision + 1,
+    terminal_error = NULL,
     updated_at = sqlc.arg('updated_at')
 WHERE repository_id = sqlc.arg('repository_id')
   AND owner_id = sqlc.arg('owner_id');

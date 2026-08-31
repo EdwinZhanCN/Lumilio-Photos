@@ -12,9 +12,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"server/internal/db"
 	"server/internal/db/dbtypes"
-	statusdb "server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/storage"
@@ -23,20 +21,16 @@ import (
 	"server/internal/utils/hash"
 )
 
-const (
-	TaskMetadata  = "metadata_asset"
-	TaskThumbnail = "thumbnail_asset"
-	TaskTranscode = "transcode_asset"
-)
-
 // SourceMaterializer owns the recoverable private-staging to ROE commit
-// boundary for upload and cloud sources. Asset processing is published through
-// the ROE outbox; this type never inserts processing jobs directly.
+// boundary for upload and cloud sources. Asset processing is activated from
+// the immutable ROE publication result; this type never inserts processing
+// jobs directly.
 type SourceMaterializer struct {
-	database       *db.DB
+	reader         SourceReader
+	journal        StagingJournal
 	stagingManager storage.StagingManager
 	files          *storage.RepositoryFSFactory
-	publisher      *roematerializer.HashMaterializer
+	activate       func(context.Context, roematerializer.KnownContent) (roematerializer.Result, error)
 	logger         *zap.Logger
 	auditProvider  logging.RepositoryAuditProvider
 	capacityGuard  interface {
@@ -44,10 +38,17 @@ type SourceMaterializer struct {
 	}
 }
 
+type SourceReader interface {
+	GetRepositoryStagingCommit(context.Context, uuid.UUID) (repo.RepositoryStagingCommit, error)
+	GetAssetByIDAny(context.Context, uuid.UUID) (repo.Asset, error)
+	GetRepository(context.Context, uuid.UUID) (repo.Repository, error)
+	GetPrimaryRepository(context.Context) (repo.Repository, error)
+}
+
 func NewSourceMaterializer(
-	database *db.DB,
+	reader SourceReader,
+	journal StagingJournal,
 	stagingManager storage.StagingManager,
-	publisher *roematerializer.HashMaterializer,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 	files *storage.RepositoryFSFactory,
@@ -56,8 +57,8 @@ func NewSourceMaterializer(
 		logger = zap.NewNop()
 	}
 	return &SourceMaterializer{
-		database: database, stagingManager: stagingManager, files: files,
-		publisher: publisher, logger: logger.With(zap.String("component", "source_materializer")),
+		reader: reader, journal: journal, stagingManager: stagingManager, files: files,
+		logger:        logger.With(zap.String("component", "source_materializer")),
 		auditProvider: auditProvider,
 	}
 }
@@ -66,6 +67,13 @@ func (m *SourceMaterializer) SetCapacityGuard(guard interface {
 	CheckRepositoryWriteCapacity(context.Context, string, uint64) (storage.CapacityDecision, error)
 }) {
 	m.capacityGuard = guard
+}
+
+// SetActivation installs the sole catalog publication boundary for immutable
+// source facts. Production wires it to the commit coordinator; this type never
+// receives a catalog writer or a materializer with a write method.
+func (m *SourceMaterializer) SetActivation(activate func(context.Context, roematerializer.KnownContent) (roematerializer.Result, error)) {
+	m.activate = activate
 }
 
 // MaterializeStaged registers an unjournaled source when needed and resumes the
@@ -78,7 +86,7 @@ func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source Inges
 			resultErr = WithStagingOwnership(resultErr, prepared)
 		}
 	}()
-	if m == nil || m.database == nil || m.stagingManager == nil || m.publisher == nil {
+	if m == nil || m.reader == nil || m.journal == nil || m.stagingManager == nil {
 		return nil, errors.New("source materializer unavailable")
 	}
 	if source.Kind != IngestSourceUpload && source.Kind != IngestSourceCloud {
@@ -113,7 +121,7 @@ func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source Inges
 	}
 	commitID := uuid.New()
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	_, err = m.database.Queries.CreateRepositoryStagingCommit(ctx, repo.CreateRepositoryStagingCommitParams{
+	err = m.journal.Create(ctx, repo.CreateRepositoryStagingCommitParams{
 		CommitID: commitID, RepositoryID: repository.RepoID, OwnerID: ownerID,
 		SourceKind: string(source.Kind), StagingPath: stagingFile.PrivatePath,
 		OriginalFilename: source.OriginalFilename, MimeType: validation.MimeType,
@@ -136,24 +144,24 @@ func (m *SourceMaterializer) MaterializeCommit(ctx context.Context, commitID uui
 }
 
 func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uuid.UUID, preverified *hash.LayeredHashResult) (*repo.Asset, error) {
-	record, err := m.database.ReaderQueries.GetRepositoryStagingCommit(ctx, commitID)
+	record, err := m.reader.GetRepositoryStagingCommit(ctx, commitID)
 	if err != nil {
 		return nil, fmt.Errorf("load staging commit: %w", err)
 	}
 	if record.Status == "completed" && record.AssetID.Valid {
-		asset, assetErr := m.database.ReaderQueries.GetAssetByIDAny(ctx, record.AssetID.UUID)
+		asset, assetErr := m.reader.GetAssetByIDAny(ctx, record.AssetID.UUID)
 		return &asset, assetErr
 	}
 	if record.Status == "quarantined" {
 		return nil, fmt.Errorf("staging commit %s is quarantined: %s", commitID, valueOrEmptyString(record.FailureDetail))
 	}
-	record, err = m.database.Queries.ClaimRepositoryStagingCommit(ctx, repo.ClaimRepositoryStagingCommitParams{
+	record, err = m.journal.Claim(ctx, repo.ClaimRepositoryStagingCommitParams{
 		CommitID: commitID, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("claim staging commit: %w", err)
 	}
-	repository, err := m.database.ReaderQueries.GetRepository(ctx, record.RepositoryID)
+	repository, err := m.reader.GetRepository(ctx, record.RepositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +181,7 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 		if err != nil {
 			return nil, err
 		}
-		record, err = m.database.Queries.SetRepositoryStagingCommitTarget(ctx, repo.SetRepositoryStagingCommitTargetParams{
+		record, err = m.journal.SetTarget(ctx, repo.SetRepositoryStagingCommitTargetParams{
 			CommitID: commitID, TargetPath: &target, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 		})
 		if err != nil {
@@ -223,7 +231,7 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 			return nil, m.quarantine(ctx, repository, record, "staging_commit_failed", err)
 		}
 	}
-	if _, err := m.database.Queries.MarkRepositoryStagingCommitOnDisk(ctx, repo.MarkRepositoryStagingCommitOnDiskParams{
+	if err := m.journal.MarkOnDisk(ctx, repo.MarkRepositoryStagingCommitOnDiskParams{
 		CommitID: commitID, TargetPath: &target, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}); err != nil {
 		return nil, err
@@ -232,7 +240,7 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 	if err != nil || !finalExists || finalObservation.Size != record.FileSize {
 		return nil, fmt.Errorf("verify committed source stability: %w", err)
 	}
-	result, err := m.publisher.PublishKnownContent(ctx, roematerializer.KnownContent{
+	fact := roematerializer.KnownContent{
 		RepositoryID: record.RepositoryID, OwnerID: record.OwnerID,
 		Source: record.SourceKind, SourceEventKey: "staging:" + commitID.String(),
 		RelativePath: target, OriginalFilename: record.OriginalFilename,
@@ -241,19 +249,23 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 		QuickFingerprint:        record.QuickFingerprint,
 		QuickFingerprintVersion: record.QuickFingerprintVersion,
 		Observation:             finalObservation,
-	})
+	}
+	if m.activate == nil {
+		return nil, errors.New("source activation boundary is not configured")
+	}
+	result, err := m.activate(ctx, fact)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("activate materialized asset: %w", err)
 	}
 	completedAt := dbtypes.NewTimestamp(time.Now().UTC())
 	completedAtMicros := completedAt.Time.UnixMicro()
-	if _, err := m.database.Queries.CompleteRepositoryStagingCommit(ctx, repo.CompleteRepositoryStagingCommitParams{
+	if err := m.journal.Complete(ctx, repo.CompleteRepositoryStagingCommitParams{
 		CommitID: commitID, NodeID: uuid.NullUUID{UUID: result.NodeID, Valid: true},
 		AssetID: uuid.NullUUID{UUID: result.AssetID, Valid: true}, CompletedAt: &completedAtMicros,
 	}); err != nil {
 		return nil, err
 	}
-	asset, err := m.database.ReaderQueries.GetAssetByIDAny(ctx, result.AssetID)
+	asset, err := m.reader.GetAssetByIDAny(ctx, result.AssetID)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +357,7 @@ func (m *SourceMaterializer) quarantine(ctx context.Context, repository repo.Rep
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	detail := cause.Error()
-	_, updateErr := m.database.Queries.QuarantineRepositoryStagingCommit(ctx, repo.QuarantineRepositoryStagingCommitParams{
+	updateErr := m.journal.Quarantine(ctx, repo.QuarantineRepositoryStagingCommitParams{
 		CommitID: record.CommitID, StagingPath: stagingPath, FailureCode: &code,
 		FailureDetail: &detail, UpdatedAt: now,
 	})
@@ -380,9 +392,9 @@ func resolvedOwner(sourceOwner, repositoryDefault *int32) (int32, error) {
 
 func (m *SourceMaterializer) resolveRepository(ctx context.Context, repositoryID uuid.UUID) (repo.Repository, error) {
 	if repositoryID != uuid.Nil {
-		return m.database.ReaderQueries.GetRepository(ctx, repositoryID)
+		return m.reader.GetRepository(ctx, repositoryID)
 	}
-	repository, err := m.database.ReaderQueries.GetPrimaryRepository(ctx)
+	repository, err := m.reader.GetPrimaryRepository(ctx)
 	if err != nil {
 		return repo.Repository{}, fmt.Errorf("no repository available: %w", err)
 	}
@@ -401,23 +413,4 @@ func valueOrEmptyString(value *string) string {
 		return ""
 	}
 	return *value
-}
-
-func PipelineTaskNames(assetType dbtypes.AssetType) []string { return pipelineTaskNames(assetType) }
-
-func pipelineTaskNames(assetType dbtypes.AssetType) []string {
-	switch assetType {
-	case dbtypes.AssetTypePhoto:
-		return []string{TaskMetadata, TaskThumbnail}
-	case dbtypes.AssetTypeVideo:
-		return []string{TaskMetadata, TaskThumbnail, TaskTranscode}
-	case dbtypes.AssetTypeAudio:
-		return []string{TaskMetadata, TaskTranscode}
-	default:
-		return []string{TaskMetadata}
-	}
-}
-
-func BuildTrackedProcessingStatus(assetType dbtypes.AssetType, message string) ([]byte, error) {
-	return statusdb.NewTrackedProcessingStatus(message, pipelineTaskNames(assetType)).ToJSON()
 }

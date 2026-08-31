@@ -235,37 +235,3 @@ func TestCatalogConcurrentOwnerContentInsertSelectAndLocationConstraints(t *test
 		t.Fatal("second active location for one node was accepted")
 	}
 }
-
-func TestCatalogOutboxEffectIsIdempotent(t *testing.T) {
-	fixture := newCatalogFixture(t)
-	first, err := fixture.database.Queries.InsertRepositoryOutboxEffect(fixture.ctx, repo.InsertRepositoryOutboxEffectParams{
-		OutboxID: uuid.New(), RepositoryID: fixture.repositoryID,
-		EffectKey: "hash:" + fixture.rootNodeID.String() + ":7", EffectKind: "hash",
-		EntityID: fixture.rootNodeID.String(), ExpectedRevision: 7,
-		Payload: `{}`, CreatedAt: fixture.now,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := fixture.database.Queries.InsertRepositoryOutboxEffect(fixture.ctx, repo.InsertRepositoryOutboxEffectParams{
-		OutboxID: uuid.New(), RepositoryID: fixture.repositoryID,
-		EffectKey: first.EffectKey, EffectKind: "hash",
-		EntityID: fixture.rootNodeID.String(), ExpectedRevision: 7,
-		Payload: `{}`, CreatedAt: fixture.now,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if second.OutboxID != first.OutboxID {
-		t.Fatalf("idempotent effect IDs = %s and %s", first.OutboxID, second.OutboxID)
-	}
-	var effectCount int
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
-		"SELECT count(*) FROM repository_outbox WHERE effect_key = ?", first.EffectKey,
-	).Scan(&effectCount); err != nil {
-		t.Fatal(err)
-	}
-	if effectCount != 1 {
-		t.Fatalf("outbox effect count = %d, want 1", effectCount)
-	}
-}

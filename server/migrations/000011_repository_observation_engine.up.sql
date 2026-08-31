@@ -280,34 +280,3 @@ CREATE UNIQUE INDEX asset_locations_one_active_node
 CREATE INDEX idx_asset_locations_active_asset
     ON asset_locations (asset_id, node_id)
     WHERE unbound_observation_revision IS NULL;
-
-CREATE TABLE repository_outbox (
-    outbox_id TEXT PRIMARY KEY
-        CHECK (outbox_id = lower(outbox_id) AND length(outbox_id) = 36),
-    repository_id TEXT NOT NULL
-        REFERENCES repositories(repo_id) ON DELETE CASCADE,
-    effect_key TEXT NOT NULL UNIQUE,
-    effect_kind TEXT NOT NULL
-        CHECK (effect_kind IN ('hash', 'bind', 'process_asset', 'controller')),
-    entity_id TEXT NOT NULL,
-    expected_revision INTEGER NOT NULL CHECK (expected_revision >= 0),
-    payload TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(payload)),
-    status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'delivering', 'delivered', 'dead')),
-    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
-    lease_id TEXT,
-    lease_expires_at INTEGER,
-    last_failure_code TEXT,
-    created_at INTEGER NOT NULL,
-    delivered_at INTEGER,
-    updated_at INTEGER NOT NULL
-) STRICT;
-
-CREATE INDEX idx_repository_outbox_drain
-    ON repository_outbox (effect_kind, status, lease_expires_at, created_at, outbox_id)
-    WHERE status IN ('pending', 'delivering');
-CREATE INDEX idx_repository_outbox_pending_repository
-    ON repository_outbox (repository_id, status)
-    WHERE status IN ('pending', 'delivering');
-CREATE INDEX idx_repository_outbox_entity
-    ON repository_outbox (repository_id, entity_id, expected_revision);

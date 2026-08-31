@@ -166,23 +166,6 @@ func (q *Queries) BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAsset
 	return err
 }
 
-const bulkUpdateAssetStatus = `-- name: BulkUpdateAssetStatus :exec
-UPDATE assets
-SET status = ?1
-WHERE CAST(?2 AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false
-`
-
-type BulkUpdateAssetStatusParams struct {
-	Status   dbtypes.JSON `db:"status" json:"status"`
-	AssetIds *string      `db:"asset_ids" json:"asset_ids"`
-}
-
-func (q *Queries) BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error {
-	_, err := q.db.ExecContext(ctx, bulkUpdateAssetStatus, arg.Status, arg.AssetIds)
-	return err
-}
-
 const countAssetsByRating = `-- name: CountAssetsByRating :many
 SELECT rating, COUNT(*) as count
 FROM assets
@@ -2475,49 +2458,6 @@ func (q *Queries) RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAsset
 	return err
 }
 
-const resetAssetStatusForRetry = `-- name: ResetAssetStatusForRetry :one
-UPDATE assets
-SET status = json_set(
-    status,
-    char(36) || '.state',
-    '"processing"'
-)
-WHERE asset_id = ?1 AND json_extract(status, char(36) || '.state') IN ('warning', 'failed')
-RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-func (q *Queries) ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, resetAssetStatusForRetry, assetID)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.ContentID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.MimeType,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
-}
-
 const restoreAsset = `-- name: RestoreAsset :exec
 UPDATE assets
 SET is_deleted = false, deleted_at = NULL
@@ -2818,92 +2758,4 @@ type UpdateAssetRatingAndLikeParams struct {
 func (q *Queries) UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error {
 	_, err := q.db.ExecContext(ctx, updateAssetRatingAndLike, arg.Rating, arg.Liked, arg.AssetID)
 	return err
-}
-
-const updateAssetStatus = `-- name: UpdateAssetStatus :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-type UpdateAssetStatusParams struct {
-	AssetID uuid.UUID    `db:"asset_id" json:"asset_id"`
-	Status  dbtypes.JSON `db:"status" json:"status"`
-}
-
-func (q *Queries) UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, updateAssetStatus, arg.AssetID, arg.Status)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.ContentID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.MimeType,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
-}
-
-const updateAssetStatusWithErrors = `-- name: UpdateAssetStatusWithErrors :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-type UpdateAssetStatusWithErrorsParams struct {
-	AssetID uuid.UUID    `db:"asset_id" json:"asset_id"`
-	Status  dbtypes.JSON `db:"status" json:"status"`
-}
-
-func (q *Queries) UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, updateAssetStatusWithErrors, arg.AssetID, arg.Status)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.ContentID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.MimeType,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
 }

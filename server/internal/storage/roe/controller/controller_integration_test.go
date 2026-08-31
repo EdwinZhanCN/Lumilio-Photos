@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"server/config"
+	"server/internal/commit"
 	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -23,8 +24,34 @@ type controllerFixture struct {
 	ctx            context.Context
 	database       *db.DB
 	controller     *Controller
+	commands       *Commands
+	files          *storage.RepositoryFSFactory
 	repository     repo.Repository
 	repositoryPath string
+}
+
+func newTestControllerRuntime(
+	tb testing.TB,
+	database *db.DB,
+	files *storage.RepositoryFSFactory,
+	cfg Config,
+) (*Controller, *Commands) {
+	tb.Helper()
+	coordinator, err := commit.New(
+		database.Writer,
+		commit.Config{Capacity: 64, MaxBatch: 16, OldestWait: time.Millisecond},
+		CommitHandlers(),
+	)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	coordinator.Start()
+	tb.Cleanup(func() {
+		if err := coordinator.Stop(context.Background()); err != nil {
+			tb.Errorf("stop commit coordinator: %v", err)
+		}
+	})
+	return New(database.ReaderQueries, coordinator, files, cfg, nil), NewCommands(database, cfg, nil)
 }
 
 func newControllerFixture(t *testing.T, batchSize int) *controllerFixture {
@@ -95,9 +122,10 @@ func newControllerFixtureWithFeed(t *testing.T, batchSize int, feed changefeed.F
 		t.Fatal(err)
 	}
 	files := storage.NewRepositoryFSFactory(nil, database.Queries)
+	controller, commands := newTestControllerRuntime(t, database, files, Config{BatchSize: batchSize, ChangeFeed: feed})
 	return &controllerFixture{
 		ctx: ctx, database: database,
-		controller: New(database, files, Config{BatchSize: batchSize, ChangeFeed: feed}, nil),
+		controller: controller, commands: commands, files: files,
 		repository: repository, repositoryPath: repositoryPath,
 	}
 }
@@ -143,11 +171,11 @@ func TestControllerRequestCoalescesAndPublishesProgressively(t *testing.T) {
 	fixture.writeMedia(t, "wide/b.jpg", []byte("b"))
 	fixture.writeMedia(t, "wide/c.jpg", []byte("c"))
 
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,11 +192,8 @@ func TestControllerRequestCoalescesAndPublishesProgressively(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var hashes int
-		if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
-			"SELECT count(*) FROM repository_outbox WHERE repository_id = ? AND effect_kind = 'hash'",
-			fixture.repository.RepoID,
-		).Scan(&hashes); err != nil {
+		hashes, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+		if err != nil {
 			t.Fatal(err)
 		}
 		if hashes > 0 && result.HasMore {
@@ -198,11 +223,11 @@ func TestControllerRequestCoalescesAndPublishesProgressively(t *testing.T) {
 func TestControllerCoalescedQueuedRequestPublishesCurrentEpochWakeup(t *testing.T) {
 	fixture := newControllerFixture(t, 8)
 
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,12 +238,11 @@ func TestControllerCoalescedQueuedRequestPublishesCurrentEpochWakeup(t *testing.
 	var wakeups int
 	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
 		SELECT count(*)
-		FROM repository_outbox
-		WHERE repository_id = ?
-		  AND effect_kind = 'controller'
-		  AND entity_id = ?
-		  AND expected_revision = ?`,
-		fixture.repository.RepoID, first.OperationID.String(), second.RequestedEpoch,
+		FROM domain_outbox
+		WHERE command_kind = 'repository.scan'
+		  AND subject_key = ?
+		  AND desired_version = ?`,
+		fixture.repository.RepoID.String(), second.RequestedEpoch,
 	).Scan(&wakeups); err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +255,7 @@ func TestControllerReclaimsFrontierAndReplayIsIdempotent(t *testing.T) {
 	fixture := newControllerFixture(t, 16)
 	fixture.writeMedia(t, "a.jpg", []byte("a"))
 	fixture.writeMedia(t, "b.jpg", []byte("b"))
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,15 +277,14 @@ func TestControllerReclaimsFrontierAndReplayIsIdempotent(t *testing.T) {
 	if _, err := fixture.controller.RunTurn(fixture.ctx, fixture.repository.RepoID, receipt.OperationID); err != nil {
 		t.Fatal(err)
 	}
-	var beforeObservations, beforeEffects int
+	var beforeObservations int
 	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
 		"SELECT count(*) FROM repository_observations WHERE run_id = ?", receipt.OperationID,
 	).Scan(&beforeObservations); err != nil {
 		t.Fatal(err)
 	}
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
-		"SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'",
-	).Scan(&beforeEffects); err != nil {
+	beforeEffects, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := fixture.database.SQL.ExecContext(fixture.ctx, `
@@ -273,15 +296,14 @@ func TestControllerReclaimsFrontierAndReplayIsIdempotent(t *testing.T) {
 	if _, err := fixture.controller.RunTurn(fixture.ctx, fixture.repository.RepoID, receipt.OperationID); err != nil {
 		t.Fatal(err)
 	}
-	var afterObservations, afterEffects int
+	var afterObservations int
 	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
 		"SELECT count(*) FROM repository_observations WHERE run_id = ?", receipt.OperationID,
 	).Scan(&afterObservations); err != nil {
 		t.Fatal(err)
 	}
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
-		"SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'",
-	).Scan(&afterEffects); err != nil {
+	afterEffects, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if afterObservations != beforeObservations || afterEffects != beforeEffects {
@@ -293,7 +315,7 @@ func TestControllerReclaimsFrontierAndReplayIsIdempotent(t *testing.T) {
 func TestControllerPartialVerificationCannotFinalizeAbsence(t *testing.T) {
 	fixture := newControllerFixture(t, 8)
 	fixture.writeMedia(t, "keep.jpg", []byte("original"))
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +334,7 @@ func TestControllerPartialVerificationCannotFinalizeAbsence(t *testing.T) {
 	if err := os.Remove(filepath.Join(fixture.repositoryPath, "keep.jpg")); err != nil {
 		t.Fatal(err)
 	}
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", true)
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +357,7 @@ func TestControllerCancellationPreservesUnverifiedLocationAndRequiresRecovery(t 
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 1, feed)
 	fixture.writeMedia(t, "keep.jpg", []byte("keep"))
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,14 +367,14 @@ func TestControllerCancellationPreservesUnverifiedLocationAndRequiresRecovery(t 
 		t.Fatal(err)
 	}
 
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := fixture.controller.RunTurn(fixture.ctx, fixture.repository.RepoID, receipt.OperationID); err != nil {
 		t.Fatal(err)
 	}
-	requested, err := fixture.controller.CancelScanRun(
+	requested, err := fixture.commands.CancelScanRun(
 		fixture.ctx, fixture.repository.RepoID.String(), receipt.OperationID.String(),
 	)
 	if err != nil {
@@ -390,7 +412,7 @@ func TestRepositoryOfflineCannotFinalizeAbsence(t *testing.T) {
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 8, feed)
 	fixture.writeMedia(t, "keep.jpg", []byte("keep"))
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +424,7 @@ func TestRepositoryOfflineCannotFinalizeAbsence(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Rename(offlinePath, fixture.repositoryPath) })
 
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "recovery", "", true)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "recovery", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +439,7 @@ func TestAccessDeniedSubtreePreservesPriorLocation(t *testing.T) {
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 8, feed)
 	fixture.writeMedia(t, "locked/keep.jpg", []byte("keep"))
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,7 +455,7 @@ func TestAccessDeniedSubtreePreservesPriorLocation(t *testing.T) {
 		t.Skip("test process can bypass directory permissions")
 	}
 
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "recovery", "", true)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "recovery", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

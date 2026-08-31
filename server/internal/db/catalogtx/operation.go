@@ -73,7 +73,7 @@ const (
 	OperationRepositoryMaterializeKnownContent
 	OperationRepositoryMaterializeHash
 	OperationRepositoryReobserveNode
-	OperationRepositoryOutboxMaterializeAsset
+	OperationRepositoryAssetActivate
 	OperationRepositoryRelocate
 	OperationRepositoryRemove
 	OperationRepositoryRootRelocateMaintenance
@@ -82,13 +82,13 @@ const (
 	OperationRepositoryLifecycleComplete
 	OperationRepositoryLifecycleFail
 	OperationRepositoryHostActionFinish
-	OperationAssetRetry
 	OperationAssetMetadataPublish
 	OperationAssetDelete
 	OperationAssetRestore
 	OperationAssetStagingCommit
 	OperationAssetReprocess
-	OperationAssetStatusMutate
+	OperationAssetReindexRequest
+	OperationAssetUserStateMutate
 	OperationEventInitializeBackfill
 	OperationEventRebuildSnapshot
 	OperationEventPublishOwnerSnapshot
@@ -146,6 +146,10 @@ const (
 	OperationSQLiteTruncateCheckpoint
 	OperationVectorStateRepair
 	OperationVectorClearPending
+	OperationBackgroundCommitBatch
+	OperationDomainOutboxDeliver
+	OperationDomainOutboxReconcile
+	OperationBackupRequest
 	OperationCatalogGeneratedWriterExec
 	OperationCatalogGeneratedWriterReturning
 	OperationCatalogGeneratedReaderRows
@@ -169,6 +173,26 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Operation: OperationInvalid,
 		Name:      "invalid",
 		Role:      RoleUnknown,
+	},
+	OperationBackgroundCommitBatch: {
+		Operation: OperationBackgroundCommitBatch,
+		Name:      "background.commit.batch",
+		Role:      RoleWriter,
+	},
+	OperationDomainOutboxDeliver: {
+		Operation: OperationDomainOutboxDeliver,
+		Name:      "domain_outbox.deliver",
+		Role:      RoleWriter,
+	},
+	OperationDomainOutboxReconcile: {
+		Operation: OperationDomainOutboxReconcile,
+		Name:      "domain_outbox.reconcile",
+		Role:      RoleWriter,
+	},
+	OperationBackupRequest: {
+		Operation: OperationBackupRequest,
+		Name:      "backup.request",
+		Role:      RoleWriter,
 	},
 	OperationRepositoryObservationClaim: {
 		Operation: OperationRepositoryObservationClaim,
@@ -235,9 +259,9 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Name:      "repository.materialize.reobserve_node",
 		Role:      RoleWriter,
 	},
-	OperationRepositoryOutboxMaterializeAsset: {
-		Operation: OperationRepositoryOutboxMaterializeAsset,
-		Name:      "repository.outbox.materialize_asset",
+	OperationRepositoryAssetActivate: {
+		Operation: OperationRepositoryAssetActivate,
+		Name:      "repository.asset.activate",
 		Role:      RoleWriter,
 	},
 	OperationRepositoryRelocate: {
@@ -280,11 +304,6 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Name:      "repository.host_action.finish",
 		Role:      RoleWriter,
 	},
-	OperationAssetRetry: {
-		Operation: OperationAssetRetry,
-		Name:      "asset.retry",
-		Role:      RoleWriter,
-	},
 	OperationAssetMetadataPublish: {
 		Operation: OperationAssetMetadataPublish,
 		Name:      "asset.metadata.publish",
@@ -310,9 +329,14 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Name:      "asset.reprocess.enqueue",
 		Role:      RoleWriter,
 	},
-	OperationAssetStatusMutate: {
-		Operation: OperationAssetStatusMutate,
-		Name:      "asset.status.mutate",
+	OperationAssetReindexRequest: {
+		Operation: OperationAssetReindexRequest,
+		Name:      "asset.reindex.request",
+		Role:      RoleWriter,
+	},
+	OperationAssetUserStateMutate: {
+		Operation: OperationAssetUserStateMutate,
+		Name:      "asset.user_state.mutate",
 		Role:      RoleWriter,
 	},
 	OperationEventInitializeBackfill: {

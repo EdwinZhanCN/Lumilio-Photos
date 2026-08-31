@@ -35,6 +35,58 @@ type OCRIndexNotifier interface {
 	Notify()
 }
 
+// ApplyOCRResultsTx replaces OCR facts and queues the derived search-index
+// projection inside a caller-owned catalog transaction.
+func ApplyOCRResultsTx(ctx context.Context, tx *sql.Tx, queries *repo.Queries, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error {
+	if tx == nil || queries == nil || assetID == uuid.Nil || ocrResult == nil {
+		return fmt.Errorf("OCR result commit is incomplete")
+	}
+	type persistedOCRItem struct {
+		TextContent string          `json:"text_content"`
+		Confidence  float64         `json:"confidence"`
+		BoundingBox json.RawMessage `json:"bounding_box"`
+		TextLength  int             `json:"text_length"`
+		AreaPixels  float64         `json:"area_pixels"`
+	}
+	items := make([]persistedOCRItem, 0, len(ocrResult.Items))
+	for index, item := range ocrResult.Items {
+		boundingBox := dbtypes.NewBoundingBox(item.Box)
+		boundingBoxJSON, err := boundingBox.SerializeToJSON()
+		if err != nil {
+			return fmt.Errorf("failed to serialize bounding box for item %d: %w", index, err)
+		}
+		items = append(items, persistedOCRItem{TextContent: item.Text, Confidence: float64(item.Confidence), BoundingBox: json.RawMessage(boundingBoxJSON), TextLength: len(item.Text), AreaPixels: float64(boundingBox.CalculateArea())})
+	}
+	payload, err := json.Marshal(items)
+	if err != nil {
+		return fmt.Errorf("encode OCR text items: %w", err)
+	}
+	if err := queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
+		return fmt.Errorf("failed to delete existing OCR results: %w", err)
+	}
+	processingTimePtr := int64(processingTimeMs)
+	if _, err := queries.CreateOCRResult(ctx, repo.CreateOCRResultParams{AssetID: assetID, ModelID: ocrResult.ModelID, TotalCount: int64(len(ocrResult.Items)), ProcessingTimeMs: &processingTimePtr}); err != nil {
+		return fmt.Errorf("failed to create OCR result: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO ocr_text_items (
+			asset_id, text_content, confidence, bounding_box,
+			text_length, area_pixels, created_at
+		)
+		SELECT
+			?, json_extract(value, '$.text_content'),
+			json_extract(value, '$.confidence'),
+			json_extract(value, '$.bounding_box'),
+			json_extract(value, '$.text_length'),
+			json_extract(value, '$.area_pixels'),
+			CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+		FROM json_each(?)
+	`, assetID, payload); err != nil {
+		return fmt.Errorf("failed to insert OCR text items: %w", err)
+	}
+	return enqueueOCRIndexOutbox(ctx, queries, assetID)
+}
+
 type ocrService struct {
 	queries       *repo.Queries
 	pool          *sql.DB
@@ -65,76 +117,13 @@ func NewOCRServiceWithNotifier(queries *repo.Queries, pool *sql.DB, writer *cata
 
 // SaveOCRResults saves OCR results to database
 func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error {
-	if ocrResult == nil {
-		return fmt.Errorf("OCR result payload is required")
-	}
-	type persistedOCRItem struct {
-		TextContent string          `json:"text_content"`
-		Confidence  float64         `json:"confidence"`
-		BoundingBox json.RawMessage `json:"bounding_box"`
-		TextLength  int             `json:"text_length"`
-		AreaPixels  float64         `json:"area_pixels"`
-	}
-	items := make([]persistedOCRItem, 0, len(ocrResult.Items))
-	for index, item := range ocrResult.Items {
-		boundingBox := dbtypes.NewBoundingBox(item.Box)
-		boundingBoxJSON, err := boundingBox.SerializeToJSON()
-		if err != nil {
-			return fmt.Errorf("failed to serialize bounding box for item %d: %w", index, err)
-		}
-		items = append(items, persistedOCRItem{
-			TextContent: item.Text,
-			Confidence:  float64(item.Confidence),
-			BoundingBox: json.RawMessage(boundingBoxJSON),
-			TextLength:  len(item.Text),
-			AreaPixels:  float64(boundingBox.CalculateArea()),
-		})
-	}
-	payload, err := json.Marshal(items)
-	if err != nil {
-		return fmt.Errorf("encode OCR text items: %w", err)
-	}
-
 	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationOCRSave, nil)
 	if err != nil {
 		return fmt.Errorf("begin OCR result transaction: %w", err)
 	}
 	defer tx.Rollback()
 	queries := s.queries.WithTx(tx.Raw())
-
-	if err := queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
-		return fmt.Errorf("failed to delete existing OCR results: %w", err)
-	}
-
-	processingTimePtr := int64(processingTimeMs)
-	_, err = queries.CreateOCRResult(ctx, repo.CreateOCRResultParams{
-		AssetID:          assetID,
-		ModelID:          ocrResult.ModelID,
-		TotalCount:       int64(len(ocrResult.Items)),
-		ProcessingTimeMs: &processingTimePtr,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create OCR result: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO ocr_text_items (
-			asset_id, text_content, confidence, bounding_box,
-			text_length, area_pixels, created_at
-		)
-		SELECT
-			?, json_extract(value, '$.text_content'),
-			json_extract(value, '$.confidence'),
-			json_extract(value, '$.bounding_box'),
-			json_extract(value, '$.text_length'),
-			json_extract(value, '$.area_pixels'),
-			CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-		FROM json_each(?)
-	`, assetID, payload); err != nil {
-		return fmt.Errorf("bulk insert OCR text items: %w", err)
-	}
-
-	if err := enqueueOCRIndexOutbox(ctx, queries, assetID); err != nil {
+	if err := ApplyOCRResultsTx(ctx, tx.Raw(), queries, assetID, ocrResult, processingTimeMs); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {

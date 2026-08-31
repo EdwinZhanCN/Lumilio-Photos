@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
@@ -37,13 +36,12 @@ type KnownContent struct {
 	Observation             storage.FileObservation
 }
 
-// PublishKnownContent atomically publishes the node observation, immutable
-// content identity, owner/content Asset, versioned Location, and process
-// outbox effect. All filesystem and hashing work must be complete before this
-// method is called.
-func (m *HashMaterializer) PublishKnownContent(ctx context.Context, fact KnownContent) (Result, error) {
+// ApplyKnownContent publishes a source fact in the caller-owned coordinator
+// transaction. Filesystem and hashing work must be complete before this call;
+// workers never receive a catalog writer through this API.
+func (m *HashApplier) ApplyKnownContent(ctx context.Context, tx *sql.Tx, fact KnownContent) (Result, error) {
 	result := Result{Code: ResultStale}
-	if m == nil || m.database == nil {
+	if m == nil || tx == nil {
 		return result, errors.New("repository materializer unavailable")
 	}
 	if fact.RepositoryID == uuid.Nil || fact.OwnerID <= 0 {
@@ -72,21 +70,27 @@ func (m *HashMaterializer) PublishKnownContent(ctx context.Context, fact KnownCo
 
 	now := dbtypes.NewTimestamp(m.now())
 	candidateAssetID := uuid.New()
-	err = m.database.WithTx(ctx, catalogtx.OperationRepositoryMaterializeKnownContent, func(_ *sql.Tx, queries *repo.Queries) error {
+	apply := func(queries *repo.Queries) error {
 		if priorObservation, priorErr := queries.GetRepositoryObservationBySourceEvent(ctx, repo.GetRepositoryObservationBySourceEventParams{
 			RepositoryID: fact.RepositoryID, Source: fact.Source, SourceEventKey: &fact.SourceEventKey,
 		}); priorErr == nil && priorObservation.MappedNodeID.Valid {
 			location, locationErr := queries.GetActiveAssetLocationByNode(ctx, priorObservation.MappedNodeID.UUID)
-			if locationErr != nil {
+			if locationErr == nil {
+				asset, assetErr := queries.GetAssetByIDAny(ctx, location.AssetID)
+				if assetErr != nil {
+					return assetErr
+				}
+				result = Result{Code: ResultNoop, RepositoryID: fact.RepositoryID, NodeID: priorObservation.MappedNodeID.UUID,
+					AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: priorObservation.Revision}
+				return nil
+			}
+			if !errors.Is(locationErr, sql.ErrNoRows) {
 				return locationErr
 			}
-			asset, assetErr := queries.GetAssetByIDAny(ctx, location.AssetID)
-			if assetErr != nil {
-				return assetErr
-			}
-			result = Result{Code: ResultNoop, NodeID: priorObservation.MappedNodeID.UUID,
-				AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: priorObservation.Revision}
-			return nil
+			// A durable source event can outlive its active location after a
+			// deletion or interrupted repair. Fall through and re-materialize the
+			// occurrence instead of turning the missing location into a permanent
+			// retry error.
 		} else if priorErr != nil && !errors.Is(priorErr, sql.ErrNoRows) {
 			return priorErr
 		}
@@ -224,6 +228,32 @@ func (m *HashMaterializer) PublishKnownContent(ctx context.Context, fact KnownCo
 		}); err != nil {
 			return err
 		}
+		// Resolve the active binding before creating immutable rows. A replay
+		// racing a prior source commit must not leave an unbound asset behind.
+		active, locationErr := queries.GetActiveAssetLocationByNode(ctx, node.NodeID)
+		switch {
+		case locationErr == nil && active.BoundObservationRevision >= revision:
+			asset, assetErr := queries.GetAssetByIDAny(ctx, active.AssetID)
+			if assetErr != nil {
+				return assetErr
+			}
+			result = Result{Code: ResultNoop, RepositoryID: fact.RepositoryID, NodeID: node.NodeID,
+				AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: revision}
+			return nil
+		case locationErr == nil:
+			closedRevision := revision
+			rows, closeErr := queries.CloseActiveAssetLocationCAS(ctx, repo.CloseActiveAssetLocationCASParams{
+				NodeID: node.NodeID, UnboundObservationRevision: &closedRevision, UpdatedAt: now,
+			})
+			if closeErr != nil {
+				return closeErr
+			}
+			if rows != 1 {
+				return nil
+			}
+		case !errors.Is(locationErr, sql.ErrNoRows):
+			return locationErr
+		}
 
 		content, err := queries.InsertContentObject(ctx, repo.InsertContentObjectParams{
 			ContentID: uuid.New(), HashAlgorithm: "blake3-v1",
@@ -246,48 +276,17 @@ func (m *HashMaterializer) PublishKnownContent(ctx context.Context, fact KnownCo
 		if err != nil {
 			return err
 		}
-		active, locationErr := queries.GetActiveAssetLocationByNode(ctx, node.NodeID)
-		switch {
-		case locationErr == nil && active.BoundObservationRevision >= revision:
-			result = Result{Code: ResultNoop, NodeID: node.NodeID, AssetID: active.AssetID,
-				ContentID: content.ContentID, Revision: revision}
-			return nil
-		case locationErr == nil:
-			closedRevision := revision
-			rows, closeErr := queries.CloseActiveAssetLocationCAS(ctx, repo.CloseActiveAssetLocationCASParams{
-				NodeID: node.NodeID, UnboundObservationRevision: &closedRevision, UpdatedAt: now,
-			})
-			if closeErr != nil {
-				return closeErr
-			}
-			if rows != 1 {
-				return nil
-			}
-		case !errors.Is(locationErr, sql.ErrNoRows):
-			return locationErr
-		}
 		if _, err := queries.BindAssetLocation(ctx, repo.BindAssetLocationParams{
 			LocationID: uuid.New(), NodeID: node.NodeID, AssetID: asset.AssetID,
 			BoundObservationRevision: revision, CreatedAt: now,
 		}); err != nil {
 			return err
 		}
-		newAsset := asset.AssetID == candidateAssetID
-		if newAsset {
-			effectKey := fmt.Sprintf("process_asset:%s:%s", asset.AssetID, content.ContentID)
-			if _, err := queries.InsertRepositoryOutboxEffect(ctx, repo.InsertRepositoryOutboxEffectParams{
-				OutboxID: uuid.New(), RepositoryID: fact.RepositoryID, EffectKey: effectKey,
-				EffectKind: "process_asset", EntityID: asset.AssetID.String(),
-				ExpectedRevision: revision, Payload: `{}`, CreatedAt: now,
-			}); err != nil {
-				return err
-			}
-		}
-		result = Result{Code: ResultBound, NodeID: node.NodeID, AssetID: asset.AssetID,
-			ContentID: content.ContentID, Revision: revision, NewAsset: newAsset}
+		result = Result{Code: ResultBound, RepositoryID: fact.RepositoryID, NodeID: node.NodeID, AssetID: asset.AssetID,
+			ContentID: content.ContentID, Revision: revision, NewAsset: asset.AssetID == candidateAssetID}
 		return nil
-	})
-	return result, err
+	}
+	return result, apply(repo.New(tx))
 }
 
 func allocateRevision(ctx context.Context, queries *repo.Queries, repositoryID uuid.UUID, now dbtypes.Timestamp) (int64, error) {

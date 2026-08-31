@@ -26,13 +26,14 @@ import (
 )
 
 var (
-	ErrRepositoryUnavailable      = ErrRepositoryOffline
-	ErrRepositoryMarkerInvalid    = errors.New("repository marker is invalid")
-	ErrRepositoryPermission       = errors.New("repository permission denied")
-	ErrRepositoryFSClosed         = errors.New("repository filesystem is closed")
-	ErrRepositoryFileUnstable     = errors.New("repository file changed during inspection")
-	ErrRepositoryEntryUnsupported = errors.New("repository entry is unsupported")
-	ErrNestedRepository           = errors.New("nested repository boundary encountered")
+	ErrRepositoryUnavailable       = ErrRepositoryOffline
+	ErrRepositoryMarkerInvalid     = errors.New("repository marker is invalid")
+	ErrRepositoryPermission        = errors.New("repository permission denied")
+	ErrRepositoryFSClosed          = errors.New("repository filesystem is closed")
+	ErrRepositoryFileUnstable      = errors.New("repository file changed during inspection")
+	ErrRepositoryEntryUnsupported  = errors.New("repository entry is unsupported")
+	ErrRepositoryImmutableConflict = errors.New("immutable repository file conflicts with existing content")
+	ErrNestedRepository            = errors.New("nested repository boundary encountered")
 )
 
 type EntryKind string
@@ -484,6 +485,119 @@ func (r *RepositoryFS) WritePrivateFileAtomic(repositoryPath RepositoryPath, rea
 	return written, syncRootDirectory(root, path.Dir(repositoryPath.String()))
 }
 
+// WritePrivateFileImmutable publishes a private-workspace file without ever
+// replacing an existing destination. A retry may reuse an existing regular
+// file only when its complete content is byte-for-byte identical; a different
+// file at the immutable path is a conflict and remains untouched.
+func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath RepositoryPath, reader io.Reader, perm fs.FileMode) (int64, error) {
+	if !repositoryPath.isPrivate() {
+		return 0, ErrRepositoryPathNamespace
+	}
+	if reader == nil {
+		return 0, errors.New("immutable file reader is required")
+	}
+	destination, err := repositoryPath.local()
+	if err != nil {
+		return 0, err
+	}
+	temporaryPath, err := ParsePrivateRepositoryPath(repositoryPath.String() + ".tmp-" + uuid.NewString())
+	if err != nil {
+		return 0, err
+	}
+	temporary, err := temporaryPath.local()
+	if err != nil {
+		return 0, err
+	}
+	root, done, err := r.withRoot()
+	if err != nil {
+		return 0, err
+	}
+	defer done()
+	file, err := root.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	if err != nil {
+		return 0, err
+	}
+	cleanup := true
+	defer func() {
+		_ = file.Close()
+		if cleanup {
+			_ = root.Remove(temporary)
+		}
+	}()
+
+	digest := sha256.New()
+	written, err := io.Copy(io.MultiWriter(file, digest), reader)
+	if err != nil {
+		return written, err
+	}
+	if written == 0 {
+		return 0, io.ErrUnexpectedEOF
+	}
+	if err := file.Sync(); err != nil {
+		return written, err
+	}
+	if err := file.Close(); err != nil {
+		return written, err
+	}
+
+	if err := root.Link(temporary, destination); err != nil {
+		if !errors.Is(err, fs.ErrExist) {
+			return written, err
+		}
+		existingSize, existingDigest, compareErr := hashRootRegularFile(root, destination)
+		if compareErr != nil {
+			return written, compareErr
+		}
+		if existingSize != written || !equalDigest(existingDigest, digest.Sum(nil)) {
+			return written, fmt.Errorf("%w: %s", ErrRepositoryImmutableConflict, repositoryPath.String())
+		}
+		return existingSize, nil
+	}
+	if err := syncRootDirectory(root, path.Dir(repositoryPath.String())); err != nil {
+		return written, err
+	}
+	if err := root.Remove(temporary); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return written, err
+	}
+	cleanup = false
+	if err := syncRootDirectory(root, path.Dir(repositoryPath.String())); err != nil {
+		return written, err
+	}
+	return written, nil
+}
+
+func hashRootRegularFile(root *os.Root, name string) (int64, []byte, error) {
+	info, err := root.Lstat(name)
+	if err != nil {
+		return 0, nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return 0, nil, fmt.Errorf("%w: immutable destination is not a regular file", ErrRepositoryImmutableConflict)
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer file.Close()
+	digest := sha256.New()
+	size, err := io.Copy(digest, file)
+	if err != nil {
+		return 0, nil, err
+	}
+	return size, digest.Sum(nil), nil
+}
+
+func equalDigest(left, right []byte) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	var difference byte
+	for index := range left {
+		difference |= left[index] ^ right[index]
+	}
+	return difference == 0
+}
+
 func (r *RepositoryFS) StatPrivate(repositoryPath RepositoryPath) (fs.FileInfo, error) {
 	if !repositoryPath.isPrivate() {
 		return nil, ErrRepositoryPathNamespace
@@ -538,6 +652,64 @@ func (r *RepositoryFS) RemovePrivate(repositoryPath RepositoryPath) error {
 	}
 	defer done()
 	return root.Remove(local)
+}
+
+// PrivateFile is one regular application-owned file discovered below a
+// validated private repository directory. Callers receive repository-relative
+// paths only; the rooted filesystem capability never leaks an absolute path.
+type PrivateFile struct {
+	Path    RepositoryPath
+	Size    int64
+	ModTime time.Time
+}
+
+// ListPrivateFiles walks one private subtree without following or accepting
+// non-regular entries. It is the bounded capability used by artifact garbage
+// collection; ordinary media code must not inspect the application-owned tree.
+func (r *RepositoryFS) ListPrivateFiles(ctx context.Context, directory RepositoryPath) ([]PrivateFile, error) {
+	if ctx == nil {
+		return nil, errors.New("private file walk context is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !directory.isPrivate() {
+		return nil, ErrRepositoryPathNamespace
+	}
+	root, done, err := r.withRoot()
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	files := make([]PrivateFile, 0)
+	err = fs.WalkDir(root.FS(), directory.String(), func(name string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if errors.Is(walkErr, fs.ErrNotExist) && name == directory.String() {
+				return fs.SkipDir
+			}
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("%w: private entry %s is not a regular file", ErrRepositoryEntryUnsupported, name)
+		}
+		privatePath, err := ParsePrivateRepositoryPath(name)
+		if err != nil {
+			return err
+		}
+		files = append(files, PrivateFile{Path: privatePath, Size: info.Size(), ModTime: info.ModTime()})
+		return nil
+	})
+	return files, err
 }
 
 func (r *RepositoryFS) StatMedia(repositoryPath RepositoryPath) (fs.FileInfo, error) {

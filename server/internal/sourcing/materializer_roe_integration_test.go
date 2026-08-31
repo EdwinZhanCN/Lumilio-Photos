@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"server/config"
+	"server/internal/commit"
 	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -31,8 +32,80 @@ type sourceMaterializerFixture struct {
 	repositoryPath string
 	files          *storage.RepositoryFSFactory
 	staging        *storage.DefaultStagingManager
-	publisher      *roematerializer.HashMaterializer
+	preparer       *roematerializer.HashPreparer
+	coordinator    *commit.Coordinator
 	materializer   *SourceMaterializer
+}
+
+func (fixture *sourceMaterializerFixture) activate(ctx context.Context, fact roematerializer.KnownContent) (roematerializer.Result, error) {
+	outcome, err := fixture.coordinator.Submit(ctx, commit.Intent{
+		Key: commit.Key{
+			Family: commit.FamilyRepositoryKnownContent, Subject: fact.RepositoryID.String(),
+			Fence: fact.SourceEventKey, Stage: "known_content", DesiredVersion: 1,
+		},
+		Payload: commit.RepositoryKnownContentApplied{Fact: fact},
+	})
+	if err != nil {
+		return roematerializer.Result{}, err
+	}
+	if outcome.Outcome == commit.OutcomeStale {
+		return roematerializer.Result{Code: roematerializer.ResultStale, RepositoryID: fact.RepositoryID}, nil
+	}
+	observation, err := fixture.database.ReaderQueries.GetRepositoryObservationBySourceEvent(ctx, repo.GetRepositoryObservationBySourceEventParams{
+		RepositoryID: fact.RepositoryID, Source: fact.Source, SourceEventKey: &fact.SourceEventKey,
+	})
+	if err != nil || !observation.MappedNodeID.Valid {
+		return roematerializer.Result{}, err
+	}
+	location, err := fixture.database.ReaderQueries.GetActiveAssetLocationByNode(ctx, observation.MappedNodeID.UUID)
+	if err != nil {
+		return roematerializer.Result{}, err
+	}
+	asset, err := fixture.database.ReaderQueries.GetAssetByIDAny(ctx, location.AssetID)
+	if err != nil {
+		return roematerializer.Result{}, err
+	}
+	code := roematerializer.ResultBound
+	if outcome.Outcome == commit.OutcomeDuplicate {
+		code = roematerializer.ResultNoop
+	}
+	return roematerializer.Result{
+		Code: code, RepositoryID: fact.RepositoryID, NodeID: observation.MappedNodeID.UUID,
+		AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: observation.Revision,
+	}, nil
+}
+
+func (fixture *sourceMaterializerFixture) processHash(ctx context.Context, nodeID uuid.UUID, revision int64) (roematerializer.Result, error) {
+	prepared, err := fixture.preparer.PrepareHash(ctx, nodeID, revision)
+	if err != nil || prepared == nil {
+		return roematerializer.Result{Code: roematerializer.ResultStale, NodeID: nodeID, Revision: revision}, err
+	}
+	outcome, err := fixture.coordinator.Submit(ctx, commit.Intent{
+		Key: commit.Key{
+			Family: commit.FamilyRepositoryHash, Subject: nodeID.String(),
+			Fence: prepared.Observation.ObservationToken, Stage: "hash", DesiredVersion: 1,
+		},
+		Payload: commit.RepositoryHashApplied{Prepared: *prepared},
+	})
+	if err != nil || outcome.Outcome == commit.OutcomeStale {
+		return roematerializer.Result{Code: roematerializer.ResultStale, NodeID: nodeID, Revision: revision}, err
+	}
+	location, err := fixture.database.ReaderQueries.GetActiveAssetLocationByNode(ctx, nodeID)
+	if err != nil {
+		return roematerializer.Result{}, err
+	}
+	asset, err := fixture.database.ReaderQueries.GetAssetByIDAny(ctx, location.AssetID)
+	if err != nil {
+		return roematerializer.Result{}, err
+	}
+	code := roematerializer.ResultBound
+	if outcome.Outcome == commit.OutcomeDuplicate {
+		code = roematerializer.ResultNoop
+	}
+	return roematerializer.Result{
+		Code: code, RepositoryID: prepared.Node.RepositoryID, NodeID: nodeID,
+		AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: revision,
+	}, nil
 }
 
 func newSourceMaterializerFixture(t *testing.T) *sourceMaterializerFixture {
@@ -99,12 +172,33 @@ func newSourceMaterializerFixture(t *testing.T) *sourceMaterializerFixture {
 	}
 	files := storage.NewRepositoryFSFactory(nil, database.Queries)
 	staging := storage.NewStagingManager(files)
-	publisher := roematerializer.NewHashMaterializer(database, files)
-	return &sourceMaterializerFixture{
-		ctx: ctx, database: database, repository: repository, repositoryPath: repositoryPath,
-		files: files, staging: staging, publisher: publisher,
-		materializer: NewSourceMaterializer(database, staging, publisher, zap.NewNop(), nil, files),
+	preparer := roematerializer.NewHashPreparer(database.ReaderQueries, database.ReaderSQL, files)
+	applier := roematerializer.NewHashApplier()
+	handlers := commit.CatalogHandlersWithRepositoryMaterializer(nil, nil, nil, nil, applier)
+	for family, handler := range StagingCommitHandlers() {
+		handlers[family] = handler
 	}
+	coordinator, err := commit.New(database.Writer, commit.Config{Capacity: 16, MaxBatch: 4, OldestWait: time.Millisecond}, handlers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coordinator.Start()
+	t.Cleanup(func() { _ = coordinator.Stop(context.Background()) })
+	materializer := NewSourceMaterializer(
+		database.ReaderQueries,
+		NewCoordinatorStagingJournal(coordinator),
+		staging,
+		zap.NewNop(),
+		nil,
+		files,
+	)
+	fixture := &sourceMaterializerFixture{
+		ctx: ctx, database: database, repository: repository, repositoryPath: repositoryPath,
+		files: files, staging: staging, preparer: preparer,
+		coordinator: coordinator, materializer: materializer,
+	}
+	materializer.SetActivation(fixture.activate)
+	return fixture
 }
 
 func (fixture *sourceMaterializerFixture) stage(
@@ -249,7 +343,7 @@ func TestStagingCommitReplaysEveryPersistedFilesystemCatalogBoundary(t *testing.
 			if err != nil || !exists {
 				t.Fatalf("inspect committed source = %t, %v", exists, err)
 			}
-			if _, err := fixture.publisher.PublishKnownContent(fixture.ctx, roematerializer.KnownContent{
+			if _, err := fixture.activate(fixture.ctx, roematerializer.KnownContent{
 				RepositoryID: updated.RepositoryID, OwnerID: updated.OwnerID,
 				Source: updated.SourceKind, SourceEventKey: "staging:" + updated.CommitID.String(),
 				RelativePath: *updated.TargetPath, OriginalFilename: updated.OriginalFilename,
@@ -275,8 +369,14 @@ func TestStagingCommitReplaysEveryPersistedFilesystemCatalogBoundary(t *testing.
 			}
 
 			restarted := NewSourceMaterializer(
-				fixture.database, fixture.staging, fixture.publisher, zap.NewNop(), nil, fixture.files,
+				fixture.database.ReaderQueries,
+				NewCoordinatorStagingJournal(fixture.coordinator),
+				fixture.staging,
+				zap.NewNop(),
+				nil,
+				fixture.files,
 			)
+			restarted.SetActivation(fixture.activate)
 			asset, err := restarted.MaterializeCommit(fixture.ctx, commit.CommitID)
 			if err != nil {
 				t.Fatalf("resume %s: %v", stage.name, err)
@@ -288,20 +388,21 @@ func TestStagingCommitReplaysEveryPersistedFilesystemCatalogBoundary(t *testing.
 			if replayed.AssetID != asset.AssetID {
 				t.Fatalf("replay asset = %s, want %s", replayed.AssetID, asset.AssetID)
 			}
-			var commits, contents, assets, locations, processingEffects int
+			var commits, contents, assets, locations, mediaItems, pipelineStates int
 			if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
 				SELECT
 				  (SELECT count(*) FROM repository_staging_commits WHERE status = 'completed'),
 				  (SELECT count(*) FROM content_objects),
 				  (SELECT count(*) FROM assets),
 				  (SELECT count(*) FROM asset_locations WHERE unbound_observation_revision IS NULL),
-				  (SELECT count(*) FROM repository_outbox WHERE effect_kind = 'process_asset')
-			`).Scan(&commits, &contents, &assets, &locations, &processingEffects); err != nil {
+				  (SELECT count(*) FROM media_items),
+				  (SELECT count(*) FROM asset_pipeline_state)
+			`).Scan(&commits, &contents, &assets, &locations, &mediaItems, &pipelineStates); err != nil {
 				t.Fatal(err)
 			}
-			if commits != 1 || contents != 1 || assets != 1 || locations != 1 || processingEffects != 1 {
-				t.Fatalf("resume counts commits=%d contents=%d assets=%d locations=%d processing=%d",
-					commits, contents, assets, locations, processingEffects)
+			if commits != 1 || contents != 1 || assets != 1 || locations != 1 || mediaItems != 1 || pipelineStates != 3 {
+				t.Fatalf("resume counts commits=%d contents=%d assets=%d locations=%d media_items=%d pipeline_states=%d",
+					commits, contents, assets, locations, mediaItems, pipelineStates)
 			}
 		})
 	}
@@ -313,13 +414,20 @@ func TestConcurrentScanUploadAndCloudConvergeOnContentAndOwnerAsset(t *testing.T
 	if err := os.WriteFile(filepath.Join(fixture.repositoryPath, "scanned.jpg"), contents, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	controller := roecontroller.New(
-		fixture.database,
-		fixture.files,
-		roecontroller.Config{BatchSize: 8, ChangeFeed: changefeed.Periodic{}},
-		zap.NewNop(),
+	cfg := roecontroller.Config{BatchSize: 8, ChangeFeed: changefeed.Periodic{}}
+	coordinator, err := commit.New(
+		fixture.database.Writer,
+		commit.Config{Capacity: 32, MaxBatch: 8, OldestWait: time.Millisecond},
+		roecontroller.CommitHandlers(),
 	)
-	receipt, err := controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coordinator.Start()
+	t.Cleanup(func() { _ = coordinator.Stop(context.Background()) })
+	controller := roecontroller.New(fixture.database.ReaderQueries, coordinator, fixture.files, cfg, zap.NewNop())
+	commands := roecontroller.NewCommands(fixture.database, cfg, zap.NewNop())
+	receipt, err := commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,17 +443,17 @@ func TestConcurrentScanUploadAndCloudConvergeOnContentAndOwnerAsset(t *testing.T
 			t.Fatal("scan controller did not finish")
 		}
 	}
-	var scanNodeID uuid.UUID
-	var scanRevision int64
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-		SELECT entity_id, expected_revision
-		FROM repository_outbox
-		WHERE effect_kind = 'hash'
-		ORDER BY created_at, outbox_id
-		LIMIT 1
-	`).Scan(&scanNodeID, &scanRevision); err != nil {
+	candidates, err := fixture.database.ReaderQueries.ListRepositoryMaterializationCandidates(fixture.ctx, repo.ListRepositoryMaterializationCandidatesParams{
+		RepositoryID: fixture.repository.RepoID, Limit: 1,
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
+	if len(candidates) != 1 {
+		t.Fatalf("scan materialization candidates = %d, want 1", len(candidates))
+	}
+	scanNodeID := candidates[0].NodeID
+	scanRevision := candidates[0].ObservationRevision
 	upload := fixture.stage(t, IngestSourceUpload, "uploaded.jpg", contents)
 	cloud := fixture.stage(t, IngestSourceCloud, "cloud.jpg", contents)
 
@@ -360,7 +468,7 @@ func TestConcurrentScanUploadAndCloudConvergeOnContentAndOwnerAsset(t *testing.T
 	go func() {
 		ready.Done()
 		<-start
-		result, processErr := fixture.publisher.Process(fixture.ctx, scanNodeID, scanRevision)
+		result, processErr := fixture.processHash(fixture.ctx, scanNodeID, scanRevision)
 		results <- concurrentResult{assetID: result.AssetID, err: processErr}
 	}()
 	for _, source := range []IngestSource{upload, cloud} {
@@ -392,20 +500,21 @@ func TestConcurrentScanUploadAndCloudConvergeOnContentAndOwnerAsset(t *testing.T
 	if len(assetIDs) != 1 {
 		t.Fatalf("concurrent source Asset IDs = %v, want one", assetIDs)
 	}
-	var contentsCount, assetsCount, locationsCount, commitsCount, processingEffects int
+	var contentsCount, assetsCount, locationsCount, commitsCount, mediaItems, pipelineStates int
 	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
 		SELECT
 		  (SELECT count(*) FROM content_objects),
 		  (SELECT count(*) FROM assets),
 		  (SELECT count(*) FROM asset_locations WHERE unbound_observation_revision IS NULL),
 		  (SELECT count(*) FROM repository_staging_commits WHERE status = 'completed'),
-		  (SELECT count(*) FROM repository_outbox WHERE effect_kind = 'process_asset')
-	`).Scan(&contentsCount, &assetsCount, &locationsCount, &commitsCount, &processingEffects); err != nil {
+		  (SELECT count(*) FROM media_items),
+		  (SELECT count(*) FROM asset_pipeline_state)
+	`).Scan(&contentsCount, &assetsCount, &locationsCount, &commitsCount, &mediaItems, &pipelineStates); err != nil {
 		t.Fatal(err)
 	}
-	if contentsCount != 1 || assetsCount != 1 || locationsCount != 3 || commitsCount != 2 || processingEffects != 1 {
-		t.Fatalf("convergence contents=%d assets=%d locations=%d commits=%d processing=%d",
-			contentsCount, assetsCount, locationsCount, commitsCount, processingEffects)
+	if contentsCount != 1 || assetsCount != 1 || locationsCount != 3 || commitsCount != 2 || mediaItems != 1 || pipelineStates != 3 {
+		t.Fatalf("convergence contents=%d assets=%d locations=%d commits=%d media_items=%d pipeline_states=%d",
+			contentsCount, assetsCount, locationsCount, commitsCount, mediaItems, pipelineStates)
 	}
 }
 

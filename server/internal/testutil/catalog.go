@@ -42,7 +42,7 @@ type AssetOccurrence struct {
 	LocationID uuid.UUID
 }
 
-// InsertAssetOccurrence seeds the post-cutover owner/content/Asset/node/
+// InsertAssetOccurrence seeds the normalized owner/content/Asset/node/
 // Location contract. It intentionally does not create repository observations:
 // the active occurrence projection requires the current node and binding, while
 // observation history belongs only in tests that exercise reconciliation.

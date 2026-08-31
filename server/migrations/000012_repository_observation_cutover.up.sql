@@ -1,7 +1,6 @@
--- ROE v2 is a forward-only destructive media-catalog cutover. Repository
--- registrations, users, settings, lifecycle journals, and original files are
--- intentionally outside this transaction. The application creates and
--- validates an Online Backup before this migration is allowed to begin.
+-- Install the normalized Repository Observation Engine catalog shape. This
+-- migration is intentionally destructive for obsolete media projections; a
+-- fresh local catalog is the supported starting point for this schema.
 
 -- Containers that are themselves derived from media must not survive as
 -- empty, misleading projections. User-authored album/tag definitions survive;
@@ -25,12 +24,6 @@ DELETE FROM asset_stacks;
 DELETE FROM media_items;
 DELETE FROM cloud_sync_files;
 DELETE FROM cloud_import_runs;
-
--- Queue consumers are not started until this maintenance transaction and its
--- verified backup boundary complete. Every pre-cutover job is discarded:
--- media jobs reference Assets that are about to be purged, and obsolete scan,
--- discovery, and path-bearing ingest payloads must never reach the v2 runtime.
-DELETE FROM river_job;
 
 -- This is the destructive catalog boundary. FK actions clear thumbnails,
 -- metadata, faces, OCR, ML/search projections, shares, memberships, and all
@@ -241,102 +234,3 @@ CREATE UNIQUE INDEX repository_scan_runs_one_active
     WHERE status IN ('queued', 'crawling', 'catching_up', 'finalizing');
 CREATE INDEX idx_repository_scan_runs_history
     ON repository_scan_runs (repository_id, created_at DESC, run_id);
-
--- Allocate one durable migration receipt per currently reachable repository.
--- A short-lived mapping table keeps UUID generation stable across the state,
--- run, and outbox inserts and is removed before commit.
-CREATE TABLE roe_cutover_runs (
-    repository_id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL UNIQUE,
-    created_at INTEGER NOT NULL
-) STRICT;
-
-INSERT INTO roe_cutover_runs (repository_id, run_id, created_at)
-SELECT
-    repo_id,
-    lower(
-        substr(hex(randomblob(16)), 1, 8) || '-' ||
-        substr(hex(randomblob(16)), 1, 4) || '-' ||
-        '4' || substr(hex(randomblob(16)), 1, 3) || '-' ||
-        '8' || substr(hex(randomblob(16)), 1, 3) || '-' ||
-        substr(hex(randomblob(16)), 1, 12)
-    ),
-    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-FROM repositories
-WHERE reachability = 'active';
-
-INSERT INTO repository_observation_state (
-    repository_id,
-    desired_epoch,
-    applied_epoch,
-    adapter_kind,
-    cursor_health,
-    full_verification_required,
-    updated_at
-)
-SELECT repository_id, 1, 0, 'periodic', 'unavailable', 1, created_at
-FROM roe_cutover_runs
-WHERE true
-ON CONFLICT (repository_id) DO UPDATE SET
-    desired_epoch = MAX(repository_observation_state.desired_epoch + 1, 1),
-    full_verification_required = 1,
-    cursor_health = 'unavailable',
-    updated_at = excluded.updated_at;
-
-INSERT INTO repository_scan_runs (
-    run_id,
-    repository_id,
-    requested_epoch,
-    mode,
-    requested_by,
-    status,
-    created_at,
-    updated_at
-)
-SELECT
-    cutover.run_id,
-    cutover.repository_id,
-    state.desired_epoch,
-    'migration',
-    'schema-000012',
-    'queued',
-    cutover.created_at,
-    cutover.created_at
-FROM roe_cutover_runs cutover
-JOIN repository_observation_state state
-  ON state.repository_id = cutover.repository_id;
-
-INSERT INTO repository_outbox (
-    outbox_id,
-    repository_id,
-    effect_key,
-    effect_kind,
-    entity_id,
-    expected_revision,
-    payload,
-    status,
-    created_at,
-    updated_at
-)
-SELECT
-    lower(
-        substr(hex(randomblob(16)), 1, 8) || '-' ||
-        substr(hex(randomblob(16)), 1, 4) || '-' ||
-        '4' || substr(hex(randomblob(16)), 1, 3) || '-' ||
-        '8' || substr(hex(randomblob(16)), 1, 3) || '-' ||
-        substr(hex(randomblob(16)), 1, 12)
-    ),
-    cutover.repository_id,
-    'controller:migration:' || cutover.run_id,
-    'controller',
-    cutover.run_id,
-    state.desired_epoch,
-    '{}',
-    'pending',
-    cutover.created_at,
-    cutover.created_at
-FROM roe_cutover_runs cutover
-JOIN repository_observation_state state
-  ON state.repository_id = cutover.repository_id;
-
-DROP TABLE roe_cutover_runs;

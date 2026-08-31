@@ -222,8 +222,6 @@
     "nvenc": "NVIDIA NVENC",
     "processing": "Processing",
     "qsv": "Intel Quick Sync",
-    "repositoryScan": "Repository Scanning",
-    "repositoryScanDescription": "Periodically reconcile registered Repositories with the catalog.",
     "softwareOnly": "Software only",
     "vaapi": "VA-API",
     "videoToolbox": "VideoToolbox",

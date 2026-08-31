@@ -35,7 +35,7 @@ type DefaultStagingManager struct {
 	files *RepositoryFSFactory
 }
 
-// StagingQuarantine records one recoverable preflight move. Both paths are
+// StagingQuarantine records one recoverable recovery move. Both paths are
 // repository-private paths; no host path becomes a durable payload.
 type StagingQuarantine struct {
 	Before string
@@ -214,7 +214,7 @@ func (sm *DefaultStagingManager) MoveStagingToFailed(repository repo.Repository,
 // before it moves any file, then moves every regular file outside the existing
 // failed subtree into that explicit recoverable area. A symlink, special file,
 // nested repository error, or unavailable Repository aborts the destructive
-// catalog preflight.
+// startup/recovery boundary.
 func (sm *DefaultStagingManager) QuarantineUnresolvedStaging(
 	ctx context.Context,
 	repository repo.Repository,

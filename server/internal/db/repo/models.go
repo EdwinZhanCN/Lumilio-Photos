@@ -820,24 +820,6 @@ type RepositoryObservationState struct {
 	UpdatedAt                dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
-type RepositoryOutbox struct {
-	OutboxID         uuid.UUID         `db:"outbox_id" json:"outbox_id"`
-	RepositoryID     uuid.UUID         `db:"repository_id" json:"repository_id"`
-	EffectKey        string            `db:"effect_key" json:"effect_key"`
-	EffectKind       string            `db:"effect_kind" json:"effect_kind"`
-	EntityID         string            `db:"entity_id" json:"entity_id"`
-	ExpectedRevision int64             `db:"expected_revision" json:"expected_revision"`
-	Payload          string            `db:"payload" json:"payload"`
-	Status           string            `db:"status" json:"status"`
-	AttemptCount     int64             `db:"attempt_count" json:"attempt_count"`
-	LeaseID          *string           `db:"lease_id" json:"lease_id"`
-	LeaseExpiresAt   *int64            `db:"lease_expires_at" json:"lease_expires_at"`
-	LastFailureCode  *string           `db:"last_failure_code" json:"last_failure_code"`
-	CreatedAt        dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	DeliveredAt      *int64            `db:"delivered_at" json:"delivered_at"`
-	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-}
-
 type RepositoryRoot struct {
 	RootID           uuid.UUID                    `db:"root_id" json:"root_id"`
 	Name             string                       `db:"name" json:"name"`

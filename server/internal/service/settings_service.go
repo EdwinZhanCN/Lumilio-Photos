@@ -10,31 +10,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 	"server/internal/llm"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/secretbox"
 	"server/internal/settings"
-
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 )
 
 var ErrInvalidSystemSettings = errors.New("invalid system settings")
 
-// RiverJobInserter is the small transaction boundary the settings service
-// needs. Keeping this interface here avoids making service depend on the
-// queue package while still allowing River InsertTx to share the settings
-// transaction.
-type RiverJobInserter interface {
-	InsertTx(context.Context, *sql.Tx, river.JobArgs, *river.InsertOpts) (*rivertype.JobInsertResult, error)
-}
-
 type SettingsRuntime struct {
 	DB     *sql.DB
 	Writer *catalogtx.Writer
-	Queue  RiverJobInserter
 }
 
 type SystemSettings struct {
@@ -161,7 +151,6 @@ type settingsService struct {
 	queries          *repo.Queries
 	db               *sql.DB
 	writer           *catalogtx.Writer
-	queue            RiverJobInserter
 	secretPath       string
 	defaults         settings.Settings
 	encryptionSecret string
@@ -181,7 +170,6 @@ func NewSettingsServiceWithRuntime(queries *repo.Queries, defaults settings.Sett
 		queries:    queries,
 		db:         runtime.DB,
 		writer:     runtime.Writer,
-		queue:      runtime.Queue,
 		secretPath: strings.TrimSpace(secretKeyPath),
 		defaults:   defaults,
 	}
@@ -459,7 +447,7 @@ func (s *settingsService) updateGeocodingSettings(
 	previous settings.Geocoding,
 	candidate settings.Geocoding,
 ) (SystemSettings, error) {
-	if s.db == nil || s.queue == nil {
+	if s.db == nil || s.writer == nil {
 		return SystemSettings{}, errors.New("geocoding settings runtime dependencies are not configured")
 	}
 
@@ -495,9 +483,7 @@ func (s *settingsService) updateGeocodingSettings(
 	}
 
 	if candidateEnabled {
-		args := jobs.ResolveLocationClustersArgs{GeocodingRevision: params.GeocodingRevision}
-		opts := args.InsertOpts()
-		if _, err := s.queue.InsertTx(ctx, tx.Raw(), args, &opts); err != nil {
+		if err := pipeline.RequestLocationResolutionTx(ctx, tx.Raw(), uint64(params.GeocodingRevision), uuid.New()); err != nil {
 			return SystemSettings{}, fmt.Errorf("enqueue location cluster resolution: %w", err)
 		}
 	}

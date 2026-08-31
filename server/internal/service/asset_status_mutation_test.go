@@ -40,9 +40,9 @@ func TestForegroundAssetMutationUsesNamedWriterOperation(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	report, ok := database.TransactionReport().Operation(catalogtx.OperationAssetStatusMutate)
+	report, ok := database.TransactionReport().Operation(catalogtx.OperationAssetUserStateMutate)
 	want := int64(len(mutations))
 	if !ok || report.Outcomes.Committed != want || report.Admission.Count != want {
-		t.Fatalf("asset status mutation report = %+v present=%t, want %d named commits", report, ok, want)
+		t.Fatalf("asset user-state mutation report = %+v present=%t, want %d named commits", report, ok, want)
 	}
 }

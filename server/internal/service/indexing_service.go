@@ -3,21 +3,21 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
-	"server/internal/db/vectorindex"
 	"server/internal/logging"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/settings"
 	"server/internal/storage"
 
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
 
@@ -75,7 +75,7 @@ func containsIndexingTask(tasks []AssetIndexingTask, target AssetIndexingTask) b
 }
 
 type ReindexAssetsJobResult struct {
-	JobID        int64
+	ReceiptID    uuid.UUID
 	Requested    []AssetIndexingTask
 	Disabled     []AssetIndexingTask
 	Limit        int
@@ -86,15 +86,39 @@ type ReindexAssetsJobResult struct {
 type AssetIndexingService interface {
 	GetIndexingStats(ctx context.Context, repositoryID *string) (AssetIndexingStats, error)
 	EnqueueReindexAssets(ctx context.Context, input ReindexAssetsInput) (ReindexAssetsJobResult, error)
-	ProcessReindexAssets(ctx context.Context, input ReindexAssetsInput) error
+	// ProcessReindexReceipt advances one bounded page. The boolean reports that
+	// another page was scheduled in the same catalog transaction, allowing the
+	// queue macro to snooze without publishing a completion receipt early.
+	ProcessReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (more bool, err error)
+	PrepareReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (PreparedReindex, error)
+	ApplyPreparedReindexTx(ctx context.Context, tx *sql.Tx, prepared PreparedReindex) error
+}
+
+var ErrReindexProjectionStale = errors.New("reindex projection source revision changed")
+var ErrSemanticResetRequiresGlobalScope = errors.New("semantic reset cannot be scoped to one repository")
+
+type PreparedReindexCandidate struct {
+	AssetID   uuid.UUID
+	ContentID uuid.UUID
+}
+
+// PreparedReindex is the immutable bounded page computed by a rebuild macro.
+// Its catalog effects (stage requests, cursor advancement, and receipt
+// completion) are applied together by the commit coordinator.
+type PreparedReindex struct {
+	ReceiptID         uuid.UUID
+	RequestedRevision uint64
+	Candidates        []PreparedReindexCandidate
+	Command           pipeline.ReindexCommand
+	HasMore           bool
+	NextCursor        string
+	ResetSemantic     bool
 }
 
 type assetIndexingService struct {
 	queries         *repo.Queries
 	settingsService SettingsService
 	runtimeChecker  LumenService
-	queueClient     *river.Client[*sql.Tx]
-	dbpool          *sql.DB
 	writer          *catalogtx.Writer
 	readerPool      *sql.DB
 	logger          *zap.Logger
@@ -111,7 +135,6 @@ func NewAssetIndexingService(
 	queries *repo.Queries,
 	settingsService SettingsService,
 	runtimeChecker LumenService,
-	queueClient *river.Client[*sql.Tx],
 	dbpool *sql.DB,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
@@ -121,8 +144,6 @@ func NewAssetIndexingService(
 		queries,
 		settingsService,
 		runtimeChecker,
-		queueClient,
-		dbpool,
 		catalogtx.NewWriter(dbpool, nil),
 		dbpool,
 		logger,
@@ -135,8 +156,6 @@ func NewAssetIndexingServiceWithReader(
 	queries *repo.Queries,
 	settingsService SettingsService,
 	runtimeChecker LumenService,
-	queueClient *river.Client[*sql.Tx],
-	dbpool *sql.DB,
 	writer *catalogtx.Writer,
 	readerPool *sql.DB,
 	logger *zap.Logger,
@@ -153,8 +172,6 @@ func NewAssetIndexingServiceWithReader(
 		queries:         queries,
 		settingsService: settingsService,
 		runtimeChecker:  runtimeChecker,
-		queueClient:     queueClient,
-		dbpool:          dbpool,
 		writer:          writer,
 		readerPool:      readerPool,
 		logger:          logger.With(zap.String("component", "indexing")),
@@ -209,6 +226,17 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 		return result[i] < result[j]
 	})
 	return result
+}
+
+func expandSemanticResetTasks(tasks []AssetIndexingTask) []AssetIndexingTask {
+	if !containsIndexingTask(tasks, AssetIndexingTaskSemanticImage) || containsIndexingTask(tasks, AssetIndexingTaskVideoSemantic) {
+		return tasks
+	}
+	tasks = append(append([]AssetIndexingTask(nil), tasks...), AssetIndexingTaskVideoSemantic)
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i] < tasks[j]
+	})
+	return tasks
 }
 
 func parseRepositoryUUID(repositoryID *string) (uuid.NullUUID, error) {
@@ -274,23 +302,38 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 		return AssetIndexingStats{}, fmt.Errorf("count video semantic coverage: %w", err)
 	}
 
-	stats.Tasks.Semantic.QueuedJobs = s.countPendingQueueJobs(ctx, "process_semantic")
-	stats.Tasks.BioCLIP.QueuedJobs = s.countPendingQueueJobs(ctx, "process_bioclip")
-	stats.Tasks.OCR.QueuedJobs = s.countPendingQueueJobs(ctx, "process_ocr")
-	stats.Tasks.Face.QueuedJobs = s.countPendingQueueJobs(ctx, "process_face")
-	stats.Tasks.VideoSemantic.QueuedJobs = s.countPendingQueueJobs(ctx, "process_video_frames")
-	stats.ReindexJobs = s.countPendingQueueJobs(ctx, "reindex_assets")
+	// QueueDB is disposable control state, so backlog reporting is derived from
+	// catalog desired/applied rows rather than River job states. Enrichment is a
+	// single macro boundary; the same pending asset count is exposed for each
+	// optional coverage lane for backwards-compatible response shape.
+	pendingAssets := s.countPendingCatalogEnrichment(ctx)
+	stats.Tasks.Semantic.QueuedJobs = pendingAssets
+	stats.Tasks.BioCLIP.QueuedJobs = pendingAssets
+	stats.Tasks.OCR.QueuedJobs = pendingAssets
+	stats.Tasks.Face.QueuedJobs = pendingAssets
+	stats.Tasks.VideoSemantic.QueuedJobs = pendingAssets
+	stats.ReindexJobs = s.countPendingReindexReceipts(ctx)
 
 	return stats, nil
 }
 
 func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input ReindexAssetsInput) (ReindexAssetsJobResult, error) {
-	if s.queueClient == nil {
-		return ReindexAssetsJobResult{}, errors.New("queue client is not configured")
+	if s.writer == nil {
+		return ReindexAssetsJobResult{}, errors.New("catalog writer is not configured")
 	}
 
 	input = normalizeReindexAssetsInput(input)
 	requestedTasks := normalizeRequestedIndexingTasks(input.Tasks)
+	if input.ResetSemantic {
+		if input.RepositoryID != nil {
+			return ReindexAssetsJobResult{}, ErrSemanticResetRequiresGlobalScope
+		}
+		// search_embeddings is one authoritative photo-and-video search index.
+		// A model reset must refill both semantic lanes after deleting it; rebuilding
+		// only photo embeddings would leave video frame coverage permanently absent.
+		requestedTasks = expandSemanticResetTasks(requestedTasks)
+		input.MissingOnly = false
+	}
 	if len(requestedTasks) == 0 {
 		return ReindexAssetsJobResult{}, errors.New("no valid indexing tasks requested")
 	}
@@ -312,19 +355,24 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 		}, nil
 	}
 
-	jobResult, err := s.queueClient.Insert(ctx, jobs.ReindexAssetsArgs{
-		RepositoryID:  input.RepositoryID,
-		Tasks:         indexingTasksToStrings(enabledTasks),
-		Limit:         input.Limit,
-		MissingOnly:   input.MissingOnly,
-		ResetSemantic: input.ResetSemantic,
-	}, nil)
+	receiptID := uuid.New()
+	var repositoryID *uuid.UUID
+	if input.RepositoryID != nil {
+		parsed, err := uuid.Parse(*input.RepositoryID)
+		if err != nil {
+			return ReindexAssetsJobResult{}, err
+		}
+		repositoryID = &parsed
+	}
+	err = s.writer.Transact(ctx, catalogtx.OperationAssetReindexRequest, nil, func(tx *sql.Tx) error {
+		return pipeline.RequestReindexTx(ctx, tx, receiptID, repositoryID, indexingTasksToStrings(enabledTasks), input.Limit, input.MissingOnly, input.ResetSemantic)
+	})
 	if err != nil {
-		return ReindexAssetsJobResult{}, fmt.Errorf("enqueue reindex job: %w", err)
+		return ReindexAssetsJobResult{}, fmt.Errorf("request reindex: %w", err)
 	}
 
 	return ReindexAssetsJobResult{
-		JobID:        jobResult.Job.ID,
+		ReceiptID:    receiptID,
 		Requested:    enabledTasks,
 		Disabled:     disabledTasks,
 		Limit:        input.Limit,
@@ -333,149 +381,140 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 	}, nil
 }
 
-func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input ReindexAssetsInput) error {
-	input = normalizeReindexAssetsInput(input)
-	requestedTasks := normalizeRequestedIndexingTasks(input.Tasks)
-	if len(requestedTasks) == 0 {
-		return nil
-	}
-
-	effectiveConfig, err := s.settingsService.GetEffectiveMLConfig(ctx)
+// offset pagination would skip or reprocess assets.
+func (s *assetIndexingService) ProcessReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (bool, error) {
+	prepared, err := s.PrepareReindexReceipt(ctx, receiptID, expectedRevision)
 	if err != nil {
-		return fmt.Errorf("load ML settings: %w", err)
+		return false, err
 	}
-
-	enabledTasks := filterEnabledIndexingTasks(requestedTasks, effectiveConfig)
-	if len(enabledTasks) == 0 {
-		s.logger.Info("reindex skipped: no enabled tasks",
-			zap.String("operation", "reindex.process"),
-			zap.Any("requested_tasks", requestedTasks),
-		)
-		return nil
+	if prepared.ReceiptID == uuid.Nil {
+		return false, nil
 	}
-
-	repositoryUUID, err := parseRepositoryUUID(input.RepositoryID)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetReindexRequest, nil)
 	if err != nil {
-		return err
+		return false, fmt.Errorf("begin reindex commit: %w", err)
 	}
-
-	// Model-swap reset: on the first page of a semantic rebuild, drop every
-	// semantic vector and demote the default space so the next re-embed promotes
-	// the newly served model. This is a clean drop+refill — search returns fewer
-	// results until the rebuild completes, but never mixes vectors from two
-	// models. Guarded to Offset == 0 so paginated continuations do not re-wipe.
-	if input.ResetSemantic && input.Offset == 0 && containsIndexingTask(enabledTasks, AssetIndexingTaskSemanticImage) {
-		if err := s.queries.DeleteAllSearchEmbeddings(ctx); err != nil {
-			return fmt.Errorf("reset semantic index: delete search embeddings: %w", err)
-		}
-		if err := s.queries.ClearDefaultSearchSpaceByType(ctx, string(EmbeddingTypeSemantic)); err != nil {
-			return fmt.Errorf("reset semantic index: clear default space: %w", err)
-		}
-		if err := vectorindex.Maintain(ctx, s.writer, s.readerPool); err != nil {
-			return fmt.Errorf("reset semantic index: rebuild Vec1 flat index: %w", err)
-		}
-		// Video frame rows were wiped with the table; ensure videos are
-		// re-queued when video semantic indexing is enabled.
-		if effectiveConfig.SemanticEnabled && effectiveConfig.VideoSemanticEnabled &&
-			!containsIndexingTask(enabledTasks, AssetIndexingTaskVideoSemantic) {
-			enabledTasks = append(enabledTasks, AssetIndexingTaskVideoSemantic)
-		}
-		s.logger.Info("semantic index reset for model swap",
-			zap.String("operation", "reindex.process"),
-		)
+	if err := s.ApplyPreparedReindexTx(ctx, tx.Raw(), prepared); err != nil {
+		_ = tx.Rollback()
+		return false, err
 	}
-
-	candidates, err := s.collectReindexCandidates(ctx, repositoryUUID, enabledTasks, input)
-	if err != nil {
-		return err
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit reindex: %w", err)
 	}
-	if len(candidates) == 0 {
-		s.audit(input.RepositoryID, "").Operation("asset.reindex",
-			zap.Any("tasks", enabledTasks),
-			zap.Int("limit", input.Limit),
-			zap.Bool("missing_only", input.MissingOnly),
-			zap.String("result", "no_candidates"),
-		)
-		return nil
-	}
-
-	queuedJobs := 0
-	failedAssets := 0
-
-	for _, candidate := range candidates {
-		queued, enqueueErr := s.enqueueAssetIndexingTasks(ctx, candidate)
-		if enqueueErr != nil {
-			failedAssets++
-			s.logger.Warn("reindex failed to queue asset",
-				zap.String("operation", "reindex.process"),
-				zap.String("asset_id", candidate.asset.AssetID.String()),
-				zap.Error(enqueueErr),
-			)
-			s.audit(input.RepositoryID, "").Error("asset.reindex", enqueueErr,
-				zap.String("asset_id", candidate.asset.AssetID.String()),
-			)
-			continue
-		}
-		queuedJobs += queued
-	}
-
-	if queuedJobs == 0 && failedAssets > 0 {
-		return fmt.Errorf("failed to queue %d assets for reindex", failedAssets)
-	}
-
-	s.logger.Info("reindex queued jobs",
-		zap.String("operation", "reindex.process"),
-		zap.Int("queued_jobs", queuedJobs),
-		zap.Int("candidate_assets", len(candidates)),
-		zap.Int("failed_assets", failedAssets),
-	)
-	s.audit(input.RepositoryID, "").Operation("asset.reindex",
-		zap.Int("queued_jobs", queuedJobs),
-		zap.Int("candidate_assets", len(candidates)),
-		zap.Int("failed_assets", failedAssets),
-		zap.Any("tasks", enabledTasks),
-	)
-
-	// Full rebuilds page through the entire library: a full batch means more
-	// assets likely remain, so enqueue the next page (offset += limit). The
-	// single-worker reindex_assets queue processes pages serially. Missing-only
-	// backfills are intentionally one-shot because their result set shrinks as
-	// downstream ML jobs complete, which would make offset pagination skip or
-	// reprocess assets; callers re-trigger to make further progress.
-	//
-	// Mixed photo+video pages may return up to 2*Limit candidates; treat a
-	// page as complete when fewer than Limit candidates were collected.
-	pageFilled := len(candidates) >= input.Limit
-	if !input.MissingOnly && pageFilled {
-		if _, err := s.queueClient.Insert(ctx, jobs.ReindexAssetsArgs{
-			RepositoryID: input.RepositoryID,
-			Tasks:        indexingTasksToStrings(enabledTasks),
-			Limit:        input.Limit,
-			Offset:       input.Offset + input.Limit,
-			MissingOnly:  false,
-		}, nil); err != nil {
-			s.logger.Warn("reindex failed to enqueue next page",
-				zap.String("operation", "reindex.process"),
-				zap.Int("next_offset", input.Offset+input.Limit),
-				zap.Int("limit", input.Limit),
-				zap.Error(err),
-			)
-			return fmt.Errorf("enqueue reindex next page: %w", err)
-		}
-		s.logger.Info("reindex enqueued next page",
-			zap.String("operation", "reindex.process"),
-			zap.Int("next_offset", input.Offset+input.Limit),
-			zap.Int("limit", input.Limit),
-		)
-	}
-	return nil
+	return prepared.HasMore, nil
 }
 
-// nextReindexPageOffset computes the offset for a chained full-rebuild page.
-// It returns hasMore=false when the batch did not fill (last page reached) or
-// when the run is missing-only. Missing-only backfills stay one-shot because
-// their candidate set shrinks asynchronously as downstream ML jobs finish, so
-// offset pagination would skip or reprocess assets.
+// PrepareReindexReceipt computes one deterministic candidate page from the
+// reader pool. It does not reset indexes, request stages, advance cursors, or
+// complete receipts; those mutations are committed atomically by the
+// coordinator through ApplyPreparedReindexTx.
+func (s *assetIndexingService) PrepareReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (PreparedReindex, error) {
+	if receiptID == uuid.Nil || expectedRevision == 0 {
+		return PreparedReindex{}, errors.New("invalid reindex receipt generation")
+	}
+	var repositoryRaw, cursor sql.NullString
+	var tasksJSON string
+	var limit int
+	var missingOnly, resetSemantic bool
+	var requestedRevision, appliedRevision uint64
+	if err := s.readerPool.QueryRowContext(ctx, `SELECT repository_id,tasks,page_limit,cursor,missing_only,reset_semantic,requested_revision,applied_revision FROM asset_reindex_requests WHERE receipt_id=?`, receiptID.String()).Scan(&repositoryRaw, &tasksJSON, &limit, &cursor, &missingOnly, &resetSemantic, &requestedRevision, &appliedRevision); err != nil {
+		return PreparedReindex{}, fmt.Errorf("read reindex receipt: %w", err)
+	}
+	if requestedRevision != expectedRevision || appliedRevision >= requestedRevision {
+		return PreparedReindex{}, nil
+	}
+	var requestedNames []string
+	if err := json.Unmarshal([]byte(tasksJSON), &requestedNames); err != nil {
+		return PreparedReindex{}, fmt.Errorf("decode reindex tasks: %w", err)
+	}
+	requestedTasks := make([]AssetIndexingTask, 0, len(requestedNames))
+	for _, task := range requestedNames {
+		requestedTasks = append(requestedTasks, AssetIndexingTask(task))
+	}
+	effectiveConfig, err := s.settingsService.GetEffectiveMLConfig(ctx)
+	if err != nil {
+		return PreparedReindex{}, fmt.Errorf("load ML settings: %w", err)
+	}
+	enabledTasks := filterEnabledIndexingTasks(requestedTasks, effectiveConfig)
+	if len(enabledTasks) == 0 {
+		return PreparedReindex{ReceiptID: receiptID, RequestedRevision: expectedRevision, Command: pipeline.ReindexCommand{ReceiptID: receiptID, Tasks: requestedNames, Limit: limit, Cursor: cursor.String, MissingOnly: missingOnly, ResetSemantic: resetSemantic, RequestedRevision: expectedRevision, Admission: pipeline.AdmissionMaintenance}}, nil
+	}
+	var repositoryID *string
+	if repositoryRaw.Valid {
+		repositoryID = &repositoryRaw.String
+	}
+	repositoryUUID, err := parseRepositoryUUID(repositoryID)
+	if err != nil {
+		return PreparedReindex{}, err
+	}
+	offset := 0
+	if cursor.Valid && cursor.String != "" {
+		offset, err = strconv.Atoi(cursor.String)
+		if err != nil || offset < 0 {
+			return PreparedReindex{}, errors.New("invalid reindex cursor")
+		}
+	}
+	input := ReindexAssetsInput{RepositoryID: repositoryID, Tasks: enabledTasks, Limit: limit, Offset: offset, MissingOnly: missingOnly, ResetSemantic: resetSemantic}
+	candidates, err := s.collectReindexCandidates(ctx, repositoryUUID, enabledTasks, input)
+	if err != nil {
+		return PreparedReindex{}, err
+	}
+	nextOffset, hasMore := nextReindexPageOffset(missingOnly, len(candidates), limit, offset)
+	command := pipeline.ReindexCommand{ReceiptID: receiptID, Tasks: requestedNames, Limit: limit, Cursor: cursor.String, MissingOnly: missingOnly, ResetSemantic: resetSemantic, RequestedRevision: expectedRevision, Admission: pipeline.AdmissionMaintenance}
+	if repositoryRaw.Valid {
+		parsed, err := uuid.Parse(repositoryRaw.String)
+		if err != nil {
+			return PreparedReindex{}, err
+		}
+		command.RepositoryID = &parsed
+	}
+	prepared := PreparedReindex{ReceiptID: receiptID, RequestedRevision: expectedRevision, Command: command, HasMore: hasMore, ResetSemantic: resetSemantic && offset == 0 && containsIndexingTask(enabledTasks, AssetIndexingTaskSemanticImage)}
+	if hasMore {
+		prepared.NextCursor = strconv.Itoa(nextOffset)
+	}
+	prepared.Candidates = make([]PreparedReindexCandidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		prepared.Candidates = append(prepared.Candidates, PreparedReindexCandidate{AssetID: candidate.asset.AssetID, ContentID: candidate.asset.ContentID})
+	}
+	return prepared, nil
+}
+
+// ApplyPreparedReindexTx applies a prepared candidate page to a caller-owned
+// transaction. A stale page is a successful no-op at the commit boundary.
+func (s *assetIndexingService) ApplyPreparedReindexTx(ctx context.Context, tx *sql.Tx, prepared PreparedReindex) error {
+	if s == nil || tx == nil || prepared.ReceiptID == uuid.Nil || prepared.RequestedRevision == 0 {
+		return errors.New("reindex commit is incomplete")
+	}
+	var requested, applied uint64
+	if err := tx.QueryRowContext(ctx, `SELECT requested_revision,applied_revision FROM asset_reindex_requests WHERE receipt_id=?`, prepared.ReceiptID.String()).Scan(&requested, &applied); err != nil {
+		return fmt.Errorf("validate reindex receipt: %w", err)
+	}
+	if requested != prepared.RequestedRevision || applied >= requested {
+		return ErrReindexProjectionStale
+	}
+	qtx := s.queries.WithTx(tx)
+	if prepared.ResetSemantic {
+		if err := qtx.DeleteAllSearchEmbeddings(ctx); err != nil {
+			return fmt.Errorf("reset semantic index: delete embeddings: %w", err)
+		}
+		if err := qtx.ClearDefaultSearchSpaceByType(ctx, string(EmbeddingTypeSemantic)); err != nil {
+			return fmt.Errorf("reset semantic index: clear default space: %w", err)
+		}
+	}
+	for _, candidate := range prepared.Candidates {
+		if candidate.AssetID == uuid.Nil || candidate.ContentID == uuid.Nil {
+			return errors.New("invalid reindex candidate")
+		}
+		if err := pipeline.RequestAssetStagesTx(ctx, tx, candidate.AssetID, candidate.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, pipeline.AdmissionMaintenance, prepared.ReceiptID); err != nil {
+			return err
+		}
+	}
+	if prepared.HasMore {
+		return pipeline.AdvanceReindexTx(ctx, tx, prepared.Command, prepared.NextCursor)
+	}
+	return pipeline.FinishReindexTx(ctx, tx, prepared.ReceiptID, prepared.RequestedRevision)
+}
+
 func nextReindexPageOffset(missingOnly bool, candidateCount, limit, currentOffset int) (nextOffset int, hasMore bool) {
 	if missingOnly || limit <= 0 || candidateCount < limit {
 		return 0, false
@@ -618,138 +657,30 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 	}
 }
 
-func (s *assetIndexingService) enqueueAssetIndexingTasks(
-	ctx context.Context,
-	candidate reindexCandidate,
-) (int, error) {
-	// A queued ML worker resolves and validates an active Location immediately
-	// before opening media. Here we only reject catalog-orphaned Assets; carrying
-	// a path or repository through the River payload would reintroduce the stale
-	// work race that the observation engine removes.
-	if _, err := s.queries.GetPreferredActiveAssetOccurrence(ctx, candidate.asset.AssetID); err != nil {
-		return 0, fmt.Errorf("asset has no active location: %w", err)
-	}
-
-	queued := 0
-	if candidate.tasks[AssetIndexingTaskSemanticImage] {
-		inserted, err := s.enqueueSemanticTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
-		if err != nil {
-			return queued, err
-		}
-		if inserted {
-			queued++
-		}
-	}
-	if candidate.tasks[AssetIndexingTaskOCR] {
-		inserted, err := s.enqueueOCRTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
-		if err != nil {
-			return queued, err
-		}
-		if inserted {
-			queued++
-		}
-	}
-	if candidate.tasks[AssetIndexingTaskFaceRecognition] {
-		inserted, err := s.enqueueFaceTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
-		if err != nil {
-			return queued, err
-		}
-		if inserted {
-			queued++
-		}
-	}
-	if candidate.tasks[AssetIndexingTaskVideoSemantic] {
-		inserted, err := s.enqueueVideoFramesTask(ctx, candidate.asset.AssetID, candidate.asset.ContentID)
-		if err != nil {
-			return queued, err
-		}
-		if inserted {
-			queued++
-		}
-	}
-
-	return queued, nil
-}
-
-func (s *assetIndexingService) enqueueSemanticTask(
-	ctx context.Context,
-	assetID, expectedContentID uuid.UUID,
-) (bool, error) {
-	res, err := s.queueClient.Insert(ctx, jobs.ProcessSemanticArgs{
-		AssetID:           assetID,
-		ExpectedContentID: expectedContentID,
-		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, nil)
-	if err != nil {
-		return false, fmt.Errorf("enqueue semantic job: %w", err)
-	}
-	return !res.UniqueSkippedAsDuplicate, nil
-}
-
-func (s *assetIndexingService) enqueueOCRTask(
-	ctx context.Context,
-	assetID, expectedContentID uuid.UUID,
-) (bool, error) {
-	res, err := s.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
-		AssetID:           assetID,
-		ExpectedContentID: expectedContentID,
-		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, nil)
-	if err != nil {
-		return false, fmt.Errorf("enqueue OCR job: %w", err)
-	}
-	return !res.UniqueSkippedAsDuplicate, nil
-}
-
-func (s *assetIndexingService) enqueueFaceTask(
-	ctx context.Context,
-	assetID, expectedContentID uuid.UUID,
-) (bool, error) {
-	res, err := s.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
-		AssetID:           assetID,
-		ExpectedContentID: expectedContentID,
-		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, nil)
-	if err != nil {
-		return false, fmt.Errorf("enqueue face job: %w", err)
-	}
-	return !res.UniqueSkippedAsDuplicate, nil
-}
-
-func (s *assetIndexingService) enqueueVideoFramesTask(
-	ctx context.Context,
-	assetID, expectedContentID uuid.UUID,
-) (bool, error) {
-	res, err := s.queueClient.Insert(ctx, jobs.ProcessVideoFramesArgs{
-		AssetID:           assetID,
-		ExpectedContentID: expectedContentID,
-		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, nil)
-	if err != nil {
-		return false, fmt.Errorf("enqueue video frames job: %w", err)
-	}
-	return !res.UniqueSkippedAsDuplicate, nil
-}
-
-func (s *assetIndexingService) countPendingQueueJobs(ctx context.Context, queueName string) int64 {
+func (s *assetIndexingService) countPendingCatalogEnrichment(ctx context.Context) int64 {
 	if s.readerPool == nil {
 		return 0
 	}
 
-	const query = `
-SELECT COUNT(*)
-FROM river_job
-WHERE queue = $1
-  AND state IN ('available', 'scheduled', 'running', 'retryable')
-`
-
 	var count int64
-	if err := s.readerPool.QueryRowContext(ctx, query, queueName).Scan(&count); err != nil {
-		s.logger.Warn("indexing stats queue count failed",
+	if err := s.readerPool.QueryRowContext(ctx, `SELECT count(*) FROM asset_pipeline_state WHERE desired_version>applied_version AND stage='enrich'`).Scan(&count); err != nil {
+		s.logger.Warn("indexing stats catalog backlog count failed",
 			zap.String("operation", "indexing.stats"),
-			zap.String("queue", queueName),
+			zap.String("scope", "asset_pipeline.enrich"),
 			zap.Error(err),
 		)
+		return 0
+	}
+	return count
+}
+
+func (s *assetIndexingService) countPendingReindexReceipts(ctx context.Context) int64 {
+	if s.readerPool == nil {
+		return 0
+	}
+	var count int64
+	if err := s.readerPool.QueryRowContext(ctx, `SELECT count(*) FROM asset_reindex_requests WHERE requested_revision>applied_revision`).Scan(&count); err != nil {
+		s.logger.Warn("indexing stats receipt count failed", zap.String("operation", "indexing.stats"), zap.String("scope", "asset_reindex"), zap.Error(err))
 		return 0
 	}
 	return count

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"io"
 	"os"
@@ -11,108 +12,62 @@ import (
 
 	"github.com/google/uuid"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/storage/roe/locations"
 	"server/internal/storage/roe/materializer"
 	"server/internal/storage/roe/nodegraph"
-	"server/internal/storage/roe/outbox"
 )
+
+func processHash(ctx context.Context, fixture *controllerFixture, preparer *materializer.HashPreparer, applier *materializer.HashApplier, nodeID uuid.UUID, revision int64) (materializer.Result, error) {
+	prepared, err := preparer.PrepareHash(ctx, nodeID, revision)
+	if err != nil || prepared == nil {
+		return materializer.Result{Code: materializer.ResultStale, NodeID: nodeID, Revision: revision}, err
+	}
+	var result materializer.Result
+	err = fixture.database.WithTx(ctx, catalogtx.OperationRepositoryMaterializeHash, func(tx *sql.Tx, queries *repo.Queries) error {
+		applied, err := applier.ApplyHash(ctx, tx, *prepared)
+		if err != nil {
+			return err
+		}
+		result = applied
+		if result.Code != materializer.ResultBound && result.Code != materializer.ResultNoop {
+			return nil
+		}
+		return service.ApplyAssetActivationTx(ctx, tx, queries, result.RepositoryID, result.NodeID, result.AssetID, result.ContentID)
+	})
+	return result, err
+}
 
 func drainHashEffects(t *testing.T, fixture *controllerFixture) []materializer.Result {
 	t.Helper()
 	files := storage.NewRepositoryFSFactory(nil, fixture.database.Queries)
-	hasher := materializer.NewHashMaterializer(fixture.database, files)
-	drainer := outbox.New(fixture.database, outbox.Config{BatchSize: 8})
+	preparer := materializer.NewHashPreparer(fixture.database.ReaderQueries, fixture.database.ReaderSQL, files)
+	applier := materializer.NewHashApplier()
 	results := make([]materializer.Result, 0)
 	for turn := 0; turn < 100; turn++ {
-		drainResult, err := drainer.DrainKind(fixture.ctx, "hash", func(ctx context.Context, effect repo.RepositoryOutbox) error {
-			nodeID, err := uuid.Parse(effect.EntityID)
-			if err != nil {
-				return err
-			}
-			result, err := hasher.Process(ctx, nodeID, effect.ExpectedRevision)
-			results = append(results, result)
-			return err
+		candidates, err := fixture.database.ReaderQueries.ListRepositoryMaterializationCandidates(fixture.ctx, repo.ListRepositoryMaterializationCandidatesParams{
+			RepositoryID: fixture.repository.RepoID, Limit: 8,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if drainResult.Claimed == 0 {
+		if len(candidates) == 0 {
 			return results
 		}
-	}
-	t.Fatal("hash outbox did not drain")
-	return nil
-}
-
-func TestRepositoryOutboxReclaimsExpiredLeaseAndRetriesIdempotentDelivery(t *testing.T) {
-	fixture := newControllerFixture(t, 8)
-	now := time.Now().UTC()
-	effect, err := fixture.database.Queries.InsertRepositoryOutboxEffect(fixture.ctx, repo.InsertRepositoryOutboxEffectParams{
-		OutboxID: uuid.New(), RepositoryID: fixture.repository.RepoID,
-		EffectKey: "test:expired-lease", EffectKind: "controller",
-		EntityID: uuid.NewString(), ExpectedRevision: 7, Payload: `{}`,
-		CreatedAt: dbtypes.NewTimestamp(now),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fixture.database.SQL.ExecContext(fixture.ctx, `
-		UPDATE repository_outbox
-		SET status = 'delivering', lease_id = 'crashed-worker',
-		    lease_expires_at = ?, attempt_count = 1
-		WHERE outbox_id = ?`, now.Add(-time.Second).UnixMicro(), effect.OutboxID); err != nil {
-		t.Fatal(err)
-	}
-
-	drainer := outbox.New(fixture.database, outbox.Config{
-		BatchSize: 1, Lease: time.Second, MaxAttempts: 4,
-	})
-	deliveryCalls := 0
-	appliedEffects := map[string]struct{}{}
-	deliver := func(_ context.Context, claimed repo.RepositoryOutbox) error {
-		deliveryCalls++
-		appliedEffects[claimed.EffectKey] = struct{}{}
-		if deliveryCalls == 1 {
-			return errors.New("injected crash after idempotent side effect")
+		for _, candidate := range candidates {
+			result, err := processHash(fixture.ctx, fixture, preparer, applier, candidate.NodeID, candidate.ObservationRevision)
+			results = append(results, result)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
-		return nil
 	}
-
-	first, err := drainer.DrainKind(fixture.ctx, "controller", deliver)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first.Claimed != 1 || first.Retrying != 1 || first.Delivered != 0 {
-		t.Fatalf("first drain = %+v", first)
-	}
-	second, err := drainer.DrainKind(fixture.ctx, "controller", deliver)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if second.Claimed != 1 || second.Delivered != 1 || second.Retrying != 0 {
-		t.Fatalf("second drain = %+v", second)
-	}
-	third, err := drainer.DrainKind(fixture.ctx, "controller", deliver)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if third.Claimed != 0 || deliveryCalls != 2 || len(appliedEffects) != 1 {
-		t.Fatalf("terminal drain=%+v calls=%d applied=%d", third, deliveryCalls, len(appliedEffects))
-	}
-
-	var status string
-	var attempts int64
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
-		"SELECT status, attempt_count FROM repository_outbox WHERE outbox_id = ?", effect.OutboxID,
-	).Scan(&status, &attempts); err != nil {
-		t.Fatal(err)
-	}
-	if status != "delivered" || attempts != 3 {
-		t.Fatalf("outbox status=%q attempts=%d, want delivered/3", status, attempts)
-	}
+	t.Fatal("repository materialization candidates did not drain")
+	return nil
 }
 
 func TestExactCopiesCreateOneOwnerContentAssetAndMultipleLocations(t *testing.T) {
@@ -120,7 +75,7 @@ func TestExactCopiesCreateOneOwnerContentAssetAndMultipleLocations(t *testing.T)
 	contents := []byte("identical original bytes")
 	fixture.writeMedia(t, "copies/one.jpg", contents)
 	fixture.writeMedia(t, "copies/two.jpg", contents)
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,19 +94,20 @@ func TestExactCopiesCreateOneOwnerContentAssetAndMultipleLocations(t *testing.T)
 	if bound != 2 || newAssets != 1 {
 		t.Fatalf("hash results bound=%d new_assets=%d: %+v", bound, newAssets, results)
 	}
-	var contentsCount, assetsCount, locationsCount, processingEffects int
+	var contentsCount, assetsCount, locationsCount, mediaItems, pipelineStates int
 	row := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
 		SELECT
 		  (SELECT count(*) FROM content_objects),
 		  (SELECT count(*) FROM assets),
 		  (SELECT count(*) FROM asset_locations WHERE unbound_observation_revision IS NULL),
-		  (SELECT count(*) FROM repository_outbox WHERE effect_kind = 'process_asset')`)
-	if err := row.Scan(&contentsCount, &assetsCount, &locationsCount, &processingEffects); err != nil {
+		  (SELECT count(*) FROM media_items),
+		  (SELECT count(*) FROM asset_pipeline_state)`)
+	if err := row.Scan(&contentsCount, &assetsCount, &locationsCount, &mediaItems, &pipelineStates); err != nil {
 		t.Fatal(err)
 	}
-	if contentsCount != 1 || assetsCount != 1 || locationsCount != 2 || processingEffects != 1 {
-		t.Fatalf("content=%d assets=%d locations=%d processing_effects=%d",
-			contentsCount, assetsCount, locationsCount, processingEffects)
+	if contentsCount != 1 || assetsCount != 1 || locationsCount != 2 || mediaItems != 1 || pipelineStates != 3 {
+		t.Fatalf("content=%d assets=%d locations=%d media_items=%d pipeline_states=%d",
+			contentsCount, assetsCount, locationsCount, mediaItems, pipelineStates)
 	}
 	var assetID uuid.UUID
 	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, "SELECT asset_id FROM assets").Scan(&assetID); err != nil {
@@ -174,7 +130,11 @@ func TestExactCopiesCreateOneOwnerContentAssetAndMultipleLocations(t *testing.T)
 	if err := os.Remove(filepath.Join(fixture.repositoryPath, filepath.FromSlash(firstPath))); err != nil {
 		t.Fatal(err)
 	}
-	resolver := locations.NewResolver(fixture.database, storage.NewRepositoryFSFactory(nil, fixture.database.Queries))
+	resolver := locations.NewResolver(
+		fixture.database.ReaderQueries,
+		fixture.database.ReaderSQL,
+		storage.NewRepositoryFSFactory(nil, fixture.database.Queries),
+	)
 	opened, err := resolver.OpenAsset(fixture.ctx, assetID)
 	if err != nil {
 		t.Fatalf("resolve remaining exact copy: %v", err)
@@ -192,7 +152,7 @@ func TestExactCopiesCreateOneOwnerContentAssetAndMultipleLocations(t *testing.T)
 func TestHashMutationPublishesNewRevisionWithoutStaleBinding(t *testing.T) {
 	fixture := newControllerFixture(t, 8)
 	fixture.writeMedia(t, "replace.jpg", []byte("before"))
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +180,7 @@ func TestSharedContentSeparatesAssetsByResolvedOwner(t *testing.T) {
 	fixture := newControllerFixture(t, 8)
 	contents := []byte("shared exact content")
 	fixture.writeMedia(t, "owner-one.jpg", contents)
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +204,7 @@ func TestSharedContentSeparatesAssetsByResolvedOwner(t *testing.T) {
 	}
 	fixture.repository = updatedRepository
 	fixture.writeMedia(t, "owner-two.jpg", contents)
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}

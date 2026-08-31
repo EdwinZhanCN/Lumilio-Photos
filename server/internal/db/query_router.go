@@ -53,7 +53,7 @@ func (r *queryRouter) QueryRowContext(ctx context.Context, query string, args ..
 }
 
 // Transact is intentionally outside repo.DBTX but is discovered by the
-// repository's hand-written atomic helpers (for example MutateAssetStatus).
+// repository's hand-written atomic helpers (for example MutateAssetRating).
 func (r *queryRouter) Transact(ctx context.Context, operation catalogtx.Operation, options *sql.TxOptions, body func(*sql.Tx) error) error {
 	return r.writer.Transact(ctx, operation, options, body)
 }

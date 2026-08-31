@@ -288,7 +288,6 @@ export interface RuntimeConfigSettings {
     "listen": string;
     "storagePath": string;
     "loggingLevel": string;
-    "repositoryScanEnabled": boolean;
     "hardwareAcceleration": string;
 }
 

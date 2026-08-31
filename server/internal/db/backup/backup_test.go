@@ -130,6 +130,65 @@ func TestCreateSnapshotIsStandaloneAndChecksumProtected(t *testing.T) {
 	}
 }
 
+func TestCatalogSnapshotExcludesIndependentQueueDatabase(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	catalogPath := filepath.Join(root, "app-state", "library.sqlite3")
+	queuePath := filepath.Join(root, "app-state", "river.sqlite3")
+	catalog, err := db.Open(ctx, config.DatabaseConfig{Path: catalogPath, QueuePath: queuePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := catalog.MigrateCatalog(ctx); err != nil {
+		_ = catalog.Close(ctx)
+		t.Fatal(err)
+	}
+	queueDB, err := db.OpenQueue(ctx, config.DatabaseConfig{Path: catalogPath, QueuePath: queuePath})
+	if err != nil {
+		_ = catalog.Close(ctx)
+		t.Fatal(err)
+	}
+	if err := queueDB.Migrate(ctx); err != nil {
+		_ = queueDB.Close(ctx)
+		_ = catalog.Close(ctx)
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = queueDB.Close(context.Background())
+		_ = catalog.Close(context.Background())
+	})
+
+	snapshot, err := CreateSnapshot(ctx, catalog.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+		AppVersion: "test", ConfigSchemaVersion: config.SchemaVersion,
+	}, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := db.InspectStandaloneCatalog(ctx, snapshot.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.RiverMigration != 0 {
+		t.Fatalf("catalog snapshot reports River migration %d, want 0", info.RiverMigration)
+	}
+	query := make(url.Values)
+	query.Set("mode", "ro")
+	snapshotDB, err := sql.Open("sqlite3", sqliteuri.DSN(snapshot.Path, query))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer snapshotDB.Close()
+	var riverTables int
+	if err := snapshotDB.QueryRowContext(ctx, `
+		SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = 'river_job'
+	`).Scan(&riverTables); err != nil {
+		t.Fatal(err)
+	}
+	if riverTables != 0 {
+		t.Fatalf("catalog snapshot contains %d River tables, want 0", riverTables)
+	}
+}
+
 func TestCreateSnapshotFromReaderDoesNotWaitForWriterTransaction(t *testing.T) {
 	root := t.TempDir()
 	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))

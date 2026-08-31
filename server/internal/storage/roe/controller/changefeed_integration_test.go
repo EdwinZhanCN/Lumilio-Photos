@@ -127,7 +127,7 @@ func TestHealthyCursorZeroChangeIncrementalPassDoesNotWalkOrHash(t *testing.T) {
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 8, feed)
 	fixture.writeMedia(t, "album/photo.jpg", []byte("original"))
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,15 +136,16 @@ func TestHealthyCursorZeroChangeIncrementalPassDoesNotWalkOrHash(t *testing.T) {
 		t.Fatalf("initial healthy-cursor run = %q", firstRun.Status)
 	}
 
-	var observationsBefore, hashesBefore int
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-		SELECT
-		  (SELECT count(*) FROM repository_observations),
-		  (SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash')
-	`).Scan(&observationsBefore, &hashesBefore); err != nil {
+	var observationsBefore int
+	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
+		"SELECT count(*) FROM repository_observations").Scan(&observationsBefore); err != nil {
 		t.Fatal(err)
 	}
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", false)
+	hashesBefore, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,12 +153,13 @@ func TestHealthyCursorZeroChangeIncrementalPassDoesNotWalkOrHash(t *testing.T) {
 	if secondRun.Status != StatusCompleted || secondRun.DirectoriesObserved != 0 || secondRun.FilesObserved != 0 {
 		t.Fatalf("zero-change incremental run = %+v", secondRun)
 	}
-	var observationsAfter, hashesAfter int
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-		SELECT
-		  (SELECT count(*) FROM repository_observations),
-		  (SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash')
-	`).Scan(&observationsAfter, &hashesAfter); err != nil {
+	var observationsAfter int
+	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
+		"SELECT count(*) FROM repository_observations").Scan(&observationsAfter); err != nil {
+		t.Fatal(err)
+	}
+	hashesAfter, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if observationsAfter != observationsBefore || hashesAfter != hashesBefore {
@@ -173,7 +175,7 @@ func TestFixedCatchUpCoalescesManyHintsIntoOneDirectoryVerification(t *testing.T
 	for index := range files {
 		fixture.writeMedia(t, fmt.Sprintf("album/photo-%03d.jpg", index), []byte("unchanged"))
 	}
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +183,7 @@ func TestFixedCatchUpCoalescesManyHintsIntoOneDirectoryVerification(t *testing.T
 	for index := range files {
 		feed.publish(changefeed.EventModify, fmt.Sprintf("album/photo-%03d.jpg", index), "", false)
 	}
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +214,7 @@ func TestCaughtUpAuthoritativeParentFinalizesAbsence(t *testing.T) {
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 8, feed)
 	fixture.writeMedia(t, "gone.jpg", []byte("original"))
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +225,7 @@ func TestCaughtUpAuthoritativeParentFinalizesAbsence(t *testing.T) {
 		t.Fatal(err)
 	}
 	feed.publish(changefeed.EventRemove, "gone.jpg", "", false)
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +266,7 @@ func TestCaughtUpMissingDirectoryClosesDescendantLocationsInBoundedCascades(t *t
 	fixture.writeMedia(t, "album/direct.jpg", []byte("direct"))
 	fixture.writeMedia(t, "album/nested/first.jpg", []byte("first"))
 	fixture.writeMedia(t, "album/nested/second.jpg", []byte("second"))
-	initial, err := fixture.controller.Request(
+	initial, err := fixture.commands.Request(
 		fixture.ctx,
 		fixture.repository.RepoID,
 		"manual",
@@ -282,7 +284,7 @@ func TestCaughtUpMissingDirectoryClosesDescendantLocationsInBoundedCascades(t *t
 		t.Fatal(err)
 	}
 	feed.publish(changefeed.EventRemove, "album", "", false)
-	receipt, err := fixture.controller.Request(
+	receipt, err := fixture.commands.Request(
 		fixture.ctx,
 		fixture.repository.RepoID,
 		"watcher",
@@ -327,11 +329,11 @@ func TestCaughtUpMissingDirectoryClosesDescendantLocationsInBoundedCascades(t *t
 	}
 	// A new process owns no in-memory frontier or cursor state. It must reclaim
 	// the expired absence lease and continue from the persisted keyset cursor.
-	fixture.controller = New(
+	fixture.controller, _ = newTestControllerRuntime(
+		t,
 		fixture.database,
-		fixture.controller.files,
+		fixture.files,
 		Config{BatchSize: 1, ChangeFeed: feed},
-		nil,
 	)
 	run = fixture.runToTerminal(t, receipt.OperationID)
 	if run.Status != StatusCompleted {
@@ -409,7 +411,7 @@ func exerciseAbsenceFinalizationQuantum(
 			[]byte(fmt.Sprintf("photo-%d", index)),
 		)
 	}
-	initial, err := fixture.controller.Request(
+	initial, err := fixture.commands.Request(
 		fixture.ctx,
 		fixture.repository.RepoID,
 		"manual",
@@ -428,7 +430,7 @@ func exerciseAbsenceFinalizationQuantum(
 		t.Fatal(err)
 	}
 	feed.publish(changefeed.EventRemove, "album", "", false)
-	receipt, err := fixture.controller.Request(
+	receipt, err := fixture.commands.Request(
 		fixture.ctx,
 		fixture.repository.RepoID,
 		"watcher",
@@ -500,7 +502,7 @@ func TestNativeIdentityDirectoryRenameChangesOneEdgeWithoutDescendantWalk(t *tes
 	for index := range 16 {
 		fixture.writeMedia(t, fmt.Sprintf("before/photo-%02d.jpg", index), []byte(fmt.Sprintf("photo-%d", index)))
 	}
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,16 +513,15 @@ func TestNativeIdentityDirectoryRenameChangesOneEdgeWithoutDescendantWalk(t *tes
 	`).Scan(&descendantID); err != nil {
 		t.Fatal(err)
 	}
-	var hashesBefore int
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
-		"SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'").Scan(&hashesBefore); err != nil {
+	hashesBefore, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(filepath.Join(fixture.repositoryPath, "before"), filepath.Join(fixture.repositoryPath, "after")); err != nil {
 		t.Fatal(err)
 	}
 	feed.publish(changefeed.EventRename, "after", "before", false)
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,9 +529,8 @@ func TestNativeIdentityDirectoryRenameChangesOneEdgeWithoutDescendantWalk(t *tes
 	if run.Status != StatusCompleted || run.FilesObserved != 0 {
 		t.Fatalf("rename run unexpectedly walked descendants: %+v", run)
 	}
-	var hashesAfter int
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx,
-		"SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'").Scan(&hashesAfter); err != nil {
+	hashesAfter, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if hashesAfter != hashesBefore {
@@ -551,7 +551,7 @@ func TestFixedCatchUpBoundaryDefersLateCoalescedChangeToFollowUpRun(t *testing.T
 	fixture.writeMedia(t, "a.jpg", []byte("a"))
 	fixture.writeMedia(t, "b.jpg", []byte("b"))
 	fixture.writeMedia(t, "c.jpg", []byte("c"))
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -559,7 +559,7 @@ func TestFixedCatchUpBoundaryDefersLateCoalescedChangeToFollowUpRun(t *testing.T
 
 	feed.publish(changefeed.EventModify, "a.jpg", "", false)
 	feed.publish(changefeed.EventModify, "b.jpg", "", false)
-	current, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	current, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -572,14 +572,14 @@ func TestFixedCatchUpBoundaryDefersLateCoalescedChangeToFollowUpRun(t *testing.T
 
 	// Recreate the controller after C1 has been persisted. No in-memory
 	// checkpoint may be needed to keep this run's catch-up boundary fixed.
-	fixture.controller = New(
+	fixture.controller, _ = newTestControllerRuntime(
+		t,
 		fixture.database,
-		fixture.controller.files,
+		fixture.files,
 		Config{BatchSize: 1, ChangeFeed: feed},
-		nil,
 	)
 	feed.publish(changefeed.EventModify, "c.jpg", "", false)
-	late, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	late, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -631,7 +631,7 @@ func TestChangeFeedOverflowCannotFinalizeAbsence(t *testing.T) {
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 8, feed)
 	fixture.writeMedia(t, "keep.jpg", []byte("keep"))
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,7 +643,7 @@ func TestChangeFeedOverflowCannotFinalizeAbsence(t *testing.T) {
 	feed.publish(changefeed.EventRemove, "keep.jpg", "", false)
 	feed.failReads(changefeed.HealthOverflow, changefeed.ErrCursorInvalid)
 
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -691,7 +691,7 @@ func TestMalformedChangeEventFailsClosedWithoutWedgingController(t *testing.T) {
 			feed := &deterministicFeed{}
 			fixture := newControllerFixtureWithFeed(t, 8, feed)
 			fixture.writeMedia(t, "keep.jpg", []byte("keep"))
-			initial, err := fixture.controller.Request(
+			initial, err := fixture.commands.Request(
 				fixture.ctx,
 				fixture.repository.RepoID,
 				"manual",
@@ -708,7 +708,7 @@ func TestMalformedChangeEventFailsClosedWithoutWedgingController(t *testing.T) {
 			}
 			feed.publishRaw(test.event)
 
-			receipt, err := fixture.controller.Request(
+			receipt, err := fixture.commands.Request(
 				fixture.ctx,
 				fixture.repository.RepoID,
 				"watcher",
@@ -741,7 +741,7 @@ func TestVolumeIdentityReplacementCannotFinalizeAbsence(t *testing.T) {
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 8, feed)
 	fixture.writeMedia(t, "keep.jpg", []byte("keep"))
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -752,7 +752,7 @@ func TestVolumeIdentityReplacementCannotFinalizeAbsence(t *testing.T) {
 	}
 	feed.replaceVolume("replacement-volume")
 
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -787,7 +787,7 @@ func TestRemovableVolumeAbsenceSettlesAcrossAuthoritativeRuns(t *testing.T) {
 	feed := &deterministicFeed{}
 	fixture := newControllerFixtureWithFeed(t, 8, feed)
 	fixture.writeMedia(t, "settle.jpg", []byte("settle"))
-	initial, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	initial, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,7 +802,7 @@ func TestRemovableVolumeAbsenceSettlesAcrossAuthoritativeRuns(t *testing.T) {
 	}
 	feed.publish(changefeed.EventRemove, "settle.jpg", "", false)
 
-	first, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -822,7 +822,7 @@ func TestRemovableVolumeAbsenceSettlesAcrossAuthoritativeRuns(t *testing.T) {
 	}
 
 	fixedNow = fixedNow.Add(2 * time.Hour)
-	second, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", true)
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

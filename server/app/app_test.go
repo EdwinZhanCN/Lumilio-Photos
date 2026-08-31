@@ -2,9 +2,7 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,10 +11,8 @@ import (
 
 	"server/config"
 	"server/internal/db"
-	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/event"
 	"server/internal/storage"
 
 	"github.com/google/uuid"
@@ -202,195 +198,6 @@ func TestProductURLUsesLoopbackForDesktopListeners(t *testing.T) {
 		}
 	}
 }
-
-func TestQueueRecoveryPredicatesOnlyWakeForDurableWork(t *testing.T) {
-	ctx := context.Background()
-	database, repository, _, _ := newCutoverPreflightFixture(t, ctx)
-	now := time.Now().UTC()
-
-	pending, err := repositoryOutboxWorkPending(ctx, database.ReaderSQL, "controller", now)
-	if err != nil || pending {
-		t.Fatalf("empty repository outbox pending=%t err=%v", pending, err)
-	}
-	pending, err = eventMaintenanceWorkPending(ctx, database.ReaderSQL, now)
-	if err != nil || pending {
-		t.Fatalf("converged Event state pending=%t err=%v", pending, err)
-	}
-	pending, err = locationProjectionWorkPending(ctx, database.ReaderSQL)
-	if err != nil || pending {
-		t.Fatalf("converged location projection pending=%t err=%v", pending, err)
-	}
-	pending, err = ocrIndexWorkPending(ctx, database.ReaderSQL)
-	if err != nil || pending {
-		t.Fatalf("empty OCR outbox pending=%t err=%v", pending, err)
-	}
-
-	outboxID := uuid.New()
-	if _, err := database.Queries.InsertRepositoryOutboxEffect(ctx, repo.InsertRepositoryOutboxEffectParams{
-		OutboxID:         outboxID,
-		RepositoryID:     repository.RepoID,
-		EffectKey:        "controller:test:1",
-		EffectKind:       "controller",
-		EntityID:         uuid.NewString(),
-		ExpectedRevision: 1,
-		Payload:          `{}`,
-		CreatedAt:        dbtypes.NewTimestamp(now),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	pending, err = repositoryOutboxWorkPending(ctx, database.ReaderSQL, "controller", now)
-	if err != nil || !pending {
-		t.Fatalf("durable repository outbox pending=%t err=%v", pending, err)
-	}
-	activeRepositoryJob := insertActiveRiverJob(t, ctx, database.SQL, "drain_repository_outbox", "repository_outbox", `{"effectKind":"controller"}`)
-	pending, err = repositoryOutboxWorkPending(ctx, database.ReaderSQL, "controller", now)
-	if err != nil || pending {
-		t.Fatalf("actively owned repository outbox pending=%t err=%v", pending, err)
-	}
-	deleteRiverJob(t, ctx, database.SQL, activeRepositoryJob)
-	futureLease := now.Add(time.Minute).UnixMicro()
-	if _, err := database.SQL.ExecContext(ctx, `
-UPDATE repository_outbox
-SET status='delivering', lease_id='active', lease_expires_at=?
-WHERE outbox_id=?`, futureLease, outboxID); err != nil {
-		t.Fatal(err)
-	}
-	pending, err = repositoryOutboxWorkPending(ctx, database.ReaderSQL, "controller", now)
-	if err != nil || pending {
-		t.Fatalf("actively leased repository outbox pending=%t err=%v", pending, err)
-	}
-	pending, err = repositoryOutboxWorkPending(ctx, database.ReaderSQL, "controller", now.Add(2*time.Minute))
-	if err != nil || !pending {
-		t.Fatalf("expired repository outbox pending=%t err=%v", pending, err)
-	}
-
-	owner, err := database.Queries.GetUserByUsername(ctx, "cutover-owner")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := database.WithTx(ctx, catalogtx.OperationEventRebuildRequest, func(tx *sql.Tx, _ *repo.Queries) error {
-		return event.MarkEventFactsChangedTx(ctx, tx, owner.UserID, "queue_recovery_test")
-	}); err != nil {
-		t.Fatal(err)
-	}
-	pending, err = eventMaintenanceWorkPending(ctx, database.ReaderSQL, now)
-	if err != nil || !pending {
-		t.Fatalf("dirty Event state pending=%t err=%v", pending, err)
-	}
-	activeEventJob := insertActiveRiverJob(t, ctx, database.SQL, "schedule_event_rebuilds", "event_scheduler", `{}`)
-	pending, err = eventMaintenanceWorkPending(ctx, database.ReaderSQL, now)
-	if err != nil || pending {
-		t.Fatalf("actively owned Event maintenance pending=%t err=%v", pending, err)
-	}
-	deleteRiverJob(t, ctx, database.SQL, activeEventJob)
-
-	if _, err := database.SQL.ExecContext(ctx, `
-INSERT INTO location_projection_state (
-  repository_id, owner_id, source_revision, published_revision, updated_at
-) VALUES (?, ?, 2, 1, ?)
-`, repository.RepoID, owner.UserID, now.UnixMicro()); err != nil {
-		t.Fatal(err)
-	}
-	pending, err = locationProjectionWorkPending(ctx, database.ReaderSQL)
-	if err != nil || !pending {
-		t.Fatalf("dirty location projection pending=%t err=%v", pending, err)
-	}
-	activeLocationJob := insertActiveRiverJob(
-		t,
-		ctx,
-		database.SQL,
-		"rebuild_location_clusters",
-		"rebuild_location_clusters",
-		`{"repositoryId":"`+repository.RepoID.String()+`","ownerId":`+fmt.Sprint(owner.UserID)+`}`,
-	)
-	pending, err = locationProjectionWorkPending(ctx, database.ReaderSQL)
-	if err != nil || pending {
-		t.Fatalf("actively owned location projection pending=%t err=%v", pending, err)
-	}
-	deleteRiverJob(t, ctx, database.SQL, activeLocationJob)
-	activeLocationScheduler := insertActiveRiverJob(t, ctx, database.SQL, "schedule_location_rebuilds", "rebuild_location_clusters", `{}`)
-	pending, err = locationProjectionWorkPending(ctx, database.ReaderSQL)
-	if err != nil || pending {
-		t.Fatalf("actively owned location scheduler pending=%t err=%v", pending, err)
-	}
-	deleteRiverJob(t, ctx, database.SQL, activeLocationScheduler)
-
-	if err := database.Queries.UpsertOCRIndexOutbox(ctx, repo.UpsertOCRIndexOutboxParams{
-		AssetID: uuid.New(), Revision: 1,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	pending, err = ocrIndexWorkPending(ctx, database.ReaderSQL)
-	if err != nil || !pending {
-		t.Fatalf("durable OCR outbox pending=%t err=%v", pending, err)
-	}
-	activeOCRJob := insertActiveRiverJob(t, ctx, database.SQL, "process_ocr_outbox", "ocr_index", `{}`)
-	pending, err = ocrIndexWorkPending(ctx, database.ReaderSQL)
-	if err != nil || pending {
-		t.Fatalf("actively owned OCR outbox pending=%t err=%v", pending, err)
-	}
-	deleteRiverJob(t, ctx, database.SQL, activeOCRJob)
-}
-
-func insertActiveRiverJob(t *testing.T, ctx context.Context, database *sql.DB, kind, queue, args string) int64 {
-	t.Helper()
-	result, err := database.ExecContext(ctx, `
-INSERT INTO river_job(kind, queue, state, args)
-VALUES (?, ?, 'running', jsonb(?))`, kind, queue, args)
-	if err != nil {
-		t.Fatalf("insert active River job %s: %v", kind, err)
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		t.Fatalf("read active River job %s ID: %v", kind, err)
-	}
-	return id
-}
-
-func deleteRiverJob(t *testing.T, ctx context.Context, database *sql.DB, id int64) {
-	t.Helper()
-	if _, err := database.ExecContext(ctx, `DELETE FROM river_job WHERE id = ?`, id); err != nil {
-		t.Fatalf("delete active River job %d: %v", id, err)
-	}
-}
-
-func TestPendingWorkSignalCoalescesWithoutBlockingPeriodicConstructor(t *testing.T) {
-	signal := &pendingWorkSignal{}
-	if signal.ConsumePending() {
-		t.Fatal("new signal unexpectedly pending")
-	}
-
-	signal.Notify()
-	signal.Notify()
-	if !signal.ConsumePending() {
-		t.Fatal("coalesced durable work signal was not consumed")
-	}
-	if signal.ConsumePending() {
-		t.Fatal("one wakeup must consume all duplicate notifications")
-	}
-}
-
-func TestPendingWorkMonitorLevelTriggersUnownedBacklog(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	notifier := &countingPendingNotifier{}
-	checks := 0
-	monitorPendingWork(ctx, time.Microsecond, "test_backlog", func(context.Context) (bool, error) {
-		checks++
-		if checks == 3 {
-			cancel()
-		}
-		return true, nil
-	}, notifier, nil)
-	if notifier.count != 3 {
-		t.Fatalf("notifications = %d, want one for every positive unowned-work probe", notifier.count)
-	}
-}
-
-type countingPendingNotifier struct {
-	count int
-}
-
-func (n *countingPendingNotifier) Notify() { n.count++ }
 
 func TestWALStateOnlyRearmsCheckpointAfterFileChanges(t *testing.T) {
 	checkpointed := db.WALState{SizeBytes: 8 << 20, ModifiedAt: time.Unix(10, 20)}

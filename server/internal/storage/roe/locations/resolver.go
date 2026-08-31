@@ -6,13 +6,13 @@ package locations
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/google/uuid"
 
-	"server/internal/db"
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"server/internal/storage/roe/nodegraph"
@@ -21,12 +21,23 @@ import (
 var ErrAssetUnavailable = errors.New("asset has no available active location")
 
 type Resolver struct {
-	database *db.DB
+	reader   Reader
+	queryRow QueryRower
 	files    *storage.RepositoryFSFactory
 }
 
-func NewResolver(database *db.DB, files *storage.RepositoryFSFactory) *Resolver {
-	return &Resolver{database: database, files: files}
+type Reader interface {
+	ListActiveAssetLocations(context.Context, uuid.UUID) ([]repo.AssetLocation, error)
+	GetRepositoryNode(context.Context, repo.GetRepositoryNodeParams) (repo.RepositoryNode, error)
+	GetRepository(context.Context, uuid.UUID) (repo.Repository, error)
+}
+
+type QueryRower interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func NewResolver(reader Reader, queryRow QueryRower, files *storage.RepositoryFSFactory) *Resolver {
+	return &Resolver{reader: reader, queryRow: queryRow, files: files}
 }
 
 type OpenedMedia struct {
@@ -55,10 +66,10 @@ func (opened *OpenedMedia) Close() error {
 }
 
 func (r *Resolver) OpenAsset(ctx context.Context, assetID uuid.UUID) (*OpenedMedia, error) {
-	if r == nil || r.database == nil || r.files == nil {
+	if r == nil || r.reader == nil || r.queryRow == nil || r.files == nil {
 		return nil, ErrAssetUnavailable
 	}
-	locations, err := r.database.ReaderQueries.ListActiveAssetLocations(ctx, assetID)
+	locations, err := r.reader.ListActiveAssetLocations(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("list active asset locations: %w", err)
 	}
@@ -69,7 +80,7 @@ func (r *Resolver) OpenAsset(ctx context.Context, assetID uuid.UUID) (*OpenedMed
 			unavailable = errors.Join(unavailable, err)
 			continue
 		}
-		projectedPath, err := nodegraph.ProjectPath(ctx, r.database.ReaderQueries, node.RepositoryID, node.NodeID)
+		projectedPath, err := nodegraph.ProjectPath(ctx, r.reader, node.RepositoryID, node.NodeID)
 		if err != nil {
 			unavailable = errors.Join(unavailable, err)
 			continue
@@ -79,7 +90,7 @@ func (r *Resolver) OpenAsset(ctx context.Context, assetID uuid.UUID) (*OpenedMed
 			unavailable = errors.Join(unavailable, err)
 			continue
 		}
-		repository, err := r.database.ReaderQueries.GetRepository(ctx, node.RepositoryID)
+		repository, err := r.reader.GetRepository(ctx, node.RepositoryID)
 		if err != nil {
 			unavailable = errors.Join(unavailable, err)
 			continue
@@ -121,12 +132,12 @@ func (r *Resolver) LocalAssetPath(ctx context.Context, assetID uuid.UUID) (*Open
 
 func (r *Resolver) nodeByID(ctx context.Context, nodeID uuid.UUID) (repo.RepositoryNode, error) {
 	var repositoryID uuid.UUID
-	if err := r.database.ReaderSQL.QueryRowContext(ctx,
+	if err := r.queryRow.QueryRowContext(ctx,
 		"SELECT repository_id FROM repository_nodes WHERE node_id = ?", nodeID,
 	).Scan(&repositoryID); err != nil {
 		return repo.RepositoryNode{}, err
 	}
-	return r.database.ReaderQueries.GetRepositoryNode(ctx, repo.GetRepositoryNodeParams{
+	return r.reader.GetRepositoryNode(ctx, repo.GetRepositoryNodeParams{
 		RepositoryID: repositoryID, NodeID: nodeID,
 	})
 }

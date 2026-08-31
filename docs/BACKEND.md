@@ -26,11 +26,6 @@ This document describes the current Go backend as implemented in `server/`.
   Docker-managed named volumes for isolated development state.
 - Browser E2E Compose files: `web/e2e/compose.yml` plus the CI cache overlay
   `web/e2e/compose.ci.yml`.
-- SQLite/River qualification uses the host-side
-  `server/tools/sqlitepressure` controller plus
-  `web/e2e/compose.pressure.yml`. Every growing bind mount and artifact stays
-  below `.cache/sqlite-concurrency/<run-id>/`; the controller stops producers
-  at 15 GiB and fails at 16 GiB so rollback and cleanup keep a 4 GiB reserve.
 
 Startup ownership is split between the thin CLI host and the shared app runtime:
 
@@ -40,15 +35,15 @@ Startup ownership is split between the thin CLI host and the shared app runtime:
 2. `server/app.Run` owns the actual runtime bootstrap:
    - initialize logging
    - start libvips runtime
-   - open the single-writer SQLite catalog
-   - run application and River migrations
+   - open the single-writer SQLite catalog and independent QueueDB
+   - run catalog and River migrations in their respective files
    - construct the generated query layer
    - initialize settings, repository storage, River queues, ML services, processors, handlers, and router
    - start `internal/servertransport` from `server.listen` and `server.tls.mode`
 
 ## Configuration Boundary
 
-Runtime-immutable configuration is a complete schema v4 manifest, not a defaults
+Runtime-immutable configuration is a complete schema v5 manifest, not a defaults
 or override layer. Missing, unknown, legacy, contradictory, or invalid fields
 fail startup. Relative paths use the manifest directory. Startup logs the
 absolute path, schema version, and source SHA-256 without logging secret content.
@@ -84,10 +79,17 @@ does not narrow their backend test surface: the App embeds the complete runtime,
 so both Desktop platforms run all Server tests in their native CI environment.
 
 TOML contains all immutable database/server/logging/storage/repository-observation/auth/
-transcode/Lumen/tool decisions. `[database]` contains only the explicit
-persistent catalog path. The application secret is a file reference and may be
+transcode/Lumen/tool decisions. `[database]` contains the explicit persistent
+catalog path and the distinct persistent `queue_path`; River execution state is
+not part of catalog backups. The application secret is a file reference and may be
 created at that exact path on first start. No secret value appears in TOML,
 generated desktop manifests, or logs.
+
+`[repository_scan].interval_seconds` controls a mandatory startup-and-periodic
+authoritative verification sweep over every active Repository.
+`settle_seconds` controls file-stability observation; there is no enable switch
+or repository concurrency/batch knob because bounded ROE turns and global
+resource admission own those limits.
 
 Reverse-geocoding provider, endpoint, response language, and User-Agent are
 runtime-mutable administrator settings owned by the singleton SQLite `settings`
@@ -116,8 +118,11 @@ the Settings WebView never calls the Server HTTP API.
 - `internal/api/handler`: HTTP handlers and request/response wiring.
 - `internal/api/dto`: API DTO types.
 - `internal/service`: business services for auth, assets, settings, search, locations, faces, species, indexing, duplicate detection, cloud import, and Lumen/LLM/classifier integration.
-- `internal/processors`: ingest, metadata, thumbnail, transcode, retry, and asset processing tasks.
-- `internal/queue`: River queue setup and worker implementations.
+- `internal/processors`: read/compute stages for ingest, metadata, derivatives,
+  transcode, and enrichment. Catalog activation is owned by the commit
+  coordinator.
+- `internal/queue`: River adapter, closed macro workers, and operational
+  diagnostics.
 - `internal/db`: database connection, migrations, generated sqlc repo layer.
 - `internal/storage`: RepositoryFS, repository/staging managers, repository config,
   and the Repository Observation Engine under `internal/storage/roe`.
@@ -204,13 +209,21 @@ positive observations may publish, but unproven absence never closes a valid
 Location. Native USN/ReadDirectoryChangesW, FSEvents, and inotify adapters are
 hints backed by periodic authoritative verification.
 
+Independent ROE directory frontiers are enumerated in bounded deterministic
+batches. Catalog desired/applied rows are authoritative for asset, repository,
+and projection work. A transactional domain outbox bulk-delivers closed macro
+commands to QueueDB, while a catalog-only reconciler restores outstanding work
+after QueueDB loss. Fine-grained compute is admitted by the process-wide
+resource governor and background results activate through the bounded commit
+coordinator.
+
 Changed or unresolved nodes are hashed once with BLAKE3 from a stable open
 handle and committed only if their observation revision and before/after token
 still match. `content_objects` owns exact byte identity; one owner/content pair
-has one Asset and may have multiple active Locations. Catalog changes and
-revisioned effects commit together in `repository_outbox`; bounded, leased,
-at-least-once drains feed hashing and derived River work without holding a
-filesystem operation inside a database transaction.
+has one Asset and may have multiple active Locations. Catalog desired/applied
+state and the domain outbox commit together; the bounded coordinator activates
+typed results without holding a filesystem operation inside a database
+transaction.
 
 ## Database And API Contracts
 
@@ -219,14 +232,16 @@ filesystem operation inside a database transaction.
   0.7 extension statically, and applies fixed pragmas to every physical
   connection through driver DSN options plus a connection hook. Startup reads
   the effective values back and fails closed if policy differs.
-- The catalog has exactly one physical read/write connection, shared by
-  application mutations and River, plus four `mode=ro`, `query_only` WAL
-  connections. Do not add another ordinary writer or use `busy_timeout` as a
-  writer-admission design. `database.Queries` routes generated read-only
-  statements to the reader pool and mutations or unclassified statements to
-  the writer; an explicit transaction remains pinned to the connection that
-  began it. The router is checked against SQLite's own statement-readonly
-  classification for every generated query.
+- The catalog has exactly one physical read/write connection for product facts,
+  desired/applied pipeline state, and the domain outbox, plus four `mode=ro`,
+  `query_only` WAL connections.
+  QueueDB has its own one-writer/four-reader pools for River migrations, leases,
+  attempts, and notifications. The paths are explicit `database.path` and
+  `database.queue_path` and must differ. Do not add another catalog writer or
+  use `busy_timeout` as a writer-admission design. `database.Queries` routes
+  generated read-only statements to the catalog reader pool and mutations or
+  unclassified statements to the catalog writer; an explicit transaction
+  remains pinned to the connection that began it.
 - `internal/db/catalogtx` is the closed application transaction capability.
   Every runtime transaction has a compile-time operation name and role; the
   observed connector also names standalone writer statements and returned-row
@@ -248,19 +263,13 @@ filesystem operation inside a database transaction.
   projection; boot and the one-minute storage reconciler own filesystem probes
   and projection writes. Host Action expiry is materialized during reads and
   durably swept only at an explicit recovery boundary.
-- Application tables and River queues share the same catalog. ROE commits
-  business state plus outbox effects in one short transaction and delivers
-  River jobs separately with revision-fenced idempotency. Repeatable River work
-  never uses time-window uniqueness. Revisioned, outbox-backed, or immutable
-  work is unique across every active state; mutable snapshot projections such
-  as Event, Location, and Stack exclude `running` but include every queued state, which
-  preserves exactly one follower when facts change during a run. Further
-  changes coalesce into that follower. Asynchronous, cancellable reader probes
-  arm process-local atomic hints, and
-  River periodic constructors only consume those hints because constructors
-  must never block. An idle system therefore does not continuously write no-op
-  jobs. Bounded ROE outbox pages continue by snoozing the same active job, which
-  yields the writer without inserting a follower.
+- Application tables and River queues use separate files. Foreground commands
+  and asynchronous result commits update desired/applied state and the domain
+  outbox in one short catalog transaction; a bounded dispatcher delivers only
+  the closed macro commands to River with revision-fenced idempotency. River
+  uniqueness is by immutable macro arguments, never a time window. A startup
+  and periodic catalog reconciler re-arms every desired version whose applied
+  version lags, without reading River state to infer product work.
 - WAL auto-checkpointing is disabled on every connection so an arbitrary
   foreground commit is not charged an automatic checkpoint. Runtime monitoring
   samples writer pool wait count/duration and WAL size; once the WAL exceeds
@@ -272,15 +281,14 @@ filesystem operation inside a database transaction.
   published as private mode-0600 `sqlite-runtime.json` under `logging.dir` for
   host-side sampling; there is deliberately no private-data HTTP debug API.
   Slow named transactions remain logged against the write-transaction budget.
-  Online Backup and pre-cutover snapshot reads use a reader connection, never
-  the writer semaphore.
+  Online Backup reads use a reader connection, never the writer semaphore.
 - Migration `000004_media_semantic_events` adds stable Events, membership,
   correction constraints, one-hop redirects, factual dirty ranges, and
   per-owner rebuild state. Migration `000006_event_convergence` adds the
   owner-wide source/published revision pair, renewable rebuild leases, persisted
-  rebuild runs, and the terminal `retired` state. The `event_scheduler` queue
-  discovers pending owners while `rebuild_events` runs owner jobs concurrently;
-  River uniqueness leaves at most one queued/running follower per owner.
+  rebuild runs, and the terminal `retired` state. Event and other derived
+  projections are delivered through the closed `rebuild_projection_batch`
+  macro; River is not the lifecycle authority.
 - Event reads, browse filters, shares, relations, and Agent refs resolve through
   the same owner-aware Event resolver. Repository filtering is a read-only
   Browse Scope projection over canonical logical-media membership. Event shares
@@ -297,15 +305,17 @@ filesystem operation inside a database transaction.
   filtered inside Vec1 and exact-reranked from authoritative BLOBs.
 - OCR search lives at
   `<sqlite-directory>/indexes/bleve/ocr-v1/`. `ocr_results` and
-  `ocr_text_items` remain authoritative; a revisioned SQLite outbox drives
-  Bleve batch updates. Successful OCR result, Trash, and restore commits signal
-  a process-local coalescer; recovery and wake ticks insert a River drain only
-  when the reader observes durable outbox work. Missing, corrupt,
+  `ocr_text_items` remain authoritative; a revisioned catalog projection is
+  rebuilt through `rebuild_projection_batch`. Missing, corrupt,
   mapping-mismatched, and post-restore indexes are deleted and rebuilt before
   HTTP starts.
 - Migrations live in `server/migrations`. The application migration ledger
   records SHA-256 for every applied SQL file; version, name, and checksum must
   continue to match embedded history, so historical migrations are immutable.
+- The current schema deliberately has no catalog-to-QueueDB cutover journal or
+  task-state compatibility layer. A fresh QueueDB is disposable: startup and
+  periodic reconciliation rebuild its macro jobs from catalog desired/applied
+  state after loss or quarantine.
 - SQLite restore is a generation boundary, not a live-handle operation. Its
   journal progresses through `staged`, `previous_preserved`,
   `active_installed`, `verified`, and `completed`; rollback has corresponding
@@ -316,41 +326,8 @@ Generated sqlc code lives under `server/internal/db/repo`. Generated OpenAPI
 output lives in `server/docs`. Frontend generated types live in
 `web/src/lib/http-commons/schema.d.ts`. None of these are hand-edited.
 Regeneration, cast triage, and the swag empty-object quirk:
-[lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
+[lumilio-api-contract-change](../.agents/skills/lumilio-api-contract-change/SKILL.md).
 `task verify:generated` is the CI freshness gate.
-
-## SQLite Runtime Proof
-
-The root tasks below are cross-module orchestration, not ordinary CI wrappers:
-
-```sh
-task sqlite:pressure:smoke RUN_ID=smoke-macos-001
-task sqlite:pressure:baseline RUN_ID=baseline-macos-001
-task sqlite:pressure:qualify RUN_ID=qualify-macos-001
-task sqlite:pressure:soak RUN_ID=soak-macos-001
-task sqlite:pressure:startup RUN_ID=startup-macos-001
-task sqlite:pressure:recover RUN_ID=recover-macos-001
-task sqlite:pressure:compare RUN_ID=qualification-set-macos-001 BASELINE_RUN_ID=baseline-macos-001 MIXED_RUN_IDS=qualify-macos-001,qualify-macos-002,qualify-macos-003
-task sqlite:pressure:cleanup RUN_ID=smoke-macos-001
-```
-
-The smoke profile validates wiring and all corpus/queue families but its short
-histograms are diagnostic only. The baseline uses the same 32 RPS foreground
-mix as qualification after initial durable work has remained drained for 65
-seconds; it disables media/maintenance producers and controlled failure
-injection, and does not require synthetic 23-queue coverage. A steady-state p99
-is eligible only with at least 10,000 scheduled terminal samples in each
-operation class; warm-up is reported separately and repeats are never pooled.
-Startup runs retry-free real Chromium trials and reports p50/p95/max—30
-observations do not justify a p99. Normal startup measurement retains only
-failure traces and the three slowest successful traces. Direct catalog
-inspection occurs only after the runtime is stopped. The compare target refuses
-to pool histograms: it checks all three qualification summaries independently,
-publishes the worst per-run p99, and requires every mixed/idle class ratio to
-stay at or below 4x.
-The soak target keeps the complete 1,200-media producer/queue workload active
-for two hours at exactly half the qualification arrival rate; it remains a
-10,000-sample p99 run rather than a low-volume functional check.
 
 ### API Problem boundary
 
@@ -423,7 +400,26 @@ LAN profiles use the same request-derived Origin behavior as standalone Server.
 
 ## Queues And Processing
 
-River worker counts and queue config live in `internal/queue/queue_setup.go`. Worker registration happens in `server/app/app.go`, and the implementations live in `internal/queue`. The processing pipeline uses services and processors for:
+`catalog.db` is the only product truth for asynchronous work. Foreground
+commands atomically update typed desired state and `domain_outbox`; a bulk
+adapter and periodic catalog-only reconciler publish disposable River control
+work. `river.sqlite3` may be replaced without changing reported product state.
+River has one `catalog_macro` queue and exactly eight durable kinds:
+`ingest_asset`, `scan_repository_batch`, `analyze_asset`,
+`generate_asset_derivatives`, `transcode_media`, `enrich_asset`,
+`rebuild_projection_batch`, and `backup_catalog`. Fine-grained tasks are an
+in-process DAG, never child River jobs.
+
+The process-wide execution engine admits DAG steps against explicit CPU, disk,
+memory, image-codec, video, and Lumen capacities. Asynchronous producers own
+only narrow read/filesystem capabilities and submit typed immutable results to
+the bounded commit coordinator. They receive success only after catalog commit
+or a fenced stale/already-applied no-op; they cannot own a catalog writer or
+insert follow-up River work. Runtime diagnostics combine desired/applied lag,
+outbox age, macro depth, execution waits, coordinator depth/batches/latency,
+throughput, and both SQLite WAL states.
+
+The processing pipeline covers:
 
 - asset ingest and discovery
 - cloud import materialization
@@ -437,11 +433,12 @@ River worker counts and queue config live in `internal/queue/queue_setup.go`. Wo
 - ML tasks through Lumen, including BioCLIP, OCR, face, semantic indexing, and zero-shot classifier tagging
 
 Accepted uploads expose their user-scoped ingest lifecycle at
-`GET /api/v1/assets/batch/jobs?task_ids=…`. Frontend upload completion means the
-River ingest job reached a terminal state, not merely that multipart transport
-returned 2xx. Repository scans expose run lifecycle through the existing
+`GET /api/v1/assets/batch/operations?receipt_ids=…`. Frontend upload completion
+means the catalog-owned receipt reached a terminal state, not merely that
+multipart transport returned 2xx. The receipt survives QueueDB replacement and
+never exposes River identity. Repository scans expose run lifecycle through the existing
 `/api/v1/repositories/{id}/scans/latest` endpoint. E2E seeding and readiness:
-[lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md).
+[lumilio-e2e-environment](../.agents/skills/lumilio-e2e-environment/SKILL.md).
 
 Materialization owns staging files. A commit error is always returned to River
 or the caller; failed quarantine never deletes the source. Existing physical
@@ -449,6 +446,12 @@ targets and instant-upload duplicates require exact size plus BLAKE3
 verification before staging removal, and conflicts retain both files with a
 structured recoverable ingest phase. HTTP/cloud callers must not add their own
 error cleanup around this boundary.
+
+Derived files publish to immutable identities containing the source fence,
+stage, pipeline version, and name before catalog activation. The first complete
+regular file at an identity is canonical; a retry adopts and hashes it even if
+a nondeterministic encoder recomputes different valid bytes. No catalog row may
+reference a temporary or partial artifact.
 
 `GET /api/v1/assets/map-points` accepts an optional complete
 `south,north,west,east` WGS-84 viewport. All four values must be supplied
@@ -551,7 +554,7 @@ The app should remain useful when ML/LLM features are disabled. Isolated E2E
 talks to `fakelumen`, which replays recorded Hub responses (or a deterministic
 builtin embedding when no fixture matches). Recording is explicit, never
 implicit in CI:
-[lumilio-lumen-fixtures](../../../.agents/skills/lumilio-lumen-fixtures/SKILL.md).
+[lumilio-lumen-fixtures](../.agents/skills/lumilio-lumen-fixtures/SKILL.md).
 
 ## Quality Gate
 
@@ -562,4 +565,4 @@ task server:test
 The Taskfile target exports the local cgo flag allowlist needed by media
 dependencies on macOS. Reproduce the CI Server gate with `task server:test:ci`.
 Run `gofmt` on changed Go files. Map a diff to evidence with
-[lumilio-select-checks](../../../.agents/skills/lumilio-select-checks/SKILL.md).
+[lumilio-select-checks](../.agents/skills/lumilio-select-checks/SKILL.md).

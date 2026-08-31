@@ -34,9 +34,10 @@ var registerVec1Extension sync.Once
 
 const sqliteWriteTransactionBudget = 25 * time.Millisecond
 
-// DB owns the SQLite catalog's explicit connection roles. SQL is the sole
-// writer pool shared by application writes and River. ReaderSQL is a bounded,
-// query-only WAL pool for foreground reads and controller snapshots.
+// DB owns the catalog SQLite connection roles. SQL is the sole catalog writer
+// for product facts and durable work intent. River execution state belongs to
+// QueueDB. ReaderSQL is a bounded, query-only WAL pool for foreground reads and
+// controller snapshots.
 type DB struct {
 	SQL           *sql.DB
 	Queries       *repo.Queries
@@ -218,8 +219,8 @@ func Open(ctx context.Context, cfg config.DatabaseConfig, suppliedOptions ...Ope
 	}, nil
 }
 
-// WithTx runs fn in one named, measured write transaction shared by
-// application queries and River InsertTx calls.
+// WithTx runs fn in one named, measured catalog write transaction. Queue work
+// must be recorded as catalog intent and dispatched to QueueDB after commit.
 func (d *DB) WithTx(
 	ctx context.Context,
 	operation catalogtx.Operation,
@@ -321,10 +322,11 @@ type TelemetrySnapshot struct {
 }
 
 func (d *DB) TelemetrySnapshot() TelemetrySnapshot {
-	result := TelemetrySnapshot{ObservedAt: time.Now().UTC(), Catalog: d.TransactionReport()}
+	result := TelemetrySnapshot{ObservedAt: time.Now().UTC()}
 	if d == nil {
 		return result
 	}
+	result.Catalog = d.TransactionReport()
 	if d.SQL != nil {
 		result.Writer = d.SQL.Stats()
 	}
@@ -339,6 +341,9 @@ func (d *DB) TelemetrySnapshot() TelemetrySnapshot {
 // other writes, so checkpoint work is serialized rather than racing a second
 // write-capable connection.
 func (d *DB) PassiveCheckpoint(ctx context.Context) (CheckpointResult, error) {
+	if d == nil || d.Writer == nil {
+		return CheckpointResult{}, errors.New("catalog database is not open")
+	}
 	started := time.Now()
 	var result CheckpointResult
 	if err := d.Writer.QueryRowContext(ctx, catalogtx.OperationSQLitePassiveCheckpoint, "PRAGMA wal_checkpoint(PASSIVE)").Scan(
@@ -355,6 +360,9 @@ func (d *DB) PassiveCheckpoint(ctx context.Context) (CheckpointResult, error) {
 // InspectWAL returns the currently allocated live WAL file version. A missing
 // WAL means the catalog has no accumulated frames and is reported as zero.
 func (d *DB) InspectWAL() (WALState, error) {
+	if d == nil || strings.TrimSpace(d.Path) == "" {
+		return WALState{}, errors.New("catalog database is not open")
+	}
 	info, err := os.Stat(d.Path + "-wal")
 	if errors.Is(err, os.ErrNotExist) {
 		return WALState{}, nil
@@ -375,6 +383,9 @@ func (d *DB) WALSize() (int64, error) {
 // Check validates the live catalog after migrations or before a destructive
 // restore boundary.
 func (d *DB) Check(ctx context.Context) error {
+	if d == nil || d.SQL == nil {
+		return errors.New("catalog database is not open")
+	}
 	if err := validateIntegrity(ctx, d.SQL); err != nil {
 		return fmt.Errorf("validate SQLite catalog %s: %w", safeLocation(d.Path), err)
 	}
@@ -464,8 +475,20 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	if err := database.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM lumilio_schema_migrations").Scan(&info.ApplicationMigration); err != nil {
 		return CatalogInfo{}, fmt.Errorf("read application migration version: %w", err)
 	}
-	if err := database.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM river_migration WHERE line = 'main'").Scan(&info.RiverMigration); err != nil {
-		return CatalogInfo{}, fmt.Errorf("read River migration version: %w", err)
+	// River lives in QueueDB for production catalogs. Keep this field as an
+	// optional compatibility observation for historical snapshots and tests;
+	// catalog backup validation must not require River tables.
+	var riverTable int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM sqlite_schema
+		WHERE type = 'table' AND name = 'river_migration'
+	`).Scan(&riverTable); err != nil {
+		return CatalogInfo{}, fmt.Errorf("inspect optional River migration table: %w", err)
+	}
+	if riverTable != 0 {
+		if err := database.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM river_migration WHERE line = 'main'").Scan(&info.RiverMigration); err != nil {
+			return CatalogInfo{}, fmt.Errorf("read optional River migration version: %w", err)
+		}
 	}
 	fileInfo, err := os.Stat(cleanPath)
 	if err != nil {

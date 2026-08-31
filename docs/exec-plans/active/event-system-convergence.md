@@ -1,11 +1,9 @@
 # Event System Convergence and Correctness
 
-Status: active. Implementation is complete as of 2026-08-25: correction
-algebra and frontend convergence landed with the repository lifecycle/SQLite
-work, the temporary write capability flag is removed, and architecture docs
-name the revision lifecycle and shared resolver. The seven-media fixture
-(Phase 0), the legacy-data recovery run (Phase 6), and the repository gates
-remain before this plan can complete.
+Status: active. Event correction algebra, frontend convergence, and the typed
+owner-wide rebuild commit path are landed. The seven-media fixture,
+legacy-data recovery run, and repository gates remain before this plan can
+complete.
 
 Primary owners: `server/internal/event`, `server/internal/queue`,
 `server/internal/sourcing`, `server/internal/service`, `server/internal/api`, and
@@ -96,8 +94,10 @@ before changing production behavior:
   the revision represented by published Events.
 - `source_revision > published_revision` is the only definition of pending
   rebuild work.
-- A single `MarkEventFactsChangedTx` boundary increments the owner revision and
-  inserts or deduplicates the River job in the same catalog transaction.
+- A single `MarkEventFactsChangedTx` boundary increments the owner revision;
+  the owning mutation publishes a typed projection envelope in that same
+  transaction, and the domain-outbox dispatcher later publishes the
+  `rebuild_projection_batch` macro command.
 - The following mutations must call that boundary:
   - logical media creation and permanent deletion;
   - effective capture time, capture offset, timezone, or GPS change;
@@ -105,7 +105,9 @@ before changing production behavior:
   - automatic or manual Stack create, extend, remove, and delete;
   - trash and restore changes that affect eligibility or displayability; and
   - manual Event membership corrections.
-- If an enqueue fails, the fact mutation and revision update roll back together.
+- If envelope persistence fails, the fact mutation and revision update roll
+  back together. A later QueueDB insertion failure leaves the committed
+  envelope retryable and does not roll back product facts.
 - Existing `event_dirty_ranges` may be migrated for recovery, but no code may
   continue treating unused ranges as incremental computation windows.
 
@@ -134,10 +136,10 @@ Additional rules:
   rebuilds the newest revision.
 - A failed worker always releases its lease and remains retryable. Zero newly
   claimed work is never evidence that an earlier failed publish succeeded.
-- Scheduler work runs in a separate queue from rebuild work and ignores paused
-  owners.
+- Rebuild work uses the closed `rebuild_projection_batch` macro and the same
+  owner revision/follower rules; there is no separate scheduler queue.
 - At most one pending follower exists per owner while a rebuild is running.
-- Resume enqueues pending work immediately.
+- Resume advances desired state and publishes the macro command atomically.
 - Persist rebuild runs with queued/running/succeeded/failed/stale state,
   requested and published revisions, timestamps, counts, and a stable error
   code. API responses must not expose raw internal errors.
@@ -256,15 +258,15 @@ not found. It must never fall back to the owner library.
 
 Exit: all observed failures reproduce deterministically in tests.
 
-### Phase 1 — Revision and queue lifecycle
+### Phase 1 — Revision and macro lifecycle
 
 - Migrate owner dirty state to source/published revisions and add rebuild-run
   observability.
 - Introduce `MarkEventFactsChangedTx` and wire every fact mutation listed above.
-- Separate scheduler and rebuild queues; add owner lease, follower dedupe,
-  pause/resume, stale lease, cancellation, and failure cleanup behavior.
-- Add a recovery scan that enqueues every unpaused owner whose source revision
-  is newer than its published revision.
+- Use the closed `rebuild_projection_batch` macro with owner lease, follower
+  dedupe, pause/resume, stale lease, cancellation, and failure cleanup.
+- Add a recovery scan that re-arms every unpaused owner whose source revision is
+  newer than its published revision.
 
 Exit: no fact change can commit without either a deduplicated queued rebuild or
 a rolled-back mutation, and failed jobs remain truthfully pending.

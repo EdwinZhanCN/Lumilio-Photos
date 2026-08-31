@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"desktop/internal/control/dto"
@@ -208,9 +209,6 @@ func (s *Store) PatchDraft(candidate string, settings dto.RuntimeConfigSettings)
 	if err := setTableValue(document, "logging", "level", strings.TrimSpace(settings.LoggingLevel)); err != nil {
 		return dto.RuntimeConfigDraft{}, err
 	}
-	if err := setTableValue(document, "repository_scan", "enabled", settings.RepositoryScanEnabled); err != nil {
-		return dto.RuntimeConfigDraft{}, err
-	}
 	if err := setTableValue(document, "transcode", "hardware_accel", strings.TrimSpace(settings.HardwareAcceleration)); err != nil {
 		return dto.RuntimeConfigDraft{}, err
 	}
@@ -231,12 +229,11 @@ func (s *Store) draftFromBytes(data []byte, baseFingerprint, source string) (dto
 		return dto.RuntimeConfigDraft{}, err
 	}
 	settings := dto.RuntimeConfigSettings{
-		NetworkMode:           desktopNetworkMode(validation.Config.ServerConfig.Listen),
-		Listen:                validation.Config.ServerConfig.Listen,
-		StoragePath:           validation.Config.StorageConfig.Path,
-		LoggingLevel:          validation.Config.LoggingConfig.Level,
-		RepositoryScanEnabled: validation.Config.RepositoryScan.Enabled,
-		HardwareAcceleration:  validation.Config.Transcode.HardwareAccel,
+		NetworkMode:          desktopNetworkMode(validation.Config.ServerConfig.Listen),
+		Listen:               validation.Config.ServerConfig.Listen,
+		StoragePath:          validation.Config.StorageConfig.Path,
+		LoggingLevel:         validation.Config.LoggingConfig.Level,
+		HardwareAcceleration: validation.Config.Transcode.HardwareAccel,
 	}
 	return dto.RuntimeConfigDraft{
 		TOML: string(validation.Canonical), BaseFingerprint: baseFingerprint,
@@ -324,6 +321,9 @@ func (s *Store) defaultIntent() ([]byte, error) {
 	if err := toml.Unmarshal(data, &document); err != nil {
 		return nil, err
 	}
+	if err := materializeExecutionBudget(document); err != nil {
+		return nil, err
+	}
 	stateDir := filepath.Join(s.paths.Root, "state")
 	storagePath := filepath.Join(s.paths.Root, "media")
 	if home, homeErr := os.UserHomeDir(); homeErr == nil && strings.TrimSpace(home) != "" {
@@ -335,6 +335,7 @@ func (s *Store) defaultIntent() ([]byte, error) {
 		value any
 	}{
 		{"database", "path", filepath.Join(stateDir, "library.sqlite3")},
+		{"database", "queue_path", filepath.Join(stateDir, "river.sqlite3")},
 		{"logging", "dir", s.paths.LogsDir},
 		{"storage", "path", storagePath},
 		{"storage", "cloud_state_path", filepath.Join(stateDir, "cloud")},
@@ -356,6 +357,43 @@ func (s *Store) defaultIntent() ([]byte, error) {
 	// bundle is present (dev runs) the empty root keeps the runtime API-only.
 	serverTable["web_root"] = s.paths.WebRoot
 	return toml.Marshal(document)
+}
+
+// materializeExecutionBudget turns the Desktop profile into a complete host
+// intent once. These values are persisted with the candidate and are never
+// recalculated during ordinary Server starts.
+func materializeExecutionBudget(document map[string]any) error {
+	executionTable, err := requireTable(document, "execution")
+	if err != nil {
+		return err
+	}
+	cores := runtime.NumCPU()
+	if cores < 1 {
+		cores = 1
+	}
+	cpu := cores - 1
+	if cpu < 1 {
+		cpu = 1
+	}
+	imageCodec := 1
+	if cores >= 4 {
+		imageCodec = 2
+	}
+	macroWorkers := 2 * (cpu + imageCodec + 1 + 2)
+	if macroWorkers > 32 {
+		macroWorkers = 32
+	}
+	executionTable["cpu"] = cpu
+	executionTable["disk_io"] = max(2, min(4, cores))
+	executionTable["image_codec"] = imageCodec
+	executionTable["video_codec"] = 1
+	executionTable["inference"] = 2
+	executionTable["memory_mib"] = 768
+	executionTable["macro_workers"] = macroWorkers
+	executionTable["max_waiting"] = max(256, macroWorkers*8)
+	executionTable["ffmpeg_threads"] = cpu
+	executionTable["ffmpeg_software_preset"] = "veryfast"
+	return nil
 }
 
 func requireTable(document map[string]any, key string) (map[string]any, error) {

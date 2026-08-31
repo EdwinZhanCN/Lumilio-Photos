@@ -44,14 +44,18 @@ const (
 )
 
 func (s *faceService) recognizePendingFacesForAsset(ctx context.Context, asset repo.Asset, items []repo.FaceItem) error {
-	occurrence, err := s.queries.GetPreferredActiveAssetOccurrence(ctx, asset.AssetID)
+	return s.recognizePendingFacesForAssetWithQueries(ctx, s.queries, asset, items)
+}
+
+func (s *faceService) recognizePendingFacesForAssetWithQueries(ctx context.Context, q *repo.Queries, asset repo.Asset, items []repo.FaceItem) error {
+	occurrence, err := q.GetPreferredActiveAssetOccurrence(ctx, asset.AssetID)
 	if err != nil {
 		return fmt.Errorf("resolve active asset occurrence for face recognition: %w", err)
 	}
 	for _, scope := range collectPendingFaceRecognitionScopes(asset, items) {
 		// The asset's repository bounds which pending faces get processed on
 		// this save; cluster matching inside is owner-wide across repos.
-		if err := s.recognizePendingFaces(ctx, scope, uuid.NullUUID{UUID: occurrence.RepositoryID, Valid: true}); err != nil {
+		if err := s.recognizePendingFacesWithQueries(ctx, q, scope, uuid.NullUUID{UUID: occurrence.RepositoryID, Valid: true}); err != nil {
 			return err
 		}
 	}

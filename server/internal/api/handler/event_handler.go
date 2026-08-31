@@ -14,12 +14,11 @@ import (
 	"server/internal/api/dto"
 	"server/internal/db/catalogtx"
 	"server/internal/event"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 )
 
 type EventHandler struct {
@@ -29,20 +28,16 @@ type EventHandler struct {
 	reader    *sql.DB
 	shares    service.ResolvedSnapshotShareService
 	relations *event.RelationService
-	queue     *river.Client[*sql.Tx]
 }
 
-func NewEventHandler(eventService *event.Service, db *sql.DB, shares service.ResolvedSnapshotShareService, queues ...*river.Client[*sql.Tx]) *EventHandler {
-	return NewEventHandlerWithReader(eventService, db, catalogtx.NewWriter(db, nil), db, shares, queues...)
+func NewEventHandler(eventService *event.Service, db *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
+	return NewEventHandlerWithReader(eventService, db, catalogtx.NewWriter(db, nil), db, shares)
 }
 
-func NewEventHandlerWithReader(eventService *event.Service, db *sql.DB, writer *catalogtx.Writer, reader *sql.DB, shares service.ResolvedSnapshotShareService, queues ...*river.Client[*sql.Tx]) *EventHandler {
+func NewEventHandlerWithReader(eventService *event.Service, db *sql.DB, writer *catalogtx.Writer, reader *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
 	handler := &EventHandler{
 		service: eventService, db: db, writer: writer, reader: reader, shares: shares,
 		relations: event.NewRelationService(reader),
-	}
-	if len(queues) > 0 {
-		handler.queue = queues[0]
 	}
 	return handler
 }
@@ -351,10 +346,6 @@ func (h *EventHandler) RebuildEvents(c *gin.Context) {
 		}
 		ownerID = *request.OwnerID
 	}
-	if h.queue == nil {
-		api.WriteProblem(c, api.Internal(errors.New("Event rebuild queue unavailable")))
-		return
-	}
 	now := apiNowMicros()
 	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventRebuildRequest, nil)
 	if err != nil {
@@ -391,9 +382,7 @@ VALUES(?,?, 'queued',?,?)`, runID, ownerID, requestedRevision, now); err != nil 
 			return
 		}
 	}
-	args := jobs.EventRebuildArgs{OwnerID: ownerID, Force: true}
-	opts := args.InsertOpts()
-	if _, err := h.queue.InsertTx(c, tx.Raw(), args, &opts); err != nil {
+	if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(requestedRevision), true, uuid.New()); err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
@@ -515,7 +504,7 @@ updated_at=excluded.updated_at`, ownerID, event.AlgorithmVersion, now, request.P
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	if !request.Paused && h.queue != nil {
+	if !request.Paused {
 		var sourceRevision, publishedRevision int64
 		if err := tx.QueryRowContext(c, `SELECT source_revision,published_revision FROM event_owner_state WHERE owner_id=?`, ownerID).
 			Scan(&sourceRevision, &publishedRevision); err != nil {
@@ -532,9 +521,7 @@ updated_at=excluded.updated_at`, ownerID, event.AlgorithmVersion, now, request.P
 					return
 				}
 			}
-			args := jobs.EventRebuildArgs{OwnerID: ownerID}
-			opts := args.InsertOpts()
-			if _, err := h.queue.InsertTx(c, tx.Raw(), args, &opts); err != nil {
+			if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(sourceRevision), false, uuid.New()); err != nil {
 				api.WriteProblem(c, api.Internal(err))
 				return
 			}

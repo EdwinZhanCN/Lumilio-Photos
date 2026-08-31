@@ -20,9 +20,8 @@ import (
 	"server/internal/api/problem"
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
-	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/service"
 	"server/internal/storage"
 	roelocations "server/internal/storage/roe/locations"
@@ -38,8 +37,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 )
 
 // AssetHandler handles HTTP requests for asset management
@@ -50,12 +47,12 @@ type AssetHandler struct {
 	stackService     service.StackService
 	queries          *repo.Queries
 	database         *sql.DB
+	readerDatabase   *sql.DB
 	writer           *catalogtx.Writer
 	repoManager      storage.RepositoryManager
 	stagingManager   storage.StagingManager
 	files            *storage.RepositoryFSFactory
 	locationResolver *roelocations.Resolver
-	queueClient      *river.Client[*sql.Tx]
 	settingsService  service.SettingsService
 	runtimeChecker   service.LumenService
 	memoryMonitor    *memory.MemoryMonitor
@@ -75,7 +72,6 @@ func NewAssetHandler(
 	writer *catalogtx.Writer,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
-	queueClient *river.Client[*sql.Tx],
 	settingsService service.SettingsService,
 	runtimeChecker service.LumenService,
 	files *storage.RepositoryFSFactory,
@@ -93,11 +89,11 @@ func NewAssetHandler(
 		stackService:    stackService,
 		queries:         queries,
 		database:        database,
+		readerDatabase:  database,
 		writer:          writer,
 		repoManager:     repoManager,
 		stagingManager:  stagingManager,
 		files:           files,
-		queueClient:     queueClient,
 		settingsService: settingsService,
 		runtimeChecker:  runtimeChecker,
 		memoryMonitor:   memoryMonitor,
@@ -107,6 +103,15 @@ func NewAssetHandler(
 	}
 
 	return handler
+}
+
+// SetReaderDatabase installs the query-only catalog connection used by
+// polling/status endpoints. Tests and small tools may omit it, in which case
+// the constructor's database connection remains the safe fallback.
+func (h *AssetHandler) SetReaderDatabase(reader *sql.DB) {
+	if h != nil && reader != nil {
+		h.readerDatabase = reader
+	}
 }
 
 // SetLocationResolver installs the single execution-time Asset-to-Location
@@ -173,13 +178,13 @@ func (h *AssetHandler) enqueueStagingCommit(
 	originalFilename string,
 	mimeType string,
 	hashes *hash.LayeredHashResult,
-) (int64, error) {
+) (uuid.UUID, error) {
 	if hashes == nil || stagingFile == nil || ownerID <= 0 {
-		return 0, errors.New("staging commit identity is incomplete")
+		return uuid.Nil, errors.New("staging commit identity is incomplete")
 	}
 	tx, err := h.writer.BeginTx(ctx, catalogtx.OperationAssetStagingCommit, nil)
 	if err != nil {
-		return 0, err
+		return uuid.Nil, err
 	}
 	defer tx.Rollback()
 	commitID := uuid.New()
@@ -193,21 +198,16 @@ func (h *AssetHandler) enqueueStagingCommit(
 		QuickFingerprint:        hashes.QuickFingerprint,
 		QuickFingerprintVersion: hashes.QuickFingerprintVersion, CreatedAt: now,
 	}); err != nil {
-		return 0, err
+		return uuid.Nil, err
 	}
-	args := jobs.IngestAssetArgs{CommitID: commitID}
-	opts := args.InsertOpts()
-	inserted, err := h.queueClient.InsertTx(ctx, tx.Raw(), args, &opts)
-	if err != nil {
-		return 0, err
-	}
-	if inserted == nil || inserted.Job == nil {
-		return 0, errors.New("enqueue staging commit returned no job")
+	receiptID := uuid.New()
+	if err := pipeline.RequestIngestTx(ctx, tx.Raw(), commitID, receiptID, uuid.New()); err != nil {
+		return uuid.Nil, err
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, err
+		return uuid.Nil, err
 	}
-	return inserted.Job.ID, nil
+	return receiptID, nil
 }
 
 // rejectOfflineRepository refuses ingest into a repository whose location is not
@@ -339,7 +339,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		api.WriteProblem(c, api.Unauthorized(err))
 		return
 	}
-	jobID, err := h.enqueueStagingCommit(ctx, repository, *ownerID, stagingFile,
+	receiptID, err := h.enqueueStagingCommit(ctx, repository, *ownerID, stagingFile,
 		header.Filename, validationResult.MimeType, hashResult)
 	if err != nil {
 		log.Printf("Failed to enqueue task: %v", err)
@@ -347,10 +347,10 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	log.Printf("Task %d enqueued for processing file %s in repository %s", jobID, header.Filename, repository.Name)
+	log.Printf("Ingest receipt %s accepted for file %s in repository %s", receiptID, header.Filename, repository.Name)
 
 	response := dto.UploadResponseDTO{
-		TaskID:      jobID,
+		ReceiptID:   receiptID.String(),
 		Status:      "processing",
 		FileName:    header.Filename,
 		Size:        header.Size,
@@ -635,8 +635,8 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}
 
 		h.sessionManager.UpdateSessionStatus(sessionID, "completed")
-		if result.TaskID != nil {
-			h.sessionManager.SetSessionTaskID(sessionID, *result.TaskID)
+		if result.ReceiptID != nil {
+			h.sessionManager.SetSessionReceiptID(sessionID, *result.ReceiptID)
 		}
 		result.SessionID = sessionID
 		results = append(results, *result)
@@ -837,7 +837,7 @@ func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 		chunks = append(chunks, upload.ChunkInfo{SessionID: session.SessionID, ChunkIndex: index, PrivatePath: session.ChunkFiles[index], Size: session.ChunkSizes[index]})
 	}
 	h.chunkMerger.AddChunks(session.SessionID, chunks)
-	api.JSONOK(c, dto.UploadSessionResponseDTO{SessionID: session.SessionID, Status: session.Status, TotalChunks: session.TotalChunks, ReceivedChunks: session.ReceivedChunks, BytesReceived: session.BytesReceived, TaskID: session.TaskID})
+	api.JSONOK(c, dto.UploadSessionResponseDTO{SessionID: session.SessionID, Status: session.Status, TotalChunks: session.TotalChunks, ReceivedChunks: session.ReceivedChunks, BytesReceived: session.BytesReceived, ReceiptID: session.ReceiptID})
 }
 
 func (h *AssetHandler) respondCapacityError(c *gin.Context, err error) {
@@ -930,33 +930,33 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 	api.JSONOK(c, response)
 }
 
-// GetUploadJobStatus returns lifecycle state for accepted ingest jobs.
+// GetUploadOperationStatus returns catalog-owned lifecycle state for accepted ingests.
 // @Summary Get upload materialization status
-// @Description Get backend ingest lifecycle state for upload task IDs owned by the current caller
+// @Description Get ingest receipt state owned by the current caller
 // @Tags assets
 // @Produce json
-// @Param task_ids query string true "Comma-separated upload task IDs"
-// @Success 200 {object} dto.UploadJobStatusResponseDTO "Upload materialization status"
-// @Failure 400 {object} api.ProblemResponse "Invalid task IDs"
-// @Router /api/v1/assets/batch/jobs [get]
-func (h *AssetHandler) GetUploadJobStatus(c *gin.Context) {
-	statuses, err := h.loadUploadJobStatuses(c, c.Query("task_ids"))
+// @Param receipt_ids query string true "Comma-separated catalog receipt IDs"
+// @Success 200 {object} dto.UploadOperationStatusResponseDTO "Upload materialization status"
+// @Failure 400 {object} api.ProblemResponse "Invalid receipt IDs"
+// @Router /api/v1/assets/batch/operations [get]
+func (h *AssetHandler) GetUploadOperationStatus(c *gin.Context) {
+	statuses, err := h.loadUploadOperationStatuses(c, c.Query("receipt_ids"))
 	if err != nil {
 		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
-	api.JSONOK(c, dto.UploadJobStatusResponseDTO{Jobs: statuses})
+	api.JSONOK(c, dto.UploadOperationStatusResponseDTO{Operations: statuses})
 }
 
-// StreamUploadJobStatus streams ingest lifecycle updates until every job is terminal.
+// StreamUploadOperationStatus streams catalog ingest receipt updates until terminal.
 // @Summary Stream upload materialization status
 // @Tags assets
 // @Produce text/event-stream
-// @Param task_ids query string true "Comma-separated upload task IDs"
+// @Param receipt_ids query string true "Comma-separated catalog receipt IDs"
 // @Success 200 {string} string "SSE stream"
-// @Router /api/v1/assets/batch/jobs/stream [get]
-func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
-	requestedIDs, err := parseUploadTaskIDs(c.Query("task_ids"))
+// @Router /api/v1/assets/batch/operations/stream [get]
+func (h *AssetHandler) StreamUploadOperationStatus(c *gin.Context) {
+	requestedIDs, err := parseUploadReceiptIDs(c.Query("receipt_ids"))
 	if err != nil {
 		api.WriteProblem(c, api.BadRequest(err))
 		return
@@ -985,16 +985,16 @@ func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
 		return err == nil
 	}
 	for {
-		statuses, err := h.loadUploadJobStatuses(c, c.Query("task_ids"))
+		statuses, err := h.loadUploadOperationStatuses(c, c.Query("receipt_ids"))
 		if err != nil {
 			send("error", problem.NewReference(problem.UploadProcessingFailed, true))
 			return
 		}
-		if !send("jobs", dto.UploadJobStatusResponseDTO{Jobs: statuses}) {
+		if !send("operations", dto.UploadOperationStatusResponseDTO{Operations: statuses}) {
 			return
 		}
-		if allRequestedUploadJobsTerminal(requestedIDs, statuses) {
-			send("done", dto.UploadJobStatusResponseDTO{Jobs: statuses})
+		if allRequestedUploadOperationsTerminal(requestedIDs, statuses) {
+			send("done", dto.UploadOperationStatusResponseDTO{Operations: statuses})
 			return
 		}
 		select {
@@ -1009,41 +1009,53 @@ func (h *AssetHandler) StreamUploadJobStatus(c *gin.Context) {
 	}
 }
 
-func parseUploadTaskIDs(raw string) ([]int64, error) {
+func parseUploadReceiptIDs(raw string) ([]uuid.UUID, error) {
 	rawIDs := strings.Split(strings.TrimSpace(raw), ",")
 	if len(rawIDs) == 0 || len(rawIDs) > 100 || (len(rawIDs) == 1 && strings.TrimSpace(rawIDs[0]) == "") {
-		return nil, errors.New("task_ids must contain between 1 and 100 IDs")
+		return nil, errors.New("receipt_ids must contain between 1 and 100 IDs")
 	}
-	ids := make([]int64, 0, len(rawIDs))
+	ids := make([]uuid.UUID, 0, len(rawIDs))
 	for _, rawID := range rawIDs {
-		id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
-		if err != nil || id <= 0 {
-			return nil, errors.New("task_ids must be positive integers")
+		id, err := uuid.Parse(strings.TrimSpace(rawID))
+		if err != nil {
+			return nil, errors.New("receipt_ids must be UUIDs")
 		}
 		ids = append(ids, id)
 	}
 	return ids, nil
 }
 
-func (h *AssetHandler) loadUploadJobStatuses(c *gin.Context, raw string) ([]dto.UploadJobStatusDTO, error) {
-	ids, err := parseUploadTaskIDs(raw)
+func (h *AssetHandler) loadUploadOperationStatuses(c *gin.Context, raw string) ([]dto.UploadOperationStatusDTO, error) {
+	ids, err := parseUploadReceiptIDs(raw)
 	if err != nil {
 		return nil, err
 	}
-	jobRows, err := h.queueClient.JobList(c.Request.Context(), river.NewJobListParams().IDs(ids...).Kinds(jobs.IngestAssetArgs{}.Kind()).First(len(ids)))
-	if err != nil {
-		return nil, err
-	}
-
 	callerID, err := currentUserIDFromContext(c)
 	if err != nil || callerID == nil {
 		return nil, errors.New("upload owner is unavailable")
 	}
-	statuses := make([]dto.UploadJobStatusDTO, 0, len(jobRows.Jobs))
-	for _, row := range jobRows.Jobs {
-		if status, ok := h.uploadJobStatusForCaller(c.Request.Context(), row, *callerID); ok {
-			statuses = append(statuses, status)
+	statuses := make([]dto.UploadOperationStatusDTO, 0, len(ids))
+	for _, id := range ids {
+		var status dto.UploadOperationStatusDTO
+		var terminalError sql.NullString
+		reader := h.readerDatabase
+		if reader == nil {
+			reader = h.database
 		}
+		err := reader.QueryRowContext(c, `SELECT receipt.receipt_id, commit.original_filename, receipt.state, receipt.terminal_error FROM catalog_operation_receipts receipt JOIN repository_staging_commits commit ON commit.commit_id = receipt.subject_id WHERE receipt.receipt_id = ? AND receipt.kind = 'ingest' AND commit.owner_id = ?`, id.String(), *callerID).Scan(&status.ReceiptID, &status.FileName, &status.Status, &terminalError)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		status.Terminal = status.Status == "completed" || status.Status == "failed"
+		status.Success = status.Status == "completed"
+		if terminalError.Valid {
+			value := problem.ReferenceFor(problem.UploadProcessingFailed, "receipt:"+status.ReceiptID, true)
+			status.Problem = &value
+		}
+		statuses = append(statuses, status)
 	}
 
 	return statuses, nil
@@ -1052,46 +1064,21 @@ func (h *AssetHandler) loadUploadJobStatuses(c *gin.Context, raw string) ([]dto.
 // allRequestedUploadJobsTerminal is true only when every requested task ID is
 // present in statuses and marked terminal. A partial/ownership-filtered set must
 // not end the SSE stream early.
-func allRequestedUploadJobsTerminal(requested []int64, statuses []dto.UploadJobStatusDTO) bool {
+func allRequestedUploadOperationsTerminal(requested []uuid.UUID, statuses []dto.UploadOperationStatusDTO) bool {
 	if len(requested) == 0 {
 		return false
 	}
-	byID := make(map[int64]dto.UploadJobStatusDTO, len(statuses))
+	byID := make(map[string]dto.UploadOperationStatusDTO, len(statuses))
 	for _, status := range statuses {
-		byID[status.TaskID] = status
+		byID[status.ReceiptID] = status
 	}
 	for _, id := range requested {
-		status, ok := byID[id]
+		status, ok := byID[id.String()]
 		if !ok || !status.Terminal {
 			return false
 		}
 	}
 	return true
-}
-
-func (h *AssetHandler) uploadJobStatusForCaller(ctx context.Context, row *rivertype.JobRow, callerID int32) (dto.UploadJobStatusDTO, bool) {
-	if row == nil {
-		return dto.UploadJobStatusDTO{}, false
-	}
-	var args jobs.IngestAssetArgs
-	if err := json.Unmarshal(row.EncodedArgs, &args); err != nil {
-		return dto.UploadJobStatusDTO{}, false
-	}
-	commit, err := h.queries.GetRepositoryStagingCommit(ctx, args.CommitID)
-	if err != nil || commit.OwnerID != callerID {
-		return dto.UploadJobStatusDTO{}, false
-	}
-	terminal := row.State == rivertype.JobStateCompleted || row.State == rivertype.JobStateCancelled || row.State == rivertype.JobStateDiscarded
-	success := row.State == rivertype.JobStateCompleted
-	var operationProblem *problem.Reference
-	if len(row.Errors) > 0 && !success {
-		value := problem.ReferenceFor(problem.UploadProcessingFailed, fmt.Sprintf("river-job:%d", row.ID), true)
-		operationProblem = &value
-	}
-	return dto.UploadJobStatusDTO{
-		TaskID: row.ID, FileName: commit.OriginalFilename, Status: string(row.State),
-		Terminal: terminal, Success: success, Problem: operationProblem,
-	}, true
 }
 
 func newUploadProblem(retryable bool) *problem.Reference {
@@ -1915,7 +1902,7 @@ func (h *AssetHandler) enqueueBioClipForAddedAsset(ctx context.Context, album re
 	if !available {
 		return
 	}
-	if err := enqueueBioClipAsset(ctx, h.queueClient, asset); err != nil {
+	if err := requestBioClipAsset(ctx, h.writer, asset); err != nil {
 		log.Printf("Failed to queue BioCLIP for album %d asset %s: %v", album.AlbumID, asset.AssetID.String(), err)
 	}
 }
@@ -2908,6 +2895,10 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Failed to queue reindex job: %v", err)
+		if errors.Is(err, service.ErrSemanticResetRequiresGlobalScope) {
+			api.WriteProblem(c, api.BadRequest(err))
+			return
+		}
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
@@ -2924,15 +2915,19 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 
 	status := "queued"
 	message := "Index rebuild job queued successfully"
-	if result.JobID == 0 && len(result.Requested) == 0 {
+	if result.ReceiptID == uuid.Nil && len(result.Requested) == 0 {
 		status = "skipped"
 		message = "All requested indexing tasks are disabled in ML settings"
+	}
+	receiptID := ""
+	if result.ReceiptID != uuid.Nil {
+		receiptID = result.ReceiptID.String()
 	}
 
 	api.JSONOK(c, dto.RebuildAssetIndexesResponseDTO{
 		Status:         status,
 		Message:        message,
-		JobID:          result.JobID,
+		ReceiptID:      receiptID,
 		RequestedTasks: requestedTasks,
 		DisabledTasks:  disabledTasks,
 		Limit:          result.Limit,
@@ -4035,7 +4030,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		h.handleUploadFailureFile(repository, stagingFile, "resolve completed upload owner")
 		return nil, err
 	}
-	taskID, err := h.enqueueStagingCommit(ctx, repository, ownerID, stagingFile,
+	receiptID, err := h.enqueueStagingCommit(ctx, repository, ownerID, stagingFile,
 		session.Filename, finalContentType, hashResult)
 	if err != nil {
 		h.handleUploadFailureFile(repository, stagingFile, "enqueue ingest task")
@@ -4051,16 +4046,16 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		SessionID:   session.SessionID,
 		FileName:    header.Filename,
 		ContentHash: finalHash,
-		TaskID:      &taskID,
+		ReceiptID:   stringPtr(receiptID.String()),
 		Status:      &status,
 		Size:        &size,
 		Message:     &message,
 	}, nil
 }
 
-// ReprocessAsset reprocesses a failed or warning asset
+// ReprocessAsset requests a new fenced asset-pipeline generation.
 // @Summary Reprocess asset
-// @Description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
+// @Description Request catalog-owned analysis, derivative, transcode, and enrichment stages for an asset. Progress is reported from the receipt and desired/applied catalog state.
 // @Tags assets
 // @Produce json
 // @Param id path string true "Asset ID"
@@ -4088,17 +4083,19 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		req = dto.ReprocessAssetRequestDTO{}
 	}
 
-	// Validate requested tasks (using queue names as canonical task identifiers)
+	// Validate requested product stages. Queue names are not API contracts.
 	if len(req.Tasks) > 0 {
 		for _, task := range req.Tasks {
-			if !isValidReprocessQueue(task) {
-				api.WriteProblem(c, api.BadRequest(fmt.Errorf("invalid queue name: %s", task)))
+			if !isValidReprocessStage(task) {
+				api.WriteProblem(c, api.BadRequest(fmt.Errorf("invalid pipeline stage: %s", task)))
 				return
 			}
 		}
 	}
 
-	// Get the asset to check its current status
+	// Read the immutable asset identity once. Reprocessing is a desired-state
+	// mutation; product status is derived from the pipeline state and receipt,
+	// not from a task map embedded in assets.status.
 	asset, err := h.queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -4113,21 +4110,6 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		return
 	}
 
-	// Parse current status
-	var currentStatus status.AssetStatus
-	if len(asset.Status) > 0 {
-		currentStatus, err = status.FromJSON(asset.Status)
-		if err != nil {
-			api.WriteProblem(c, api.Internal(err))
-			return
-		}
-	}
-
-	// Check for fatal errors (skip state check to allow retry on any state)
-	if currentStatus.HasFatalErrors() {
-		api.WriteProblem(c, api.BadRequest(errors.New("asset has fatal errors")))
-		return
-	}
 	opened, err := h.locationResolver.OpenAsset(ctx, asset.AssetID)
 	if err != nil {
 		respondRepositoryResolveError(c, err, "Asset has no available location")
@@ -4139,169 +4121,74 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		return
 	}
 
-	// Determine retry strategy
-	if len(req.Tasks) == 0 || req.ForceFullRetry {
-		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, repositoryID.String(), dbtypes.RepositoryActivityProcessing)
-		if err != nil {
-			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
-			return
-		}
-		finishWork := func() bool {
-			if releaseErr := releaseWork(); releaseErr != nil {
-				api.WriteProblem(c, api.Internal(releaseErr))
-				return false
-			}
-			return true
-		}
-		tx, err := h.writer.BeginTx(ctx, catalogtx.OperationAssetReprocess, nil)
-		if err != nil {
-			_ = releaseWork()
-			api.WriteProblem(c, api.Internal(err))
-			return
-		}
-		defer tx.Rollback()
-		txQueries := h.queries.WithTx(tx.Raw())
-		updatedAsset, err := txQueries.ResetAssetStatusForRetry(ctx, assetID)
-		if err != nil {
-			_ = releaseWork()
-			api.WriteProblem(c, api.Internal(err))
-			return
-		}
-
-		assetType := dbtypes.AssetType(updatedAsset.Type)
-		metaArgs := jobs.MetadataArgs{
-			AssetID: updatedAsset.AssetID, ExpectedContentID: updatedAsset.ContentID, EffectID: uuid.New(),
-		}
-		if err := insertReprocessJobTx(ctx, h.queueClient, tx.Raw(), metaArgs, "metadata_asset"); err != nil {
-			_ = releaseWork()
-			api.WriteProblem(c, api.Internal(err))
-			return
-		}
-
-		switch assetType {
-		case dbtypes.AssetTypePhoto:
-			if err := insertReprocessJobTx(ctx, h.queueClient, tx.Raw(), jobs.ThumbnailArgs{
-				AssetID: updatedAsset.AssetID, ExpectedContentID: updatedAsset.ContentID, EffectID: uuid.New(),
-			}, "thumbnail_asset"); err != nil {
-				_ = releaseWork()
-				api.WriteProblem(c, api.Internal(err))
-				return
-			}
-		case dbtypes.AssetTypeVideo:
-			if err := insertReprocessJobTx(ctx, h.queueClient, tx.Raw(), jobs.ThumbnailArgs{
-				AssetID: updatedAsset.AssetID, ExpectedContentID: updatedAsset.ContentID, EffectID: uuid.New(),
-			}, "thumbnail_asset"); err != nil {
-				_ = releaseWork()
-				api.WriteProblem(c, api.Internal(err))
-				return
-			}
-			if err := insertReprocessJobTx(ctx, h.queueClient, tx.Raw(), jobs.TranscodeArgs{
-				AssetID: updatedAsset.AssetID, ExpectedContentID: updatedAsset.ContentID, EffectID: uuid.New(),
-			}, "transcode_asset"); err != nil {
-				_ = releaseWork()
-				api.WriteProblem(c, api.Internal(err))
-				return
-			}
-		case dbtypes.AssetTypeAudio:
-			if err := insertReprocessJobTx(ctx, h.queueClient, tx.Raw(), jobs.TranscodeArgs{
-				AssetID: updatedAsset.AssetID, ExpectedContentID: updatedAsset.ContentID, EffectID: uuid.New(),
-			}, "transcode_asset"); err != nil {
-				_ = releaseWork()
-				api.WriteProblem(c, api.Internal(err))
-				return
-			}
-		}
-		if err := tx.Commit(); err != nil {
-			_ = releaseWork()
-			api.WriteProblem(c, api.Internal(err))
-			return
-		}
-		if !finishWork() {
-			return
-		}
-
-		log.Printf("Full reprocessing jobs enqueued for asset %s", assetID.String())
-
-		// Return success response
-		response := dto.ReprocessAssetResponseDTO{
-			AssetID:    assetID.String(),
-			Status:     "queued",
-			Message:    "Full reprocessing job queued successfully",
-			RetryTasks: []string{"all_failed_tasks"}, // Indicate full retry
-		}
-
-		api.JSONOK(c, response)
-		return
-	} else {
-		_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, repositoryID.String(), dbtypes.RepositoryActivityProcessing)
-		if err != nil {
-			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
-			return
-		}
-		// Selective retry - enqueue selective retry job
-		// Create selective retry job payload
-		retryArgs := jobs.AssetRetryPayload{
-			AssetID:        assetID.String(),
-			RetryTasks:     req.Tasks,
-			ForceFullRetry: req.ForceFullRetry,
-			EffectID:       uuid.New(),
-		}
-
-		// Enqueue the selective retry job
-		jobResult, err := insertSelectiveRetryReceipt(ctx, h.queueClient, retryArgs)
-		if err != nil {
-			_ = releaseWork()
-			api.WriteProblem(c, api.Internal(err))
-			return
-		}
-		if err := releaseWork(); err != nil {
-			api.WriteProblem(c, api.Internal(err))
-			return
-		}
-
-		log.Printf("Selective retry job %d enqueued for asset %s, tasks: %v", jobResult.Job.ID, assetID.String(), req.Tasks)
-
-		// Return success response
-		response := dto.ReprocessAssetResponseDTO{
-			AssetID:    assetID.String(),
-			Status:     "queued",
-			Message:    "Selective retry job queued successfully",
-			RetryTasks: req.Tasks,
-		}
-
-		api.JSONOK(c, response)
+	_, releaseWork, err := h.repoManager.BeginRepositoryWork(ctx, repositoryID.String(), dbtypes.RepositoryActivityProcessing)
+	if err != nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 		return
 	}
-}
-
-func insertSelectiveRetryReceipt(ctx context.Context, queueClient *river.Client[*sql.Tx], args jobs.AssetRetryPayload) (*rivertype.JobInsertResult, error) {
-	return queueClient.Insert(ctx, args, nil)
-}
-
-func insertReprocessJobTx(ctx context.Context, queueClient *river.Client[*sql.Tx], tx *sql.Tx, args river.JobArgs, queue string) error {
-	opts := river.InsertOpts{Queue: queue}
-	if provider, ok := args.(interface{ InsertOpts() river.InsertOpts }); ok {
-		opts = provider.InsertOpts()
-		opts.Queue = queue
+	released := false
+	defer func() {
+		if !released {
+			_ = releaseWork()
+		}
+	}()
+	tx, err := h.writer.BeginTx(ctx, catalogtx.OperationAssetReprocess, nil)
+	if err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
 	}
-	_, err := queueClient.InsertTx(ctx, tx, args, &opts)
-	return err
+	defer tx.Rollback()
+	stages := requestedAssetStages(req.Tasks, dbtypes.AssetType(asset.Type), len(req.Tasks) == 0 || req.ForceFullRetry)
+	receiptID := uuid.New()
+	now := time.Now().UTC().UnixMicro()
+	if _, err := tx.Raw().ExecContext(ctx, `INSERT INTO catalog_operation_receipts (receipt_id,kind,subject_id,desired_version,state,created_at,updated_at) VALUES (?,?,?,1,'pending',?,?)`, receiptID.String(), "reprocess", assetID.String(), now, now); err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if err := pipeline.RequestAssetStagesTx(ctx, tx.Raw(), asset.AssetID, asset.ContentID, stages, pipeline.AssetPipelineVersion, pipeline.AdmissionInteractive, receiptID); err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if err := releaseWork(); err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	released = true
+	api.JSONOK(c, dto.ReprocessAssetResponseDTO{AssetID: assetID.String(), ReceiptID: receiptID.String(), Status: "queued", Message: "Reprocessing request accepted"})
 }
 
-func isValidReprocessQueue(queue string) bool {
-	switch queue {
-	case "metadata_asset",
-		"thumbnail_asset",
-		"transcode_asset",
-		"process_semantic",
-		"process_bioclip",
-		"process_ocr",
-		"process_face",
-		"process_video_frames":
+func isValidReprocessStage(stage string) bool {
+	switch pipeline.Stage(stage) {
+	case pipeline.StageAnalyze, pipeline.StageDerivatives, pipeline.StageTranscode, pipeline.StageEnrich:
 		return true
 	default:
 		return false
 	}
+}
+
+func requestedAssetStages(requested []string, assetType dbtypes.AssetType, full bool) []pipeline.Stage {
+	if !full {
+		result := make([]pipeline.Stage, 0, len(requested))
+		for _, stage := range requested {
+			result = append(result, pipeline.Stage(stage))
+		}
+		return result
+	}
+	result := []pipeline.Stage{pipeline.StageAnalyze, pipeline.StageEnrich}
+	if assetType == dbtypes.AssetTypePhoto {
+		return append(result, pipeline.StageDerivatives)
+	}
+	if assetType == dbtypes.AssetTypeVideo {
+		return append(result, pipeline.StageDerivatives, pipeline.StageTranscode)
+	}
+	if assetType == dbtypes.AssetTypeAudio {
+		return append(result, pipeline.StageTranscode)
+	}
+	return result
 }
 
 // ============================================================================

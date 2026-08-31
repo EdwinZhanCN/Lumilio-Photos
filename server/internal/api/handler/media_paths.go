@@ -9,12 +9,13 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
 	"server/internal/api"
+	"server/internal/artifact"
 	"server/internal/db/repo"
+	"server/internal/pipeline"
 	"server/internal/storage"
 	"server/internal/storage/roe/locations"
 
@@ -95,7 +96,7 @@ func serveRepositoryFile(c *gin.Context, repositoryFS *storage.RepositoryFS, fil
 	http.ServeContent(c.Writer, c.Request, filename, info.ModTime(), file)
 }
 
-func openWebOrOriginal(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, kind, suffix string) (*storage.RepositoryFS, *os.File, error) {
+func openWebOrOriginal(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, _ string, suffix string) (*storage.RepositoryFS, *os.File, error) {
 	if resolver == nil || asset == nil {
 		return nil, nil, locations.ErrAssetUnavailable
 	}
@@ -104,7 +105,7 @@ func openWebOrOriginal(ctx context.Context, resolver assetLocationResolver, asse
 		return nil, nil, err
 	}
 	if asset.ContentID != uuid.Nil {
-		privatePath, parseErr := storage.ParsePrivateRepositoryPath(path.Join(".lumilio/assets", kind, "web", asset.ContentID.String()+suffix))
+		privatePath, parseErr := (artifact.Identity{SourceFence: asset.ContentID.String(), Stage: "transcode", PipelineVersion: pipeline.AssetPipelineVersion, Name: strings.TrimPrefix(suffix, "_")}).Path()
 		if parseErr != nil {
 			_ = opened.Close()
 			return nil, nil, parseErr

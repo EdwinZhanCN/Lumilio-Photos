@@ -65,7 +65,7 @@ Known gaps this plan owns:
 3. **Transcription is a new optional Lumen capability**, never an embedded
    model. Internal service name `whisper`, protocol task `audio_transcribe`.
    Canonical user-facing capability terminology (must be added to the
-   [lumilio-frontend-i18n](../../../../../.agents/skills/lumilio-frontend-i18n/SKILL.md)
+   [lumilio-frontend-i18n](../../../.agents/skills/lumilio-frontend-i18n/SKILL.md)
    table and `productTerminology.test.ts` when Phase 2 ships): `语音转写` /
    `Voice Transcription`. ML stays optional: with no Hub, recordings remain
    fully browsable/playable.
@@ -142,27 +142,29 @@ Photos backend:
    `assets`, `model_id`, `language`, `full_text`, `segment_count`,
    `processing_time_ms`, timestamps) + `audio_transcript_segments`
    (`asset_id`, `seq`, `start_ms`, `end_ms`, `text`) +
-   `transcript_index_metadata` / `transcript_index_outbox` mirroring the
-   `000002` OCR shapes. sqlc queries + `TranscriptService`
-   (save = replace-all in one transaction + revision bump + outbox row).
-3. Job `ProcessTranscribeArgs` (kind `process_transcribe`, ML insert opts),
-   thin worker mirroring `ml_ocr_worker.go`: gate
-   `isMLTaskEnabled("process_transcribe")`, load the web audio version (same
-   resolution as the playback handler; original when the web version is a
-   copy), call `AudioTranscribe`, save via `TranscriptService`. Skip with a
-   typed log for durations > 4h (constant, not a setting). Queue
-   `process_transcribe` `MaxWorkers: 1`; generous timeout (~20 min).
-4. Enqueue after successful `transcodeAudioSmart` in `transcode_task.go`
-   (same style as the video-frames enqueue), gated on effective settings;
-   extend `asset_retry.go` for audio ML retry.
+   catalog-owned transcript projection source/applied revisions. sqlc queries
+   + `TranscriptService` (save = replace-all plus projection desired state and
+   typed domain-outbox envelope in one coordinator transaction).
+3. Add a typed audio-transcription step to the existing `enrich_asset` DAG.
+   The preparer owns only asset/settings readers and RepositoryFS access, loads
+   the web audio version (original when the web version is a copy), and calls
+   `AudioTranscribe` under the process-wide inference/memory resource budget.
+   It emits an immutable fenced commit intent; it receives no catalog writer
+   or River insertion capability. Skip durations > 4h with a typed terminal
+   reason (constant, not a setting). The macro timeout remains generous
+   (~20 min), but no new River kind or queue is introduced.
+4. A successful audio transcode commit advances the asset's desired enrichment
+   generation and publishes its domain envelope atomically. Manual retry uses
+   the canonical `enrich` reprocess task; backfill/rebuild re-arms catalog
+   desired state. Do not add a transcode child enqueue or retry wrapper job.
 5. Settings: `ML.TranscribeEnabled` (prod default true, dev zero-value false —
    same pattern as other ML toggles), wired through
-   settings migration/sqlc/DTO/`isMLTaskEnabled`/`HasManualTasksEnabled`;
+   settings migration/sqlc/DTO/effective-capability checks;
    Settings AI tab toggle; Monitor capability card using the canonical
    `语音转写` / `Voice Transcription` label; add the terminology-table row.
 6. Indexing/backfill: `AssetIndexingTaskTranscribe = "transcribe"` counting
    AUDIO assets missing an `audio_transcripts` row; Monitor progress bucket;
-   reset path re-enqueues audio.
+   reset path re-arms audio enrichment desired state.
 7. HTTP: `GET /api/v1/assets/{id}/transcript` → `TranscriptDTO`
    (language, model_id, full_text, segments); 404 when absent; `task dto`.
 
@@ -176,10 +178,13 @@ breaking browse/playback.
    (document/mapping/index/query/writer/rebuild): one document per segment,
    id `{asset_id}#{seq}`, fields `asset_id`, `text` (same CJK tokenization
    strategy as OCR), stored `start_ms`.
-2. Outbox drain worker + queue (`transcript_index`, `MaxWorkers: 1`) mirroring
-   `search_ocr_outbox_worker.go`; reuse OCR's mutation-signaled coalescer and
-   one-minute recovery drain rather than adding an unconditional one-second
-   River job; startup rebuild parity with the OCR sidecar.
+2. Add transcript as a closed projection kind under
+   `rebuild_projection_batch`. Transcript mutations advance its catalog-owned
+   source revision and publish the typed domain envelope in the same commit;
+   bounded pages advance applied revision/cursor through the commit
+   coordinator. Startup and periodic catalog reconciliation recover missed
+   QueueDB delivery. Do not add a transcript-specific River queue, scheduler,
+   drain job, or process-local correctness trigger.
 3. `SourceTranscript = "transcript"` retriever: max-pool per asset, best
    segment's `start_ms` → `Candidate.BestTsMs`; initial RRF weight equal to
    `SourceOCR`. Wire into aggregate retrievers, `setretrieve` (agent), and
@@ -226,10 +231,12 @@ No sampling knobs; the 4h duration cap is a code constant. TOML is untouched
   component for row + waveform fallback, flow spec for
   `/collections/recordings` with MSW), `task dto`, i18n extract, `task
   ci:architecture`.
-- Phase 2: worker save/replace semantics with fake Lumen; settings gate on/off;
-  indexing counts; retry path. Manual: real Hub smoke on a short m4a + a >4h
+- Phase 2: fenced enrich-step save/replace semantics with fake Lumen; settings
+  gate on/off; indexing counts; desired-state retry path. Prove the preparer has
+  no write/enqueue capability. Manual: real Hub smoke on a short m4a + a >4h
   skip.
-- Phase 3: outbox drain + rebuild parity tests (mirror `bleveocr` suites);
+- Phase 3: projection desired/applied + QueueDB-loss recovery tests (mirror the
+  current OCR projection suites);
   retriever `BestTsMs` correctness; mixed OCR+transcript ranking regression.
 - Phase 4: tool unit tests (cap, sanitization, ≤2-asset guard); an e2e-style
   agent conversation fixture if the harness allows.
@@ -248,8 +255,10 @@ No sampling knobs; the 4h duration cap is a code constant. TOML is untouched
 
 - `server/internal/utils/exif/parsers.go` — AUDIO `parseCommonMetadata` branch
 - `server/internal/api/handler/asset_handler.go` — waveform thumbnail; transcript endpoint
-- `server/internal/processors/{transcode_task,asset_retry}.go` — enqueue + retry
-- `server/internal/queue/{jobs/types.go,ml_transcribe_worker.go,queue_setup.go}` + `app/app.go`
+- `server/internal/pipeline/*`, `server/app/pipeline_runtime.go` — enrich DAG,
+  desired-state composition, and closed macro registration
+- `server/internal/commit/*`, `server/internal/domainoutbox/*` — fenced result
+  commit and transcript projection delivery/reconciliation
 - `server/internal/service/{lumen_service.go,transcript_service.go,settings_service.go,indexing_service.go}`
 - `server/internal/search/blevetranscript/*`, `search/{types,retrievers,setretrieve,service}.go`
 - `server/internal/agent/tools/{producers,inspect,read_transcript}.go`

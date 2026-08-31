@@ -34,6 +34,7 @@ RETURNING *;
 UPDATE repository_observation_state
 SET desired_epoch = desired_epoch + 1,
     full_verification_required = CASE WHEN ?2 THEN 1 ELSE full_verification_required END,
+    terminal_error = NULL,
     updated_at = ?3
 WHERE repository_id = ?1
 RETURNING *;
@@ -693,45 +694,50 @@ SELECT * FROM asset_locations
 WHERE asset_id = ?1 AND unbound_observation_revision IS NULL
 ORDER BY node_id;
 
--- name: InsertRepositoryOutboxEffect :one
-INSERT INTO repository_outbox (
-    outbox_id, repository_id, effect_key, effect_kind, entity_id,
-    expected_revision, payload, status, created_at, updated_at
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8)
-ON CONFLICT (effect_key) DO UPDATE SET
-    updated_at = repository_outbox.updated_at
-RETURNING *;
+-- name: CountPendingRepositoryMaterialization :one
+SELECT count(*)
+FROM repository_nodes node
+WHERE node.repository_id = ?1
+  AND node.lifecycle = 'active'
+  AND node.kind = 'file'
+  AND EXISTS (
+      SELECT 1
+      FROM repository_observations observation
+      WHERE observation.repository_id = node.repository_id
+        AND observation.mapped_node_id = node.node_id
+        AND observation.revision = node.observation_revision
+        AND observation.resolved_owner_id IS NOT NULL
+        AND observation.processing_state = 'applied'
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM asset_locations location
+      WHERE location.node_id = node.node_id
+        AND location.unbound_observation_revision IS NULL
+        AND location.bound_observation_revision >= node.observation_revision
+  );
 
--- name: ClaimRepositoryOutboxBatch :many
-UPDATE repository_outbox
-SET status = 'delivering',
-    lease_id = ?1,
-    lease_expires_at = ?2,
-    attempt_count = attempt_count + 1,
-    updated_at = ?3
-WHERE outbox_id IN (
-    SELECT candidate.outbox_id
-    FROM repository_outbox AS candidate
-    WHERE candidate.effect_kind = ?4
-      AND (candidate.status = 'pending'
-       OR (candidate.status = 'delivering' AND candidate.lease_expires_at < ?3))
-    ORDER BY candidate.created_at, candidate.outbox_id
-    LIMIT ?5
-)
-RETURNING *;
-
--- name: CompleteRepositoryOutboxEffect :execrows
-UPDATE repository_outbox
-SET status = ?3,
-    lease_id = NULL,
-    lease_expires_at = NULL,
-    last_failure_code = ?4,
-    delivered_at = CASE WHEN ?3 = 'delivered' THEN ?5 ELSE delivered_at END,
-    updated_at = ?5
-WHERE outbox_id = ?1
-  AND lease_id = ?2
-  AND status = 'delivering';
-
--- name: CountPendingRepositoryOutbox :one
-SELECT count(*) FROM repository_outbox
-WHERE repository_id = ?1 AND status IN ('pending', 'delivering');
+-- name: ListRepositoryMaterializationCandidates :many
+SELECT node.node_id, node.observation_revision
+FROM repository_nodes node
+WHERE node.repository_id = ?1
+  AND node.lifecycle = 'active'
+  AND node.kind = 'file'
+  AND EXISTS (
+      SELECT 1
+      FROM repository_observations observation
+      WHERE observation.repository_id = node.repository_id
+        AND observation.mapped_node_id = node.node_id
+        AND observation.revision = node.observation_revision
+        AND observation.resolved_owner_id IS NOT NULL
+        AND observation.processing_state = 'applied'
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM asset_locations location
+      WHERE location.node_id = node.node_id
+        AND location.unbound_observation_revision IS NULL
+        AND location.bound_observation_revision >= node.observation_revision
+  )
+ORDER BY node.observation_revision, node.node_id
+LIMIT ?2;

@@ -72,3 +72,15 @@ type ReconcileResult struct {
 	Assignments []Assignment
 	Redirects   []Redirect
 }
+
+// PreparedRebuild is the immutable output of an Event projection compute
+// pass. It contains only deterministic domain facts; catalog activation is
+// performed later by the commit coordinator in its caller-owned transaction.
+type PreparedRebuild struct {
+	OwnerID        int32
+	SourceRevision int64
+	Segments       []Segment
+	Published      []PublishedEvent
+	Result         ReconcileResult
+	Preview        RebuildPreview
+}

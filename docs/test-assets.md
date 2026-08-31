@@ -6,9 +6,9 @@ revision and materializes assets on demand with integrity checks. Never commit
 media files here.
 
 Pin, reconcile, and verify procedure:
-[lumilio-pin-reconcile](../../../.agents/skills/lumilio-pin-reconcile/SKILL.md).
+[lumilio-pin-reconcile](../.agents/skills/lumilio-pin-reconcile/SKILL.md).
 E2E seed and stack lifecycle:
-[lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md).
+[lumilio-e2e-environment](../.agents/skills/lumilio-e2e-environment/SKILL.md).
 
 ## Pin & profiles
 

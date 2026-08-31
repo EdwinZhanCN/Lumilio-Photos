@@ -22,17 +22,16 @@ type BatchUploadRequestDTO struct {
 
 // ReprocessAssetRequestDTO represents the request structure for asset reprocessing
 type ReprocessAssetRequestDTO struct {
-	Tasks          []string `json:"tasks" binding:"omitempty" example:"thumbnail_small,thumbnail_medium,transcode_1080p"`
+	Tasks          []string `json:"tasks" binding:"omitempty" example:"analyze,derivatives,enrich"`
 	ForceFullRetry bool     `json:"force_full_retry,omitempty" example:"false"`
 }
 
 // ReprocessAssetResponseDTO represents the response structure for asset reprocessing
 type ReprocessAssetResponseDTO struct {
-	AssetID     string   `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Status      string   `json:"status" example:"queued"`
-	Message     string   `json:"message" example:"Reprocessing job queued successfully"`
-	FailedTasks []string `json:"failed_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
-	RetryTasks  []string `json:"retry_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
+	AssetID   string `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ReceiptID string `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
+	Status    string `json:"status" example:"queued"`
+	Message   string `json:"message" example:"Reprocessing request accepted"`
 }
 
 type RebuildAssetIndexesRequestDTO struct {
@@ -40,16 +39,17 @@ type RebuildAssetIndexesRequestDTO struct {
 	Tasks        []string `json:"tasks,omitempty" example:"semantic,ocr"`
 	Limit        int      `json:"limit,omitempty" minimum:"1" maximum:"500" example:"200"`
 	MissingOnly  *bool    `json:"missing_only,omitempty" example:"true"`
-	// ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use
-	// after switching the embedding model (drop+refill) so no two models' vectors
-	// are mixed. Honored only when the semantic task is included.
+	// ResetSemantic globally wipes all photo and video semantic vectors and
+	// rebuilds both lanes from scratch. Use after switching the embedding model
+	// (drop+refill) so no two models' vectors are mixed. Repository-scoped resets
+	// are rejected; the semantic task must be included.
 	ResetSemantic *bool `json:"reset_semantic,omitempty" example:"false"`
 }
 
 type RebuildAssetIndexesResponseDTO struct {
 	Status         string   `json:"status" example:"queued"`
 	Message        string   `json:"message" example:"Index rebuild job queued successfully"`
-	JobID          int64    `json:"job_id" example:"123"`
+	ReceiptID      string   `json:"receipt_id,omitempty" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
 	RequestedTasks []string `json:"requested_tasks"`
 	DisabledTasks  []string `json:"disabled_tasks,omitempty"`
 	Limit          int      `json:"limit" example:"200"`
@@ -102,7 +102,7 @@ type AssetIndexingStatsResponseDTO struct {
 
 // UploadResponseDTO represents the response structure for file upload
 type UploadResponseDTO struct {
-	TaskID      int64  `json:"task_id" example:"12345"`
+	ReceiptID   string `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
 	Status      string `json:"status" example:"processing"`
 	FileName    string `json:"file_name" example:"photo.jpg"`
 	Size        int64  `json:"size" example:"1048576"`
@@ -121,7 +121,7 @@ type BatchUploadResultDTO struct {
 	SessionID   string             `json:"session_id,omitempty"`
 	FileName    string             `json:"file_name,omitempty"`
 	ContentHash string             `json:"content_hash"`
-	TaskID      *int64             `json:"task_id,omitempty"`
+	ReceiptID   *string            `json:"receipt_id,omitempty"`
 	Status      *string            `json:"status,omitempty"`
 	Size        *int64             `json:"size,omitempty"`
 	Message     *string            `json:"message,omitempty"`
@@ -185,12 +185,12 @@ type CreateUploadSessionRequestDTO struct {
 }
 
 type UploadSessionResponseDTO struct {
-	SessionID      string `json:"session_id"`
-	Status         string `json:"status"`
-	TotalChunks    int    `json:"total_chunks"`
-	ReceivedChunks []int  `json:"received_chunks"`
-	BytesReceived  int64  `json:"bytes_received"`
-	TaskID         *int64 `json:"task_id,omitempty"`
+	SessionID      string  `json:"session_id"`
+	Status         string  `json:"status"`
+	TotalChunks    int     `json:"total_chunks"`
+	ReceivedChunks []int   `json:"received_chunks"`
+	BytesReceived  int64   `json:"bytes_received"`
+	ReceiptID      *string `json:"receipt_id,omitempty"`
 }
 
 func stringPtr(value string) *string {
@@ -226,19 +226,19 @@ type UploadProgressResponseDTO struct {
 	Summary  ProgressSummaryDTO   `json:"summary"`
 }
 
-// UploadJobStatusDTO reports whether an accepted upload has been materialized
-// by the ingest queue. Only jobs owned by the current caller are returned.
-type UploadJobStatusDTO struct {
-	TaskID   int64              `json:"task_id" example:"12345"`
-	FileName string             `json:"file_name" example:"photo.jpg"`
-	Status   string             `json:"status" example:"completed"`
-	Terminal bool               `json:"terminal" example:"true"`
-	Success  bool               `json:"success" example:"true"`
-	Problem  *problem.Reference `json:"problem,omitempty"`
+// UploadOperationStatusDTO reports catalog-owned ingest receipt state. It is
+// independent of the disposable queue database.
+type UploadOperationStatusDTO struct {
+	ReceiptID string             `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
+	FileName  string             `json:"file_name" example:"photo.jpg"`
+	Status    string             `json:"status" example:"completed"`
+	Terminal  bool               `json:"terminal" example:"true"`
+	Success   bool               `json:"success" example:"true"`
+	Problem   *problem.Reference `json:"problem,omitempty"`
 }
 
-type UploadJobStatusResponseDTO struct {
-	Jobs []UploadJobStatusDTO `json:"jobs"`
+type UploadOperationStatusResponseDTO struct {
+	Operations []UploadOperationStatusDTO `json:"operations"`
 }
 
 // AssetDTO represents an asset

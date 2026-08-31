@@ -128,7 +128,7 @@ func TestReaderRecordsBoundedSnapshotLifetime(t *testing.T) {
 func TestManualTransactionFinalizationIsObservedOnce(t *testing.T) {
 	pool := openTestPool(t)
 	capture := &capturingObserver{}
-	tx, err := NewWriter(pool, capture).BeginTx(context.Background(), OperationAssetRetry, nil)
+	tx, err := NewWriter(pool, capture).BeginTx(context.Background(), OperationAssetReprocess, nil)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}

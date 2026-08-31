@@ -75,14 +75,12 @@ type Querier interface {
 	BulkToggleAssetLiked(ctx context.Context, assetIds []uuid.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
-	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
 	BumpOCRIndexRevision(ctx context.Context, assetID uuid.UUID) (int64, error)
 	CancelPendingAgentEffects(ctx context.Context, arg CancelPendingAgentEffectsParams) error
 	CaptureRepositoryScanRunCursorTarget(ctx context.Context, arg CaptureRepositoryScanRunCursorTargetParams) (RepositoryScanRun, error)
 	ClaimEventDirtyRanges(ctx context.Context, arg ClaimEventDirtyRangesParams) (int64, error)
 	ClaimRepositoryAbsenceFrontier(ctx context.Context, arg ClaimRepositoryAbsenceFrontierParams) (RepositoryScanFrontier, error)
 	ClaimRepositoryObservationController(ctx context.Context, arg ClaimRepositoryObservationControllerParams) (RepositoryObservationState, error)
-	ClaimRepositoryOutboxBatch(ctx context.Context, arg ClaimRepositoryOutboxBatchParams) ([]RepositoryOutbox, error)
 	ClaimRepositoryScanFrontier(ctx context.Context, arg ClaimRepositoryScanFrontierParams) (RepositoryScanFrontier, error)
 	ClaimRepositoryStagingCommit(ctx context.Context, arg ClaimRepositoryStagingCommitParams) (RepositoryStagingCommit, error)
 	ClearActiveRepositoryObservationRunCAS(ctx context.Context, arg ClearActiveRepositoryObservationRunCASParams) (int64, error)
@@ -97,7 +95,6 @@ type Querier interface {
 	CompleteLifecycleOperation(ctx context.Context, arg CompleteLifecycleOperationParams) (LifecycleOperation, error)
 	CompleteRepositoryAbsenceFrontier(ctx context.Context, arg CompleteRepositoryAbsenceFrontierParams) (RepositoryScanFrontier, error)
 	CompleteRepositoryObservationCAS(ctx context.Context, arg CompleteRepositoryObservationCASParams) (RepositoryObservation, error)
-	CompleteRepositoryOutboxEffect(ctx context.Context, arg CompleteRepositoryOutboxEffectParams) (int64, error)
 	CompleteRepositoryScanFrontier(ctx context.Context, arg CompleteRepositoryScanFrontierParams) (RepositoryScanFrontier, error)
 	CompleteRepositoryStagingCommit(ctx context.Context, arg CompleteRepositoryStagingCommitParams) (RepositoryStagingCommit, error)
 	CompleteRequiredPasswordChange(ctx context.Context, arg CompleteRequiredPasswordChangeParams) (User, error)
@@ -135,7 +132,7 @@ type Querier interface {
 	CountMediaItemsUnified(ctx context.Context, arg CountMediaItemsUnifiedParams) (int64, error)
 	CountOpenRepositoryAbsenceFrontier(ctx context.Context, runID uuid.UUID) (int64, error)
 	CountOpenRepositoryScanFrontier(ctx context.Context, runID uuid.UUID) (int64, error)
-	CountPendingRepositoryOutbox(ctx context.Context, repositoryID uuid.UUID) (int64, error)
+	CountPendingRepositoryMaterialization(ctx context.Context, repositoryID uuid.UUID) (int64, error)
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPersonFacesScoped(ctx context.Context, arg CountPersonFacesScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error)
@@ -527,7 +524,6 @@ type Querier interface {
 	InsertLocationClusterAsset(ctx context.Context, arg InsertLocationClusterAssetParams) (int64, error)
 	InsertOwnerContentAsset(ctx context.Context, arg InsertOwnerContentAssetParams) (Asset, error)
 	InsertRepositoryObservation(ctx context.Context, arg InsertRepositoryObservationParams) (RepositoryObservation, error)
-	InsertRepositoryOutboxEffect(ctx context.Context, arg InsertRepositoryOutboxEffectParams) (RepositoryOutbox, error)
 	InsertRepositoryRootNode(ctx context.Context, arg InsertRepositoryRootNodeParams) (RepositoryNode, error)
 	// Dedicated fixed-dimension authoritative semantic search vectors.
 	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
@@ -579,6 +575,7 @@ type Querier interface {
 	ListRecoverableRepositoryStagingCommits(ctx context.Context, limit int64) ([]RepositoryStagingCommit, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID uuid.UUID) ([]RepositoryCloudBinding, error)
+	ListRepositoryMaterializationCandidates(ctx context.Context, arg ListRepositoryMaterializationCandidatesParams) ([]ListRepositoryMaterializationCandidatesRow, error)
 	ListRepositoryNodeChildrenPage(ctx context.Context, arg ListRepositoryNodeChildrenPageParams) ([]RepositoryNode, error)
 	ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
@@ -654,7 +651,6 @@ type Querier interface {
 	RequestRepositoryObservationEpoch(ctx context.Context, arg RequestRepositoryObservationEpochParams) (RepositoryObservationState, error)
 	RequestRepositoryScanRunCancellation(ctx context.Context, arg RequestRepositoryScanRunCancellationParams) (RepositoryScanRun, error)
 	RequeueRepositoryScanFrontierForVerification(ctx context.Context, arg RequeueRepositoryScanFrontierForVerificationParams) (RepositoryScanFrontier, error)
-	ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error)
 	ResetLocationClustersForGeocodingSource(ctx context.Context) error
 	ResetLocationClustersForGeocodingUserAgent(ctx context.Context) error
 	ResetRepositoriesByActivity(ctx context.Context, arg ResetRepositoriesByActivityParams) (int64, error)
@@ -703,8 +699,6 @@ type Querier interface {
 	UpdateAssetPositionInAlbum(ctx context.Context, arg UpdateAssetPositionInAlbumParams) error
 	UpdateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error
 	UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error
-	UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error)
-	UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error)
 	UpdateCloudCredentialAuthState(ctx context.Context, arg UpdateCloudCredentialAuthStateParams) (CloudCredential, error)
 	UpdateCloudCredentialStatus(ctx context.Context, arg UpdateCloudCredentialStatusParams) (CloudCredential, error)
 	// Resets all asset roles in a group, then flags the chosen keeper.

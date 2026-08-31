@@ -3,7 +3,7 @@
 The loops, memories, and gates that let coding agents work in this repository
 without losing decisions, repeating incidents, or skipping verification. This
 file is the reference for the harness itself. Repository rules stay in
-[AGENTS.md](../../../AGENTS.md); module contracts stay in their owning docs.
+[AGENTS.md](../AGENTS.md); module contracts stay in their owning docs.
 
 ## Design rules
 
@@ -35,8 +35,8 @@ file is the reference for the harness itself. Repository rules stay in
 `.claude/skills` is a symlink to `.agents/skills` so Claude Code loads the
 same tree. `.agents/` stays the real home.
 
-Existing homes keep their jobs: `site/docs/internal/` holds current-state
-reference docs, `site/docs/internal/exec-plans/active/` tracks large
+Existing homes keep their jobs: `docs/` holds current-state
+reference docs, `docs/exec-plans/active/` tracks large
 prospective work (plans are deleted at completion after decision extraction;
 there is no completed archive), and root `AGENTS.md` remains the single entry
 point that links everything here.
@@ -44,7 +44,7 @@ point that links everything here.
 | Content | Home |
 | --- | --- |
 | Standing orders for every session | root `AGENTS.md` |
-| Current-state contracts and maps | `site/docs/internal/*.md`, `web/ARCHITECTURE.md` |
+| Current-state contracts and maps | `docs/*.md`, `web/ARCHITECTURE.md` |
 | Large prospective work | `exec-plans/active/`, deleted at completion |
 | How to run a recurring workflow | `.agents/skills/lumilio-<name>/SKILL.md` |
 | Why a project-coupled decision stands, and what it beat | `.agents/decisions/` |
@@ -66,19 +66,20 @@ known failure modes.
 
 | Skill | Procedure it owns |
 | --- | --- |
-| [lumilio-select-checks](../../../.agents/skills/lumilio-select-checks/SKILL.md) | map a diff to the narrowest `task` targets before push |
-| [lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md) | DTO/annotation change, `task dto`, `schema.d.ts` verification, cast triage |
-| [lumilio-write-a-test](../../../.agents/skills/lumilio-write-a-test/SKILL.md) | pick the test layer, file name, GPU self-skip, prove it can fail |
-| [lumilio-integration-spec](../../../.agents/skills/lumilio-integration-spec/SKILL.md) | Vitest component/flow specs: MSW, helpers, locators, import gotchas |
-| [lumilio-e2e-spec](../../../.agents/skills/lumilio-e2e-spec/SKILL.md) | Playwright locator order, i18n-safe names, forbidden aria-label hooks |
-| [lumilio-frontend-i18n](../../../.agents/skills/lumilio-frontend-i18n/SKILL.md) | extract-then-fill workflow and canonical bilingual product terminology registry |
-| [lumilio-e2e-environment](../../../.agents/skills/lumilio-e2e-environment/SKILL.md) | E2E stack lifecycle, seed variants, slice selection, readiness |
-| [lumilio-lumen-fixtures](../../../.agents/skills/lumilio-lumen-fixtures/SKILL.md) | record real Hub responses, replay them keyless in CI |
-| [lumilio-z-index](../../../.agents/skills/lumilio-z-index/SKILL.md) | three-rule stacking strategy and token scale |
-| [lumilio-add-task-target](../../../.agents/skills/lumilio-add-task-target/SKILL.md) | Taskfile placement, naming, when a `ci:*` orchestrator is earned |
-| [lumilio-feature-doc](../../../.agents/skills/lumilio-feature-doc/SKILL.md) | `doc.ts` authoring, `{@link}`/import pairing, `doc.md` regeneration |
-| [lumilio-pin-reconcile](../../../.agents/skills/lumilio-pin-reconcile/SKILL.md) | assets.lock / lumen.lock bump, verify, PR shape |
-| [lumilio-exec-plan](../../../.agents/skills/lumilio-exec-plan/SKILL.md) | plan creation criteria, skeleton, completion extraction |
+| [lumilio-select-checks](../.agents/skills/lumilio-select-checks/SKILL.md) | map a diff to the narrowest `task` targets before push |
+| [lumilio-api-contract-change](../.agents/skills/lumilio-api-contract-change/SKILL.md) | DTO/annotation change, `task dto`, `schema.d.ts` verification, cast triage |
+| [lumilio-write-a-test](../.agents/skills/lumilio-write-a-test/SKILL.md) | pick the test layer, file name, GPU self-skip, prove it can fail |
+| [lumilio-integration-spec](../.agents/skills/lumilio-integration-spec/SKILL.md) | Vitest component/flow specs: MSW, helpers, locators, import gotchas |
+| [lumilio-e2e-spec](../.agents/skills/lumilio-e2e-spec/SKILL.md) | Playwright locator order, i18n-safe names, forbidden aria-label hooks |
+| [lumilio-frontend-i18n](../.agents/skills/lumilio-frontend-i18n/SKILL.md) | extract-then-fill workflow and canonical bilingual product terminology registry |
+| [lumilio-e2e-environment](../.agents/skills/lumilio-e2e-environment/SKILL.md) | E2E stack lifecycle, seed variants, slice selection, readiness |
+| [lumilio-remote-qualification](../.agents/skills/lumilio-remote-qualification/SKILL.md) | remote hardware qualification (Radxa X4), execution budgets, and destructive resilience |
+| [lumilio-lumen-fixtures](../.agents/skills/lumilio-lumen-fixtures/SKILL.md) | record real Hub responses, replay them keyless in CI |
+| [lumilio-z-index](../.agents/skills/lumilio-z-index/SKILL.md) | three-rule stacking strategy and token scale |
+| [lumilio-add-task-target](../.agents/skills/lumilio-add-task-target/SKILL.md) | Taskfile placement, naming, when a `ci:*` orchestrator is earned |
+| [lumilio-feature-doc](../.agents/skills/lumilio-feature-doc/SKILL.md) | `doc.ts` authoring, `{@link}`/import pairing, `doc.md` regeneration |
+| [lumilio-pin-reconcile](../.agents/skills/lumilio-pin-reconcile/SKILL.md) | assets.lock / lumen.lock bump, verify, PR shape |
+| [lumilio-exec-plan](../.agents/skills/lumilio-exec-plan/SKILL.md) | plan creation criteria, skeleton, completion extraction |
 
 ## Decision records
 
@@ -113,7 +114,7 @@ cross-module contract, an on-disk or wire format, process or tooling, a
 dependency or pin policy — records its decision in the same PR. Work driven
 by an exec plan keeps interim decisions inside the active plan; completing
 the plan extracts the durable ones here
-([lumilio-exec-plan](../../../.agents/skills/lumilio-exec-plan/SKILL.md)).
+([lumilio-exec-plan](../.agents/skills/lumilio-exec-plan/SKILL.md)).
 Mechanical or local edits are exempt.
 
 ## Postmortems
@@ -175,7 +176,7 @@ Linked from `AGENTS.md`; this section is the home.
   `fakelumen`. Recording is explicit (`task lumen:record`), never implicit in
   CI. Until a recorded set is committed, replay serves the deterministic
   builtin embedding — same as the previous constant-vector fixture.
-  Procedure: [lumilio-lumen-fixtures](../../../.agents/skills/lumilio-lumen-fixtures/SKILL.md).
+  Procedure: [lumilio-lumen-fixtures](../.agents/skills/lumilio-lumen-fixtures/SKILL.md).
 
 ## The obligation
 

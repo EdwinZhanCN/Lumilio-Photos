@@ -35,6 +35,7 @@ const (
 // FaceService defines face detection and recognition related operations interface.
 type FaceService interface {
 	SaveFaceResults(ctx context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error
+	ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error
 	GetFaceResults(ctx context.Context, assetID uuid.UUID) (*FaceResultWithItems, error)
 	SearchAssetsByFaceID(ctx context.Context, faceID string, limit, offset int) ([]repo.Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, clusterID int32, limit, offset int) ([]repo.Asset, error)
@@ -171,12 +172,42 @@ func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
 	s.clusterRebuildMu.RLock()
 	defer s.clusterRebuildMu.RUnlock()
+	if s.writer == nil {
+		return s.applyFaceResultsTx(ctx, s.queries, assetID, faceV1, imageData, processingTimeMs)
+	}
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationFaceMutation, nil)
+	if err != nil {
+		return fmt.Errorf("begin face result transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if err := s.applyFaceResultsTx(ctx, s.queries.WithTx(tx.Raw()), assetID, faceV1, imageData, processingTimeMs); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit face result transaction: %w", err)
+	}
+	return nil
+}
+
+// ApplyFaceResultsTx persists face facts and immutable crops in a caller-owned
+// catalog transaction. The coordinator supplies the transaction so the face
+// result and its fenced stage acknowledgement share one commit boundary.
+func (s *faceService) ApplyFaceResultsTx(ctx context.Context, tx *sql.Tx, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
+	if tx == nil {
+		return errors.New("face result transaction is required")
+	}
+	s.clusterRebuildMu.RLock()
+	defer s.clusterRebuildMu.RUnlock()
+	return s.applyFaceResultsTx(ctx, s.queries.WithTx(tx), assetID, faceV1, imageData, processingTimeMs)
+}
+
+func (s *faceService) applyFaceResultsTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, faceV1 *types.FaceV1, imageData []byte, processingTimeMs int) error {
 
 	if faceV1 == nil {
 		return fmt.Errorf("face result payload is required")
 	}
 
-	repository, asset, err := s.resolveAssetRepository(ctx, assetID)
+	repository, asset, err := s.resolveAssetRepositoryWithQueries(ctx, queries, assetID)
 	if err != nil {
 		return err
 	}
@@ -186,16 +217,16 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, fa
 	}
 	defer repositoryFS.Close()
 
-	affectedClusters, err := s.cleanupExistingFaceState(ctx, assetID, repositoryFS)
+	affectedClusters, err := s.cleanupExistingFaceStateWithQueries(ctx, queries, assetID, repositoryFS)
 	if err != nil {
 		return err
 	}
-	if err := s.cleanupAffectedClusters(ctx, affectedClusters); err != nil {
+	if err := s.cleanupAffectedClustersWithQueries(ctx, queries, affectedClusters); err != nil {
 		return err
 	}
 
 	processingTimePtr := int64(processingTimeMs)
-	if _, err := s.queries.CreateFaceResult(ctx, repo.CreateFaceResultParams{
+	if _, err := queries.CreateFaceResult(ctx, repo.CreateFaceResultParams{
 		AssetID:          assetID,
 		ModelID:          faceV1.ModelID,
 		TotalFaces:       int64(faceV1.Count),
@@ -238,7 +269,7 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, fa
 			return fmt.Errorf("failed to persist face crop %d: %w", i, err)
 		}
 
-		createdItem, err := s.queries.CreateFaceItem(ctx, repo.CreateFaceItemParams{
+		createdItem, err := queries.CreateFaceItem(ctx, repo.CreateFaceItemParams{
 			AssetID:        assetID,
 			FaceID:         nil,
 			BoundingBox:    dbtypes.JSON(boundingBoxJSON),
@@ -263,7 +294,7 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID uuid.UUID, fa
 		createdItems = append(createdItems, createdItem)
 	}
 
-	if err := s.recognizePendingFacesForAsset(ctx, *asset, createdItems); err != nil {
+	if err := s.recognizePendingFacesForAssetWithQueries(ctx, queries, *asset, createdItems); err != nil {
 		return fmt.Errorf("recognize pending faces: %w", err)
 	}
 
@@ -317,19 +348,23 @@ func (s *faceService) convertLumenFaceToDBFace(lumenFace types.Face, index int) 
 }
 
 func (s *faceService) resolveAssetRepository(ctx context.Context, assetID uuid.UUID) (repo.Repository, *repo.Asset, error) {
-	asset, err := s.queries.GetAssetByID(ctx, assetID)
+	return s.resolveAssetRepositoryWithQueries(ctx, s.queries, assetID)
+}
+
+func (s *faceService) resolveAssetRepositoryWithQueries(ctx context.Context, queries *repo.Queries, assetID uuid.UUID) (repo.Repository, *repo.Asset, error) {
+	asset, err := queries.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return repo.Repository{}, nil, fmt.Errorf("failed to load asset for face processing: %w", err)
 	}
 	if s.files == nil {
 		return repo.Repository{}, nil, fmt.Errorf("face repository filesystem is unavailable")
 	}
-	occurrence, err := s.queries.GetPreferredActiveAssetOccurrence(ctx, assetID)
+	occurrence, err := queries.GetPreferredActiveAssetOccurrence(ctx, assetID)
 	if err != nil {
 		return repo.Repository{}, nil, fmt.Errorf("asset %s has no active location: %w", assetID, err)
 	}
 
-	repository, err := s.queries.GetRepository(ctx, occurrence.RepositoryID)
+	repository, err := queries.GetRepository(ctx, occurrence.RepositoryID)
 	if err != nil {
 		return repo.Repository{}, nil, fmt.Errorf("failed to resolve repository for asset %s: %w", assetID, err)
 	}
@@ -338,12 +373,16 @@ func (s *faceService) resolveAssetRepository(ctx context.Context, assetID uuid.U
 }
 
 func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid.UUID, repositoryFS *storage.RepositoryFS) ([]int32, error) {
-	existingItems, err := s.queries.GetFaceItemsByAsset(ctx, assetID)
+	return s.cleanupExistingFaceStateWithQueries(ctx, s.queries, assetID, repositoryFS)
+}
+
+func (s *faceService) cleanupExistingFaceStateWithQueries(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, repositoryFS *storage.RepositoryFS) ([]int32, error) {
+	existingItems, err := queries.GetFaceItemsByAsset(ctx, assetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load existing face items: %w", err)
 	}
 
-	affectedClusterIDs, err := s.collectAffectedClusterIDs(ctx, existingItems)
+	affectedClusterIDs, err := s.collectAffectedClusterIDsWithQueries(ctx, queries, existingItems)
 	if err != nil {
 		return nil, err
 	}
@@ -361,10 +400,10 @@ func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid
 		}
 	}
 
-	if err := s.queries.DeleteFaceResultByAsset(ctx, assetID); err != nil {
+	if err := queries.DeleteFaceResultByAsset(ctx, assetID); err != nil {
 		return nil, fmt.Errorf("failed to delete existing face result: %w", err)
 	}
-	if err := s.queries.DeleteFaceItemsByAsset(ctx, assetID); err != nil {
+	if err := queries.DeleteFaceItemsByAsset(ctx, assetID); err != nil {
 		return nil, fmt.Errorf("failed to delete existing face items: %w", err)
 	}
 
@@ -372,9 +411,13 @@ func (s *faceService) cleanupExistingFaceState(ctx context.Context, assetID uuid
 }
 
 func (s *faceService) collectAffectedClusterIDs(ctx context.Context, items []repo.FaceItem) ([]int32, error) {
+	return s.collectAffectedClusterIDsWithQueries(ctx, s.queries, items)
+}
+
+func (s *faceService) collectAffectedClusterIDsWithQueries(ctx context.Context, queries *repo.Queries, items []repo.FaceItem) ([]int32, error) {
 	clusterIDs := make(map[int32]struct{})
 	for _, item := range items {
-		cluster, err := s.queries.GetFaceClusterByFaceID(ctx, item.ID)
+		cluster, err := queries.GetFaceClusterByFaceID(ctx, item.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				continue
@@ -393,8 +436,12 @@ func (s *faceService) collectAffectedClusterIDs(ctx context.Context, items []rep
 }
 
 func (s *faceService) cleanupAffectedClusters(ctx context.Context, clusterIDs []int32) error {
+	return s.cleanupAffectedClustersWithQueries(ctx, s.queries, clusterIDs)
+}
+
+func (s *faceService) cleanupAffectedClustersWithQueries(ctx context.Context, queries *repo.Queries, clusterIDs []int32) error {
 	for _, clusterID := range clusterIDs {
-		if err := s.refreshClusterRepresentative(ctx, clusterID); err != nil {
+		if err := s.refreshClusterRepresentativeWithQueries(ctx, queries, clusterID); err != nil {
 			return err
 		}
 	}

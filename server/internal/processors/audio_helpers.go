@@ -10,13 +10,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/execution"
 	"server/internal/storage"
 	"server/internal/utils/exif"
+	fileutil "server/internal/utils/file"
 	"server/internal/utils/sysproc"
 )
 
@@ -31,7 +32,7 @@ type AudioInfo struct {
 }
 
 // extractAudioMetadata updates the asset with ffprobe/EXIF-derived metadata.
-func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.Asset, fileSize int64, reader io.Reader, audioInfo *AudioInfo) error {
+func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.Asset, fileSize int64, reader io.Reader, audioInfo *AudioInfo) (MetadataResult, error) {
 	config := &exif.Config{
 		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
 		MaxFileSize:  2 * 1024 * 1024 * 1024, // 2GB
@@ -52,15 +53,15 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 
 	result, err := extractor.ExtractFromStream(ctx, req)
 	if err != nil {
-		return fmt.Errorf("extract metadata: %w", err)
+		return MetadataResult{}, fmt.Errorf("extract metadata: %w", err)
 	}
 	if result.Error != nil {
-		return fmt.Errorf("extract metadata: %w", result.Error)
+		return MetadataResult{}, fmt.Errorf("extract metadata: %w", result.Error)
 	}
 
 	meta, ok := result.Metadata.(*dbtypes.AudioSpecificMetadata)
 	if !ok {
-		return fmt.Errorf("unexpected metadata type for audio: %T", result.Metadata)
+		return MetadataResult{}, fmt.Errorf("unexpected metadata type for audio: %T", result.Metadata)
 	}
 
 	if audioInfo.Codec != "" {
@@ -83,31 +84,10 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 
 	sm, err := dbtypes.MarshalMeta(meta)
 	if err != nil {
-		return fmt.Errorf("marshal metadata: %w", err)
+		return MetadataResult{}, fmt.Errorf("marshal metadata: %w", err)
 	}
-
-	if err := ap.assetService.UpdateAssetExtractedMetadata(ctx, asset.AssetID, sm, common, result.Raw); err != nil {
-		return fmt.Errorf("save metadata: %w", err)
-	}
-	ap.reconcileComponentRelation(ctx, asset, false, asset.MimeType)
-	ap.enqueueDetectStacks(ctx, asset)
-
-	return nil
-}
-
-// transcodeAudioSmart applies a best-effort, resource-aware transcoding strategy.
-func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
-	if strings.ToLower(audioInfo.Format) == "mp3" && audioInfo.Bitrate >= 128000 && audioInfo.Bitrate <= 320000 {
-		return copyAudioForWeb(files, sourcePath, asset, "web")
-	}
-
-	outputPath, err := ap.transcodeAudioToMP3(ctx, audioPath, audioInfo)
-	if err != nil {
-		return fmt.Errorf("transcode to mp3: %w", err)
-	}
-	defer os.Remove(outputPath)
-
-	return ap.saveTranscodedAudio(files, asset, outputPath, "web")
+	relation := repo.InitialMediaRelation(&fileutil.ValidationResult{MimeType: asset.MimeType}, asset.OriginalFilename)
+	return MetadataResult{AssetID: asset.AssetID, SourceContentID: asset.ContentID, Metadata: sm, Common: common, ExifRaw: dbtypes.JSON(result.Raw), ComponentRelation: string(relation)}, nil
 }
 
 // transcodeAudioToMP3 runs ffmpeg to produce an MP3 at a reasonable bitrate.
@@ -124,6 +104,7 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 		outputPath,
 		targetBitrate,
 		audioInfo.Channels,
+		ap.toolSession,
 	)...)
 	sysproc.HideConsole(cmd)
 
@@ -134,48 +115,53 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
-func buildAudioTranscodeArgs(inputPath, outputPath, targetBitrate string, sourceChannels int) []string {
+func buildAudioTranscodeArgs(inputPath, outputPath, targetBitrate string, sourceChannels int, session execution.ToolSession) []string {
 	channels := "2"
 	if sourceChannels == 1 {
 		channels = "1"
 	}
-	return []string{
+	args := []string{
 		"-i", inputPath,
 		"-c:a", "libmp3lame",
 		"-b:a", targetBitrate,
 		"-q:a", "2",
 		"-ar", "44100",
 		"-ac", channels,
+	}
+	args = append(args, session.FFmpegThreadsArg()...)
+	args = append(args,
 		"-f", "mp3",
 		"-y",
 		outputPath,
-	}
+	)
+	return args
 }
 
 // copyAudioForWeb saves the provided audio file as the web version.
-func copyAudioForWeb(files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, version string) error {
+func copyAudioForWeb(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, pipelineVersion, version string) error {
 	audioFile, err := files.OpenMedia(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open audio file: %w", err)
 	}
 	defer audioFile.Close()
 
-	return saveAudioVersion(files, audioFile, asset, version)
+	return saveAudioVersion(ctx, files, audioFile, asset, pipelineVersion, version)
 }
 
 // saveTranscodedAudio saves a transcoded output as the web version.
-func (ap *AssetProcessor) saveTranscodedAudio(files *storage.RepositoryFS, asset *repo.Asset, outputPath, version string) error {
+func (ap *AssetProcessor) saveTranscodedAudio(ctx context.Context, files *storage.RepositoryFS, asset *repo.Asset, outputPath, pipelineVersion, version string) error {
 	transcodedFile, err := os.Open(outputPath)
 	if err != nil {
 		return fmt.Errorf("open transcoded file: %w", err)
 	}
 	defer transcodedFile.Close()
 
-	return saveAudioVersion(files, transcodedFile, asset, version)
+	return saveAudioVersion(ctx, files, transcodedFile, asset, pipelineVersion, version)
 }
 
-// generateWaveform produces a waveform thumbnail image (best-effort; non-fatal).
-func (ap *AssetProcessor) generateWaveform(ctx context.Context, files *storage.RepositoryFS, asset *repo.Asset, audioPath string) error {
+// computeWaveform produces an in-memory waveform. Publication is performed by
+// the derivative publish stage after the codec reservation is released.
+func (ap *AssetProcessor) computeWaveform(ctx context.Context, asset *repo.Asset, audioPath string) ([]byte, error) {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID))
 	defer os.Remove(outputPath)
 
@@ -191,21 +177,20 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, files *storage.R
 	sysproc.HideConsole(cmd)
 
 	if err := cmd.Run(); err != nil {
-		return nil // optional: ignore errors
+		return nil, nil // optional: ignore errors
 	}
 
 	waveformFile, err := os.Open(outputPath)
 	if err != nil {
-		return nil // optional: ignore errors
+		return nil, nil // optional: ignore errors
 	}
 	defer waveformFile.Close()
 
 	buf := &bytes.Buffer{}
 	if _, err := io.Copy(buf, waveformFile); err != nil {
-		return nil // optional: ignore errors
+		return nil, nil // optional: ignore errors
 	}
-
-	return ap.saveThumbnail(ctx, files, buf, asset, "waveform")
+	return bytes.Clone(buf.Bytes()), nil
 }
 
 // getAudioInfo probes the audio using ffprobe to collect duration, bitrate, codec, and format.

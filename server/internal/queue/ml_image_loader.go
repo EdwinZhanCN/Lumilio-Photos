@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"os"
 
+	"server/internal/artifact"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/storage"
 	"server/internal/utils/imagesource"
 
@@ -23,16 +24,22 @@ type MLImageLoader interface {
 var ErrDerivedAssetStale = ErrAssetWorkStale
 
 type DBMLImageLoader struct {
-	Queries *repo.Queries
-	Files   *storage.RepositoryFSFactory
+	Reader MLImageReader
+	Files  *storage.RepositoryFSFactory
 }
 
-func NewDBMLImageLoader(queries *repo.Queries, files *storage.RepositoryFSFactory) *DBMLImageLoader {
-	return &DBMLImageLoader{Queries: queries, Files: files}
+type MLImageReader interface {
+	AssetWorkReader
+	GetThumbnailByAssetAndSize(context.Context, repo.GetThumbnailByAssetAndSizeParams) (repo.Thumbnail, error)
+	GetRepository(context.Context, uuid.UUID) (repo.Repository, error)
+}
+
+func NewDBMLImageLoader(reader MLImageReader, files *storage.RepositoryFSFactory) *DBMLImageLoader {
+	return &DBMLImageLoader{Reader: reader, Files: files}
 }
 
 func (l *DBMLImageLoader) ValidateAssetWork(ctx context.Context, assetID, expectedContentID uuid.UUID) error {
-	_, err := validateCurrentAssetWork(ctx, l.Queries, assetID, expectedContentID)
+	_, err := validateCurrentAssetWork(ctx, l.Reader, assetID, expectedContentID)
 	return err
 }
 
@@ -51,14 +58,14 @@ func mlThumbnailSize(purpose imagesource.Purpose) string {
 }
 
 func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
-	if l == nil || l.Queries == nil {
+	if l == nil || l.Reader == nil {
 		return nil, fmt.Errorf("ml image loader unavailable")
 	}
-	if preprocessVersion != "" && preprocessVersion != jobs.MLPreprocessVersionV1 {
+	if preprocessVersion != "" && preprocessVersion != MLPreprocessVersionV1 {
 		return nil, fmt.Errorf("unsupported ml preprocess version: %s", preprocessVersion)
 	}
 
-	asset, err := validateCurrentAssetWork(ctx, l.Queries, assetID, uuid.Nil)
+	asset, err := validateCurrentAssetWork(ctx, l.Reader, assetID, uuid.Nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +73,7 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 		return nil, fmt.Errorf("asset %s is not a photo: %s", asset.AssetID.String(), asset.Type)
 	}
 	thumbnailSize := mlThumbnailSize(purpose)
-	thumbnail, err := l.Queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
+	thumbnail, err := l.Reader.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
 		AssetID: assetID,
 		Size:    thumbnailSize,
 	})
@@ -87,7 +94,7 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 	if thumbnail.RepositoryID == uuid.Nil {
 		return nil, fmt.Errorf("%s thumbnail has no repository", thumbnailSize)
 	}
-	repository, err := l.Queries.GetRepository(ctx, thumbnail.RepositoryID)
+	repository, err := l.Reader.GetRepository(ctx, thumbnail.RepositoryID)
 	if err != nil {
 		return nil, fmt.Errorf("get thumbnail repository: %w", err)
 	}
@@ -125,7 +132,7 @@ func derivedThumbnailPath(contentID uuid.UUID, size string) (string, error) {
 	if contentID == uuid.Nil {
 		return "", ErrDerivedAssetStale
 	}
-	p, err := storage.ParsePrivateRepositoryPath(fmt.Sprintf(".lumilio/assets/thumbnails/%s/%s_%s.webp", size, contentID, size))
+	p, err := (artifact.Identity{SourceFence: contentID.String(), Stage: "derivatives", PipelineVersion: pipeline.AssetPipelineVersion, Name: size + ".webp"}).Path()
 	if err != nil {
 		return "", err
 	}

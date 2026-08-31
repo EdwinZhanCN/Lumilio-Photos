@@ -167,12 +167,6 @@ AND (?2 IS NULL OR type = ?2)
 ORDER BY upload_time DESC
 LIMIT ?3 OFFSET ?4;
 
--- name: UpdateAssetStatus :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING *;
-
 -- name: GetAssetsByStatus :many
 SELECT * FROM assets
 WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false
@@ -229,28 +223,6 @@ WHERE json_extract(status, char(36) || '.state') = ?1
 SELECT COUNT(*) as count
 FROM assets
 WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false;
-
--- name: ResetAssetStatusForRetry :one
-UPDATE assets
-SET status = json_set(
-    status,
-    char(36) || '.state',
-    '"processing"'
-)
-WHERE asset_id = ?1 AND json_extract(status, char(36) || '.state') IN ('warning', 'failed')
-RETURNING *;
-
--- name: UpdateAssetStatusWithErrors :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING *;
-
--- name: BulkUpdateAssetStatus :exec
-UPDATE assets
-SET status = sqlc.arg('status')
-WHERE CAST(sqlc.narg('asset_ids') AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false;
 
 -- name: GetAssetsByContentHash :many
 SELECT * FROM assets

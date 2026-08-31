@@ -21,7 +21,7 @@ Hub YAML semantics remain owned by Hub.
 ## Deterministic and remote commands
 
 Pin, reconcile, and verify:
-[lumilio-pin-reconcile](../../../.agents/skills/lumilio-pin-reconcile/SKILL.md).
+[lumilio-pin-reconcile](../.agents/skills/lumilio-pin-reconcile/SKILL.md).
 
 ```text
 task lumen:check                  # committed local state only; no network

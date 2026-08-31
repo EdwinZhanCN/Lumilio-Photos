@@ -24,7 +24,7 @@ useful; implementation plans belong in `exec-plans/`.
   into `.local/dev/config/server.toml`. Container images ship complete
   `docker-http` and `docker-caddy` manifests; ACME and custom operator
   manifests are generated into app-state by `server config init`. The
-  Desktop keeps a complete schema-v4 runtime intent and projects it through
+  Desktop keeps a complete schema-v6 runtime intent and projects it through
   the same strict `server/config` loader before calling `server/app`.
 - Standalone requires `--config <path>`. Ordinary environment variables never override `AppConfig`; only CLI diagnostics and the explicit break-glass whitelist are single-run host controls.
 
@@ -34,7 +34,7 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/app`: the only server runtime — logging, migrations, queue workers, router, repository bootstrap, SPA serving, and graceful shutdown via `Run(ctx, cfg, controls)`. It rejects configuration not produced by the strict loader.
 - `server/config`: leaf package exposing the runtime constructor
   `LoadAppConfig(path)` plus a one-shot complete-manifest generator. It strictly
-  decodes schema v4, resolves manifest-relative paths and secret files,
+  decodes schema v5, resolves manifest-relative paths and secret files,
   validates the complete graph, and fingerprints the source bytes.
 - `server/internal/httporigin`: request-derived target/browser Origin policy
   and trusted-proxy client-IP recovery.
@@ -42,8 +42,12 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS.
 - `server/internal/api/handler`: HTTP request/response layer.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
-- `server/internal/processors`: ingest, metadata, thumbnail, transcode pipeline.
-- `server/internal/queue`: River jobs and workers.
+- `server/internal/processors`: read/compute stages for ingest, metadata,
+  derivatives, transcode, and enrichment. Background results are committed by
+  the shared coordinator rather than by processors themselves.
+- `server/internal/queue`: the River adapter, closed macro-job catalog, and
+  operational diagnostics. River is disposable control state, not product
+  truth.
 - Event topology is owner-wide and derived from logical `media_item` facts.
   `source_revision`/`published_revision` and the shared Event resolver are the
   lifecycle authority; repository Browse Scope is applied only as a read
@@ -55,41 +59,45 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/storage`: RepositoryFS, repository layout/configuration,
   staging, and the Repository Observation Engine (ROE). ROE persists a node
   graph, resumable directory frontiers, native change cursors, revisioned
-  observations and Locations, exact content identity, and a transactional
-  outbox. Its `C0 → crawl → fixed C1 → dirty verification → finalize` protocol
-  never treats a watcher hint as absence authority.
+  observations and Locations, and exact content identity. Its
+  `C0 → crawl → fixed C1 → dirty verification → finalize` protocol never
+  treats a watcher hint as absence authority.
+- Catalog migrations establish the current desired/applied pipeline state and
+  domain-outbox contracts. QueueDB migrations are independent and may be
+  recreated without a catalog cutover or compatibility journal.
 - `server/internal/sourcing`: recoverable staged materialization for upload and
   cloud flows. A committed source publishes the same node/content/Location
   facts as repository observation.
-- `server/internal/db` and `server/migrations`: exactly one physical SQLite
-  writer shared by application mutations and River, plus four query-only WAL
-  readers used by default for non-transactional queries and Online Backup.
+- `server/internal/db` and `server/migrations`: one physical catalog writer
+  plus four query-only WAL readers for product facts, and an independent
+  one-writer/four-reader QueueDB for disposable River macro-job control state.
+  Typed desired/applied records and the domain outbox are the durable handoff;
+  River traffic never admits directly to the catalog writer.
   Planning snapshots are short; filesystem, media, network, and unbounded CPU
   work never occurs inside write transactions. Large atomic changes are
   set-based and restartable derived projections publish in bounded,
   revision-fenced turns. Automatic WAL checkpoints are disabled; one runtime
   monitor observes writer wait/WAL growth and requests explicit passive
-  checkpoints through the sole writer. This boundary also owns
-  application/River migrations, verified snapshots, FTS5, and the statically
-  linked SQLite Vec1 semantic index.
+  checkpoints through each database's sole writer. This boundary owns catalog
+  migrations and verified snapshots; QueueDB owns River migrations. The catalog
+  still owns FTS5 and the statically linked SQLite Vec1 semantic index.
 - `server/internal/db/catalogtx`: the closed, compile-time named transaction
   and observed-connector boundary. It measures writer/reader admission,
   bounded transaction/statement/cursor lifetimes, outcomes, cancellations,
   and `DBStats` reconciliation. An AST inventory prevents raw transaction or
   standalone writer escape hatches from reappearing in production code.
-- `server/tools/sqlitepressure`: host-side mixed-load, real-Chromium startup,
-  recovery, and post-stop integrity controller. The pressure Compose overlay
-  bind-mounts all mutable bytes into one marked run-id directory with explicit
-  disk guards; qualification histograms are never pooled across runs or
-  platforms.
 - Foreground bootstrap/setup/status and repository-list requests are strictly
   read-only. Incomplete bootstrap gates are derived through query-only readers;
   repository reachability is a cached projection refreshed at boot and by the
   portable background reconciler. HTTP reads never trigger reconciliation or
   expiry writes merely to render current state.
-- River periodic constructors never access SQLite. Cancellable reader probes
-  observe durable pending state and arm coalesced in-memory hints; bounded
-  backlog continuations snooze the same active unique job between writer turns.
+- Domain-outbox dispatch and periodic reconciliation derive outstanding work
+  only from catalog desired/applied state. They never inspect River state to
+  decide whether product work exists.
+- ROE claims bounded deterministic directory frontiers. Asset, repository, and
+  projection pipelines publish typed macro commands, execute under one global
+  resource governor, and acknowledge background catalog results through the
+  bounded commit coordinator.
 - `server/internal/search/bleveocr`: rebuildable OCR search sidecar. SQLite OCR
   rows remain authoritative; a revision outbox feeds
   `<sqlite-directory>/indexes/bleve/ocr-v1/`.
@@ -135,7 +143,7 @@ useful; implementation plans belong in `exec-plans/`.
 ## Contracts
 
 - OpenAPI is the HTTP contract source of truth. Regeneration:
-  [lumilio-api-contract-change](../../../.agents/skills/lumilio-api-contract-change/SKILL.md).
+  [lumilio-api-contract-change](../.agents/skills/lumilio-api-contract-change/SKILL.md).
 - Do not hand-edit generated OpenAPI artifacts.
 - `storage.path` is registered at startup as the non-removable default Storage
   Location, identified by `.lumilioroot`; startup does not create repositories.

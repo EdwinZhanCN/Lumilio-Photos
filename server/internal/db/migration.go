@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -28,24 +27,10 @@ const migrationTable = "lumilio_schema_migrations"
 // other generation are rejected outright: experimental catalogs are never
 // upgraded in place.
 const (
-	schemaGeneration                 = 7
+	schemaGeneration                 = 8
 	currentGenerationBaselineVersion = 9
-	currentApplicationMigration      = 13
-	destructiveCutoverStartVersion   = 11
-	destructiveCutoverVersion        = 12
+	currentApplicationMigration      = 14
 )
-
-var ErrDestructiveMigrationPreflightRequired = errors.New("destructive catalog migration preflight is required")
-
-// DestructiveMigrationPlan identifies the immutable migration boundary for a
-// populated catalog. The callback runs before River or application migrations
-// can change the catalog.
-type DestructiveMigrationPlan struct {
-	FromApplicationMigration int64
-	ToApplicationMigration   int64
-}
-
-type DestructiveMigrationPreflight func(context.Context, DestructiveMigrationPlan) error
 
 type embeddedMigration struct {
 	version  int64
@@ -60,41 +45,22 @@ type appliedMigration struct {
 	checksum string
 }
 
-// Migrate applies migrations for a new or already-current catalog. An existing
-// catalog that still needs the destructive ROE cutover must use
-// MigrateWithPreflight so the caller can establish the filesystem and backup
-// recovery boundary first.
+// Migrate applies the catalog migrations and, for standalone package tests,
+// River's schema on the same handle. Production calls MigrateCatalog for the
+// catalog and migrates its independent QueueDB separately.
 func (d *DB) Migrate(ctx context.Context) error {
-	return d.MigrateWithPreflight(ctx, nil)
-}
-
-// MigrateWithPreflight runs the required recovery callback before any schema
-// change to an existing pre-cutover catalog. River is migrated before the
-// application cutover so obsolete jobs can be deleted in the same transaction
-// that replaces the media catalog.
-func (d *DB) MigrateWithPreflight(ctx context.Context, preflight DestructiveMigrationPreflight) error {
-	if err := assertSchemaGeneration(ctx, d.SQL); err != nil {
+	if err := d.MigrateCatalog(ctx); err != nil {
 		return err
 	}
-	plan, err := pendingDestructiveMigration(ctx, d.SQL)
-	if err != nil {
-		return fmt.Errorf("plan Lumilio migration: %w", err)
-	}
-	if plan != nil {
-		if preflight == nil {
-			return fmt.Errorf(
-				"%w: application migration %d -> %d",
-				ErrDestructiveMigrationPreflightRequired,
-				plan.FromApplicationMigration,
-				plan.ToApplicationMigration,
-			)
-		}
-		if err := preflight(ctx, *plan); err != nil {
-			return fmt.Errorf("destructive catalog migration preflight: %w", err)
-		}
-	}
-	if err := migrateRiver(ctx, d.SQL); err != nil {
-		return fmt.Errorf("migrate River schema: %w", err)
+	return MigrateRiver(ctx, d.SQL)
+}
+
+// MigrateCatalog applies the current catalog generation. Legacy translation was
+// removed: incompatible pre-production catalogs are rejected by
+// assertSchemaGeneration and can be recreated.
+func (d *DB) MigrateCatalog(ctx context.Context) error {
+	if err := assertSchemaGeneration(ctx, d.SQL); err != nil {
+		return err
 	}
 	if err := migrateApplication(ctx, d.SQL); err != nil {
 		return fmt.Errorf("migrate Lumilio schema: %w", err)
@@ -106,51 +72,6 @@ func (d *DB) MigrateWithPreflight(ctx context.Context, preflight DestructiveMigr
 		return fmt.Errorf("post-migration integrity check: %w", err)
 	}
 	return nil
-}
-
-func pendingDestructiveMigration(ctx context.Context, database *sql.DB) (*DestructiveMigrationPlan, error) {
-	var ledgerExists int
-	if err := database.QueryRowContext(ctx, `
-		SELECT count(*) FROM sqlite_schema
-		WHERE type = 'table' AND name = ?
-	`, migrationTable).Scan(&ledgerExists); err != nil {
-		return nil, fmt.Errorf("inspect migration ledger: %w", err)
-	}
-	if ledgerExists == 0 {
-		return nil, nil
-	}
-	all, err := loadEmbeddedMigrations()
-	if err != nil {
-		return nil, err
-	}
-	available, err := currentGenerationMigrations(all)
-	if err != nil {
-		return nil, err
-	}
-	applied, err := readAppliedMigrations(ctx, database)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateAppliedMigrations(available, applied); err != nil {
-		return nil, err
-	}
-	if len(applied) == 0 {
-		return nil, nil
-	}
-	if _, complete := applied[destructiveCutoverVersion]; complete {
-		return nil, nil
-	}
-	from := int64(0)
-	for version := range applied {
-		from = max(from, version)
-	}
-	if from >= destructiveCutoverVersion {
-		return nil, nil
-	}
-	return &DestructiveMigrationPlan{
-		FromApplicationMigration: from,
-		ToApplicationMigration:   destructiveCutoverVersion,
-	}, nil
 }
 
 // assertSchemaGeneration refuses to start against a catalog written by an
@@ -218,18 +139,7 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 			index++
 			continue
 		}
-
 		group := []embeddedMigration{migration}
-		next := index + 1
-		if migration.version >= destructiveCutoverStartVersion && migration.version <= destructiveCutoverVersion {
-			group = group[:0]
-			for next = index; next < len(available) && available[next].version <= destructiveCutoverVersion; next++ {
-				candidate := available[next]
-				if _, ok := applied[candidate.version]; !ok {
-					group = append(group, candidate)
-				}
-			}
-		}
 
 		started := time.Now()
 		if err := applyMigrationGroup(ctx, database, group); err != nil {
@@ -244,7 +154,7 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 				time.Since(started),
 			)
 		}
-		index = next
+		index++
 	}
 	return nil
 }
@@ -277,15 +187,6 @@ func validateAppliedMigrations(available []embeddedMigration, applied map[int64]
 			)
 		}
 	}
-	if _, cutoverApplied := applied[destructiveCutoverVersion]; cutoverApplied {
-		if _, schemaApplied := applied[destructiveCutoverStartVersion]; !schemaApplied {
-			return fmt.Errorf(
-				"catalog migration %06d is recorded without required migration %06d",
-				destructiveCutoverVersion,
-				destructiveCutoverStartVersion,
-			)
-		}
-	}
 	return nil
 }
 
@@ -295,7 +196,7 @@ func structToApplied(migration embeddedMigration) appliedMigration {
 
 // currentGenerationMigrations excludes destructive baselines from older
 // experimental generations. Those files remain embedded and immutable for
-// auditability, but a fresh generation-7 catalog starts directly at migration
+// auditability, but a fresh generation-8 catalog starts directly at migration
 // 000009 and therefore never reads the historical generation-6 sequence.
 func currentGenerationMigrations(all []embeddedMigration) ([]embeddedMigration, error) {
 	var current []embeddedMigration
@@ -401,7 +302,6 @@ func applyMigrationGroup(ctx context.Context, database *sql.DB, migrations []emb
 	defer func() {
 		_ = tx.Rollback()
 	}()
-
 	for _, migration := range migrations {
 		if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
 			return fmt.Errorf("execute migration %s: %w", migration.file, err)
@@ -424,7 +324,10 @@ func applyMigrationGroup(ctx context.Context, database *sql.DB, migrations []emb
 	return nil
 }
 
-func migrateRiver(ctx context.Context, database *sql.DB) error {
+// MigrateRiver applies only River's execution schema to the supplied queue
+// database. The catalog and queue files intentionally have independent
+// migration ledgers and lifecycle owners.
+func MigrateRiver(ctx context.Context, database *sql.DB) error {
 	migrator, err := rivermigrate.New(riversqlite.New(database), nil)
 	if err != nil {
 		return fmt.Errorf("initialize River migrator: %w", err)
@@ -442,4 +345,11 @@ func migrateRiver(ctx context.Context, database *sql.DB) error {
 		)
 	}
 	return nil
+}
+
+// migrateRiver is retained for package-local migration tests that exercise a
+// standalone catalog handle. Production bootstrap calls the exported helper
+// with QueueDB.SQL instead.
+func migrateRiver(ctx context.Context, database *sql.DB) error {
+	return MigrateRiver(ctx, database)
 }

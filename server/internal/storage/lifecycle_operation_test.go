@@ -476,9 +476,11 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 		"kept.jpg", int64(len("original-media")), true,
 	)
 	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO river_job (args, kind, state)
-		VALUES (jsonb(?), 'process_semantic', 'available')
-	`, `{"assetId":"`+assetID.String()+`"}`); err != nil {
+		INSERT INTO domain_outbox (
+			outbox_id, envelope_version, command_kind, subject_key,
+			desired_version, envelope, available_at, created_at, updated_at
+		) VALUES (?, 1, 'repository.scan', ?, 1, '{}', 0, 0, 0)
+	`, uuid.NewString(), created.Repository.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 	credentialID := uuid.New()
@@ -509,27 +511,11 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 		t.Fatalf("cloud import receipt impact = %d, want 1", impact.CloudImportCount)
 	}
 	if impact.ActiveTaskCount != 1 {
-		t.Fatalf("asset-scoped task impact = %d, want 1", impact.ActiveTaskCount)
+		t.Fatalf("catalog work impact = %d, want 1", impact.ActiveTaskCount)
 	}
 	if !impact.PrivateStateFound || impact.PrivateStateBytes < int64(len("private-state")) {
 		t.Fatalf("private-state impact = %+v", impact)
 	}
-	manager.beforeRepositoryJobCleanup = func() {
-		if _, updateErr := catalog.SQL.ExecContext(ctx, `UPDATE river_job SET state = 'running' WHERE json_extract(args, '$.assetId') = ?`, assetID.String()); updateErr != nil {
-			t.Errorf("transition available asset job to running: %v", updateErr)
-		}
-	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
-		t.Fatalf("running asset-scoped removal error = %v, want ErrRepositoryBusy", err)
-	}
-	manager.beforeRepositoryJobCleanup = nil
-	if _, err := manager.queries.GetRepository(ctx, created.Repository.RepoID); err != nil {
-		t.Fatalf("running-job rejection removed repository: %v", err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `UPDATE river_job SET state = 'available' WHERE json_extract(args, '$.assetId') = ?`, assetID.String()); err != nil {
-		t.Fatal(err)
-	}
-
 	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
 		RequestID: "remove-regular", Actor: "test",
 	}); err != nil {
@@ -545,15 +531,14 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if assets != 0 {
 		t.Fatalf("remaining catalog assets = %d, want 0", assets)
 	}
-	var remainingAssetJobs int
+	var remainingDomainCommands int
 	if err := catalog.SQL.QueryRowContext(ctx, `
-		SELECT count(*) FROM river_job
-		WHERE json_extract(args, '$.assetId') = ?
-	`, assetID.String()).Scan(&remainingAssetJobs); err != nil {
+		SELECT count(*) FROM domain_outbox WHERE subject_key = ?
+	`, created.Repository.RepoID.String()).Scan(&remainingDomainCommands); err != nil {
 		t.Fatal(err)
 	}
-	if remainingAssetJobs != 0 {
-		t.Fatalf("remaining asset-scoped jobs = %d, want 0", remainingAssetJobs)
+	if remainingDomainCommands != 0 {
+		t.Fatalf("remaining repository domain commands = %d, want 0", remainingDomainCommands)
 	}
 	var removalAudit int
 	if err := catalog.SQL.QueryRowContext(ctx, `
@@ -616,7 +601,7 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 	}
 	assetID := uuid.New()
 	contentID := uuid.New()
-	targetNodeID := seedRepositoryAssetOccurrence(
+	seedRepositoryAssetOccurrence(
 		t, catalog, target.RepoID, assetID, contentID, owner.UserID, "shared.jpg", 12, true,
 	)
 	seedRepositoryAssetOccurrence(
@@ -683,10 +668,11 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO river_job (args, kind, state) VALUES
-			(jsonb(?), 'process_semantic', 'available'),
-			(jsonb(?), 'hash_repository_node', 'available')
-	`, `{"assetId":"`+assetID.String()+`"}`, `{"nodeId":"`+targetNodeID.String()+`"}`); err != nil {
+		INSERT INTO domain_outbox (
+			outbox_id, envelope_version, command_kind, subject_key,
+			desired_version, envelope, available_at, created_at, updated_at
+		) VALUES (?, 1, 'repository.scan', ?, 1, '{}', 0, 0, 0)
+	`, uuid.NewString(), target.RepoID.String()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -710,13 +696,8 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM share_links WHERE asset_ids = ?`, 1, assetIDs)
 	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM agent_pins WHERE asset_ids = ?`, 1, assetIDs)
 	assertStorageCount(t, catalog.SQL, `
-		SELECT count(*) FROM river_job
-		WHERE json_extract(args, '$.assetId') = ?
-	`, 1, assetID.String())
-	assertStorageCount(t, catalog.SQL, `
-		SELECT count(*) FROM river_job
-		WHERE json_extract(args, '$.nodeId') = ?
-	`, 0, targetNodeID.String())
+		SELECT count(*) FROM domain_outbox WHERE subject_key = ?
+	`, 0, target.RepoID.String())
 	assertStorageCount(t, catalog.SQL, `
 		SELECT count(*) FROM media_items
 		WHERE media_item_id = ? AND repository_id = ?

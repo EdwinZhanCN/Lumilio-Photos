@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/service"
 
-	"github.com/riverqueue/river"
+	"github.com/google/uuid"
 )
 
 func bioClipRuntimeAvailable(ctx context.Context, settingsService service.SettingsService, lumenService service.LumenService) (bool, error) {
@@ -32,18 +33,15 @@ func bioClipRuntimeAvailable(ctx context.Context, settingsService service.Settin
 	return service.IsIndexingTaskRuntimeAvailable(lumenService, service.AssetIndexingTaskBioCLIP), nil
 }
 
-func enqueueBioClipAsset(ctx context.Context, queueClient *river.Client[*sql.Tx], asset repo.Asset) error {
-	if queueClient == nil {
-		return fmt.Errorf("queue client is not configured")
+func requestBioClipAsset(ctx context.Context, writer *catalogtx.Writer, asset repo.Asset) error {
+	if writer == nil {
+		return fmt.Errorf("catalog writer is not configured")
 	}
-
-	_, err := queueClient.Insert(ctx, jobs.ProcessBioClipArgs{
-		AssetID:           asset.AssetID,
-		ExpectedContentID: asset.ContentID,
-		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, nil)
+	err := writer.Transact(ctx, catalogtx.OperationAssetReprocess, nil, func(tx *sql.Tx) error {
+		return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, pipeline.AdmissionInteractive, uuid.New())
+	})
 	if err != nil {
-		return fmt.Errorf("enqueue BioCLIP job: %w", err)
+		return fmt.Errorf("request asset enrichment: %w", err)
 	}
 	return nil
 }

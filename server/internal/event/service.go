@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 	"server/internal/db/catalogtx"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 )
 
 var (
@@ -28,26 +27,22 @@ type Service struct {
 	writer   *catalogtx.Writer
 	snapshot *catalogtx.Reader
 	resolver *Resolver
-	queue    *river.Client[*sql.Tx]
 }
 
-func NewService(db *sql.DB, queues ...*river.Client[*sql.Tx]) *Service {
-	return NewServiceWithReader(db, db, queues...)
+func NewService(db *sql.DB) *Service {
+	return NewServiceWithReader(db, db)
 }
 
-func NewServiceWithReader(db, reader *sql.DB, queues ...*river.Client[*sql.Tx]) *Service {
-	return NewServiceWithCatalog(catalogtx.NewWriter(db, nil), catalogtx.NewReader(reader, nil), queues...)
+func NewServiceWithReader(db, reader *sql.DB) *Service {
+	return NewServiceWithCatalog(catalogtx.NewWriter(db, nil), catalogtx.NewReader(reader, nil))
 }
 
 // NewServiceWithCatalog wires the measured writer and read-snapshot
 // capabilities owned by the live catalog.
-func NewServiceWithCatalog(writer *catalogtx.Writer, snapshot *catalogtx.Reader, queues ...*river.Client[*sql.Tx]) *Service {
+func NewServiceWithCatalog(writer *catalogtx.Writer, snapshot *catalogtx.Reader) *Service {
 	service := &Service{
 		db: writer.Pool(), reader: snapshot.Pool(), writer: writer, snapshot: snapshot,
 		resolver: NewResolver(snapshot.Pool()),
-	}
-	if len(queues) > 0 {
-		service.queue = queues[0]
 	}
 	return service
 }
@@ -61,14 +56,16 @@ func (s *Service) Resolver() *Resolver { return s.resolver }
 // authority used by workers and readers.
 func MarkEventFactsChangedTx(ctx context.Context, tx *sql.Tx, ownerID int32, reason string) error {
 	now := time.Now().UTC().UnixMicro()
-	if _, err := tx.ExecContext(ctx, `
+	var sourceRevision uint64
+	if err := tx.QueryRowContext(ctx, `
 INSERT INTO event_owner_state(
  owner_id,active_algorithm_version,initialized_at,revision,source_revision,published_revision,updated_at
 ) VALUES(?,?,?,0,1,0,?)
 ON CONFLICT(owner_id) DO UPDATE SET
  source_revision=event_owner_state.source_revision+1,
  revision=event_owner_state.revision+1,
- updated_at=excluded.updated_at`, ownerID, AlgorithmVersion, now, now); err != nil {
+ updated_at=excluded.updated_at
+RETURNING source_revision`, ownerID, AlgorithmVersion, now, now).Scan(&sourceRevision); err != nil {
 		return fmt.Errorf("advance Event source revision: %w", err)
 	}
 	// A single marker is enough to recover legacy claims and to make old
@@ -78,6 +75,9 @@ INSERT INTO event_dirty_ranges(
  dirty_range_id,owner_id,range_start,range_end,reason,created_at
 ) VALUES(?,?,?,?,?,?)`, uuid.NewString(), ownerID, now, now, reason, now); err != nil {
 		return fmt.Errorf("record Event invalidation: %w", err)
+	}
+	if err := pipeline.RequestEventProjectionTx(ctx, tx, ownerID, sourceRevision, false, uuid.New()); err != nil {
+		return fmt.Errorf("request Event projection: %w", err)
 	}
 	return nil
 }
@@ -140,6 +140,10 @@ INSERT INTO event_dirty_ranges(dirty_range_id,owner_id,range_start,range_end,rea
 				return nil, err
 			}
 			queued = append(queued, ownerID)
+			if err := pipeline.RequestEventProjectionTx(ctx, tx.Raw(), ownerID, 1, false, uuid.New()); err != nil {
+				tx.Rollback()
+				return nil, err
+			}
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, err
@@ -160,6 +164,40 @@ func (s *Service) RebuildOwner(ctx context.Context, ownerID int32, dryRun bool) 
 	return s.rebuildOwner(ctx, ownerID, dryRun, nil)
 }
 
+// RebuildAtRevision runs one projection rebuild against the caller's fenced
+// source revision. It is the projection macro's compute entry point: a stale
+// revision is a successful no-op at the adapter layer, while a matching
+// revision is atomically published by the event service.
+func (s *Service) RebuildAtRevision(ctx context.Context, ownerID int32, expectedRevision uint64) (RebuildPreview, error) {
+	if expectedRevision == 0 {
+		return RebuildPreview{}, errors.New("event projection revision is required")
+	}
+	prepared, err := s.PrepareAtRevision(ctx, ownerID, expectedRevision)
+	if err != nil {
+		return RebuildPreview{}, err
+	}
+	if err := s.publish(ctx, ownerID, prepared.Segments, prepared.Published, prepared.Result, &prepared.SourceRevision, nil); err != nil {
+		return RebuildPreview{}, err
+	}
+	return prepared.Preview, nil
+}
+
+// PrepareAtRevision reads one stable owner snapshot and computes the complete
+// deterministic replacement without acquiring the catalog writer. The
+// prepared value is handed to the commit coordinator, which performs the
+// fenced publication transaction.
+func (s *Service) PrepareAtRevision(ctx context.Context, ownerID int32, expectedRevision uint64) (PreparedRebuild, error) {
+	if expectedRevision == 0 {
+		return PreparedRebuild{}, errors.New("event projection revision is required")
+	}
+	revision := int64(expectedRevision)
+	segments, old, reconciled, sourceRevision, preview, err := s.prepareOwner(ctx, ownerID, &revision)
+	if err != nil {
+		return PreparedRebuild{}, err
+	}
+	return PreparedRebuild{OwnerID: ownerID, SourceRevision: sourceRevision, Segments: segments, Published: old, Result: reconciled, Preview: preview}, nil
+}
+
 func (s *Service) RebuildClaimed(ctx context.Context, ownerID int32, expectedRevision int64, leaseToken string) (RebuildPreview, error) {
 	return s.rebuildOwnerWithLease(ctx, ownerID, false, &expectedRevision, &leaseToken)
 }
@@ -169,38 +207,49 @@ func (s *Service) rebuildOwner(ctx context.Context, ownerID int32, dryRun bool, 
 }
 
 func (s *Service) rebuildOwnerWithLease(ctx context.Context, ownerID int32, dryRun bool, expectedRevision *int64, leaseToken *string) (RebuildPreview, error) {
+	segments, old, reconciled, snapshotRevision, preview, err := s.prepareOwner(ctx, ownerID, expectedRevision)
+	if err != nil {
+		return RebuildPreview{}, err
+	}
+	if dryRun {
+		return preview, nil
+	}
+	if err := s.publish(ctx, ownerID, segments, old, reconciled, &snapshotRevision, leaseToken); err != nil {
+		return RebuildPreview{}, err
+	}
+	return preview, nil
+}
+
+func (s *Service) prepareOwner(ctx context.Context, ownerID int32, expectedRevision *int64) ([]Segment, []PublishedEvent, ReconcileResult, int64, RebuildPreview, error) {
 	readTx, err := s.snapshot.BeginTx(ctx, catalogtx.OperationEventRebuildSnapshot)
 	if err != nil {
-		return RebuildPreview{}, fmt.Errorf("begin Event rebuild snapshot: %w", err)
+		return nil, nil, ReconcileResult{}, 0, RebuildPreview{}, fmt.Errorf("begin Event rebuild snapshot: %w", err)
 	}
 	defer readTx.Rollback()
 	candidates, err := loadCandidates(ctx, readTx, ownerID)
 	if err != nil {
-		return RebuildPreview{}, err
+		return nil, nil, ReconcileResult{}, 0, RebuildPreview{}, err
 	}
 	constraints, err := loadConstraints(ctx, readTx, ownerID)
 	if err != nil {
-		return RebuildPreview{}, err
+		return nil, nil, ReconcileResult{}, 0, RebuildPreview{}, err
 	}
 	old, err := loadPublished(ctx, readTx, ownerID)
 	if err != nil {
-		return RebuildPreview{}, err
+		return nil, nil, ReconcileResult{}, 0, RebuildPreview{}, err
 	}
 	var snapshotRevision int64
 	if err := readTx.QueryRowContext(ctx, `
 SELECT COALESCE((
  SELECT source_revision FROM event_owner_state WHERE owner_id=?
 ),0)`, ownerID).Scan(&snapshotRevision); err != nil {
-		return RebuildPreview{}, fmt.Errorf("read Event rebuild revision: %w", err)
+		return nil, nil, ReconcileResult{}, 0, RebuildPreview{}, fmt.Errorf("read Event rebuild revision: %w", err)
 	}
 	if err := readTx.Commit(); err != nil {
-		return RebuildPreview{}, fmt.Errorf("close Event rebuild snapshot: %w", err)
+		return nil, nil, ReconcileResult{}, 0, RebuildPreview{}, fmt.Errorf("close Event rebuild snapshot: %w", err)
 	}
 	if expectedRevision != nil && snapshotRevision != *expectedRevision {
-		return RebuildPreview{}, ErrStaleRevision
-	}
-	if expectedRevision == nil {
-		expectedRevision = &snapshotRevision
+		return nil, nil, ReconcileResult{}, snapshotRevision, RebuildPreview{}, ErrStaleRevision
 	}
 
 	// Segmentation and reconciliation can be CPU-heavy for a large owner. They
@@ -208,13 +257,13 @@ SELECT COALESCE((
 	// compare-and-swap writer transaction begins.
 	segments, err := SegmentCandidates(candidates, constraints, V1)
 	if err != nil {
-		return RebuildPreview{}, err
+		return nil, nil, ReconcileResult{}, snapshotRevision, RebuildPreview{}, err
 	}
 	reconciled, err := Reconcile(old, segments, constraints, V1, func() string {
 		return uuid.NewString()
 	})
 	if err != nil {
-		return RebuildPreview{}, err
+		return nil, nil, ReconcileResult{}, snapshotRevision, RebuildPreview{}, err
 	}
 	preview := RebuildPreview{Events: len(segments), Redirected: len(reconciled.Redirects)}
 	for _, assignment := range reconciled.Assignments {
@@ -225,13 +274,7 @@ SELECT COALESCE((
 			preview.Created++
 		}
 	}
-	if dryRun {
-		return preview, nil
-	}
-	if err := s.publish(ctx, ownerID, segments, old, reconciled, expectedRevision, leaseToken); err != nil {
-		return RebuildPreview{}, err
-	}
-	return preview, nil
+	return segments, old, reconciled, snapshotRevision, preview, nil
 }
 
 func loadCandidates(ctx context.Context, database queryer, ownerID int32) ([]Candidate, error) {
@@ -367,6 +410,29 @@ ORDER BY e.created_at, e.event_id, emi.position, emi.media_item_id`, ownerID)
 }
 
 func (s *Service) publish(ctx context.Context, ownerID int32, segments []Segment, old []PublishedEvent, result ReconcileResult, expectedRevision *int64, leaseToken *string) error {
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventPublishOwnerSnapshot, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := s.publishTx(ctx, tx.Raw(), ownerID, segments, old, result, expectedRevision, leaseToken); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ApplyPreparedRebuildTx publishes an already-computed owner replacement in a
+// caller-owned catalog transaction. The commit coordinator uses this boundary
+// so Event workers never receive a catalog writer or open their own write
+// transaction.
+func (s *Service) ApplyPreparedRebuildTx(ctx context.Context, tx *sql.Tx, prepared PreparedRebuild) error {
+	if s == nil || tx == nil || prepared.OwnerID <= 0 || prepared.SourceRevision <= 0 {
+		return errors.New("event projection commit is incomplete")
+	}
+	return s.publishTx(ctx, tx, prepared.OwnerID, prepared.Segments, prepared.Published, prepared.Result, &prepared.SourceRevision, nil)
+}
+
+func (s *Service) publishTx(ctx context.Context, tx *sql.Tx, ownerID int32, segments []Segment, old []PublishedEvent, result ReconcileResult, expectedRevision *int64, leaseToken *string) error {
 	// Prepare and validate the complete membership replacement before acquiring
 	// SQLite's sole writer. The final publish remains one atomic transaction,
 	// as required by the Event convergence contract, but membership persistence
@@ -487,11 +553,6 @@ func (s *Service) publish(ctx context.Context, ownerID int32, segments []Segment
 		}
 	}
 
-	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationEventPublishOwnerSnapshot, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	now := time.Now().UTC().UnixMicro()
 	var sourceRevision, publishedRevision int64
 	var leaseExpiresAt sql.NullInt64
@@ -662,7 +723,7 @@ WHERE owner_id=? AND source_revision=?
 	if affected, _ := stateResult.RowsAffected(); affected != 1 {
 		return ErrStaleRevision
 	}
-	return tx.Commit()
+	return nil
 }
 
 func optionalString(value string) *string {
@@ -1040,18 +1101,6 @@ WHERE event_id=? AND owner_id=?`, start, end, cover, now, eventID, ownerID)
 func (s *Service) markDirtyTx(ctx context.Context, tx *sql.Tx, ownerID int32, eventID, reason string, now int64) error {
 	if err := MarkEventFactsChangedTx(ctx, tx, ownerID, reason); err != nil {
 		return err
-	}
-	return s.enqueueRebuildTx(ctx, tx, ownerID)
-}
-
-func (s *Service) enqueueRebuildTx(ctx context.Context, tx *sql.Tx, ownerID int32) error {
-	if s.queue == nil {
-		return nil
-	}
-	args := jobs.EventRebuildArgs{OwnerID: ownerID}
-	opts := args.InsertOpts()
-	if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
-		return fmt.Errorf("enqueue Event rebuild: %w", err)
 	}
 	return nil
 }

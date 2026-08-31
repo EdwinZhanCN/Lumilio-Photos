@@ -37,6 +37,117 @@ type VideoFrameEmbedding struct {
 	Vector    []float32
 }
 
+// ApplyEmbeddingTx persists one computed embedding in an existing catalog
+// transaction. Callers use this from the asynchronous commit coordinator so
+// compute workers never acquire a catalog writer.
+func ApplyEmbeddingTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, embeddingType EmbeddingType, model string, vector []float32, isPrimary bool) error {
+	if queries == nil || assetID == uuid.Nil || strings.TrimSpace(model) == "" || len(vector) == 0 {
+		return errors.New("embedding commit is incomplete")
+	}
+	if embeddingType == EmbeddingTypeSemantic {
+		vector = canonicalizeSemanticVector(vector)
+	}
+	space, err := queries.UpsertEmbeddingSpace(ctx, repo.UpsertEmbeddingSpaceParams{
+		EmbeddingType: string(embeddingType), ModelID: model,
+		Dimensions: int64(len(vector)), DistanceMetric: embeddingDistanceMetricL2,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert embedding space: %w", err)
+	}
+	if embeddingType == EmbeddingTypeSemantic {
+		space, err = promoteOrUseDefaultSpace(ctx, queries, embeddingType, space)
+		if err != nil {
+			return err
+		}
+		if err := queries.DeleteSearchEmbeddingsByAsset(ctx, assetID); err != nil {
+			return fmt.Errorf("clear search embeddings: %w", err)
+		}
+		if err := queries.InsertSearchEmbedding(ctx, repo.InsertSearchEmbeddingParams{
+			AssetID: assetID, SpaceID: space.ID, Vector: dbtypes.NewVector(vector), ModelID: model,
+		}); err != nil {
+			return fmt.Errorf("insert search embedding: %w", err)
+		}
+		return nil
+	}
+	if err := queries.UpsertEmbedding(ctx, repo.UpsertEmbeddingParams{
+		AssetID: assetID, EmbeddingType: string(embeddingType), EmbeddingModel: model,
+		EmbeddingDimensions: int64(len(vector)), SpaceID: space.ID,
+		Vector: dbtypes.NewVector(vector), IsPrimary: isPrimary,
+	}); err != nil {
+		return fmt.Errorf("upsert embedding: %w", err)
+	}
+	return nil
+}
+
+// ApplyAestheticScoreTx persists an aesthetic score in an existing catalog
+// transaction owned by the commit coordinator.
+func ApplyAestheticScoreTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, score float32, modelVersion string) error {
+	if queries == nil || assetID == uuid.Nil || strings.TrimSpace(modelVersion) == "" {
+		return errors.New("aesthetic score commit is incomplete")
+	}
+	if _, err := queries.UpsertAssetQualityScore(ctx, repo.UpsertAssetQualityScoreParams{AssetID: assetID, Score: float64(score), ModelVersion: modelVersion}); err != nil {
+		return fmt.Errorf("upsert aesthetic score: %w", err)
+	}
+	return nil
+}
+
+// ApplyVideoFrameEmbeddingsTx persists a computed video-frame vector set in an
+// existing catalog transaction. It is used by the asynchronous commit
+// coordinator so workers never acquire the catalog writer themselves.
+func ApplyVideoFrameEmbeddingsTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, model string, frames []VideoFrameEmbedding) error {
+	if queries == nil || assetID == uuid.Nil || strings.TrimSpace(model) == "" || len(frames) == 0 {
+		return errors.New("video frame embedding commit is incomplete")
+	}
+	canonical := make([]VideoFrameEmbedding, 0, len(frames))
+	seen := make(map[int32]struct{}, len(frames))
+	for _, frame := range frames {
+		if frame.FrameTsMs < 0 || len(frame.Vector) == 0 {
+			return fmt.Errorf("invalid video frame embedding at ts=%d", frame.FrameTsMs)
+		}
+		if _, exists := seen[frame.FrameTsMs]; exists {
+			return fmt.Errorf("duplicate frame timestamp: %d", frame.FrameTsMs)
+		}
+		seen[frame.FrameTsMs] = struct{}{}
+		canonical = append(canonical, VideoFrameEmbedding{FrameTsMs: frame.FrameTsMs, Vector: canonicalizeSemanticVector(frame.Vector)})
+	}
+	space, err := queries.UpsertEmbeddingSpace(ctx, repo.UpsertEmbeddingSpaceParams{EmbeddingType: string(EmbeddingTypeSemantic), ModelID: model, Dimensions: int64(len(canonical[0].Vector)), DistanceMetric: embeddingDistanceMetricL2})
+	if err != nil {
+		return fmt.Errorf("upsert video embedding space: %w", err)
+	}
+	space, err = promoteOrUseDefaultSpace(ctx, queries, EmbeddingTypeSemantic, space)
+	if err != nil {
+		return err
+	}
+	if err := queries.DeleteSearchEmbeddingsByAsset(ctx, assetID); err != nil {
+		return fmt.Errorf("clear video search embeddings: %w", err)
+	}
+	for _, frame := range canonical {
+		ts := int64(frame.FrameTsMs)
+		if err := queries.InsertSearchEmbedding(ctx, repo.InsertSearchEmbeddingParams{AssetID: assetID, SpaceID: space.ID, FrameTsMs: &ts, Vector: dbtypes.NewVector(frame.Vector), ModelID: model}); err != nil {
+			return fmt.Errorf("insert video frame embedding at ts=%d: %w", frame.FrameTsMs, err)
+		}
+	}
+	return nil
+}
+
+func promoteOrUseDefaultSpace(ctx context.Context, queries *repo.Queries, embeddingType EmbeddingType, space repo.EmbeddingSpace) (repo.EmbeddingSpace, error) {
+	promoted, err := queries.PromoteEmbeddingSpaceAsDefaultIfNone(ctx, repo.PromoteEmbeddingSpaceAsDefaultIfNoneParams{ID: space.ID, EmbeddingType: string(embeddingType)})
+	if err == nil {
+		return promoted, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return repo.EmbeddingSpace{}, fmt.Errorf("promote embedding space as default: %w", err)
+	}
+	defaultSpace, err := queries.GetDefaultEmbeddingSpaceByType(ctx, string(embeddingType))
+	if errors.Is(err, sql.ErrNoRows) {
+		return space, nil
+	}
+	if err != nil {
+		return repo.EmbeddingSpace{}, fmt.Errorf("load default embedding space: %w", err)
+	}
+	return defaultSpace, nil
+}
+
 // PrimaryEmbedding is the decoded primary embedding for an asset/type, returned
 // as a plain []float32 so callers are independent of its database encoding.
 type PrimaryEmbedding struct {
@@ -91,14 +202,6 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID uuid.UUID,
 		return fmt.Errorf("embedding vector is empty")
 	}
 
-	// Semantic vectors are canonicalized (MRL-truncated to CanonicalEmbeddingDim
-	// and L2-normalized) so stored image vectors share one comparable, unit-length
-	// space with text queries and zero-shot prototypes. Other embedding types
-	// (e.g. pHash) carry their own semantics and are stored verbatim.
-	if embeddingType == EmbeddingTypeSemantic {
-		vector = canonicalizeSemanticVector(vector)
-	}
-
 	tx, err := e.writer.BeginTx(ctx, catalogtx.OperationEmbeddingSave, nil)
 	if err != nil {
 		return fmt.Errorf("begin embedding transaction: %w", err)
@@ -106,56 +209,8 @@ func (e *embeddingService) SaveEmbedding(ctx context.Context, assetID uuid.UUID,
 	defer tx.Rollback()
 
 	queries := e.queries.WithTx(tx.Raw())
-
-	space, err := e.upsertEmbeddingSpace(ctx, queries, embeddingType, model, len(vector))
-	if err != nil {
+	if err := ApplyEmbeddingTx(ctx, queries, assetID, embeddingType, model, vector, isPrimary); err != nil {
 		return err
-	}
-
-	storedVector := dbtypes.NewVector(vector)
-
-	if embeddingType == EmbeddingTypeSemantic {
-		// Semantic vectors live in the dedicated fixed-dimension search_embeddings
-		// table. The default space records the active model for query routing and
-		// model-change detection; Vec1 is maintained as a derived flat/ANN index.
-		space, err = e.ensureDefaultSpace(ctx, queries, embeddingType, space)
-		if err != nil {
-			return err
-		}
-
-		// Replace the asset's primary (whole-asset) semantic row. Video frame rows
-		// (frame_ts_ms IS NOT NULL) are written by SaveVideoFrameEmbeddings.
-		if err := queries.DeleteSearchEmbeddingsByAsset(ctx, assetID); err != nil {
-			return fmt.Errorf("clear search embeddings: %w", err)
-		}
-		if err := queries.InsertSearchEmbedding(ctx, repo.InsertSearchEmbeddingParams{
-			AssetID:   assetID,
-			SpaceID:   space.ID,
-			FrameTsMs: nil,
-			Vector:    storedVector,
-			ModelID:   model,
-		}); err != nil {
-			return fmt.Errorf("insert search embedding: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit embedding transaction: %w", err)
-		}
-		return e.maintainSemanticIndex(ctx)
-	}
-
-	// Non-search vectors (e.g. pHash) stay in the generic exact-scan table.
-	params := repo.UpsertEmbeddingParams{
-		AssetID:             assetID,
-		EmbeddingType:       string(embeddingType),
-		EmbeddingModel:      model,
-		EmbeddingDimensions: int64(len(vector)),
-		SpaceID:             space.ID,
-		Vector:              storedVector,
-		IsPrimary:           isPrimary,
-	}
-	if err := queries.UpsertEmbedding(ctx, params); err != nil {
-		return fmt.Errorf("upsert embedding: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -244,13 +299,16 @@ func (e *embeddingService) maintainSemanticIndex(ctx context.Context) error {
 
 // SaveAestheticScore upserts a per-asset aesthetic quality score.
 func (e *embeddingService) SaveAestheticScore(ctx context.Context, assetID uuid.UUID, score float32, modelVersion string) error {
-	_, err := e.queries.UpsertAssetQualityScore(ctx, repo.UpsertAssetQualityScoreParams{
-		AssetID:      assetID,
-		Score:        float64(score),
-		ModelVersion: modelVersion,
-	})
+	tx, err := e.writer.BeginTx(ctx, catalogtx.OperationEmbeddingSave, nil)
 	if err != nil {
-		return fmt.Errorf("upsert aesthetic score: %w", err)
+		return fmt.Errorf("begin aesthetic score transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if err := ApplyAestheticScoreTx(ctx, e.queries.WithTx(tx.Raw()), assetID, score, modelVersion); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit aesthetic score transaction: %w", err)
 	}
 	return nil
 }
@@ -474,25 +532,7 @@ func (e *embeddingService) upsertEmbeddingSpace(ctx context.Context, queries *re
 }
 
 func (e *embeddingService) ensureDefaultSpace(ctx context.Context, queries *repo.Queries, embeddingType EmbeddingType, space repo.EmbeddingSpace) (repo.EmbeddingSpace, error) {
-	promoted, err := queries.PromoteEmbeddingSpaceAsDefaultIfNone(ctx, repo.PromoteEmbeddingSpaceAsDefaultIfNoneParams{
-		ID:            space.ID,
-		EmbeddingType: string(embeddingType),
-	})
-	if err == nil {
-		return promoted, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return repo.EmbeddingSpace{}, fmt.Errorf("promote embedding space as default: %w", err)
-	}
-
-	defaultSpace, err := queries.GetDefaultEmbeddingSpaceByType(ctx, string(embeddingType))
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return space, nil
-		}
-		return repo.EmbeddingSpace{}, fmt.Errorf("load default embedding space: %w", err)
-	}
-	return defaultSpace, nil
+	return promoteOrUseDefaultSpace(ctx, queries, embeddingType, space)
 }
 
 func mapEmbeddingRow(row repo.GetEmbeddingRow) repo.Embedding {

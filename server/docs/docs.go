@@ -3057,6 +3057,9 @@ const docTemplate = `{
                     "problem": {
                         "$ref": "#/components/schemas/api.ProblemReference"
                     },
+                    "receipt_id": {
+                        "type": "string"
+                    },
                     "session_id": {
                         "type": "string"
                     },
@@ -3068,9 +3071,6 @@ const docTemplate = `{
                     },
                     "success": {
                         "type": "boolean"
-                    },
-                    "task_id": {
-                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -6507,7 +6507,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "reset_semantic": {
-                        "description": "ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use\nafter switching the embedding model (drop+refill) so no two models' vectors\nare mixed. Honored only when the semantic task is included.",
+                        "description": "ResetSemantic globally wipes all photo and video semantic vectors and\nrebuilds both lanes from scratch. Use after switching the embedding model\n(drop+refill) so no two models' vectors are mixed. Repository-scoped resets\nare rejected; the semantic task must be included.",
                         "example": false,
                         "type": "boolean"
                     },
@@ -6534,10 +6534,6 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
-                    "job_id": {
-                        "example": 123,
-                        "type": "integer"
-                    },
                     "limit": {
                         "example": 200,
                         "type": "integer"
@@ -6549,6 +6545,10 @@ const docTemplate = `{
                     "missing_only": {
                         "example": true,
                         "type": "boolean"
+                    },
+                    "receipt_id": {
+                        "example": "21a0a629-7329-4623-9f0c-a53b99878edc",
+                        "type": "string"
                     },
                     "repository_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
@@ -6579,12 +6579,12 @@ const docTemplate = `{
             },
             "dto.RebuildLocationClustersResponseDTO": {
                 "properties": {
-                    "job_id": {
-                        "example": 123,
-                        "type": "integer"
-                    },
                     "message": {
                         "example": "Location cluster rebuild queued successfully",
+                        "type": "string"
+                    },
+                    "receipt_id": {
+                        "example": "21a0a629-7329-4623-9f0c-a53b99878edc",
                         "type": "string"
                     },
                     "repository_id": {
@@ -7150,9 +7150,9 @@ const docTemplate = `{
                     },
                     "tasks": {
                         "example": [
-                            "thumbnail_small",
-                            "thumbnail_medium",
-                            "transcode_1080p"
+                            "analyze",
+                            "derivatives",
+                            "enrich"
                         ],
                         "items": {
                             "type": "string"
@@ -7169,31 +7169,13 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
-                    "failed_tasks": {
-                        "example": [
-                            "thumbnail_small",
-                            "transcode_1080p"
-                        ],
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
                     "message": {
-                        "example": "Reprocessing job queued successfully",
+                        "example": "Reprocessing request accepted",
                         "type": "string"
                     },
-                    "retry_tasks": {
-                        "example": [
-                            "thumbnail_small",
-                            "transcode_1080p"
-                        ],
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
+                    "receipt_id": {
+                        "example": "21a0a629-7329-4623-9f0c-a53b99878edc",
+                        "type": "string"
                     },
                     "status": {
                         "example": "queued",
@@ -7334,10 +7316,6 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "passkey_enabled": {
-                        "example": true,
-                        "type": "boolean"
-                    },
-                    "repository_scan_enabled": {
                         "example": true,
                         "type": "boolean"
                     },
@@ -8923,7 +8901,7 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.UploadJobStatusDTO": {
+            "dto.UploadOperationStatusDTO": {
                 "properties": {
                     "file_name": {
                         "example": "photo.jpg",
@@ -8931,6 +8909,10 @@ const docTemplate = `{
                     },
                     "problem": {
                         "$ref": "#/components/schemas/api.ProblemReference"
+                    },
+                    "receipt_id": {
+                        "example": "21a0a629-7329-4623-9f0c-a53b99878edc",
+                        "type": "string"
                     },
                     "status": {
                         "example": "completed",
@@ -8940,10 +8922,6 @@ const docTemplate = `{
                         "example": true,
                         "type": "boolean"
                     },
-                    "task_id": {
-                        "example": 12345,
-                        "type": "integer"
-                    },
                     "terminal": {
                         "example": true,
                         "type": "boolean"
@@ -8951,11 +8929,11 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.UploadJobStatusResponseDTO": {
+            "dto.UploadOperationStatusResponseDTO": {
                 "properties": {
-                    "jobs": {
+                    "operations": {
                         "items": {
-                            "$ref": "#/components/schemas/dto.UploadJobStatusDTO"
+                            "$ref": "#/components/schemas/dto.UploadOperationStatusDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -9079,6 +9057,10 @@ const docTemplate = `{
                         "example": "File received and queued for processing",
                         "type": "string"
                     },
+                    "receipt_id": {
+                        "example": "21a0a629-7329-4623-9f0c-a53b99878edc",
+                        "type": "string"
+                    },
                     "size": {
                         "example": 1048576,
                         "type": "integer"
@@ -9086,10 +9068,6 @@ const docTemplate = `{
                     "status": {
                         "example": "processing",
                         "type": "string"
-                    },
-                    "task_id": {
-                        "example": 12345,
-                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -9098,6 +9076,9 @@ const docTemplate = `{
                 "properties": {
                     "bytes_received": {
                         "type": "integer"
+                    },
+                    "receipt_id": {
+                        "type": "string"
                     },
                     "received_chunks": {
                         "items": {
@@ -9111,9 +9092,6 @@ const docTemplate = `{
                     },
                     "status": {
                         "type": "string"
-                    },
-                    "task_id": {
-                        "type": "integer"
                     },
                     "total_chunks": {
                         "type": "integer"
@@ -11935,14 +11913,14 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/assets/batch/jobs": {
+        "/api/v1/assets/batch/operations": {
             "get": {
-                "description": "Get backend ingest lifecycle state for upload task IDs owned by the current caller",
+                "description": "Get ingest receipt state owned by the current caller",
                 "parameters": [
                     {
-                        "description": "Comma-separated upload task IDs",
+                        "description": "Comma-separated catalog receipt IDs",
                         "in": "query",
-                        "name": "task_ids",
+                        "name": "receipt_ids",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -11954,7 +11932,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/dto.UploadJobStatusResponseDTO"
+                                    "$ref": "#/components/schemas/dto.UploadOperationStatusResponseDTO"
                                 }
                             }
                         },
@@ -11968,7 +11946,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Invalid task IDs"
+                        "description": "Invalid receipt IDs"
                     }
                 },
                 "summary": "Get upload materialization status",
@@ -11977,13 +11955,13 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/assets/batch/jobs/stream": {
+        "/api/v1/assets/batch/operations/stream": {
             "get": {
                 "parameters": [
                     {
-                        "description": "Comma-separated upload task IDs",
+                        "description": "Comma-separated catalog receipt IDs",
                         "in": "query",
-                        "name": "task_ids",
+                        "name": "receipt_ids",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -14425,7 +14403,7 @@ const docTemplate = `{
         },
         "/api/v1/assets/{id}/reprocess": {
             "post": {
-                "description": "Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing",
+                "description": "Request catalog-owned analysis, derivative, transcode, and enrichment stages for an asset. Progress is reported from the receipt and desired/applied catalog state.",
                 "parameters": [
                     {
                         "description": "Asset ID",

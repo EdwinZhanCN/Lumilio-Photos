@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/motion/select";
-import { Switch } from "@/components/motion/switch";
 import { SettingRow, SettingsSection } from "@/components/settings/setting-layout";
 import type { ToastInput } from "@/components/motion/animated-toast-stack";
 import { errorMessage } from "@/lib/desktop/errors";
@@ -56,14 +55,6 @@ export function RuntimeConfigWorkspace({
       </SettingsSection>
 
       <SettingsSection title={t("runtimeWorkspace.processing")}>
-        <SettingRow title={t("runtimeWorkspace.repositoryScan")} description={t("runtimeWorkspace.repositoryScanDescription")}>
-          <Switch
-            checked={settings.repositoryScanEnabled}
-            onCheckedChange={(value) => updateSetting("repositoryScanEnabled", value)}
-            disabled={disabled}
-            ariaLabel={t("runtimeWorkspace.repositoryScan")}
-          />
-        </SettingRow>
         <SettingRow title={t("runtimeWorkspace.hardwareAcceleration")} description={t("runtimeWorkspace.hardwareAccelerationDescription")}>
           <Select
             value={settings.hardwareAcceleration}

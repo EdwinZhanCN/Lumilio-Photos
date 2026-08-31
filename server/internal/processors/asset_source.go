@@ -38,14 +38,14 @@ func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID
 	if ap == nil || ap.locationResolver == nil {
 		return nil, locations.ErrAssetUnavailable
 	}
-	asset, err := ap.queries.GetAssetByID(ctx, assetID)
+	asset, err := ap.reader.GetAssetByID(ctx, assetID)
 	if err != nil {
 		return nil, err
 	}
 	if asset.IsDeleted || (expectedContentID != uuid.Nil && asset.ContentID != expectedContentID) {
 		return nil, ErrAssetSourceStale
 	}
-	content, err := ap.queries.GetContentObjectByID(ctx, asset.ContentID)
+	content, err := ap.reader.GetContentObjectByID(ctx, asset.ContentID)
 	if err != nil {
 		return nil, err
 	}

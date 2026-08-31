@@ -192,20 +192,19 @@ type RepositoryManager interface {
 
 // DefaultRepositoryManager implements the RepositoryManager interface
 type DefaultRepositoryManager struct {
-	database                   *sql.DB
-	writer                     *catalogtx.Writer
-	readerDatabase             *sql.DB
-	queries                    *repo.Queries
-	readerQueries              *repo.Queries
-	dirManager                 DirectoryManager
-	files                      *RepositoryFSFactory
-	logger                     *zap.Logger
-	auditProvider              logging.RepositoryAuditProvider
-	initialScan                func(context.Context, string) error
-	beforeRepositoryJobCleanup func()
-	ownershipMu                sync.Mutex
-	ownershipOn                bool
-	ownership                  map[string]func()
+	database       *sql.DB
+	writer         *catalogtx.Writer
+	readerDatabase *sql.DB
+	queries        *repo.Queries
+	readerQueries  *repo.Queries
+	dirManager     DirectoryManager
+	files          *RepositoryFSFactory
+	logger         *zap.Logger
+	auditProvider  logging.RepositoryAuditProvider
+	initialScan    func(context.Context, string) error
+	ownershipMu    sync.Mutex
+	ownershipOn    bool
+	ownership      map[string]func()
 }
 
 // SetInitialScanEnqueuer connects the storage lifecycle to the queue only
@@ -844,33 +843,11 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 		return RepositoryRemovalImpact{}, fmt.Errorf("count affected albums: %w", err)
 	}
 	if err := rm.readerDatabase.QueryRowContext(ctx, `
-		SELECT count(*) FROM river_job
-		WHERE (
-			json_extract(args, '$.repositoryId') = ?
-			OR EXISTS (
-				SELECT 1 FROM repository_nodes node
-				WHERE node.node_id = json_extract(river_job.args, '$.nodeId')
-				  AND node.repository_id = ?
-			)
-			OR EXISTS (
-				SELECT 1 FROM repository_staging_commits staging
-				WHERE staging.commit_id = json_extract(river_job.args, '$.commitId')
-				  AND staging.repository_id = ?
-			)
-			OR EXISTS (
-				SELECT 1 FROM active_asset_occurrences target
-				WHERE target.asset_id = json_extract(river_job.args, '$.assetId')
-				  AND target.repository_id = ?
-				  AND NOT EXISTS (
-					SELECT 1 FROM active_asset_occurrences survivor
-					WHERE survivor.asset_id = target.asset_id
-					  AND survivor.repository_id <> ?
-				  )
-			)
-		)
-		  AND state IN ('available', 'scheduled', 'retryable', 'pending', 'running')
-	`, repoUUID.String(), repoUUID, repoUUID, repoUUID, repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
-		return RepositoryRemovalImpact{}, fmt.Errorf("count repository tasks: %w", err)
+		SELECT
+		  (SELECT count(*) FROM domain_outbox WHERE delivered_at IS NULL AND (subject_key=? OR EXISTS (SELECT 1 FROM repository_staging_commits staging WHERE staging.commit_id=domain_outbox.subject_key AND staging.repository_id=?)))
+		  + (SELECT count(*) FROM repository_observation_state WHERE repository_id=? AND desired_epoch>applied_epoch)
+	`, repoUUID.String(), repoUUID, repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
+		return RepositoryRemovalImpact{}, fmt.Errorf("count repository catalog work: %w", err)
 	}
 	if err := rm.readerDatabase.QueryRowContext(ctx, `
 		SELECT count(*) FROM cloud_import_runs WHERE repository_id = ?
@@ -949,80 +926,15 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 		})
 	}()
-	if rm.beforeRepositoryJobCleanup != nil {
-		rm.beforeRepositoryJobCleanup()
-	}
-
 	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRemove, nil)
 	if err != nil {
 		return fmt.Errorf("begin repository removal: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	queries := rm.queries.WithTx(tx.Raw())
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM river_job
-		WHERE (
-			json_extract(args, '$.repositoryId') = ?
-			OR EXISTS (
-				SELECT 1 FROM repository_nodes node
-				WHERE node.node_id = json_extract(river_job.args, '$.nodeId')
-				  AND node.repository_id = ?
-			)
-			OR EXISTS (
-				SELECT 1 FROM repository_staging_commits staging
-				WHERE staging.commit_id = json_extract(river_job.args, '$.commitId')
-				  AND staging.repository_id = ?
-			)
-			OR EXISTS (
-				SELECT 1 FROM active_asset_occurrences target
-				WHERE target.asset_id = json_extract(river_job.args, '$.assetId')
-				  AND target.repository_id = ?
-				  AND NOT EXISTS (
-					SELECT 1 FROM active_asset_occurrences survivor
-					WHERE survivor.asset_id = target.asset_id
-					  AND survivor.repository_id <> ?
-				  )
-			)
-		) AND state <> 'running'
-	`, repoUUID.String(), repoUUID, repoUUID, repoUUID, repoUUID); err != nil {
-		return fmt.Errorf("remove queued repository jobs: %w", err)
-	}
-	// The maintenance row blocks all repository-aware enqueuers. Delete queued
-	// work first, then inspect running work in the same SQLite write transaction:
-	// an available job can either be claimed before this DELETE (and is observed
-	// below) or be deleted before River can claim it, never slip between checks.
-	var runningJobs int
-	if err := tx.QueryRowContext(ctx, `
-		SELECT count(*) FROM river_job
-		WHERE (
-			json_extract(args, '$.repositoryId') = ?
-			OR EXISTS (
-				SELECT 1 FROM repository_nodes node
-				WHERE node.node_id = json_extract(river_job.args, '$.nodeId')
-				  AND node.repository_id = ?
-			)
-			OR EXISTS (
-				SELECT 1 FROM repository_staging_commits staging
-				WHERE staging.commit_id = json_extract(river_job.args, '$.commitId')
-				  AND staging.repository_id = ?
-			)
-			OR EXISTS (
-				SELECT 1 FROM active_asset_occurrences target
-				WHERE target.asset_id = json_extract(river_job.args, '$.assetId')
-				  AND target.repository_id = ?
-				  AND NOT EXISTS (
-					SELECT 1 FROM active_asset_occurrences survivor
-					WHERE survivor.asset_id = target.asset_id
-					  AND survivor.repository_id <> ?
-				  )
-			)
-		) AND state = 'running'
-	`, repoUUID.String(), repoUUID, repoUUID, repoUUID, repoUUID).Scan(&runningJobs); err != nil {
-		return fmt.Errorf("inspect running repository jobs: %w", err)
-	}
-	if runningJobs != 0 {
-		return fmt.Errorf("%w: repository has running work", ErrRepositoryBusy)
-	}
+	// The repository mutation lock prevents new or running repository compute
+	// from crossing this transaction. Catalog cascades remove desired state;
+	// pending domain commands are explicitly removed for the deleted subject.
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM share_links
 		WHERE EXISTS (
@@ -1052,6 +964,19 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		)
 	`, repoUUID, repoUUID); err != nil {
 		return fmt.Errorf("remove repository agent pins: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM domain_outbox
+		WHERE (command_kind = 'repository.scan' AND subject_key = ?)
+		   OR (command_kind = 'projection.location' AND subject_key LIKE ? || ':%')
+		   OR EXISTS (
+				SELECT 1
+				FROM repository_staging_commits staging
+				WHERE staging.commit_id = domain_outbox.subject_key
+				  AND staging.repository_id = ?
+		   )
+	`, repoUUID.String(), repoUUID.String(), repoUUID); err != nil {
+		return fmt.Errorf("remove repository domain commands: %w", err)
 	}
 	// Logical media and stacks are projections of Assets, not repository-owned
 	// filesystem entries. Rehome them before deleting the repository whenever a

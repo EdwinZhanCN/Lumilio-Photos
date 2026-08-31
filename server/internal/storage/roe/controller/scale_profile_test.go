@@ -11,11 +11,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 
 	"server/config"
 	"server/internal/db"
@@ -26,10 +26,10 @@ import (
 	"server/internal/storage/repocfg"
 	"server/internal/storage/roe/changefeed"
 	"server/internal/storage/roe/nodegraph"
-	"server/internal/storage/roe/outbox"
 )
 
 type generatedDirectorySource struct {
+	mu                 sync.RWMutex
 	entries            int
 	directories        int
 	fileBytes          int64
@@ -39,6 +39,9 @@ type generatedDirectorySource struct {
 	directoryReadCalls map[string]int
 	mutated            map[int]int
 	firstDirectoryName string
+	readDelay          time.Duration
+	activeReads        int
+	maxActiveReads     int
 }
 
 func newGeneratedDirectorySource(entries, directories int) *generatedDirectorySource {
@@ -61,8 +64,29 @@ func (source *generatedDirectorySource) ReadDirectory(
 	if options.Offset < 0 || options.Limit <= 0 || options.Limit > 256 {
 		return batch, fmt.Errorf("invalid generated directory page offset=%d limit=%d", options.Offset, options.Limit)
 	}
+	source.mu.Lock()
 	source.readCalls++
 	source.directoryReadCalls[options.Directory]++
+	source.activeReads++
+	if source.activeReads > source.maxActiveReads {
+		source.maxActiveReads = source.activeReads
+	}
+	readDelay := source.readDelay
+	source.mu.Unlock()
+	defer func() {
+		source.mu.Lock()
+		source.activeReads--
+		source.mu.Unlock()
+	}()
+	if readDelay > 0 {
+		timer := time.NewTimer(readDelay)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return batch, ctx.Err()
+		case <-timer.C:
+		}
+	}
 	start := int(options.Offset)
 	if options.Directory == "" {
 		end := min(source.directories, start+options.Limit)
@@ -112,7 +136,9 @@ func (source *generatedDirectorySource) ReadDirectory(
 	for localIndex := start; localIndex < end; localIndex++ {
 		fileOrdinal := directoryIndex + localIndex*source.directories
 		filename := fmt.Sprintf("media-%09d.jpg", fileOrdinal)
+		source.mu.RLock()
 		version := 1 + source.mutated[fileOrdinal]
+		source.mu.RUnlock()
 		observation, err := generatedObservation(
 			repository.RepoID,
 			options.ScanID,
@@ -158,6 +184,8 @@ func (source *generatedDirectorySource) filesInDirectory(directory int) int {
 }
 
 func (source *generatedDirectorySource) recordBatch(entries int) {
+	source.mu.Lock()
+	defer source.mu.Unlock()
 	source.entriesReturned += int64(entries)
 	if entries > source.maxReturned {
 		source.maxReturned = entries
@@ -192,6 +220,7 @@ type generatedControllerFixture struct {
 	database   *db.DB
 	repository repo.Repository
 	controller *Controller
+	commands   *Commands
 	feed       *deterministicFeed
 	source     *generatedDirectorySource
 }
@@ -247,13 +276,14 @@ func newGeneratedControllerFixture(tb testing.TB, entries, directories int) *gen
 	}
 	feed := &deterministicFeed{}
 	source := newGeneratedDirectorySource(entries, directories)
-	controller := New(database, nil, Config{
-		BatchSize: 48, OutboxHighWaterMark: 256,
+	cfg := Config{
+		BatchSize: 48, OutboxHighWaterMark: int64(entries + 1),
 		ChangeFeed: feed, directorySource: source,
-	}, zap.NewNop())
+	}
+	controller, commands := newTestControllerRuntime(tb, database, nil, cfg)
 	return &generatedControllerFixture{
 		ctx: ctx, database: database, repository: repository,
-		controller: controller, feed: feed, source: source,
+		controller: controller, commands: commands, feed: feed, source: source,
 	}
 }
 
@@ -277,11 +307,10 @@ func runGeneratedCrawlProfile(tb testing.TB, entries, directories int) (generate
 	runtime.ReadMemStats(&baseline)
 	maxHeap := baseline.Alloc
 	started := time.Now()
-	receipt, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "manual", "scale", true)
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "scale", true)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	drainer := outbox.New(fixture.database, outbox.Config{BatchSize: 64})
 	profile := generatedProfile{entries: entries}
 	transactionDurations := make([]time.Duration, 0, entries/32)
 	commitDurations := make([]time.Duration, 0, entries/32)
@@ -307,14 +336,14 @@ func runGeneratedCrawlProfile(tb testing.TB, entries, directories int) (generate
 		if result.CommitDuration > 0 {
 			commitDurations = append(commitDurations, result.CommitDuration)
 		}
-		drainResult, drainErr := drainer.DrainKind(fixture.ctx, "hash", func(context.Context, repo.RepositoryOutbox) error {
-			downstream++
-			return nil
-		})
-		if drainErr != nil {
-			tb.Fatal(drainErr)
+		pending, countErr := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+		if countErr != nil {
+			tb.Fatal(countErr)
 		}
-		if drainResult.Claimed > 0 && result.HasMore {
+		if int(pending) > downstream {
+			downstream = int(pending)
+		}
+		if pending > 0 && result.HasMore {
 			progressive = true
 		}
 		if turn%32 == 0 {
@@ -360,13 +389,11 @@ func runGeneratedCrawlProfile(tb testing.TB, entries, directories int) (generate
 		tb.Fatalf("generated crawl additional Go heap = %.1f MiB, want <256 MiB", float64(profile.additionalHeapBytes)/(1<<20))
 	}
 	readsBefore := fixture.source.readCalls
-	var effectsBefore int
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-		SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'
-	`).Scan(&effectsBefore); err != nil {
+	effectsBefore, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
 		tb.Fatal(err)
 	}
-	incremental, err := fixture.controller.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", false)
+	incremental, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "periodic", "", false)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -382,10 +409,8 @@ func runGeneratedCrawlProfile(tb testing.TB, entries, directories int) (generate
 			tb.Fatal("zero-change incremental pass did not terminate")
 		}
 	}
-	var effectsAfter int
-	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-		SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'
-	`).Scan(&effectsAfter); err != nil {
+	effectsAfter, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
 		tb.Fatal(err)
 	}
 	if fixture.source.readCalls != readsBefore || effectsAfter != effectsBefore {
@@ -458,31 +483,37 @@ func TestGeneratedCrawlUsesBoundedBatchesAndCursorOnlyIncrementalPass(t *testing
 	}
 }
 
-func TestPendingOutboxDepthUsesLiveRepositoryIndex(t *testing.T) {
+func TestPendingMaterializationDepthUsesLiveRepositoryProjection(t *testing.T) {
 	fixture := newGeneratedControllerFixture(t, 100, 4)
-	rows, err := fixture.database.ReaderSQL.QueryContext(fixture.ctx, `
-		EXPLAIN QUERY PLAN
-		SELECT count(*) FROM repository_outbox
-		WHERE repository_id = ? AND status IN ('pending', 'delivering')
-	`, fixture.repository.RepoID)
+	initial, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rows.Close()
-	plan := ""
-	for rows.Next() {
-		var id, parent, unused int
-		var detail string
-		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
-			t.Fatal(err)
-		}
-		plan += detail + "\n"
+	if initial != 0 {
+		t.Fatalf("initial pending materialization depth = %d, want 0", initial)
 	}
-	if err := rows.Err(); err != nil {
+	receipt, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "projection", true)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(plan, "idx_repository_outbox_pending_repository") {
-		t.Fatalf("pending outbox query plan did not use live-row index:\n%s", plan)
+	for turn := 0; turn < 100; turn++ {
+		result, turnErr := fixture.controller.RunTurn(fixture.ctx, fixture.repository.RepoID, receipt.OperationID)
+		if turnErr != nil {
+			t.Fatal(turnErr)
+		}
+		if !result.HasMore {
+			break
+		}
+		if turn == 99 {
+			t.Fatal("projection crawl did not terminate")
+		}
+	}
+	pending, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != 96 {
+		t.Fatalf("pending materialization depth = %d, want 96", pending)
 	}
 }
 
@@ -530,7 +561,7 @@ func BenchmarkGeneratedRepositoryOnePercentChange(b *testing.B) {
 		readsBefore := fixture.source.readCalls
 		entriesBefore := fixture.source.entriesReturned
 		started := time.Now()
-		receipt, err := fixture.controller.Request(
+		receipt, err := fixture.commands.Request(
 			fixture.ctx,
 			fixture.repository.RepoID,
 			"watcher",
@@ -540,7 +571,6 @@ func BenchmarkGeneratedRepositoryOnePercentChange(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		drainer := outbox.New(fixture.database, outbox.Config{BatchSize: 64})
 		hashes := 0
 		var run repo.RepositoryScanRun
 		for turn := 0; turn < entries; turn++ {
@@ -552,11 +582,12 @@ func BenchmarkGeneratedRepositoryOnePercentChange(b *testing.B) {
 			if turnErr != nil {
 				b.Fatal(turnErr)
 			}
-			if _, drainErr := drainer.DrainKind(fixture.ctx, "hash", func(context.Context, repo.RepositoryOutbox) error {
-				hashes++
-				return nil
-			}); drainErr != nil {
-				b.Fatal(drainErr)
+			pending, countErr := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+			if countErr != nil {
+				b.Fatal(countErr)
+			}
+			if int(pending) > hashes {
+				hashes = int(pending)
 			}
 			if !result.HasMore {
 				run, err = fixture.database.ReaderQueries.GetRepositoryScanRun(fixture.ctx, repo.GetRepositoryScanRunParams{
@@ -599,17 +630,15 @@ func BenchmarkGeneratedDirectoryRename50k(b *testing.B) {
 		`).Scan(&descendantID); err != nil {
 			b.Fatal(err)
 		}
-		var hashEffectsBefore int
-		if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-			SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'
-		`).Scan(&hashEffectsBefore); err != nil {
+		hashEffectsBefore, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+		if err != nil {
 			b.Fatal(err)
 		}
 		readsBefore := fixture.source.readCalls
 		fixture.source.firstDirectoryName = "renamed"
 		fixture.feed.publish(changefeed.EventRename, "renamed", "directory-000000", false)
 		started := time.Now()
-		receipt, err := fixture.controller.Request(
+		receipt, err := fixture.commands.Request(
 			fixture.ctx,
 			fixture.repository.RepoID,
 			"watcher",
@@ -651,10 +680,8 @@ func BenchmarkGeneratedDirectoryRename50k(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		var hashEffectsAfter int
-		if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-			SELECT count(*) FROM repository_outbox WHERE effect_kind = 'hash'
-		`).Scan(&hashEffectsAfter); err != nil {
+		hashEffectsAfter, err := fixture.database.ReaderQueries.CountPendingRepositoryMaterialization(fixture.ctx, fixture.repository.RepoID)
+		if err != nil {
 			b.Fatal(err)
 		}
 		if run.Status != StatusCompleted || run.FilesObserved != 0 ||

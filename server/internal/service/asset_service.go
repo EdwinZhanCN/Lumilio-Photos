@@ -12,7 +12,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
-	"server/internal/queue/jobs"
 	aggregatesearch "server/internal/search"
 	"server/internal/search/bleveocr"
 	"server/internal/utils/geohash"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
 
@@ -299,7 +297,6 @@ type assetService struct {
 	searchAssetsFusedSetFn func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool)
 	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error)
 	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
-	eventQueue             *river.Client[*sql.Tx]
 	ocrIndexNotifier       OCRIndexNotifier
 }
 
@@ -368,18 +365,15 @@ func newAssetService(
 	return svc, nil
 }
 
-// NewAssetServiceWithQueue is the runtime constructor. The queue and OCR index
-// notifier are kept optional so unit tests and embedded callers can still
-// exercise asset CRUD. Event fact invalidation and its rebuild enqueue commit
-// in the same SQLite transaction; the OCR notifier fires only after commit
-// because the durable outbox owns crash recovery.
-func NewAssetServiceWithQueue(
+// NewAssetServiceWithNotifier wires the OCR wakeup notifier. The durable
+// projection request is written to the catalog domain outbox in the same
+// transaction as the asset mutation.
+func NewAssetServiceWithNotifier(
 	q *repo.Queries,
 	pool *sql.DB,
 	l LumenService,
 	e EmbeddingService,
 	ocrIndex *bleveocr.Index,
-	queueClient *river.Client[*sql.Tx],
 	ocrIndexNotifier OCRIndexNotifier,
 	loggers ...*zap.Logger,
 ) (AssetService, error) {
@@ -388,16 +382,15 @@ func NewAssetServiceWithQueue(
 		return nil, err
 	}
 	if concrete, ok := created.(*assetService); ok {
-		concrete.eventQueue = queueClient
 		concrete.ocrIndexNotifier = ocrIndexNotifier
 	}
 	return created, nil
 }
 
-// NewAssetServiceWithQueueAndReader is the runtime constructor with explicit
+// NewAssetServiceWithReader is the runtime constructor with explicit
 // SQLite roles: mutations use the sole writer while library/search reads use
 // the bounded query-only WAL pool.
-func NewAssetServiceWithQueueAndReader(
+func NewAssetServiceWithReader(
 	q *repo.Queries,
 	pool *sql.DB,
 	writer *catalogtx.Writer,
@@ -406,7 +399,6 @@ func NewAssetServiceWithQueueAndReader(
 	l LumenService,
 	e EmbeddingService,
 	ocrIndex *bleveocr.Index,
-	queueClient *river.Client[*sql.Tx],
 	ocrIndexNotifier OCRIndexNotifier,
 	loggers ...*zap.Logger,
 ) (AssetService, error) {
@@ -415,7 +407,6 @@ func NewAssetServiceWithQueueAndReader(
 		return nil, err
 	}
 	if concrete, ok := created.(*assetService); ok {
-		concrete.eventQueue = queueClient
 		concrete.ocrIndexNotifier = ocrIndexNotifier
 	}
 	return created, nil
@@ -571,21 +562,48 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 }
 
 func (s *assetService) UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error {
-	asset, err := s.readQueries.GetAssetByID(ctx, id)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetMetadataPublish, nil)
+	if err != nil {
+		return fmt.Errorf("begin metadata update transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if err := ApplyAssetExtractedMetadataTx(ctx, tx.Raw(), s.queries.WithTx(tx.Raw()), id, metadata, common, exifRaw, ""); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit metadata update transaction: %w", err)
+	}
+	return nil
+}
+
+// ApplyAssetExtractedMetadataTx applies a computed metadata result inside an
+// existing catalog transaction. It is the write-side counterpart used by the
+// asynchronous commit coordinator; callers must pass the transaction-scoped
+// query set and never a standalone writer.
+func ApplyAssetExtractedMetadataTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	queries *repo.Queries,
+	id uuid.UUID,
+	metadata dbtypes.SpecificMetadata,
+	common dbtypes.CommonMetadata,
+	exifRaw json.RawMessage,
+	componentRelation string,
+) error {
+	if tx == nil || queries == nil || id == uuid.Nil {
+		return errors.New("metadata transaction requires catalog transaction, queries, and asset")
+	}
+	asset, err := queries.GetAssetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get asset for metadata update: %w", err)
 	}
-
 	metadata, err = preserveSpecificMetadataDescription(asset.SpecificMetadata, metadata)
 	if err != nil {
 		return fmt.Errorf("preserve asset description: %w", err)
 	}
-
 	common, firstExtraction := prepareImportedCommonMetadata(asset, common)
-
 	gpsLatitude, gpsLongitude := normalizedGPS(common.GPSLatitude, common.GPSLongitude)
 	gpsGeohash5, gpsGeohash7 := geohashesForGPS(gpsLatitude, gpsLongitude)
-
 	var takenTimeParam any
 	if common.TakenTime != nil {
 		takenTimeParam = dbtypes.NewTimestamp(*common.TakenTime)
@@ -608,47 +626,29 @@ func (s *assetService) UpdateAssetExtractedMetadata(ctx context.Context, id uuid
 		value := int64(*common.Rating)
 		rating = &value
 	}
-
-	params := repo.UpdateAssetExtractedMetadataParams{
-		AssetID:              id,
-		SpecificMetadata:     metadata,
-		ExifRaw:              dbtypes.JSON(exifRaw),
-		TakenTime:            takenTimeParam,
-		CaptureOffsetMinutes: captureOffset,
-		GpsLatitude:          gpsLatitude,
-		GpsLongitude:         gpsLongitude,
-		GpsGeohash5:          gpsGeohash5,
-		GpsGeohash7:          gpsGeohash7,
-		Width:                width,
-		Height:               height,
-		Duration:             common.Duration,
-		Rating:               rating,
-	}
-
-	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetMetadataPublish, nil)
-	if err != nil {
-		return fmt.Errorf("begin metadata update transaction: %w", err)
-	}
-	defer tx.Rollback()
-	txQueries := s.queries.WithTx(tx.Raw())
-	if err := txQueries.UpdateAssetExtractedMetadata(ctx, params); err != nil {
+	if err := queries.UpdateAssetExtractedMetadata(ctx, repo.UpdateAssetExtractedMetadataParams{
+		AssetID: id, SpecificMetadata: metadata, ExifRaw: dbtypes.JSON(exifRaw),
+		TakenTime: takenTimeParam, CaptureOffsetMinutes: captureOffset,
+		GpsLatitude: gpsLatitude, GpsLongitude: gpsLongitude,
+		GpsGeohash5: gpsGeohash5, GpsGeohash7: gpsGeohash7,
+		Width: width, Height: height, Duration: common.Duration, Rating: rating,
+	}); err != nil {
 		return err
 	}
 	if firstExtraction {
-		if err := importEmbeddedKeywords(ctx, txQueries, id, common.Keywords); err != nil {
+		if err := importEmbeddedKeywords(ctx, queries, id, common.Keywords); err != nil {
+			return err
+		}
+	}
+	if componentRelation != "" {
+		if err := queries.ReconcileMediaItemComponentRelation(ctx, repo.ReconcileMediaItemComponentRelationParams{AssetID: id, Relation: componentRelation}); err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 	}
 	if asset.OwnerID != nil {
-		if err := event.MarkEventFactsChangedTx(ctx, tx.Raw(), *asset.OwnerID, "asset_metadata_changed"); err != nil {
+		if err := event.MarkEventFactsChangedTx(ctx, tx, *asset.OwnerID, "asset_metadata_changed"); err != nil {
 			return err
 		}
-		if err := s.enqueueEventRebuildTx(ctx, tx.Raw(), *asset.OwnerID); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit metadata update transaction: %w", err)
 	}
 	return nil
 }
@@ -775,9 +775,6 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 		if err := event.MarkEventFactsChangedTx(ctx, tx.Raw(), *item.OwnerID, "asset_trashed"); err != nil {
 			return err
 		}
-		if err := s.enqueueEventRebuildTx(ctx, tx.Raw(), *item.OwnerID); err != nil {
-			return err
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit asset Trash transaction: %w", err)
@@ -815,27 +812,12 @@ func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
 		if err := event.MarkEventFactsChangedTx(ctx, tx.Raw(), *item.OwnerID, "asset_restored"); err != nil {
 			return err
 		}
-		if err := s.enqueueEventRebuildTx(ctx, tx.Raw(), *item.OwnerID); err != nil {
-			return err
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit asset restore transaction: %w", err)
 	}
 	if s.ocrIndexNotifier != nil {
 		s.ocrIndexNotifier.Notify()
-	}
-	return nil
-}
-
-func (s *assetService) enqueueEventRebuildTx(ctx context.Context, tx *sql.Tx, ownerID int32) error {
-	if s.eventQueue == nil {
-		return nil
-	}
-	args := jobs.EventRebuildArgs{OwnerID: ownerID}
-	opts := args.InsertOpts()
-	if _, err := s.eventQueue.InsertTx(ctx, tx, args, &opts); err != nil {
-		return fmt.Errorf("enqueue Event rebuild: %w", err)
 	}
 	return nil
 }
