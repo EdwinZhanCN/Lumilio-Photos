@@ -32,7 +32,7 @@
  *     PROCESS --> HASH["useGenerateHashcode"]
  *     HASH --> PRECHECK["precheckUploads"]
  *     PRECHECK --> TRANSPORT["Batch or chunk transport"]
- *     TRANSPORT --> JOBS["waitForUploadJobs"]
+ *     TRANSPORT --> JOBS["waitForUploadOperations"]
  *     JOBS --> REFRESH["Refresh asset queries"]
  * ```
  *
@@ -44,7 +44,7 @@
  * {@link precheckUploads}. Known files are marked duplicate and skip transport;
  * a failed precheck falls back to normal upload. Small files use
  * {@link useBatchUploadMutation}, large files use
- * {@link useChunkedUploadMutation}, and {@link waitForUploadJobs} follows
+ * {@link useChunkedUploadMutation}, and {@link waitForUploadOperations} follows
  * accepted ingest tasks to terminal backend state before asset queries refresh.
  *
  * ## Data
@@ -81,7 +81,7 @@ import type { runUploadProcess } from "./modules/process/runner.ts";
 import type { UploadAction, UploadContext, UploadState } from "./state/context.ts";
 import type { UploadProvider } from "./state/UploadProvider.tsx";
 import type { uploadReducer } from "./state/reducer.ts";
-import type { waitForUploadJobs } from "../../lib/upload/uploadLifecycle.ts";
+import type { waitForUploadOperations } from "../../lib/upload/uploadLifecycle.ts";
 import type { precheckUploads } from "../../lib/upload/uploadTransport.ts";
 import type { useWorkingRepository } from "../repositories/index.ts";
 

@@ -336,10 +336,15 @@ packages:
     resolution: {integrity: sha512-UrWfjNQVlBxN+OVcFwHmkjARMW55MBN04E9KfGac8ac8z1QnFVuiOOFtMWXCk3UwsyRqhsNaFoYLZC+xxqsVjQ==}
 
   '@edwinzhancn/docts@0.1.0':
-    resolution: {integrity: sha512-sxtdJLtOhykKYbK48stXSyhZWhkhFkd1/OlvwIxgGegq4E7XxbS0XxQuwJH4nino/uPulMYVXGHo59UB4Lkh8g==, tarball: https://npm.pkg.github.com/download/@edwinzhancn/docts/0.1.0/4493fb420b291d4f6703a560763b56634bdee8c6}
+    resolution: {integrity: sha512-2VO23sBsKiJVjM0dkVFP4DO9ID+nNH09uNYtGpI121u/LxksWGNQ+E5YCqFi0uy4gGeRJoxbvCn9uZg8CJ1fzg==}
     peerDependencies:
       '@oxlint/plugins': '>=1.68.0'
       vite: '>=5'
+    peerDependenciesMeta:
+      '@oxlint/plugins':
+        optional: true
+      vite:
+        optional: true
 
   '@emnapi/runtime@1.11.2':
     resolution: {integrity: sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA==}
@@ -4008,8 +4013,9 @@ snapshots:
   '@edwinzhancn/docts@0.1.0(@oxlint/plugins@1.73.0)(@voidzero-dev/vite-plus-core@0.2.5(@types/node@25.6.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.8.4))':
     dependencies:
       '@microsoft/tsdoc': 0.16.0
-      '@oxlint/plugins': 1.73.0
       typescript: 6.0.3
+    optionalDependencies:
+      '@oxlint/plugins': 1.73.0
       vite: '@voidzero-dev/vite-plus-core@0.2.5(@types/node@25.6.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.8.4)'
 
   '@emnapi/runtime@1.11.2':

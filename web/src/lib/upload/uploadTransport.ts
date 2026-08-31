@@ -244,14 +244,14 @@ export const uploadFileInChunks = async (
     repository_id: repositoryId,
     client_fingerprint: hash,
   });
-  if (session.status === "completed" && session.task_id) {
+  if (session.status === "completed" && session.receipt_id) {
     return {
       results: [
         {
           success: true,
           file_name: file.name,
           content_hash: "",
-          task_id: session.task_id,
+          receipt_id: session.receipt_id,
           status: "processing",
         },
       ],

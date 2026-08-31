@@ -1,24 +1,13 @@
 import { useMemo, useState } from "react";
 import {
   AlertCircle,
-  Brain,
   CheckCircle2,
   ChevronDown,
   Clock,
   Copy,
-  FileSearch,
-  Fingerprint,
-  FolderSearch,
-  ImageIcon,
   Layers3,
   Loader2,
-  MapPinned,
-  RefreshCw,
-  ScanSearch,
-  Sparkles,
-  TextSearch,
-  UsersRound,
-  Video,
+  Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMessage } from "@/features/notifications";
@@ -40,29 +29,7 @@ type QueueCopy = {
 };
 
 const QUEUE_PRESENTATION: Record<string, QueuePresentation> = {
-  ingest_asset: { icon: ImageIcon, tone: "text-primary bg-primary/10" },
-  observe_repository: { icon: FolderSearch, tone: "text-info bg-info/10" },
-  hash_repository_node: { icon: FileSearch, tone: "text-warning bg-warning/10" },
-  repository_outbox: { icon: Layers3, tone: "text-secondary bg-secondary/10" },
-  metadata_asset: { icon: ScanSearch, tone: "text-secondary bg-secondary/10" },
-  thumbnail_asset: { icon: Sparkles, tone: "text-success bg-success/10" },
-  transcode_asset: { icon: Video, tone: "text-accent bg-accent/10" },
-  retry_asset: { icon: RefreshCw, tone: "text-warning bg-warning/10" },
-  reindex_assets: { icon: Brain, tone: "text-primary bg-primary/10" },
-  rebuild_location_clusters: { icon: MapPinned, tone: "text-info bg-info/10" },
-  detect_stacks: { icon: Layers3, tone: "text-secondary bg-secondary/10" },
-  match_live_photo: { icon: Layers3, tone: "text-success bg-success/10" },
-  process_semantic: { icon: Brain, tone: "text-primary bg-primary/10" },
-  process_bioclip: { icon: Sparkles, tone: "text-success bg-success/10" },
-  process_ocr: { icon: TextSearch, tone: "text-accent bg-accent/10" },
-  process_face: { icon: UsersRound, tone: "text-secondary bg-secondary/10" },
-  classify_zeroshot: { icon: Brain, tone: "text-primary bg-primary/10" },
-  process_phash: { icon: Fingerprint, tone: "text-warning bg-warning/10" },
-  db_backup: { icon: RefreshCw, tone: "text-success bg-success/10" },
-  event_scheduler: { icon: Clock, tone: "text-info bg-info/10" },
-  ocr_index: { icon: TextSearch, tone: "text-accent bg-accent/10" },
-  process_video_frames: { icon: Video, tone: "text-primary bg-primary/10" },
-  rebuild_events: { icon: RefreshCw, tone: "text-secondary bg-secondary/10" },
+  catalog_macro: { icon: Workflow, tone: "text-primary bg-primary/10" },
 };
 
 function getPresentation(name?: string): QueuePresentation {
@@ -76,183 +43,43 @@ function getPresentation(name?: string): QueuePresentation {
 
 function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
   return {
-    classify_zeroshot: {
-      name: t("monitor.queueSummary.queues.classify_zeroshot.name"),
-      description: t("monitor.queueSummary.queues.classify_zeroshot.description"),
-    },
-    db_backup: {
-      name: t("monitor.queueSummary.queues.db_backup.name", {
-        defaultValue: "Database Backups",
+    catalog_macro: {
+      name: t("monitor.queueSummary.queues.catalog_macro.name", {
+        defaultValue: "Catalog processing",
       }),
-      description: t("monitor.queueSummary.queues.db_backup.description", {
-        defaultValue: "Creates scheduled and administrator-requested database backups.",
+      description: t("monitor.queueSummary.queues.catalog_macro.description", {
+        defaultValue: "Runs bounded catalog pipeline stages with shared resource limits.",
       }),
-    },
-    detect_stacks: {
-      name: t("monitor.queueSummary.queues.detect_stacks.name"),
-      description: t("monitor.queueSummary.queues.detect_stacks.description"),
-    },
-    observe_repository: {
-      name: t("monitor.queueSummary.queues.observe_repository.name", {
-        defaultValue: "Repository observation",
-      }),
-      description: t("monitor.queueSummary.queues.observe_repository.description", {
-        defaultValue: "Discovers and reconciles Repository files in bounded turns.",
-      }),
-    },
-    hash_repository_node: {
-      name: t("monitor.queueSummary.queues.hash_repository_node.name", {
-        defaultValue: "Repository content inspection",
-      }),
-      description: t("monitor.queueSummary.queues.hash_repository_node.description", {
-        defaultValue: "Reads changed Repository files and verifies their exact content identity.",
-      }),
-    },
-    repository_outbox: {
-      name: t("monitor.queueSummary.queues.repository_outbox.name", {
-        defaultValue: "Repository work delivery",
-      }),
-      description: t("monitor.queueSummary.queues.repository_outbox.description", {
-        defaultValue: "Delivers committed Repository work to bounded background processors.",
-      }),
-    },
-    event_scheduler: {
-      name: t("monitor.queueSummary.queues.event_scheduler.name", {
-        defaultValue: "Event Scheduler",
-      }),
-      description: t("monitor.queueSummary.queues.event_scheduler.description", {
-        defaultValue: "Schedules Event rebuilds when background projections need refresh.",
-      }),
-    },
-    ingest_asset: {
-      name: t("monitor.queueSummary.queues.ingest_asset.name"),
-      description: t("monitor.queueSummary.queues.ingest_asset.description"),
-    },
-    match_live_photo: {
-      name: t("monitor.queueSummary.queues.match_live_photo.name"),
-      description: t("monitor.queueSummary.queues.match_live_photo.description"),
-    },
-    metadata_asset: {
-      name: t("monitor.queueSummary.queues.metadata_asset.name"),
-      description: t("monitor.queueSummary.queues.metadata_asset.description"),
-    },
-    ocr_index: {
-      name: t("monitor.queueSummary.queues.ocr_index.name", {
-        defaultValue: "OCR Search Index",
-      }),
-      description: t("monitor.queueSummary.queues.ocr_index.description", {
-        defaultValue: "Makes extracted OCR text available to search.",
-      }),
-    },
-    process_bioclip: {
-      name: t("monitor.queueSummary.queues.process_bioclip.name", {
-        defaultValue: "BioCLIP Species Recognition",
-      }),
-      description: t("monitor.queueSummary.queues.process_bioclip.description"),
-    },
-    process_face: {
-      name: t("monitor.queueSummary.queues.process_face.name", {
-        defaultValue: "Person Recognition",
-      }),
-      description: t("monitor.queueSummary.queues.process_face.description"),
-    },
-    process_ocr: {
-      name: t("monitor.queueSummary.queues.process_ocr.name", {
-        defaultValue: "OCR Text Recognition",
-      }),
-      description: t("monitor.queueSummary.queues.process_ocr.description"),
-    },
-    process_phash: {
-      name: t("monitor.queueSummary.queues.process_phash.name"),
-      description: t("monitor.queueSummary.queues.process_phash.description"),
-    },
-    process_semantic: {
-      name: t("monitor.queueSummary.queues.process_semantic.name", {
-        defaultValue: "Image Semantic Analysis",
-      }),
-      description: t("monitor.queueSummary.queues.process_semantic.description"),
-    },
-    process_video_frames: {
-      name: t("monitor.queueSummary.queues.process_video_frames.name", {
-        defaultValue: "Image Semantic Analysis (video)",
-      }),
-      description: t("monitor.queueSummary.queues.process_video_frames.description", {
-        defaultValue: "Builds searchable semantic embeddings from representative video frames.",
-      }),
-    },
-    rebuild_events: {
-      name: t("monitor.queueSummary.queues.rebuild_events.name", {
-        defaultValue: "Event Rebuilds",
-      }),
-      description: t("monitor.queueSummary.queues.rebuild_events.description", {
-        defaultValue: "Rebuilds Events from current media facts.",
-      }),
-    },
-    rebuild_location_clusters: {
-      name: t("monitor.queueSummary.queues.rebuild_location_clusters.name"),
-      description: t("monitor.queueSummary.queues.rebuild_location_clusters.description"),
-    },
-    reindex_assets: {
-      name: t("monitor.queueSummary.queues.reindex_assets.name"),
-      description: t("monitor.queueSummary.queues.reindex_assets.description"),
-    },
-    retry_asset: {
-      name: t("monitor.queueSummary.queues.retry_asset.name"),
-      description: t("monitor.queueSummary.queues.retry_asset.description"),
-    },
-    thumbnail_asset: {
-      name: t("monitor.queueSummary.queues.thumbnail_asset.name"),
-      description: t("monitor.queueSummary.queues.thumbnail_asset.description"),
-    },
-    transcode_asset: {
-      name: t("monitor.queueSummary.queues.transcode_asset.name"),
-      description: t("monitor.queueSummary.queues.transcode_asset.description"),
     },
   };
 }
 
 function getKindLabels(t: TFunction): Record<string, string> {
   return {
-    classify_zeroshot: t("monitor.queueSummary.kinds.classify_zeroshot"),
-    database_backup: t("monitor.queueSummary.kinds.database_backup", {
-      defaultValue: "Create database backup",
+    analyze_asset: t("monitor.queueSummary.kinds.analyze_asset", {
+      defaultValue: "Read media information",
     }),
-    detect_stacks: t("monitor.queueSummary.kinds.detect_stacks"),
-    observe_repository: t("monitor.queueSummary.kinds.observe_repository", {
-      defaultValue: "Observe Repository",
+    backup_catalog: t("monitor.queueSummary.kinds.backup_catalog", {
+      defaultValue: "Create catalog backup",
     }),
-    hash_repository_node: t("monitor.queueSummary.kinds.hash_repository_node", {
-      defaultValue: "Inspect Repository file content",
+    enrich_asset: t("monitor.queueSummary.kinds.enrich_asset", {
+      defaultValue: "Run image and media enrichment",
     }),
-    drain_repository_outbox: t("monitor.queueSummary.kinds.drain_repository_outbox", {
-      defaultValue: "Deliver Repository work",
+    generate_asset_derivatives: t("monitor.queueSummary.kinds.generate_asset_derivatives", {
+      defaultValue: "Build previews",
     }),
-    ingest_asset: t("monitor.queueSummary.kinds.ingest_asset"),
-    match_live_photo: t("monitor.queueSummary.kinds.match_live_photo"),
-    metadata_asset: t("monitor.queueSummary.kinds.metadata_asset"),
-    process_bioclip: t("monitor.queueSummary.kinds.process_bioclip"),
-    process_face: t("monitor.queueSummary.kinds.process_face"),
-    process_ocr: t("monitor.queueSummary.kinds.process_ocr"),
-    process_ocr_outbox: t("monitor.queueSummary.kinds.process_ocr_outbox", {
-      defaultValue: "Update OCR search index",
+    ingest_asset: t("monitor.queueSummary.kinds.ingest_asset", {
+      defaultValue: "Import uploaded file",
     }),
-    process_phash: t("monitor.queueSummary.kinds.process_phash"),
-    process_semantic: t("monitor.queueSummary.kinds.process_semantic"),
-    process_video_frames: t("monitor.queueSummary.kinds.process_video_frames", {
-      defaultValue: "Image Semantic Analysis (video)",
+    rebuild_projection_batch: t("monitor.queueSummary.kinds.rebuild_projection_batch", {
+      defaultValue: "Rebuild catalog projection",
     }),
-    rebuild_events: t("monitor.queueSummary.kinds.rebuild_events", {
-      defaultValue: "Rebuild Events",
+    scan_repository_batch: t("monitor.queueSummary.kinds.scan_repository_batch", {
+      defaultValue: "Scan Repository batch",
     }),
-    rebuild_location_clusters: t("monitor.queueSummary.kinds.rebuild_location_clusters"),
-    reindex_assets: t("monitor.queueSummary.kinds.reindex_assets"),
-    retry_asset: t("monitor.queueSummary.kinds.retry_asset"),
-    schedule_repository_scans: t("monitor.queueSummary.kinds.schedule_repository_scans"),
-    schedule_event_rebuilds: t("monitor.queueSummary.kinds.schedule_event_rebuilds", {
-      defaultValue: "Schedule Event rebuilds",
+    transcode_media: t("monitor.queueSummary.kinds.transcode_media", {
+      defaultValue: "Prepare playable media",
     }),
-    thumbnail_asset: t("monitor.queueSummary.kinds.thumbnail_asset"),
-    transcode_asset: t("monitor.queueSummary.kinds.transcode_asset"),
   };
 }
 

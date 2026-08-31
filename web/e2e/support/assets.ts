@@ -44,6 +44,7 @@ export const SMOKE_VIDEO_ASSET = "commons-video-ocean-waves";
 export const AUTH_ISOLATION_ASSET = "landing-01-lake-cabin";
 export const VIDEO_REGRESSION_PROFILE = "e2e";
 export const VIDEO_REGRESSION_PHOTO_ASSET = "picsum-upload-124";
+export const VIDEO_REGRESSION_DISABLED_ASSET = "immich-video-eiffel-tower";
 export const VIDEO_REGRESSION_ASSETS = [
   "commons-video-ocean-waves",
   "commons-video-chameleon-flowers",

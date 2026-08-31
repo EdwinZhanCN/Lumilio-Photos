@@ -6,7 +6,7 @@ describe("upload process results", () => {
   it("classifies duplicate, processing, and failed results", () => {
     expect(isDuplicateResult({ status: "duplicate" })).toBe(true);
     expect(resolveResultStatus({ status: "duplicate" })).toBe("duplicate");
-    expect(resolveResultStatus({ success: true, task_id: 42 })).toBe("processing");
+    expect(resolveResultStatus({ success: true, receipt_id: "receipt" })).toBe("processing");
     expect(resolveResultStatus({ success: false })).toBe("failed");
   });
 

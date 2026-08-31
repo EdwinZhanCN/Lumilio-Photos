@@ -1,7 +1,6 @@
 import { spawnSync } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { api } from "./api";
+import { compose, docker, repositoryRoot } from "./docker.ts";
 import { loadBootstrapTOTP, nextTOTPCode, totpCode } from "./totp";
 import {
   AUTH_ISOLATION_ASSET,
@@ -10,15 +9,6 @@ import {
   SMOKE_UPLOAD_ASSET,
   SMOKE_VIDEO_ASSET,
 } from "./assets";
-
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const compose = [
-  "compose",
-  "-f",
-  path.join(repositoryRoot, "web/e2e/compose.yml"),
-  "-p",
-  "lumilio-photos-e2e",
-];
 
 /** Bootstrap admin created by `e2e/support/seed.ts`. */
 const bootstrap = {
@@ -135,7 +125,7 @@ function placeScanFixture(repository: Repository, source: string, scanFilename: 
   // Storage is a named volume, so the fixture goes in through the container.
   const result = spawnSync(
     "docker",
-    [...compose, "cp", source, `lumilio:${repository.path}/${scanFilename}`],
+    [...docker, ...compose, "cp", source, `lumilio:${repository.path}/${scanFilename}`],
     { cwd: repositoryRoot, stdio: "inherit" },
   );
   if (result.error) throw result.error;

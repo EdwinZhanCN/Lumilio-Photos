@@ -1724,30 +1724,14 @@
       },
       "fetchError": "加载处理活动失败。",
       "kinds": {
-        "classify_zeroshot": "匹配已保存分类器",
-        "database_backup": "创建数据库备份",
-        "detect_stacks": "查找关联原片",
-        "drain_repository_outbox": "分发资源库任务",
-        "hash_repository_node": "检查资源库文件内容",
+        "analyze_asset": "读取媒体信息",
+        "backup_catalog": "创建目录备份",
+        "enrich_asset": "运行图像与媒体增强",
+        "generate_asset_derivatives": "生成预览图",
         "ingest_asset": "导入上传文件",
-        "match_live_photo": "匹配 Live Photo",
-        "metadata_asset": "读取媒体信息",
-        "observe_repository": "监测资源库",
-        "process_bioclip": "识别自然与物种",
-        "process_face": "识别人像",
-        "process_ocr": "识别图片文字",
-        "process_ocr_outbox": "更新 OCR 搜索索引",
-        "process_phash": "分析重复照片",
-        "process_semantic": "建立视觉搜索索引",
-        "process_video_frames": "图像语义分析（视频）",
-        "rebuild_events": "重建事件",
-        "rebuild_location_clusters": "刷新地点",
-        "reindex_assets": "重建 AI 索引",
-        "retry_asset": "重试媒体处理",
-        "schedule_event_rebuilds": "安排事件重建",
-        "schedule_repository_scans": "安排资源库扫描",
-        "thumbnail_asset": "生成预览图",
-        "transcode_asset": "准备可播放媒体",
+        "rebuild_projection_batch": "重建目录投影",
+        "scan_repository_batch": "扫描资源库批次",
+        "transcode_media": "准备可播放媒体",
         "unknown": "其他后台任务 · {{name}}"
       },
       "loading": "正在加载处理活动...",
@@ -1764,100 +1748,12 @@
       },
       "noErrorSamples": "这个处理模块没有记录最近错误详情。",
       "queues": {
-        "classify_zeroshot": {
-          "description": "在视觉索引完成后匹配已保存的分类相册。",
-          "name": "零样本分类"
-        },
-        "db_backup": {
-          "description": "创建定时或管理员手动请求的数据库备份。",
-          "name": "数据库备份"
+        "catalog_macro": {
+          "description": "在共享资源限制下运行有界目录处理阶段。",
+          "name": "目录处理"
         },
         "default": {
           "description": "资源库的后台处理。"
-        },
-        "detect_stacks": {
-          "description": "查找 RAW+JPEG 以及相关媒体堆叠。",
-          "name": "堆叠检测"
-        },
-        "event_scheduler": {
-          "description": "在后台投影需要刷新时安排事件重建。",
-          "name": "事件调度"
-        },
-        "hash_repository_node": {
-          "description": "读取发生变化的资源库文件，并验证其精确内容标识。",
-          "name": "资源库内容检查"
-        },
-        "ingest_asset": {
-          "description": "安全地把上传媒体放入资源库。",
-          "name": "导入"
-        },
-        "match_live_photo": {
-          "description": "配对 Apple Live Photo 的照片与视频文件。",
-          "name": "Live Photo 匹配"
-        },
-        "metadata_asset": {
-          "description": "读取 EXIF、拍摄时间、相机、位置和媒体信息。",
-          "name": "媒体信息"
-        },
-        "observe_repository": {
-          "description": "分批发现并协调资源库文件。",
-          "name": "资源库监测"
-        },
-        "ocr_index": {
-          "description": "让提取出的 OCR 文字可用于搜索。",
-          "name": "OCR 搜索索引"
-        },
-        "process_bioclip": {
-          "description": "在启用时添加自然与物种标签。",
-          "name": "BioCLIP物种识别"
-        },
-        "process_face": {
-          "description": "查找人脸并更新人物分组。",
-          "name": "人物识别"
-        },
-        "process_ocr": {
-          "description": "从图片中提取可搜索文字。",
-          "name": "OCR文字识别"
-        },
-        "process_phash": {
-          "description": "计算用于重复照片检测的指纹。",
-          "name": "重复分析"
-        },
-        "process_semantic": {
-          "description": "建立用于搜索和 AI 整理的视觉向量。",
-          "name": "图像语义分析"
-        },
-        "process_video_frames": {
-          "description": "从代表性视频帧建立可搜索的语义向量。",
-          "name": "图像语义分析（视频）"
-        },
-        "rebuild_events": {
-          "description": "根据当前媒体数据重建事件。",
-          "name": "事件重建"
-        },
-        "rebuild_location_clusters": {
-          "description": "在媒体位置变化后刷新地点聚类。",
-          "name": "地点"
-        },
-        "reindex_assets": {
-          "description": "为已有照片补齐 AI 索引。",
-          "name": "AI 重建索引"
-        },
-        "repository_outbox": {
-          "description": "将已提交的资源库任务分发给受限的后台处理器。",
-          "name": "资源库任务分发"
-        },
-        "retry_asset": {
-          "description": "在处理失败后重新尝试。",
-          "name": "重试"
-        },
-        "thumbnail_asset": {
-          "description": "生成媒体界面使用的预览图。",
-          "name": "预览图"
-        },
-        "transcode_asset": {
-          "description": "为浏览器播放准备视频和音频版本。",
-          "name": "播放媒体"
         },
         "unknown": {
           "name": "其他处理 · {{name}}"

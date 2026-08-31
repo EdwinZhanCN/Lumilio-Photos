@@ -13,7 +13,7 @@ const summaryResponse = {
   generated_at: now,
   queues: [
     {
-      name: "thumbnail_asset",
+      name: "catalog_macro",
       total_jobs: 100,
       processed_jobs: 80,
       remaining_jobs: 20,
@@ -26,14 +26,14 @@ const summaryResponse = {
       error_samples: [
         {
           job_id: 42,
-          kind: "thumbnail_asset",
+          kind: "generate_asset_derivatives",
           state: "retryable",
           attempt: 3,
           max_attempts: 50,
           created_at: oneMinuteAgo,
           scheduled_at: now,
           attempted_at: now,
-          last_error: "thumbnail failed: decode error",
+          last_error: "derivative generation failed: decode error",
         },
       ],
     },
@@ -57,9 +57,13 @@ describe("QueueSummaryList", () => {
     serveSummary();
     const screen = await renderWithProviders(<QueueSummaryList />);
 
-    await expect.element(screen.getByRole("heading", { name: "Previews" })).toBeInTheDocument();
     await expect
-      .element(screen.getByText("Creates previews used throughout the gallery."))
+      .element(screen.getByRole("heading", { name: "Catalog processing" }))
+      .toBeInTheDocument();
+    await expect
+      .element(
+        screen.getByText("Runs bounded catalog pipeline stages with shared resource limits."),
+      )
       .toBeInTheDocument();
     await expect.element(screen.getByText("Total", { exact: true })).toBeInTheDocument();
     await expect.element(screen.getByText("100", { exact: true })).toBeInTheDocument();
@@ -84,18 +88,20 @@ describe("QueueSummaryList", () => {
     await screen.getByRole("button", { name: "Review 2 issues" }).click();
 
     await expect.element(screen.getByText("Build previews")).toBeInTheDocument();
-    await expect.element(screen.getByText("thumbnail failed: decode error")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText("derivative generation failed: decode error"))
+      .toBeInTheDocument();
 
     await screen.getByRole("button", { name: "Copy error" }).click();
 
     await vi.waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(
-        expect.stringContaining("queue=thumbnail_asset"),
+        expect.stringContaining("queue=catalog_macro"),
       );
     });
     expect(clipboardWriteText).toHaveBeenCalledWith(expect.stringContaining("job_id=42"));
     expect(clipboardWriteText).toHaveBeenCalledWith(
-      expect.stringContaining("thumbnail failed: decode error"),
+      expect.stringContaining("derivative generation failed: decode error"),
     );
   });
 
@@ -120,14 +126,8 @@ describe("QueueSummaryList", () => {
     });
   });
 
-  it("localizes every registered Server queue that previously used the raw fallback", async () => {
-    const queueNames = [
-      "db_backup",
-      "event_scheduler",
-      "ocr_index",
-      "process_video_frames",
-      "rebuild_events",
-    ] as const;
+  it("localizes the canonical macro queue", async () => {
+    const queueNames = ["catalog_macro"] as const;
     serveSummary({
       generated_at: now,
       queues: queueNames.map((name) => ({
