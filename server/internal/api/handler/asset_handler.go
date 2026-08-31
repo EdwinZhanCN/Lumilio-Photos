@@ -2060,6 +2060,7 @@ func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository, includ
 			RootID:       repository.RootID.String(),
 			Reachability: string(repository.Reachability),
 			Activity:     string(repository.Activity),
+			PauseReason:  repository.PauseReason,
 			IsPrimary:    repository.Role == dbtypes.RepoRolePrimary,
 		}
 		if includePath {

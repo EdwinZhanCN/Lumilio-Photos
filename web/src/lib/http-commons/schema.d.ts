@@ -14660,6 +14660,8 @@ export interface components {
              * @example /Volumes/Media/Photos
              */
             path?: string;
+            /** @example low_space */
+            pause_reason?: string;
             /**
              * @description Reachability lets a selector keep an unreachable repository visible as a
              *     browse filter while refusing it as an upload target. Activity is separate
@@ -15886,10 +15888,12 @@ export interface components {
              * @enum {string}
              */
             role?: "primary" | "regular";
+            safety_margin_bytes?: number;
             target_id?: string;
             target_type?: string;
             total_bytes?: number;
             writable?: boolean;
+            writable_budget_bytes?: number;
         };
         "dto.StorageDiagnosticsResponseDTO": {
             generated_at?: string;

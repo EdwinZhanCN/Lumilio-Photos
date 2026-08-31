@@ -138,6 +138,8 @@ type StorageDiagnosticDTO struct {
 	CapacityKnown              bool       `json:"capacity_known"`
 	TotalBytes                 uint64     `json:"total_bytes,omitempty"`
 	AvailableBytes             uint64     `json:"available_bytes,omitempty"`
+	SafetyMarginBytes          uint64     `json:"safety_margin_bytes,omitempty"`
+	WritableBudgetBytes        uint64     `json:"writable_budget_bytes,omitempty"`
 	Filesystem                 string     `json:"filesystem,omitempty"`
 	MountID                    string     `json:"mount_id,omitempty"`
 	MountSource                string     `json:"mount_source,omitempty"`

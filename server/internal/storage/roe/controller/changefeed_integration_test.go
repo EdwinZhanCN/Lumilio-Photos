@@ -390,7 +390,9 @@ func TestChangeCatchUpUsesSingleEventWriterQuantum(t *testing.T) {
 }
 
 func TestAbsenceFinalizationYieldsAtTransactionBudget(t *testing.T) {
-	maxAbsenceRows := exerciseAbsenceFinalizationQuantum(t, time.Nanosecond, 5)
+	// Zero makes the cooperative check deterministic even on Windows, whose
+	// monotonic clock can report no elapsed time between adjacent operations.
+	maxAbsenceRows := exerciseAbsenceFinalizationQuantum(t, 0, 5)
 	if maxAbsenceRows != 1 {
 		t.Fatalf("largest budget-limited absence turn applied %d rows, want 1", maxAbsenceRows)
 	}

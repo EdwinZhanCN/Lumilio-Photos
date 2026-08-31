@@ -64,6 +64,9 @@ func TestBackupSchedulerRetriesTransientCatalogErrorsUntilCancellation(t *testin
 	if err := catalog.SQL.Close(); err != nil {
 		t.Fatal(err)
 	}
+	if catalog.ReaderSQL != nil {
+		_ = catalog.ReaderSQL.Close()
+	}
 	scheduler, err := NewBackupScheduler(catalog.Writer, time.Millisecond)
 	if err != nil {
 		t.Fatal(err)

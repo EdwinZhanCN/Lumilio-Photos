@@ -53,6 +53,7 @@ export type RepositoryOption = RepositoryEntity & {
   reachability: RepositoryReachability;
   /** Work is orthogonal to reachability and never hides an unavailable state. */
   activity: RepositoryActivity;
+  pauseReason?: string;
 };
 
 export type RepositoryReachability =

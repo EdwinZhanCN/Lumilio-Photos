@@ -5,8 +5,10 @@ package changefeed
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,14 +29,26 @@ func TestWindowsNativeFeedUsesUSNOrRDCWAndFailsClosedOnCursorLoss(t *testing.T) 
 	if start.AdapterKind != "usn" && start.AdapterKind != "rdcw" {
 		t.Fatalf("Windows adapter = %q", start.AdapterKind)
 	}
-	if err := os.WriteFile(filepath.Join(repository.Path, "windows-change.jpg"), []byte("change"), 0o600); err != nil {
-		t.Fatal(err)
+	// Create until RDCW reports a wakeup. CreateFile returning only proves the
+	// directory handle exists; the watcher goroutine may not have armed its
+	// first blocking ReadDirectoryChangesW call yet on a loaded hosted runner.
+	wakeupDeadline := time.Now().Add(10 * time.Second)
+	for attempt := 0; ; attempt++ {
+		name := fmt.Sprintf("windows-change-%d.jpg", attempt)
+		if err := os.WriteFile(filepath.Join(repository.Path, name), []byte("change"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-feed.Notifications():
+			goto woke
+		case <-time.After(25 * time.Millisecond):
+			if time.Now().After(wakeupDeadline) {
+				t.Fatal("ReadDirectoryChangesW emitted no wakeup")
+			}
+		}
 	}
-	select {
-	case <-feed.Notifications():
-	case <-time.After(10 * time.Second):
-		t.Fatal("ReadDirectoryChangesW emitted no wakeup")
-	}
+
+woke:
 
 	deadline := time.Now().Add(10 * time.Second)
 	var batch Batch
@@ -64,7 +78,7 @@ func TestWindowsNativeFeedUsesUSNOrRDCWAndFailsClosedOnCursorLoss(t *testing.T) 
 	}
 	found := false
 	for _, event := range batch.Events {
-		if event.Path == "windows-change.jpg" || event.Recursive {
+		if strings.HasPrefix(event.Path, "windows-change-") || event.Recursive {
 			found = true
 		}
 	}

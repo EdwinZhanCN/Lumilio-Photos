@@ -16,15 +16,9 @@ type DirectoryStructure struct {
 	InboxDir   string // inbox
 
 	// System subdirectories
-	AssetsDir     string // .lumilio/assets
-	ThumbnailsDir string // .lumilio/assets/thumbnails
-	VideosDir     string // .lumilio/assets/videos
-	AudiosDir     string // .lumilio/assets/audios
-	FacesDir      string // .lumilio/assets/faces
-	SidecarsDir   string // .lumilio/sidecars
-	StagingDir    string // .lumilio/staging
-	TempDir       string // .lumilio/temp
-	TrashDir      string // .lumilio/trash
+	FacesDir    string // .lumilio/assets/faces
+	SidecarsDir string // .lumilio/sidecars
+	StagingDir  string // .lumilio/staging
 
 	// Staging subdirectories
 	IncomingDir string // .lumilio/staging/incoming
@@ -33,20 +27,14 @@ type DirectoryStructure struct {
 
 // DefaultStructure provides the default directory structure configuration
 var DefaultStructure = DirectoryStructure{
-	SystemDir:     ".lumilio",
-	ConfigFile:    ".lumiliorepo",
-	InboxDir:      "inbox",
-	AssetsDir:     ".lumilio/assets",
-	ThumbnailsDir: ".lumilio/assets/thumbnails",
-	VideosDir:     ".lumilio/assets/videos",
-	AudiosDir:     ".lumilio/assets/audios",
-	FacesDir:      ".lumilio/assets/faces",
-	SidecarsDir:   ".lumilio/sidecars",
-	StagingDir:    ".lumilio/staging",
-	TempDir:       ".lumilio/temp",
-	TrashDir:      ".lumilio/trash",
-	IncomingDir:   ".lumilio/staging/incoming",
-	FailedDir:     ".lumilio/staging/failed",
+	SystemDir:   ".lumilio",
+	ConfigFile:  ".lumiliorepo",
+	InboxDir:    "inbox",
+	FacesDir:    ".lumilio/assets/faces",
+	SidecarsDir: ".lumilio/sidecars",
+	StagingDir:  ".lumilio/staging",
+	IncomingDir: ".lumilio/staging/incoming",
+	FailedDir:   ".lumilio/staging/failed",
 }
 
 // dirSpec is one directory in a repository's layout: its repo-relative path and
@@ -62,30 +50,18 @@ type dirSpec struct {
 // (0700); everything else is world-readable (0755).
 var repoDirs = []dirSpec{
 	{".lumilio", 0o755},
-	{".lumilio/assets", 0o755},
-	{".lumilio/assets/thumbnails", 0o755},
-	{".lumilio/assets/thumbnails/small", 0o755},
-	{".lumilio/assets/thumbnails/medium", 0o755},
-	{".lumilio/assets/thumbnails/large", 0o755},
-	{".lumilio/assets/videos", 0o755},
-	{".lumilio/assets/videos/web", 0o755},
-	{".lumilio/assets/audios", 0o755},
-	{".lumilio/assets/audios/web", 0o755},
 	{".lumilio/assets/faces", 0o755},
 	{".lumilio/sidecars", 0o755}, // Studio non-destructive edit sidecar files
 	{".lumilio/staging", 0o700},
 	{".lumilio/staging/incoming", 0o700},
 	{".lumilio/staging/failed", 0o700},
-	{".lumilio/temp", 0o700},  // General temporary processing
-	{".lumilio/trash", 0o755}, // Soft-deleted user assets
-	{".lumilio/logs", 0o755},  // Application and operation logs
-	{"inbox", 0o755},          // Structured uploads
+	{".lumilio/logs", 0o755}, // Repository operation and error audit logs
+	{"inbox", 0o755},         // Structured uploads
 }
 
 // repoLogFiles are empty JSONL targets created at init so loggers can append
 // valid lines immediately.
 var repoLogFiles = []string{
-	".lumilio/logs/app.log",
 	".lumilio/logs/error.log",
 	".lumilio/logs/operations.log",
 }

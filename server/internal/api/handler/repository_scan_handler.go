@@ -135,8 +135,17 @@ func storageDiagnosticDTO(targetType, targetID, parentTargetID, name, path, reac
 	return dto.StorageDiagnosticDTO{
 		TargetType: targetType, TargetID: targetID, ParentTargetID: parentTargetID, Name: name, Path: path, CanonicalPath: canonical,
 		Reachability: reachability, Writable: info.Writable, CapacityKnown: info.CapacityKnown,
-		TotalBytes: info.TotalBytes, AvailableBytes: info.AvailableBytes, Filesystem: info.Filesystem,
-		MountID: info.MountID, MountSource: func() string {
+		TotalBytes: info.TotalBytes, AvailableBytes: info.AvailableBytes,
+		SafetyMarginBytes: storage.CapacitySafetyMargin(info.TotalBytes),
+		WritableBudgetBytes: func() uint64 {
+			margin := storage.CapacitySafetyMargin(info.TotalBytes)
+			if info.AvailableBytes <= margin {
+				return 0
+			}
+			return info.AvailableBytes - margin
+		}(),
+		Filesystem: info.Filesystem,
+		MountID:    info.MountID, MountSource: func() string {
 			if redact {
 				return redactSupportPath(info.MountSource)
 			}

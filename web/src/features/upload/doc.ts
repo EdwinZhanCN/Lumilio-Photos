@@ -37,7 +37,9 @@
  * ```
  *
  * {@link UnifiedUploadSection} validates files, edits the queue, chooses the
- * working repository, and starts processing. {@link NavbarUploadQueue} is a
+ * working repository, blocks starts while that Repository is paused or
+ * unreachable, and explains low writable-space recovery before hashing begins.
+ * {@link NavbarUploadQueue} is a
  * compact global view over the same provider state and links back to Manage.
  *
  * {@link useGenerateHashcode} fingerprints files before

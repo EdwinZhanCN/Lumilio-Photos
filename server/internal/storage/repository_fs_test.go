@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -358,7 +359,7 @@ func TestRepositoryFSImmutablePrivateWriteNeverReplacesExistingContent(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	directory, err := ParsePrivateRepositoryPath(filepath.Dir(destination.String()))
+	directory, err := ParsePrivateRepositoryPath(path.Dir(destination.String()))
 	if err != nil {
 		t.Fatal(err)
 	}

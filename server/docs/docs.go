@@ -4857,6 +4857,10 @@ const docTemplate = `{
                         "example": "/Volumes/Media/Photos",
                         "type": "string"
                     },
+                    "pause_reason": {
+                        "example": "low_space",
+                        "type": "string"
+                    },
                     "reachability": {
                         "description": "Reachability lets a selector keep an unreachable repository visible as a\nbrowse filter while refusing it as an upload target. Activity is separate\nso scanning never masks storage availability.",
                         "example": "active",
@@ -8004,6 +8008,9 @@ const docTemplate = `{
                         "example": "primary",
                         "type": "string"
                     },
+                    "safety_margin_bytes": {
+                        "type": "integer"
+                    },
                     "target_id": {
                         "type": "string"
                     },
@@ -8015,6 +8022,9 @@ const docTemplate = `{
                     },
                     "writable": {
                         "type": "boolean"
+                    },
+                    "writable_budget_bytes": {
+                        "type": "integer"
                     }
                 },
                 "type": "object"

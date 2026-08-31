@@ -72,6 +72,7 @@ type IndexingRepositoryOptionDTO struct {
 	// so scanning never masks storage availability.
 	Reachability string `json:"reachability" example:"active"`
 	Activity     string `json:"activity" example:"idle"`
+	PauseReason  string `json:"pause_reason,omitempty" example:"low_space"`
 	IsPrimary    bool   `json:"is_primary" example:"false"`
 }
 

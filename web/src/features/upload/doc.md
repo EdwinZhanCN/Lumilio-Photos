@@ -36,7 +36,9 @@ flowchart LR
 ```
 
 [UnifiedUploadSection](./flows/intake/UnifiedUploadSection.tsx) validates files, edits the queue, chooses the
-working repository, and starts processing. [NavbarUploadQueue](./flows/queue/NavbarUploadQueue.tsx) is a
+working repository, blocks starts while that Repository is paused or
+unreachable, and explains low writable-space recovery before hashing begins.
+[NavbarUploadQueue](./flows/queue/NavbarUploadQueue.tsx) is a
 compact global view over the same provider state and links back to Manage.
 
 [useGenerateHashcode](./modules/process/useGenerateHashcode.ts) fingerprints files before

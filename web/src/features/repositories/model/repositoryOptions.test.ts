@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { normalizeRepositoryOptions } from "./repositoryOptions";
+import { isRepositoryUnavailable, normalizeRepositoryOptions } from "./repositoryOptions";
 
 describe("normalizeRepositoryOptions", () => {
   it("normalizes missing fields and both primary indicators", () => {
@@ -32,6 +32,7 @@ describe("normalizeRepositoryOptions", () => {
         rootId: "root-1",
         reachability: "offline",
         activity: "scanning",
+        pauseReason: "",
       },
       {
         entityType: "repository",
@@ -42,6 +43,7 @@ describe("normalizeRepositoryOptions", () => {
         rootId: "",
         reachability: "recovery_required",
         activity: "idle",
+        pauseReason: "",
       },
     ]);
   });
@@ -63,5 +65,20 @@ describe("normalizeRepositoryOptions", () => {
   it("returns an empty list when the response has no repositories", () => {
     expect(normalizeRepositoryOptions()).toEqual([]);
     expect(normalizeRepositoryOptions({})).toEqual([]);
+  });
+
+  it("rejects a paused Repository as an upload target", () => {
+    const [repository] = normalizeRepositoryOptions({
+      repositories: [
+        {
+          id: "paused",
+          reachability: "active",
+          activity: "paused",
+          pause_reason: "low_space",
+        },
+      ],
+    });
+    expect(repository?.pauseReason).toBe("low_space");
+    expect(repository && isRepositoryUnavailable(repository)).toBe(true);
   });
 });

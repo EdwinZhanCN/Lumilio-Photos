@@ -222,6 +222,8 @@ function CapacityDonut({ item }: { item: StorageDiagnostic }) {
 
   const usedPercent = Math.round(capacityUsedPercent(item));
   const usedBytes = Math.max(0, (item.total_bytes ?? 0) - (item.available_bytes ?? 0));
+  const safetyMargin = item.safety_margin_bytes ?? 0;
+  const writableBudget = item.writable_budget_bytes ?? 0;
   const ringTone =
     usedPercent >= 90 ? "text-error" : usedPercent >= 80 ? "text-warning" : "text-primary";
 
@@ -253,13 +255,29 @@ function CapacityDonut({ item }: { item: StorageDiagnostic }) {
         />
         <CapacityLegend
           color="bg-base-300"
-          label={t("monitor.storage.statAvailable", "Available")}
+          label={t("monitor.storage.statAvailable", "Currently writable")}
           value={formatBytes(item.available_bytes ?? 0)}
+        />
+        <CapacityLegend
+          color="bg-warning"
+          label={t("monitor.storage.safetyReserve", "Safety reserve")}
+          value={formatBytes(safetyMargin)}
+        />
+        <CapacityLegend
+          color="bg-success"
+          label={t("monitor.storage.uploadBudget", "Available for new writes")}
+          value={formatBytes(writableBudget)}
         />
         <p className="tabular-nums text-base-content/50">
           {t("monitor.storage.totalCapacity", "Total {{total}}", {
             total: formatBytes(item.total_bytes ?? 0),
           })}
+        </p>
+        <p className="max-w-sm text-base-content/50">
+          {t(
+            "monitor.storage.capacityExplanation",
+            "Writable space comes from the filesystem and may be lower than the space shown by macOS when purgeable APFS storage is included. Lumilio keeps the safety reserve free before accepting new writes.",
+          )}
         </p>
       </div>
     </div>

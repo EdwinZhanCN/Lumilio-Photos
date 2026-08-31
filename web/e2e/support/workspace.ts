@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { api } from "./api";
 import { compose, docker, repositoryRoot } from "./docker.ts";
-import { loadBootstrapTOTP, nextTOTPCode, totpCode } from "./totp";
+import { isMFAInvalidError, loadBootstrapTOTP, nextTOTPCode, totpCode } from "./totp";
 import {
   AUTH_ISOLATION_ASSET,
   smokeAsset,
@@ -90,7 +90,7 @@ async function loginBootstrap(): Promise<{ token: string }> {
   } catch (error) {
     // The seed process may have consumed this thirty-second counter moments
     // earlier. Replay rejection is expected; any other failure still aborts.
-    if (!(error instanceof Error) || !error.message.includes("invalid mfa code")) throw error;
+    if (!isMFAInvalidError(error)) throw error;
     verified = await verify(await nextTOTPCode(bootstrapTOTP.secret, code));
   }
   if (!verified.token) throw new Error("bootstrap admin MFA verification did not return a session");

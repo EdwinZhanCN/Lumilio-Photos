@@ -1,5 +1,5 @@
 import process from "node:process";
-import { loadBootstrapTOTP, totpCode } from "./totp.ts";
+import { isMFAInvalidError, loadBootstrapTOTP, nextTOTPCode, totpCode } from "./totp.ts";
 
 const baseURL = process.env.LUMILIO_E2E_BASE_URL ?? "http://localhost:16657";
 const username = process.env.LUMILIO_E2E_USERNAME ?? "e2e-admin";
@@ -54,14 +54,21 @@ async function loginBootstrap(): Promise<{ token: string }> {
   if (!bootstrapTOTP || bootstrapTOTP.username !== username) {
     throw new Error("bootstrap admin requires MFA but the temporary E2E TOTP hand-off is missing");
   }
-  const verified = await request<AuthResponse>("/api/v1/auth/mfa/verify", {
-    method: "POST",
-    body: JSON.stringify({
-      mfa_token: login.mfa_token,
-      code: totpCode(bootstrapTOTP.secret),
-      method: "totp",
-    }),
-  });
+  const verify = (code: string) =>
+    request<AuthResponse>("/api/v1/auth/mfa/verify", {
+      method: "POST",
+      body: JSON.stringify({ mfa_token: login.mfa_token, code, method: "totp" }),
+    });
+  const code = totpCode(bootstrapTOTP.secret);
+  let verified: AuthResponse;
+  try {
+    verified = await verify(code);
+  } catch (error) {
+    // The preceding first-admin regression may have consumed this counter.
+    // Wait for the next counter only for the server's explicit replay error.
+    if (!isMFAInvalidError(error)) throw error;
+    verified = await verify(await nextTOTPCode(bootstrapTOTP.secret, code));
+  }
   if (!verified.token) throw new Error("bootstrap admin MFA verification did not return a session");
   return { token: verified.token };
 }

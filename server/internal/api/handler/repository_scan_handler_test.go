@@ -41,12 +41,15 @@ func TestStorageDiagnosticDTOCarriesRepositoryParentLocation(t *testing.T) {
 		t.TempDir(),
 		"active",
 		"repository-id",
-		storage.StoragePathInfo{},
+		storage.StoragePathInfo{CapacityKnown: true, TotalBytes: 100 << 30, AvailableBytes: 20 << 30},
 		false,
 	)
 
 	if item.ParentTargetID != "storage-location-id" {
 		t.Fatalf("parent target id = %q, want storage-location-id", item.ParentTargetID)
+	}
+	if item.SafetyMarginBytes != 5<<30 || item.WritableBudgetBytes != 15<<30 {
+		t.Fatalf("capacity explanation = margin %d budget %d", item.SafetyMarginBytes, item.WritableBudgetBytes)
 	}
 }
 

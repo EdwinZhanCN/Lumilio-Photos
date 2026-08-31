@@ -2409,6 +2409,9 @@ components:
                         locations are never exposed to regular users.
                     example: /Volumes/Media/Photos
                     type: string
+                pause_reason:
+                    example: low_space
+                    type: string
                 reachability:
                     description: |-
                         Reachability lets a selector keep an unreachable repository visible as a
@@ -4619,6 +4622,8 @@ components:
                         - regular
                     example: primary
                     type: string
+                safety_margin_bytes:
+                    type: integer
                 target_id:
                     type: string
                 target_type:
@@ -4627,6 +4632,8 @@ components:
                     type: integer
                 writable:
                     type: boolean
+                writable_budget_bytes:
+                    type: integer
             type: object
         dto.StorageDiagnosticsResponseDTO:
             properties:
