@@ -197,8 +197,8 @@ jobs:
                           - 'taskfile.yml'
                           - '.github/workflows/ci.yml'
 
-    sqlite-architecture:
-        name: SQLite-only architecture
+    architecture:
+        name: architecture and Compose gates
         needs: changes
         runs-on: ubuntu-latest
         steps:
@@ -560,7 +560,7 @@ jobs:
         if: always()
         needs:
             - changes
-            - sqlite-architecture
+            - architecture
             - generated
             - server-linux
             - web
@@ -572,7 +572,7 @@ jobs:
             - name: Require all applicable CI jobs
               env:
                   CHANGES_RESULT: ${{ needs.changes.result }}
-                  SQLITE_ARCHITECTURE_RESULT: ${{ needs.sqlite-architecture.result }}
+                  ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
                   GENERATED_RESULT: ${{ needs.generated.result }}
                   SERVER_CHANGED: ${{ needs.changes.outputs.server }}
                   SERVER_RESULT: ${{ needs.server-linux.result }}
@@ -591,8 +591,8 @@ jobs:
                       exit 1
                   fi
 
-                  if [ "$SQLITE_ARCHITECTURE_RESULT" != "success" ]; then
-                      echo "::error::sqlite architecture finished with $SQLITE_ARCHITECTURE_RESULT"
+                  if [ "$ARCHITECTURE_RESULT" != "success" ]; then
+                      echo "::error::architecture finished with $ARCHITECTURE_RESULT"
                       exit 1
                   fi
 
