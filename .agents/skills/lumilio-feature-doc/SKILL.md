@@ -9,7 +9,7 @@ description: Use when adding a web feature or materially changing one —
 
 Every documented feature carries a `doc.ts` at its root; the sibling `doc.md`
 is generated from it. The mechanism and why the imports exist are owned by
-[docts.md](../../../site/docs/internal/docts.md). Canonical example:
+[docts.md](../../../docs/docts.md). Canonical example:
 `web/src/features/collections/doc.ts`. `task verify:generated` re-renders
 every `doc.md` in CI and fails on drift.
 
@@ -59,6 +59,3 @@ silently overwritten by the next render.
 When you add or materially change a feature, update its `doc.ts` in the same
 PR. Search for the old path after a move; do not leave a `README.md` or
 `docs/` directory under the feature.
-
-The `@edwinzhancn` scope is mapped to GitHub Packages in `web/.npmrc`;
-installing needs a `read:packages` token (local: `~/.npmrc`; CI: a secret).

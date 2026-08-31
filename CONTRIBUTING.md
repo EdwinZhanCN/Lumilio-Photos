@@ -11,7 +11,7 @@ for product installation and usage.
 Read [AGENTS.md](AGENTS.md) first. It is the engineering documentation entry
 point and identifies the authoritative references for the backend, frontend,
 desktop app, test assets, and execution plans. Check
-`site/docs/internal/exec-plans/active/` before making changes so your work
+`docs/exec-plans/active/` before making changes so your work
 does not conflict with an active plan.
 
 The project is local-first: preserve original media, keep media storage and
@@ -68,11 +68,7 @@ docker compose -f deploy/compose/dev.compose.yml up -d
 This builds the current Server and Web sources instead of pulling the published
 image. It uses host networking and Docker-managed named volumes for media and
 app-state, so it also works when a local IDE controls a remote Linux Docker
-daemon. The Web build reads the local `~/.npmrc` as a BuildKit secret because
-`@edwinzhancn/docts` is hosted on GitHub Packages; the token needs
-`read:packages`. Set `LUMILIO_DEV_NPMRC` when the credential file lives
-elsewhere. The secret is mounted only for dependency installation and is not
-copied into the image.
+daemon.
 
 ## Common Commands
 
@@ -116,7 +112,7 @@ task compose:test
 `task test` includes the architecture guards, `server:test`, and `web:test`; it
 does not include the desktop app or browser E2E. Follow the “Test layers”
 section in
-[FRONTEND.md](site/docs/internal/FRONTEND.md) when choosing frontend test
+[FRONTEND.md](docs/FRONTEND.md) when choosing frontend test
 file names and runners. Placement:
 [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 
@@ -185,7 +181,7 @@ The Lumen Hub release consumed by Desktop and Compose is pinned in
 `task lumen:sync` refreshes the derived fields and regenerates the Desktop
 catalog `desktop/internal/lumen/release_catalog.go`, and `task lumen:check`
 verifies catalog, `SHA256SUMS`, and consumer builds in CI). See
-`site/docs/internal/lumen-catalog.md`.
+`docs/lumen-catalog.md`.
 
 ## Generated Code
 

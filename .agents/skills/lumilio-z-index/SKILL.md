@@ -10,7 +10,7 @@ description: Use when adding or changing overlapping UI in Lumilio Photos —
 
 Three rules, in priority order. The token table lives here so a session can
 apply it without opening FRONTEND.md; the design intent (calm operational UI,
-no competing stacks) is owned by [DESIGN.md](../../../site/docs/internal/DESIGN.md).
+no competing stacks) is owned by [DESIGN.md](../../../docs/DESIGN.md).
 
 ## 1. Decorative overlays → DOM order
 

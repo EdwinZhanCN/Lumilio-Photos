@@ -8,7 +8,7 @@ description: Use when adding a test in Lumilio Photos (web/ or server/) —
 # Write A Test In The Right Layer
 
 The frontend layer table is a contract owned by
-[FRONTEND.md](../../../site/docs/internal/FRONTEND.md). The rationale is the
+[FRONTEND.md](../../../docs/FRONTEND.md). The rationale is the
 [test-layer assignment decision](../../decisions/2026-08-14-frontend-test-layer-assignment.md).
 This skill is the selection, placement, and verification procedure. Do not
 invent other file conventions.

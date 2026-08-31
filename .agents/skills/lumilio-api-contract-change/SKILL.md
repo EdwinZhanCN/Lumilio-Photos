@@ -12,8 +12,8 @@ OpenAPI is the source of truth for HTTP contracts. The generated artifacts —
 `server/docs` (OpenAPI), `web/src/lib/http-commons/schema.d.ts` (frontend
 types), and `site/docs/public/redoc-static.html` — are never hand-edited.
 `task verify:generated` regenerates them in CI and fails on drift. Contracts:
-[BACKEND.md](../../../site/docs/internal/BACKEND.md),
-[FRONTEND.md](../../../site/docs/internal/FRONTEND.md).
+[BACKEND.md](../../../docs/BACKEND.md),
+[FRONTEND.md](../../../docs/FRONTEND.md).
 
 ## Procedure
 

@@ -37,28 +37,28 @@ configuration that boots and diagnoses cleanly.
   `web/src/wasm`.
 - `deploy/`: Linux production Compose files and reverse-proxy examples.
 - `site/docs/`: VitePress user documentation under `en/` and `zh-cn/`.
-  Engineering notes under `site/docs/internal/` are excluded from the
+  Engineering notes under `docs/` are excluded from the
   VitePress build.
 
 ## Documentation Routing
 
 Before substantive changes, read the
-[system map](site/docs/internal/architecture.md) and check
-[active execution plans](site/docs/internal/exec-plans/active/).
+[system map](docs/architecture.md) and check
+[active execution plans](docs/exec-plans/active/).
 Then read only the references relevant to the change:
 
-- Backend: [BACKEND.md](site/docs/internal/BACKEND.md).
-- Frontend: [FRONTEND.md](site/docs/internal/FRONTEND.md) and
+- Backend: [BACKEND.md](docs/BACKEND.md).
+- Frontend: [FRONTEND.md](docs/FRONTEND.md) and
   [web/ARCHITECTURE.md](web/ARCHITECTURE.md).
-- UI or product behavior: [DESIGN.md](site/docs/internal/DESIGN.md) and
-  [core beliefs](site/docs/internal/core-beliefs.md).
-- Test or demo media: [test-assets.md](site/docs/internal/test-assets.md).
+- UI or product behavior: [DESIGN.md](docs/DESIGN.md) and
+  [core beliefs](docs/core-beliefs.md).
+- Test or demo media: [test-assets.md](docs/test-assets.md).
 - Frontend tooling or architecture docs:
-  [vite-plus.md](site/docs/internal/vite-plus.md) and
-  [docts.md](site/docs/internal/docts.md).
-- Known debt: [tech-debt-tracker.md](site/docs/internal/exec-plans/tech-debt-tracker.md).
+  [vite-plus.md](docs/vite-plus.md) and
+  [docts.md](docs/docts.md).
+- Known debt: [tech-debt-tracker.md](docs/exec-plans/tech-debt-tracker.md).
 - Harness itself (memories, skills, gates):
-  [agent-harness.md](site/docs/internal/agent-harness.md).
+  [agent-harness.md](docs/agent-harness.md).
 
 ## Agent Memories And Skills
 
@@ -83,7 +83,7 @@ Project-coupled decisions live in `.agents/decisions/`; escaped-bug records
 live in `.agents/postmortems/`. A non-trivial change updates one memory in
 the same PR — the owning decision record, exec plan, or postmortem;
 mechanical or local edits are exempt. Formats:
-[agent-harness.md](site/docs/internal/agent-harness.md).
+[agent-harness.md](docs/agent-harness.md).
 
 ## Non-Negotiable Rules
 
@@ -107,7 +107,7 @@ mechanical or local edits are exempt. Formats:
   workflow path filters in the same change. Follow
   [lumilio-add-task-target](.agents/skills/lumilio-add-task-target/SKILL.md).
 - Follow the frontend test-layer taxonomy in
-  [FRONTEND.md](site/docs/internal/FRONTEND.md); do not invent test-file
+  [FRONTEND.md](docs/FRONTEND.md); do not invent test-file
   conventions. Placement:
   [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 - API contracts are OpenAPI-first. Never hand-edit
@@ -137,7 +137,7 @@ mechanical or local edits are exempt. Formats:
 
 ## Execution Plans
 
-Keep unfinished plans in `site/docs/internal/exec-plans/active/`; follow
+Keep unfinished plans in `docs/exec-plans/active/`; follow
 [lumilio-exec-plan](.agents/skills/lumilio-exec-plan/SKILL.md) for creation
 criteria, the skeleton, and maintenance. Completing a plan extracts its
 durable decisions into `.agents/decisions/` and deletes the plan file; there

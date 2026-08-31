@@ -13,7 +13,7 @@ admin `e2e-admin`. Test media comes from the pinned external assets
 repository ([lumilio-pin-reconcile](../lumilio-pin-reconcile/SKILL.md)).
 Docker is required. Spec locators:
 [lumilio-e2e-spec](../lumilio-e2e-spec/SKILL.md). Lumen boundary:
-[lumilio-lumen-fixtures](../lumilio-lumen-fixtures/SKILL.md).
+[lumilio-lumen-fixtures](../lumilio-lumen-fixtures/SKILL.md). Remote hardware qualification and destructive resilience drills: [lumilio-remote-qualification](../lumilio-remote-qualification/SKILL.md).
 
 ## Lifecycle
 
@@ -36,10 +36,6 @@ serves a built image, so edits are otherwise invisible:
 ```sh
 docker compose -f web/e2e/compose.yml -p lumilio-photos-e2e up -d --build lumilio
 ```
-
-The `@edwinzhancn/docts` package is fetched from GitHub Packages during the
-image build; `environment.ts` copies `~/.npmrc` (or `LUMILIO_E2E_NPMRC`) into
-`.cache/e2e/npmrc` as a BuildKit secret.
 
 ## Seed variants
 

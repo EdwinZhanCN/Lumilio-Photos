@@ -9,8 +9,8 @@ description: Use when bumping, verifying, or reviewing assets.lock.json or
 
 Two producer pins live at the repository root. Never edit the lock files or
 their generated consumers by hand. Contracts:
-[test-assets.md](../../../site/docs/internal/test-assets.md),
-[lumen-catalog.md](../../../site/docs/internal/lumen-catalog.md).
+[test-assets.md](../../../docs/test-assets.md),
+[lumen-catalog.md](../../../docs/lumen-catalog.md).
 
 | Lock | Offline CI gate | Prove against GitHub | Reconcile |
 | --- | --- | --- | --- |

@@ -50,7 +50,7 @@ resume identities map to 404; provider, checkpoint, and transaction failures
 use the registered Agent failure boundary.
 
 The current operational boundary is documented in
-[`BACKEND.md`](../../site/docs/internal/BACKEND.md#ml-lumen-and-llm) and the
+[`BACKEND.md`](../../docs/BACKEND.md#ml-lumen-and-llm) and the
 [`lumilio-e2e-environment`](../skills/lumilio-e2e-environment/SKILL.md) skill.
 
 ## Alternatives considered
