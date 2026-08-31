@@ -1042,7 +1042,7 @@ func (h *AssetHandler) loadUploadOperationStatuses(c *gin.Context, raw string) (
 		if reader == nil {
 			reader = h.database
 		}
-		err := reader.QueryRowContext(c, `SELECT receipt.receipt_id, commit.original_filename, receipt.state, receipt.terminal_error FROM catalog_operation_receipts receipt JOIN repository_staging_commits commit ON commit.commit_id = receipt.subject_id WHERE receipt.receipt_id = ? AND receipt.kind = 'ingest' AND commit.owner_id = ?`, id.String(), *callerID).Scan(&status.ReceiptID, &status.FileName, &status.Status, &terminalError)
+		err := reader.QueryRowContext(c, `SELECT receipt.receipt_id, staging_commit.original_filename, receipt.state, receipt.terminal_error FROM catalog_operation_receipts receipt JOIN repository_staging_commits staging_commit ON staging_commit.commit_id = receipt.subject_id WHERE receipt.receipt_id = ? AND receipt.kind = 'ingest' AND staging_commit.owner_id = ?`, id.String(), *callerID).Scan(&status.ReceiptID, &status.FileName, &status.Status, &terminalError)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
