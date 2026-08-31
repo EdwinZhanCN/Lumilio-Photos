@@ -723,6 +723,13 @@ WHERE owner_id=? AND source_revision=?
 	if affected, _ := stateResult.RowsAffected(); affected != 1 {
 		return ErrStaleRevision
 	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE event_rebuild_runs
+SET state='succeeded',published_revision=?,finished_at=?,event_count=?,member_count=?,error_code=NULL
+WHERE owner_id=? AND state IN ('queued','running') AND requested_revision<=?`,
+		*expectedRevision, now, len(segments), len(memberships), ownerID, *expectedRevision); err != nil {
+		return fmt.Errorf("complete Event rebuild runs: %w", err)
+	}
 	return nil
 }
 

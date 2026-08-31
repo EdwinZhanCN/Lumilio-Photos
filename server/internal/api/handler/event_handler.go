@@ -355,7 +355,7 @@ func (h *EventHandler) RebuildEvents(c *gin.Context) {
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(c, `
 INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,revision,source_revision,published_revision,updated_at)
-VALUES(?,?,?,0,0,0,?) ON CONFLICT(owner_id) DO NOTHING`, ownerID, event.AlgorithmVersion, now, now); err != nil {
+VALUES(?,?,?,0,1,0,?) ON CONFLICT(owner_id) DO NOTHING`, ownerID, event.AlgorithmVersion, now, now); err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
