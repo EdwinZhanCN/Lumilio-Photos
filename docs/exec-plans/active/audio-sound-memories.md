@@ -143,18 +143,18 @@ Photos backend:
    `processing_time_ms`, timestamps) + `audio_transcript_segments`
    (`asset_id`, `seq`, `start_ms`, `end_ms`, `text`) +
    catalog-owned transcript projection source/applied revisions. sqlc queries
-   + `TranscriptService` (save = replace-all plus projection desired state and
-   typed domain-outbox envelope in one coordinator transaction).
+   + `TranscriptService` (save = replace-all plus projection desired state in
+   one coordinator transaction; the Catalog scheduler derives River work).
 3. Add a typed audio-transcription step to the existing `enrich_asset` DAG.
    The preparer owns only asset/settings readers and RepositoryFS access, loads
    the web audio version (original when the web version is a copy), and calls
    `AudioTranscribe` under the process-wide inference/memory resource budget.
-   It emits an immutable fenced commit intent; it receives no catalog writer
+   It emits an immutable fenced typed result; it receives no catalog writer
    or River insertion capability. Skip durations > 4h with a typed terminal
    reason (constant, not a setting). The macro timeout remains generous
    (~20 min), but no new River kind or queue is introduced.
 4. A successful audio transcode commit advances the asset's desired enrichment
-   generation and publishes its domain envelope atomically. Manual retry uses
+   generation atomically. Manual retry uses
    the canonical `enrich` reprocess task; backfill/rebuild re-arms catalog
    desired state. Do not add a transcode child enqueue or retry wrapper job.
 5. Settings: `ML.TranscribeEnabled` (prod default true, dev zero-value false —
@@ -180,11 +180,10 @@ breaking browse/playback.
    strategy as OCR), stored `start_ms`.
 2. Add transcript as a closed projection kind under
    `rebuild_projection_batch`. Transcript mutations advance its catalog-owned
-   source revision and publish the typed domain envelope in the same commit;
-   bounded pages advance applied revision/cursor through the commit
-   coordinator. Startup and periodic catalog reconciliation recover missed
-   QueueDB delivery. Do not add a transcript-specific River queue, scheduler,
-   drain job, or process-local correctness trigger.
+   source revision in the same commit; bounded pages advance applied
+   revision/cursor through the commit coordinator. The Catalog scheduler
+   recovers missed QueueDB delivery. Do not add a transcript-specific River
+   queue, drain job, or process-local correctness trigger.
 3. `SourceTranscript = "transcript"` retriever: max-pool per asset, best
    segment's `start_ms` → `Candidate.BestTsMs`; initial RRF weight equal to
    `SourceOCR`. Wire into aggregate retrievers, `setretrieve` (agent), and
@@ -257,8 +256,8 @@ No sampling knobs; the 4h duration cap is a code constant. TOML is untouched
 - `server/internal/api/handler/asset_handler.go` — waveform thumbnail; transcript endpoint
 - `server/internal/pipeline/*`, `server/app/pipeline_runtime.go` — enrich DAG,
   desired-state composition, and closed macro registration
-- `server/internal/commit/*`, `server/internal/domainoutbox/*` — fenced result
-  commit and transcript projection delivery/reconciliation
+- `server/internal/commit/*`, `server/internal/queue/scheduler.go` — fenced
+  result commit and transcript projection scheduling
 - `server/internal/service/{lumen_service.go,transcript_service.go,settings_service.go,indexing_service.go}`
 - `server/internal/search/blevetranscript/*`, `search/{types,retrievers,setretrieve,service}.go`
 - `server/internal/agent/tools/{producers,inspect,read_transcript}.go`

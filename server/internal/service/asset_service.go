@@ -366,8 +366,8 @@ func newAssetService(
 }
 
 // NewAssetServiceWithNotifier wires the OCR wakeup notifier. The durable
-// projection request is written to the catalog domain outbox in the same
-// transaction as the asset mutation.
+// projection request is written to Catalog state in the same transaction as
+// the asset mutation; the Catalog scheduler derives disposable River work.
 func NewAssetServiceWithNotifier(
 	q *repo.Queries,
 	pool *sql.DB,

@@ -172,9 +172,9 @@ func (rm *DefaultRepositoryManager) markInitialScanQueued(ctx context.Context, o
 }
 
 // RetryPendingInitialRepositoryScans closes the crash window between durable
-// repository registration and catalog domain-outbox publication. The lifecycle result remains
-// false until the queue has accepted the scan, so restart and a low-frequency
-// runtime retry can safely finish the handoff.
+// repository registration and Catalog-derived scan scheduling. The lifecycle
+// result remains false until the queue has accepted the scan, so restart and a
+// low-frequency runtime retry can safely finish the handoff.
 func (rm *DefaultRepositoryManager) RetryPendingInitialRepositoryScans(ctx context.Context) error {
 	if rm.initialScan == nil {
 		return errors.New("initial repository scan queue is unavailable")

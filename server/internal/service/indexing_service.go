@@ -16,6 +16,7 @@ import (
 	"server/internal/pipeline"
 	"server/internal/settings"
 	"server/internal/storage"
+	"server/internal/workqos"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -109,7 +110,11 @@ type PreparedReindex struct {
 	ReceiptID         uuid.UUID
 	RequestedRevision uint64
 	Candidates        []PreparedReindexCandidate
-	Command           pipeline.ReindexCommand
+	RepositoryID      *uuid.UUID
+	Tasks             []string
+	Limit             int
+	Cursor            string
+	MissingOnly       bool
 	HasMore           bool
 	NextCursor        string
 	ResetSemantic     bool
@@ -437,7 +442,7 @@ func (s *assetIndexingService) PrepareReindexReceipt(ctx context.Context, receip
 	}
 	enabledTasks := filterEnabledIndexingTasks(requestedTasks, effectiveConfig)
 	if len(enabledTasks) == 0 {
-		return PreparedReindex{ReceiptID: receiptID, RequestedRevision: expectedRevision, Command: pipeline.ReindexCommand{ReceiptID: receiptID, Tasks: requestedNames, Limit: limit, Cursor: cursor.String, MissingOnly: missingOnly, ResetSemantic: resetSemantic, RequestedRevision: expectedRevision, Admission: pipeline.AdmissionMaintenance}}, nil
+		return PreparedReindex{ReceiptID: receiptID, RequestedRevision: expectedRevision, Tasks: requestedNames, Limit: limit, Cursor: cursor.String, MissingOnly: missingOnly, ResetSemantic: resetSemantic}, nil
 	}
 	var repositoryID *string
 	if repositoryRaw.Valid {
@@ -460,15 +465,15 @@ func (s *assetIndexingService) PrepareReindexReceipt(ctx context.Context, receip
 		return PreparedReindex{}, err
 	}
 	nextOffset, hasMore := nextReindexPageOffset(missingOnly, len(candidates), limit, offset)
-	command := pipeline.ReindexCommand{ReceiptID: receiptID, Tasks: requestedNames, Limit: limit, Cursor: cursor.String, MissingOnly: missingOnly, ResetSemantic: resetSemantic, RequestedRevision: expectedRevision, Admission: pipeline.AdmissionMaintenance}
+	var requestedRepositoryID *uuid.UUID
 	if repositoryRaw.Valid {
 		parsed, err := uuid.Parse(repositoryRaw.String)
 		if err != nil {
 			return PreparedReindex{}, err
 		}
-		command.RepositoryID = &parsed
+		requestedRepositoryID = &parsed
 	}
-	prepared := PreparedReindex{ReceiptID: receiptID, RequestedRevision: expectedRevision, Command: command, HasMore: hasMore, ResetSemantic: resetSemantic && offset == 0 && containsIndexingTask(enabledTasks, AssetIndexingTaskSemanticImage)}
+	prepared := PreparedReindex{ReceiptID: receiptID, RequestedRevision: expectedRevision, RepositoryID: requestedRepositoryID, Tasks: requestedNames, Limit: limit, Cursor: cursor.String, MissingOnly: missingOnly, HasMore: hasMore, ResetSemantic: resetSemantic && offset == 0 && containsIndexingTask(enabledTasks, AssetIndexingTaskSemanticImage)}
 	if hasMore {
 		prepared.NextCursor = strconv.Itoa(nextOffset)
 	}
@@ -505,12 +510,12 @@ func (s *assetIndexingService) ApplyPreparedReindexTx(ctx context.Context, tx *s
 		if candidate.AssetID == uuid.Nil || candidate.ContentID == uuid.Nil {
 			return errors.New("invalid reindex candidate")
 		}
-		if err := pipeline.RequestAssetStagesTx(ctx, tx, candidate.AssetID, candidate.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, pipeline.AdmissionMaintenance, prepared.ReceiptID); err != nil {
+		if err := pipeline.RequestAssetStagesTx(ctx, tx, candidate.AssetID, candidate.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, workqos.Maintenance, prepared.ReceiptID); err != nil {
 			return err
 		}
 	}
 	if prepared.HasMore {
-		return pipeline.AdvanceReindexTx(ctx, tx, prepared.Command, prepared.NextCursor)
+		return pipeline.AdvanceReindexTx(ctx, tx, prepared.ReceiptID, prepared.RequestedRevision, prepared.NextCursor)
 	}
 	return pipeline.FinishReindexTx(ctx, tx, prepared.ReceiptID, prepared.RequestedRevision)
 }

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"server/internal/workqos"
 )
 
 type Class int
@@ -34,18 +36,17 @@ func (c Class) Valid() bool {
 	return c >= ClassMaintenance && c <= ClassInteractive
 }
 
-// ClassFromAdmission maps the serialized pipeline value at the app composition
-// boundary without making execution depend on the pipeline package.
-func ClassFromAdmission(admission string) (Class, error) {
-	switch admission {
-	case "interactive":
+// ClassFromQoS maps durable work service levels onto governor scheduling.
+func ClassFromQoS(qos workqos.Class) (Class, error) {
+	switch qos {
+	case workqos.Interactive:
 		return ClassInteractive, nil
-	case "background":
+	case workqos.Background:
 		return ClassBackground, nil
-	case "maintenance":
+	case workqos.Maintenance:
 		return ClassMaintenance, nil
 	default:
-		return 0, fmt.Errorf("invalid execution admission class %q", admission)
+		return 0, fmt.Errorf("invalid execution QoS class %d", qos)
 	}
 }
 

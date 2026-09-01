@@ -13,13 +13,10 @@ import (
 	"server/internal/commit"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/pipeline"
 	"server/internal/storage"
 	"server/internal/storage/roe/changefeed"
 	"server/internal/storage/roe/pathsemantics"
 )
-
-const FamilyRepositoryObservation = "repository_observation"
 
 type commitAction string
 
@@ -89,35 +86,20 @@ func (TurnAcknowledgement) CommitAcknowledgement() {}
 
 type commitApplier struct{}
 
-func CommitHandlers() map[string]commit.Handler {
-	applier := &commitApplier{}
-	return map[string]commit.Handler{
-		FamilyRepositoryObservation: commit.AcknowledgingHandler(applier.apply),
+func (applier *commitApplier) apply(ctx context.Context, tx *sql.Tx, payload observationCommit) (commit.Result, error) {
+	if payload.Action == "" || payload.RepositoryID == uuid.Nil || payload.RunID == uuid.Nil {
+		return commit.Result{}, errors.New("invalid repository observation result")
 	}
-}
-
-func (applier *commitApplier) apply(ctx context.Context, tx *sql.Tx, intents []commit.Intent) ([]commit.Result, error) {
-	results := make([]commit.Result, len(intents))
-	for index, intent := range intents {
-		payload, ok := intent.Payload.(observationCommit)
-		if !ok || payload.Action == "" || payload.RepositoryID == uuid.Nil || payload.RunID == uuid.Nil ||
-			intent.Key.Family != FamilyRepositoryObservation || intent.Key.Subject != payload.RepositoryID.String() ||
-			intent.Key.Fence != payload.RunID.String() || intent.Key.Stage != string(payload.Action) ||
-			intent.Key.DesiredVersion != max(uint64(1), payload.RequestedEpoch) {
-			return nil, errors.New("repository observation commit key does not match payload")
-		}
-		started := time.Now()
-		acknowledgement, outcome, err := applier.applyOne(ctx, tx, payload)
-		if err != nil {
-			return nil, err
-		}
-		results[index] = commit.Result{
-			Outcome:             outcome,
-			Acknowledgement:     acknowledgement,
-			TransactionDuration: time.Since(started),
-		}
+	started := time.Now()
+	acknowledgement, outcome, err := applier.applyOne(ctx, tx, payload)
+	if err != nil {
+		return commit.Result{}, err
 	}
-	return results, nil
+	return commit.Result{
+		Outcome:             outcome,
+		Acknowledgement:     acknowledgement,
+		TransactionDuration: time.Since(started),
+	}, nil
 }
 
 func (applier *commitApplier) applyOne(
@@ -790,5 +772,5 @@ func scheduleCoalescedRepositoryRun(
 	}); err != nil {
 		return fmt.Errorf("activate coalesced repository observation run: %w", err)
 	}
-	return pipeline.PublishRepositoryObservationTx(ctx, tx, completed.RepositoryID, uint64(state.DesiredEpoch), pipeline.AdmissionBackground, runID)
+	return nil
 }

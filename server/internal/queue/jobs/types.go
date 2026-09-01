@@ -14,7 +14,6 @@ import (
 func activeUniqueStates() []rivertype.JobState {
 	return []rivertype.JobState{
 		rivertype.JobStateAvailable,
-		rivertype.JobStateDiscarded,
 		rivertype.JobStatePending,
 		rivertype.JobStateRetryable,
 		rivertype.JobStateRunning,
@@ -41,7 +40,7 @@ func RuntimeJobCatalog() []RuntimeJob {
 	}
 }
 
-// NewArgs constructs a concrete macro payload for a domain command kind.
+// NewArgs constructs a concrete macro payload for a closed runtime kind.
 func NewArgs(kind string) (river.JobArgs, error) {
 	for _, representative := range RuntimeJobCatalog() {
 		if representative.Kind() != kind {

@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
 	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 	"server/internal/llm"
@@ -483,7 +481,7 @@ func (s *settingsService) updateGeocodingSettings(
 	}
 
 	if candidateEnabled {
-		if err := pipeline.RequestLocationResolutionTx(ctx, tx.Raw(), uint64(params.GeocodingRevision), uuid.New()); err != nil {
+		if err := pipeline.RequestLocationResolutionTx(ctx, tx.Raw(), uint64(params.GeocodingRevision)); err != nil {
 			return SystemSettings{}, fmt.Errorf("enqueue location cluster resolution: %w", err)
 		}
 	}

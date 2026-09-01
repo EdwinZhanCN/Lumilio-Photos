@@ -147,8 +147,7 @@ const (
 	OperationVectorStateRepair
 	OperationVectorClearPending
 	OperationBackgroundCommitBatch
-	OperationDomainOutboxDeliver
-	OperationDomainOutboxReconcile
+	OperationCatalogWorkStateRepair
 	OperationBackupRequest
 	OperationCatalogGeneratedWriterExec
 	OperationCatalogGeneratedWriterReturning
@@ -179,14 +178,9 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Name:      "background.commit.batch",
 		Role:      RoleWriter,
 	},
-	OperationDomainOutboxDeliver: {
-		Operation: OperationDomainOutboxDeliver,
-		Name:      "domain_outbox.deliver",
-		Role:      RoleWriter,
-	},
-	OperationDomainOutboxReconcile: {
-		Operation: OperationDomainOutboxReconcile,
-		Name:      "domain_outbox.reconcile",
+	OperationCatalogWorkStateRepair: {
+		Operation: OperationCatalogWorkStateRepair,
+		Name:      "catalog.work_state.repair",
 		Role:      RoleWriter,
 	},
 	OperationBackupRequest: {

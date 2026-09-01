@@ -212,6 +212,9 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		snippet string
 	}{
 		{name: "River executor on queue writer and listener on queue readers", snippet: "queue.New(queueDatabase.SQL, queueDatabase.ReaderSQL, workers"},
+		{name: "Catalog commit scheduling wake", snippet: "db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))"},
+		{name: "Catalog-derived scheduler", snippet: "queue.NewScheduler(database.Reader, database.Writer, queueClient"},
+		{name: "Catalog scheduler wake consumption", snippet: "catalogScheduleWake.Signals()"},
 		{name: "writer wait and WAL monitor", snippet: "monitorSQLiteWriter(\n\t\tctx,\n\t\tdatabase"},
 		{name: "idle WAL checkpoint suppression", snippet: "walStateAlreadyCheckpointed(walState"},
 		{name: "independent queue WAL checkpoint", snippet: `checkpointWAL("queue"`},
@@ -399,7 +402,7 @@ func checkAsyncPipelineArchitecture(root string) error {
 	}
 
 	childInserts, err := scanGoLines(root, "server/internal/queue", func(relative, line string) bool {
-		if relative == "server/internal/queue/domain_adapter.go" || strings.HasSuffix(relative, "_test.go") {
+		if relative == "server/internal/queue/scheduler.go" || strings.HasSuffix(relative, "_test.go") {
 			return false
 		}
 		return strings.Contains(line, ".Insert(") || strings.Contains(line, ".InsertMany(")

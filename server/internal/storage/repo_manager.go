@@ -843,10 +843,9 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 		return RepositoryRemovalImpact{}, fmt.Errorf("count affected albums: %w", err)
 	}
 	if err := rm.readerDatabase.QueryRowContext(ctx, `
-		SELECT
-		  (SELECT count(*) FROM domain_outbox WHERE delivered_at IS NULL AND (subject_key=? OR EXISTS (SELECT 1 FROM repository_staging_commits staging WHERE staging.commit_id=domain_outbox.subject_key AND staging.repository_id=?)))
-		  + (SELECT count(*) FROM repository_observation_state WHERE repository_id=? AND desired_epoch>applied_epoch)
-	`, repoUUID.String(), repoUUID, repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
+		SELECT count(*) FROM repository_observation_state
+		WHERE repository_id=? AND desired_epoch>applied_epoch
+	`, repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository catalog work: %w", err)
 	}
 	if err := rm.readerDatabase.QueryRowContext(ctx, `
@@ -933,8 +932,8 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 	defer func() { _ = tx.Rollback() }()
 	queries := rm.queries.WithTx(tx.Raw())
 	// The repository mutation lock prevents new or running repository compute
-	// from crossing this transaction. Catalog cascades remove desired state;
-	// pending domain commands are explicitly removed for the deleted subject.
+	// from crossing this transaction. Catalog cascades remove its durable
+	// desired state; the disposable River projection is not part of removal.
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM share_links
 		WHERE EXISTS (
@@ -964,19 +963,6 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		)
 	`, repoUUID, repoUUID); err != nil {
 		return fmt.Errorf("remove repository agent pins: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM domain_outbox
-		WHERE (command_kind = 'repository.scan' AND subject_key = ?)
-		   OR (command_kind = 'projection.location' AND subject_key LIKE ? || ':%')
-		   OR EXISTS (
-				SELECT 1
-				FROM repository_staging_commits staging
-				WHERE staging.commit_id = domain_outbox.subject_key
-				  AND staging.repository_id = ?
-		   )
-	`, repoUUID.String(), repoUUID.String(), repoUUID); err != nil {
-		return fmt.Errorf("remove repository domain commands: %w", err)
 	}
 	// Logical media and stacks are projections of Assets, not repository-owned
 	// filesystem entries. Rehome them before deleting the repository whenever a

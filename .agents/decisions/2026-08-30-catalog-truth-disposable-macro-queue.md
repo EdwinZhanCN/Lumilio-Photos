@@ -1,6 +1,8 @@
 # Decision: Keep product truth in the catalog and make QueueDB disposable
 
-Status: implemented and qualified on 2026-08-30.
+Status: implemented and qualified on 2026-08-30. Its control-plane mechanics
+were superseded on 2026-08-31 by
+[2026-08-31-catalog-derived-execution-control-plane.md](2026-08-31-catalog-derived-execution-control-plane.md).
 
 ## Problem
 
@@ -21,10 +23,10 @@ reachable after the cutover.
 ## Decision
 
 `catalog.db` is the sole product truth for desired and applied generations,
-terminal errors, operation receipts, repository observation state, projection
-revisions, and the transactional `domain_outbox`. Product APIs explain work
-only from those records. Foreground commands atomically mutate domain state and
-publish typed envelopes; they never insert River jobs or expose River IDs.
+terminal errors, operation receipts, repository observation state, and
+projection revisions. Product APIs explain work only from those records.
+Foreground commands atomically mutate Catalog state; they never insert River
+jobs or expose River IDs.
 
 QueueDB is an independent, disposable control-plane database. River registers
 exactly these eight macro kinds on one `catalog_macro` queue:
@@ -38,13 +40,12 @@ exactly these eight macro kinds on one `catalog_macro` queue:
 - `rebuild_projection_batch`
 - `backup_catalog`
 
-The domain-outbox adapter bulk-publishes closed macro commands. A periodic
-catalog-only reconciler republishes every outstanding generation without
+The bounded Catalog scheduler derives closed macro work identities without
 asking QueueDB whether work exists. Replacing QueueDB therefore loses only
-control history. For repository observation, recovery republishes the active
-run's `requested_epoch`; a newer coalesced `desired_epoch` is scheduled after
-that active run applies. A macro may execute while `desired_epoch` is newer,
-but it must still match the active run and its requested epoch.
+control history. For repository observation, recovery derives the active run's
+`requested_epoch`; a newer coalesced `desired_epoch` is scheduled after that
+active run applies. A macro may execute while `desired_epoch` is newer, but it
+must still match the active run and its requested epoch.
 
 One process-wide execution engine admits fine-grained steps against explicit
 CPU, disk, memory, image-codec, video, and inference capacities. One bounded
@@ -77,8 +78,8 @@ queue/control mechanics:
   source-of-truth and idempotent projection requirements remain.
 - The 2026-08-22 repository-observation decision's `repository_outbox`, one
   snoozing River-controller lifecycle, queue uniqueness, and compatibility
-  cutover/preflight are replaced by `domain_outbox`, bounded scan macros,
-  catalog active-run recovery, and the destructive target schema. Its C0/C1,
+  cutover/preflight are replaced by Catalog-derived scheduling, bounded scan
+  macros, catalog active-run recovery, and the destructive target schema. Its C0/C1,
   identity, ownership, absence-proof, and periodic-authoritative-verifier
   invariants remain.
 - The 2026-08-25 SQLite decision's rejection of a separate River database is
@@ -97,7 +98,7 @@ were 1.514/3.375/3.565 seconds.
 The live QueueDB-replacement scenario converged four repository runs after
 recovering their active epochs. All four finished with
 `desired_epoch = applied_epoch = 6`, no active run or terminal error, zero
-catalog backlog/outbox rows, and 107 completed versus zero non-completed River
+catalog backlog rows, and 107 completed versus zero non-completed River
 jobs. A separate reprocess receipt completed after the server was killed and
 `river.sqlite3`, its WAL, and SHM were deleted; the catalog-owned asset and
 receipt remained readable and correct.
@@ -108,8 +109,8 @@ with peak one, zero failures, and 206 acknowledgements. Coordinator enqueue
 p50/p95/p99 were 1/7/18 microseconds; oldest-wait p50/p95/p99 were
 0.238/10.263/10.575 milliseconds; transaction p50/p95/p99 were
 0.400/2.449/3.629 milliseconds; batch p99 was two. Catalog backlog, runnable
-work, terminal errors, desired/applied lag, domain outbox, and macro remaining
-depth were all zero.
+work, terminal errors, desired/applied lag, and macro remaining depth were all
+zero.
 
 The exact dirty tree passed the serial tagged Linux/CGO server suite, focused
 race suites, local Server/Web/Desktop/Site gates, architecture checks,

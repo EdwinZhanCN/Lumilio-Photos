@@ -38,13 +38,7 @@ type sourceMaterializerFixture struct {
 }
 
 func (fixture *sourceMaterializerFixture) activate(ctx context.Context, fact roematerializer.KnownContent) (roematerializer.Result, error) {
-	outcome, err := fixture.coordinator.Submit(ctx, commit.Intent{
-		Key: commit.Key{
-			Family: commit.FamilyRepositoryKnownContent, Subject: fact.RepositoryID.String(),
-			Fence: fact.SourceEventKey, Stage: "known_content", DesiredVersion: 1,
-		},
-		Payload: commit.RepositoryKnownContentApplied{Fact: fact},
-	})
+	outcome, err := fixture.coordinator.ApplyRepositoryKnownContent(ctx, commit.RepositoryKnownContentApplied{Fact: fact})
 	if err != nil {
 		return roematerializer.Result{}, err
 	}
@@ -80,13 +74,7 @@ func (fixture *sourceMaterializerFixture) processHash(ctx context.Context, nodeI
 	if err != nil || prepared == nil {
 		return roematerializer.Result{Code: roematerializer.ResultStale, NodeID: nodeID, Revision: revision}, err
 	}
-	outcome, err := fixture.coordinator.Submit(ctx, commit.Intent{
-		Key: commit.Key{
-			Family: commit.FamilyRepositoryHash, Subject: nodeID.String(),
-			Fence: prepared.Observation.ObservationToken, Stage: "hash", DesiredVersion: 1,
-		},
-		Payload: commit.RepositoryHashApplied{Prepared: *prepared},
-	})
+	outcome, err := fixture.coordinator.ApplyRepositoryHash(ctx, commit.RepositoryHashApplied{Prepared: *prepared})
 	if err != nil || outcome.Outcome == commit.OutcomeStale {
 		return roematerializer.Result{Code: roematerializer.ResultStale, NodeID: nodeID, Revision: revision}, err
 	}
@@ -174,11 +162,7 @@ func newSourceMaterializerFixture(t *testing.T) *sourceMaterializerFixture {
 	staging := storage.NewStagingManager(files)
 	preparer := roematerializer.NewHashPreparer(database.ReaderQueries, database.ReaderSQL, files)
 	applier := roematerializer.NewHashApplier()
-	handlers := commit.CatalogHandlersWithRepositoryMaterializer(nil, nil, nil, nil, applier)
-	for family, handler := range StagingCommitHandlers() {
-		handlers[family] = handler
-	}
-	coordinator, err := commit.New(database.Writer, commit.Config{Capacity: 16, MaxBatch: 4, OldestWait: time.Millisecond}, handlers)
+	coordinator, err := commit.New(database.Writer, commit.Config{Capacity: 16, MaxBatch: 4, OldestWait: time.Millisecond}, commit.CatalogDependencies{Materializer: applier})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +402,7 @@ func TestConcurrentScanUploadAndCloudConvergeOnContentAndOwnerAsset(t *testing.T
 	coordinator, err := commit.New(
 		fixture.database.Writer,
 		commit.Config{Capacity: 32, MaxBatch: 8, OldestWait: time.Millisecond},
-		roecontroller.CommitHandlers(),
+		commit.CatalogDependencies{},
 	)
 	if err != nil {
 		t.Fatal(err)

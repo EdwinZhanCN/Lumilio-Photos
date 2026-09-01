@@ -382,7 +382,7 @@ VALUES(?,?, 'queued',?,?)`, runID, ownerID, requestedRevision, now); err != nil 
 			return
 		}
 	}
-	if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(requestedRevision), true, uuid.New()); err != nil {
+	if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(requestedRevision), true); err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
@@ -521,7 +521,7 @@ updated_at=excluded.updated_at`, ownerID, event.AlgorithmVersion, now, request.P
 					return
 				}
 			}
-			if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(sourceRevision), false, uuid.New()); err != nil {
+			if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(sourceRevision), false); err != nil {
 				api.WriteProblem(c, api.Internal(err))
 				return
 			}

@@ -50,19 +50,19 @@ func TestCommitQueuePressureStopsExecutionAdmission(t *testing.T) {
 	var releaseOnce sync.Once
 	release := func() { releaseOnce.Do(func() { close(releaseCommit) }) }
 	defer release()
-	handler := commit.OutcomeHandler(func(context.Context, *sql.Tx, []commit.Intent) ([]commit.Outcome, error) {
+	block := func(context.Context, *sql.Tx) (commit.Result, error) {
 		select {
 		case <-entered:
 		default:
 			close(entered)
 		}
 		<-releaseCommit
-		return []commit.Outcome{commit.OutcomeApplied}, nil
-	})
+		return commit.Result{Outcome: commit.OutcomeApplied}, nil
+	}
 	coordinator, err := commit.New(
 		catalogtx.NewWriter(database, nil),
 		commit.Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Millisecond},
-		map[string]commit.Handler{commit.FamilyAssetStage: handler},
+		commit.CatalogDependencies{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -77,10 +77,10 @@ func TestCommitQueuePressureStopsExecutionAdmission(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	fence := uuid.New()
 	stage := func(assetID uuid.UUID) error {
 		return runtime.engine.Run(ctx, execution.ClassBackground, execution.Resources{CPU: 1, MemoryBytes: 1}, func(stepCtx context.Context) error {
-			return runtime.submitAssetStage(stepCtx, assetID, fence, "analyze", "asset-v1", 1)
+			_, err := coordinator.SubmitOperation(stepCtx, commit.Operation{Kind: 254, Apply: block})
+			return err
 		})
 	}
 

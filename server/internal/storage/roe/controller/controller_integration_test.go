@@ -40,7 +40,7 @@ func newTestControllerRuntime(
 	coordinator, err := commit.New(
 		database.Writer,
 		commit.Config{Capacity: 64, MaxBatch: 16, OldestWait: time.Millisecond},
-		CommitHandlers(),
+		commit.CatalogDependencies{},
 	)
 	if err != nil {
 		tb.Fatal(err)
@@ -220,7 +220,7 @@ func TestControllerRequestCoalescesAndPublishesProgressively(t *testing.T) {
 	}
 }
 
-func TestControllerCoalescedQueuedRequestPublishesCurrentEpochWakeup(t *testing.T) {
+func TestControllerCoalescedQueuedRequestUpdatesCatalogEpoch(t *testing.T) {
 	fixture := newControllerFixture(t, 8)
 
 	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
@@ -235,19 +235,14 @@ func TestControllerCoalescedQueuedRequestPublishesCurrentEpochWakeup(t *testing.
 		t.Fatalf("receipts = first %+v second %+v", first, second)
 	}
 
-	var wakeups int
+	var desired uint64
 	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
-		SELECT count(*)
-		FROM domain_outbox
-		WHERE command_kind = 'repository.scan'
-		  AND subject_key = ?
-		  AND desired_version = ?`,
-		fixture.repository.RepoID.String(), second.RequestedEpoch,
-	).Scan(&wakeups); err != nil {
+		SELECT desired_epoch FROM repository_observation_state WHERE repository_id = ?`,
+		fixture.repository.RepoID.String()).Scan(&desired); err != nil {
 		t.Fatal(err)
 	}
-	if wakeups != 1 {
-		t.Fatalf("current-epoch controller wakeups = %d, want 1", wakeups)
+	if desired != uint64(second.RequestedEpoch) {
+		t.Fatalf("catalog desired epoch = %d, want %d", desired, second.RequestedEpoch)
 	}
 }
 

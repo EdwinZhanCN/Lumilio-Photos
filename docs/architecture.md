@@ -63,7 +63,7 @@ useful; implementation plans belong in `exec-plans/`.
   `C0 → crawl → fixed C1 → dirty verification → finalize` protocol never
   treats a watcher hint as absence authority.
 - Catalog migrations establish the current desired/applied pipeline state and
-  domain-outbox contracts. QueueDB migrations are independent and may be
+  typed execution ledgers. QueueDB migrations are independent and may be
   recreated without a catalog cutover or compatibility journal.
 - `server/internal/sourcing`: recoverable staged materialization for upload and
   cloud flows. A committed source publishes the same node/content/Location
@@ -71,8 +71,12 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/db` and `server/migrations`: one physical catalog writer
   plus four query-only WAL readers for product facts, and an independent
   one-writer/four-reader QueueDB for disposable River macro-job control state.
-  Typed desired/applied records and the domain outbox are the durable handoff;
-  River traffic never admits directly to the catalog writer.
+  Typed desired/applied records are the durable handoff. A bounded scheduler
+  derives disposable River work directly from those records. Catalog QoS is
+  projected into River priority metadata rather than serialized in job
+  arguments. Committed catalog writes wake the scheduler through a coalesced
+  process-local hint, while the periodic pass remains the recovery path; River
+  traffic never admits directly to the catalog writer.
   Planning snapshots are short; filesystem, media, network, and unbounded CPU
   work never occurs inside write transactions. Large atomic changes are
   set-based and restartable derived projections publish in bounded,
@@ -91,11 +95,12 @@ useful; implementation plans belong in `exec-plans/`.
   repository reachability is a cached projection refreshed at boot and by the
   portable background reconciler. HTTP reads never trigger reconciliation or
   expiry writes merely to render current state.
-- Domain-outbox dispatch and periodic reconciliation derive outstanding work
-  only from catalog desired/applied state. They never inspect River state to
-  decide whether product work exists.
+- The bounded Catalog scheduler derives outstanding work only from catalog
+  desired/applied state. It never inspects River state to decide whether
+  product work exists. River uniqueness covers active delivery states only, so
+  a discarded delivery can be re-created while Catalog still reports lag.
 - ROE claims bounded deterministic directory frontiers. Asset, repository, and
-  projection pipelines publish typed macro commands, execute under one global
+  projection pipelines publish typed work identities, execute under one global
   resource governor, and acknowledge background catalog results through the
   bounded commit coordinator.
 - `server/internal/search/bleveocr`: rebuildable OCR search sidecar. SQLite OCR

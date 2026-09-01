@@ -116,7 +116,7 @@ type TurnResult struct {
 }
 
 type committer interface {
-	Submit(context.Context, commit.Intent) (commit.Result, error)
+	SubmitOperation(context.Context, commit.Operation) (commit.Result, error)
 }
 
 type Reader interface {
@@ -588,12 +588,11 @@ func (controller *Controller) releaseController(repositoryID, operationID uuid.U
 }
 
 func (controller *Controller) submit(ctx context.Context, payload observationCommit) (TurnAcknowledgement, commit.Result, error) {
-	result, err := controller.commits.Submit(ctx, commit.Intent{
-		Key: commit.Key{
-			Family: FamilyRepositoryObservation, Subject: payload.RepositoryID.String(), Fence: payload.RunID.String(),
-			Stage: string(payload.Action), DesiredVersion: max(uint64(1), payload.RequestedEpoch),
+	result, err := controller.commits.SubmitOperation(ctx, commit.Operation{
+		Kind: commit.OperationKindRepositoryObservation, BatchLimit: 1,
+		Apply: func(ctx context.Context, tx *sql.Tx) (commit.Result, error) {
+			return (&commitApplier{}).apply(ctx, tx, payload)
 		},
-		Payload: payload,
 	})
 	if err != nil {
 		return TurnAcknowledgement{}, commit.Result{}, err

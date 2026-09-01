@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"server/internal/artifact"
 	"server/internal/commit"
@@ -21,6 +22,7 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
+	"server/internal/workqos"
 )
 
 func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t *testing.T) {
@@ -34,7 +36,6 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 		`CREATE TABLE assets(asset_id TEXT PRIMARY KEY,type TEXT,status TEXT,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
 		`CREATE TABLE thumbnails(thumbnail_id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,size TEXT,storage_path TEXT,mime_type TEXT,created_at INTEGER,repository_id TEXT,UNIQUE(asset_id,size))`,
-		`CREATE TABLE domain_outbox(outbox_id TEXT PRIMARY KEY,envelope_version INTEGER,command_kind TEXT,subject_key TEXT,desired_version INTEGER,envelope TEXT,available_at INTEGER,delivered_at INTEGER,delivery_attempts INTEGER DEFAULT 0,last_error TEXT,created_at INTEGER,updated_at INTEGER,UNIQUE(command_kind,subject_key,desired_version))`,
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
 	} {
@@ -57,11 +58,10 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 	body := []byte("immutable thumbnail")
 	candidateBody := body
 	identity := artifact.Identity{SourceFence: sourceFence.String(), Stage: "derivatives", PipelineVersion: "asset-v1", Name: "small.webp"}
-	handlers := commit.CatalogHandlersWithAllServices(nil, nil, nil)
 	coordinator, err := commit.New(
 		catalogtx.NewWriter(database, nil),
 		commit.Config{Capacity: 4, MaxBatch: 1, OldestWait: time.Millisecond},
-		handlers,
+		commit.CatalogDependencies{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -79,31 +79,29 @@ func TestDerivativeMacroWithholdsRiverSuccessAcrossArtifactCommitCrashWindows(t 
 	args := jobs.GenerateAssetDerivativesArgs{
 		AssetID: assetID, SourceFence: sourceFence, DesiredVersion: 1, PipelineVersion: "asset-v1",
 	}
-	worker := queue.NewGenerateAssetDerivativesWorker(func(ctx context.Context, args jobs.GenerateAssetDerivativesArgs) error {
+	worker := queue.NewGenerateAssetDerivativesWorker(func(ctx context.Context, _ workqos.Class, args jobs.GenerateAssetDerivativesArgs) error {
 		return runtime.engine.Run(ctx, execution.ClassBackground, runtime.demand.Demand(execution.StepDerivativesComputeThumb, execution.MediaPhoto), func(stepCtx context.Context) error {
 			published, err := store.Publish(stepCtx, identity, bytes.NewReader(candidateBody))
 			if err != nil {
 				return err
 			}
-			if _, err := runtime.commits.Submit(stepCtx, commit.Intent{
-				Key: commit.Key{
-					Family: commit.FamilyAssetDerivatives, Subject: args.AssetID.String(),
-					Fence: args.SourceFence.String(), Stage: "derivatives", DesiredVersion: args.DesiredVersion,
-				},
-				Payload: commit.AssetDerivativesApplied{
-					AssetID: args.AssetID, SourceFence: args.SourceFence,
-					PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
-					Artifacts: []commit.ThumbnailArtifact{{
-						RepositoryID: repositoryID, Size: "small", StoragePath: published.Path, MimeType: "image/webp",
-					}},
-				},
+			if _, err := runtime.commits.ApplyAssetDerivatives(stepCtx, commit.AssetDerivativesApplied{
+				AssetID: args.AssetID, SourceFence: args.SourceFence,
+				PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
+				Artifacts: []commit.ThumbnailArtifact{{
+					RepositoryID: repositoryID, Size: "small", StoragePath: published.Path, MimeType: "image/webp",
+				}},
 			}); err != nil {
 				return err
 			}
 			return runtime.submitAssetStage(stepCtx, args.AssetID, args.SourceFence, "derivatives", args.PipelineVersion, args.DesiredVersion)
 		})
 	})
-	job := &river.Job[jobs.GenerateAssetDerivativesArgs]{Args: args}
+	priority, err := workqos.Background.Priority()
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := &river.Job[jobs.GenerateAssetDerivativesArgs]{JobRow: &rivertype.JobRow{Priority: priority}, Args: args}
 
 	if err := worker.Work(context.Background(), job); err == nil {
 		t.Fatal("macro reported River success after injected catalog rollback")

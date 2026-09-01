@@ -32,14 +32,12 @@ func TestRuntimeDiagnosticsReadCatalogAndMacroTruth(t *testing.T) {
 		`CREATE TABLE ocr_projection_pipeline_state(projection_version INTEGER,applied_revision INTEGER,terminal_error TEXT,updated_at INTEGER)`,
 		`CREATE TABLE asset_reindex_requests(requested_revision INTEGER,applied_revision INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE catalog_operation_receipts(desired_version INTEGER,applied_version INTEGER,state TEXT,updated_at INTEGER)`,
-		`CREATE TABLE domain_outbox(delivered_at INTEGER,created_at INTEGER)`,
 		`INSERT INTO asset_pipeline_state VALUES(3,1,NULL,1)`,
 		`INSERT INTO repository_observation_state VALUES(1,1,1,NULL,1)`,
 		`INSERT INTO event_projection_pipeline_state VALUES(5,2,'attempts_exhausted',1)`,
 		`INSERT INTO location_projection_state VALUES(2,2,NULL,105000000)`,
 		`INSERT INTO asset_reindex_requests VALUES(4,4,106000000)`,
 		`INSERT INTO catalog_operation_receipts VALUES(1,1,'completed',107000000)`,
-		`INSERT INTO domain_outbox VALUES(NULL,106000000)`,
 	} {
 		if _, err := catalog.Exec(statement); err != nil {
 			t.Fatal(err)
@@ -51,9 +49,6 @@ func TestRuntimeDiagnosticsReadCatalogAndMacroTruth(t *testing.T) {
 	}
 	if catalogSnapshot.Backlog != 3 || catalogSnapshot.RunnableBacklog != 2 || catalogSnapshot.TerminalBacklog != 1 || catalogSnapshot.DesiredAppliedLag != 6 {
 		t.Fatalf("catalog backlog snapshot = %+v", catalogSnapshot)
-	}
-	if catalogSnapshot.PendingOutbox != 1 || catalogSnapshot.OldestOutboxAge != 4*time.Second {
-		t.Fatalf("catalog outbox snapshot = %+v", catalogSnapshot)
 	}
 	if catalogSnapshot.AppliedTransitions != 3 || catalogSnapshot.AppliedTransitionsPerSecond != 0.3 {
 		t.Fatalf("catalog throughput snapshot = %+v", catalogSnapshot)

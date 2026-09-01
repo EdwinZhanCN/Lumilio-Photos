@@ -211,19 +211,20 @@ hints backed by periodic authoritative verification.
 
 Independent ROE directory frontiers are enumerated in bounded deterministic
 batches. Catalog desired/applied rows are authoritative for asset, repository,
-and projection work. A transactional domain outbox bulk-delivers closed macro
-commands to QueueDB, while a catalog-only reconciler restores outstanding work
-after QueueDB loss. Fine-grained compute is admitted by the process-wide
-resource governor and background results activate through the bounded commit
-coordinator.
+and projection work. A bounded Catalog scheduler derives closed macro work
+identities directly into disposable QueueDB; rebuilding QueueDB therefore only
+delays execution. Catalog QoS is projected into River's native priority rather
+than carried in macro payloads. Committed catalog writes provide a coalesced
+low-latency wake hint and the periodic pass remains the crash-recovery path.
+Fine-grained compute is admitted by the process-wide resource governor and
+background results activate through the bounded commit coordinator.
 
 Changed or unresolved nodes are hashed once with BLAKE3 from a stable open
 handle and committed only if their observation revision and before/after token
 still match. `content_objects` owns exact byte identity; one owner/content pair
 has one Asset and may have multiple active Locations. Catalog desired/applied
-state and the domain outbox commit together; the bounded coordinator activates
-typed results without holding a filesystem operation inside a database
-transaction.
+state is the durable handoff; the bounded coordinator activates typed results
+without holding a filesystem operation inside a database transaction.
 
 ## Database And API Contracts
 
@@ -232,9 +233,9 @@ transaction.
   0.7 extension statically, and applies fixed pragmas to every physical
   connection through driver DSN options plus a connection hook. Startup reads
   the effective values back and fails closed if policy differs.
-- The catalog has exactly one physical read/write connection for product facts,
-  desired/applied pipeline state, and the domain outbox, plus four `mode=ro`,
-  `query_only` WAL connections.
+- The catalog has exactly one physical read/write connection for product facts
+  and desired/applied pipeline state, plus four `mode=ro`, `query_only` WAL
+  connections.
   QueueDB has its own one-writer/four-reader pools for River migrations, leases,
   attempts, and notifications. The paths are explicit `database.path` and
   `database.queue_path` and must differ. Do not add another catalog writer or
@@ -264,12 +265,14 @@ transaction.
   and projection writes. Host Action expiry is materialized during reads and
   durably swept only at an explicit recovery boundary.
 - Application tables and River queues use separate files. Foreground commands
-  and asynchronous result commits update desired/applied state and the domain
-  outbox in one short catalog transaction; a bounded dispatcher delivers only
-  the closed macro commands to River with revision-fenced idempotency. River
-  uniqueness is by immutable macro arguments, never a time window. A startup
-  and periodic catalog reconciler re-arms every desired version whose applied
-  version lags, without reading River state to infer product work.
+  and asynchronous result commits update desired/applied state in one short
+  catalog transaction; a bounded Catalog scheduler derives only the closed
+  macro work identities to River with revision-fenced idempotency. River
+  uniqueness is by immutable macro arguments, never a time window. Rebuilding
+  QueueDB re-arms every desired version whose applied version lags, without
+  reading River state to infer product work. Discarded delivery rows do not
+  retain uniqueness, so a still-runnable Catalog generation starts a fresh
+  bounded delivery cycle.
 - WAL auto-checkpointing is disabled on every connection so an arbitrary
   foreground commit is not charged an automatic checkpoint. Runtime monitoring
   samples writer pool wait count/duration and WAL size; once the WAL exceeds
@@ -401,9 +404,12 @@ LAN profiles use the same request-derived Origin behavior as standalone Server.
 ## Queues And Processing
 
 `catalog.db` is the only product truth for asynchronous work. Foreground
-commands atomically update typed desired state and `domain_outbox`; a bulk
-adapter and periodic catalog-only reconciler publish disposable River control
-work. `river.sqlite3` may be replaced without changing reported product state.
+commands atomically update typed desired state; a bounded Catalog scheduler
+publishes disposable River control work from those rows. `river.sqlite3` may be
+replaced without changing reported product state. Request QoS stays in Catalog
+and is emitted as River priority metadata; it is not part of job arguments.
+Catalog commits wake the scheduler immediately in-process, with periodic scans
+as the authoritative fallback.
 River has one `catalog_macro` queue and exactly eight durable kinds:
 `ingest_asset`, `scan_repository_batch`, `analyze_asset`,
 `generate_asset_derivatives`, `transcode_media`, `enrich_asset`,
@@ -416,8 +422,8 @@ only narrow read/filesystem capabilities and submit typed immutable results to
 the bounded commit coordinator. They receive success only after catalog commit
 or a fenced stale/already-applied no-op; they cannot own a catalog writer or
 insert follow-up River work. Runtime diagnostics combine desired/applied lag,
-outbox age, macro depth, execution waits, coordinator depth/batches/latency,
-throughput, and both SQLite WAL states.
+macro depth, execution waits, coordinator depth/batches/latency, throughput,
+and both SQLite WAL states.
 
 The processing pipeline covers:
 

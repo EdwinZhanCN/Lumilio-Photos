@@ -37,7 +37,6 @@ import (
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/domainoutbox"
 	"server/internal/event"
 	"server/internal/execution"
 	"server/internal/httporigin"
@@ -261,7 +260,8 @@ func run(
 		return fmt.Errorf("ensure storage layout: %w", err)
 	}
 
-	database, err := db.Open(ctx, dbConfig)
+	catalogScheduleWake := queue.NewSchedulerWake()
+	database, err := db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))
 	if err != nil {
 		return fmt.Errorf("open SQLite database: %w", err)
 	}
@@ -361,18 +361,16 @@ func run(
 	// desired state remains recoverable while the domain services and commit
 	// capabilities are assembled below.
 	workers := river.NewWorkers()
-	macroErrorHandler := queue.NewMacroErrorHandler()
-	queueClient, err := queue.New(queueDatabase.SQL, queueDatabase.ReaderSQL, workers, logRuntime.RiverLogger(), macroErrorHandler, budget.DerivedMacroWorkers())
+	queueClient, err := queue.New(queueDatabase.SQL, queueDatabase.ReaderSQL, workers, logRuntime.RiverLogger(), budget.DerivedMacroWorkers())
 	if err != nil {
 		return fmt.Errorf("initialize queue: %w", err)
 	}
-	intentDispatcher, err := domainoutbox.NewDispatcher(database.Reader, database.Writer, queue.NewDomainAdapter(queueClient), 256, time.Second)
+	catalogScheduler, err := queue.NewScheduler(database.Reader, database.Writer, queueClient, catalogScheduleWake.Signals(), 256, 30*time.Second)
 	if err != nil {
-		return fmt.Errorf("initialize domain outbox dispatcher: %w", err)
+		return fmt.Errorf("initialize catalog scheduler: %w", err)
 	}
-	reconciler := domainoutbox.NewReconciler(database.Writer, 30*time.Second)
-	if _, err := reconciler.ReconcileOnce(ctx); err != nil {
-		return fmt.Errorf("reconcile catalog desired work: %w", err)
+	if _, err := catalogScheduler.ScheduleOnce(ctx); err != nil {
+		return fmt.Errorf("schedule catalog desired work: %w", err)
 	}
 	settingsService := service.NewSettingsServiceWithRuntime(
 		queries,
@@ -567,19 +565,14 @@ func run(
 	repositoryObservationConfig := roecontroller.Config{
 		Settle: time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
 	}
-	commitHandlers := commit.CatalogHandlersWithRepositoryMaterializer(faceService, eventService, locationService, indexingService, repositoryHashApplier)
-	for family, handler := range roecontroller.CommitHandlers() {
-		commitHandlers[family] = handler
-	}
-	for family, handler := range sourcing.StagingCommitHandlers() {
-		commitHandlers[family] = handler
-	}
-	commitCoordinator, err := commit.New(database.Writer, commit.Config{Capacity: 256, MaxBatch: 32, OldestWait: 10 * time.Millisecond}, commitHandlers)
+	commitCoordinator, err := commit.New(database.Writer, commit.Config{Capacity: 256, MaxBatch: 32, OldestWait: 10 * time.Millisecond}, commit.CatalogDependencies{
+		Face: faceService, Event: eventService, Location: locationService,
+		Indexing: indexingService, Materializer: repositoryHashApplier,
+	})
 	if err != nil {
 		return fmt.Errorf("initialize commit coordinator: %w", err)
 	}
 	commitCoordinator.Start()
-	macroErrorHandler.SetCoordinator(commitCoordinator)
 	go monitorSQLiteWriter(
 		ctx,
 		database,
@@ -612,10 +605,7 @@ func run(
 		repositoryFiles,
 	)
 	sourceMaterializer.SetActivation(func(ctx context.Context, fact roematerializer.KnownContent) (roematerializer.Result, error) {
-		_, err := commitCoordinator.Submit(ctx, commit.Intent{
-			Key:     commit.Key{Family: commit.FamilyRepositoryKnownContent, Subject: fact.RepositoryID.String(), Fence: fact.SourceEventKey, Stage: "known_content", DesiredVersion: 1},
-			Payload: commit.RepositoryKnownContentApplied{Fact: fact},
-		})
+		_, err := commitCoordinator.ApplyRepositoryKnownContent(ctx, commit.RepositoryKnownContentApplied{Fact: fact})
 		if err != nil {
 			return roematerializer.Result{}, err
 		}
@@ -744,7 +734,7 @@ func run(
 		Settings: settingsService.GetBackupConfig,
 		Logf:     func(format string, args ...any) { backupLogger.Infof(format, args...) },
 	}
-	backupRequestScheduler, err := domainoutbox.NewBackupScheduler(database.Writer, time.Hour)
+	backupRequestScheduler, err := queue.NewBackupScheduler(database.Writer, time.Hour)
 	if err != nil {
 		return fmt.Errorf("initialize catalog backup scheduler: %w", err)
 	}
@@ -771,15 +761,10 @@ func run(
 	if err := queueClient.Start(context.Background()); err != nil {
 		return fmt.Errorf("start queue client: %w", err)
 	}
-	go intentDispatcher.Run(ctx)
+	go catalogScheduler.Run(ctx)
 	go func() {
 		if err := backupRequestScheduler.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			appLogger.Error("catalog backup scheduler stopped", zap.Error(err))
-		}
-	}()
-	go func() {
-		if err := reconciler.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			appLogger.Error("desired work reconciler stopped", zap.Error(err))
 		}
 	}()
 	queueStopped := false

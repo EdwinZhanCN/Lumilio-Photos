@@ -17,9 +17,9 @@ import (
 	"server/internal/commit"
 	"server/internal/db"
 	"server/internal/db/catalogtx"
-	"server/internal/domainoutbox"
 	"server/internal/pipeline"
 	"server/internal/queue"
+	"server/internal/queue/jobs"
 )
 
 func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *
 
 	commitID, receiptID := uuid.New(), uuid.New()
 	if err := catalog.Writer.Transact(ctx, catalogtx.OperationAssetStagingCommit, nil, func(tx *sql.Tx) error {
-		return pipeline.RequestIngestTx(ctx, tx, commitID, receiptID, uuid.New())
+		return pipeline.RequestIngestTx(ctx, tx, commitID, receiptID)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -51,20 +51,14 @@ func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *
 
 	queueDatabase := openRecoveryQueue(t, ctx, configuration)
 	client := newRecoveryQueueClient(t, queueDatabase)
-	dispatcher, err := domainoutbox.NewDispatcher(
-		catalog.Reader,
-		catalog.Writer,
-		queue.NewDomainAdapter(client),
-		8,
-		time.Millisecond,
-	)
+	scheduler, err := queue.NewScheduler(catalog.Reader, catalog.Writer, client, make(chan struct{}), 8, time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if delivered, err := dispatcher.DeliverOnce(ctx); err != nil || delivered != 1 {
-		t.Fatalf("initial QueueDB delivery = %d, %v", delivered, err)
+	if scheduled, err := scheduler.ScheduleOnce(ctx); err != nil || scheduled != 1 {
+		t.Fatalf("initial QueueDB scheduling = %d, %v", scheduled, err)
 	}
-	assertMacroJobs(t, queueDatabase.ReaderSQL, 1, "ingest_asset")
+	assertMacroJobs(t, queueDatabase.ReaderSQL, 1, "ingest_asset", 1)
 	if err := queueDatabase.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -80,51 +74,32 @@ func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *
 	replacement := openRecoveryQueue(t, ctx, configuration)
 	t.Cleanup(func() { _ = replacement.Close(context.Background()) })
 	replacementClient := newRecoveryQueueClient(t, replacement)
-	replacementDispatcher, err := domainoutbox.NewDispatcher(
-		catalog.Reader,
-		catalog.Writer,
-		queue.NewDomainAdapter(replacementClient),
-		8,
-		time.Millisecond,
-	)
+	replacementScheduler, err := queue.NewScheduler(catalog.Reader, catalog.Writer, replacementClient, make(chan struct{}), 8, time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if inserted, err := domainoutbox.NewReconciler(catalog.Writer, time.Second).ReconcileOnce(ctx); err != nil || inserted != 1 {
-		t.Fatalf("catalog recovery reconciliation = %d, %v", inserted, err)
+	if scheduled, err := replacementScheduler.ScheduleOnce(ctx); err != nil || scheduled != 1 {
+		t.Fatalf("catalog recovery scheduling = %d, %v", scheduled, err)
 	}
-	if delivered, err := replacementDispatcher.DeliverOnce(ctx); err != nil || delivered != 1 {
-		t.Fatalf("replacement QueueDB delivery = %d, %v", delivered, err)
-	}
-	assertMacroJobs(t, replacement.ReaderSQL, 1, "ingest_asset")
+	assertMacroJobs(t, replacement.ReaderSQL, 1, "ingest_asset", 1)
 	assertReceiptState(t, catalog.ReaderSQL, receiptID, "pending", 0)
 
-	handlers := commit.CatalogHandlersWithAllServices(nil, nil, nil)
 	coordinator, err := commit.New(
 		catalog.Writer,
 		commit.Config{Capacity: 4, MaxBatch: 1, OldestWait: time.Millisecond},
-		handlers,
+		commit.CatalogDependencies{},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	coordinator.Start()
 	t.Cleanup(func() { _ = coordinator.Stop(context.Background()) })
-	if result, err := coordinator.Submit(ctx, commit.Intent{
-		Key: commit.Key{
-			Family: commit.FamilyIngestReceipt, Subject: receiptID.String(),
-			Fence: commitID.String(), Stage: "ingest", DesiredVersion: 1,
-		},
-		Payload: commit.IngestReceiptApplied{ReceiptID: receiptID},
-	}); err != nil || result.Outcome != commit.OutcomeApplied {
+	if result, err := coordinator.ApplyIngestReceipt(ctx, commit.IngestReceiptApplied{ReceiptID: receiptID}, commitID); err != nil || result.Outcome != commit.OutcomeApplied {
 		t.Fatalf("redelivered macro acknowledgement = %+v, %v", result, err)
 	}
 	assertReceiptState(t, catalog.ReaderSQL, receiptID, "completed", 1)
-	if inserted, err := domainoutbox.NewReconciler(catalog.Writer, time.Second).ReconcileOnce(ctx); err != nil || inserted != 0 {
-		t.Fatalf("completed receipt reconciliation = %d, %v", inserted, err)
-	}
-	if delivered, err := replacementDispatcher.DeliverOnce(ctx); err != nil || delivered != 0 {
-		t.Fatalf("completed receipt redelivery = %d, %v", delivered, err)
+	if scheduled, err := replacementScheduler.ScheduleOnce(ctx); err != nil || scheduled != 0 {
+		t.Fatalf("completed receipt scheduling = %d, %v", scheduled, err)
 	}
 }
 
@@ -150,7 +125,6 @@ func newRecoveryQueueClient(t *testing.T, queueDatabase *db.QueueDB) *river.Clie
 		queueDatabase.ReaderSQL,
 		workers,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
-		queue.NewMacroErrorHandler(),
 		8,
 	)
 	if err != nil {
@@ -171,14 +145,16 @@ func assertReceiptState(t *testing.T, reader *sql.DB, receiptID uuid.UUID, state
 	}
 }
 
-func assertMacroJobs(t *testing.T, reader *sql.DB, count int, kind string) {
+func assertMacroJobs(t *testing.T, reader *sql.DB, count int, kind string, priority int) {
 	t.Helper()
 	var gotCount int
 	var gotKind string
-	if err := reader.QueryRow(`SELECT count(*),coalesce(max(kind),'') FROM river_job`).Scan(&gotCount, &gotKind); err != nil {
+	var gotPriority, gotAttempts int
+	var gotQueue string
+	if err := reader.QueryRow(`SELECT count(*),coalesce(max(kind),''),coalesce(max(priority),0),coalesce(max(max_attempts),0),coalesce(max(queue),'') FROM river_job`).Scan(&gotCount, &gotKind, &gotPriority, &gotAttempts, &gotQueue); err != nil {
 		t.Fatal(err)
 	}
-	if gotCount != count || gotKind != kind {
-		t.Fatalf("QueueDB jobs = %d/%q, want %d/%q", gotCount, gotKind, count, kind)
+	if gotCount != count || gotKind != kind || gotPriority != priority || gotAttempts != 8 || gotQueue != jobs.QueueMacro {
+		t.Fatalf("QueueDB jobs = %d/%q priority=%d attempts=%d queue=%q, want %d/%q priority=%d attempts=8 queue=%q", gotCount, gotKind, gotPriority, gotAttempts, gotQueue, count, kind, priority, jobs.QueueMacro)
 	}
 }

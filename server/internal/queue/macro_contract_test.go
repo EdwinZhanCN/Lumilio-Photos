@@ -2,37 +2,44 @@ package queue
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
-	"server/internal/commit"
 	"server/internal/queue/jobs"
+	"server/internal/workqos"
 )
 
 func TestProjectionMacroCannotCompleteWithoutNoopOrCommitAcknowledgement(t *testing.T) {
 	args := jobs.RebuildProjectionBatchArgs{
 		ProjectionKind: "event", Scope: "1", SourceRevision: 1, ProjectionVersion: 1,
 	}
-	job := &river.Job[jobs.RebuildProjectionBatchArgs]{Args: args}
-	worker := &RebuildProjectionBatchWorker{Execute: func(context.Context, jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error) {
+	priority, err := workqos.Background.Priority()
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := &river.Job[jobs.RebuildProjectionBatchArgs]{JobRow: &rivertype.JobRow{Priority: priority}, Args: args}
+	var observedQoS workqos.Class
+	worker := &RebuildProjectionBatchWorker{Execute: func(_ context.Context, qos workqos.Class, _ jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error) {
+		observedQoS = qos
 		return ProjectionExecution{}, nil
 	}}
 	if err := worker.Work(context.Background(), job); !errors.Is(err, ErrMacroStageUnavailable) {
 		t.Fatalf("unacknowledged projection error = %v", err)
 	}
-	worker.Execute = func(context.Context, jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error) {
+	if observedQoS != workqos.Background {
+		t.Fatalf("worker QoS = %s, want background", observedQoS)
+	}
+	worker.Execute = func(context.Context, workqos.Class, jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error) {
 		return ProjectionExecution{Acknowledged: true}, nil
 	}
 	if err := worker.Work(context.Background(), job); err != nil {
 		t.Fatalf("acknowledged projection: %v", err)
 	}
-	worker.Execute = func(context.Context, jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error) {
+	worker.Execute = func(context.Context, workqos.Class, jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error) {
 		return ProjectionExecution{Noop: true}, nil
 	}
 	if err := worker.Work(context.Background(), job); err != nil {
@@ -40,9 +47,10 @@ func TestProjectionMacroCannotCompleteWithoutNoopOrCommitAcknowledgement(t *test
 	}
 }
 
-// Macro work has materially different runtime envelopes. Leaving any of these
+// Macro work has materially different runtime shapes. Leaving any of these
 // on River's one-minute client default turns normal media work into a retry
-// loop, and eventually into a discarded job with no product terminal state.
+// loop. River's retry/discard state is delivery-only; Catalog remains the
+// source of whether the work is still runnable.
 func TestMacroWorkersDeclareExplicitTimeouts(t *testing.T) {
 	tests := []struct {
 		name string
@@ -67,51 +75,16 @@ func TestMacroWorkersDeclareExplicitTimeouts(t *testing.T) {
 	}
 }
 
-func TestFinalMacroAttemptMapsToTypedTerminalCommit(t *testing.T) {
-	assetID, fence, receiptID := uuid.New(), uuid.New(), uuid.New()
-	tests := []struct {
-		name    string
-		kind    string
-		args    any
-		family  string
-		stage   string
-		subject string
-	}{
-		{"asset", "generate_asset_derivatives", jobs.GenerateAssetDerivativesArgs{AssetID: assetID, SourceFence: fence, DesiredVersion: 3, PipelineVersion: "asset-v1"}, commit.FamilyAssetStage, "derivatives", assetID.String()},
-		{"ingest", "ingest_asset", jobs.IngestAssetArgs{CommitID: fence, ReceiptID: receiptID}, commit.FamilyIngestReceipt, "ingest", receiptID.String()},
-		{"backup", "backup_catalog", jobs.BackupCatalogArgs{RequestID: receiptID}, commit.FamilyOperationReceipt, "backup", receiptID.String()},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			encoded, err := json.Marshal(test.args)
-			if err != nil {
-				t.Fatal(err)
-			}
-			intent, ok := macroTerminalIntent(&rivertype.JobRow{Kind: test.kind, Attempt: 8, MaxAttempts: 8, EncodedArgs: encoded}, "attempts_exhausted")
-			if !ok {
-				t.Fatal("final macro attempt did not produce a terminal catalog intent")
-			}
-			if intent.Key.Family != test.family || intent.Key.Subject != test.subject || intent.Key.Stage != test.stage {
-				t.Fatalf("terminal intent key = %+v", intent.Key)
-			}
-		})
-	}
-}
-
-func TestMacroJobAttemptsAreFiniteAndDiscardedJobsRemainUnique(t *testing.T) {
+func TestMacroJobAttemptsAreFiniteAndDiscardedJobsCanBeRecreated(t *testing.T) {
 	for _, job := range jobs.RuntimeJobCatalog() {
 		opts := job.InsertOpts()
 		if opts.MaxAttempts < 1 {
 			t.Fatalf("%s MaxAttempts = %d", job.Kind(), opts.MaxAttempts)
 		}
-		foundDiscarded := false
 		for _, state := range opts.UniqueOpts.ByState {
 			if state == "discarded" {
-				foundDiscarded = true
+				t.Fatalf("%s retains uniqueness after discard", job.Kind())
 			}
-		}
-		if !foundDiscarded {
-			t.Fatalf("%s does not retain uniqueness after terminal failure", job.Kind())
 		}
 	}
 }

@@ -76,7 +76,7 @@ INSERT INTO event_dirty_ranges(
 ) VALUES(?,?,?,?,?,?)`, uuid.NewString(), ownerID, now, now, reason, now); err != nil {
 		return fmt.Errorf("record Event invalidation: %w", err)
 	}
-	if err := pipeline.RequestEventProjectionTx(ctx, tx, ownerID, sourceRevision, false, uuid.New()); err != nil {
+	if err := pipeline.RequestEventProjectionTx(ctx, tx, ownerID, sourceRevision, false); err != nil {
 		return fmt.Errorf("request Event projection: %w", err)
 	}
 	return nil
@@ -140,7 +140,7 @@ INSERT INTO event_dirty_ranges(dirty_range_id,owner_id,range_start,range_end,rea
 				return nil, err
 			}
 			queued = append(queued, ownerID)
-			if err := pipeline.RequestEventProjectionTx(ctx, tx.Raw(), ownerID, 1, false, uuid.New()); err != nil {
+			if err := pipeline.RequestEventProjectionTx(ctx, tx.Raw(), ownerID, 1, false); err != nil {
 				tx.Rollback()
 				return nil, err
 			}

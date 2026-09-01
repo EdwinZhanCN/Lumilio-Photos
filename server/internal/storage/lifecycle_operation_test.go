@@ -475,14 +475,6 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 		t, catalog, created.Repository.RepoID, assetID, contentID, owner.UserID,
 		"kept.jpg", int64(len("original-media")), true,
 	)
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO domain_outbox (
-			outbox_id, envelope_version, command_kind, subject_key,
-			desired_version, envelope, available_at, created_at, updated_at
-		) VALUES (?, 1, 'repository.scan', ?, 1, '{}', 0, 0, 0)
-	`, uuid.NewString(), created.Repository.RepoID.String()); err != nil {
-		t.Fatal(err)
-	}
 	credentialID := uuid.New()
 	if _, err := catalog.SQL.ExecContext(ctx, `
 		INSERT INTO cloud_credentials (
@@ -510,8 +502,8 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if impact.CloudImportCount != 1 {
 		t.Fatalf("cloud import receipt impact = %d, want 1", impact.CloudImportCount)
 	}
-	if impact.ActiveTaskCount != 1 {
-		t.Fatalf("catalog work impact = %d, want 1", impact.ActiveTaskCount)
+	if impact.ActiveTaskCount != 0 {
+		t.Fatalf("catalog work impact = %d, want 0", impact.ActiveTaskCount)
 	}
 	if !impact.PrivateStateFound || impact.PrivateStateBytes < int64(len("private-state")) {
 		t.Fatalf("private-state impact = %+v", impact)
@@ -530,15 +522,6 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	}
 	if assets != 0 {
 		t.Fatalf("remaining catalog assets = %d, want 0", assets)
-	}
-	var remainingDomainCommands int
-	if err := catalog.SQL.QueryRowContext(ctx, `
-		SELECT count(*) FROM domain_outbox WHERE subject_key = ?
-	`, created.Repository.RepoID.String()).Scan(&remainingDomainCommands); err != nil {
-		t.Fatal(err)
-	}
-	if remainingDomainCommands != 0 {
-		t.Fatalf("remaining repository domain commands = %d, want 0", remainingDomainCommands)
 	}
 	var removalAudit int
 	if err := catalog.SQL.QueryRowContext(ctx, `
@@ -667,20 +650,12 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 	`, uuid.New(), owner.UserID, assetIDs); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO domain_outbox (
-			outbox_id, envelope_version, command_kind, subject_key,
-			desired_version, envelope, available_at, created_at, updated_at
-		) VALUES (?, 1, 'repository.scan', ?, 1, '{}', 0, 0, 0)
-	`, uuid.NewString(), target.RepoID.String()); err != nil {
-		t.Fatal(err)
-	}
 
 	impact, err := manager.PreviewRepositoryRemoval(ctx, target.RepoID.String())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if impact.AssetCount != 1 || impact.CatalogMediaBytes != 12 || impact.AlbumCount != 1 || impact.ActiveTaskCount != 1 {
+	if impact.AssetCount != 1 || impact.CatalogMediaBytes != 12 || impact.AlbumCount != 1 || impact.ActiveTaskCount != 0 {
 		t.Fatalf("shared-location removal impact = %+v", impact)
 	}
 	if err := manager.RemoveRepository(ctx, target.RepoID.String()); err != nil {
@@ -695,9 +670,6 @@ func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
 	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM album_assets WHERE asset_id = ?`, 1, assetID)
 	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM share_links WHERE asset_ids = ?`, 1, assetIDs)
 	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM agent_pins WHERE asset_ids = ?`, 1, assetIDs)
-	assertStorageCount(t, catalog.SQL, `
-		SELECT count(*) FROM domain_outbox WHERE subject_key = ?
-	`, 0, target.RepoID.String())
 	assertStorageCount(t, catalog.SQL, `
 		SELECT count(*) FROM media_items
 		WHERE media_item_id = ? AND repository_id = ?

@@ -17,7 +17,6 @@ func macroOpts() river.InsertOpts {
 type IngestAssetArgs struct {
 	CommitID  uuid.UUID `json:"commitId" river:"unique"`
 	ReceiptID uuid.UUID `json:"receiptId" river:"unique"`
-	Admission string    `json:"admissionClass" river:"unique"`
 }
 
 func (IngestAssetArgs) Kind() string                 { return "ingest_asset" }
@@ -28,7 +27,6 @@ type AnalyzeAssetArgs struct {
 	SourceFence     uuid.UUID `json:"sourceFence" river:"unique"`
 	DesiredVersion  uint64    `json:"desiredVersion" river:"unique"`
 	PipelineVersion string    `json:"pipelineVersion" river:"unique"`
-	Admission       string    `json:"admissionClass" river:"unique"`
 }
 
 func (AnalyzeAssetArgs) Kind() string                 { return "analyze_asset" }
@@ -39,7 +37,6 @@ type GenerateAssetDerivativesArgs struct {
 	SourceFence     uuid.UUID `json:"sourceFence" river:"unique"`
 	DesiredVersion  uint64    `json:"desiredVersion" river:"unique"`
 	PipelineVersion string    `json:"pipelineVersion" river:"unique"`
-	Admission       string    `json:"admissionClass" river:"unique"`
 }
 
 func (GenerateAssetDerivativesArgs) Kind() string                 { return "generate_asset_derivatives" }
@@ -50,7 +47,6 @@ type TranscodeMediaArgs struct {
 	SourceFence     uuid.UUID `json:"sourceFence" river:"unique"`
 	DesiredVersion  uint64    `json:"desiredVersion" river:"unique"`
 	PipelineVersion string    `json:"pipelineVersion" river:"unique"`
-	Admission       string    `json:"admissionClass" river:"unique"`
 }
 
 func (TranscodeMediaArgs) Kind() string                 { return "transcode_media" }
@@ -61,7 +57,6 @@ type EnrichAssetArgs struct {
 	SourceFence     uuid.UUID `json:"sourceFence" river:"unique"`
 	DesiredVersion  uint64    `json:"desiredVersion" river:"unique"`
 	PipelineVersion string    `json:"pipelineVersion" river:"unique"`
-	Admission       string    `json:"admissionClass" river:"unique"`
 }
 
 func (EnrichAssetArgs) Kind() string                 { return "enrich_asset" }
@@ -72,7 +67,6 @@ type ScanRepositoryBatchArgs struct {
 	RequestedEpoch uint64    `json:"requestedEpoch" river:"unique"`
 	DesiredVersion uint64    `json:"desiredVersion" river:"unique"`
 	Frontier       string    `json:"frontier,omitempty" river:"unique"`
-	Admission      string    `json:"admissionClass" river:"unique"`
 }
 
 func (ScanRepositoryBatchArgs) Kind() string                 { return "scan_repository_batch" }
@@ -84,7 +78,6 @@ type RebuildProjectionBatchArgs struct {
 	SourceRevision    uint64 `json:"sourceRevision" river:"unique"`
 	ProjectionVersion uint64 `json:"projectionVersion" river:"unique"`
 	Cursor            string `json:"cursor,omitempty" river:"unique"`
-	Admission         string `json:"admissionClass" river:"unique"`
 }
 
 func (RebuildProjectionBatchArgs) Kind() string                 { return "rebuild_projection_batch" }
@@ -93,7 +86,6 @@ func (RebuildProjectionBatchArgs) InsertOpts() river.InsertOpts { return macroOp
 type BackupCatalogArgs struct {
 	RequestID uuid.UUID `json:"requestId" river:"unique"`
 	Force     bool      `json:"force"`
-	Admission string    `json:"admissionClass" river:"unique"`
 }
 
 func (BackupCatalogArgs) Kind() string                 { return "backup_catalog" }

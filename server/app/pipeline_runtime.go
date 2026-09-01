@@ -30,6 +30,7 @@ import (
 	"server/internal/storage"
 	roecontroller "server/internal/storage/roe/controller"
 	"server/internal/storage/roe/materializer"
+	"server/internal/workqos"
 )
 
 type repositoryScanReader interface {
@@ -51,6 +52,7 @@ func runRepositoryScanBatch(
 	engine *execution.Engine,
 	demand execution.DemandCatalog,
 	commits *commit.Coordinator,
+	qos workqos.Class,
 	args jobs.ScanRepositoryBatchArgs,
 ) (bool, error) {
 	if controller == nil || hasher == nil || reader == nil || engine == nil || commits == nil {
@@ -80,7 +82,7 @@ func runRepositoryScanBatch(
 		return false, nil
 	}
 	var turn roecontroller.TurnResult
-	class, err := execution.ClassFromAdmission(args.Admission)
+	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return false, err
 	}
@@ -106,10 +108,7 @@ func runRepositoryScanBatch(
 			if prepareErr != nil || prepared == nil {
 				return prepareErr
 			}
-			_, submitErr := commits.Submit(stepCtx, commit.Intent{
-				Key:     commit.Key{Family: commit.FamilyRepositoryHash, Subject: prepared.Node.NodeID.String(), Fence: prepared.Observation.ObservationToken, Stage: "hash", DesiredVersion: args.DesiredVersion},
-				Payload: commit.RepositoryHashApplied{Prepared: *prepared},
-			})
+			_, submitErr := commits.ApplyRepositoryHash(stepCtx, commit.RepositoryHashApplied{Prepared: *prepared})
 			return submitErr
 		})
 		if err != nil {
@@ -119,13 +118,7 @@ func runRepositoryScanBatch(
 	more = more || len(candidates) == 32
 	if !more {
 		err = engine.Run(ctx, class, demand.Demand(execution.StepScanRepositoryEpoch, execution.MediaUnknown), func(stepCtx context.Context) error {
-			_, submitErr := commits.Submit(stepCtx, commit.Intent{
-				Key: commit.Key{
-					Family: commit.FamilyRepositoryEpoch, Subject: args.RepositoryID.String(),
-					Fence: strconv.FormatUint(args.RequestedEpoch, 10), Stage: "repository_scan", DesiredVersion: args.DesiredVersion,
-				},
-				Payload: commit.RepositoryEpochApplied{RepositoryID: args.RepositoryID, RequestedEpoch: args.RequestedEpoch},
-			})
+			_, submitErr := commits.ApplyRepositoryEpoch(stepCtx, commit.RepositoryEpochApplied{RepositoryID: args.RepositoryID, RequestedEpoch: args.RequestedEpoch})
 			return submitErr
 		})
 		if err != nil {
@@ -157,6 +150,7 @@ func runAssetEnrichment(
 	repositoryFiles *storage.RepositoryFSFactory,
 	engine *execution.Engine,
 	demand execution.DemandCatalog,
+	qos workqos.Class,
 	args jobs.EnrichAssetArgs,
 ) (queue.EnrichmentResult, error) {
 	if reader == nil || repositoryFiles == nil || engine == nil {
@@ -168,7 +162,7 @@ func runAssetEnrichment(
 		Classifier:  classifierService,
 		ImageLoader: imageLoader, Files: repositoryFiles,
 		ExecuteStep: func(stepCtx context.Context, step queue.EnrichmentStep, work func(context.Context) error) error {
-			class, err := execution.ClassFromAdmission(args.Admission)
+			class, err := execution.ClassFromQoS(qos)
 			if err != nil {
 				return err
 			}
@@ -255,8 +249,8 @@ func (runtime *pipelineRuntime) registerBackup(workers *river.Workers, execute f
 	if runtime == nil || workers == nil || runtime.engine == nil || runtime.commits == nil || execute == nil {
 		return errors.New("backup pipeline runtime is not configured")
 	}
-	river.AddWorker[jobs.BackupCatalogArgs](workers, &queue.BackupCatalogWorker{Execute: func(ctx context.Context, args jobs.BackupCatalogArgs) error {
-		class, err := execution.ClassFromAdmission(args.Admission)
+	river.AddWorker[jobs.BackupCatalogArgs](workers, &queue.BackupCatalogWorker{Execute: func(ctx context.Context, qos workqos.Class, args jobs.BackupCatalogArgs) error {
+		class, err := execution.ClassFromQoS(qos)
 		if err != nil {
 			return err
 		}
@@ -264,21 +258,15 @@ func (runtime *pipelineRuntime) registerBackup(workers *river.Workers, execute f
 			if err := execute(stepCtx, args.Force); err != nil {
 				return err
 			}
-			_, err := runtime.commits.Submit(stepCtx, commit.Intent{
-				Key: commit.Key{
-					Family: commit.FamilyOperationReceipt, Subject: args.RequestID.String(),
-					Fence: args.RequestID.String(), Stage: "backup", DesiredVersion: 1,
-				},
-				Payload: commit.OperationReceiptApplied{ReceiptID: args.RequestID, Kind: "backup"},
-			})
+			_, err := runtime.commits.ApplyOperationReceipt(stepCtx, commit.OperationReceiptApplied{ReceiptID: args.RequestID, Kind: "backup"})
 			return err
 		})
 	}})
 	return nil
 }
 
-func (runtime *pipelineRuntime) ingest(ctx context.Context, args jobs.IngestAssetArgs) error {
-	class, err := execution.ClassFromAdmission(args.Admission)
+func (runtime *pipelineRuntime) ingest(ctx context.Context, qos workqos.Class, args jobs.IngestAssetArgs) error {
+	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
 	}
@@ -286,19 +274,13 @@ func (runtime *pipelineRuntime) ingest(ctx context.Context, args jobs.IngestAsse
 		if _, err := runtime.processor.IngestAsset(stepCtx, args); err != nil {
 			return err
 		}
-		_, err := runtime.commits.Submit(stepCtx, commit.Intent{
-			Key: commit.Key{
-				Family: commit.FamilyIngestReceipt, Subject: args.ReceiptID.String(),
-				Fence: args.CommitID.String(), Stage: "ingest", DesiredVersion: 1,
-			},
-			Payload: commit.IngestReceiptApplied{ReceiptID: args.ReceiptID},
-		})
+		_, err := runtime.commits.ApplyIngestReceipt(stepCtx, commit.IngestReceiptApplied{ReceiptID: args.ReceiptID}, args.CommitID)
 		return err
 	})
 }
 
-func (runtime *pipelineRuntime) analyze(ctx context.Context, args jobs.AnalyzeAssetArgs) error {
-	class, err := execution.ClassFromAdmission(args.Admission)
+func (runtime *pipelineRuntime) analyze(ctx context.Context, qos workqos.Class, args jobs.AnalyzeAssetArgs) error {
+	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
 	}
@@ -308,31 +290,19 @@ func (runtime *pipelineRuntime) analyze(ctx context.Context, args jobs.AnalyzeAs
 			return err
 		}
 		if result.AssetID != uuid.Nil {
-			metadataOutcome, err := runtime.commits.Submit(stepCtx, commit.Intent{
-				Key: commit.Key{
-					Family: commit.FamilyAssetMetadata, Subject: result.AssetID.String(),
-					Fence: result.SourceContentID.String(), Stage: "metadata", DesiredVersion: args.DesiredVersion,
-				},
-				Payload: commit.AssetMetadataApplied{
-					AssetID: result.AssetID, SourceFence: result.SourceContentID,
-					PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
-					Metadata: result.Metadata, Common: result.Common, ExifRaw: result.ExifRaw,
-					ComponentRelation: result.ComponentRelation,
-				},
+			metadataOutcome, err := runtime.commits.ApplyAssetMetadata(stepCtx, commit.AssetMetadataApplied{
+				AssetID: result.AssetID, SourceFence: result.SourceContentID,
+				PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
+				Metadata: result.Metadata, Common: result.Common, ExifRaw: result.ExifRaw,
+				ComponentRelation: result.ComponentRelation,
 			})
 			if err != nil {
 				return err
 			}
 			if metadataOutcome.Outcome != commit.OutcomeStale {
-				if _, err := runtime.commits.Submit(stepCtx, commit.Intent{
-					Key: commit.Key{
-						Family: commit.FamilyAssetStack, Subject: result.AssetID.String(),
-						Fence: result.SourceContentID.String(), Stage: "stack", DesiredVersion: args.DesiredVersion,
-					},
-					Payload: commit.AssetStackApplied{
-						AssetID: result.AssetID, SourceFence: result.SourceContentID,
-						PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
-					},
+				if _, err := runtime.commits.ApplyAssetStack(stepCtx, commit.AssetStackApplied{
+					AssetID: result.AssetID, SourceFence: result.SourceContentID,
+					PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
 				}); err != nil {
 					return err
 				}
@@ -342,8 +312,8 @@ func (runtime *pipelineRuntime) analyze(ctx context.Context, args jobs.AnalyzeAs
 	})
 }
 
-func (runtime *pipelineRuntime) derivatives(ctx context.Context, args jobs.GenerateAssetDerivativesArgs) error {
-	class, err := execution.ClassFromAdmission(args.Admission)
+func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Class, args jobs.GenerateAssetDerivativesArgs) error {
+	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
 	}
@@ -398,15 +368,9 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, args jobs.Gener
 					StoragePath: artifact.StoragePath, MimeType: artifact.MimeType,
 				})
 			}
-			if _, err := runtime.commits.Submit(stepCtx, commit.Intent{
-				Key: commit.Key{
-					Family: commit.FamilyAssetDerivatives, Subject: result.AssetID.String(),
-					Fence: result.SourceContentID.String(), Stage: "derivatives", DesiredVersion: args.DesiredVersion,
-				},
-				Payload: commit.AssetDerivativesApplied{
-					AssetID: result.AssetID, SourceFence: result.SourceContentID,
-					PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion, Artifacts: artifacts,
-				},
+			if _, err := runtime.commits.ApplyAssetDerivatives(stepCtx, commit.AssetDerivativesApplied{
+				AssetID: result.AssetID, SourceFence: result.SourceContentID,
+				PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion, Artifacts: artifacts,
 			}); err != nil {
 				return err
 			}
@@ -415,8 +379,8 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, args jobs.Gener
 	})
 }
 
-func (runtime *pipelineRuntime) transcode(ctx context.Context, args jobs.TranscodeMediaArgs) error {
-	class, err := execution.ClassFromAdmission(args.Admission)
+func (runtime *pipelineRuntime) transcode(ctx context.Context, qos workqos.Class, args jobs.TranscodeMediaArgs) error {
+	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
 	}
@@ -458,7 +422,7 @@ func (runtime *pipelineRuntime) transcode(ctx context.Context, args jobs.Transco
 	})
 }
 
-func (runtime *pipelineRuntime) enrich(ctx context.Context, args jobs.EnrichAssetArgs) error {
+func (runtime *pipelineRuntime) enrich(ctx context.Context, qos workqos.Class, args jobs.EnrichAssetArgs) error {
 	result, err := runAssetEnrichment(
 		ctx,
 		runtime.processor,
@@ -469,28 +433,23 @@ func (runtime *pipelineRuntime) enrich(ctx context.Context, args jobs.EnrichAsse
 		runtime.files,
 		runtime.engine,
 		runtime.demand,
+		qos,
 		args,
 	)
 	if err != nil {
 		return err
 	}
-	class, err := execution.ClassFromAdmission(args.Admission)
+	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return err
 	}
 	return runtime.engine.Run(ctx, class, runtime.demand.Demand(execution.StepEnrichPublish, execution.MediaUnknown), func(stepCtx context.Context) error {
 		if result.PHash != nil || result.Semantic != nil || result.Aesthetic != nil || result.Species != nil || result.OCR != nil || result.Face != nil || result.AITags != nil {
-			if _, err := runtime.commits.Submit(stepCtx, commit.Intent{
-				Key: commit.Key{
-					Family: commit.FamilyEnrichment, Subject: args.AssetID.String(),
-					Fence: args.SourceFence.String(), Stage: "enrich", DesiredVersion: args.DesiredVersion,
-				},
-				Payload: commit.EnrichmentApplied{
-					AssetID: args.AssetID, SourceFence: args.SourceFence,
-					PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
-					PHash: result.PHash, Semantic: result.Semantic, Aesthetic: result.Aesthetic,
-					Species: result.Species, OCR: result.OCR, Face: result.Face, AITags: result.AITags,
-				},
+			if _, err := runtime.commits.ApplyEnrichment(stepCtx, commit.EnrichmentApplied{
+				AssetID: args.AssetID, SourceFence: args.SourceFence,
+				PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
+				PHash: result.PHash, Semantic: result.Semantic, Aesthetic: result.Aesthetic,
+				Species: result.Species, OCR: result.OCR, Face: result.Face, AITags: result.AITags,
 			}); err != nil {
 				return err
 			}
@@ -500,16 +459,10 @@ func (runtime *pipelineRuntime) enrich(ctx context.Context, args jobs.EnrichAsse
 			for _, frame := range result.VideoFrames.Frames {
 				frames = append(frames, commit.VideoFrameEmbedding{FrameTsMs: frame.FrameTsMs, Vector: frame.Vector})
 			}
-			if _, err := runtime.commits.Submit(stepCtx, commit.Intent{
-				Key: commit.Key{
-					Family: commit.FamilyVideoFrameEmbeddings, Subject: result.VideoFrames.AssetID.String(),
-					Fence: result.VideoFrames.SourceContentID.String(), Stage: "enrich", DesiredVersion: args.DesiredVersion,
-				},
-				Payload: commit.VideoFrameEmbeddingsApplied{
-					AssetID: result.VideoFrames.AssetID, SourceFence: result.VideoFrames.SourceContentID,
-					PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
-					ModelID: result.VideoFrames.ModelID, Frames: frames,
-				},
+			if _, err := runtime.commits.ApplyVideoFrameEmbeddings(stepCtx, commit.VideoFrameEmbeddingsApplied{
+				AssetID: result.VideoFrames.AssetID, SourceFence: result.VideoFrames.SourceContentID,
+				PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion,
+				ModelID: result.VideoFrames.ModelID, Frames: frames,
 			}); err != nil {
 				return err
 			}
@@ -518,7 +471,7 @@ func (runtime *pipelineRuntime) enrich(ctx context.Context, args jobs.EnrichAsse
 	})
 }
 
-func (runtime *pipelineRuntime) scanRepository(ctx context.Context, args jobs.ScanRepositoryBatchArgs) (bool, error) {
+func (runtime *pipelineRuntime) scanRepository(ctx context.Context, qos workqos.Class, args jobs.ScanRepositoryBatchArgs) (bool, error) {
 	return runRepositoryScanBatch(
 		ctx,
 		runtime.repository,
@@ -527,18 +480,19 @@ func (runtime *pipelineRuntime) scanRepository(ctx context.Context, args jobs.Sc
 		runtime.engine,
 		runtime.demand,
 		runtime.commits,
+		qos,
 		args,
 	)
 }
 
-func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, args jobs.RebuildProjectionBatchArgs) (queue.ProjectionExecution, error) {
+func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, qos workqos.Class, args jobs.RebuildProjectionBatchArgs) (queue.ProjectionExecution, error) {
 	var result queue.ProjectionExecution
-	class, err := execution.ClassFromAdmission(args.Admission)
+	class, err := execution.ClassFromQoS(qos)
 	if err != nil {
 		return result, err
 	}
 	err = runtime.engine.Run(ctx, class, runtime.demand.DemandForProjection(args.ProjectionKind), func(stepCtx context.Context) error {
-		intent, more, snooze, noop, err := runtime.prepareProjection(stepCtx, args)
+		apply, more, snooze, noop, err := runtime.prepareProjection(stepCtx, args)
 		if err != nil {
 			return err
 		}
@@ -546,10 +500,10 @@ func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, args jobs
 		if noop {
 			return nil
 		}
-		if intent == nil {
-			return errors.New("projection step returned no commit intent")
+		if apply == nil {
+			return errors.New("projection step returned no typed commit")
 		}
-		_, err = runtime.commits.Submit(stepCtx, *intent)
+		_, err = apply(stepCtx)
 		if err == nil {
 			result.Acknowledged = true
 		}
@@ -558,7 +512,7 @@ func (runtime *pipelineRuntime) rebuildProjection(ctx context.Context, args jobs
 	return result, err
 }
 
-func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs.RebuildProjectionBatchArgs) (*commit.Intent, bool, time.Duration, bool, error) {
+func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs.RebuildProjectionBatchArgs) (func(context.Context) (commit.Result, error), bool, time.Duration, bool, error) {
 	switch args.ProjectionKind {
 	case "event":
 		ownerID, err := strconv.ParseInt(args.Scope, 10, 32)
@@ -572,12 +526,8 @@ func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs
 		if err != nil {
 			return nil, false, 0, false, err
 		}
-		return &commit.Intent{
-			Key: commit.Key{
-				Family: commit.FamilyProjectionStage, Subject: args.Scope,
-				Fence: strconv.FormatUint(args.SourceRevision, 10), Stage: args.ProjectionKind, DesiredVersion: args.ProjectionVersion,
-			},
-			Payload: commit.EventProjectionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion},
+		return func(ctx context.Context) (commit.Result, error) {
+			return runtime.commits.ApplyEventProjection(ctx, commit.EventProjectionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion})
 		}, false, 0, false, nil
 	case "location":
 		parts := strings.SplitN(args.Scope, ":", 2)
@@ -599,12 +549,8 @@ func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs
 		if err != nil {
 			return nil, false, 0, false, err
 		}
-		return &commit.Intent{
-			Key: commit.Key{
-				Family: commit.FamilyProjectionStage, Subject: args.Scope,
-				Fence: strconv.FormatUint(args.SourceRevision, 10), Stage: args.ProjectionKind, DesiredVersion: args.ProjectionVersion,
-			},
-			Payload: commit.LocationProjectionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion},
+		return func(ctx context.Context) (commit.Result, error) {
+			return runtime.commits.ApplyLocationProjection(ctx, commit.LocationProjectionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion})
 		}, !prepared.Complete, 0, false, nil
 	case "location_resolution":
 		prepared, err := runtime.locationProjection.PrepareLocationResolution(ctx, int64(args.SourceRevision))
@@ -614,12 +560,8 @@ func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs
 		if err != nil {
 			return nil, false, 0, false, err
 		}
-		return &commit.Intent{
-			Key: commit.Key{
-				Family: commit.FamilyProjectionStage, Subject: args.Scope,
-				Fence: strconv.FormatUint(args.SourceRevision, 10), Stage: args.ProjectionKind, DesiredVersion: args.ProjectionVersion,
-			},
-			Payload: commit.LocationResolutionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion},
+		return func(ctx context.Context) (commit.Result, error) {
+			return runtime.commits.ApplyLocationResolution(ctx, commit.LocationResolutionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion})
 		}, !prepared.Complete, prepared.NextDelay, false, nil
 	case "ocr":
 		prepared, err := runtime.ocrProjection.PrepareBatch(ctx, bleveocr.DefaultOutboxBatchSize)
@@ -633,15 +575,11 @@ func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs
 		for _, entry := range prepared.Entries {
 			entries = append(entries, commit.OCRIndexEntry{AssetID: entry.AssetID, Revision: entry.Revision})
 		}
-		return &commit.Intent{
-			Key: commit.Key{
-				Family: commit.FamilyProjectionStage, Subject: args.Scope,
-				Fence: strconv.FormatUint(args.SourceRevision, 10), Stage: args.ProjectionKind, DesiredVersion: args.ProjectionVersion,
-			},
-			Payload: commit.OCRProjectionApplied{
+		return func(ctx context.Context) (commit.Result, error) {
+			return runtime.commits.ApplyOCRProjection(ctx, commit.OCRProjectionApplied{
 				Entries: entries, SourceRevision: args.SourceRevision,
 				ProjectionVersion: args.ProjectionVersion, Complete: !prepared.More,
-			},
+			})
 		}, prepared.More, 0, false, nil
 	case "asset_reindex":
 		receiptID, err := uuid.Parse(args.Scope)
@@ -658,12 +596,8 @@ func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs
 		if prepared.ReceiptID == uuid.Nil {
 			return nil, false, 0, true, nil
 		}
-		return &commit.Intent{
-			Key: commit.Key{
-				Family: commit.FamilyProjectionStage, Subject: args.Scope,
-				Fence: strconv.FormatUint(args.SourceRevision, 10), Stage: args.ProjectionKind, DesiredVersion: args.ProjectionVersion,
-			},
-			Payload: commit.ReindexProjectionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion},
+		return func(ctx context.Context) (commit.Result, error) {
+			return runtime.commits.ApplyReindexProjection(ctx, commit.ReindexProjectionApplied{Prepared: prepared, ProjectionVersion: args.ProjectionVersion})
 		}, prepared.HasMore, 0, false, nil
 	default:
 		return nil, false, 0, false, fmt.Errorf("unsupported projection kind %q", args.ProjectionKind)
@@ -671,15 +605,9 @@ func (runtime *pipelineRuntime) prepareProjection(ctx context.Context, args jobs
 }
 
 func (runtime *pipelineRuntime) submitAssetStage(ctx context.Context, assetID, sourceFence uuid.UUID, stage, pipelineVersion string, desiredVersion uint64) error {
-	_, err := runtime.commits.Submit(ctx, commit.Intent{
-		Key: commit.Key{
-			Family: commit.FamilyAssetStage, Subject: assetID.String(),
-			Fence: sourceFence.String(), Stage: stage, DesiredVersion: desiredVersion,
-		},
-		Payload: commit.AssetStageApplied{
-			AssetID: assetID, SourceFence: sourceFence, Stage: stage,
-			PipelineVersion: pipelineVersion, DesiredVersion: desiredVersion,
-		},
+	_, err := runtime.commits.ApplyAssetStage(ctx, commit.AssetStageApplied{
+		AssetID: assetID, SourceFence: sourceFence, Stage: stage,
+		PipelineVersion: pipelineVersion, DesiredVersion: desiredVersion,
 	})
 	return err
 }

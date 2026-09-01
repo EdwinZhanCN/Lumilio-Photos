@@ -299,7 +299,7 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 
 func assertSettingsProjectionRequestCount(t *testing.T, database *sql.DB, want int) {
 	t.Helper()
-	var got int
-	require.NoError(t, database.QueryRow(`SELECT count(*) FROM domain_outbox WHERE command_kind = 'projection.location' AND subject_key = 'all'`).Scan(&got))
-	require.Equal(t, want, got)
+	var got int64
+	require.NoError(t, database.QueryRow(`SELECT projection_version FROM location_resolution_pipeline_state WHERE scope = 'all'`).Scan(&got))
+	require.Equal(t, int64(want), got)
 }

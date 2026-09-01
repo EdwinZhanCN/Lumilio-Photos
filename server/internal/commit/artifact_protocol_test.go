@@ -23,7 +23,6 @@ func TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop(t *testing.T)
 		`CREATE TABLE assets(asset_id TEXT PRIMARY KEY,type TEXT,status TEXT,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
 		`CREATE TABLE thumbnails(thumbnail_id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,size TEXT,storage_path TEXT,mime_type TEXT,created_at INTEGER,repository_id TEXT,UNIQUE(asset_id,size))`,
-		`CREATE TABLE domain_outbox(outbox_id TEXT PRIMARY KEY,envelope_version INTEGER,command_kind TEXT,subject_key TEXT,desired_version INTEGER,envelope TEXT,available_at INTEGER,delivered_at INTEGER,delivery_attempts INTEGER DEFAULT 0,last_error TEXT,created_at INTEGER,updated_at INTEGER,UNIQUE(command_kind,subject_key,desired_version))`,
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
 	} {
@@ -51,36 +50,26 @@ func TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop(t *testing.T)
 		AssetID: assetID, SourceFence: sourceFence, PipelineVersion: "asset-v1", DesiredVersion: 1,
 		Artifacts: []ThumbnailArtifact{{RepositoryID: repositoryID, Size: "small", StoragePath: published.Path, MimeType: "image/webp"}},
 	}
-	derivativeIntent := Intent{
-		Key:     Key{Family: FamilyAssetDerivatives, Subject: assetID.String(), Fence: sourceFence.String(), Stage: "derivatives", DesiredVersion: 1},
-		Payload: payload,
-	}
-	stageIntent := Intent{
-		Key:     Key{Family: FamilyAssetStage, Subject: assetID.String(), Fence: sourceFence.String(), Stage: "derivatives", DesiredVersion: 1},
-		Payload: AssetStageApplied{AssetID: assetID, SourceFence: sourceFence, Stage: "derivatives", PipelineVersion: "asset-v1", DesiredVersion: 1},
-	}
-
 	injected := errors.New("injected catalog failure after artifact publication")
 	failBeforeCommit := true
-	derivatives := OutcomeHandler(func(ctx context.Context, tx *sql.Tx, intents []Intent) ([]Outcome, error) {
-		outcomes, applyErr := applyAssetDerivatives(ctx, tx, intents)
-		if applyErr == nil && failBeforeCommit {
-			failBeforeCommit = false
-			return nil, injected
-		}
-		return outcomes, applyErr
-	})
-	coordinator, err := New(writer, Config{Capacity: 2, MaxBatch: 1, OldestWait: time.Millisecond}, map[string]Handler{
-		FamilyAssetDerivatives: derivatives,
-		FamilyAssetStage:       OutcomeHandler(applyAssetStages),
-	})
+	derivativeOperation := func() Operation {
+		return Operation{Kind: OperationKindCatalogAssetDerivatives, Apply: func(ctx context.Context, tx *sql.Tx) (Result, error) {
+			result, applyErr := applyAssetDerivatives(ctx, tx, payload)
+			if applyErr == nil && failBeforeCommit {
+				failBeforeCommit = false
+				return Result{}, injected
+			}
+			return Result{Outcome: result}, applyErr
+		}}
+	}
+	coordinator, err := New(writer, Config{Capacity: 2, MaxBatch: 1, OldestWait: time.Millisecond}, CatalogDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	coordinator.Start()
 	defer coordinator.Stop(context.Background())
 
-	failedResult, err := coordinator.Submit(context.Background(), derivativeIntent)
+	failedResult, err := coordinator.SubmitOperation(context.Background(), derivativeOperation())
 	if !errors.Is(err, injected) || failedResult != (Result{}) {
 		t.Fatalf("failed commit result = %+v, error = %v", failedResult, err)
 	}
@@ -105,10 +94,10 @@ func TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop(t *testing.T)
 	if err != nil || republished != published {
 		t.Fatalf("immutable retry = %+v, error = %v, want %+v", republished, err, published)
 	}
-	if result, err := coordinator.Submit(context.Background(), derivativeIntent); err != nil || result.Outcome != OutcomeApplied {
+	if result, err := coordinator.SubmitOperation(context.Background(), derivativeOperation()); err != nil || result.Outcome != OutcomeApplied {
 		t.Fatalf("derivative retry result = %+v, error = %v", result, err)
 	}
-	if result, err := coordinator.Submit(context.Background(), stageIntent); err != nil || result.Outcome != OutcomeApplied {
+	if result, err := coordinator.ApplyAssetStage(context.Background(), AssetStageApplied{AssetID: assetID, SourceFence: sourceFence, Stage: "derivatives", PipelineVersion: "asset-v1", DesiredVersion: 1}); err != nil || result.Outcome != OutcomeApplied {
 		t.Fatalf("stage ACK result = %+v, error = %v", result, err)
 	}
 
@@ -118,10 +107,10 @@ func TestArtifactCatalogFailureWithholdsACKAndCommittedRetryIsNoop(t *testing.T)
 	if republished, err = store.Publish(context.Background(), identity, bytes.NewReader(recomputedBody)); err != nil || republished != published {
 		t.Fatalf("post-ACK artifact retry = %+v, error = %v", republished, err)
 	}
-	if result, err := coordinator.Submit(context.Background(), derivativeIntent); err != nil || result.Outcome != OutcomeDuplicate {
+	if result, err := coordinator.SubmitOperation(context.Background(), derivativeOperation()); err != nil || result.Outcome != OutcomeDuplicate {
 		t.Fatalf("post-ACK derivative result = %+v, error = %v", result, err)
 	}
-	if result, err := coordinator.Submit(context.Background(), stageIntent); err != nil || result.Outcome != OutcomeDuplicate {
+	if result, err := coordinator.ApplyAssetStage(context.Background(), AssetStageApplied{AssetID: assetID, SourceFence: sourceFence, Stage: "derivatives", PipelineVersion: "asset-v1", DesiredVersion: 1}); err != nil || result.Outcome != OutcomeDuplicate {
 		t.Fatalf("post-ACK stage result = %+v, error = %v", result, err)
 	}
 	var appliedVersion uint64

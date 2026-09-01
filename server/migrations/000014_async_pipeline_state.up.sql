@@ -8,6 +8,7 @@ CREATE TABLE asset_pipeline_state (
     desired_version INTEGER NOT NULL CHECK (desired_version > 0),
     applied_version INTEGER NOT NULL DEFAULT 0
         CHECK (applied_version >= 0 AND applied_version <= desired_version),
+    priority INTEGER NOT NULL CHECK (priority BETWEEN 1 AND 3),
     terminal_error TEXT,
     updated_at INTEGER NOT NULL,
     PRIMARY KEY (asset_id, stage)
@@ -46,7 +47,8 @@ CREATE INDEX idx_catalog_operation_receipts_subject
 
 CREATE TABLE catalog_backup_requests (
     receipt_id TEXT PRIMARY KEY REFERENCES catalog_operation_receipts(receipt_id) ON DELETE CASCADE,
-    force INTEGER NOT NULL CHECK (force IN (0,1))
+    force INTEGER NOT NULL CHECK (force IN (0,1)),
+    priority INTEGER NOT NULL CHECK (priority BETWEEN 1 AND 3)
 ) STRICT;
 
 CREATE TABLE asset_reindex_requests (
@@ -57,34 +59,11 @@ CREATE TABLE asset_reindex_requests (
     cursor TEXT,
     missing_only INTEGER NOT NULL CHECK (missing_only IN (0,1)),
     reset_semantic INTEGER NOT NULL CHECK (reset_semantic IN (0,1)),
+    priority INTEGER NOT NULL CHECK (priority BETWEEN 1 AND 3),
     requested_revision INTEGER NOT NULL DEFAULT 1 CHECK (requested_revision > 0),
     applied_revision INTEGER NOT NULL DEFAULT 0 CHECK (applied_revision BETWEEN 0 AND requested_revision),
     updated_at INTEGER NOT NULL
 ) STRICT;
-
--- Payload is a versioned domain envelope. Delivery columns are intentionally
--- limited to at-least-once bookkeeping; no River state or identifier is copied
--- back into the catalog.
-CREATE TABLE domain_outbox (
-    outbox_id TEXT PRIMARY KEY
-        CHECK (outbox_id = lower(outbox_id) AND length(outbox_id) = 36),
-    envelope_version INTEGER NOT NULL CHECK (envelope_version > 0),
-    command_kind TEXT NOT NULL,
-    subject_key TEXT NOT NULL,
-    desired_version INTEGER NOT NULL CHECK (desired_version > 0),
-    envelope TEXT NOT NULL CHECK (json_valid(envelope)),
-    available_at INTEGER NOT NULL,
-    delivered_at INTEGER,
-    delivery_attempts INTEGER NOT NULL DEFAULT 0 CHECK (delivery_attempts >= 0),
-    last_error TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    UNIQUE (command_kind, subject_key, desired_version)
-) STRICT;
-
-CREATE INDEX idx_domain_outbox_pending
-    ON domain_outbox (available_at, created_at, outbox_id)
-    WHERE delivered_at IS NULL;
 
 -- Projection domains retain enforceable owners instead of sharing a
 -- polymorphic generic desired/applied table.
@@ -94,6 +73,7 @@ CREATE TABLE event_projection_pipeline_state (
     projection_version INTEGER NOT NULL CHECK (projection_version > 0),
     applied_revision INTEGER NOT NULL DEFAULT 0
         CHECK (applied_revision >= 0 AND applied_revision <= source_revision),
+    priority INTEGER NOT NULL CHECK (priority BETWEEN 1 AND 3),
     cursor TEXT,
     terminal_error TEXT,
     updated_at INTEGER NOT NULL
@@ -130,10 +110,11 @@ CREATE TABLE location_projection_receipt_scopes (
         REFERENCES location_projection_state(repository_id, owner_id) ON DELETE CASCADE
 ) STRICT;
 
--- Final macro failures are product facts. These two pre-existing ledgers own
--- their requested/applied identities, so the terminal marker belongs beside
--- them rather than in River or a generic task table. A newer request clears
--- the marker as part of its existing desired-state mutation.
+-- Terminal failures are product facts only when an explicit Catalog transition
+-- records them. These ledgers own their requested/applied identities, so the
+-- terminal marker belongs beside them rather than in River or a generic task
+-- table. A newer request clears the marker as part of its desired-state
+-- mutation.
 ALTER TABLE repository_observation_state ADD COLUMN terminal_error TEXT;
 ALTER TABLE location_projection_state ADD COLUMN terminal_error TEXT;
 

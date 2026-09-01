@@ -12,6 +12,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/pipeline"
+	"server/internal/workqos"
 )
 
 // ApplyAssetActivationTx publishes the logical media item and requests the
@@ -96,11 +97,11 @@ func ApplyAssetActivationTx(ctx context.Context, tx *sql.Tx, queries *repo.Queri
 	}
 	if reset {
 		return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, stages,
-			pipeline.AssetPipelineVersion, pipeline.AdmissionBackground, nodeID)
+			pipeline.AssetPipelineVersion, workqos.Background, nodeID)
 	}
 	if len(missing) == 0 {
 		return nil
 	}
 	return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, missing,
-		pipeline.AssetPipelineVersion, pipeline.AdmissionBackground, nodeID)
+		pipeline.AssetPipelineVersion, workqos.Background, nodeID)
 }

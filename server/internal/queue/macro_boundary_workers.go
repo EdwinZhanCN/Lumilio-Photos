@@ -9,13 +9,14 @@ import (
 	"github.com/riverqueue/river"
 
 	"server/internal/queue/jobs"
+	"server/internal/workqos"
 )
 
 var ErrMacroStageUnavailable = errors.New("macro stage is not configured")
 
 type EnrichAssetWorker struct {
 	river.WorkerDefaults[jobs.EnrichAssetArgs]
-	Execute func(context.Context, jobs.EnrichAssetArgs) error
+	Execute func(context.Context, workqos.Class, jobs.EnrichAssetArgs) error
 }
 
 func (*EnrichAssetWorker) Timeout(*river.Job[jobs.EnrichAssetArgs]) time.Duration {
@@ -23,15 +24,22 @@ func (*EnrichAssetWorker) Timeout(*river.Job[jobs.EnrichAssetArgs]) time.Duratio
 }
 
 func (w *EnrichAssetWorker) Work(ctx context.Context, job *river.Job[jobs.EnrichAssetArgs]) error {
-	if w.Execute == nil || job.Args.AssetID == uuid.Nil || job.Args.SourceFence == uuid.Nil || job.Args.DesiredVersion == 0 || job.Args.PipelineVersion == "" {
+	if w.Execute == nil {
 		return ErrMacroStageUnavailable
 	}
-	return w.Execute(ctx, job.Args)
+	qos, err := jobQoS(job)
+	if err != nil {
+		return err
+	}
+	if job.Args.AssetID == uuid.Nil || job.Args.SourceFence == uuid.Nil || job.Args.DesiredVersion == 0 || job.Args.PipelineVersion == "" {
+		return ErrMacroStageUnavailable
+	}
+	return w.Execute(ctx, qos, job.Args)
 }
 
 type ScanRepositoryBatchWorker struct {
 	river.WorkerDefaults[jobs.ScanRepositoryBatchArgs]
-	Execute func(context.Context, jobs.ScanRepositoryBatchArgs) (bool, error)
+	Execute func(context.Context, workqos.Class, jobs.ScanRepositoryBatchArgs) (bool, error)
 }
 
 func (*ScanRepositoryBatchWorker) Timeout(*river.Job[jobs.ScanRepositoryBatchArgs]) time.Duration {
@@ -39,10 +47,17 @@ func (*ScanRepositoryBatchWorker) Timeout(*river.Job[jobs.ScanRepositoryBatchArg
 }
 
 func (w *ScanRepositoryBatchWorker) Work(ctx context.Context, job *river.Job[jobs.ScanRepositoryBatchArgs]) error {
-	if w.Execute == nil || job.Args.RepositoryID == uuid.Nil || job.Args.RequestedEpoch == 0 || job.Args.DesiredVersion != job.Args.RequestedEpoch {
+	if w.Execute == nil {
 		return ErrMacroStageUnavailable
 	}
-	more, err := w.Execute(ctx, job.Args)
+	qos, err := jobQoS(job)
+	if err != nil {
+		return err
+	}
+	if job.Args.RepositoryID == uuid.Nil || job.Args.RequestedEpoch == 0 || job.Args.DesiredVersion != job.Args.RequestedEpoch {
+		return ErrMacroStageUnavailable
+	}
+	more, err := w.Execute(ctx, qos, job.Args)
 	if err != nil {
 		return err
 	}
@@ -54,7 +69,7 @@ func (w *ScanRepositoryBatchWorker) Work(ctx context.Context, job *river.Job[job
 
 type RebuildProjectionBatchWorker struct {
 	river.WorkerDefaults[jobs.RebuildProjectionBatchArgs]
-	Execute func(context.Context, jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error)
+	Execute func(context.Context, workqos.Class, jobs.RebuildProjectionBatchArgs) (ProjectionExecution, error)
 }
 
 func (*RebuildProjectionBatchWorker) Timeout(*river.Job[jobs.RebuildProjectionBatchArgs]) time.Duration {
@@ -71,10 +86,17 @@ type ProjectionExecution struct {
 }
 
 func (w *RebuildProjectionBatchWorker) Work(ctx context.Context, job *river.Job[jobs.RebuildProjectionBatchArgs]) error {
-	if w.Execute == nil || job.Args.Scope == "" || job.Args.SourceRevision == 0 || job.Args.ProjectionVersion == 0 {
+	if w.Execute == nil {
 		return ErrMacroStageUnavailable
 	}
-	result, err := w.Execute(ctx, job.Args)
+	qos, err := jobQoS(job)
+	if err != nil {
+		return err
+	}
+	if job.Args.Scope == "" || job.Args.SourceRevision == 0 || job.Args.ProjectionVersion == 0 {
+		return ErrMacroStageUnavailable
+	}
+	result, err := w.Execute(ctx, qos, job.Args)
 	if err != nil {
 		return err
 	}
@@ -96,15 +118,22 @@ func (w *RebuildProjectionBatchWorker) Work(ctx context.Context, job *river.Job[
 
 type BackupCatalogWorker struct {
 	river.WorkerDefaults[jobs.BackupCatalogArgs]
-	Execute func(context.Context, jobs.BackupCatalogArgs) error
+	Execute func(context.Context, workqos.Class, jobs.BackupCatalogArgs) error
 }
 
 func (w *BackupCatalogWorker) Timeout(*river.Job[jobs.BackupCatalogArgs]) time.Duration {
 	return 30 * time.Minute
 }
 func (w *BackupCatalogWorker) Work(ctx context.Context, job *river.Job[jobs.BackupCatalogArgs]) error {
-	if w.Execute == nil || job.Args.RequestID == uuid.Nil {
+	if w.Execute == nil {
 		return ErrMacroStageUnavailable
 	}
-	return w.Execute(ctx, job.Args)
+	qos, err := jobQoS(job)
+	if err != nil {
+		return err
+	}
+	if job.Args.RequestID == uuid.Nil {
+		return ErrMacroStageUnavailable
+	}
+	return w.Execute(ctx, qos, job.Args)
 }

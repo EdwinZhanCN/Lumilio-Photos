@@ -95,9 +95,9 @@ before changing production behavior:
 - `source_revision > published_revision` is the only definition of pending
   rebuild work.
 - A single `MarkEventFactsChangedTx` boundary increments the owner revision;
-  the owning mutation publishes a typed projection envelope in that same
-  transaction, and the domain-outbox dispatcher later publishes the
-  `rebuild_projection_batch` macro command.
+  the owning mutation records the desired projection revision in that same
+  transaction, and the Catalog scheduler later derives the
+  `rebuild_projection_batch` work identity.
 - The following mutations must call that boundary:
   - logical media creation and permanent deletion;
   - effective capture time, capture offset, timezone, or GPS change;
@@ -105,9 +105,9 @@ before changing production behavior:
   - automatic or manual Stack create, extend, remove, and delete;
   - trash and restore changes that affect eligibility or displayability; and
   - manual Event membership corrections.
-- If envelope persistence fails, the fact mutation and revision update roll
-  back together. A later QueueDB insertion failure leaves the committed
-  envelope retryable and does not roll back product facts.
+- If the desired-state mutation fails, the fact mutation and revision update
+  roll back together. A later QueueDB insertion failure leaves the committed
+  Catalog state retryable and does not roll back product facts.
 - Existing `event_dirty_ranges` may be migrated for recovery, but no code may
   continue treating unused ranges as incremental computation windows.
 

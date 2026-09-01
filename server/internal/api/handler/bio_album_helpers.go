@@ -10,6 +10,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/pipeline"
 	"server/internal/service"
+	"server/internal/workqos"
 
 	"github.com/google/uuid"
 )
@@ -38,7 +39,7 @@ func requestBioClipAsset(ctx context.Context, writer *catalogtx.Writer, asset re
 		return fmt.Errorf("catalog writer is not configured")
 	}
 	err := writer.Transact(ctx, catalogtx.OperationAssetReprocess, nil, func(tx *sql.Tx) error {
-		return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, pipeline.AdmissionInteractive, uuid.New())
+		return pipeline.RequestAssetStagesTx(ctx, tx, asset.AssetID, asset.ContentID, []pipeline.Stage{pipeline.StageEnrich}, pipeline.AssetPipelineVersion, workqos.Interactive, uuid.New())
 	})
 	if err != nil {
 		return fmt.Errorf("request asset enrichment: %w", err)

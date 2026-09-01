@@ -18,16 +18,16 @@ func TestCoordinatorSnapshotUsesBoundedHistogramsAndReportsPressure(t *testing.T
 	writer, _ := testWriter(t)
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	handler := OutcomeHandler(func(context.Context, *sql.Tx, []Intent) ([]Outcome, error) {
+	handler := func(context.Context, *sql.Tx, string) (Result, error) {
 		select {
 		case <-entered:
 		default:
 			close(entered)
 		}
 		<-release
-		return []Outcome{OutcomeApplied}, nil
-	})
-	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Millisecond}, map[string]Handler{"test": handler})
+		return Result{Outcome: OutcomeApplied}, nil
+	}
+	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Millisecond}, CatalogDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,12 +38,12 @@ func TestCoordinatorSnapshotUsesBoundedHistogramsAndReportsPressure(t *testing.T
 	submissions.Add(2)
 	go func() {
 		defer submissions.Done()
-		_, _ = coordinator.Submit(context.Background(), intent("active"))
+		_, _ = coordinator.SubmitOperation(context.Background(), testOperation("active", 1, handler))
 	}()
 	<-entered
 	go func() {
 		defer submissions.Done()
-		_, _ = coordinator.Submit(context.Background(), intent("queued"))
+		_, _ = coordinator.SubmitOperation(context.Background(), testOperation("queued", 1, handler))
 	}()
 	deadline := time.Now().Add(time.Second)
 	for coordinator.Snapshot().Depth != 1 && time.Now().Before(deadline) {
@@ -57,7 +57,7 @@ func TestCoordinatorSnapshotUsesBoundedHistogramsAndReportsPressure(t *testing.T
 	const canceled = 32
 	for index := range canceled {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
-		_, submitErr := coordinator.Submit(ctx, intent(string(rune('a'+index))))
+		_, submitErr := coordinator.SubmitOperation(ctx, testOperation(string(rune('a'+index)), 1, handler))
 		cancel()
 		if !errors.Is(submitErr, context.DeadlineExceeded) {
 			close(release)
@@ -101,27 +101,45 @@ func testWriter(t *testing.T) (*catalogtx.Writer, *sql.DB) {
 	}
 	return catalogtx.NewWriter(database, nil), database
 }
-func intent(value string) Intent {
-	return Intent{Key: Key{Family: "test", Subject: value, Fence: "fence", Stage: "stage", DesiredVersion: 1}, Payload: value}
+func testOperation(value string, batchLimit int, handler func(context.Context, *sql.Tx, string) (Result, error)) Operation {
+	return Operation{
+		Kind:       255,
+		BatchLimit: batchLimit,
+		Apply: func(ctx context.Context, tx *sql.Tx) (Result, error) {
+			return handler(ctx, tx, value)
+		},
+	}
 }
 
-func TestCoordinatorSplitsFailedBatchAndAcknowledgesEveryIntent(t *testing.T) {
-	writer, database := testWriter(t)
-	handler := func(ctx context.Context, tx *sql.Tx, intents []Intent) ([]Outcome, error) {
-		out := make([]Outcome, len(intents))
-		for i, item := range intents {
-			value := item.Payload.(string)
-			if value == "bad" {
-				return nil, errors.New("injected")
-			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO applied(value) VALUES (?)`, value); err != nil {
-				return nil, err
-			}
-			out[i] = OutcomeApplied
-		}
-		return out, nil
+func TestTypedCatalogCommitterRejectsInvalidResultBeforeQueueing(t *testing.T) {
+	writer, _ := testWriter(t)
+	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Hour}, CatalogDependencies{})
+	if err != nil {
+		t.Fatal(err)
 	}
-	coordinator, err := New(writer, Config{Capacity: 8, MaxBatch: 8, OldestWait: 20 * time.Millisecond}, map[string]Handler{"test": OutcomeHandler(handler)})
+	coordinator.Start()
+	defer coordinator.Stop(context.Background())
+
+	if _, err := coordinator.ApplyAssetStage(context.Background(), AssetStageApplied{}); err == nil {
+		t.Fatal("invalid typed result was accepted")
+	}
+	if snapshot := coordinator.Snapshot(); snapshot.Depth != 0 || snapshot.Operations != 0 {
+		t.Fatalf("invalid typed result entered coordinator: %+v", snapshot)
+	}
+}
+
+func TestCoordinatorSplitsFailedBatchAndAcknowledgesEveryOperation(t *testing.T) {
+	writer, database := testWriter(t)
+	handler := func(ctx context.Context, tx *sql.Tx, value string) (Result, error) {
+		if value == "bad" {
+			return Result{}, errors.New("injected")
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO applied(value) VALUES (?)`, value); err != nil {
+			return Result{}, err
+		}
+		return Result{Outcome: OutcomeApplied}, nil
+	}
+	coordinator, err := New(writer, Config{Capacity: 8, MaxBatch: 8, OldestWait: 20 * time.Millisecond}, CatalogDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +153,7 @@ func TestCoordinatorSplitsFailedBatchAndAcknowledgesEveryIntent(t *testing.T) {
 	results := make(chan result, 3)
 	for _, value := range []string{"left", "bad", "right"} {
 		go func(value string) {
-			acknowledgement, err := coordinator.Submit(context.Background(), intent(value))
+			acknowledgement, err := coordinator.SubmitOperation(context.Background(), testOperation(value, 0, handler))
 			results <- result{value, acknowledgement.Outcome, err}
 		}(value)
 	}
@@ -153,22 +171,18 @@ func TestCoordinatorSplitsFailedBatchAndAcknowledgesEveryIntent(t *testing.T) {
 	}
 }
 
-func TestAcknowledgingHandlerPreservesPerIntentTransactionBoundary(t *testing.T) {
+func TestOperationPreservesPerOperationTransactionBoundary(t *testing.T) {
 	writer, database := testWriter(t)
 	if _, err := database.Exec(`CREATE TABLE observed_batches(size INTEGER NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
-	handler := AcknowledgingHandler(func(ctx context.Context, tx *sql.Tx, intents []Intent) ([]Result, error) {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO observed_batches(size) VALUES (?)`, len(intents)); err != nil {
-			return nil, err
+	handler := func(ctx context.Context, tx *sql.Tx, value string) (Result, error) {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO observed_batches(size) VALUES (?)`, 1); err != nil {
+			return Result{}, err
 		}
-		results := make([]Result, len(intents))
-		for index := range results {
-			results[index].Outcome = OutcomeApplied
-		}
-		return results, nil
-	})
-	coordinator, err := New(writer, Config{Capacity: 8, MaxBatch: 8, OldestWait: 20 * time.Millisecond}, map[string]Handler{"test": handler})
+		return Result{Outcome: OutcomeApplied}, nil
+	}
+	coordinator, err := New(writer, Config{Capacity: 8, MaxBatch: 8, OldestWait: 20 * time.Millisecond}, CatalogDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +192,7 @@ func TestAcknowledgingHandlerPreservesPerIntentTransactionBoundary(t *testing.T)
 	errors := make(chan error, 2)
 	for _, value := range []string{"first", "second"} {
 		go func(value string) {
-			_, err := coordinator.Submit(context.Background(), intent(value))
+			_, err := coordinator.SubmitOperation(context.Background(), testOperation(value, 1, handler))
 			errors <- err
 		}(value)
 	}
@@ -193,7 +207,7 @@ func TestAcknowledgingHandlerPreservesPerIntentTransactionBoundary(t *testing.T)
 		t.Fatal(err)
 	}
 	if count != 2 || minimum != 1 || maximum != 1 {
-		t.Fatalf("acknowledging handler transactions = count %d, sizes %d..%d; want two single-intent transactions", count, minimum, maximum)
+		t.Fatalf("operation transactions = count %d, sizes %d..%d; want two single-operation transactions", count, minimum, maximum)
 	}
 }
 
@@ -201,25 +215,25 @@ func TestCoordinatorBackpressureIsCancellationAware(t *testing.T) {
 	writer, _ := testWriter(t)
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	handler := func(context.Context, *sql.Tx, []Intent) ([]Outcome, error) {
+	handler := func(context.Context, *sql.Tx, string) (Result, error) {
 		select {
 		case <-entered:
 		default:
 			close(entered)
 		}
 		<-release
-		return []Outcome{OutcomeApplied}, nil
+		return Result{Outcome: OutcomeApplied}, nil
 	}
-	coordinator, _ := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Hour}, map[string]Handler{"test": OutcomeHandler(handler)})
+	coordinator, _ := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Hour}, CatalogDependencies{})
 	coordinator.Start()
 	defer coordinator.Stop(context.Background())
-	go coordinator.Submit(context.Background(), intent("first"))
+	go coordinator.SubmitOperation(context.Background(), testOperation("first", 1, handler))
 	<-entered
-	go coordinator.Submit(context.Background(), intent("second"))
+	go coordinator.SubmitOperation(context.Background(), testOperation("second", 1, handler))
 	time.Sleep(10 * time.Millisecond)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	_, err := coordinator.Submit(ctx, intent("third"))
+	_, err := coordinator.SubmitOperation(ctx, testOperation("third", 1, handler))
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Submit error=%v", err)
 	}
@@ -230,35 +244,35 @@ func TestCoordinatorStopUnblocksSubmissionWhenQueueIsFull(t *testing.T) {
 	writer, _ := testWriter(t)
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	handler := func(context.Context, *sql.Tx, []Intent) ([]Outcome, error) {
+	handler := func(context.Context, *sql.Tx, string) (Result, error) {
 		select {
 		case <-entered:
 		default:
 			close(entered)
 		}
 		<-release
-		return []Outcome{OutcomeApplied}, nil
+		return Result{Outcome: OutcomeApplied}, nil
 	}
-	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Hour}, map[string]Handler{"test": OutcomeHandler(handler)})
+	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Hour}, CatalogDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	coordinator.Start()
 	firstDone := make(chan struct{})
 	go func() {
-		_, _ = coordinator.Submit(context.Background(), intent("first"))
+		_, _ = coordinator.SubmitOperation(context.Background(), testOperation("first", 1, handler))
 		close(firstDone)
 	}()
 	<-entered
 	secondDone := make(chan struct{})
 	go func() {
-		_, _ = coordinator.Submit(context.Background(), intent("second"))
+		_, _ = coordinator.SubmitOperation(context.Background(), testOperation("second", 1, handler))
 		close(secondDone)
 	}()
 	time.Sleep(10 * time.Millisecond)
 	thirdDone := make(chan error, 1)
 	go func() {
-		_, err := coordinator.Submit(context.Background(), intent("third"))
+		_, err := coordinator.SubmitOperation(context.Background(), testOperation("third", 1, handler))
 		thirdDone <- err
 	}()
 	stopDone := make(chan error, 1)
@@ -288,11 +302,7 @@ func TestCoordinatorStopUnblocksSubmissionWhenQueueIsFull(t *testing.T) {
 
 func TestCoordinatorStopBeforeStartRejectsSubmit(t *testing.T) {
 	writer, _ := testWriter(t)
-	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Millisecond}, map[string]Handler{
-		"test": OutcomeHandler(func(context.Context, *sql.Tx, []Intent) ([]Outcome, error) {
-			return []Outcome{OutcomeApplied}, nil
-		}),
-	})
+	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Millisecond}, CatalogDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +311,9 @@ func TestCoordinatorStopBeforeStartRejectsSubmit(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if _, err := coordinator.Submit(ctx, intent("after-stop")); !errors.Is(err, ErrNotRunning) {
+	if _, err := coordinator.SubmitOperation(ctx, testOperation("after-stop", 1, func(context.Context, *sql.Tx, string) (Result, error) {
+		return Result{Outcome: OutcomeApplied}, nil
+	})); !errors.Is(err, ErrNotRunning) {
 		// The coordinator has not started a worker goroutine in this case, so
 		// rejection is immediate and deterministic.
 		t.Fatalf("submit after stop error=%v", err)
@@ -310,11 +322,7 @@ func TestCoordinatorStopBeforeStartRejectsSubmit(t *testing.T) {
 
 func TestCoordinatorRejectsAlreadyCanceledSubmission(t *testing.T) {
 	writer, _ := testWriter(t)
-	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Millisecond}, map[string]Handler{
-		"test": OutcomeHandler(func(context.Context, *sql.Tx, []Intent) ([]Outcome, error) {
-			return []Outcome{OutcomeApplied}, nil
-		}),
-	})
+	coordinator, err := New(writer, Config{Capacity: 1, MaxBatch: 1, OldestWait: time.Millisecond}, CatalogDependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +330,9 @@ func TestCoordinatorRejectsAlreadyCanceledSubmission(t *testing.T) {
 	defer coordinator.Stop(context.Background())
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := coordinator.Submit(ctx, intent("already-canceled")); !errors.Is(err, context.Canceled) {
+	if _, err := coordinator.SubmitOperation(ctx, testOperation("already-canceled", 1, func(context.Context, *sql.Tx, string) (Result, error) {
+		return Result{Outcome: OutcomeApplied}, nil
+	})); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Submit error=%v, want context canceled", err)
 	}
 }
@@ -331,7 +341,6 @@ func TestAssetStageCommitCompletesReceiptOnlyAfterEveryBoundStage(t *testing.T) 
 	_, database := testWriter(t)
 	for _, statement := range []string{
 		`CREATE TABLE assets(asset_id TEXT PRIMARY KEY,type TEXT,status TEXT,updated_at INTEGER)`,
-		`CREATE TABLE domain_outbox(outbox_id TEXT PRIMARY KEY,envelope_version INTEGER,command_kind TEXT,subject_key TEXT,desired_version INTEGER,envelope TEXT,available_at INTEGER,delivered_at INTEGER,delivery_attempts INTEGER,last_error TEXT,created_at INTEGER,updated_at INTEGER,UNIQUE(command_kind,subject_key,desired_version))`,
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER DEFAULT 0,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
@@ -361,7 +370,7 @@ func TestAssetStageCommitCompletesReceiptOnlyAfterEveryBoundStage(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = applyAssetStages(context.Background(), tx, []Intent{{Key: Key{Family: FamilyAssetStage, Subject: assetID.String(), Fence: fence.String(), Stage: stage, DesiredVersion: 1}, Payload: AssetStageApplied{AssetID: assetID, SourceFence: fence, Stage: stage, PipelineVersion: "asset-v1", DesiredVersion: 1}}})
+		_, err = applyAssetStages(context.Background(), tx, AssetStageApplied{AssetID: assetID, SourceFence: fence, Stage: stage, PipelineVersion: "asset-v1", DesiredVersion: 1})
 		if err != nil {
 			_ = tx.Rollback()
 			t.Fatal(err)
@@ -388,7 +397,6 @@ func TestAssetStageTerminalFailureProjectsProductAndReceiptFailure(t *testing.T)
 		`CREATE TABLE catalog_operation_receipts(receipt_id TEXT PRIMARY KEY,kind TEXT,subject_id TEXT,desired_version INTEGER,applied_version INTEGER DEFAULT 0,state TEXT,terminal_error TEXT,created_at INTEGER,updated_at INTEGER)`,
 		`CREATE TABLE asset_pipeline_state(asset_id TEXT,source_content_id TEXT,stage TEXT,pipeline_version TEXT,desired_version INTEGER,applied_version INTEGER,terminal_error TEXT,updated_at INTEGER,PRIMARY KEY(asset_id,stage))`,
 		`CREATE TABLE asset_pipeline_receipt_stages(receipt_id TEXT,asset_id TEXT,stage TEXT,desired_version INTEGER,PRIMARY KEY(receipt_id,asset_id,stage))`,
-		`CREATE TABLE domain_outbox(outbox_id TEXT PRIMARY KEY,envelope_version INTEGER,command_kind TEXT,subject_key TEXT,desired_version INTEGER,envelope TEXT,available_at INTEGER,delivered_at INTEGER,delivery_attempts INTEGER,last_error TEXT,created_at INTEGER,updated_at INTEGER,UNIQUE(command_kind,subject_key,desired_version))`,
 	} {
 		if _, err := database.Exec(statement); err != nil {
 			t.Fatal(err)
@@ -413,7 +421,7 @@ func TestAssetStageTerminalFailureProjectsProductAndReceiptFailure(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = applyAssetStages(context.Background(), tx, []Intent{{Key: Key{Family: FamilyAssetStage, Subject: assetID.String(), Fence: fence.String(), Stage: "derivatives", DesiredVersion: 1}, Payload: AssetStageApplied{AssetID: assetID, SourceFence: fence, Stage: "derivatives", PipelineVersion: "asset-v1", DesiredVersion: 1, TerminalError: "attempts_exhausted"}}})
+	_, err = applyAssetStages(context.Background(), tx, AssetStageApplied{AssetID: assetID, SourceFence: fence, Stage: "derivatives", PipelineVersion: "asset-v1", DesiredVersion: 1, TerminalError: "attempts_exhausted"})
 	if err != nil {
 		_ = tx.Rollback()
 		t.Fatal(err)

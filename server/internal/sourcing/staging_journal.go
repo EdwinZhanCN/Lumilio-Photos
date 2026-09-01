@@ -11,8 +11,6 @@ import (
 	"server/internal/db/repo"
 )
 
-const FamilyRepositoryStaging = "repository_staging"
-
 type stagingAction string
 
 const (
@@ -65,12 +63,11 @@ func (journal *CoordinatorStagingJournal) submit(ctx context.Context, mutation s
 	if journal == nil || journal.coordinator == nil || mutation.CommitID == uuid.Nil || mutation.Action == "" {
 		return repo.RepositoryStagingCommit{}, errors.New("repository staging journal is not configured")
 	}
-	result, err := journal.coordinator.Submit(ctx, commit.Intent{
-		Key: commit.Key{
-			Family: FamilyRepositoryStaging, Subject: mutation.CommitID.String(),
-			Fence: mutation.CommitID.String(), Stage: string(mutation.Action), DesiredVersion: 1,
+	result, err := journal.coordinator.SubmitOperation(ctx, commit.Operation{
+		Kind: commit.OperationKindRepositoryStaging, BatchLimit: 1,
+		Apply: func(ctx context.Context, tx *sql.Tx) (commit.Result, error) {
+			return applyStagingMutation(ctx, tx, mutation)
 		},
-		Payload: mutation,
 	})
 	if err != nil {
 		return repo.RepositoryStagingCommit{}, err
@@ -110,46 +107,31 @@ func (journal *CoordinatorStagingJournal) Quarantine(ctx context.Context, params
 	return err
 }
 
-// StagingCommitHandlers exposes the sole coordinator-owned staging journal
-// writer. SourceMaterializer itself receives only StagingJournal.
-func StagingCommitHandlers() map[string]commit.Handler {
-	return map[string]commit.Handler{
-		FamilyRepositoryStaging: commit.AcknowledgingHandler(applyStagingMutations),
-	}
-}
-
-func applyStagingMutations(ctx context.Context, tx *sql.Tx, intents []commit.Intent) ([]commit.Result, error) {
-	results := make([]commit.Result, len(intents))
+func applyStagingMutation(ctx context.Context, tx *sql.Tx, mutation stagingMutation) (commit.Result, error) {
 	queries := repo.New(tx)
-	for index, intent := range intents {
-		mutation, ok := intent.Payload.(stagingMutation)
-		if !ok || mutation.CommitID == uuid.Nil || mutation.Action == "" ||
-			intent.Key.Family != FamilyRepositoryStaging || intent.Key.Subject != mutation.CommitID.String() ||
-			intent.Key.Fence != mutation.CommitID.String() || intent.Key.Stage != string(mutation.Action) || intent.Key.DesiredVersion != 1 {
-			return nil, errors.New("repository staging commit key does not match payload")
-		}
-		var record repo.RepositoryStagingCommit
-		var err error
-		switch mutation.Action {
-		case stagingCreate:
-			record, err = queries.CreateRepositoryStagingCommit(ctx, mutation.Create)
-		case stagingClaim:
-			record, err = queries.ClaimRepositoryStagingCommit(ctx, mutation.Claim)
-		case stagingSetTarget:
-			record, err = queries.SetRepositoryStagingCommitTarget(ctx, mutation.SetTarget)
-		case stagingMarkOnDisk:
-			record, err = queries.MarkRepositoryStagingCommitOnDisk(ctx, mutation.MarkOnDisk)
-		case stagingComplete:
-			record, err = queries.CompleteRepositoryStagingCommit(ctx, mutation.Complete)
-		case stagingQuarantine:
-			record, err = queries.QuarantineRepositoryStagingCommit(ctx, mutation.Quarantine)
-		default:
-			return nil, errors.New("unsupported repository staging mutation")
-		}
-		if err != nil {
-			return nil, err
-		}
-		results[index] = commit.Result{Outcome: commit.OutcomeApplied, Acknowledgement: stagingAcknowledgement{Record: record}}
+	if mutation.CommitID == uuid.Nil || mutation.Action == "" {
+		return commit.Result{}, errors.New("invalid repository staging result")
 	}
-	return results, nil
+	var record repo.RepositoryStagingCommit
+	var err error
+	switch mutation.Action {
+	case stagingCreate:
+		record, err = queries.CreateRepositoryStagingCommit(ctx, mutation.Create)
+	case stagingClaim:
+		record, err = queries.ClaimRepositoryStagingCommit(ctx, mutation.Claim)
+	case stagingSetTarget:
+		record, err = queries.SetRepositoryStagingCommitTarget(ctx, mutation.SetTarget)
+	case stagingMarkOnDisk:
+		record, err = queries.MarkRepositoryStagingCommitOnDisk(ctx, mutation.MarkOnDisk)
+	case stagingComplete:
+		record, err = queries.CompleteRepositoryStagingCommit(ctx, mutation.Complete)
+	case stagingQuarantine:
+		record, err = queries.QuarantineRepositoryStagingCommit(ctx, mutation.Quarantine)
+	default:
+		return commit.Result{}, errors.New("unsupported repository staging mutation")
+	}
+	if err != nil {
+		return commit.Result{}, err
+	}
+	return commit.Result{Outcome: commit.OutcomeApplied, Acknowledgement: stagingAcknowledgement{Record: record}}, nil
 }

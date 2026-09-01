@@ -87,7 +87,7 @@ func validateRuntimeQueueConfigs(queues map[string]river.QueueConfig) error {
 	return fmt.Errorf("runtime queue catalog drift: missing=%v extra=%v", missing, extra)
 }
 
-func New(writerPool, readerPool *sql.DB, workers *river.Workers, logger *slog.Logger, errorHandler river.ErrorHandler, macroWorkers int) (*river.Client[*sql.Tx], error) {
+func New(writerPool, readerPool *sql.DB, workers *river.Workers, logger *slog.Logger, macroWorkers int) (*river.Client[*sql.Tx], error) {
 	if writerPool == nil || readerPool == nil {
 		return nil, fmt.Errorf("River SQLite requires writer and query-only listener pools")
 	}
@@ -100,10 +100,9 @@ func New(writerPool, readerPool *sql.DB, workers *river.Workers, logger *slog.Lo
 	}
 
 	client, err := river.NewClient(newRiverSQLiteSplitDriver(writerPool, readerPool), &river.Config{
-		Queues:       queues,
-		Workers:      workers,
-		Logger:       logger,
-		ErrorHandler: errorHandler,
+		Queues:  queues,
+		Workers: workers,
+		Logger:  logger,
 		// SQLite notification rows wake the producer immediately. Thirty
 		// seconds is only the crash/recovery fallback; the existing cooldown
 		// remains the throughput guard until measured evidence changes it.

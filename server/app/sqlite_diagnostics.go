@@ -54,14 +54,12 @@ type sqliteRuntimeObservation struct {
 // those terminal rows. Throughput counts durable applied/completed catalog
 // transitions in the current telemetry interval.
 type catalogPipelineObservation struct {
-	Backlog                     int64         `json:"backlog"`
-	RunnableBacklog             int64         `json:"runnable_backlog"`
-	TerminalBacklog             int64         `json:"terminal_backlog"`
-	DesiredAppliedLag           int64         `json:"desired_applied_lag"`
-	PendingOutbox               int64         `json:"pending_outbox"`
-	OldestOutboxAge             time.Duration `json:"oldest_outbox_age_ns"`
-	AppliedTransitions          int64         `json:"applied_transitions"`
-	AppliedTransitionsPerSecond float64       `json:"applied_transitions_per_second"`
+	Backlog                     int64   `json:"backlog"`
+	RunnableBacklog             int64   `json:"runnable_backlog"`
+	TerminalBacklog             int64   `json:"terminal_backlog"`
+	DesiredAppliedLag           int64   `json:"desired_applied_lag"`
+	AppliedTransitions          int64   `json:"applied_transitions"`
+	AppliedTransitionsPerSecond float64 `json:"applied_transitions_per_second"`
 }
 
 type macroQueueObservation struct {
@@ -85,7 +83,6 @@ func readCatalogPipelineObservation(ctx context.Context, reader *sql.DB, started
 	}
 	startedMicros := startedAt.UTC().UnixMicro()
 	endedMicros := endedAt.UTC().UnixMicro()
-	var oldestOutbox sql.NullInt64
 	err := reader.QueryRowContext(ctx, `
 WITH pipeline_state(pending, runnable, terminal, lag, applied_in_interval) AS (
   SELECT desired_version > applied_version,
@@ -149,17 +146,13 @@ SELECT
   coalesce(sum(runnable), 0),
   coalesce(sum(terminal), 0),
   coalesce(sum(lag), 0),
-  coalesce(sum(applied_in_interval), 0),
-  (SELECT count(*) FROM domain_outbox WHERE delivered_at IS NULL),
-  (SELECT min(created_at) FROM domain_outbox WHERE delivered_at IS NULL)
+  coalesce(sum(applied_in_interval), 0)
 FROM pipeline_state`, startedMicros, endedMicros).Scan(
 		&snapshot.Backlog,
 		&snapshot.RunnableBacklog,
 		&snapshot.TerminalBacklog,
 		&snapshot.DesiredAppliedLag,
 		&snapshot.AppliedTransitions,
-		&snapshot.PendingOutbox,
-		&oldestOutbox,
 	)
 	if err != nil {
 		return catalogPipelineObservation{}, fmt.Errorf("read catalog pipeline diagnostics: %w", err)
@@ -167,12 +160,6 @@ FROM pipeline_state`, startedMicros, endedMicros).Scan(
 	interval := endedAt.Sub(startedAt)
 	if interval > 0 {
 		snapshot.AppliedTransitionsPerSecond = float64(snapshot.AppliedTransitions) / interval.Seconds()
-	}
-	if oldestOutbox.Valid {
-		snapshot.OldestOutboxAge = endedAt.Sub(time.UnixMicro(oldestOutbox.Int64))
-		if snapshot.OldestOutboxAge < 0 {
-			snapshot.OldestOutboxAge = 0
-		}
 	}
 	return snapshot, nil
 }

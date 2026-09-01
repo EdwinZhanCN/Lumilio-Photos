@@ -15,7 +15,6 @@ import (
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/pipeline"
 )
 
 // Commands owns the foreground repository-observation command transactions.
@@ -92,9 +91,6 @@ func (commands *Commands) Request(
 			if err != nil {
 				return fmt.Errorf("coalesce repository observation run: %w", err)
 			}
-			if err := pipeline.PublishRepositoryObservationTx(ctx, tx, repositoryID, uint64(state.DesiredEpoch), pipeline.AdmissionBackground, active.RunID); err != nil {
-				return err
-			}
 			receipt.OperationID = active.RunID
 			receipt.RequestedEpoch = active.RequestedEpoch
 			receipt.Mode = active.Mode
@@ -117,13 +113,6 @@ func (commands *Commands) Request(
 			ActiveRunID:  uuid.NullUUID{UUID: runID, Valid: true}, UpdatedAt: now,
 		}); err != nil {
 			return fmt.Errorf("activate repository observation run: %w", err)
-		}
-		admission := pipeline.AdmissionBackground
-		if mode == "manual" {
-			admission = pipeline.AdmissionInteractive
-		}
-		if err := pipeline.PublishRepositoryObservationTx(ctx, tx, repositoryID, uint64(state.DesiredEpoch), admission, runID); err != nil {
-			return err
 		}
 		receipt.OperationID = runID
 		receipt.RequestedEpoch = state.DesiredEpoch

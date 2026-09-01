@@ -102,7 +102,7 @@ func (s *locationService) RequestLocationRebuild(ctx context.Context, repository
 			if err := tx.QueryRowContext(ctx, `UPDATE location_projection_state SET source_revision=source_revision+1,updated_at=? WHERE repository_id=? AND owner_id=? RETURNING source_revision`, now, item.repository.String(), item.owner).Scan(&revision); err != nil {
 				return err
 			}
-			if err := pipeline.RequestLocationProjectionTx(ctx, tx, item.repository, item.owner, receiptID); err != nil {
+			if err := pipeline.RequestLocationProjectionTx(ctx, tx, item.repository, item.owner); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `INSERT INTO location_projection_receipt_scopes(receipt_id,repository_id,owner_id,desired_revision) VALUES(?,?,?,?)`, receiptID.String(), item.repository.String(), item.owner, revision); err != nil {
@@ -453,7 +453,7 @@ func (s *locationService) ApplyPreparedLocationRebuildTx(ctx context.Context, tx
 		return fmt.Errorf("normalize geocoding settings for location publish: %w", err)
 	}
 	if geocoding.IsEnabled() {
-		if err := pipeline.RequestLocationResolutionTx(ctx, tx, uint64(settingsRow.GeocodingRevision), uuid.New()); err != nil {
+		if err := pipeline.RequestLocationResolutionTx(ctx, tx, uint64(settingsRow.GeocodingRevision)); err != nil {
 			return fmt.Errorf("enqueue location cluster resolution: %w", err)
 		}
 	}
@@ -540,7 +540,7 @@ func (s *locationService) requestLocationClusterRebuilds(ctx context.Context, re
 			err = fmt.Errorf("mark location projection scope dirty: affected=%d", affected)
 		}
 		if err == nil {
-			err = pipeline.RequestLocationProjectionTx(ctx, tx.Raw(), scope.RepositoryID, scope.OwnerID, uuid.New())
+			err = pipeline.RequestLocationProjectionTx(ctx, tx.Raw(), scope.RepositoryID, scope.OwnerID)
 		}
 		if err == nil {
 			err = tx.Commit()

@@ -31,6 +31,7 @@ import (
 	"server/internal/utils/imaging"
 	"server/internal/utils/memory"
 	"server/internal/utils/upload"
+	"server/internal/workqos"
 	"strconv"
 	"strings"
 	"time"
@@ -201,7 +202,7 @@ func (h *AssetHandler) enqueueStagingCommit(
 		return uuid.Nil, err
 	}
 	receiptID := uuid.New()
-	if err := pipeline.RequestIngestTx(ctx, tx.Raw(), commitID, receiptID, uuid.New()); err != nil {
+	if err := pipeline.RequestIngestTx(ctx, tx.Raw(), commitID, receiptID); err != nil {
 		return uuid.Nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -4146,7 +4147,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	if err := pipeline.RequestAssetStagesTx(ctx, tx.Raw(), asset.AssetID, asset.ContentID, stages, pipeline.AssetPipelineVersion, pipeline.AdmissionInteractive, receiptID); err != nil {
+	if err := pipeline.RequestAssetStagesTx(ctx, tx.Raw(), asset.AssetID, asset.ContentID, stages, pipeline.AssetPipelineVersion, workqos.Interactive, receiptID); err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
