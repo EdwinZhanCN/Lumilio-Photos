@@ -3,6 +3,7 @@ package processors
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -143,6 +144,7 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 
 	processor := &AssetProcessor{
 		reader:           catalog.ReaderQueries,
+		readerDatabase:   catalog.ReaderSQL,
 		locationResolver: locations.NewResolver(catalog.ReaderQueries, catalog.ReaderSQL, files),
 	}
 	source, err := processor.resolveCurrentAssetSource(ctx, first.AssetID, first.ContentID)
@@ -181,4 +183,39 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 		t.Fatalf("thumbnail load retained repository lease across admission boundary: %v", err)
 	}
 	releaseMutation()
+
+	processor.locationResolver = unavailableLocationResolver{}
+	if _, err := processor.LoadThumbnailTask(ctx, ThumbnailArgs{
+		AssetID: first.AssetID, ExpectedContentID: first.ContentID, PipelineVersion: "lease-boundary-v1",
+	}); !errors.Is(err, locations.ErrAssetUnavailable) {
+		t.Fatalf("temporary location outage error = %v, want ErrAssetUnavailable", err)
+	}
+
+	// Simulate repository removal winning between the active-occurrence check
+	// and capability resolution. The historical delivery must be acknowledged
+	// as a no-op instead of retrying forever on ErrAssetUnavailable.
+	processor.locationResolver = deleteLocationResolver{database: catalog.SQL}
+	work, err = processor.LoadThumbnailTask(ctx, ThumbnailArgs{
+		AssetID: first.AssetID, ExpectedContentID: first.ContentID, PipelineVersion: "lease-boundary-v1",
+	})
+	if err != nil || work != nil {
+		t.Fatalf("stale thumbnail delivery: work=%v err=%v", work, err)
+	}
+}
+
+type deleteLocationResolver struct {
+	database *sql.DB
+}
+
+type unavailableLocationResolver struct{}
+
+func (unavailableLocationResolver) LocalAssetPath(context.Context, uuid.UUID) (*locations.OpenedMedia, string, error) {
+	return nil, "", locations.ErrAssetUnavailable
+}
+
+func (r deleteLocationResolver) LocalAssetPath(ctx context.Context, assetID uuid.UUID) (*locations.OpenedMedia, string, error) {
+	if _, err := r.database.ExecContext(ctx, `DELETE FROM asset_locations WHERE asset_id = ?`, assetID); err != nil {
+		return nil, "", err
+	}
+	return nil, "", locations.ErrAssetUnavailable
 }

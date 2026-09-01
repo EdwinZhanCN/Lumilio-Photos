@@ -2,6 +2,7 @@ package processors
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -40,6 +41,9 @@ func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID
 	}
 	asset, err := ap.reader.GetAssetByID(ctx, assetID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrAssetSourceStale
+		}
 		return nil, err
 	}
 	if asset.IsDeleted || (expectedContentID != uuid.Nil && asset.ContentID != expectedContentID) {
@@ -49,8 +53,26 @@ func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID
 	if err != nil {
 		return nil, err
 	}
+	if active, err := ap.hasActiveAssetOccurrence(ctx, assetID); err != nil {
+		return nil, err
+	} else if !active {
+		return nil, ErrAssetSourceStale
+	}
 	opened, localPath, err := ap.locationResolver.LocalAssetPath(ctx, assetID)
 	if err != nil {
+		// Repository removal can win the race after the asset fence was read but
+		// before the resolver opened its capability. A delivery for that old
+		// occurrence is stale and must be acknowledged, while a still-active but
+		// temporarily unavailable repository remains retryable.
+		if errors.Is(err, locations.ErrAssetUnavailable) {
+			active, checkErr := ap.hasActiveAssetOccurrence(ctx, assetID)
+			if checkErr != nil {
+				return nil, checkErr
+			}
+			if !active {
+				return nil, ErrAssetSourceStale
+			}
+		}
 		return nil, err
 	}
 	if opened.File != nil {
@@ -81,4 +103,20 @@ func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID
 		return nil, fmt.Errorf("release source capability: %w", err)
 	}
 	return source, nil
+}
+
+func (ap *AssetProcessor) hasActiveAssetOccurrence(ctx context.Context, assetID uuid.UUID) (bool, error) {
+	if ap == nil || ap.readerDatabase == nil {
+		// Lightweight processor tests and non-catalog callers may not provide the
+		// diagnostic query handle. The resolver remains the authority in that case.
+		return true, nil
+	}
+	var active bool
+	if err := ap.readerDatabase.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM active_asset_occurrences WHERE asset_id = ?
+		)`, assetID).Scan(&active); err != nil {
+		return false, fmt.Errorf("check active asset occurrence: %w", err)
+	}
+	return active, nil
 }
