@@ -365,13 +365,6 @@ func run(
 	if err != nil {
 		return fmt.Errorf("initialize queue: %w", err)
 	}
-	catalogScheduler, err := queue.NewScheduler(database.Reader, database.Writer, queueClient, catalogScheduleWake.Signals(), 256, 30*time.Second)
-	if err != nil {
-		return fmt.Errorf("initialize catalog scheduler: %w", err)
-	}
-	if _, err := catalogScheduler.ScheduleOnce(ctx); err != nil {
-		return fmt.Errorf("schedule catalog desired work: %w", err)
-	}
 	settingsService := service.NewSettingsServiceWithRuntime(
 		queries,
 		settings.Default(appConfig.Environment),
@@ -760,6 +753,13 @@ func run(
 	// rather than an abrupt cancellation of in-flight jobs.
 	if err := queueClient.Start(context.Background()); err != nil {
 		return fmt.Errorf("start queue client: %w", err)
+	}
+	catalogScheduler, err := queue.NewScheduler(database.Reader, database.Writer, queueClient, catalogScheduleWake.Signals(), 256, 30*time.Second)
+	if err != nil {
+		return fmt.Errorf("initialize catalog scheduler: %w", err)
+	}
+	if _, err := catalogScheduler.ScheduleOnce(ctx); err != nil {
+		return fmt.Errorf("schedule catalog desired work: %w", err)
 	}
 	go catalogScheduler.Run(ctx)
 	go func() {
