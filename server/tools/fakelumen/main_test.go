@@ -7,6 +7,8 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -201,12 +203,58 @@ func TestReplayHitMissAndStrict(t *testing.T) {
 	}
 }
 
+func TestReplayControlledFailureIsConsumedExactlyOnce(t *testing.T) {
+	store, err := loadFixtureStore(os.DirFS(t.TempDir()))
+	if err != nil {
+		t.Fatalf("empty store: %v", err)
+	}
+	replay := newReplayServer(store, false)
+
+	request := httptest.NewRequest(http.MethodPost, "/fail-next", bytes.NewBufferString(
+		`{"task":"face_recognition","count":1}`,
+	))
+	response := httptest.NewRecorder()
+	metricsHandler(replay).ServeHTTP(response, request)
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("arm failure status = %d, body=%s", response.Code, response.Body.String())
+	}
+
+	client := startInferenceServer(t, replay)
+	if _, err := infer(t, client, types.TaskFaceRecognition, []byte("controlled"), "image/webp"); status.Code(err) != codes.Unavailable {
+		t.Fatalf("first request error = %v, want Unavailable", err)
+	}
+	if _, err := infer(t, client, types.TaskFaceRecognition, []byte("controlled"), "image/webp"); err != nil {
+		t.Fatalf("second request should recover: %v", err)
+	}
+
+	snapshot := replay.metrics.snapshot(replay.mode, store.size())
+	injected := snapshot["injected_failures"].(map[string]uint64)
+	if injected[types.TaskFaceRecognition] != 1 {
+		t.Fatalf("injected failures = %v, want exactly one face failure", injected)
+	}
+	if armed := replay.faults.snapshot(); len(armed) != 0 {
+		t.Fatalf("failure remained armed: %v", armed)
+	}
+}
+
 func TestReplayFallbackShapesForOtherTasks(t *testing.T) {
 	store, err := loadFixtureStore(os.DirFS(t.TempDir()))
 	if err != nil {
 		t.Fatalf("empty store: %v", err)
 	}
 	client := startInferenceServer(t, newReplayServer(store, false))
+
+	bioclip, err := infer(t, client, types.TaskBioCLIPClassify, []byte{1, 2, 3}, types.DefaultTensorMIME)
+	if err != nil {
+		t.Fatalf("BioCLIP fallback: %v", err)
+	}
+	labels := types.LabelsV1{}
+	if err := json.Unmarshal(bioclip.GetResult(), &labels); err != nil {
+		t.Fatalf("BioCLIP fallback must be valid labels_v1 JSON: %v", err)
+	}
+	if len(labels.Labels) != 0 || bioclip.GetResultMime() != "application/json;schema=labels_v1" {
+		t.Fatalf("BioCLIP fallback should be an empty result, got %+v (%s)", labels, bioclip.GetResultMime())
+	}
 
 	face, err := infer(t, client, types.TaskFaceRecognition, []byte{1, 2, 3}, "image/webp")
 	if err != nil {
@@ -267,9 +315,32 @@ func TestBuiltinCapabilityWithoutFixtures(t *testing.T) {
 		}
 		services = append(services, capability.GetServiceName())
 	}
-	if !slices.Contains(services, types.ServiceOCR) {
-		t.Fatalf("builtin capabilities should advertise OCR, got %v", services)
+	for _, service := range []string{types.ServiceSigLIP, types.ServiceBioCLIP, types.ServiceOCR, types.ServiceFace} {
+		if !slices.Contains(services, service) {
+			t.Fatalf("builtin capabilities should advertise %s, got %v", service, services)
+		}
 	}
+	capabilities := newReplayServer(store, false).advertisedCapabilities()
+	assertCapabilityTask(t, capabilities, types.ServiceBioCLIP, types.TaskBioCLIPClassify, types.PreprocessBioCLIP224Image, true)
+	assertCapabilityTask(t, capabilities, types.ServiceFace, types.TaskFaceRecognition, "", false)
+}
+
+func assertCapabilityTask(t *testing.T, capabilities []*pb.Capability, service, task, preprocess string, batching bool) {
+	t.Helper()
+	for _, capability := range capabilities {
+		if capability.GetServiceName() != service {
+			continue
+		}
+		for _, candidate := range capability.GetTasks() {
+			if candidate.GetName() == task {
+				if candidate.GetTensorPreprocessId() != preprocess || candidate.GetTensorBatchingSupported() != batching {
+					t.Fatalf("%s/%s tensor contract = %q/%t, want %q/%t", service, task, candidate.GetTensorPreprocessId(), candidate.GetTensorBatchingSupported(), preprocess, batching)
+				}
+				return
+			}
+		}
+	}
+	t.Fatalf("missing builtin capability task %s/%s", service, task)
 }
 
 // recordingUpstream is the stand-in real hub: distinctive embeddings derived

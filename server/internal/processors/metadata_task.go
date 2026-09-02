@@ -2,26 +2,36 @@ package processors
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/queue/jobs"
 	"server/internal/utils/exif"
 	"server/internal/utils/file"
 
 	"go.uber.org/zap"
 )
 
-// ProcessMetadataTask handles EXIF/ffprobe metadata extraction only.
-func (ap *AssetProcessor) ProcessMetadataTask(ctx context.Context, args jobs.MetadataArgs) error {
+// MetadataResult is the immutable output of EXIF/ffprobe extraction. It is
+// passed to the commit coordinator; no catalog writer is carried through the
+// compute boundary.
+type MetadataResult struct {
+	AssetID, SourceContentID uuid.UUID
+	Metadata                 dbtypes.SpecificMetadata
+	Common                   dbtypes.CommonMetadata
+	ExifRaw                  dbtypes.JSON
+	ComponentRelation        string
+}
+
+// ComputeMetadataTask handles EXIF/ffprobe metadata extraction only.
+func (ap *AssetProcessor) ComputeMetadataTask(ctx context.Context, args MetadataArgs) (MetadataResult, error) {
 	start := time.Now()
 	defer func() {
 		ap.logger.Debug("metadata_task",
@@ -29,53 +39,44 @@ func (ap *AssetProcessor) ProcessMetadataTask(ctx context.Context, args jobs.Met
 			zap.Duration("duration", time.Since(start)),
 		)
 	}()
-	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ObservationToken, args.ExpectedContentHash)
+	source, err := ap.resolveCurrentAssetSource(ctx, args.AssetID, args.ExpectedContentID)
 	if err != nil {
 		if errors.Is(err, ErrAssetSourceStale) {
-			return nil
+			return MetadataResult{}, nil
 		}
-		return err
+		return MetadataResult{}, err
 	}
 	defer source.Close()
 	asset := source.asset
 	assetType := dbtypes.AssetType(asset.Type)
 	original, err := source.files.OpenMedia(source.path)
 	if err != nil {
-		return err
+		return MetadataResult{}, err
 	}
 	defer original.Close()
 
-	return ap.runTrackedAssetTask(
-		ctx,
-		args.AssetID,
-		taskMetadata,
-		"Extracting metadata",
-		"Metadata extracted",
-		func() error {
-			switch assetType {
-			case dbtypes.AssetTypePhoto:
-				return ap.extractPhotoMetadata(ctx, asset, original)
-			case dbtypes.AssetTypeVideo:
-				info, err := ap.getVideoInfo(source.localPath)
-				if err != nil {
-					return err
-				}
-				return ap.extractVideoMetadata(ctx, asset, original, info)
-			case dbtypes.AssetTypeAudio:
-				info, err := ap.getAudioInfo(source.localPath)
-				if err != nil {
-					return err
-				}
-				return ap.extractAudioMetadata(ctx, asset, original, info)
-			default:
-				return fmt.Errorf("unsupported asset type for metadata: %s", assetType)
-			}
-		},
-	)
+	switch assetType {
+	case dbtypes.AssetTypePhoto:
+		return ap.extractPhotoMetadata(ctx, asset, source.content.FileSize, original)
+	case dbtypes.AssetTypeVideo:
+		info, err := ap.getVideoInfo(source.localPath)
+		if err != nil {
+			return MetadataResult{}, err
+		}
+		return ap.extractVideoMetadata(ctx, asset, source.content.FileSize, original, info)
+	case dbtypes.AssetTypeAudio:
+		info, err := ap.getAudioInfo(source.localPath)
+		if err != nil {
+			return MetadataResult{}, err
+		}
+		return ap.extractAudioMetadata(ctx, asset, source.content.FileSize, original, info)
+	default:
+		return MetadataResult{}, fmt.Errorf("unsupported asset type for metadata: %s", assetType)
+	}
 }
 
 // extractPhotoMetadata extracts EXIF metadata for photos.
-func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.Asset, reader io.Reader) error {
+func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.Asset, fileSize int64, reader io.Reader) (MetadataResult, error) {
 	// EXIF extraction
 	exifCfg := ap.createEXIFConfig()
 	extractor := exif.NewExtractor(exifCfg)
@@ -85,121 +86,32 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 		Reader:    reader,
 		AssetType: dbtypes.AssetTypePhoto,
 		Filename:  asset.OriginalFilename,
-		Size:      asset.FileSize,
+		Size:      fileSize,
 	}
 
 	res, err := extractor.ExtractFromStream(ctx, req)
 	if err != nil {
-		return fmt.Errorf("extract exif: %w", err)
+		return MetadataResult{}, fmt.Errorf("extract exif: %w", err)
 	}
 	// Defensive check: the extractor may store an error in the result even when
 	// the top-level error is nil (e.g. exiftool timeout, corrupt output).
 	if res.Error != nil {
-		return fmt.Errorf("extract exif: %w", res.Error)
+		return MetadataResult{}, fmt.Errorf("extract exif: %w", res.Error)
 	}
 
 	// Update photo metadata
 	meta, ok := res.Metadata.(*dbtypes.PhotoSpecificMetadata)
 	if !ok {
-		return fmt.Errorf("unexpected metadata type for photo: %T", res.Metadata)
+		return MetadataResult{}, fmt.Errorf("unexpected metadata type for photo: %T", res.Metadata)
 	}
 	meta.IsRAW = file.IsRAWFile(asset.OriginalFilename)
 
 	sm, err := dbtypes.MarshalMeta(meta)
 	if err != nil {
-		return fmt.Errorf("marshal photo metadata: %w", err)
+		return MetadataResult{}, fmt.Errorf("marshal photo metadata: %w", err)
 	}
-	if err := ap.assetService.UpdateAssetExtractedMetadata(ctx, asset.AssetID, sm, res.Common, res.Raw); err != nil {
-		return fmt.Errorf("update asset metadata: %w", err)
-	}
-
-	ap.reconcileComponentRelation(ctx, asset, meta.IsRAW, asset.MimeType)
-
-	if hasValidLocationGPS(res.Common.GPSLatitude, res.Common.GPSLongitude) {
-		ap.enqueueLocationClusterRebuild(ctx, asset)
-	}
-	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
-	ap.enqueueDetectStacks(ctx, asset)
-
-	return nil
-}
-
-// reconcileComponentRelation re-derives the media item component relation from
-// metadata-confirmed facts after extraction. Relations assigned by stack or
-// live-photo matching (live_photo_*, edited_version) are never overwritten,
-// and the SQL is a no-op when the stored relation already matches, so metadata
-// retries stay idempotent.
-func (ap *AssetProcessor) reconcileComponentRelation(ctx context.Context, asset *repo.Asset, isRAW bool, mimeType string) {
-	if ap == nil || ap.queries == nil || asset == nil {
-		return
-	}
-	relation := repo.InitialMediaRelation(&file.ValidationResult{IsRAW: isRAW, MimeType: mimeType}, asset.OriginalFilename)
-	if err := ap.queries.ReconcileMediaItemComponentRelation(ctx, repo.ReconcileMediaItemComponentRelationParams{
-		AssetID:  asset.AssetID,
-		Relation: string(relation),
-	}); err != nil && ap.logger != nil {
-		ap.logger.Warn("failed to reconcile media item component relation",
-			zap.String("asset_id", asset.AssetID.String()),
-			zap.String("relation", string(relation)),
-			zap.Error(err),
-		)
-	}
-}
-
-func (ap *AssetProcessor) enqueueLocationClusterRebuild(ctx context.Context, asset *repo.Asset) {
-	if ap == nil || ap.queueClient == nil || asset == nil || !asset.RepositoryID.Valid {
-		return
-	}
-	repositoryID := asset.RepositoryID.UUID.String()
-	args := jobs.RebuildLocationClustersArgs{
-		RepositoryID: &repositoryID,
-		OwnerID:      asset.OwnerID,
-	}
-	opts := args.InsertOpts()
-	opts.Queue = "rebuild_location_clusters"
-	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
-		ap.logger.Warn("failed to enqueue location cluster rebuild", zap.Error(err))
-	}
-}
-
-func (ap *AssetProcessor) enqueueDetectStacks(ctx context.Context, asset *repo.Asset) {
-	if ap == nil || ap.queueClient == nil || asset == nil || !asset.RepositoryID.Valid {
-		return
-	}
-
-	repositoryID := asset.RepositoryID.UUID.String()
-	args := jobs.DetectStacksArgs{
-		RepositoryID: repositoryID,
-	}
-	opts := args.InsertOpts()
-	opts.Queue = "detect_stacks"
-
-	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
-		ap.logger.Warn("failed to enqueue detect stacks after metadata extraction",
-			zap.String("repository_id", repositoryID),
-			zap.Error(err),
-		)
-	}
-}
-
-func (ap *AssetProcessor) enqueueLivePhotoMatcher(ctx context.Context, asset *repo.Asset, contentIdentifier string) {
-	if ap == nil || ap.queueClient == nil || asset == nil || asset.AssetID == uuid.Nil {
-		return
-	}
-	if strings.TrimSpace(contentIdentifier) == "" {
-		return
-	}
-
-	args := jobs.LivePhotoMatchArgs{AssetID: asset.AssetID}
-	opts := args.InsertOpts()
-	opts.Queue = "match_live_photo"
-
-	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
-		ap.logger.Warn("failed to enqueue live photo matcher after metadata extraction",
-			zap.String("asset_id", asset.AssetID.String()),
-			zap.Error(err),
-		)
-	}
+	relation := repo.InitialMediaRelation(&file.ValidationResult{IsRAW: meta.IsRAW, MimeType: asset.MimeType}, asset.OriginalFilename)
+	return MetadataResult{AssetID: asset.AssetID, SourceContentID: asset.ContentID, Metadata: sm, Common: res.Common, ExifRaw: dbtypes.JSON(res.Raw), ComponentRelation: string(relation)}, nil
 }
 
 func hasValidLocationGPS(latitude, longitude *float64) bool {
@@ -216,16 +128,39 @@ func hasValidLocationGPS(latitude, longitude *float64) bool {
 		lng >= -180 && lng <= 180
 }
 
-// loadAssetAndRepo loads asset and repository by asset ID.
+// loadAssetAndRepo chooses an active Location's repository for repository-
+// private derived work. Asset itself has no repository ownership.
 func (ap *AssetProcessor) loadAssetAndRepo(ctx context.Context, assetID uuid.UUID) (*repo.Asset, repo.Repository, error) {
-	asset, err := ap.queries.GetAssetByID(ctx, assetID)
+	return ap.loadAssetAndRepoForContent(ctx, assetID, uuid.Nil)
+}
+
+func (ap *AssetProcessor) loadAssetAndRepoForContent(
+	ctx context.Context,
+	assetID uuid.UUID,
+	expectedContentID uuid.UUID,
+) (*repo.Asset, repo.Repository, error) {
+	asset, err := ap.reader.GetAssetByID(ctx, assetID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, repo.Repository{}, ErrAssetSourceStale
+	}
 	if err != nil {
 		return nil, repo.Repository{}, fmt.Errorf("get asset: %w", err)
 	}
-	if !asset.RepositoryID.Valid {
-		return nil, repo.Repository{}, fmt.Errorf("asset has no repository")
+	if expectedContentID != uuid.Nil && asset.ContentID != expectedContentID {
+		return nil, repo.Repository{}, ErrAssetSourceStale
 	}
-	repository, err := ap.queries.GetRepository(ctx, asset.RepositoryID.UUID)
+	var repositoryID uuid.UUID
+	if err := ap.readerDatabase.QueryRowContext(ctx, `
+		SELECT repository_id
+		FROM active_asset_occurrences
+		WHERE asset_id = ?
+		ORDER BY repository_id, node_id
+		LIMIT 1`, assetID).Scan(&repositoryID); errors.Is(err, sql.ErrNoRows) {
+		return nil, repo.Repository{}, ErrAssetSourceStale
+	} else if err != nil {
+		return nil, repo.Repository{}, fmt.Errorf("asset has no active Location: %w", err)
+	}
+	repository, err := ap.reader.GetRepository(ctx, repositoryID)
 	if err != nil {
 		return nil, repo.Repository{}, fmt.Errorf("get repository: %w", err)
 	}

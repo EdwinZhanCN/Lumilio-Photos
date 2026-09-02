@@ -29,7 +29,7 @@ import (
 //     config column is a cache. Reconcile overwrites the cache from disk, so a
 //     rename made while a repository was detached is not silently reverted.
 func (rm *DefaultRepositoryManager) ReconcileAll(ctx context.Context) error {
-	repositories, err := rm.queries.ListRepositories(ctx)
+	repositories, err := rm.readerQueries.ListRepositories(ctx)
 	if err != nil {
 		return fmt.Errorf("list repositories: %w", err)
 	}

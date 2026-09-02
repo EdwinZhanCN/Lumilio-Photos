@@ -3,7 +3,7 @@
 Escaped bugs: a defect reached a user, `main`, or a release, and the
 interesting part is why every safety net missed it. Format and the
 guardrail-linking rule are owned by
-[agent-harness.md](../../site/docs/internal/agent-harness.md#postmortems).
+[agent-harness.md](../../docs/agent-harness.md#postmortems).
 
 Files are `NNNN-slug.md`, sequentially numbered. `## Guardrails added` must
 link the real merged artifacts (regression test, CI gate, rule); a postmortem

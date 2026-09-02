@@ -105,13 +105,15 @@ const createFaceItem = `-- name: CreateFaceItem :one
 INSERT INTO face_items (
     asset_id, face_id, bounding_box, confidence, age_group, gender,
     ethnicity, expression, face_size, face_image_path, embedding,
-    embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at
+    embedding_model, is_primary, quality_score, blur_score, pose_angles,
+    repository_id, created_at
 )
 VALUES (
     ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
+    ?17,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
-RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at
+RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id
 `
 
 type CreateFaceItemParams struct {
@@ -131,6 +133,7 @@ type CreateFaceItemParams struct {
 	QualityScore   *float64       `db:"quality_score" json:"quality_score"`
 	BlurScore      *float64       `db:"blur_score" json:"blur_score"`
 	PoseAngles     dbtypes.JSON   `db:"pose_angles" json:"pose_angles"`
+	RepositoryID   uuid.UUID      `db:"repository_id" json:"repository_id"`
 }
 
 func (q *Queries) CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error) {
@@ -151,6 +154,7 @@ func (q *Queries) CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) 
 		arg.QualityScore,
 		arg.BlurScore,
 		arg.PoseAngles,
+		arg.RepositoryID,
 	)
 	var i FaceItem
 	err := row.Scan(
@@ -172,6 +176,7 @@ func (q *Queries) CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) 
 		&i.BlurScore,
 		&i.PoseAngles,
 		&i.CreatedAt,
+		&i.RepositoryID,
 	)
 	return i, err
 }
@@ -411,7 +416,7 @@ func (q *Queries) GetFaceClusterByRepresentative(ctx context.Context, representa
 }
 
 const getFaceClusterMembers = `-- name: GetFaceClusterMembers :many
-SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fcm.similarity_score, fcm.confidence, fcm.is_manual
+SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id, fcm.similarity_score, fcm.confidence, fcm.is_manual
 FROM face_cluster_members fcm
 JOIN face_items fi ON fcm.face_id = fi.id
 WHERE fcm.cluster_id = ?1
@@ -437,6 +442,7 @@ type GetFaceClusterMembersRow struct {
 	BlurScore       *float64          `db:"blur_score" json:"blur_score"`
 	PoseAngles      dbtypes.JSON      `db:"pose_angles" json:"pose_angles"`
 	CreatedAt       dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	RepositoryID    uuid.UUID         `db:"repository_id" json:"repository_id"`
 	SimilarityScore float64           `db:"similarity_score" json:"similarity_score"`
 	Confidence_2    float64           `db:"confidence_2" json:"confidence_2"`
 	IsManual        bool              `db:"is_manual" json:"is_manual"`
@@ -470,6 +476,7 @@ func (q *Queries) GetFaceClusterMembers(ctx context.Context, clusterID int32) ([
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 			&i.SimilarityScore,
 			&i.Confidence_2,
 			&i.IsManual,
@@ -488,7 +495,7 @@ func (q *Queries) GetFaceClusterMembers(ctx context.Context, clusterID int32) ([
 }
 
 const getFaceItemByID = `-- name: GetFaceItemByID :one
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE id = ?1
 `
 
@@ -514,12 +521,13 @@ func (q *Queries) GetFaceItemByID(ctx context.Context, id int32) (FaceItem, erro
 		&i.BlurScore,
 		&i.PoseAngles,
 		&i.CreatedAt,
+		&i.RepositoryID,
 	)
 	return i, err
 }
 
 const getFaceItemsByAsset = `-- name: GetFaceItemsByAsset :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE asset_id = ?1
 ORDER BY is_primary DESC, confidence DESC
 `
@@ -552,6 +560,7 @@ func (q *Queries) GetFaceItemsByAsset(ctx context.Context, assetID uuid.UUID) ([
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -567,7 +576,7 @@ func (q *Queries) GetFaceItemsByAsset(ctx context.Context, assetID uuid.UUID) ([
 }
 
 const getFaceItemsByAssetWithLimit = `-- name: GetFaceItemsByAssetWithLimit :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE asset_id = ?1
 ORDER BY is_primary DESC, confidence DESC
 LIMIT ?2
@@ -606,6 +615,7 @@ func (q *Queries) GetFaceItemsByAssetWithLimit(ctx context.Context, arg GetFaceI
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -640,7 +650,7 @@ func (q *Queries) GetFaceResultByAsset(ctx context.Context, assetID uuid.UUID) (
 }
 
 const getUnclusteredFaces = `-- name: GetUnclusteredFaces :many
-SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at FROM face_items fi
+SELECT fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id FROM face_items fi
 LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
 WHERE fcm.face_id IS NULL
 AND fi.confidence >= ?1
@@ -681,6 +691,7 @@ func (q *Queries) GetUnclusteredFaces(ctx context.Context, arg GetUnclusteredFac
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -712,7 +723,7 @@ page_ids AS (
     ORDER BY a.upload_time DESC, m.asset_id DESC
     LIMIT ?3 OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.upload_time DESC, p.asset_id DESC
@@ -736,14 +747,10 @@ func (q *Queries) SearchAssetsByFaceCluster(ctx context.Context, arg SearchAsset
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -755,7 +762,6 @@ func (q *Queries) SearchAssetsByFaceCluster(ctx context.Context, arg SearchAsset
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -778,7 +784,7 @@ func (q *Queries) SearchAssetsByFaceCluster(ctx context.Context, arg SearchAsset
 }
 
 const searchAssetsByFaceID = `-- name: SearchAssetsByFaceID :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 JOIN face_items fi ON a.asset_id = fi.asset_id
 WHERE fi.face_id = ?1
 ORDER BY a.upload_time DESC
@@ -803,14 +809,10 @@ func (q *Queries) SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFa
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -822,7 +824,6 @@ func (q *Queries) SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFa
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,

@@ -222,8 +222,6 @@
     "nvenc": "NVIDIA NVENC",
     "processing": "处理",
     "qsv": "Intel Quick Sync",
-    "repositoryScan": "资源库扫描",
-    "repositoryScanDescription": "定期将已注册资源库与目录对账。",
     "softwareOnly": "仅软件",
     "vaapi": "VA-API",
     "videoToolbox": "VideoToolbox",

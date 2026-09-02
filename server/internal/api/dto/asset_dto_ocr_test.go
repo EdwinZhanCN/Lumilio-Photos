@@ -11,6 +11,7 @@ import (
 
 	"server/config"
 	"server/internal/db"
+	"server/internal/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -102,11 +103,12 @@ INSERT INTO repository_roots (
 INSERT INTO repositories (
     repo_id, name, path, created_at, updated_at, default_owner_id, root_id
 ) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, mime_type, file_size,
-    content_hash, upload_time, repository_id, updated_at
-) VALUES (?, 1, 'PHOTO', 'ocr.jpg', 'image/jpeg', 1, 'hash', 1, ?, 1);
-`, rootID, repositoryID, rootID, assetID, repositoryID)
+`, rootID, repositoryID, rootID)
+	require.NoError(t, err)
+	_, err = testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
+		AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1,
+		AssetType: "PHOTO", Filename: "ocr.jpg", MIMEType: "image/jpeg", FileSize: 1,
+	})
 	require.NoError(t, err)
 	return catalog, assetID
 }

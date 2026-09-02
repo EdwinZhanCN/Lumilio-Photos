@@ -288,10 +288,9 @@ func (r *BleveOCRRetriever) Retrieve(ctx context.Context, req Request) ([]Candid
 		AssetTypes: req.Filter.AssetTypes,
 		IsDeleted:  req.Filter.IsDeleted != nil && *req.Filter.IsDeleted,
 	}
-	if req.Filter.RepositoryID != nil {
-		repositoryID := req.Filter.RepositoryID.String()
-		filters.RepositoryID = &repositoryID
-	}
+	// One Asset may have Locations in several repositories, while the compact
+	// Bleve document stores only one representative repository. The SQLite
+	// post-filter below checks every active Location without false negatives.
 
 	candidates := make([]Candidate, 0, req.TopK)
 	seen := make(map[uuid.UUID]struct{})

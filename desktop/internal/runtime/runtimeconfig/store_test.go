@@ -96,6 +96,17 @@ func TestReadDraftGeneratesCompleteFirstRunIntent(t *testing.T) {
 	if draft.Settings.StoragePath == "" || draft.TOML == "" {
 		t.Fatal("first-run draft did not include a usable storage path and complete TOML")
 	}
+	validation, err := store.Validate(filepath.Join(paths.RuntimeIntents, "candidate.toml"), []byte(draft.TOML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantQueuePath := filepath.Join(paths.Root, "state", "river.sqlite3")
+	if validation.Config.DatabaseConfig.QueuePath != wantQueuePath {
+		t.Fatalf("first-run QueueDB path = %q, want %q", validation.Config.DatabaseConfig.QueuePath, wantQueuePath)
+	}
+	if validation.Config.DatabaseConfig.QueuePath == validation.Config.DatabaseConfig.Path {
+		t.Fatal("first-run QueueDB aliases the catalog database")
+	}
 	if pointer, err := store.CurrentPointer(); err != nil || pointer.Fingerprint != "" {
 		t.Fatalf("reading the first-run draft persisted configuration: %#v, %v", pointer, err)
 	}
@@ -196,7 +207,6 @@ func TestPatchDraftUpdatesStructuredSettingsThroughStrictLoader(t *testing.T) {
 	settings.NetworkMode = "lan"
 	settings.StoragePath = filepath.Join(t.TempDir(), "photos")
 	settings.LoggingLevel = "debug"
-	settings.RepositoryScanEnabled = false
 	settings.HardwareAcceleration = "none"
 
 	patched, err := store.PatchDraft(draft.TOML, settings)
@@ -208,7 +218,7 @@ func TestPatchDraftUpdatesStructuredSettingsThroughStrictLoader(t *testing.T) {
 	}
 	if patched.Settings != (dto.RuntimeConfigSettings{
 		NetworkMode: "lan", Listen: "0.0.0.0:6680", StoragePath: settings.StoragePath,
-		LoggingLevel: "debug", RepositoryScanEnabled: false, HardwareAcceleration: "none",
+		LoggingLevel: "debug", HardwareAcceleration: "none",
 	}) {
 		t.Fatalf("structured settings did not round-trip: %#v", patched.Settings)
 	}

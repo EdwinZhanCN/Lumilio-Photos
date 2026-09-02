@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
-	"server/internal/queue/jobs"
 	aggregatesearch "server/internal/search"
 	"server/internal/search/bleveocr"
 	"server/internal/utils/geohash"
@@ -20,7 +20,6 @@ import (
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
 
@@ -83,7 +82,7 @@ type AssetService interface {
 	// SearchTags returns tag definitions for autocomplete; empty query lists all.
 	SearchTags(ctx context.Context, query string, limit int) ([]repo.Tag, error)
 
-	CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
+	CreateThumbnail(ctx context.Context, assetID, repositoryID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
 	CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error)
 
@@ -118,8 +117,8 @@ type AssetService interface {
 	SearchAssetIDsSemanticForOwner(ctx context.Context, ownerID int32, query string, strictness aggregatesearch.SetStrictness, maxResults int) ([]uuid.UUID, aggregatesearch.SetMeta, error)
 	SearchAssetIDsOCRForOwner(ctx context.Context, ownerID int32, query string, maxResults int) ([]uuid.UUID, error)
 
-	// Folders and tags are derived/vocabulary collection views (no folder
-	// entity exists; "folders" come from assets.storage_path prefixes).
+	// Folders and tags are derived/vocabulary collection views. Folder paths
+	// are projected from the repository node graph and active Locations.
 	ListFolderSummaries(ctx context.Context, ownerID *int32, repositoryID *string, parentPath string) ([]FolderSummary, error)
 	GetFolderSummary(ctx context.Context, ownerID *int32, repositoryID string, folderPath string) (FolderSummary, error)
 	ListTagSummaries(ctx context.Context, ownerID *int32, repositoryID *string, source *string, query *string, limit, offset int) ([]TagSummary, error)
@@ -285,6 +284,9 @@ type PhotoMapPoint struct {
 type assetService struct {
 	queries                *repo.Queries
 	pool                   *sql.DB
+	writer                 *catalogtx.Writer
+	readQueries            *repo.Queries
+	readPool               *sql.DB
 	lumen                  LumenService
 	embeddingService       EmbeddingService
 	aggregateSearch        aggregatesearch.Service
@@ -295,13 +297,26 @@ type assetService struct {
 	searchAssetsFusedSetFn func(ctx context.Context, params SearchAssetsParams) (fusedSearchSet, bool)
 	hydrateAssetsInOrderFn func(ctx context.Context, ids []uuid.UUID, isDeleted *bool) ([]repo.Asset, error)
 	pageAssetsBySortFn     func(ctx context.Context, ids []uuid.UUID, sortBy string, limit, offset int, isDeleted *bool) ([]repo.Asset, error)
-	eventQueue             *river.Client[*sql.Tx]
 	ocrIndexNotifier       OCRIndexNotifier
 }
 
 func NewAssetService(
 	q *repo.Queries,
 	pool *sql.DB,
+	l LumenService,
+	e EmbeddingService,
+	ocrIndex *bleveocr.Index,
+	loggers ...*zap.Logger,
+) (AssetService, error) {
+	return newAssetService(q, pool, catalogtx.NewWriter(pool, nil), q, pool, l, e, ocrIndex, loggers...)
+}
+
+func newAssetService(
+	q *repo.Queries,
+	pool *sql.DB,
+	writer *catalogtx.Writer,
+	readQueries *repo.Queries,
+	readPool *sql.DB,
 	l LumenService,
 	e EmbeddingService,
 	ocrIndex *bleveocr.Index,
@@ -314,11 +329,14 @@ func NewAssetService(
 	svc := &assetService{
 		queries:          q,
 		pool:             pool,
+		writer:           writer,
+		readQueries:      readQueries,
+		readPool:         readPool,
 		lumen:            l,
 		embeddingService: e,
 	}
 	svc.semanticRetriever = aggregatesearch.NewEmbeddingRetriever(
-		pool,
+		readPool,
 		func(ctx context.Context, query string, fast bool) (aggregatesearch.QueryEmbedding, error) {
 			embedding, err := svc.resolveSemanticQueryEmbedding(ctx, query, fast)
 			if err != nil {
@@ -337,9 +355,9 @@ func NewAssetService(
 		},
 		1.0,
 	)
-	svc.ocrRetriever = aggregatesearch.NewBleveOCRRetriever(pool, ocrIndex, 0.7)
-	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(pool, 0.8)
-	svc.aggregateSearch = aggregatesearch.NewAggregateService(pool, []aggregatesearch.Retriever{
+	svc.ocrRetriever = aggregatesearch.NewBleveOCRRetriever(readPool, ocrIndex, 0.7)
+	svc.placeRetriever = aggregatesearch.NewPlaceRetriever(readPool, 0.8)
+	svc.aggregateSearch = aggregatesearch.NewAggregateService(readPool, []aggregatesearch.Retriever{
 		svc.semanticRetriever,
 		svc.ocrRetriever,
 		svc.placeRetriever,
@@ -347,18 +365,15 @@ func NewAssetService(
 	return svc, nil
 }
 
-// NewAssetServiceWithQueue is the runtime constructor. The queue and OCR index
-// notifier are kept optional so unit tests and embedded callers can still
-// exercise asset CRUD. Event fact invalidation and its rebuild enqueue commit
-// in the same SQLite transaction; the OCR notifier fires only after commit
-// because the durable outbox owns crash recovery.
-func NewAssetServiceWithQueue(
+// NewAssetServiceWithNotifier wires the OCR wakeup notifier. The durable
+// projection request is written to Catalog state in the same transaction as
+// the asset mutation; the Catalog scheduler derives disposable River work.
+func NewAssetServiceWithNotifier(
 	q *repo.Queries,
 	pool *sql.DB,
 	l LumenService,
 	e EmbeddingService,
 	ocrIndex *bleveocr.Index,
-	queueClient *river.Client[*sql.Tx],
 	ocrIndexNotifier OCRIndexNotifier,
 	loggers ...*zap.Logger,
 ) (AssetService, error) {
@@ -367,7 +382,31 @@ func NewAssetServiceWithQueue(
 		return nil, err
 	}
 	if concrete, ok := created.(*assetService); ok {
-		concrete.eventQueue = queueClient
+		concrete.ocrIndexNotifier = ocrIndexNotifier
+	}
+	return created, nil
+}
+
+// NewAssetServiceWithReader is the runtime constructor with explicit
+// SQLite roles: mutations use the sole writer while library/search reads use
+// the bounded query-only WAL pool.
+func NewAssetServiceWithReader(
+	q *repo.Queries,
+	pool *sql.DB,
+	writer *catalogtx.Writer,
+	readQueries *repo.Queries,
+	readPool *sql.DB,
+	l LumenService,
+	e EmbeddingService,
+	ocrIndex *bleveocr.Index,
+	ocrIndexNotifier OCRIndexNotifier,
+	loggers ...*zap.Logger,
+) (AssetService, error) {
+	created, err := newAssetService(q, pool, writer, readQueries, readPool, l, e, ocrIndex, loggers...)
+	if err != nil {
+		return nil, err
+	}
+	if concrete, ok := created.(*assetService); ok {
 		concrete.ocrIndexNotifier = ocrIndexNotifier
 	}
 	return created, nil
@@ -394,7 +433,7 @@ func (s *assetService) CreateAssetRecord(ctx context.Context, params repo.Create
 
 // GetAsset retrieves an asset by its ID
 func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
-	dbAsset, err := s.queries.GetAssetByID(ctx, id)
+	dbAsset, err := s.readQueries.GetAssetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset: %w", err)
 	}
@@ -404,7 +443,7 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 
 // GetAssetAny retrieves an asset by ID regardless of Trash state.
 func (s *assetService) GetAssetAny(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
-	dbAsset, err := s.queries.GetAssetByIDAny(ctx, id)
+	dbAsset, err := s.readQueries.GetAssetByIDAny(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset: %w", err)
 	}
@@ -413,7 +452,7 @@ func (s *assetService) GetAssetAny(ctx context.Context, id uuid.UUID) (*repo.Ass
 }
 
 func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.RawMessage, error) {
-	exifRaw, err := s.queries.GetAssetExifRaw(ctx, id)
+	exifRaw, err := s.readQueries.GetAssetExifRaw(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset exif: %w", err)
 	}
@@ -427,7 +466,7 @@ func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.
 // dto.AssetDetailDTO, honoring the include_* query flags. Trash state is not
 // filtered here; handler auth decides access.
 func (s *assetService) GetAssetRelations(ctx context.Context, id uuid.UUID) (repo.GetAssetWithRelationsRow, error) {
-	row, err := s.queries.GetAssetWithRelations(ctx, id)
+	row, err := s.readQueries.GetAssetWithRelations(ctx, id)
 	if err != nil {
 		return repo.GetAssetWithRelationsRow{}, fmt.Errorf("failed to get asset with relations: %w", err)
 	}
@@ -442,7 +481,7 @@ func (s *assetService) GetAssetsByType(ctx context.Context, assetType string, li
 		Offset: int64(offset),
 	}
 
-	return s.queries.GetAssetsByType(ctx, params)
+	return s.readQueries.GetAssetsByType(ctx, params)
 }
 
 // GetAssetsByOwner retrieves assets by owner with pagination
@@ -453,7 +492,7 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 		Offset:  int64(offset),
 	}
 
-	return s.queries.GetAssetsByOwner(ctx, params)
+	return s.readQueries.GetAssetsByOwner(ctx, params)
 }
 
 // GetAssetsByOwnerSorted retrieves assets by owner sorted by taken_time
@@ -465,7 +504,7 @@ func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, 
 		Offset:    int64(offset),
 	}
 
-	return s.queries.GetAssetsByOwnerSorted(ctx, params)
+	return s.readQueries.GetAssetsByOwnerSorted(ctx, params)
 }
 
 // GetAssetsByTypesSorted retrieves assets by multiple types sorted by taken_time
@@ -477,7 +516,7 @@ func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []
 		Offset:    int64(offset),
 	}
 
-	return s.queries.GetAssetsByTypesSorted(ctx, params)
+	return s.readQueries.GetAssetsByTypesSorted(ctx, params)
 }
 
 // GetAssetsByOwnerAndTypes retrieves assets by owner and multiple types sorted by taken_time
@@ -490,19 +529,19 @@ func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int
 		Offset:    int64(offset),
 	}
 
-	return s.queries.GetAssetsByOwnerAndTypesSorted(ctx, params)
+	return s.readQueries.GetAssetsByOwnerAndTypesSorted(ctx, params)
 }
 
 // DetectDuplicates finds assets with the same hash
 func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error) {
-	return s.queries.GetAssetsByContentHash(ctx, hash)
+	return s.readQueries.GetAssetsByContentHash(ctx, hash)
 }
 
 // UpdateAssetMetadata replaces type-specific metadata from the public API. The
 // decode/re-encode step is intentionally destructive: unknown and retired JSON
 // fields are discarded instead of being carried forward.
 func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error {
-	asset, err := s.queries.GetAssetByID(ctx, id)
+	asset, err := s.readQueries.GetAssetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get asset for metadata update: %w", err)
 	}
@@ -523,21 +562,48 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 }
 
 func (s *assetService) UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error {
-	asset, err := s.queries.GetAssetByID(ctx, id)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetMetadataPublish, nil)
+	if err != nil {
+		return fmt.Errorf("begin metadata update transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if err := ApplyAssetExtractedMetadataTx(ctx, tx.Raw(), s.queries.WithTx(tx.Raw()), id, metadata, common, exifRaw, ""); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit metadata update transaction: %w", err)
+	}
+	return nil
+}
+
+// ApplyAssetExtractedMetadataTx applies a computed metadata result inside an
+// existing catalog transaction. It is the write-side counterpart used by the
+// asynchronous commit coordinator; callers must pass the transaction-scoped
+// query set and never a standalone writer.
+func ApplyAssetExtractedMetadataTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	queries *repo.Queries,
+	id uuid.UUID,
+	metadata dbtypes.SpecificMetadata,
+	common dbtypes.CommonMetadata,
+	exifRaw json.RawMessage,
+	componentRelation string,
+) error {
+	if tx == nil || queries == nil || id == uuid.Nil {
+		return errors.New("metadata transaction requires catalog transaction, queries, and asset")
+	}
+	asset, err := queries.GetAssetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get asset for metadata update: %w", err)
 	}
-
 	metadata, err = preserveSpecificMetadataDescription(asset.SpecificMetadata, metadata)
 	if err != nil {
 		return fmt.Errorf("preserve asset description: %w", err)
 	}
-
 	common, firstExtraction := prepareImportedCommonMetadata(asset, common)
-
 	gpsLatitude, gpsLongitude := normalizedGPS(common.GPSLatitude, common.GPSLongitude)
 	gpsGeohash5, gpsGeohash7 := geohashesForGPS(gpsLatitude, gpsLongitude)
-
 	var takenTimeParam any
 	if common.TakenTime != nil {
 		takenTimeParam = dbtypes.NewTimestamp(*common.TakenTime)
@@ -560,34 +626,22 @@ func (s *assetService) UpdateAssetExtractedMetadata(ctx context.Context, id uuid
 		value := int64(*common.Rating)
 		rating = &value
 	}
-
-	params := repo.UpdateAssetExtractedMetadataParams{
-		AssetID:              id,
-		SpecificMetadata:     metadata,
-		ExifRaw:              dbtypes.JSON(exifRaw),
-		TakenTime:            takenTimeParam,
-		CaptureOffsetMinutes: captureOffset,
-		GpsLatitude:          gpsLatitude,
-		GpsLongitude:         gpsLongitude,
-		GpsGeohash5:          gpsGeohash5,
-		GpsGeohash7:          gpsGeohash7,
-		Width:                width,
-		Height:               height,
-		Duration:             common.Duration,
-		Rating:               rating,
-	}
-
-	tx, err := s.pool.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin metadata update transaction: %w", err)
-	}
-	defer tx.Rollback()
-	txQueries := s.queries.WithTx(tx)
-	if err := txQueries.UpdateAssetExtractedMetadata(ctx, params); err != nil {
+	if err := queries.UpdateAssetExtractedMetadata(ctx, repo.UpdateAssetExtractedMetadataParams{
+		AssetID: id, SpecificMetadata: metadata, ExifRaw: dbtypes.JSON(exifRaw),
+		TakenTime: takenTimeParam, CaptureOffsetMinutes: captureOffset,
+		GpsLatitude: gpsLatitude, GpsLongitude: gpsLongitude,
+		GpsGeohash5: gpsGeohash5, GpsGeohash7: gpsGeohash7,
+		Width: width, Height: height, Duration: common.Duration, Rating: rating,
+	}); err != nil {
 		return err
 	}
 	if firstExtraction {
-		if err := importEmbeddedKeywords(ctx, txQueries, id, common.Keywords); err != nil {
+		if err := importEmbeddedKeywords(ctx, queries, id, common.Keywords); err != nil {
+			return err
+		}
+	}
+	if componentRelation != "" {
+		if err := queries.ReconcileMediaItemComponentRelation(ctx, repo.ReconcileMediaItemComponentRelationParams{AssetID: id, Relation: componentRelation}); err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 	}
@@ -595,12 +649,6 @@ func (s *assetService) UpdateAssetExtractedMetadata(ctx context.Context, id uuid
 		if err := event.MarkEventFactsChangedTx(ctx, tx, *asset.OwnerID, "asset_metadata_changed"); err != nil {
 			return err
 		}
-		if err := s.enqueueEventRebuildTx(ctx, tx, *asset.OwnerID); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit metadata update transaction: %w", err)
 	}
 	return nil
 }
@@ -702,12 +750,12 @@ func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
 
 // DeleteAsset moves an asset into the app Trash via a database soft-delete.
 func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetDelete, nil)
 	if err != nil {
 		return fmt.Errorf("begin asset Trash transaction: %w", err)
 	}
 	defer tx.Rollback()
-	queries := s.queries.WithTx(tx)
+	queries := s.queries.WithTx(tx.Raw())
 	if err := queries.DeleteAsset(ctx, id); err != nil {
 		return err
 	}
@@ -724,10 +772,7 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil && item.OwnerID != nil {
-		if err := event.MarkEventFactsChangedTx(ctx, tx, *item.OwnerID, "asset_trashed"); err != nil {
-			return err
-		}
-		if err := s.enqueueEventRebuildTx(ctx, tx, *item.OwnerID); err != nil {
+		if err := event.MarkEventFactsChangedTx(ctx, tx.Raw(), *item.OwnerID, "asset_trashed"); err != nil {
 			return err
 		}
 	}
@@ -742,12 +787,12 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 
 // RestoreAsset restores an asset from the app Trash.
 func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationAssetRestore, nil)
 	if err != nil {
 		return fmt.Errorf("begin asset restore transaction: %w", err)
 	}
 	defer tx.Rollback()
-	queries := s.queries.WithTx(tx)
+	queries := s.queries.WithTx(tx.Raw())
 	if err := queries.RestoreAsset(ctx, id); err != nil {
 		return err
 	}
@@ -764,10 +809,7 @@ func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if item, err := queries.GetMediaItemByAssetID(ctx, id); err == nil && item.OwnerID != nil {
-		if err := event.MarkEventFactsChangedTx(ctx, tx, *item.OwnerID, "asset_restored"); err != nil {
-			return err
-		}
-		if err := s.enqueueEventRebuildTx(ctx, tx, *item.OwnerID); err != nil {
+		if err := event.MarkEventFactsChangedTx(ctx, tx.Raw(), *item.OwnerID, "asset_restored"); err != nil {
 			return err
 		}
 	}
@@ -776,18 +818,6 @@ func (s *assetService) RestoreAsset(ctx context.Context, id uuid.UUID) error {
 	}
 	if s.ocrIndexNotifier != nil {
 		s.ocrIndexNotifier.Notify()
-	}
-	return nil
-}
-
-func (s *assetService) enqueueEventRebuildTx(ctx context.Context, tx *sql.Tx, ownerID int32) error {
-	if s.eventQueue == nil {
-		return nil
-	}
-	args := jobs.EventRebuildArgs{OwnerID: ownerID}
-	opts := args.InsertOpts()
-	if _, err := s.eventQueue.InsertTx(ctx, tx, args, &opts); err != nil {
-		return fmt.Errorf("enqueue Event rebuild: %w", err)
 	}
 	return nil
 }
@@ -856,7 +886,7 @@ func (s *assetService) AddManualTagToAsset(ctx context.Context, assetID uuid.UUI
 
 // GetAssetTags returns the raw JSON tag aggregate for an asset.
 func (s *assetService) GetAssetTags(ctx context.Context, assetID uuid.UUID) (json.RawMessage, error) {
-	row, err := s.queries.GetAssetWithTags(ctx, assetID)
+	row, err := s.readQueries.GetAssetWithTags(ctx, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -890,7 +920,7 @@ func (s *assetService) SearchTags(ctx context.Context, query string, limit int) 
 		q = &trimmed
 	}
 
-	return s.queries.SearchTagsByName(ctx, repo.SearchTagsByNameParams{
+	return s.readQueries.SearchTagsByName(ctx, repo.SearchTagsByNameParams{
 		Limit: int64(limit),
 		Query: q,
 	})
@@ -907,12 +937,13 @@ func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, f
 // ================================
 
 // CreateThumbnail creates or updates a thumbnail record for an asset
-func (s *assetService) CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
+func (s *assetService) CreateThumbnail(ctx context.Context, assetID, repositoryID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
 	params := repo.CreateThumbnailParams{
-		AssetID:     assetID,
-		Size:        size,
-		StoragePath: thumbnailPath,
-		MimeType:    "image/webp",
+		AssetID:      assetID,
+		Size:         size,
+		StoragePath:  thumbnailPath,
+		MimeType:     "image/webp",
+		RepositoryID: repositoryID,
 	}
 
 	dbThumbnail, err := s.queries.CreateThumbnail(ctx, params)
@@ -925,7 +956,7 @@ func (s *assetService) CreateThumbnail(ctx context.Context, assetID uuid.UUID, s
 
 // GetThumbnailByID retrieves thumbnails by their ID
 func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*repo.Thumbnail, error) {
-	dbThumbnail, err := s.queries.GetThumbnailByID(ctx, int32(thumbnailID))
+	dbThumbnail, err := s.readQueries.GetThumbnailByID(ctx, int32(thumbnailID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get thumbnail: %w", err)
 	}
@@ -940,7 +971,7 @@ func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID
 		Size:    size,
 	}
 
-	dbThumbnail, err := s.queries.GetThumbnailByAssetAndSize(ctx, params)
+	dbThumbnail, err := s.readQueries.GetThumbnailByAssetAndSize(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get thumbnail: %w", err)
 	}
@@ -953,7 +984,7 @@ func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID
 // ================================
 
 func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*repo.Tag, error) {
-	tag, err := s.queries.GetTagByName(ctx, name)
+	tag, err := s.readQueries.GetTagByName(ctx, name)
 	if err == nil {
 		return &tag, nil
 	}
@@ -1028,7 +1059,7 @@ func matchFilename(filename, pattern, mode string) bool {
 }
 
 func (s *assetService) GetDistinctCameraModels(ctx context.Context) ([]string, error) {
-	rows, err := s.queries.GetDistinctCameraModels(ctx)
+	rows, err := s.readQueries.GetDistinctCameraModels(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get distinct camera models: %w", err)
 	}
@@ -1044,7 +1075,7 @@ func (s *assetService) GetDistinctCameraModels(ctx context.Context) ([]string, e
 }
 
 func (s *assetService) GetDistinctLenses(ctx context.Context) ([]string, error) {
-	results, err := s.queries.GetDistinctLenses(ctx)
+	results, err := s.readQueries.GetDistinctLenses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get distinct lenses: %w", err)
 	}
@@ -1068,7 +1099,7 @@ func (s *assetService) UpdateAssetRating(ctx context.Context, id uuid.UUID, rati
 		Rating:  &value,
 	}
 
-	return s.queries.UpdateAssetRating(ctx, params)
+	return s.queries.MutateAssetRating(ctx, params)
 }
 
 func (s *assetService) UpdateAssetLike(ctx context.Context, id uuid.UUID, liked bool) error {
@@ -1077,7 +1108,7 @@ func (s *assetService) UpdateAssetLike(ctx context.Context, id uuid.UUID, liked 
 		Liked:   liked,
 	}
 
-	return s.queries.UpdateAssetLike(ctx, params)
+	return s.queries.MutateAssetLike(ctx, params)
 }
 
 func (s *assetService) UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUID, rating int, liked bool) error {
@@ -1088,7 +1119,7 @@ func (s *assetService) UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUI
 		Liked:   liked,
 	}
 
-	return s.queries.UpdateAssetRatingAndLike(ctx, params)
+	return s.queries.MutateAssetRatingAndLike(ctx, params)
 }
 
 func (s *assetService) UpdateAssetDescription(ctx context.Context, id uuid.UUID, description string) error {
@@ -1097,7 +1128,7 @@ func (s *assetService) UpdateAssetDescription(ctx context.Context, id uuid.UUID,
 		Description: description,
 	}
 
-	return s.queries.UpdateAssetDescription(ctx, params)
+	return s.queries.MutateAssetDescription(ctx, params)
 }
 
 func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, ownerID *int32, limit, offset int) ([]repo.Asset, error) {
@@ -1109,7 +1140,7 @@ func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, ownerI
 		Offset:  int64(offset),
 	}
 
-	return s.queries.GetAssetsByRating(ctx, params)
+	return s.readQueries.GetAssetsByRating(ctx, params)
 }
 
 func (s *assetService) GetLikedAssets(ctx context.Context, ownerID *int32, limit, offset int) ([]repo.Asset, error) {
@@ -1119,7 +1150,7 @@ func (s *assetService) GetLikedAssets(ctx context.Context, ownerID *int32, limit
 		Offset:  int64(offset),
 	}
 
-	return s.queries.GetLikedAssets(ctx, params)
+	return s.readQueries.GetLikedAssets(ctx, params)
 }
 
 func (s *assetService) UpdateAssetDuration(ctx context.Context, id uuid.UUID, duration float64) error {
@@ -1611,12 +1642,12 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		return nil, 0, err
 	}
 
-	total, err := s.queries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
+	total, err := s.readQueries.CountMediaItemsUnified(ctx, countMediaItemsUnifiedParams(params, in))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count media items: %w", err)
 	}
 
-	rows, err := s.queries.GetMediaItemsUnified(ctx, getMediaItemsUnifiedParams(params, in))
+	rows, err := s.readQueries.GetMediaItemsUnified(ctx, getMediaItemsUnifiedParams(params, in))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1713,7 +1744,7 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 		repoUUID = uuid.NullUUID{UUID: parsedUUID, Valid: true}
 	}
 
-	total, err := s.queries.CountPhotoMapPoints(ctx, repo.CountPhotoMapPointsParams{
+	total, err := s.readQueries.CountPhotoMapPoints(ctx, repo.CountPhotoMapPointsParams{
 		RepositoryID: repoUUID,
 		OwnerID:      params.OwnerID,
 		South:        params.South,
@@ -1725,7 +1756,7 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 		return nil, 0, fmt.Errorf("failed to count photo map points: %w", err)
 	}
 
-	rows, err := s.queries.GetPhotoMapPoints(ctx, repo.GetPhotoMapPointsParams{
+	rows, err := s.readQueries.GetPhotoMapPoints(ctx, repo.GetPhotoMapPointsParams{
 		RepositoryID: repoUUID,
 		OwnerID:      params.OwnerID,
 		South:        params.South,

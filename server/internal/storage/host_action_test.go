@@ -165,6 +165,37 @@ func TestHostActionCancellationAndExpiry(t *testing.T) {
 	}
 }
 
+func TestListPendingHostActionsStaysAvailableWhileWriterIsBusy(t *testing.T) {
+	catalog, manager := newCatalogRepositoryManager(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	manager.readerDatabase = catalog.ReaderSQL
+	if _, err := manager.CreateHostAction(ctx, CreateHostActionInput{
+		RequestID: "writer-busy-host-action", Kind: HostActionOpenRepository, TTL: time.Minute,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	writer, err := catalog.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Rollback()
+	if _, err := writer.ExecContext(ctx, `UPDATE system_state SET updated_at = updated_at WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	readCtx, readCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer readCancel()
+	actions, err := manager.ListPendingHostActions(readCtx)
+	if err != nil {
+		t.Fatalf("pending host action list waited for the writer connection: %v", err)
+	}
+	if len(actions) != 1 {
+		t.Fatalf("pending host actions = %d, want 1", len(actions))
+	}
+}
+
 func TestHostActionFailurePersistsTerminalState(t *testing.T) {
 	_, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()

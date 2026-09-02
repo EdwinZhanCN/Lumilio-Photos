@@ -88,6 +88,12 @@ func TestWritePreflightRejectsReplacedParentStorageIdentity(t *testing.T) {
 	if err := original.Save(rootPath); err != nil {
 		t.Fatal(err)
 	}
+	if err := manager.ReconcileRepositoryRoots(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.ReconcileAll(ctx); err != nil {
+		t.Fatal(err)
+	}
 	runtimeStatus, err := manager.StorageRuntimeStatus(ctx)
 	if err != nil || runtimeStatus.State != StorageRuntimeStateActive {
 		t.Fatalf("explicit coordination status = %+v, error = %v", runtimeStatus, err)

@@ -7,6 +7,9 @@ sql:
       schema:
           - "migrations/000009_auth_security_baseline.up.sql"
           - "migrations/000010_agent_resume_preparation.up.sql"
+          - "migrations/000011_repository_observation_engine.up.sql"
+          - "migrations/000012_repository_observation_cutover.up.sql"
+          - "migrations/000013_location_projection_convergence.up.sql"
       gen:
           go:
               package: "repo"
@@ -24,18 +27,22 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "albums.cover_asset_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "assets.repository_id"
+                  - column: "repository_observation_state.active_run_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_file_index.asset_id"
+                  - column: "repository_nodes.parent_node_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_file_index.first_seen_scan_id"
+                  - column: "repository_nodes.last_seen_run_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_file_index.last_seen_scan_id"
+                  - column: "repository_observations.run_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_file_index.missing_since_scan_id"
+                  - column: "repository_observations.parent_node_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_scan_runs.authoritative"
-                    go_type: { type: "bool" }
+                  - column: "repository_observations.mapped_node_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_staging_commits.node_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_staging_commits.asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "media_items.repository_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "media_items.primary_asset_id"
@@ -61,6 +68,10 @@ sql:
                   - column: "repositories.default_owner_id"
                     go_type: { type: "int32", pointer: true }
                   - column: "assets.owner_id"
+                    # sqlc applies column overrides to optional narg filters as
+                    # well as row models. Keep the generated Go carrier
+                    # nullable so those filters remain optional; the v2 table's
+                    # NOT NULL constraint is the actual Asset invariant.
                     go_type: { type: "int32", pointer: true }
                   - column: "media_items.owner_id"
                     go_type: { type: "int32", pointer: true }
@@ -72,6 +83,8 @@ sql:
                     go_type: { type: "int32", pointer: true }
                   - column: "location_clusters.owner_id"
                     go_type: { type: "int32", pointer: true }
+                  - column: "location_projection_state.owner_id"
+                    go_type: { type: "int32" }
                   - column: "face_clusters.owner_id"
                     go_type: { type: "int32", pointer: true }
                   - column: "*.asset_id"
@@ -102,6 +115,8 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.effect_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.commit_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.initiating_run_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.executing_run_id"
@@ -119,6 +134,16 @@ sql:
                   - column: "*.last_import_run_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.active_run_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.node_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.observation_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.content_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.location_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "*.outbox_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.asset_id_a"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }

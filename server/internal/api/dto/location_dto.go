@@ -33,6 +33,6 @@ type RebuildLocationClustersRequestDTO struct {
 type RebuildLocationClustersResponseDTO struct {
 	Status       string  `json:"status" example:"queued"`
 	Message      string  `json:"message" example:"Location cluster rebuild queued successfully"`
-	JobID        int64   `json:"job_id" example:"123"`
+	ReceiptID    string  `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
 	RepositoryID *string `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 }

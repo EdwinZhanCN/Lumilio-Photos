@@ -25,6 +25,18 @@ func TestDirectoryManagerCreatesAndValidatesOnlyRepositoryStructure(t *testing.T
 			t.Fatalf("repository directory %s: info=%v error=%v", directory.path, info, err)
 		}
 	}
+	for _, obsolete := range []string{
+		".lumilio/assets/thumbnails",
+		".lumilio/assets/videos",
+		".lumilio/assets/audios",
+		".lumilio/temp",
+		".lumilio/trash",
+		".lumilio/logs/app.log",
+	} {
+		if _, err := os.Stat(filepath.Join(repositoryPath, obsolete)); !os.IsNotExist(err) {
+			t.Fatalf("obsolete repository path %s exists or returned unexpected error: %v", obsolete, err)
+		}
+	}
 }
 
 func TestDirectoryManagerValidationReportsMissingWithoutRepairing(t *testing.T) {

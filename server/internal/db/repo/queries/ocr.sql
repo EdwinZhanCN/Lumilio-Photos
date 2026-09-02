@@ -80,13 +80,18 @@ WITH filter_params AS (
 SELECT
     a.asset_id,
     a.owner_id,
-    a.repository_id,
+    COALESCE(CAST(occurrence.repository_id AS TEXT), '') AS repository_id,
     a.type AS asset_type,
     a.is_deleted,
     m.revision,
     ti.text_content
 FROM ocr_results r
 JOIN assets a ON a.asset_id = r.asset_id
+LEFT JOIN (
+    SELECT asset_id, MIN(repository_id) AS repository_id
+    FROM active_asset_occurrences
+    GROUP BY asset_id
+) occurrence ON occurrence.asset_id = a.asset_id
 JOIN ocr_index_metadata m ON m.asset_id = r.asset_id
 LEFT JOIN ocr_text_items ti ON ti.asset_id = r.asset_id
 WHERE r.asset_id IN (
@@ -105,7 +110,7 @@ WITH batch_assets AS (
 SELECT
     a.asset_id,
     a.owner_id,
-    a.repository_id,
+    COALESCE(CAST(occurrence.repository_id AS TEXT), '') AS repository_id,
     a.type AS asset_type,
     a.is_deleted,
     m.revision,
@@ -113,6 +118,11 @@ SELECT
 FROM batch_assets b
 JOIN ocr_results r ON r.asset_id = b.asset_id
 JOIN assets a ON a.asset_id = r.asset_id
+LEFT JOIN (
+    SELECT asset_id, MIN(repository_id) AS repository_id
+    FROM active_asset_occurrences
+    GROUP BY asset_id
+) occurrence ON occurrence.asset_id = a.asset_id
 JOIN ocr_index_metadata m ON m.asset_id = r.asset_id
 LEFT JOIN ocr_text_items ti ON ti.asset_id = r.asset_id
 ORDER BY a.asset_id, ti.id;

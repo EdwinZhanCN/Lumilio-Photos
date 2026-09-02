@@ -13,26 +13,51 @@ import (
 
 const getFolderChildSummaries = `-- name: GetFolderChildSummaries :many
 
-WITH scoped AS (
+WITH RECURSIVE node_paths (repository_id, node_id, relative_path) AS (
+  SELECT repository_id, node_id, CAST('' AS TEXT)
+  FROM repository_nodes
+  WHERE parent_node_id IS NULL AND lifecycle = 'active'
+
+  UNION ALL
+
   SELECT
-    a.asset_id,
-    a.type,
-    a.taken_time,
-    a.upload_time,
-    a.repository_id,
+    child.repository_id,
+    child.node_id,
     CASE
-      WHEN ?1 = '' THEN a.storage_path
-      ELSE substr(a.storage_path, length(?1) + 2)
+      WHEN parent.relative_path = '' THEN child.name
+      ELSE parent.relative_path || '/' || child.name
+    END
+  FROM repository_nodes child
+  JOIN node_paths parent
+    ON parent.repository_id = child.repository_id
+   AND parent.node_id = child.parent_node_id
+  WHERE child.lifecycle = 'active'
+),
+scoped AS (
+  SELECT
+    asset.asset_id,
+    asset.type,
+    asset.taken_time,
+    asset.upload_time,
+    occurrence.repository_id,
+    CASE
+      WHEN ?1 = '' THEN node_path.relative_path
+      ELSE substr(node_path.relative_path, length(?1) + 2)
     END AS remainder
-  FROM assets a
-  WHERE a.is_deleted = false
-    AND (?2 IS NULL OR a.owner_id = ?2)
-    AND (?3 IS NULL OR a.repository_id = ?3)
-    AND a.storage_path NOT LIKE '.lumilio/%'
-    AND a.storage_path NOT LIKE 'inbox/%'
+  FROM assets asset
+  JOIN active_asset_occurrences occurrence
+    ON occurrence.asset_id = asset.asset_id
+  JOIN node_paths node_path
+    ON node_path.repository_id = occurrence.repository_id
+   AND node_path.node_id = occurrence.node_id
+  WHERE asset.is_deleted = false
+    AND (?2 IS NULL OR asset.owner_id = ?2)
+    AND (?3 IS NULL OR occurrence.repository_id = ?3)
+    AND node_path.relative_path NOT LIKE '.lumilio/%'
+    AND node_path.relative_path NOT LIKE 'inbox/%'
     AND (
       ?1 = ''
-      OR a.storage_path LIKE ?1 || '/%'
+      OR node_path.relative_path LIKE ?1 || '/%'
     )
 ),
 child_folders AS (
@@ -58,10 +83,10 @@ ranked AS (
 SELECT
   repository_id,
   child_name,
-  COUNT(*) AS asset_count,
-  COUNT(*) FILTER (WHERE type = 'PHOTO') AS photo_count,
-  COUNT(*) FILTER (WHERE type = 'VIDEO') AS video_count,
-  COUNT(*) FILTER (WHERE type = 'AUDIO') AS audio_count,
+  COUNT(DISTINCT asset_id) AS asset_count,
+  COUNT(DISTINCT asset_id) FILTER (WHERE type = 'PHOTO') AS photo_count,
+  COUNT(DISTINCT asset_id) FILTER (WHERE type = 'VIDEO') AS video_count,
+  COUNT(DISTINCT asset_id) FILTER (WHERE type = 'AUDIO') AS audio_count,
   MIN(COALESCE(taken_time, upload_time)) AS date_start,
   MAX(COALESCE(taken_time, upload_time)) AS date_end,
   MAX(CASE WHEN cover_rank = 1 THEN asset_id END) AS cover_asset_id
@@ -88,14 +113,10 @@ type GetFolderChildSummariesRow struct {
 	CoverAssetID interface{} `db:"cover_asset_id" json:"cover_asset_id"`
 }
 
-// Folder browsing has no dedicated table: "folders" are derived from the
-// repository-relative prefix of assets.storage_path. All queries here treat
-// storage_path as relative (see assets_repository_id_storage_path_key) and
-// must never expose repositories.path (the absolute host path).
-// Lists immediate child folders of parent_path (recursive descendant
-// counts/covers). Excludes internal .lumilio paths, app-managed inbox
-// uploads, and any asset that sits directly in parent_path (files, not
-// folders).
+// Folder collection views are graph projections. Repository-relative paths
+// are assembled by traversing repository_nodes and are never stored on Asset.
+// Lists immediate child folders of parent_path and computes recursive
+// descendant counts/covers from active Locations.
 func (q *Queries) GetFolderChildSummaries(ctx context.Context, arg GetFolderChildSummariesParams) ([]GetFolderChildSummariesRow, error) {
 	rows, err := q.db.QueryContext(ctx, getFolderChildSummaries, arg.ParentPath, arg.OwnerID, arg.RepositoryID)
 	if err != nil {
@@ -130,28 +151,56 @@ func (q *Queries) GetFolderChildSummaries(ctx context.Context, arg GetFolderChil
 }
 
 const getFolderSummary = `-- name: GetFolderSummary :one
-WITH scoped AS (
+WITH RECURSIVE node_paths (repository_id, node_id, relative_path) AS (
+  SELECT repository_id, node_id, CAST('' AS TEXT)
+  FROM repository_nodes
+  WHERE parent_node_id IS NULL AND lifecycle = 'active'
+
+  UNION ALL
+
   SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
+    child.repository_id,
+    child.node_id,
+    CASE
+      WHEN parent.relative_path = '' THEN child.name
+      ELSE parent.relative_path || '/' || child.name
+    END
+  FROM repository_nodes child
+  JOIN node_paths parent
+    ON parent.repository_id = child.repository_id
+   AND parent.node_id = child.parent_node_id
+  WHERE child.lifecycle = 'active'
+),
+scoped AS (
+  SELECT
+    asset.asset_id,
+    asset.type,
+    asset.taken_time,
+    asset.upload_time,
     ROW_NUMBER() OVER (
-      ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+      ORDER BY COALESCE(asset.taken_time, asset.upload_time) DESC, asset.asset_id DESC
     ) AS cover_rank
-  FROM assets a
-  WHERE a.is_deleted = false
-    AND (?1 IS NULL OR a.owner_id = ?1)
-    AND a.repository_id = ?2
-    AND a.storage_path NOT LIKE '.lumilio/%'
-    AND a.storage_path NOT LIKE 'inbox/%'
+  FROM assets asset
+  JOIN active_asset_occurrences occurrence
+    ON occurrence.asset_id = asset.asset_id
+   AND occurrence.repository_id = ?1
+  JOIN node_paths node_path
+    ON node_path.repository_id = occurrence.repository_id
+   AND node_path.node_id = occurrence.node_id
+  WHERE asset.is_deleted = false
+    AND (?2 IS NULL OR asset.owner_id = ?2)
+    AND node_path.relative_path NOT LIKE '.lumilio/%'
+    AND node_path.relative_path NOT LIKE 'inbox/%'
     AND (
       ?3 = ''
-      OR a.storage_path LIKE ?3 || '/%'
+      OR node_path.relative_path LIKE ?3 || '/%'
     )
 )
 SELECT
-  COUNT(*) AS asset_count,
-  COUNT(*) FILTER (WHERE type = 'PHOTO') AS photo_count,
-  COUNT(*) FILTER (WHERE type = 'VIDEO') AS video_count,
-  COUNT(*) FILTER (WHERE type = 'AUDIO') AS audio_count,
+  COUNT(DISTINCT asset_id) AS asset_count,
+  COUNT(DISTINCT asset_id) FILTER (WHERE type = 'PHOTO') AS photo_count,
+  COUNT(DISTINCT asset_id) FILTER (WHERE type = 'VIDEO') AS video_count,
+  COUNT(DISTINCT asset_id) FILTER (WHERE type = 'AUDIO') AS audio_count,
   MIN(COALESCE(taken_time, upload_time)) AS date_start,
   MAX(COALESCE(taken_time, upload_time)) AS date_end,
   MAX(CASE WHEN cover_rank = 1 THEN asset_id END) AS cover_asset_id
@@ -159,9 +208,9 @@ FROM scoped
 `
 
 type GetFolderSummaryParams struct {
-	OwnerID      interface{}   `db:"owner_id" json:"owner_id"`
-	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	FolderPath   interface{}   `db:"folder_path" json:"folder_path"`
+	RepositoryID uuid.UUID   `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	FolderPath   interface{} `db:"folder_path" json:"folder_path"`
 }
 
 type GetFolderSummaryRow struct {
@@ -174,9 +223,9 @@ type GetFolderSummaryRow struct {
 	CoverAssetID interface{} `db:"cover_asset_id" json:"cover_asset_id"`
 }
 
-// Aggregate stats for one folder path (recursive descendants).
+// Aggregate stats for one graph-derived folder path and all descendants.
 func (q *Queries) GetFolderSummary(ctx context.Context, arg GetFolderSummaryParams) (GetFolderSummaryRow, error) {
-	row := q.db.QueryRowContext(ctx, getFolderSummary, arg.OwnerID, arg.RepositoryID, arg.FolderPath)
+	row := q.db.QueryRowContext(ctx, getFolderSummary, arg.RepositoryID, arg.OwnerID, arg.FolderPath)
 	var i GetFolderSummaryRow
 	err := row.Scan(
 		&i.AssetCount,

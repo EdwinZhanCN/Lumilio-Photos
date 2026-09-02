@@ -11,6 +11,7 @@ import (
 	"sort"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/utils/phash"
@@ -180,6 +181,7 @@ type AssetDeleter interface {
 type duplicateService struct {
 	queries      *repo.Queries
 	pool         *sql.DB
+	writer       *catalogtx.Writer
 	logger       *zap.Logger
 	assetDeleter AssetDeleter
 }
@@ -188,6 +190,7 @@ type duplicateService struct {
 func NewDuplicateService(
 	queries *repo.Queries,
 	pool *sql.DB,
+	writer *catalogtx.Writer,
 	logger *zap.Logger,
 	assetDeleter AssetDeleter,
 ) DuplicateService {
@@ -197,6 +200,7 @@ func NewDuplicateService(
 	return &duplicateService{
 		queries:      queries,
 		pool:         pool,
+		writer:       writer,
 		logger:       logger,
 		assetDeleter: assetDeleter,
 	}
@@ -233,22 +237,44 @@ type duplicateEdge struct {
 	conf     float64
 }
 
+type duplicateDetectionMember struct {
+	AssetID  string `json:"asset_id"`
+	Role     string `json:"role"`
+	FileSize int64  `json:"file_size"`
+}
+
+type duplicateDetectionEvidence struct {
+	AssetIDA   string  `json:"asset_id_a"`
+	AssetIDB   string  `json:"asset_id_b"`
+	Method     string  `json:"method"`
+	Distance   float64 `json:"distance"`
+	Confidence float64 `json:"confidence"`
+}
+
+type duplicateDetectionGroup struct {
+	GroupID           string                       `json:"group_id"`
+	OwnerID           *int32                       `json:"owner_id"`
+	Method            string                       `json:"method"`
+	AssetCount        int                          `json:"asset_count"`
+	TotalSize         int64                        `json:"total_size"`
+	RecommendedKeeper string                       `json:"recommended_keeper"`
+	Members           []duplicateDetectionMember   `json:"members"`
+	Edges             []duplicateDetectionEvidence `json:"edges"`
+}
+
 // DetectForRepository implements DuplicateService.
 func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID uuid.UUID) (DuplicateDetectionResult, error) {
 	logger := s.logger.With(zap.String("repository_id", repositoryID.String()))
 	pgRepoID := uuidToPG(repositoryID)
 
-	// 1. Gather exact-hash candidates, pHash embeddings, and stack membership.
-	repositoryFilter := optionalUUID(&repositoryID)
-	exactRows, err := s.queries.GetExactDuplicateCandidates(ctx, repositoryFilter)
-	if err != nil {
-		return DuplicateDetectionResult{}, fmt.Errorf("load exact candidates: %w", err)
-	}
-	phashRows, err := s.queries.ListPHashEmbeddingsForRepository(ctx, repositoryFilter)
+	// 1. Gather pHash embeddings and stack membership. Byte-identical files
+	// converge to one logical Asset with multiple Locations, so an exact-hash
+	// duplicate group can no longer exist in the Asset graph.
+	phashRows, err := s.queries.ListPHashEmbeddingsForRepository(ctx, repositoryID)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("load phash embeddings: %w", err)
 	}
-	stackRows, err := s.queries.GetStackMembershipForRepository(ctx, repositoryFilter)
+	stackRows, err := s.queries.GetStackMembershipForRepository(ctx, repositoryID)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("load stack membership: %w", err)
 	}
@@ -258,24 +284,8 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 		stackOf[pgToUUID(row.AssetID)] = pgToUUID(row.StackID)
 	}
 
-	// 2. Index every photo we saw, regardless of which edge introduced it,
-	// so the same asset reachable from exact and pHash collapses into one node.
+	// 2. Index every photo with a pHash.
 	assets := make(map[uuid.UUID]*detectionAsset)
-	for _, row := range exactRows {
-		id := pgToUUID(row.AssetID)
-		da := assets[id]
-		if da == nil {
-			da = &detectionAsset{id: id}
-			assets[id] = da
-		}
-		da.owner = row.OwnerID
-		da.fileSize = row.FileSize
-		da.takenTime = timestamptzOrZero(row.TakenTime)
-		da.uploadTime = timestamptzOrZero(row.UploadTime)
-		if row.Rating != nil {
-			da.rating = *row.Rating
-		}
-	}
 	for _, row := range phashRows {
 		id := pgToUUID(row.AssetID)
 		da := assets[id]
@@ -308,9 +318,8 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 
 	// 3. Collect edges. Each edge is canonicalized to (min, max) endpoints so
 	// union-find treats both methods uniformly and exact/pHash edges naturally
-	// merge into a single connected component when they share an asset.
+	// form connected components of perceptually similar assets.
 	edges := make([]duplicateEdge, 0)
-	edges = append(edges, buildExactEdges(exactRows, stackOf)...)
 	edges = append(edges, buildPHashEdges(phashRows, stackOf)...)
 
 	if len(edges) == 0 {
@@ -319,7 +328,6 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 			return DuplicateDetectionResult{}, fmt.Errorf("clear pending groups: %w", err)
 		}
 		logger.Info("duplicate detection complete: no edges",
-			zap.Int("exact_candidates", len(exactRows)),
 			zap.Int("phash_assets", len(phashRows)),
 		)
 		return DuplicateDetectionResult{GeneratedAt: time.Now()}, nil
@@ -360,20 +368,11 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 		c.members = append(c.members, da)
 	}
 
-	// 6. Persist groups in a single transaction so the UI never sees a partial
-	// graph if the detection run fails halfway.
-	tx, err := s.pool.BeginTx(ctx, nil)
-	if err != nil {
-		return DuplicateDetectionResult{}, fmt.Errorf("begin detection tx: %w", err)
-	}
-	defer tx.Rollback()
-	txQueries := s.queries.WithTx(tx)
-
-	if err := txQueries.DeletePendingDuplicateGroupsByRepository(ctx, pgRepoID); err != nil {
-		return DuplicateDetectionResult{}, fmt.Errorf("clear pending groups: %w", err)
-	}
-
+	// 6. Build the complete replacement payload before acquiring SQLite's sole
+	// writer. Persistence remains one atomic graph swap, but three set-based
+	// json_each statements replace O(groups+members+edges) driver round trips.
 	result := DuplicateDetectionResult{GeneratedAt: time.Now()}
+	persistedGroups := make([]duplicateDetectionGroup, 0, len(components))
 	for _, c := range components {
 		if len(c.members) < 2 {
 			continue
@@ -391,57 +390,93 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 		result.AssetsAffected += len(c.members)
 
 		recommended := pickRecommendedKeeper(c.members)
-		totalSize := int64(0)
-		for _, m := range c.members {
-			totalSize += m.fileSize
+		group := duplicateDetectionGroup{
+			GroupID:           uuid.NewString(),
+			OwnerID:           c.members[0].owner,
+			Method:            method,
+			AssetCount:        len(c.members),
+			RecommendedKeeper: recommended.String(),
+			Members:           make([]duplicateDetectionMember, 0, len(c.members)),
+			Edges:             make([]duplicateDetectionEvidence, 0, len(c.edges)),
 		}
-
-		// Edges never cross owners, so every member of a component shares
-		// the same owner; stamp it as the group owner (NULL = admin-only).
-		groupID, err := txQueries.CreateDuplicateGroup(ctx, repo.CreateDuplicateGroupParams{
-			RepositoryID:             pgRepoID,
-			OwnerID:                  c.members[0].owner,
-			Method:                   method,
-			AssetCount:               int64(len(c.members)),
-			TotalSize:                totalSize,
-			RecommendedKeeperAssetID: uuid.NullUUID{UUID: recommended, Valid: true},
-			DetectionVersion:         DuplicateDetectionVersion,
-			GroupID:                  uuid.New(),
-		})
-		if err != nil {
-			return DuplicateDetectionResult{}, fmt.Errorf("create duplicate group: %w", err)
-		}
-
-		for _, m := range c.members {
+		for _, member := range c.members {
+			group.TotalSize += member.fileSize
 			role := DuplicateRoleCandidate
-			if m.id == recommended {
-				// Mark the recommendation as keeper to keep the API stable; the user
-				// can override at merge time and we will reset roles then.
+			if member.id == recommended {
 				role = DuplicateRoleKeeper
 			}
-			if err := txQueries.InsertDuplicateGroupAsset(ctx, repo.InsertDuplicateGroupAssetParams{
-				GroupID:  groupID,
-				AssetID:  uuidToPG(m.id),
-				Role:     role,
-				FileSize: m.fileSize,
-			}); err != nil {
-				return DuplicateDetectionResult{}, fmt.Errorf("insert duplicate asset: %w", err)
-			}
+			group.Members = append(group.Members, duplicateDetectionMember{
+				AssetID: member.id.String(), Role: role, FileSize: member.fileSize,
+			})
 		}
+		for _, edge := range c.edges {
+			a, b := orderEdge(edge.a, edge.b)
+			group.Edges = append(group.Edges, duplicateDetectionEvidence{
+				AssetIDA: a.String(), AssetIDB: b.String(), Method: edge.method,
+				Distance: edge.distance, Confidence: edge.conf,
+			})
+		}
+		persistedGroups = append(persistedGroups, group)
+	}
+	payload, err := json.Marshal(persistedGroups)
+	if err != nil {
+		return DuplicateDetectionResult{}, fmt.Errorf("encode duplicate detection graph: %w", err)
+	}
 
-		for _, e := range c.edges {
-			a, b := orderEdge(e.a, e.b)
-			if err := txQueries.InsertDuplicateGroupEdge(ctx, repo.InsertDuplicateGroupEdgeParams{
-				GroupID:    groupID,
-				AssetIDA:   uuidToPG(a),
-				AssetIDB:   uuidToPG(b),
-				Method:     e.method,
-				Distance:   e.distance,
-				Confidence: e.conf,
-			}); err != nil {
-				return DuplicateDetectionResult{}, fmt.Errorf("insert duplicate edge: %w", err)
-			}
-		}
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationDuplicateDetectPublish, nil)
+	if err != nil {
+		return DuplicateDetectionResult{}, fmt.Errorf("begin detection tx: %w", err)
+	}
+	defer tx.Rollback()
+	txQueries := s.queries.WithTx(tx.Raw())
+
+	if err := txQueries.DeletePendingDuplicateGroupsByRepository(ctx, pgRepoID); err != nil {
+		return DuplicateDetectionResult{}, fmt.Errorf("clear pending groups: %w", err)
+	}
+
+	now := time.Now().UTC().UnixMicro()
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO duplicate_groups (
+			group_id, repository_id, owner_id, method, status,
+			asset_count, total_size, recommended_keeper_asset_id,
+			detection_version, detected_at, created_at, updated_at
+		)
+		SELECT
+			json_extract(value, '$.group_id'), ?,
+			json_extract(value, '$.owner_id'), json_extract(value, '$.method'), 'pending',
+			json_extract(value, '$.asset_count'), json_extract(value, '$.total_size'),
+			json_extract(value, '$.recommended_keeper'), ?, ?, ?, ?
+		FROM json_each(?)
+	`, pgRepoID, DuplicateDetectionVersion, now, now, now, payload); err != nil {
+		return DuplicateDetectionResult{}, fmt.Errorf("bulk insert duplicate groups: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO duplicate_group_assets (group_id, asset_id, role, file_size)
+		SELECT
+			json_extract(graph.value, '$.group_id'),
+			json_extract(member.value, '$.asset_id'),
+			json_extract(member.value, '$.role'),
+			json_extract(member.value, '$.file_size')
+		FROM json_each(?) AS graph,
+		     json_each(graph.value, '$.members') AS member
+	`, payload); err != nil {
+		return DuplicateDetectionResult{}, fmt.Errorf("bulk insert duplicate assets: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO duplicate_group_edges (
+			group_id, asset_id_a, asset_id_b, method, distance, confidence
+		)
+		SELECT
+			json_extract(graph.value, '$.group_id'),
+			json_extract(edge.value, '$.asset_id_a'),
+			json_extract(edge.value, '$.asset_id_b'),
+			json_extract(edge.value, '$.method'),
+			json_extract(edge.value, '$.distance'),
+			json_extract(edge.value, '$.confidence')
+		FROM json_each(?) AS graph,
+		     json_each(graph.value, '$.edges') AS edge
+	`, payload); err != nil {
+		return DuplicateDetectionResult{}, fmt.Errorf("bulk insert duplicate edges: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -456,45 +491,6 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 		zap.Int("affected_assets", result.AssetsAffected),
 	)
 	return result, nil
-}
-
-// buildExactEdges turns rows sharing (owner, hash, file_size) into edges. To
-// keep the edge set linear we connect each non-first row to the first row in
-// the run; union-find handles full connectivity. Owner is part of the grouping
-// key so a group never spans owners. Pairs in the same photo stack are skipped.
-func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow, stackOf map[uuid.UUID]uuid.UUID) []duplicateEdge {
-	if len(rows) == 0 {
-		return nil
-	}
-	var edges []duplicateEdge
-	type key struct {
-		owner int64
-		hash  string
-		size  int64
-	}
-	var anchor uuid.UUID
-	var have bool
-	var prev key
-	for _, r := range rows {
-		k := key{owner: detectionOwnerKey(r.OwnerID), hash: r.ContentHash, size: r.FileSize}
-		id := pgToUUID(r.AssetID)
-		if !have || k != prev {
-			anchor = id
-			prev = k
-			have = true
-			continue
-		}
-		if sameStackPair(anchor, id, stackOf) {
-			continue
-		}
-		edges = append(edges, duplicateEdge{
-			a: anchor, b: id,
-			method:   DuplicateMethodExact,
-			distance: 0,
-			conf:     1.0,
-		})
-	}
-	return edges
 }
 
 // buildPHashEdges loads pHash uint64 values for each photo and produces edges
@@ -842,12 +838,12 @@ func (s *duplicateService) MergeGroup(ctx context.Context, params MergeGroupPara
 
 	// Stage 1: metadata merge in a single transaction so partial failures leave
 	// no half-merged keeper.
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationDuplicateMerge, nil)
 	if err != nil {
 		return MergeGroupResult{}, fmt.Errorf("begin merge tx: %w", err)
 	}
 	defer tx.Rollback()
-	txQueries := s.queries.WithTx(tx)
+	txQueries := s.queries.WithTx(tx.Raw())
 
 	keeperAsset, err := txQueries.GetAssetByID(ctx, uuidToPG(params.KeeperAssetID))
 	if err != nil {

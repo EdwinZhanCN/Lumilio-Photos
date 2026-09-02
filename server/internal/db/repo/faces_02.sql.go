@@ -14,18 +14,24 @@ import (
 
 const getFaceClusteringCandidates = `-- name: GetFaceClusteringCandidates :many
 SELECT
-    fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at,
-    a.repository_id,
+    fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at, fi.repository_id,
+    occurrence.repository_id,
     a.owner_id
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
+JOIN (
+    SELECT asset_id, MIN(repository_id) AS repository_id
+    FROM active_asset_occurrences
+    WHERE ?1 IS NULL
+       OR repository_id = ?1
+    GROUP BY asset_id
+) occurrence ON occurrence.asset_id = a.asset_id
 WHERE COALESCE(a.is_deleted, false) = false
-  AND (?1 IS NULL OR a.repository_id = ?1)
   AND (?2 IS NULL OR a.owner_id = ?2)
   AND fi.embedding IS NOT NULL
   AND fi.confidence >= ?3
   AND COALESCE(fi.face_size, 0) >= ?4
-ORDER BY a.repository_id ASC, a.owner_id ASC NULLS FIRST, fi.embedding_model ASC NULLS FIRST, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
+ORDER BY occurrence.repository_id ASC, a.owner_id ASC, fi.embedding_model ASC NULLS FIRST, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
 `
 
 type GetFaceClusteringCandidatesParams struct {
@@ -54,7 +60,8 @@ type GetFaceClusteringCandidatesRow struct {
 	BlurScore      *float64          `db:"blur_score" json:"blur_score"`
 	PoseAngles     dbtypes.JSON      `db:"pose_angles" json:"pose_angles"`
 	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	RepositoryID   uuid.NullUUID     `db:"repository_id" json:"repository_id"`
+	RepositoryID   uuid.UUID         `db:"repository_id" json:"repository_id"`
+	RepositoryID_2 interface{}       `db:"repository_id_2" json:"repository_id_2"`
 	OwnerID        *int32            `db:"owner_id" json:"owner_id"`
 }
 
@@ -92,6 +99,7 @@ func (q *Queries) GetFaceClusteringCandidates(ctx context.Context, arg GetFaceCl
 			&i.PoseAngles,
 			&i.CreatedAt,
 			&i.RepositoryID,
+			&i.RepositoryID_2,
 			&i.OwnerID,
 		); err != nil {
 			return nil, err
@@ -306,7 +314,7 @@ func (q *Queries) GetFaceStatsByModel(ctx context.Context) ([]GetFaceStatsByMode
 }
 
 const getFacesByExpression = `-- name: GetFacesByExpression :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE expression = ?1
 AND confidence >= ?2
 ORDER BY confidence DESC
@@ -347,6 +355,7 @@ func (q *Queries) GetFacesByExpression(ctx context.Context, arg GetFacesByExpres
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -362,7 +371,7 @@ func (q *Queries) GetFacesByExpression(ctx context.Context, arg GetFacesByExpres
 }
 
 const getPrimaryFaces = `-- name: GetPrimaryFaces :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE is_primary = true
 AND confidence >= ?1
 ORDER BY confidence DESC
@@ -402,6 +411,7 @@ func (q *Queries) GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -417,7 +427,7 @@ func (q *Queries) GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams
 }
 
 const getTopFacesByQuality = `-- name: GetTopFacesByQuality :many
-SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at FROM face_items
+SELECT id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id FROM face_items
 WHERE quality_score >= ?1
 ORDER BY quality_score DESC, confidence DESC
 LIMIT ?2
@@ -456,6 +466,7 @@ func (q *Queries) GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQua
 			&i.BlurScore,
 			&i.PoseAngles,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -476,7 +487,7 @@ SET
     embedding = ?2,
     embedding_model = ?3
 WHERE id = ?1
-RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at
+RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at, repository_id
 `
 
 type UpdateFaceItemEmbeddingParams struct {
@@ -507,6 +518,7 @@ func (q *Queries) UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceIte
 		&i.BlurScore,
 		&i.PoseAngles,
 		&i.CreatedAt,
+		&i.RepositoryID,
 	)
 	return i, err
 }

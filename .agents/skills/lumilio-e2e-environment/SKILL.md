@@ -13,7 +13,7 @@ admin `e2e-admin`. Test media comes from the pinned external assets
 repository ([lumilio-pin-reconcile](../lumilio-pin-reconcile/SKILL.md)).
 Docker is required. Spec locators:
 [lumilio-e2e-spec](../lumilio-e2e-spec/SKILL.md). Lumen boundary:
-[lumilio-lumen-fixtures](../lumilio-lumen-fixtures/SKILL.md).
+[lumilio-lumen-fixtures](../lumilio-lumen-fixtures/SKILL.md). Remote hardware qualification and destructive resilience drills: [lumilio-remote-qualification](../lumilio-remote-qualification/SKILL.md).
 
 ## Lifecycle
 
@@ -36,10 +36,6 @@ serves a built image, so edits are otherwise invisible:
 ```sh
 docker compose -f web/e2e/compose.yml -p lumilio-photos-e2e up -d --build lumilio
 ```
-
-The `@edwinzhancn/docts` package is fetched from GitHub Packages during the
-image build; `environment.ts` copies `~/.npmrc` (or `LUMILIO_E2E_NPMRC`) into
-`.cache/e2e/npmrc` as a BuildKit secret.
 
 ## Seed variants
 
@@ -87,8 +83,6 @@ same `web:*` targets — there are no `ci:web:e2e:*` wrappers.
   a separate regular repository when a primary already exists.
 - Frontend upload completion means the River ingest job reached a terminal
   state, not that multipart transport returned 2xx.
-- `server/tools/uploadbench` deliberately excludes ML — it benchmarks the
-  pipeline and cannot validate embeddings.
 - fakelumen metrics live at `http://127.0.0.1:16658/metrics`
   (`LUMILIO_E2E_LUMEN_METRICS_URL`). `video-semantic-regression.spec.ts`
   waits on `semantic_image` counts; a recording miss that falls back to the

@@ -1,11 +1,10 @@
 -- name: CreateAsset :one
 INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, storage_path, mime_type,
-    file_size, content_hash, quick_fingerprint, quick_fingerprint_version,
-    width, height, duration, taken_time, specific_metadata, rating, liked, repository_id, status,
+    asset_id, owner_id, content_id, type, original_filename, mime_type,
+    width, height, duration, taken_time, specific_metadata, rating, liked, status,
     upload_time, updated_at
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19,
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
@@ -168,32 +167,6 @@ AND (?2 IS NULL OR type = ?2)
 ORDER BY upload_time DESC
 LIMIT ?3 OFFSET ?4;
 
--- name: UpdateAssetStatus :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING *;
-
--- name: UpdateAssetStoragePathAndStatus :one
-UPDATE assets
-SET
-    storage_path = ?2,
-    status = ?3
-WHERE asset_id = ?1
-RETURNING *;
-
--- name: MoveAssetWithinRepository :one
-UPDATE assets
-SET
-    storage_path = sqlc.arg('storage_path'),
-    original_filename = sqlc.arg('original_filename'),
-    is_deleted = false,
-    deleted_at = NULL,
-    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE asset_id = sqlc.arg('asset_id')
-  AND repository_id = sqlc.arg('repository_id')
-RETURNING *;
-
 -- name: GetAssetsByStatus :many
 SELECT * FROM assets
 WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false
@@ -214,7 +187,13 @@ LIMIT ?1 OFFSET ?2;
 
 -- name: GetAssetsByStatusAndRepository :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND repository_id = ?2 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = ?1
+  AND is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = ?2
+  )
 ORDER BY upload_time DESC
 LIMIT ?3 OFFSET ?4;
 
@@ -232,108 +211,50 @@ WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false;
 -- name: CountAssetsByStatusAndRepository :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND repository_id = ?2 AND is_deleted = false;
+WHERE json_extract(status, char(36) || '.state') = ?1
+  AND is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = ?2
+  );
 
 -- name: CountAssetsByStatusAndOwner :one
 SELECT COUNT(*) as count
 FROM assets
 WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false;
 
--- name: ResetAssetStatusForRetry :one
-UPDATE assets
-SET status = json_set(
-    status,
-    char(36) || '.state',
-    '"processing"'
-)
-WHERE asset_id = ?1 AND json_extract(status, char(36) || '.state') IN ('warning', 'failed')
-RETURNING *;
-
--- name: UpdateAssetStatusWithErrors :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING *;
-
--- name: BulkUpdateAssetStatus :exec
-UPDATE assets
-SET status = sqlc.arg('status')
-WHERE CAST(sqlc.narg('asset_ids') AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false;
-
 -- name: GetAssetsByContentHash :many
 SELECT * FROM assets
-WHERE content_hash = ?1 AND is_deleted = false;
+WHERE content_id IN (
+    SELECT content_objects.content_id
+    FROM content_objects
+    WHERE content_objects.full_hash = ?1
+  )
+  AND is_deleted = false;
 
 -- name: GetAssetByContentHashAndRepository :one
 SELECT * FROM assets
-WHERE content_hash = ?1 AND repository_id = ?2 AND is_deleted = false;
-
--- name: GetAssetsByContentHashesAndRepository :many
-WITH filter_params AS (
-  SELECT CAST(sqlc.narg('content_hashes') AS TEXT) AS content_hashes_json
-)
-SELECT asset_id, content_hash, file_size, original_filename, storage_path
-FROM assets
-WHERE content_hash IN (
-    SELECT CAST(value AS TEXT)
-    FROM json_each((SELECT content_hashes_json FROM filter_params))
+WHERE content_id IN (
+    SELECT content_objects.content_id
+    FROM content_objects
+    WHERE content_objects.full_hash = ?1
   )
-  AND repository_id = sqlc.arg('repository_id')
-  AND is_deleted = false;
-
--- name: GetAssetsByQuickFingerprintsAndRepository :many
-WITH filter_params AS (
-  SELECT CAST(sqlc.narg('quick_fingerprints') AS TEXT) AS quick_fingerprints_json
-)
-SELECT asset_id, quick_fingerprint, quick_fingerprint_version, file_size, original_filename
-FROM assets
-WHERE quick_fingerprint IN (
-    SELECT CAST(value AS TEXT)
-    FROM json_each((SELECT quick_fingerprints_json FROM filter_params))
+  AND is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = ?2
   )
-  AND repository_id = sqlc.arg('repository_id')
-  AND is_deleted = false;
-
--- name: GetAssetByRepositoryAndStoragePathAny :one
-SELECT * FROM assets
-WHERE repository_id = ?1 AND storage_path = ?2
 LIMIT 1;
 
--- name: ListAssetsByRepositoryAny :many
-SELECT * FROM assets
-WHERE repository_id = ?1
-  AND storage_path IS NOT NULL
-ORDER BY storage_path ASC;
-
--- name: SoftDeleteAssetByRepositoryAndStoragePath :execrows
-UPDATE assets
-SET is_deleted = true, deleted_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE repository_id = ?1
-  AND storage_path = ?2
-  AND is_deleted = false;
-
--- name: UpdateDiscoveredAssetByID :one
-UPDATE assets
-SET original_filename = ?2,
-    mime_type = ?3,
-    file_size = ?4,
-    content_hash = ?5,
-    quick_fingerprint = ?6,
-    quick_fingerprint_version = ?7,
-    taken_time = ?8,
-    status = ?9,
-    is_deleted = false,
-    deleted_at = NULL
-WHERE asset_id = ?1
-RETURNING *;
-
 -- name: CreateThumbnail :one
-INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, created_at)
-VALUES (?1, ?2, ?3, ?4, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
+INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, repository_id, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, size) DO UPDATE
 SET storage_path = EXCLUDED.storage_path,
     mime_type = EXCLUDED.mime_type,
+    repository_id = EXCLUDED.repository_id,
     created_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 RETURNING *;
 
@@ -600,6 +521,20 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 -- Repository Asset Statistics (kept for repository management)
 
 -- name: GetRepositoryAssetStats :one
+WITH scoped AS (
+  SELECT DISTINCT
+    asset.asset_id,
+    asset.type,
+    asset.liked,
+    asset.rating,
+    asset.upload_time,
+    occurrence.file_size
+  FROM assets asset
+  JOIN active_asset_occurrences occurrence ON occurrence.asset_id = asset.asset_id
+  WHERE asset.is_deleted = false
+    AND occurrence.repository_id = sqlc.arg('repository_id')
+    AND (sqlc.narg('owner_id') IS NULL OR asset.owner_id = sqlc.narg('owner_id'))
+)
 SELECT
   COUNT(*) as total_assets,
   COUNT(CASE WHEN type = 'PHOTO' THEN 1 END) as photo_count,
@@ -611,10 +546,7 @@ SELECT
   SUM(file_size) as total_size,
   MIN(upload_time) as oldest_upload,
   MAX(upload_time) as newest_upload
-FROM assets
-WHERE is_deleted = false
-  AND repository_id = sqlc.arg('repository_id')
-  AND (sqlc.narg('owner_id') IS NULL OR owner_id = sqlc.narg('owner_id'));
+FROM scoped;
 
 -- ============================================================================
 -- UNIFIED QUERY API

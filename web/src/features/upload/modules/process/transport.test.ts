@@ -25,7 +25,7 @@ describe("matchBatchUploadResult", () => {
       success: true,
       session_id: "upload-b",
       file_name: "DSC_0001.JPG",
-      task_id: 2,
+      receipt_id: "receipt-b",
     };
     expect(matchBatchUploadResult(first, byId, byName)).toBe(b);
     expect(byId.has("upload-b")).toBe(false);
@@ -34,7 +34,7 @@ describe("matchBatchUploadResult", () => {
       success: true,
       session_id: "upload-a",
       file_name: "DSC_0001.JPG",
-      task_id: 1,
+      receipt_id: "receipt-a",
     };
     expect(matchBatchUploadResult(second, byId, byName)).toBe(a);
   });
@@ -44,7 +44,7 @@ describe("matchBatchUploadResult", () => {
     const byId = new Map([["ui-1", only]]);
     const byName = new Map<string, FileUploadSession[]>([["photo.jpg", [only]]]);
     const matched = matchBatchUploadResult(
-      { success: true, file_name: "photo.jpg", task_id: 9 },
+      { success: true, file_name: "photo.jpg", receipt_id: "receipt" },
       byId,
       byName,
     );

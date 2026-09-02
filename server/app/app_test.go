@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"server/config"
+	"server/internal/db"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
@@ -195,5 +196,20 @@ func TestProductURLUsesLoopbackForDesktopListeners(t *testing.T) {
 		if got := productURL(test.listen); got != test.want {
 			t.Fatalf("productURL(%q) = %q, want %q", test.listen, got, test.want)
 		}
+	}
+}
+
+func TestWALStateOnlyRearmsCheckpointAfterFileChanges(t *testing.T) {
+	checkpointed := db.WALState{SizeBytes: 8 << 20, ModifiedAt: time.Unix(10, 20)}
+	if !walStateAlreadyCheckpointed(checkpointed, checkpointed, true) {
+		t.Fatal("identical WAL version must not schedule another passive checkpoint")
+	}
+	if walStateAlreadyCheckpointed(checkpointed, checkpointed, false) {
+		t.Fatal("WAL without a completed checkpoint must remain eligible")
+	}
+	changed := checkpointed
+	changed.ModifiedAt = changed.ModifiedAt.Add(time.Nanosecond)
+	if walStateAlreadyCheckpointed(changed, checkpointed, true) {
+		t.Fatal("a new WAL file version must re-arm checkpoint maintenance")
 	}
 }

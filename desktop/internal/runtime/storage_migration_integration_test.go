@@ -56,7 +56,6 @@ func newEmbeddedRuntimeHarness(t *testing.T) *embeddedRuntimeHarness {
 	settings.NetworkMode = "custom"
 	settings.Listen = reserveLoopbackAddress(t)
 	settings.StoragePath = oldPath
-	settings.RepositoryScanEnabled = false
 	settings.HardwareAcceleration = "none"
 	draft, err = configStore.PatchDraft(draft.TOML, settings)
 	if err != nil {

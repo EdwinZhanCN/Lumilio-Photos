@@ -10,6 +10,7 @@ import (
 
 	"server/config"
 	"server/internal/db"
+	"server/internal/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -84,14 +85,26 @@ INSERT INTO repository_roots (
 INSERT INTO repositories (
     repo_id, name, path, created_at, updated_at, default_owner_id, root_id
 ) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, mime_type, file_size,
-    content_hash, upload_time, repository_id, is_deleted, updated_at
-) VALUES
-    (?, 1, 'PHOTO', 'owned.jpg', 'image/jpeg', 1, 'owned', 1, ?, false, 1),
-    (?, 2, 'PHOTO', 'secret.jpg', 'image/jpeg', 1, 'secret', 1, ?, false, 1),
-    (?, 1, 'PHOTO', 'deleted.jpg', 'image/jpeg', 1, 'deleted', 1, ?, true, 1),
-    (?, 1, 'VIDEO', 'clip.mp4', 'video/mp4', 1, 'video', 1, ?, false, 1);
+`, rootID, repositoryID, rootID)
+	require.NoError(t, err)
+	for _, fixture := range []struct {
+		id, filename, assetType, mime string
+		ownerID                       int32
+		deleted                       bool
+	}{
+		{id: ids.ownerPhoto.String(), filename: "owned.jpg", assetType: "PHOTO", mime: "image/jpeg", ownerID: 1},
+		{id: ids.otherOwnerPhoto.String(), filename: "secret.jpg", assetType: "PHOTO", mime: "image/jpeg", ownerID: 2},
+		{id: ids.deletedPhoto.String(), filename: "deleted.jpg", assetType: "PHOTO", mime: "image/jpeg", ownerID: 1, deleted: true},
+		{id: ids.ownerVideo.String(), filename: "clip.mp4", assetType: "VIDEO", mime: "video/mp4", ownerID: 1},
+	} {
+		_, err = testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
+			AssetID: uuid.MustParse(fixture.id), RepositoryID: repositoryID, OwnerID: fixture.ownerID,
+			AssetType: fixture.assetType, Filename: fixture.filename, MIMEType: fixture.mime,
+			FileSize: 1, IsDeleted: fixture.deleted,
+		})
+		require.NoError(t, err)
+	}
+	_, err = catalog.SQL.ExecContext(ctx, `
 INSERT INTO ocr_results (
     asset_id, model_id, total_count, processing_time_ms, created_at, updated_at
 ) VALUES
@@ -106,11 +119,6 @@ INSERT INTO ocr_text_items (
     (?, 'other owner secret', 0.99, '[[0,0],[1,0],[1,1],[0,1]]', 18, 1, 1),
     (?, 'deleted secret', 0.99, '[[0,0],[1,0],[1,1],[0,1]]', 14, 1, 1);
 `,
-		rootID, repositoryID, rootID,
-		ids.ownerPhoto, repositoryID,
-		ids.otherOwnerPhoto, repositoryID,
-		ids.deletedPhoto, repositoryID,
-		ids.ownerVideo, repositoryID,
 		ids.ownerPhoto, ids.otherOwnerPhoto, ids.deletedPhoto,
 		ids.ownerPhoto, ids.ownerPhoto, ids.otherOwnerPhoto, ids.deletedPhoto,
 	)

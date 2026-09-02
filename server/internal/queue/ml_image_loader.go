@@ -2,13 +2,15 @@ package queue
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"path"
+	"os"
 
+	"server/internal/artifact"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/storage"
 	"server/internal/utils/imagesource"
 
@@ -19,15 +21,26 @@ type MLImageLoader interface {
 	LoadMLImage(ctx context.Context, assetID uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error)
 }
 
-var ErrDerivedAssetStale = errors.New("derived asset does not match current content")
+var ErrDerivedAssetStale = ErrAssetWorkStale
 
 type DBMLImageLoader struct {
-	Queries *repo.Queries
-	Files   *storage.RepositoryFSFactory
+	Reader MLImageReader
+	Files  *storage.RepositoryFSFactory
 }
 
-func NewDBMLImageLoader(queries *repo.Queries, files *storage.RepositoryFSFactory) *DBMLImageLoader {
-	return &DBMLImageLoader{Queries: queries, Files: files}
+type MLImageReader interface {
+	AssetWorkReader
+	GetThumbnailByAssetAndSize(context.Context, repo.GetThumbnailByAssetAndSizeParams) (repo.Thumbnail, error)
+	GetRepository(context.Context, uuid.UUID) (repo.Repository, error)
+}
+
+func NewDBMLImageLoader(reader MLImageReader, files *storage.RepositoryFSFactory) *DBMLImageLoader {
+	return &DBMLImageLoader{Reader: reader, Files: files}
+}
+
+func (l *DBMLImageLoader) ValidateAssetWork(ctx context.Context, assetID, expectedContentID uuid.UUID) error {
+	_, err := validateCurrentAssetWork(ctx, l.Reader, assetID, expectedContentID)
+	return err
 }
 
 func mlThumbnailSize(purpose imagesource.Purpose) string {
@@ -45,34 +58,28 @@ func mlThumbnailSize(purpose imagesource.Purpose) string {
 }
 
 func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
-	if l == nil || l.Queries == nil {
+	if l == nil || l.Reader == nil {
 		return nil, fmt.Errorf("ml image loader unavailable")
 	}
-	if preprocessVersion != "" && preprocessVersion != jobs.MLPreprocessVersionV1 {
+	if preprocessVersion != "" && preprocessVersion != MLPreprocessVersionV1 {
 		return nil, fmt.Errorf("unsupported ml preprocess version: %s", preprocessVersion)
 	}
 
-	asset, err := l.Queries.GetAssetByID(ctx, assetID)
+	asset, err := validateCurrentAssetWork(ctx, l.Reader, assetID, uuid.Nil)
 	if err != nil {
-		return nil, fmt.Errorf("get asset: %w", err)
+		return nil, err
 	}
 	if dbtypes.AssetType(asset.Type) != dbtypes.AssetTypePhoto {
 		return nil, fmt.Errorf("asset %s is not a photo: %s", asset.AssetID.String(), asset.Type)
 	}
-	if !asset.RepositoryID.Valid {
-		return nil, fmt.Errorf("asset %s has no repository", asset.AssetID.String())
-	}
-
-	repository, err := l.Queries.GetRepository(ctx, asset.RepositoryID.UUID)
-	if err != nil {
-		return nil, fmt.Errorf("get repository: %w", err)
-	}
-
 	thumbnailSize := mlThumbnailSize(purpose)
-	thumbnail, err := l.Queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
+	thumbnail, err := l.Reader.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
 		AssetID: assetID,
 		Size:    thumbnailSize,
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrDerivedAssetNotReady
+	}
 	if err != nil {
 		return nil, fmt.Errorf("get %s thumbnail: %w", thumbnailSize, err)
 	}
@@ -84,12 +91,22 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 	if err := validateThumbnailContent(asset, thumbnailSize, thumbnailPath); err != nil {
 		return nil, err
 	}
+	if thumbnail.RepositoryID == uuid.Nil {
+		return nil, fmt.Errorf("%s thumbnail has no repository", thumbnailSize)
+	}
+	repository, err := l.Reader.GetRepository(ctx, thumbnail.RepositoryID)
+	if err != nil {
+		return nil, fmt.Errorf("get thumbnail repository: %w", err)
+	}
 	repositoryFS, err := l.Files.Open(repository)
 	if err != nil {
 		return nil, err
 	}
 	defer repositoryFS.Close()
 	file, err := repositoryFS.OpenPrivate(thumbnailPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, ErrDerivedAssetNotReady
+	}
 	if err != nil {
 		return nil, fmt.Errorf("open %s thumbnail: %w", thumbnailSize, err)
 	}
@@ -104,9 +121,20 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID uuid.UUID, pu
 }
 
 func validateThumbnailContent(asset repo.Asset, size string, thumbnailPath storage.RepositoryPath) error {
-	expected := fmt.Sprintf("%s_%s.webp", asset.ContentHash, size)
-	if asset.ContentHash == "" || path.Base(thumbnailPath.String()) != expected {
+	expected, err := derivedThumbnailPath(asset.ContentID, size)
+	if err != nil || thumbnailPath.String() != expected {
 		return fmt.Errorf("%w: asset=%s size=%s", ErrDerivedAssetStale, asset.AssetID, size)
 	}
 	return nil
+}
+
+func derivedThumbnailPath(contentID uuid.UUID, size string) (string, error) {
+	if contentID == uuid.Nil {
+		return "", ErrDerivedAssetStale
+	}
+	p, err := (artifact.Identity{SourceFence: contentID.String(), Stage: "derivatives", PipelineVersion: pipeline.AssetPipelineVersion, Name: size + ".webp"}).Path()
+	if err != nil {
+		return "", err
+	}
+	return p.String(), nil
 }

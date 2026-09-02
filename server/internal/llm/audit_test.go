@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/cloudwego/eino/components/model"
@@ -62,7 +63,7 @@ func TestAuditWrappingSurvivesToolBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat audit log: %v", err)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
+	if got := info.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("audit permissions = %#o, want 0600", got)
 	}
 }

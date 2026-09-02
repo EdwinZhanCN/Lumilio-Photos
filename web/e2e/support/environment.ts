@@ -1,33 +1,21 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { compose, docker, repositoryRoot } from "./docker.ts";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const cache = path.join(root, ".cache/e2e");
-// CI layers a build-cache override on top through this env var; local runs leave
-// it unset and build without a cache backend.
-const extraFile = process.env.LUMILIO_E2E_COMPOSE_EXTRA;
-const composeFile = path.join(root, "web/e2e/compose.yml");
-const extraPath = extraFile
-  ? path.isAbsolute(extraFile)
-    ? extraFile
-    : path.resolve(root, extraFile)
-  : undefined;
-const compose = [
-  "compose",
-  "-f",
-  composeFile,
-  ...(extraPath ? ["-f", extraPath] : []),
-  "-p",
-  "lumilio-photos-e2e",
-];
+const cache = path.join(repositoryRoot, ".cache/e2e");
 
 function run(args: string[]): void {
-  const result = spawnSync("docker", args, { cwd: root, stdio: "inherit", env: process.env });
+  const result = spawnSync("docker", [...docker, ...args], {
+    cwd: repositoryRoot,
+    stdio: "inherit",
+    env: process.env,
+  });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`docker ${args.join(" ")} failed (${result.status})`);
+  if (result.status !== 0) {
+    throw new Error(`docker ${[...docker, ...args].join(" ")} failed (${result.status})`);
+  }
 }
 
 const command = process.argv[2];
@@ -37,8 +25,6 @@ if (command === "up") {
   run([...compose, "down", "--volumes", "--remove-orphans"]);
   await rm(cache, { recursive: true, force: true });
   await mkdir(cache, { recursive: true });
-  const npmrc = process.env.LUMILIO_E2E_NPMRC ?? path.join(process.env.HOME ?? "", ".npmrc");
-  await copyFile(npmrc, path.join(cache, "npmrc"));
   run([...compose, "up", "-d", "--build", "--wait"]);
 } else if (command === "down") {
   run([...compose, "down", "--volumes", "--remove-orphans"]);

@@ -2,12 +2,12 @@
 
 /**
  * Configuration for asset retry/reprocess tasks.
- * Uses queue names as task identifiers (bijection: queue name ↔ task type).
- * These must match the backend's validQueues in asset_handler.go.
+ * Uses catalog pipeline stages as task identifiers. These are product-level
+ * requests; River queue and macro-job names remain an implementation detail.
  */
 
 export interface RetryTaskOption {
-  key: string; // Queue name (canonical identifier)
+  key: string; // Catalog pipeline stage (canonical identifier)
   label: string;
   description: string;
   category: "metadata" | "media" | "ml";
@@ -17,51 +17,37 @@ export interface RetryTaskOption {
 export type AssetType = "PHOTO" | "VIDEO" | "AUDIO";
 
 /**
- * Available retry tasks using queue names as identifiers.
- * Keep this in sync with asset_handler.go validQueues map.
+ * Available retry tasks using catalog stage identifiers.
+ * Keep this in sync with asset_handler.go isValidReprocessStage.
  */
 export const RETRY_TASK_OPTIONS: RetryTaskOption[] = [
   {
-    key: "metadata_asset",
+    key: "analyze",
     label: "Metadata Extraction",
     description: "Extract EXIF and file metadata",
     category: "metadata",
     supportedAssetTypes: ["PHOTO", "VIDEO", "AUDIO"],
   },
   {
-    key: "thumbnail_asset",
+    key: "derivatives",
     label: "Thumbnail Generation",
     description: "Generate thumbnails at multiple sizes",
     category: "media",
     supportedAssetTypes: ["PHOTO", "VIDEO"],
   },
   {
-    key: "transcode_asset",
+    key: "transcode",
     label: "Media Transcoding",
     description: "Transcode video/audio to web-optimized formats",
     category: "media",
     supportedAssetTypes: ["VIDEO", "AUDIO"],
   },
   {
-    key: "process_semantic",
-    label: "Semantic Embedding",
-    description: "Generate embeddings for Image Semantic Analysis",
+    key: "enrich",
+    label: "Image and Media Enrichment",
+    description: "Run enabled semantic, OCR, face, and classification analysis",
     category: "ml",
-    supportedAssetTypes: ["PHOTO"],
-  },
-  {
-    key: "process_ocr",
-    label: "OCR Text Recognition",
-    description: "Extract text from images using OCR",
-    category: "ml",
-    supportedAssetTypes: ["PHOTO"],
-  },
-  {
-    key: "process_face",
-    label: "Face Detection",
-    description: "Detect and recognize faces in images",
-    category: "ml",
-    supportedAssetTypes: ["PHOTO"],
+    supportedAssetTypes: ["PHOTO", "VIDEO"],
   },
 ];
 
@@ -86,13 +72,13 @@ export function normalizeAssetType(assetType: string | undefined): AssetType | u
 }
 
 export function isRetryTaskSupportedForAssetType(
-  queueName: string,
+  stage: string,
   assetType: string | undefined,
 ): boolean {
   const normalizedAssetType = normalizeAssetType(assetType);
   if (!normalizedAssetType) return false;
 
-  const task = getRetryTaskOption(queueName);
+  const task = getRetryTaskOption(stage);
   return task?.supportedAssetTypes.includes(normalizedAssetType) ?? false;
 }
 
@@ -113,15 +99,15 @@ export function getRetryTasksByCategoryForAssetType(
 }
 
 /**
- * Get task option by queue name.
+ * Get task option by catalog stage.
  */
-export function getRetryTaskOption(queueName: string): RetryTaskOption | undefined {
-  return RETRY_TASK_OPTIONS.find((t) => t.key === queueName);
+export function getRetryTaskOption(stage: string): RetryTaskOption | undefined {
+  return RETRY_TASK_OPTIONS.find((t) => t.key === stage);
 }
 
 /**
- * Validate if a queue name is valid for retry.
+ * Validate if a catalog stage is valid for retry.
  */
-export function isValidRetryTask(queueName: string): boolean {
-  return RETRY_TASK_OPTIONS.some((t) => t.key === queueName);
+export function isValidRetryTask(stage: string): boolean {
+  return RETRY_TASK_OPTIONS.some((t) => t.key === stage);
 }

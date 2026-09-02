@@ -81,9 +81,12 @@
  * Repository `role`, so the monitor neither infers filesystem hierarchy from
  * path strings nor renders transport names as product copy.
  *
- * {@link useRepositoryScan} starts scans and stack detection.
- * {@link waitForRepositoryScan} follows a scan run to a terminal state before
- * repository-aware list/search queries are invalidated.
+ * {@link useRepositoryScan} starts scans and stack detection. A scan mutation
+ * settles when the Server transaction returns its immutable operation id and
+ * inserted/coalesced fact; it never waits for background crawl or processing.
+ * Repository rows poll the latest durable operation only while it is active,
+ * keeping operation progress in TanStack Query rather than request-local
+ * spinner state or timestamp correlation.
  * Repository conflicts use the exact generated Problem subtype for safe
  * recovery facts. Scan and native-host terminal states retain a Problem
  * Reference, and their flows call {@link localizeProblemReference} only when
@@ -103,7 +106,6 @@ import type { useRepositoryOptions } from "./api/useRepositoryOptions.ts";
 import type { useRepositoryRoots } from "./api/useRepositoryRoots.ts";
 import type { useRepositoryScan } from "./api/useRepositoryScan.ts";
 import type { useStorageDiagnostics } from "./api/useStorageDiagnostics.ts";
-import type { waitForRepositoryScan } from "./api/waitForRepositoryScan.ts";
 import type { StorageStrategyPicker } from "./components/StorageStrategyPicker.tsx";
 import type BrowseScopeSelect from "./flows/browse-scope/BrowseScopeSelect.tsx";
 import type { useBrowseScope } from "./flows/browse-scope/useBrowseScope.ts";

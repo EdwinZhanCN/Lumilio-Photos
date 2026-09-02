@@ -1,6 +1,7 @@
 package bleveocr
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 )
@@ -24,6 +25,19 @@ type SourceDocument struct {
 	IsDeleted    bool
 	Revision     int64
 	TextItems    []string
+}
+
+func repositoryIDString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []byte:
+		return string(typed)
+	case nil:
+		return ""
+	default:
+		return fmt.Sprint(typed)
+	}
 }
 
 func BuildDocument(source SourceDocument) OCRDocument {

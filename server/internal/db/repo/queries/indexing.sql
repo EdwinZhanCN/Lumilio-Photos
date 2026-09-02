@@ -3,7 +3,11 @@ SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: CountPhotoAssetsWithSemanticEmbedding :one
 SELECT COUNT(*) AS count
@@ -16,7 +20,11 @@ WHERE a.type = 'PHOTO'
     WHERE se.asset_id = a.asset_id
       AND se.frame_ts_ms IS NULL
   )
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: CountPhotoAssetsWithOCRResults :one
 SELECT COUNT(*) AS count
@@ -28,7 +36,11 @@ WHERE a.type = 'PHOTO'
     FROM ocr_results o
     WHERE o.asset_id = a.asset_id
   )
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: CountBioAlbumPhotoAssets :one
 SELECT COUNT(DISTINCT a.asset_id) AS count
@@ -38,7 +50,11 @@ JOIN assets a ON a.asset_id = aa.asset_id
 WHERE al.album_type = 'bio'
   AND a.type = 'PHOTO'
   AND a.is_deleted = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: CountBioAlbumPhotoAssetsWithSpeciesPredictions :one
 SELECT COUNT(DISTINCT a.asset_id) AS count
@@ -53,7 +69,11 @@ WHERE al.album_type = 'bio'
     FROM species_predictions sp
     WHERE sp.asset_id = a.asset_id
   )
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: CountPhotoAssetsWithFaceResults :one
 SELECT COUNT(*) AS count
@@ -65,7 +85,11 @@ WHERE a.type = 'PHOTO'
     FROM face_results f
     WHERE f.asset_id = a.asset_id
   )
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: ListPhotoAssetsForIndexingBatch :many
 WITH page_ids AS (
@@ -75,7 +99,11 @@ WITH page_ids AS (
   FROM assets a
   WHERE a.type = 'PHOTO'
     AND a.is_deleted = false
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT sqlc.arg('limit')
   OFFSET sqlc.arg('offset')
@@ -99,7 +127,11 @@ WITH page_ids AS (
       WHERE se.asset_id = a.asset_id
         AND se.frame_ts_ms IS NULL
     )
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT sqlc.arg('limit')
   OFFSET sqlc.arg('offset')
@@ -122,7 +154,11 @@ WITH page_ids AS (
       FROM ocr_results o
       WHERE o.asset_id = a.asset_id
     )
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT sqlc.arg('limit')
   OFFSET sqlc.arg('offset')
@@ -145,7 +181,11 @@ WITH page_ids AS (
       FROM face_results f
       WHERE f.asset_id = a.asset_id
     )
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT sqlc.arg('limit')
   OFFSET sqlc.arg('offset')
@@ -160,7 +200,11 @@ SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'VIDEO'
   AND a.is_deleted = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: CountVideoAssetsWithSemanticFrames :one
 SELECT COUNT(*) AS count
@@ -173,7 +217,11 @@ WHERE a.type = 'VIDEO'
     WHERE se.asset_id = a.asset_id
       AND se.frame_ts_ms IS NOT NULL
   )
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ));
 
 -- name: ListVideoAssetsForIndexingBatch :many
 WITH page_ids AS (
@@ -183,7 +231,11 @@ WITH page_ids AS (
   FROM assets a
   WHERE a.type = 'VIDEO'
     AND a.is_deleted = false
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT sqlc.arg('limit')
   OFFSET sqlc.arg('offset')
@@ -207,7 +259,11 @@ WITH page_ids AS (
       WHERE se.asset_id = a.asset_id
         AND se.frame_ts_ms IS NOT NULL
     )
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT sqlc.arg('limit')
   OFFSET sqlc.arg('offset')

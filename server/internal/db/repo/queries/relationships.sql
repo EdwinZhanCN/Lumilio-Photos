@@ -52,6 +52,8 @@ WHERE a.asset_id = ?1;
 -- name: GetAssetWithRelations :one
 SELECT
     a.*,
+    content.full_hash AS content_hash,
+    content.file_size,
     COALESCE((
         SELECT json_group_array(json_object(
             'thumbnail_id', ordered.thumbnail_id,
@@ -171,4 +173,5 @@ SELECT
         WHERE fr.asset_id = a.asset_id
     ) AS face_result
 FROM assets a
+JOIN content_objects content ON content.content_id = a.content_id
 WHERE a.asset_id = ?1;

@@ -32,19 +32,21 @@
  *     PROCESS --> HASH["useGenerateHashcode"]
  *     HASH --> PRECHECK["precheckUploads"]
  *     PRECHECK --> TRANSPORT["Batch or chunk transport"]
- *     TRANSPORT --> JOBS["waitForUploadJobs"]
+ *     TRANSPORT --> JOBS["waitForUploadOperations"]
  *     JOBS --> REFRESH["Refresh asset queries"]
  * ```
  *
  * {@link UnifiedUploadSection} validates files, edits the queue, chooses the
- * working repository, and starts processing. {@link NavbarUploadQueue} is a
+ * working repository, blocks starts while that Repository is paused or
+ * unreachable, and explains low writable-space recovery before hashing begins.
+ * {@link NavbarUploadQueue} is a
  * compact global view over the same provider state and links back to Manage.
  *
  * {@link useGenerateHashcode} fingerprints files before
  * {@link precheckUploads}. Known files are marked duplicate and skip transport;
  * a failed precheck falls back to normal upload. Small files use
  * {@link useBatchUploadMutation}, large files use
- * {@link useChunkedUploadMutation}, and {@link waitForUploadJobs} follows
+ * {@link useChunkedUploadMutation}, and {@link waitForUploadOperations} follows
  * accepted ingest tasks to terminal backend state before asset queries refresh.
  *
  * ## Data
@@ -81,7 +83,7 @@ import type { runUploadProcess } from "./modules/process/runner.ts";
 import type { UploadAction, UploadContext, UploadState } from "./state/context.ts";
 import type { UploadProvider } from "./state/UploadProvider.tsx";
 import type { uploadReducer } from "./state/reducer.ts";
-import type { waitForUploadJobs } from "../../lib/upload/uploadLifecycle.ts";
+import type { waitForUploadOperations } from "../../lib/upload/uploadLifecycle.ts";
 import type { precheckUploads } from "../../lib/upload/uploadTransport.ts";
 import type { useWorkingRepository } from "../repositories/index.ts";
 

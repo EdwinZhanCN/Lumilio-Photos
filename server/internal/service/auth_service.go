@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"server/config"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/secretbox"
@@ -99,7 +100,9 @@ type AuthResponse struct {
 // AuthService handles JWT authentication operations
 type AuthService struct {
 	queries                   *repo.Queries
+	readQueries               *repo.Queries
 	db                        *sql.DB
+	writer                    *catalogtx.Writer
 	jwtSecret                 []byte
 	mfaTokenSecret            []byte
 	passkeyTokenSecret        []byte
@@ -171,7 +174,9 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 
 	return &AuthService{
 		queries:                   queries,
+		readQueries:               queries,
 		db:                        db,
+		writer:                    catalogtx.NewWriter(db, nil),
 		jwtSecret:                 jwtSecret,
 		mfaTokenSecret:            mfaTokenSecret,
 		passkeyTokenSecret:        passkeyTokenSecret,
@@ -187,6 +192,25 @@ func NewAuthService(queries *repo.Queries, db *sql.DB, cfg config.AuthConfig, lo
 		logger:                    logger,
 		securityLogger:            securityLogger,
 	}, nil
+}
+
+func NewAuthServiceWithReader(
+	queries *repo.Queries,
+	readQueries *repo.Queries,
+	db *sql.DB,
+	writer *catalogtx.Writer,
+	cfg config.AuthConfig,
+	loggers ...*zap.Logger,
+) (*AuthService, error) {
+	service, err := NewAuthService(queries, db, cfg, loggers...)
+	if err != nil {
+		return nil, err
+	}
+	if readQueries != nil {
+		service.readQueries = readQueries
+	}
+	service.writer = writer
+	return service, nil
 }
 
 // CSRFTokenForRefresh returns a versioned token bound to one refresh session.
@@ -223,7 +247,7 @@ func (s *AuthService) GetLoginOptions(ctx context.Context, username string) (Log
 		return LoginOptions{}, err
 	}
 
-	user, err := s.queries.GetUserByUsername(ctx, normalized)
+	user, err := s.readQueries.GetUserByUsername(ctx, normalized)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return resolveLoginOptions(false, false, 0), nil
@@ -246,7 +270,7 @@ func (s *AuthService) GetLoginOptions(ctx context.Context, username string) (Log
 // Login authenticates a user and returns tokens
 func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 	// Get user by username
-	user, err := s.queries.GetUserByUsername(context.Background(), strings.ToLower(strings.TrimSpace(req.Username)))
+	user, err := s.readQueries.GetUserByUsername(context.Background(), strings.ToLower(strings.TrimSpace(req.Username)))
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -293,7 +317,7 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 // RefreshToken generates a new access token using a refresh token
 func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, error) {
 	// Get refresh token from database
-	refreshToken, err := s.queries.GetRefreshTokenRecordByToken(context.Background(), refreshTokenString)
+	refreshToken, err := s.readQueries.GetRefreshTokenRecordByToken(context.Background(), refreshTokenString)
 	if err != nil {
 		return nil, ErrTokenNotFound
 	}
@@ -332,7 +356,7 @@ func (s *AuthService) RefreshToken(refreshTokenString string) (*AuthResponse, er
 	}
 
 	// Get user
-	user, err := s.queries.GetUserByID(context.Background(), refreshToken.UserID)
+	user, err := s.readQueries.GetUserByID(context.Background(), refreshToken.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting user: %w", err)
 	}
@@ -393,7 +417,7 @@ func (s *AuthService) AuthenticateAccessToken(ctx context.Context, tokenString s
 	if err != nil {
 		return nil, err
 	}
-	user, err := s.queries.GetUserByID(ctx, int32(claims.UserID))
+	user, err := s.readQueries.GetUserByID(ctx, int32(claims.UserID))
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
@@ -405,7 +429,7 @@ func (s *AuthService) AuthenticateAccessToken(ctx context.Context, tokenString s
 }
 
 func (s *AuthService) GenerateMediaToken(ctx context.Context, userID int) (string, time.Time, error) {
-	user, err := s.queries.GetUserByID(ctx, int32(userID))
+	user, err := s.readQueries.GetUserByID(ctx, int32(userID))
 	if err != nil || !user.IsActive || user.PasswordChangeRequired {
 		return "", time.Time{}, ErrInvalidToken
 	}
@@ -455,7 +479,7 @@ func (s *AuthService) ValidateMediaToken(ctx context.Context, tokenString string
 	if claims.Scope != mediaTokenScope {
 		return nil, ErrInvalidToken
 	}
-	user, err := s.queries.GetUserByID(ctx, int32(claims.UserID))
+	user, err := s.readQueries.GetUserByID(ctx, int32(claims.UserID))
 	if err != nil || !user.IsActive || user.PasswordChangeRequired || user.AuthVersion != claims.AuthVersion {
 		return nil, ErrInvalidToken
 	}
@@ -465,7 +489,7 @@ func (s *AuthService) ValidateMediaToken(ctx context.Context, tokenString string
 
 // RevokeRefreshToken revokes a refresh token
 func (s *AuthService) RevokeRefreshToken(refreshTokenString string) error {
-	refreshToken, err := s.queries.GetRefreshTokenByToken(context.Background(), refreshTokenString)
+	refreshToken, err := s.readQueries.GetRefreshTokenByToken(context.Background(), refreshTokenString)
 	if err != nil {
 		return ErrTokenNotFound
 	}
@@ -474,7 +498,7 @@ func (s *AuthService) RevokeRefreshToken(refreshTokenString string) error {
 }
 
 func (s *AuthService) GetCurrentUser(userID int) (*UserResponse, error) {
-	user, err := s.queries.GetUserByID(context.Background(), int32(userID))
+	user, err := s.readQueries.GetUserByID(context.Background(), int32(userID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserNotFound

@@ -10,29 +10,19 @@ import (
 	"sync"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 	"server/internal/llm"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/secretbox"
 	"server/internal/settings"
-
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 )
 
 var ErrInvalidSystemSettings = errors.New("invalid system settings")
 
-// RiverJobInserter is the small transaction boundary the settings service
-// needs. Keeping this interface here avoids making service depend on the
-// queue package while still allowing River InsertTx to share the settings
-// transaction.
-type RiverJobInserter interface {
-	InsertTx(context.Context, *sql.Tx, river.JobArgs, *river.InsertOpts) (*rivertype.JobInsertResult, error)
-}
-
 type SettingsRuntime struct {
-	DB    *sql.DB
-	Queue RiverJobInserter
+	DB     *sql.DB
+	Writer *catalogtx.Writer
 }
 
 type SystemSettings struct {
@@ -158,7 +148,7 @@ type SettingsService interface {
 type settingsService struct {
 	queries          *repo.Queries
 	db               *sql.DB
-	queue            RiverJobInserter
+	writer           *catalogtx.Writer
 	secretPath       string
 	defaults         settings.Settings
 	encryptionSecret string
@@ -177,7 +167,7 @@ func NewSettingsServiceWithRuntime(queries *repo.Queries, defaults settings.Sett
 	return &settingsService{
 		queries:    queries,
 		db:         runtime.DB,
-		queue:      runtime.Queue,
+		writer:     runtime.Writer,
 		secretPath: strings.TrimSpace(secretKeyPath),
 		defaults:   defaults,
 	}
@@ -455,16 +445,16 @@ func (s *settingsService) updateGeocodingSettings(
 	previous settings.Geocoding,
 	candidate settings.Geocoding,
 ) (SystemSettings, error) {
-	if s.db == nil || s.queue == nil {
+	if s.db == nil || s.writer == nil {
 		return SystemSettings{}, errors.New("geocoding settings runtime dependencies are not configured")
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationSettingsGeocodingUpdate, nil)
 	if err != nil {
 		return SystemSettings{}, fmt.Errorf("begin geocoding settings update: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := s.queries.WithTx(tx)
+	qtx := s.queries.WithTx(tx.Raw())
 
 	updated, err := qtx.UpsertSettings(ctx, params)
 	if err != nil {
@@ -491,9 +481,7 @@ func (s *settingsService) updateGeocodingSettings(
 	}
 
 	if candidateEnabled {
-		args := jobs.ResolveLocationClustersArgs{GeocodingRevision: params.GeocodingRevision}
-		opts := args.InsertOpts()
-		if _, err := s.queue.InsertTx(ctx, tx, args, &opts); err != nil {
+		if err := pipeline.RequestLocationResolutionTx(ctx, tx.Raw(), uint64(params.GeocodingRevision)); err != nil {
 			return SystemSettings{}, fmt.Errorf("enqueue location cluster resolution: %w", err)
 		}
 	}

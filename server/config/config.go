@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-const SchemaVersion = 4
+const SchemaVersion = 6
 
 // AppConfig is the fully resolved, runtime-immutable configuration consumed by
 // server/app. Production hosts obtain it only from LoadAppConfig.
@@ -39,6 +39,7 @@ type AppConfig struct {
 	Transcode      TranscodeConfig
 	Lumen          LumenConfig
 	Tools          ToolsConfig
+	Execution      ExecutionConfig
 	loaded         bool
 }
 
@@ -46,7 +47,11 @@ type AppConfig struct {
 func (c AppConfig) LoadedFromManifest() bool { return c.loaded }
 
 type DatabaseConfig struct {
+	// Path is the product catalog SQLite file.
 	Path string
+	// QueuePath is the independent River execution-state SQLite file. It is
+	// rebuildable from catalog work intent and must never alias Path.
+	QueuePath string
 }
 
 type ServerConfig struct {
@@ -76,6 +81,15 @@ type ProxyConfig struct {
 	TrustedCIDRs []netip.Prefix
 }
 
+func (c ProxyConfig) IsTrusted(ip netip.Addr) bool {
+	for _, prefix := range c.TrustedCIDRs {
+		if prefix.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 type LoggingConfig struct {
 	Level                  string
 	LogDir                 string
@@ -100,11 +114,8 @@ func (c StorageConfig) CloudDir() string   { return c.CloudStatePath }
 func (c StorageConfig) BackupsDir() string { return c.BackupsPath }
 
 type RepositoryScanConfig struct {
-	Enabled            bool
-	IntervalSeconds    int
-	SettleSeconds      int
-	MaxConcurrentRepos int
-	BatchSize          int
+	IntervalSeconds int
+	SettleSeconds   int
 }
 
 type AuthConfig struct {
@@ -130,6 +141,19 @@ type AuthRateLimitConfig struct {
 }
 
 type TranscodeConfig struct{ HardwareAccel string }
+
+type ExecutionConfig struct {
+	CPU                  int
+	DiskIO               int
+	ImageCodec           int
+	VideoCodec           int
+	Inference            int
+	MemoryMiB            int64
+	MacroWorkers         int
+	MaxWaiting           int
+	FFmpegThreads        int
+	FFmpegSoftwarePreset string
+}
 
 type LumenConfig struct {
 	DiscoveryEnabled     bool
@@ -173,12 +197,16 @@ type manifest struct {
 	Transcode      *transcodeManifest      `toml:"transcode" json:"transcode"`
 	Lumen          *lumenManifest          `toml:"lumen" json:"lumen"`
 	Tools          *toolsManifest          `toml:"tools" json:"tools"`
+	Execution      *executionManifest      `toml:"execution" json:"execution"`
 }
 
 type databaseManifest struct {
 	// SQLite catalog file. Relative paths resolve from the manifest directory.
 	// ":memory:" is rejected because the catalog must survive a restart.
 	Path *string `toml:"path" json:"path"`
+	// Independent River execution-state file. Relative paths resolve from the
+	// manifest directory and the file must differ from path.
+	QueuePath *string `toml:"queue_path" json:"queue_path"`
 }
 type serverManifest struct {
 	// Local socket the application listener binds, as host:port or :port.
@@ -239,16 +267,10 @@ type storageManifest struct {
 	BackupsPath *string `toml:"backups_path" json:"backups_path"`
 }
 type repositoryScanManifest struct {
-	// Whether to periodically reconcile repositories against the catalog.
-	Enabled *bool `toml:"enabled" json:"enabled"`
 	// Seconds between scan sweeps.
 	IntervalSeconds *int `toml:"interval_seconds" json:"interval_seconds"`
 	// Seconds a file must stay unmodified before it is considered complete.
 	SettleSeconds *int `toml:"settle_seconds" json:"settle_seconds"`
-	// Repositories scanned concurrently.
-	MaxConcurrentRepos *int `toml:"max_concurrent_repos" json:"max_concurrent_repos"`
-	// Files per scan batch.
-	BatchSize *int `toml:"batch_size" json:"batch_size"`
 }
 type authManifest struct {
 	// Path to the token-signing key. This is a path, never the secret itself;
@@ -332,6 +354,28 @@ type toolsManifest struct {
 	// ffprobe binary, resolved by the same rule.
 	FFprobePath *string `toml:"ffprobe_path" json:"ffprobe_path"`
 }
+type executionManifest struct {
+	// Bound on concurrent CPU-intensive pipeline execution.
+	CPU *int `toml:"cpu" json:"cpu"`
+	// Bound on concurrent disk IO operations during pipeline steps.
+	DiskIO *int `toml:"disk_io" json:"disk_io"`
+	// Bound on concurrent image decoding and encoding operations.
+	ImageCodec *int `toml:"image_codec" json:"image_codec"`
+	// Bound on concurrent video decoding and transcode operations.
+	VideoCodec *int `toml:"video_codec" json:"video_codec"`
+	// Bound on concurrent machine-learning model inference tasks.
+	Inference *int `toml:"inference" json:"inference"`
+	// Total memory limit in MiB allocated for bounded pipeline execution.
+	MemoryMiB *int64 `toml:"memory_mib" json:"memory_mib"`
+	// Maximum number of concurrent River macro workers.
+	MacroWorkers *int `toml:"macro_workers" json:"macro_workers"`
+	// Maximum number of admitted tasks queued waiting for execution resources.
+	MaxWaiting *int `toml:"max_waiting" json:"max_waiting"`
+	// Number of threads allocated for video transcode processes.
+	FFmpegThreads *int `toml:"ffmpeg_threads" json:"ffmpeg_threads"`
+	// FFmpeg software transcode preset speed.
+	FFmpegSoftwarePreset *string `toml:"ffmpeg_software_preset" json:"ffmpeg_software_preset"`
+}
 
 // LoadAppConfig strictly loads one complete runtime manifest. It never searches
 // for files, reads environment variables, or fills missing fields.
@@ -399,8 +443,10 @@ func validateManifestPresence(m manifest) []string {
 	requiredSection(&p, "transcode", m.Transcode)
 	requiredSection(&p, "lumen", m.Lumen)
 	requiredSection(&p, "tools", m.Tools)
+	requiredSection(&p, "execution", m.Execution)
 	if m.Database != nil {
 		required(&p, "database.path", m.Database.Path)
+		required(&p, "database.queue_path", m.Database.QueuePath)
 	}
 	if m.Server != nil {
 		required(&p, "server.listen", m.Server.Listen)
@@ -432,11 +478,8 @@ func validateManifestPresence(m manifest) []string {
 		required(&p, "storage.backups_path", m.Storage.BackupsPath)
 	}
 	if m.RepositoryScan != nil {
-		required(&p, "repository_scan.enabled", m.RepositoryScan.Enabled)
 		required(&p, "repository_scan.interval_seconds", m.RepositoryScan.IntervalSeconds)
 		required(&p, "repository_scan.settle_seconds", m.RepositoryScan.SettleSeconds)
-		required(&p, "repository_scan.max_concurrent_repos", m.RepositoryScan.MaxConcurrentRepos)
-		required(&p, "repository_scan.batch_size", m.RepositoryScan.BatchSize)
 	}
 	if m.Auth != nil {
 		required(&p, "auth.secret_key_file", m.Auth.SecretKeyFile)
@@ -482,6 +525,18 @@ func validateManifestPresence(m manifest) []string {
 		required(&p, "tools.ffmpeg_path", m.Tools.FFmpegPath)
 		required(&p, "tools.ffprobe_path", m.Tools.FFprobePath)
 	}
+	if m.Execution != nil {
+		required(&p, "execution.cpu", m.Execution.CPU)
+		required(&p, "execution.disk_io", m.Execution.DiskIO)
+		required(&p, "execution.image_codec", m.Execution.ImageCodec)
+		required(&p, "execution.video_codec", m.Execution.VideoCodec)
+		required(&p, "execution.inference", m.Execution.Inference)
+		required(&p, "execution.memory_mib", m.Execution.MemoryMiB)
+		required(&p, "execution.macro_workers", m.Execution.MacroWorkers)
+		required(&p, "execution.max_waiting", m.Execution.MaxWaiting)
+		required(&p, "execution.ffmpeg_threads", m.Execution.FFmpegThreads)
+		required(&p, "execution.ffmpeg_software_preset", m.Execution.FFmpegSoftwarePreset)
+	}
 	return p
 }
 
@@ -505,10 +560,18 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requireOneOf(&p, "environment", environment, environmentValues...)
 
 	rawDatabasePath := strings.TrimSpace(*m.Database.Path)
-	db := DatabaseConfig{Path: resolvePath(base, rawDatabasePath)}
+	rawQueuePath := strings.TrimSpace(*m.Database.QueuePath)
+	db := DatabaseConfig{Path: resolvePath(base, rawDatabasePath), QueuePath: resolvePath(base, rawQueuePath)}
 	requireNonEmpty(&p, "database.path", rawDatabasePath)
+	requireNonEmpty(&p, "database.queue_path", rawQueuePath)
 	if rawDatabasePath == ":memory:" {
 		p = append(p, "database.path must be a persistent filesystem path")
+	}
+	if rawQueuePath == ":memory:" {
+		p = append(p, "database.queue_path must be a persistent filesystem path")
+	}
+	if db.Path != "" && db.QueuePath != "" && filepath.Clean(db.Path) == filepath.Clean(db.QueuePath) {
+		p = append(p, "database.queue_path must differ from database.path")
 	}
 
 	server := ServerConfig{
@@ -552,14 +615,14 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requireOutsidePath(&p, "logging.dir", logging.LogDir, storage.Path)
 	requireOutsidePath(&p, "database.path", db.Path, storage.Path)
 	requireOutsidePath(&p, "database.path", db.Path, storage.BackupsPath)
+	requireOutsidePath(&p, "database.queue_path", db.QueuePath, storage.Path)
+	requireOutsidePath(&p, "database.queue_path", db.QueuePath, storage.BackupsPath)
 	if server.TLS.StoragePath != "" {
 		requireOutsidePath(&p, "server.tls.storage_path", server.TLS.StoragePath, storage.Path)
 	}
-	scan := RepositoryScanConfig{Enabled: *m.RepositoryScan.Enabled, IntervalSeconds: *m.RepositoryScan.IntervalSeconds, SettleSeconds: *m.RepositoryScan.SettleSeconds, MaxConcurrentRepos: *m.RepositoryScan.MaxConcurrentRepos, BatchSize: *m.RepositoryScan.BatchSize}
+	scan := RepositoryScanConfig{IntervalSeconds: *m.RepositoryScan.IntervalSeconds, SettleSeconds: *m.RepositoryScan.SettleSeconds}
 	requirePositive(&p, "repository_scan.interval_seconds", scan.IntervalSeconds)
 	requirePositive(&p, "repository_scan.settle_seconds", scan.SettleSeconds)
-	requirePositive(&p, "repository_scan.max_concurrent_repos", scan.MaxConcurrentRepos)
-	requirePositive(&p, "repository_scan.batch_size", scan.BatchSize)
 
 	auth := AuthConfig{
 		SecretKeyFile: resolvePath(base, *m.Auth.SecretKeyFile),
@@ -627,7 +690,75 @@ func resolveManifest(m manifest, base string) (AppConfig, []string) {
 	requireNonEmpty(&p, "tools.ffmpeg_path", tools.FFmpegPath)
 	requireNonEmpty(&p, "tools.ffprobe_path", tools.FFprobePath)
 
-	return AppConfig{Environment: environment, DatabaseConfig: db, ServerConfig: server, LoggingConfig: logging, StorageConfig: storage, RepositoryScan: scan, Auth: auth, Transcode: transcode, Lumen: lumen, Tools: tools}, p
+	executionCfg := ExecutionConfig{}
+	if m.Execution != nil {
+		if m.Execution.CPU != nil {
+			executionCfg.CPU = *m.Execution.CPU
+			if executionCfg.CPU < 0 {
+				p = append(p, "execution.cpu must be non-negative")
+			}
+		}
+		if m.Execution.DiskIO != nil {
+			executionCfg.DiskIO = *m.Execution.DiskIO
+			if executionCfg.DiskIO < 0 {
+				p = append(p, "execution.disk_io must be non-negative")
+			}
+		}
+		if m.Execution.ImageCodec != nil {
+			executionCfg.ImageCodec = *m.Execution.ImageCodec
+			if executionCfg.ImageCodec < 0 {
+				p = append(p, "execution.image_codec must be non-negative")
+			}
+		}
+		if m.Execution.VideoCodec != nil {
+			executionCfg.VideoCodec = *m.Execution.VideoCodec
+			if executionCfg.VideoCodec < 0 {
+				p = append(p, "execution.video_codec must be non-negative")
+			}
+		}
+		if m.Execution.Inference != nil {
+			executionCfg.Inference = *m.Execution.Inference
+			if executionCfg.Inference < 0 {
+				p = append(p, "execution.inference must be non-negative")
+			}
+		}
+		if m.Execution.MemoryMiB != nil {
+			executionCfg.MemoryMiB = *m.Execution.MemoryMiB
+			if executionCfg.MemoryMiB < 64 {
+				p = append(p, "execution.memory_mib must be at least 64")
+			}
+		}
+		if m.Execution.MacroWorkers != nil {
+			executionCfg.MacroWorkers = *m.Execution.MacroWorkers
+			if executionCfg.MacroWorkers < 2 {
+				p = append(p, "execution.macro_workers must be at least 2")
+			}
+		}
+		if m.Execution.MaxWaiting != nil {
+			executionCfg.MaxWaiting = *m.Execution.MaxWaiting
+			if executionCfg.MaxWaiting < 1 {
+				p = append(p, "execution.max_waiting must be positive")
+			}
+		}
+		if m.Execution.FFmpegThreads != nil {
+			executionCfg.FFmpegThreads = *m.Execution.FFmpegThreads
+			if executionCfg.FFmpegThreads < 1 {
+				p = append(p, "execution.ffmpeg_threads must be positive")
+			}
+		}
+		if m.Execution.FFmpegSoftwarePreset != nil {
+			executionCfg.FFmpegSoftwarePreset = strings.TrimSpace(*m.Execution.FFmpegSoftwarePreset)
+			requireOneOf(&p, "execution.ffmpeg_software_preset", executionCfg.FFmpegSoftwarePreset, "ultrafast", "superfast", "veryfast", "faster", "fast", "medium")
+		}
+	}
+	if executionCfg.CPU == 0 && executionCfg.ImageCodec == 0 && executionCfg.VideoCodec == 0 && executionCfg.Inference == 0 {
+		p = append(p, "execution requires at least one of cpu, image_codec, video_codec, inference to be positive")
+	}
+	if executionCfg.CPU >= 1 && executionCfg.FFmpegThreads > executionCfg.CPU {
+		p = append(p, "execution.ffmpeg_threads must not exceed execution.cpu")
+	}
+
+	return AppConfig{Environment: environment, DatabaseConfig: db, ServerConfig: server, LoggingConfig: logging, StorageConfig: storage, RepositoryScan: scan, Auth: auth, Transcode: transcode, Lumen: lumen, Tools: tools, Execution: executionCfg}, p
 }
 
 func invalidConfig(p []string) error {
@@ -933,7 +1064,7 @@ func resolveOptionalPath(base, value string) string {
 }
 func resolveCommand(base, value string) string {
 	value = strings.TrimSpace(value)
-	if value == "" || (!filepath.IsAbs(value) && !strings.ContainsAny(value, `/\`)) {
+	if value == "" || (!filepath.IsAbs(value) && !strings.ContainsAny(value, `/\\`)) {
 		return value
 	}
 	return resolvePath(base, value)

@@ -2,77 +2,111 @@ package queue
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
-	"runtime"
+	"sort"
+	"time"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver"
 	"github.com/riverqueue/river/riverdriver/riversqlite"
+
+	"server/internal/queue/jobs"
 )
 
-func clampWorkers(value, min, max int) int {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
+// riverSQLiteSplitDriver keeps every River mutation and transaction on the
+// QueueDB's sole writer while moving riversqlite's notification outbox
+// polling onto the query-only reader pool. riversqlite otherwise uses the same
+// *sql.DB for its executor and its 50ms NotificationGetAfter SELECT loop,
+// needlessly admitting read polling through the sole writer connection.
+//
+// Embedding the pinned upstream driver deliberately inherits its unstable
+// interface; the compile-time assertion and held-writer test make a River
+// upgrade fail locally if that delegation boundary changes.
+type riverSQLiteSplitDriver struct {
+	*riversqlite.Driver
+	listenerDriver *riversqlite.Driver
 }
 
-func queueWorkerCountsForCPU(cpuCount int) (ingestWorkers int, thumbnailWorkers int, phashWorkers int) {
-	if cpuCount < 1 {
-		cpuCount = 1
+var _ riverdriver.Driver[*sql.Tx] = (*riverSQLiteSplitDriver)(nil)
+
+func newRiverSQLiteSplitDriver(writerPool, readerPool *sql.DB) *riverSQLiteSplitDriver {
+	return &riverSQLiteSplitDriver{
+		Driver:         riversqlite.New(writerPool),
+		listenerDriver: riversqlite.New(readerPool),
 	}
-
-	// Favor user-visible thumbnail generation over lightweight ingest fan-out,
-	// and keep pHash from contending with thumbnails during large imports.
-	ingestWorkers = clampWorkers((cpuCount+1)/2, 2, 8)
-	thumbnailWorkers = clampWorkers(cpuCount, 4, 12)
-	phashWorkers = clampWorkers(cpuCount/4, 1, 4)
-
-	if thumbnailWorkers < ingestWorkers {
-		thumbnailWorkers = ingestWorkers
-	}
-
-	return ingestWorkers, thumbnailWorkers, phashWorkers
 }
 
-func queueWorkerCounts() (ingestWorkers int, thumbnailWorkers int, phashWorkers int) {
-	return queueWorkerCountsForCPU(runtime.NumCPU())
+func (d *riverSQLiteSplitDriver) GetListener(params *riverdriver.GetListenenerParams) riverdriver.Listener {
+	return d.listenerDriver.GetListener(params)
 }
 
-func New(dbpool *sql.DB, workers *river.Workers, logger *slog.Logger) (*river.Client[*sql.Tx], error) {
-	ingestWorkers, thumbnailWorkers, phashWorkers := queueWorkerCounts()
+func runtimeQueueConfigs(macroWorkers int) map[string]river.QueueConfig {
+	workers := RuntimeMacroWorkerCounts(macroWorkers)
+	queues := make(map[string]river.QueueConfig, len(workers))
+	for name, count := range workers {
+		queues[name] = river.QueueConfig{MaxWorkers: count}
+	}
+	return queues
+}
 
-	queues := map[string]river.QueueConfig{
-		"ingest_asset":              {MaxWorkers: ingestWorkers},
-		"discover_asset":            {MaxWorkers: 20},
-		"metadata_asset":            {MaxWorkers: 20},
-		"thumbnail_asset":           {MaxWorkers: thumbnailWorkers},
-		"transcode_asset":           {MaxWorkers: 1},
-		"retry_asset":               {MaxWorkers: 2},
-		"reindex_assets":            {MaxWorkers: 1},
-		"rebuild_location_clusters": {MaxWorkers: 1},
-		"rebuild_events":            {MaxWorkers: 4},
-		"event_scheduler":           {MaxWorkers: 1},
-		"scan_repository":           {MaxWorkers: 1},
-		"db_backup":                 {MaxWorkers: 1},
-		"detect_stacks":             {MaxWorkers: 1},
-		"match_live_photo":          {MaxWorkers: 2},
-		"process_semantic":          {MaxWorkers: 2},
-		"process_bioclip":           {MaxWorkers: 1},
-		"process_ocr":               {MaxWorkers: 2},
-		"ocr_index":                 {MaxWorkers: 1},
-		"process_face":              {MaxWorkers: 1},
-		"process_video_frames":      {MaxWorkers: 1},
-		"classify_zeroshot":         {MaxWorkers: 2},
-		"process_phash":             {MaxWorkers: phashWorkers},
+// RuntimeMacroWorkerCounts returns the River admission lane width. Fine-grained
+// work is governed by execution.Governor, so host CPU count never multiplies the
+// number of competing macro workers. Returning a fresh map prevents diagnostic
+// callers from mutating runtime configuration.
+func RuntimeMacroWorkerCounts(macroWorkers int) map[string]int {
+	return map[string]int{jobs.QueueMacro: macroWorkers}
+}
+
+func validateRuntimeQueueConfigs(queues map[string]river.QueueConfig) error {
+	required := make(map[string]struct{})
+	for _, job := range jobs.RuntimeJobCatalog() {
+		queue := job.InsertOpts().Queue
+		if queue == "" || queue == river.QueueDefault {
+			return fmt.Errorf("job kind %q routes to forbidden implicit queue %q", job.Kind(), queue)
+		}
+		required[queue] = struct{}{}
+	}
+	missing := make([]string, 0)
+	for queue := range required {
+		if _, ok := queues[queue]; !ok {
+			missing = append(missing, queue)
+		}
+	}
+	extra := make([]string, 0)
+	for queue := range queues {
+		if _, ok := required[queue]; !ok {
+			extra = append(extra, queue)
+		}
+	}
+	if len(missing) == 0 && len(extra) == 0 {
+		return nil
+	}
+	sort.Strings(missing)
+	sort.Strings(extra)
+	return fmt.Errorf("runtime queue catalog drift: missing=%v extra=%v", missing, extra)
+}
+
+func New(writerPool, readerPool *sql.DB, workers *river.Workers, logger *slog.Logger, macroWorkers int) (*river.Client[*sql.Tx], error) {
+	if writerPool == nil || readerPool == nil {
+		return nil, fmt.Errorf("River SQLite requires writer and query-only listener pools")
+	}
+	if macroWorkers < 2 {
+		return nil, fmt.Errorf("River macro worker count must be at least 2")
+	}
+	queues := runtimeQueueConfigs(macroWorkers)
+	if err := validateRuntimeQueueConfigs(queues); err != nil {
+		return nil, err
 	}
 
-	client, err := river.NewClient(riversqlite.New(dbpool), &river.Config{
+	client, err := river.NewClient(newRiverSQLiteSplitDriver(writerPool, readerPool), &river.Config{
 		Queues:  queues,
 		Workers: workers,
 		Logger:  logger,
+		// SQLite notification rows wake the producer immediately. Thirty
+		// seconds is only the crash/recovery fallback; the existing cooldown
+		// remains the throughput guard until measured evidence changes it.
+		FetchPollInterval: 30 * time.Second,
 	})
 	return client, err
 }

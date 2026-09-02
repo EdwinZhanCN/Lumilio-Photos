@@ -14,7 +14,11 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = sqlc.arg('cluster_id')
   AND COALESCE(a.is_deleted, false) = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
 ORDER BY COALESCE(fi.is_primary, false) DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
@@ -26,7 +30,11 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = sqlc.arg('cluster_id')
   AND COALESCE(a.is_deleted, false) = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'));
 
 -- name: GetPersonFaceScoped :one
@@ -36,7 +44,7 @@ SELECT
     fi.confidence,
     fi.is_primary,
     fi.face_image_path,
-    a.repository_id,
+    fi.repository_id,
     a.owner_id
 FROM face_cluster_members fcm
 JOIN face_items fi ON fi.id = fcm.face_id
@@ -44,7 +52,12 @@ JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fcm.cluster_id = sqlc.arg('cluster_id')
   AND fi.id = sqlc.arg('face_id')
   AND COALESCE(a.is_deleted, false) = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+	AND fi.repository_id IS NOT NULL
+	AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+	  SELECT 1 FROM active_asset_occurrences occurrence
+	  WHERE occurrence.asset_id = a.asset_id
+	    AND occurrence.repository_id = sqlc.narg('repository_id')
+	))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'));
 
 -- name: GetFaceForCorrectionScoped :one
@@ -53,13 +66,18 @@ SELECT
     fi.asset_id,
     fi.confidence,
     fi.face_image_path,
-    a.repository_id,
+    fi.repository_id,
     a.owner_id
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fi.id = sqlc.arg('face_id')
   AND COALESCE(a.is_deleted, false) = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+	AND fi.repository_id IS NOT NULL
+	AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+	  SELECT 1 FROM active_asset_occurrences occurrence
+	  WHERE occurrence.asset_id = a.asset_id
+	    AND occurrence.repository_id = sqlc.narg('repository_id')
+	))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'));
 
 -- name: GetManualFaceClusterMembershipsForScope :many
@@ -73,7 +91,11 @@ JOIN face_items fi ON fi.id = fcm.face_id
 JOIN assets a ON a.asset_id = fi.asset_id
 WHERE COALESCE(fcm.is_manual, false) = true
   AND COALESCE(a.is_deleted, false) = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = sqlc.narg('repository_id')
+  ))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'));
 
 -- name: MoveClusterMembersToClusterManual :exec

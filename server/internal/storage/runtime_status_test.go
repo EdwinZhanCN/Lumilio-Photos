@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
 )
 
@@ -50,8 +52,46 @@ func TestStorageRuntimeStatusDegradesOnlyForBootstrapAnchors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if status.State != StorageRuntimeStateActive {
+		t.Fatalf("status read mutated the unreconciled projection: %+v", status)
+	}
+	if err := manager.ReconcileAll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	status, err = manager.StorageRuntimeStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if status.State != StorageRuntimeStateDegraded || status.Reason != StorageRuntimeReasonRecoveryRequired {
 		t.Fatalf("primary failure runtime status = %+v", status)
+	}
+}
+
+func TestStorageRuntimeStatusStaysAvailableWhileWriterIsBusy(t *testing.T) {
+	catalog, manager := newCatalogRepositoryManager(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
+	manager.readerDatabase = catalog.ReaderSQL
+	manager.readerQueries = repo.New(catalog.ReaderSQL)
+
+	writer, err := catalog.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Rollback()
+	if _, err := writer.ExecContext(ctx, `UPDATE system_state SET updated_at = updated_at WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	readCtx, readCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer readCancel()
+	status, err := manager.StorageRuntimeStatus(readCtx)
+	if err != nil {
+		t.Fatalf("storage runtime status waited for the writer connection: %v", err)
+	}
+	if status.State != StorageRuntimeStateActive {
+		t.Fatalf("storage runtime status = %+v, want active", status)
 	}
 }
 

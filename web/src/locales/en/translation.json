@@ -1425,6 +1425,8 @@
       "activityProcessing": "Processing",
       "activityScanning": "Scanning",
       "assetCount": "Assets",
+      "cancelScan": "Cancel verification",
+      "cancelScanFailed": "Could not request verification cancellation.",
       "candidates": {
         "addSeparateConfirm": "Yes, add as separate Repository",
         "copyAdded": "Separate Repository added.",
@@ -1570,19 +1572,27 @@
       "scanAll": "Scan all Repositories",
       "scanAllQueued_one": "Scan queued for {{count}} Repository.",
       "scanAllQueued_other": "Scan queued for {{count}} Repositories.",
-      "scanAmbiguousHelp": "No identity guess was made. Remove extra copies or restore a one-to-one layout, then scan again.",
-      "scanAuthoritative": "Scan complete",
-      "scanCompletedSummary": "{{name}} scan complete: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous, {{deleted}} deleted.",
-      "scanCountAmbiguous": "Ambiguous",
-      "scanCountDeferred": "Deferred",
-      "scanCountDeleted": "Deleted",
-      "scanCountDiscovered": "Discovered",
-      "scanCountMoved": "Moved",
-      "scanCountUpdated": "Updated",
+      "scanAuthoritative": "Verification complete",
+      "scanBytesHashed": "Bytes hashed",
+      "scanBytesQueued": "Bytes queued",
+      "scanCancellationRequested": "Cancellation requested. The current bounded step will finish safely.",
+      "scanCancellationRequestedAction": "Cancellation requested",
+      "scanCoalesced": "A scan is already active for {{name}}; this request joined the existing operation.",
+      "scanCountDirectories": "Directories",
+      "scanCountFiles": "Files observed",
+      "scanDirectoryErrors": "Directory errors",
       "scanFailed": "Failed to queue scan.",
-      "scanPartial": "Partial scan",
-      "scanPartialSummary": "{{name}} scan was partial: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous. Missing files were not confirmed.",
-      "scanStatusRunning": "A scan is in progress or queued; results will appear here.",
+      "scanOutboxDepth": "Pending work",
+      "scanPartial": "Verification partial",
+      "scanPartialHelp": "Some directories could not be verified. Previously valid files remain available.",
+      "scanPhaseCatchingUp": "Catching up with changes",
+      "scanPhaseCrawling": "Observing files",
+      "scanPhaseFinalizing": "Finalizing verification",
+      "scanPhaseQueued": "Queued",
+      "scanQueued": "Scan queued for {{name}}. You can keep using Lumilio while it runs.",
+      "scanStatusCancelled": "Verification was cancelled. Previously valid files remain available.",
+      "scanStatusFailed": "Verification stopped after a stable error. Previously valid files remain available.",
+      "scanStatusRunning": "Scan phase: {{phase}}. You can keep using Lumilio while background work runs.",
       "sourceCloud": "Cloud",
       "storageLocationAvailable": "available",
       "storageLocationCapacity": "{{available}} of {{total}} available",
@@ -1733,29 +1743,14 @@
       },
       "fetchError": "Failed to load processing activity.",
       "kinds": {
-        "classify_zeroshot": "Match saved classifiers",
-        "database_backup": "Create database backup",
-        "detect_stacks": "Find related originals",
-        "discover_asset": "Import discovered file",
+        "analyze_asset": "Read media information",
+        "backup_catalog": "Create catalog backup",
+        "enrich_asset": "Run image and media enrichment",
+        "generate_asset_derivatives": "Build previews",
         "ingest_asset": "Import uploaded file",
-        "match_live_photo": "Match Live Photo pair",
-        "metadata_asset": "Read media information",
-        "process_bioclip": "Tag nature photos",
-        "process_face": "Find people",
-        "process_ocr": "Read text in images",
-        "process_ocr_outbox": "Update OCR search index",
-        "process_phash": "Analyze duplicates",
-        "process_semantic": "Build visual search index",
-        "process_video_frames": "Image Semantic Analysis (video)",
-        "rebuild_events": "Rebuild Events",
-        "rebuild_location_clusters": "Refresh places",
-        "reindex_assets": "Rebuild AI index",
-        "retry_asset": "Retry media processing",
-        "scan_repository": "Scan Repository folder",
-        "schedule_event_rebuilds": "Schedule Event rebuilds",
-        "schedule_repository_scans": "Schedule Repository scans",
-        "thumbnail_asset": "Build previews",
-        "transcode_asset": "Prepare playable media",
+        "rebuild_projection_batch": "Rebuild catalog projection",
+        "scan_repository_batch": "Scan Repository batch",
+        "transcode_media": "Prepare playable media",
         "unknown": "Other background task · {{name}}"
       },
       "loading": "Loading processing activity...",
@@ -1772,96 +1767,12 @@
       },
       "noErrorSamples": "No recent error details were recorded for this area.",
       "queues": {
-        "classify_zeroshot": {
-          "description": "Matches saved classifier albums after visual indexing.",
-          "name": "Classifier matching"
-        },
-        "db_backup": {
-          "description": "Creates scheduled and administrator-requested database backups.",
-          "name": "Database Backups"
+        "catalog_macro": {
+          "description": "Runs bounded catalog pipeline stages with shared resource limits.",
+          "name": "Catalog processing"
         },
         "default": {
           "description": "Background work for the media collection."
-        },
-        "detect_stacks": {
-          "description": "Looks for RAW+JPEG and related media stacks.",
-          "name": "Stack detection"
-        },
-        "discover_asset": {
-          "description": "Materializes files found during Repository scans.",
-          "name": "Discovered files"
-        },
-        "event_scheduler": {
-          "description": "Schedules Event rebuilds when background projections need refresh.",
-          "name": "Event Scheduler"
-        },
-        "ingest_asset": {
-          "description": "Moves uploaded media into a Repository safely.",
-          "name": "Imports"
-        },
-        "match_live_photo": {
-          "description": "Pairs Apple Live Photo image and video files.",
-          "name": "Live Photo matching"
-        },
-        "metadata_asset": {
-          "description": "Reads EXIF, capture time, camera, location, and media details.",
-          "name": "Media information"
-        },
-        "ocr_index": {
-          "description": "Makes extracted OCR text available to search.",
-          "name": "OCR Search Index"
-        },
-        "process_bioclip": {
-          "description": "Adds nature and species labels where enabled.",
-          "name": "BioCLIP Species Recognition"
-        },
-        "process_face": {
-          "description": "Finds faces and updates people groupings.",
-          "name": "Person Recognition"
-        },
-        "process_ocr": {
-          "description": "Extracts searchable text from images.",
-          "name": "OCR Text Recognition"
-        },
-        "process_phash": {
-          "description": "Computes fingerprints used by duplicate detection.",
-          "name": "Duplicate analysis"
-        },
-        "process_semantic": {
-          "description": "Builds visual embeddings for search and AI organization.",
-          "name": "Image Semantic Analysis"
-        },
-        "process_video_frames": {
-          "description": "Builds searchable semantic embeddings from representative video frames.",
-          "name": "Image Semantic Analysis (video)"
-        },
-        "rebuild_events": {
-          "description": "Rebuilds Events from current media facts.",
-          "name": "Event Rebuilds"
-        },
-        "rebuild_location_clusters": {
-          "description": "Refreshes place clusters after media locations change.",
-          "name": "Places"
-        },
-        "reindex_assets": {
-          "description": "Backfills AI indexes for existing photos.",
-          "name": "AI reindex"
-        },
-        "retry_asset": {
-          "description": "Retries media processing after a failure.",
-          "name": "Retries"
-        },
-        "scan_repository": {
-          "description": "Scans Repository folders for new, changed, or removed files.",
-          "name": "Repository scan"
-        },
-        "thumbnail_asset": {
-          "description": "Creates previews used throughout the gallery.",
-          "name": "Previews"
-        },
-        "transcode_asset": {
-          "description": "Prepares video and audio versions for browser playback.",
-          "name": "Playback media"
         },
         "unknown": {
           "name": "Other processing · {{name}}"
@@ -1925,6 +1836,7 @@
       "auditTarget": "Target",
       "auditTime": "Time",
       "auditTitle": "Lifecycle history",
+      "capacityExplanation": "Writable space comes from the filesystem and may be lower than the space shown by macOS when purgeable APFS storage is included. Lumilio keeps the safety reserve free before accepting new writes.",
       "capacityHeading": "Capacity",
       "capacityUnknown": "Capacity unavailable",
       "capacityUsed": "Used capacity",
@@ -1948,7 +1860,8 @@
       "riskMountChanged": "Mount identity changed",
       "riskNetwork": "Network filesystem",
       "riskRemovable": "Removable storage",
-      "statAvailable": "Available",
+      "safetyReserve": "Safety reserve",
+      "statAvailable": "Currently writable",
       "statusActive": "Available",
       "statUsed": "Used",
       "statusIdentityError": "Identity mismatch",
@@ -1960,7 +1873,8 @@
       "technicalDetails": "Technical details",
       "totalCapacity": "Total {{total}}",
       "unlinkedTitle": "Repositories without a known location",
-      "updated": "Checked {{time}}"
+      "updated": "Checked {{time}}",
+      "uploadBudget": "Available for new writes"
     },
     "subtitles": {
       "capabilities": "Runtime ML discovery and LLM agent status",
@@ -2894,8 +2808,12 @@
       "clear_button": "Clear",
       "default_upload_target_hint": "No working Repository is selected; uploads will use the Primary Repository.",
       "drag_drop_or_click": "Drag & Drop or Click to Upload",
+      "low_space_blocked": "This Repository is paused because its Storage Location is low on writable space. Free space and wait for the capacity check before uploading.",
+      "low_space_title": "Upload paused: low space",
       "no_files_selected_for_upload": "No files selected for upload",
       "no_valid_files_selected": "No valid files selected",
+      "repository_unavailable_for_upload": "This Repository is not currently available for uploads.",
+      "repository_unavailable_title": "Upload unavailable",
       "server_chunk_size": "Server chunk size",
       "server_concurrency": "Server concurrency",
       "server_in_flight": "In-flight requests",

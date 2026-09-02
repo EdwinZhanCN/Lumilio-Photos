@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
@@ -33,9 +35,62 @@ type OCRIndexNotifier interface {
 	Notify()
 }
 
+// ApplyOCRResultsTx replaces OCR facts and queues the derived search-index
+// projection inside a caller-owned catalog transaction.
+func ApplyOCRResultsTx(ctx context.Context, tx *sql.Tx, queries *repo.Queries, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error {
+	if tx == nil || queries == nil || assetID == uuid.Nil || ocrResult == nil {
+		return fmt.Errorf("OCR result commit is incomplete")
+	}
+	type persistedOCRItem struct {
+		TextContent string          `json:"text_content"`
+		Confidence  float64         `json:"confidence"`
+		BoundingBox json.RawMessage `json:"bounding_box"`
+		TextLength  int             `json:"text_length"`
+		AreaPixels  float64         `json:"area_pixels"`
+	}
+	items := make([]persistedOCRItem, 0, len(ocrResult.Items))
+	for index, item := range ocrResult.Items {
+		boundingBox := dbtypes.NewBoundingBox(item.Box)
+		boundingBoxJSON, err := boundingBox.SerializeToJSON()
+		if err != nil {
+			return fmt.Errorf("failed to serialize bounding box for item %d: %w", index, err)
+		}
+		items = append(items, persistedOCRItem{TextContent: item.Text, Confidence: float64(item.Confidence), BoundingBox: json.RawMessage(boundingBoxJSON), TextLength: len(item.Text), AreaPixels: float64(boundingBox.CalculateArea())})
+	}
+	payload, err := json.Marshal(items)
+	if err != nil {
+		return fmt.Errorf("encode OCR text items: %w", err)
+	}
+	if err := queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
+		return fmt.Errorf("failed to delete existing OCR results: %w", err)
+	}
+	processingTimePtr := int64(processingTimeMs)
+	if _, err := queries.CreateOCRResult(ctx, repo.CreateOCRResultParams{AssetID: assetID, ModelID: ocrResult.ModelID, TotalCount: int64(len(ocrResult.Items)), ProcessingTimeMs: &processingTimePtr}); err != nil {
+		return fmt.Errorf("failed to create OCR result: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO ocr_text_items (
+			asset_id, text_content, confidence, bounding_box,
+			text_length, area_pixels, created_at
+		)
+		SELECT
+			?, json_extract(value, '$.text_content'),
+			json_extract(value, '$.confidence'),
+			json_extract(value, '$.bounding_box'),
+			json_extract(value, '$.text_length'),
+			json_extract(value, '$.area_pixels'),
+			CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+		FROM json_each(?)
+	`, assetID, payload); err != nil {
+		return fmt.Errorf("failed to insert OCR text items: %w", err)
+	}
+	return enqueueOCRIndexOutbox(ctx, queries, assetID)
+}
+
 type ocrService struct {
 	queries       *repo.Queries
 	pool          *sql.DB
+	writer        *catalogtx.Writer
 	indexNotifier OCRIndexNotifier
 }
 
@@ -44,68 +99,31 @@ func NewOCRService(queries *repo.Queries, pool *sql.DB) OCRService {
 	return &ocrService{
 		queries: queries,
 		pool:    pool,
+		writer:  catalogtx.NewWriter(pool, nil),
 	}
 }
 
 // NewOCRServiceWithNotifier is the runtime constructor. The notifier is kept
 // optional so package tests and embedded callers can exercise OCR persistence
 // without starting the queue runtime.
-func NewOCRServiceWithNotifier(queries *repo.Queries, pool *sql.DB, notifier OCRIndexNotifier) OCRService {
+func NewOCRServiceWithNotifier(queries *repo.Queries, pool *sql.DB, writer *catalogtx.Writer, notifier OCRIndexNotifier) OCRService {
 	return &ocrService{
 		queries:       queries,
 		pool:          pool,
+		writer:        writer,
 		indexNotifier: notifier,
 	}
 }
 
 // SaveOCRResults saves OCR results to database
 func (s *ocrService) SaveOCRResults(ctx context.Context, assetID uuid.UUID, ocrResult *types.OCRV1, processingTimeMs int) error {
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationOCRSave, nil)
 	if err != nil {
 		return fmt.Errorf("begin OCR result transaction: %w", err)
 	}
 	defer tx.Rollback()
-	queries := s.queries.WithTx(tx)
-
-	if err := queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
-		return fmt.Errorf("failed to delete existing OCR results: %w", err)
-	}
-
-	processingTimePtr := int64(processingTimeMs)
-	_, err = queries.CreateOCRResult(ctx, repo.CreateOCRResultParams{
-		AssetID:          assetID,
-		ModelID:          ocrResult.ModelID,
-		TotalCount:       int64(len(ocrResult.Items)),
-		ProcessingTimeMs: &processingTimePtr,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create OCR result: %w", err)
-	}
-
-	for i, item := range ocrResult.Items {
-		boundingBox := dbtypes.NewBoundingBox(item.Box)
-		area := boundingBox.CalculateArea()
-
-		boundingBoxJSON, err := boundingBox.SerializeToJSON()
-		if err != nil {
-			return fmt.Errorf("failed to serialize bounding box for item %d: %w", i, err)
-		}
-
-		areaFloat64 := float64(area)
-		_, err = queries.CreateOCRTextItem(ctx, repo.CreateOCRTextItemParams{
-			AssetID:     assetID,
-			TextContent: item.Text,
-			Confidence:  float64(item.Confidence),
-			BoundingBox: dbtypes.JSON(boundingBoxJSON),
-			TextLength:  int64(len(item.Text)),
-			AreaPixels:  &areaFloat64,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create OCR text item %d: %w", i, err)
-		}
-	}
-
-	if err := enqueueOCRIndexOutbox(ctx, queries, assetID); err != nil {
+	queries := s.queries.WithTx(tx.Raw())
+	if err := ApplyOCRResultsTx(ctx, tx.Raw(), queries, assetID, ocrResult, processingTimeMs); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -137,12 +155,12 @@ func (s *ocrService) GetOCRResults(ctx context.Context, assetID uuid.UUID) (*OCR
 
 // DeleteOCRResults deletes OCR results for specified asset
 func (s *ocrService) DeleteOCRResults(ctx context.Context, assetID uuid.UUID) error {
-	tx, err := s.pool.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationOCRDelete, nil)
 	if err != nil {
 		return fmt.Errorf("begin OCR delete transaction: %w", err)
 	}
 	defer tx.Rollback()
-	queries := s.queries.WithTx(tx)
+	queries := s.queries.WithTx(tx.Raw())
 	if err := queries.DeleteOCRResultByAsset(ctx, assetID); err != nil {
 		return fmt.Errorf("delete OCR result: %w", err)
 	}

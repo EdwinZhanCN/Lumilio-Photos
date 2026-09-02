@@ -17,7 +17,11 @@ JOIN assets a ON a.asset_id = aa.asset_id
 WHERE al.album_type = 'bio'
   AND a.type = 'PHOTO'
   AND a.is_deleted = false
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountBioAlbumPhotoAssets(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -40,7 +44,11 @@ WHERE al.album_type = 'bio'
     FROM species_predictions sp
     WHERE sp.asset_id = a.asset_id
   )
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -55,7 +63,11 @@ SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountPhotoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -75,7 +87,11 @@ WHERE a.type = 'PHOTO'
     FROM face_results f
     WHERE f.asset_id = a.asset_id
   )
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -95,7 +111,11 @@ WHERE a.type = 'PHOTO'
     FROM ocr_results o
     WHERE o.asset_id = a.asset_id
   )
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -116,7 +136,11 @@ WHERE a.type = 'PHOTO'
     WHERE se.asset_id = a.asset_id
       AND se.frame_ts_ms IS NULL
   )
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountPhotoAssetsWithSemanticEmbedding(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -131,7 +155,11 @@ SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'VIDEO'
   AND a.is_deleted = false
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountVideoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -152,7 +180,11 @@ WHERE a.type = 'VIDEO'
     WHERE se.asset_id = a.asset_id
       AND se.frame_ts_ms IS NOT NULL
   )
-  AND (?1 IS NULL OR a.repository_id = ?1)
+  AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
 `
 
 func (q *Queries) CountVideoAssetsWithSemanticFrames(ctx context.Context, repositoryID interface{}) (int64, error) {
@@ -170,12 +202,16 @@ WITH page_ids AS (
   FROM assets a
   WHERE a.type = 'PHOTO'
     AND a.is_deleted = false
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -199,14 +235,10 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -218,7 +250,6 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -253,12 +284,16 @@ WITH page_ids AS (
       FROM face_results f
       WHERE f.asset_id = a.asset_id
     )
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -282,14 +317,10 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -301,7 +332,6 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -336,12 +366,16 @@ WITH page_ids AS (
       FROM ocr_results o
       WHERE o.asset_id = a.asset_id
     )
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -365,14 +399,10 @@ func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg List
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -384,7 +414,6 @@ func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg List
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -420,12 +449,16 @@ WITH page_ids AS (
       WHERE se.asset_id = a.asset_id
         AND se.frame_ts_ms IS NULL
     )
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -449,14 +482,10 @@ func (q *Queries) ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, a
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -468,7 +497,6 @@ func (q *Queries) ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, a
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -498,12 +526,16 @@ WITH page_ids AS (
   FROM assets a
   WHERE a.type = 'VIDEO'
     AND a.is_deleted = false
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -527,14 +559,10 @@ func (q *Queries) ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListV
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -546,7 +574,6 @@ func (q *Queries) ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListV
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -582,12 +609,16 @@ WITH page_ids AS (
       WHERE se.asset_id = a.asset_id
         AND se.frame_ts_ms IS NOT NULL
     )
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  ))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -611,14 +642,10 @@ func (q *Queries) ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg 
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -630,7 +657,6 @@ func (q *Queries) ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg 
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,

@@ -12,6 +12,7 @@ import (
 	"server/config"
 	"server/internal/db"
 	"server/internal/search/bleveocr"
+	"server/internal/testutil"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -24,10 +25,10 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	index, err := bleveocr.Open(ctx, database.Path, database.Queries, false, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
-	writer := bleveocr.NewWriter(database.SQL, database.Queries, index)
+	writer := bleveocr.NewWriter(database.SQL, database.Writer, database.Queries, index)
 	notifier := &recordingOCRIndexNotifier{}
-	ocrService := NewOCRServiceWithNotifier(database.Queries, database.SQL, notifier)
-	assetService, err := NewAssetServiceWithQueue(database.Queries, database.SQL, nil, nil, index, nil, notifier)
+	ocrService := NewOCRServiceWithNotifier(database.Queries, database.SQL, database.Writer, notifier)
+	assetService, err := NewAssetServiceWithNotifier(database.Queries, database.SQL, nil, nil, index, notifier)
 	require.NoError(t, err)
 
 	require.NoError(t, ocrService.SaveOCRResults(ctx, assetID, ocrFixture("Running invoice 2025", 0.95), 12))
@@ -111,11 +112,12 @@ INSERT INTO repository_roots (
 INSERT INTO repositories (
     repo_id, name, path, created_at, updated_at, default_owner_id, root_id
 ) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, mime_type, file_size,
-    content_hash, upload_time, repository_id, updated_at
-) VALUES (?, 1, 'PHOTO', 'ocr.jpg', 'image/jpeg', 1, 'hash', 1, ?, 1);
-`, rootID, repositoryID, rootID, assetID, repositoryID)
+`, rootID, repositoryID, rootID)
+	require.NoError(t, err)
+	_, err = testutil.InsertAssetOccurrence(context.Background(), database.SQL, testutil.AssetOccurrenceParams{
+		AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1,
+		AssetType: "PHOTO", Filename: "ocr.jpg", MIMEType: "image/jpeg", FileSize: 1,
+	})
 	require.NoError(t, err)
 	return database, assetID
 }

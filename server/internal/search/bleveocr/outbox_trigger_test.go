@@ -23,3 +23,13 @@ func TestOutboxTriggerCoalescesNotificationsAndSchedulesRecovery(t *testing.T) {
 	require.False(t, trigger.ShouldSchedule(start.Add(61*time.Second), recoveryInterval))
 	require.True(t, trigger.ShouldSchedule(start.Add(62*time.Second), recoveryInterval), "missed notifications must recover on the fallback interval")
 }
+
+func TestOutboxTriggerConsumePendingIsNonBlockingAndCoalesced(t *testing.T) {
+	trigger := NewOutboxTrigger()
+	require.False(t, trigger.ConsumePending())
+
+	trigger.Notify()
+	trigger.Notify()
+	require.True(t, trigger.ConsumePending())
+	require.False(t, trigger.ConsumePending())
+}

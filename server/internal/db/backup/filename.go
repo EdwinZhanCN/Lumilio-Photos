@@ -59,6 +59,29 @@ func IsRoutineName(name string) bool {
 	return ok
 }
 
+// ParseSnapshotName accepts routine snapshots and protected restore points
+// while preserving the timestamp encoded by the common base name.
+func ParseSnapshotName(name string) (Info, bool) {
+	base := name
+	for _, prefix := range []string{RestorePointPrefix} {
+		if value, ok := strings.CutPrefix(name, prefix); ok {
+			base = value
+			break
+		}
+	}
+	return ParseName(base)
+}
+
+func IsProtectedSnapshotName(name string) bool {
+	for _, prefix := range []string{RestorePointPrefix} {
+		if base, ok := strings.CutPrefix(name, prefix); ok {
+			_, valid := ParseName(base)
+			return valid
+		}
+	}
+	return false
+}
+
 func trimRestorePoint(name string) (string, bool) {
 	return strings.CutPrefix(name, RestorePointPrefix)
 }

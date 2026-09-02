@@ -128,20 +128,19 @@ func (dto ValidateLLMSettingsRequestDTO) ToServiceInput() service.ValidateLLMDra
 // (changed only by editing TOML and restarting). Shown in the Settings → Server
 // tab so operators can see effective boot configuration.
 type RuntimeInfoDTO struct {
-	Environment                  string     `json:"environment" example:"production"`
-	ServerListen                 string     `json:"server_listen" example:"0.0.0.0:6680"`
-	TLSMode                      string     `json:"tls_mode" example:"off"`
-	PasskeyEnabled               bool       `json:"passkey_enabled" example:"true"`
-	ACMECertificateHostname      string     `json:"acme_certificate_hostname,omitempty" example:"photos.example.com"`
-	ACMECertificateStatus        string     `json:"acme_certificate_status" example:"active"`
-	ACMECertificateExpiresAt     *time.Time `json:"acme_certificate_expires_at,omitempty"`
-	ACMELastManagedAt            *time.Time `json:"acme_last_managed_at,omitempty"`
-	LogLevel                     string     `json:"log_level" example:"info"`
-	StorageRoot                  string     `json:"storage_root" example:"/data/storage"`
-	HardwareAccel                string     `json:"hardware_accel" example:"none"`
-	RepositoryScanEnabled        bool       `json:"repository_scan_enabled" example:"true"`
-	RepositoryScanIntervalSecond int        `json:"repository_scan_interval_seconds" example:"300"`
-	LumenDiscoveryEnabled        bool       `json:"lumen_discovery_enabled" example:"true"`
+	Environment                   string     `json:"environment" example:"production"`
+	ServerListen                  string     `json:"server_listen" example:"0.0.0.0:6680"`
+	TLSMode                       string     `json:"tls_mode" example:"off"`
+	PasskeyEnabled                bool       `json:"passkey_enabled" example:"true"`
+	ACMECertificateHostname       string     `json:"acme_certificate_hostname,omitempty" example:"photos.example.com"`
+	ACMECertificateStatus         string     `json:"acme_certificate_status" example:"active"`
+	ACMECertificateExpiresAt      *time.Time `json:"acme_certificate_expires_at,omitempty"`
+	ACMELastManagedAt             *time.Time `json:"acme_last_managed_at,omitempty"`
+	LogLevel                      string     `json:"log_level" example:"info"`
+	StorageRoot                   string     `json:"storage_root" example:"/data/storage"`
+	HardwareAccel                 string     `json:"hardware_accel" example:"none"`
+	RepositoryScanIntervalSeconds int        `json:"repository_scan_interval_seconds" example:"300"`
+	LumenDiscoveryEnabled         bool       `json:"lumen_discovery_enabled" example:"true"`
 }
 
 type CertificateRuntimeInfo struct {
@@ -155,17 +154,16 @@ type CertificateRuntimeInfo struct {
 // application configuration.
 func NewRuntimeInfoDTO(cfg config.AppConfig) RuntimeInfoDTO {
 	return RuntimeInfoDTO{
-		Environment:                  cfg.Environment,
-		ServerListen:                 cfg.ServerConfig.Listen,
-		TLSMode:                      string(cfg.ServerConfig.TLS.Mode),
-		PasskeyEnabled:               cfg.Auth.Passkey.Enabled,
-		ACMECertificateStatus:        map[bool]string{true: "initializing", false: "not_applicable"}[cfg.ServerConfig.TLS.Mode == config.TLSModeACME],
-		LogLevel:                     cfg.LoggingConfig.Level,
-		StorageRoot:                  cfg.StorageConfig.Path,
-		HardwareAccel:                cfg.Transcode.HardwareAccel,
-		RepositoryScanEnabled:        cfg.RepositoryScan.Enabled,
-		RepositoryScanIntervalSecond: cfg.RepositoryScan.IntervalSeconds,
-		LumenDiscoveryEnabled:        cfg.Lumen.DiscoveryEnabled,
+		Environment:                   cfg.Environment,
+		ServerListen:                  cfg.ServerConfig.Listen,
+		TLSMode:                       string(cfg.ServerConfig.TLS.Mode),
+		PasskeyEnabled:                cfg.Auth.Passkey.Enabled,
+		ACMECertificateStatus:         map[bool]string{true: "initializing", false: "not_applicable"}[cfg.ServerConfig.TLS.Mode == config.TLSModeACME],
+		LogLevel:                      cfg.LoggingConfig.Level,
+		StorageRoot:                   cfg.StorageConfig.Path,
+		HardwareAccel:                 cfg.Transcode.HardwareAccel,
+		RepositoryScanIntervalSeconds: cfg.RepositoryScan.IntervalSeconds,
+		LumenDiscoveryEnabled:         cfg.Lumen.DiscoveryEnabled,
 	}
 }
 

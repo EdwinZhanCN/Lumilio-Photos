@@ -15,7 +15,7 @@ were kept as "historical records" nobody was required to read.
 ## Decision
 
 Three memories plus skills, defined in
-[agent-harness.md](../../site/docs/internal/agent-harness.md):
+[agent-harness.md](../../docs/agent-harness.md):
 
 - `.agents/skills/lumilio-<name>/SKILL.md` owns recurring procedures;
   reference docs keep contracts and link to skills. Initial set:

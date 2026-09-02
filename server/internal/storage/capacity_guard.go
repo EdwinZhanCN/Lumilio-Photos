@@ -15,6 +15,17 @@ import (
 
 const minimumCapacitySafetyMargin uint64 = 512 << 20 // 512 MiB
 
+// CapacitySafetyMargin is the write reserve retained on a repository's target
+// volume. Exposing the policy calculation lets diagnostics explain the same
+// threshold that the write gate enforces.
+func CapacitySafetyMargin(totalBytes uint64) uint64 {
+	margin := totalBytes / 20
+	if margin < minimumCapacitySafetyMargin {
+		return minimumCapacitySafetyMargin
+	}
+	return margin
+}
+
 var (
 	ErrRepositoryReadOnly = errors.New("repository storage is read-only")
 	ErrInsufficientSpace  = errors.New("repository storage has insufficient free space")
@@ -74,10 +85,7 @@ func capacityDecision(repositoryID, path string, info StoragePathInfo, expectedB
 	if !info.CapacityKnown {
 		return decision
 	}
-	margin := info.TotalBytes / 20 // retain five percent of the actual target volume
-	if margin < minimumCapacitySafetyMargin {
-		margin = minimumCapacitySafetyMargin
-	}
+	margin := CapacitySafetyMargin(info.TotalBytes)
 	decision.SafetyMargin = margin
 	if expectedBytes > math.MaxUint64-margin {
 		decision.RequiredBytes = math.MaxUint64

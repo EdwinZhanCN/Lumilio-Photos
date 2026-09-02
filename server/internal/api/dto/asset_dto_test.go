@@ -9,20 +9,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestToAssetDTONilStoragePath(t *testing.T) {
+func TestToAssetDTOExposesLogicalContentIdentityWithoutLocationFields(t *testing.T) {
 	assetID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	contentID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 
 	got := ToAssetDTO(repo.Asset{
 		AssetID:          assetID,
+		ContentID:        contentID,
 		Type:             "PHOTO",
 		OriginalFilename: "missing-path.jpg",
 		MimeType:         "image/jpeg",
-		FileSize:         123,
-		StoragePath:      nil,
 	})
 
 	require.Equal(t, "11111111-1111-1111-1111-111111111111", got.AssetID)
-	require.Equal(t, "", got.StoragePath)
+	require.Equal(t, contentID.String(), got.ContentID)
+	require.Nil(t, got.FileSize)
+	require.Nil(t, got.Hash)
 	require.Equal(t, "missing-path.jpg", got.OriginalFilename)
 }
 
@@ -31,6 +33,7 @@ func TestToAssetDTOExposesTopLevelGPS(t *testing.T) {
 
 	got := ToAssetDTO(repo.Asset{
 		AssetID:          uuid.New(),
+		ContentID:        uuid.New(),
 		Type:             "PHOTO",
 		OriginalFilename: "photo.jpg",
 		MimeType:         "image/jpeg",

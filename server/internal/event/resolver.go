@@ -68,7 +68,15 @@ WITH scoped_members AS (
     ON mi.media_item_id = emi.media_item_id AND mi.owner_id = emi.owner_id
   LEFT JOIN assets primary_asset
     ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
-  WHERE emi.event_id = ? AND emi.owner_id = ? AND mi.repository_id = ?
+  WHERE emi.event_id = ? AND emi.owner_id = ?
+    AND EXISTS (
+      SELECT 1
+      FROM media_item_assets scoped_membership
+      JOIN active_asset_occurrences occurrence
+        ON occurrence.asset_id = scoped_membership.asset_id
+      WHERE scoped_membership.media_item_id = mi.media_item_id
+        AND occurrence.repository_id = ?
+    )
 ),
 scoped_cover AS (
   SELECT sm.media_item_id, sm.representative_asset_id
@@ -236,7 +244,14 @@ JOIN media_items mi
 LEFT JOIN assets primary_asset
   ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
 WHERE emi.event_id = ? AND emi.owner_id = ?
-  AND (? = '' OR mi.repository_id = ?)
+  AND (? = '' OR EXISTS (
+    SELECT 1
+    FROM media_item_assets scoped_membership
+    JOIN active_asset_occurrences occurrence
+      ON occurrence.asset_id = scoped_membership.asset_id
+    WHERE scoped_membership.media_item_id = mi.media_item_id
+      AND occurrence.repository_id = ?
+  ))
 ORDER BY emi.position, emi.media_item_id`
 	rows, err := db.QueryContext(ctx, query, summary.EventID, ownerID, repositoryID, repositoryID)
 	if err != nil {

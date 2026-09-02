@@ -1,29 +1,24 @@
 package handler
 
 import (
-	"database/sql"
 	"log"
 	"strings"
 
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/queue/jobs"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 )
 
 type LocationHandler struct {
 	locationService service.LocationService
-	queueClient     *river.Client[*sql.Tx]
 }
 
-func NewLocationHandler(locationService service.LocationService, queueClient *river.Client[*sql.Tx]) *LocationHandler {
+func NewLocationHandler(locationService service.LocationService) *LocationHandler {
 	return &LocationHandler{
 		locationService: locationService,
-		queueClient:     queueClient,
 	}
 }
 
@@ -135,26 +130,17 @@ func (h *LocationHandler) RebuildLocationClusters(c *gin.Context) {
 		repositoryID = &rawRepoID
 	}
 
-	args := jobs.RebuildLocationClustersArgs{
-		RepositoryID: repositoryID,
-	}
-	opts := args.InsertOpts()
-	opts.Queue = "rebuild_location_clusters"
-	jobResult, err := h.queueClient.Insert(c.Request.Context(), args, &opts)
+	receiptID, err := h.locationService.RequestLocationRebuild(c.Request.Context(), repositoryID, ownerScopeID(c))
 	if err != nil {
 		log.Printf("Failed to enqueue location cluster rebuild: %v", err)
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
-	jobID := int64(0)
-	if jobResult != nil && jobResult.Job != nil {
-		jobID = jobResult.Job.ID
-	}
 	api.JSONOK(c, dto.RebuildLocationClustersResponseDTO{
 		Status:       "queued",
 		Message:      "Location cluster rebuild queued successfully",
-		JobID:        jobID,
+		ReceiptID:    receiptID.String(),
 		RepositoryID: repositoryID,
 	})
 }

@@ -41,8 +41,9 @@
  * ## Data
  *
  * Repository lists come from {@link useRepositoryOptions}.
- * {@link useRepositoryScan} follows scan runs through
- * {@link waitForRepositoryScan} before invalidating repository-aware views.
+ * {@link useRepositoryScan} settles from the durable enqueue receipt and
+ * invalidates repository-aware views; Repository rows own active-operation
+ * polling through TanStack Query without extending mutation lifetime.
  * {@link useDetectDuplicates}, {@link useRebuildPeopleClusters}, and
  * {@link useStartRepositoryCloudImport} remain public commands of their owning
  * features.
@@ -61,7 +62,6 @@ import type {
   RepositoryGrid,
   useRepositoryOptions,
   useRepositoryScan,
-  waitForRepositoryScan,
 } from "../repositories/index.ts";
 import type { UnifiedUploadSection, useUploadContext } from "../upload/index.ts";
 import type Manage from "./flows/overview/ManageFlow.tsx";

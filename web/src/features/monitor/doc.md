@@ -35,7 +35,8 @@ flowchart TD
 [MLMonitor](./flows/overview/MLMonitor.tsx) combines coverage, repository options, and one confirmed
 rebuild command. [CapabilitiesMonitor](./flows/overview/CapabilitiesMonitor.tsx) is display-only; durable ML and
 agent settings stay in Settings. [StorageMonitor](./flows/overview/StorageMonitor.tsx) groups repositories
-below their owning Storage Locations and exposes capacity, mount, risk, and
+below their owning Storage Locations and exposes filesystem-writable capacity,
+the server-owned safety reserve and resulting write budget, mount, risk, and
 redacted support-bundle diagnostics in a fixed-height master-detail pane
 whose tree and detail column scroll independently.
 [LifecycleHistory](./flows/overview/LifecycleHistory.tsx) renders the durable lifecycle audit below the pane.

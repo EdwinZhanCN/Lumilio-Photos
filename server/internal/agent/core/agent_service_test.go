@@ -227,7 +227,7 @@ func newAwaitingAgentFixture(t *testing.T, provider LLMConfigProvider) awaitingA
 	libraries := NewAuthorizedLibraryFactory(catalog.Queries, nil, catalog.SQL)
 	refStore := ref.NewMemoryStore(0, 0)
 	service := NewAgentService(
-		catalog.Queries, catalog.SQL, provider, refStore, libraries,
+		catalog.Queries, catalog.SQL, catalog.Writer, provider, refStore, libraries,
 		NewConversationStore(0), "",
 	).(*agentService)
 	thread, err := service.EnsureThread(ctx, user.UserID, "resume-thread", "free", ThreadBindings{})

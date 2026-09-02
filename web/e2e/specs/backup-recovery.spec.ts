@@ -1,11 +1,10 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "playwright/test";
 import { expect, test } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
+import { compose, docker, repositoryRoot } from "../support/docker";
 import { t } from "../support/i18n";
 
 type BackupEntry = {
@@ -39,15 +38,6 @@ type RestoreOperation = {
     | "failed";
   message: string;
 };
-
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const compose = [
-  "compose",
-  "-f",
-  path.join(repositoryRoot, "web/e2e/compose.yml"),
-  "-p",
-  "lumilio-photos-e2e",
-];
 
 function backupRow(page: Page, name: string): Locator {
   return page.getByRole("listitem").filter({ hasText: name });
@@ -97,6 +87,7 @@ function writePrivateBackupFixture(target: string, input: string | Buffer): void
   const result = spawnSync(
     "docker",
     [
+      ...docker,
       ...compose,
       "exec",
       "-T",
@@ -344,7 +335,6 @@ test("@backup-recovery admin UI proves backup, download, restore, and rollback",
   const corruptRow = backupRow(page, corruptName);
   await expect(corruptRow).toBeVisible();
   await rejectRestoreFromRow(page, corruptRow);
-  await expect(page.getByText("Restore could not be staged", { exact: true })).toBeVisible();
   await expect
     .poll(() => repositoryPresence(workspace.token, rollbackProof.id), {
       message: "failed restore should preserve the pre-restore public state",

@@ -40,14 +40,18 @@ WHERE al.user_id = sqlc.arg('user_id')
       JOIN assets a ON a.asset_id = aa.asset_id
       WHERE aa.album_id = al.album_id
         AND a.is_deleted = false
-        AND a.repository_id = sqlc.narg('repository_id')
+        AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a.asset_id
+            AND occurrence.repository_id = sqlc.narg('repository_id'))
     )
     OR EXISTS (
       SELECT 1
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
         AND a_cover.is_deleted = false
-        AND a_cover.repository_id = sqlc.narg('repository_id')
+        AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a_cover.asset_id
+            AND occurrence.repository_id = sqlc.narg('repository_id'))
     )
   );
 
@@ -66,14 +70,18 @@ WITH page_albums AS (
         JOIN assets a_exists ON a_exists.asset_id = aa_exists.asset_id
         WHERE aa_exists.album_id = al.album_id
           AND a_exists.is_deleted = false
-          AND a_exists.repository_id = sqlc.narg('repository_id')
+          AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_exists.asset_id
+              AND occurrence.repository_id = sqlc.narg('repository_id'))
       )
       OR EXISTS (
         SELECT 1
         FROM assets a_cover_exists
         WHERE a_cover_exists.asset_id = al.cover_asset_id
           AND a_cover_exists.is_deleted = false
-          AND a_cover_exists.repository_id = sqlc.narg('repository_id')
+          AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_cover_exists.asset_id
+              AND occurrence.repository_id = sqlc.narg('repository_id'))
       )
     )
   ORDER BY al.created_at DESC, al.album_id DESC
@@ -96,7 +104,9 @@ SELECT
       AND a_count.is_deleted = false
       AND (
         sqlc.narg('repository_id') IS NULL
-        OR a_count.repository_id = sqlc.narg('repository_id')
+        OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a_count.asset_id
+            AND occurrence.repository_id = sqlc.narg('repository_id'))
       )
   ) AS asset_count,
   COALESCE(
@@ -107,7 +117,9 @@ SELECT
         AND a_cover.is_deleted = false
         AND (
           sqlc.narg('repository_id') IS NULL
-          OR a_cover.repository_id = sqlc.narg('repository_id')
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_cover.asset_id
+              AND occurrence.repository_id = sqlc.narg('repository_id'))
         )
       LIMIT 1
     ),
@@ -119,7 +131,9 @@ SELECT
         AND a_scope.is_deleted = false
         AND (
           sqlc.narg('repository_id') IS NULL
-          OR a_scope.repository_id = sqlc.narg('repository_id')
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_scope.asset_id
+              AND occurrence.repository_id = sqlc.narg('repository_id'))
         )
       ORDER BY aa_cover.position IS NULL, aa_cover.position, aa_cover.added_time, aa_cover.asset_id
       LIMIT 1
@@ -147,7 +161,9 @@ SELECT
       AND a_count.is_deleted = false
       AND (
         sqlc.narg('repository_id') IS NULL
-        OR a_count.repository_id = sqlc.narg('repository_id')
+        OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a_count.asset_id
+            AND occurrence.repository_id = sqlc.narg('repository_id'))
       )
   ) AS asset_count,
   COALESCE(
@@ -158,7 +174,9 @@ SELECT
         AND a_cover.is_deleted = false
         AND (
           sqlc.narg('repository_id') IS NULL
-          OR a_cover.repository_id = sqlc.narg('repository_id')
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_cover.asset_id
+              AND occurrence.repository_id = sqlc.narg('repository_id'))
         )
       LIMIT 1
     ),
@@ -170,7 +188,9 @@ SELECT
         AND a_scope.is_deleted = false
         AND (
           sqlc.narg('repository_id') IS NULL
-          OR a_scope.repository_id = sqlc.narg('repository_id')
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_scope.asset_id
+              AND occurrence.repository_id = sqlc.narg('repository_id'))
         )
       ORDER BY aa_cover.position IS NULL, aa_cover.position, aa_cover.added_time, aa_cover.asset_id
       LIMIT 1
@@ -204,7 +224,9 @@ WHERE aa.album_id = sqlc.arg('album_id')
   AND a.is_deleted = false
   AND (
     sqlc.narg('repository_id') IS NULL
-    OR a.repository_id = sqlc.narg('repository_id')
+    OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = sqlc.narg('repository_id'))
   )
 ORDER BY aa.position ASC, aa.added_time ASC;
 
@@ -234,7 +256,9 @@ WHERE aa.album_id = sqlc.arg('album_id')
   AND a.is_deleted = false
   AND (
     sqlc.narg('repository_id') IS NULL
-    OR a.repository_id = sqlc.narg('repository_id')
+    OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = sqlc.narg('repository_id'))
   );
 
 -- name: ListBioAlbumAssetsMissingSpeciesPredictions :many

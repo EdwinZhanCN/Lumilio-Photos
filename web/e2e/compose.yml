@@ -29,8 +29,7 @@ services:
     build:
       context: ../..
       dockerfile: server/Dockerfile
-      secrets:
-        - npmrc
+      target: e2e
     depends_on:
       agent-model-fixture:
         condition: service_healthy
@@ -39,10 +38,9 @@ services:
     volumes:
       - storage_data:/data/storage
       - app_state_data:/data/app-state
-      - ./support/server.e2e.toml:/data/app-state/server.toml:ro
-    # The image default is the production Docker manifest. E2E mounts a
-    # complete test manifest above, so explicitly select it for this service.
-    command: ["server", "--config", "/data/app-state/server.toml"]
+    # The dedicated image target carries the complete test manifest, avoiding
+    # host bind mounts so the same Compose project works with a remote daemon.
+    command: ["server", "--config", "/app/config/server.e2e.toml"]
     ports:
       - "${LUMILIO_E2E_PORT:-16657}:6680"
     healthcheck:
@@ -55,7 +53,3 @@ services:
 volumes:
   storage_data:
   app_state_data:
-
-secrets:
-  npmrc:
-    file: ../../.cache/e2e/npmrc

@@ -20,10 +20,12 @@ DELETE FROM face_results WHERE asset_id = ?1;
 INSERT INTO face_items (
     asset_id, face_id, bounding_box, confidence, age_group, gender,
     ethnicity, expression, face_size, face_image_path, embedding,
-    embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at
+    embedding_model, is_primary, quality_score, blur_score, pose_angles,
+    repository_id, created_at
 )
 VALUES (
     ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
+    ?17,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
 RETURNING *;

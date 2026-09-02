@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,28 +11,8 @@ import (
 	"server/internal/db"
 	runtimesettings "server/internal/settings"
 
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 	"github.com/stretchr/testify/require"
 )
-
-type recordingSettingsJobInserter struct {
-	calls int
-	err   error
-}
-
-func (f *recordingSettingsJobInserter) InsertTx(
-	_ context.Context,
-	_ *sql.Tx,
-	_ river.JobArgs,
-	_ *river.InsertOpts,
-) (*rivertype.JobInsertResult, error) {
-	f.calls++
-	if f.err != nil {
-		return nil, f.err
-	}
-	return nil, nil
-}
 
 func TestSettingsServiceUpdatesFreshSQLiteCatalog(t *testing.T) {
 	ctx := context.Background()
@@ -223,12 +202,11 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 	require.NoError(t, database.Migrate(ctx))
 
-	queue := &recordingSettingsJobInserter{}
 	settingsService := NewSettingsServiceWithRuntime(
 		database.Queries,
 		runtimesettings.Default("production"),
 		filepath.Join(catalogDir, "lumilio_secret_key"),
-		SettingsRuntime{DB: database.SQL, Queue: queue},
+		SettingsRuntime{DB: database.SQL, Writer: database.Writer},
 	)
 
 	row, err := database.Queries.GetSettings(ctx)
@@ -254,7 +232,7 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 	require.Equal(t, "http://127.0.0.1:8080/reverse", updated.Geocoding.NominatimEndpoint)
 	require.Equal(t, "zh", updated.Geocoding.Language)
 	require.Equal(t, "Test-Agent/1.0", updated.Geocoding.UserAgent)
-	require.Equal(t, 1, queue.calls)
+	assertSettingsProjectionRequestCount(t, database.SQL, 1)
 
 	require.NoError(t, err)
 	row, err = database.Queries.GetSettings(ctx)
@@ -276,7 +254,6 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, queue.calls)
 	row, err = database.Queries.GetSettings(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), row.GeocodingRevision)
@@ -286,14 +263,13 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 		Geocoding: &UpdateGeocodingSettingsInput{UserAgent: &userAgent},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, queue.calls)
+	assertSettingsProjectionRequestCount(t, database.SQL, 2)
 
 	provider = "disabled"
 	_, err = settingsService.UpdateSystemSettings(ctx, UpdateSystemSettingsInput{
 		Geocoding: &UpdateGeocodingSettingsInput{Provider: &provider},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, queue.calls)
 	row, err = database.Queries.GetSettings(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(4), row.GeocodingRevision)
@@ -309,14 +285,21 @@ func TestSettingsServiceGeocodingTransitionsAndAtomicEnqueue(t *testing.T) {
 	require.Equal(t, row.GeocodingRevision, rowAfterInvalid.GeocodingRevision)
 	require.Equal(t, row.GeocodingNominatimEndpoint, rowAfterInvalid.GeocodingNominatimEndpoint)
 
-	queue.err = errors.New("forced insert failure")
 	provider = "nominatim"
 	_, err = settingsService.UpdateSystemSettings(ctx, UpdateSystemSettingsInput{
 		Geocoding: &UpdateGeocodingSettingsInput{Provider: &provider},
 	})
-	require.ErrorContains(t, err, "forced insert failure")
+	require.NoError(t, err)
 	rowAfterQueueFailure, err := database.Queries.GetSettings(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "disabled", rowAfterQueueFailure.GeocodingProvider)
-	require.Equal(t, int64(4), rowAfterQueueFailure.GeocodingRevision)
+	require.Equal(t, "nominatim", rowAfterQueueFailure.GeocodingProvider)
+	require.Equal(t, int64(5), rowAfterQueueFailure.GeocodingRevision)
+	assertSettingsProjectionRequestCount(t, database.SQL, 3)
+}
+
+func assertSettingsProjectionRequestCount(t *testing.T, database *sql.DB, want int) {
+	t.Helper()
+	var got int64
+	require.NoError(t, database.QueryRow(`SELECT projection_version FROM location_resolution_pipeline_state WHERE scope = 'all'`).Scan(&got))
+	require.Equal(t, int64(want), got)
 }

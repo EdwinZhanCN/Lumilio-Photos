@@ -2929,7 +2929,7 @@ export interface paths {
         put?: never;
         /**
          * Reprocess asset
-         * @description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
+         * @description Request catalog-owned analysis, derivative, transcode, and enrichment stages for an asset. Progress is reported from the receipt and desired/applied catalog state.
          */
         post: {
             parameters: {
@@ -3697,7 +3697,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/assets/batch/jobs": {
+    "/api/v1/assets/batch/operations": {
         parameters: {
             query?: never;
             header?: never;
@@ -3706,13 +3706,13 @@ export interface paths {
         };
         /**
          * Get upload materialization status
-         * @description Get backend ingest lifecycle state for upload task IDs owned by the current caller
+         * @description Get ingest receipt state owned by the current caller
          */
         get: {
             parameters: {
                 query: {
-                    /** @description Comma-separated upload task IDs */
-                    task_ids: string;
+                    /** @description Comma-separated catalog receipt IDs */
+                    receipt_ids: string;
                 };
                 header?: never;
                 path?: never;
@@ -3726,10 +3726,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.UploadJobStatusResponseDTO"];
+                        "application/json": components["schemas"]["dto.UploadOperationStatusResponseDTO"];
                     };
                 };
-                /** @description Invalid task IDs */
+                /** @description Invalid receipt IDs */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3748,7 +3748,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/assets/batch/jobs/stream": {
+    "/api/v1/assets/batch/operations/stream": {
         parameters: {
             query?: never;
             header?: never;
@@ -3759,8 +3759,8 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    /** @description Comma-separated upload task IDs */
-                    task_ids: string;
+                    /** @description Comma-separated catalog receipt IDs */
+                    receipt_ids: string;
                 };
                 header?: never;
                 path?: never;
@@ -10921,6 +10921,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories/{id}/scans/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get repository scan operation
+         * @description Return one durable Repository scan operation by immutable operation ID.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan operation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/scans/{operation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel repository scan operation
+         * @description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan cancellation requested */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories/{id}/scans/latest": {
         parameters: {
             query?: never;
@@ -13484,6 +13590,7 @@ export interface components {
             added_time?: string;
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             file_size?: number;
@@ -13498,12 +13605,10 @@ export interface components {
             owner_id?: number;
             position?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             taken_time?: string;
             type?: string;
             upload_time?: string;
@@ -13542,6 +13647,7 @@ export interface components {
         "dto.AssetDTO": {
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             file_size?: number;
@@ -13555,12 +13661,10 @@ export interface components {
             original_filename?: string;
             owner_id?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             taken_time?: string;
             type?: string;
             upload_time?: string;
@@ -13570,6 +13674,7 @@ export interface components {
             albums?: components["schemas"]["dto.AssetAlbumRefDTO"][];
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             face_result?: components["schemas"]["dto.AssetFaceResultDTO"];
@@ -13585,12 +13690,10 @@ export interface components {
             original_filename?: string;
             owner_id?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             tags?: components["schemas"]["dto.AssetTagDTO"][];
             taken_time?: string;
             thumbnails?: components["schemas"]["dto.AssetThumbnailDTO"][];
@@ -13851,11 +13954,11 @@ export interface components {
             file_name?: string;
             message?: string;
             problem?: components["schemas"]["api.ProblemReference"];
+            receipt_id?: string;
             session_id?: string;
             size?: number;
             status?: string;
             success?: boolean;
-            task_id?: number;
         };
         "dto.BindRepositoryCloudSourceRequest": {
             credential_id: string;
@@ -14557,6 +14660,8 @@ export interface components {
              * @example /Volumes/Media/Photos
              */
             path?: string;
+            /** @example low_space */
+            pause_reason?: string;
             /**
              * @description Reachability lets a selector keep an unreachable repository visible as a
              *     browse filter while refusing it as an upload target. Activity is separate
@@ -15162,9 +15267,10 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /**
-             * @description ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use
-             *     after switching the embedding model (drop+refill) so no two models' vectors
-             *     are mixed. Honored only when the semantic task is included.
+             * @description ResetSemantic globally wipes all photo and video semantic vectors and
+             *     rebuilds both lanes from scratch. Use after switching the embedding model
+             *     (drop+refill) so no two models' vectors are mixed. Repository-scoped resets
+             *     are rejected; the semantic task must be included.
              * @example false
              */
             reset_semantic?: boolean;
@@ -15178,14 +15284,14 @@ export interface components {
         };
         "dto.RebuildAssetIndexesResponseDTO": {
             disabled_tasks?: string[];
-            /** @example 123 */
-            job_id?: number;
             /** @example 200 */
             limit?: number;
             /** @example Index rebuild job queued successfully */
             message?: string;
             /** @example true */
             missing_only?: boolean;
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             requested_tasks?: string[];
@@ -15197,10 +15303,10 @@ export interface components {
             repository_id?: string;
         };
         "dto.RebuildLocationClustersResponseDTO": {
-            /** @example 123 */
-            job_id?: number;
             /** @example Location cluster rebuild queued successfully */
             message?: string;
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example queued */
@@ -15374,10 +15480,14 @@ export interface components {
             writable?: boolean;
         };
         "dto.RepositoryScanQueuedDTO": {
-            /** @example 12345 */
-            job_id?: number;
+            /** @example false */
+            coalesced?: boolean;
+            /** @example true */
+            inserted?: boolean;
             /** @example manual */
             mode?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example queued */
@@ -15388,35 +15498,42 @@ export interface components {
             force?: boolean;
         };
         "dto.RepositoryScanRunDTO": {
-            /** @example 0 */
-            ambiguous_count?: number;
-            /** @example true */
-            authoritative?: boolean;
+            /** @example 8 */
+            authoritative_directories?: number;
+            /** @example 524288 */
+            bytes_hashed?: number;
+            /** @example 1048576 */
+            bytes_queued?: number;
+            /** @example false */
+            cancellation_requested?: boolean;
             /** @example 1 */
-            deferred_count?: number;
-            /** @example 1 */
-            deleted_count?: number;
+            coalesced_count?: number;
+            created_at?: string;
             /** @example 10 */
-            discovered_count?: number;
+            directories_observed?: number;
+            /** @example 1 */
+            error_directories?: number;
+            /** @example 120 */
+            files_observed?: number;
             finished_at?: string;
             /** @example manual */
             mode?: string;
-            /** @example 1 */
-            moved_count?: number;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
+            /** @example 12 */
+            outbox_depth?: number;
+            /** @example true */
+            partial_coverage?: boolean;
             problem?: components["schemas"]["api.ProblemReference"];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example edwin */
             requested_by?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            scan_id?: string;
-            /** @example 4 */
-            skipped_count?: number;
+            /** @example 2 */
+            requested_epoch?: number;
             started_at?: string;
             /** @example completed */
             status?: string;
-            /** @example 2 */
-            updated_count?: number;
         };
         "dto.RepositoryScanRunListDTO": {
             scans?: components["schemas"]["dto.RepositoryScanRunDTO"][];
@@ -15426,9 +15543,9 @@ export interface components {
             force_full_retry?: boolean;
             /**
              * @example [
-             *       "thumbnail_small",
-             *       "thumbnail_medium",
-             *       "transcode_1080p"
+             *       "analyze",
+             *       "derivatives",
+             *       "enrich"
              *     ]
              */
             tasks?: string[];
@@ -15436,22 +15553,10 @@ export interface components {
         "dto.ReprocessAssetResponseDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             asset_id?: string;
-            /**
-             * @example [
-             *       "thumbnail_small",
-             *       "transcode_1080p"
-             *     ]
-             */
-            failed_tasks?: string[];
-            /** @example Reprocessing job queued successfully */
+            /** @example Reprocessing request accepted */
             message?: string;
-            /**
-             * @example [
-             *       "thumbnail_small",
-             *       "transcode_1080p"
-             *     ]
-             */
-            retry_tasks?: string[];
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example queued */
             status?: string;
         };
@@ -15508,8 +15613,6 @@ export interface components {
             lumen_discovery_enabled?: boolean;
             /** @example true */
             passkey_enabled?: boolean;
-            /** @example true */
-            repository_scan_enabled?: boolean;
             /** @example 300 */
             repository_scan_interval_seconds?: number;
             /** @example 0.0.0.0:6680 */
@@ -15785,10 +15888,12 @@ export interface components {
              * @enum {string}
              */
             role?: "primary" | "regular";
+            safety_margin_bytes?: number;
             target_id?: string;
             target_type?: string;
             total_bytes?: number;
             writable?: boolean;
+            writable_budget_bytes?: number;
         };
         "dto.StorageDiagnosticsResponseDTO": {
             generated_at?: string;
@@ -16145,21 +16250,21 @@ export interface components {
             memory_buffer?: number;
             merge_concurrency?: number;
         };
-        "dto.UploadJobStatusDTO": {
+        "dto.UploadOperationStatusDTO": {
             /** @example photo.jpg */
             file_name?: string;
             problem?: components["schemas"]["api.ProblemReference"];
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example completed */
             status?: string;
             /** @example true */
             success?: boolean;
-            /** @example 12345 */
-            task_id?: number;
             /** @example true */
             terminal?: boolean;
         };
-        "dto.UploadJobStatusResponseDTO": {
-            jobs?: components["schemas"]["dto.UploadJobStatusDTO"][];
+        "dto.UploadOperationStatusResponseDTO": {
+            operations?: components["schemas"]["dto.UploadOperationStatusDTO"][];
         };
         "dto.UploadPrecheckFileDTO": {
             /** @example blake3-size-first-last-1m-v1 */
@@ -16208,19 +16313,19 @@ export interface components {
             file_name?: string;
             /** @example File received and queued for processing */
             message?: string;
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example 1048576 */
             size?: number;
             /** @example processing */
             status?: string;
-            /** @example 12345 */
-            task_id?: number;
         };
         "dto.UploadSessionResponseDTO": {
             bytes_received?: number;
+            receipt_id?: string;
             received_chunks?: number[];
             session_id?: string;
             status?: string;
-            task_id?: number;
             total_chunks?: number;
         };
         "dto.UserDTO": {

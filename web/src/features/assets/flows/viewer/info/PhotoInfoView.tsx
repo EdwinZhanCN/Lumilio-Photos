@@ -62,7 +62,6 @@ export default function PhotoInfoView({
   const locationClusterQuery = useAssetLocationCluster({
     latitude: hasGPS ? asset.gps_latitude : undefined,
     longitude: hasGPS ? asset.gps_longitude : undefined,
-    repositoryId: asset.repository_id,
   });
   const locationCluster = locationClusterQuery.cluster;
   const locationName =

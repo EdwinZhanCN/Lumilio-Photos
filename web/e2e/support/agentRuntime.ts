@@ -1,9 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
 import { api, baseURL } from "./api";
+import { compose, docker, repositoryRoot } from "./docker.ts";
 import type { Workspace } from "./workspace";
 
 export const AGENT_FIXTURE_MODEL = "lumilio-agent-e2e-v1";
@@ -18,15 +17,6 @@ export const AGENT_PROVIDER_PRIVATE_MARKER = "fixture-upstream-private-marker";
 const scenarioPrefix = "LUMILIO_E2E_SCENARIO:";
 const metricsURL =
   process.env.LUMILIO_E2E_AGENT_MODEL_METRICS_URL ?? "http://127.0.0.1:16659/metrics";
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const compose = [
-  "compose",
-  "-f",
-  path.join(repositoryRoot, "web/e2e/compose.yml"),
-  "-p",
-  "lumilio-photos-e2e",
-];
-
 type Scenario =
   | { name: "plain" | "slow-stream" | "provider-error" | "read-ocr" }
   | { name: "confirm-add-to-album"; filename: string; album_title: string };
@@ -166,7 +156,7 @@ export function agentStreamOutput(body: string): string {
 export function e2eServerLogsSince(since: Date): string {
   const result = spawnSync(
     "docker",
-    [...compose, "logs", "--since", since.toISOString(), "lumilio"],
+    [...docker, ...compose, "logs", "--since", since.toISOString(), "lumilio"],
     { cwd: repositoryRoot, encoding: "utf8" },
   );
   if (result.error) throw result.error;

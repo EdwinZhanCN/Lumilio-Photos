@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -11,13 +10,13 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 )
 
 func optionalUUIDToString(value any) *string {
@@ -85,12 +84,10 @@ func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
 		AssetDTO: dto.ToAssetDTO(repo.Asset{
 			AssetID:              row.AssetID,
 			OwnerID:              row.OwnerID,
+			ContentID:            row.ContentID,
 			Type:                 row.Type,
 			OriginalFilename:     row.OriginalFilename,
-			StoragePath:          row.StoragePath,
 			MimeType:             row.MimeType,
-			FileSize:             row.FileSize,
-			ContentHash:          row.ContentHash,
 			Width:                row.Width,
 			Height:               row.Height,
 			Duration:             row.Duration,
@@ -102,7 +99,6 @@ func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
 			SpecificMetadata:     row.SpecificMetadata,
 			Rating:               row.Rating,
 			Liked:                row.Liked,
-			RepositoryID:         row.RepositoryID,
 			Status:               row.Status,
 			UpdatedAt:            row.UpdatedAt,
 			GpsLatitude:          row.GpsLatitude,
@@ -172,7 +168,7 @@ func toScopedAlbumListItemDTO(row repo.GetAlbumsByUserScopedRow) dto.GetAlbumRes
 type AlbumHandler struct {
 	albumService    *service.AlbumService
 	queries         *repo.Queries
-	queueClient     *river.Client[*sql.Tx]
+	writer          *catalogtx.Writer
 	settingsService service.SettingsService
 	runtimeChecker  service.LumenService
 }
@@ -181,14 +177,14 @@ type AlbumHandler struct {
 func NewAlbumHandler(
 	albumService *service.AlbumService,
 	queries *repo.Queries,
-	queueClient *river.Client[*sql.Tx],
+	writer *catalogtx.Writer,
 	settingsService service.SettingsService,
 	runtimeChecker service.LumenService,
 ) *AlbumHandler {
 	return &AlbumHandler{
 		albumService:    albumService,
 		queries:         queries,
-		queueClient:     queueClient,
+		writer:          writer,
 		settingsService: settingsService,
 		runtimeChecker:  runtimeChecker,
 	}
@@ -663,8 +659,8 @@ func (h *AlbumHandler) RebuildAlbumBioClip(c *gin.Context) {
 		return
 	}
 
-	if h.queueClient == nil {
-		api.WriteProblem(c, api.StatusProblem(http.StatusServiceUnavailable, errors.New("queue client is not configured")))
+	if h.writer == nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusServiceUnavailable, errors.New("catalog writer is not configured")))
 		return
 	}
 	available, err := bioClipRuntimeAvailable(c.Request.Context(), h.settingsService, h.runtimeChecker)
@@ -685,7 +681,7 @@ func (h *AlbumHandler) RebuildAlbumBioClip(c *gin.Context) {
 
 	queued := 0
 	for _, asset := range assets {
-		if err := enqueueBioClipAsset(c.Request.Context(), h.queueClient, asset); err != nil {
+		if err := requestBioClipAsset(c.Request.Context(), h.writer, asset); err != nil {
 			api.WriteProblem(c, api.Internal(err))
 			return
 		}
@@ -711,7 +707,7 @@ func (h *AlbumHandler) enqueueBioClipForAddedAsset(ctx context.Context, album re
 	if !available {
 		return
 	}
-	if err := enqueueBioClipAsset(ctx, h.queueClient, asset); err != nil {
+	if err := requestBioClipAsset(ctx, h.writer, asset); err != nil {
 		log.Printf("Failed to queue BioCLIP for album %d asset %s: %v", album.AlbumID, asset.AssetID.String(), err)
 	}
 }

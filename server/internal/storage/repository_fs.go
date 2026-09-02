@@ -26,20 +26,22 @@ import (
 )
 
 var (
-	ErrRepositoryUnavailable      = ErrRepositoryOffline
-	ErrRepositoryMarkerInvalid    = errors.New("repository marker is invalid")
-	ErrRepositoryPermission       = errors.New("repository permission denied")
-	ErrRepositoryFSClosed         = errors.New("repository filesystem is closed")
-	ErrRepositoryFileUnstable     = errors.New("repository file changed during inspection")
-	ErrRepositoryEntryUnsupported = errors.New("repository entry is unsupported")
-	ErrNestedRepository           = errors.New("nested repository boundary encountered")
+	ErrRepositoryUnavailable       = ErrRepositoryOffline
+	ErrRepositoryMarkerInvalid     = errors.New("repository marker is invalid")
+	ErrRepositoryPermission        = errors.New("repository permission denied")
+	ErrRepositoryFSClosed          = errors.New("repository filesystem is closed")
+	ErrRepositoryFileUnstable      = errors.New("repository file changed during inspection")
+	ErrRepositoryEntryUnsupported  = errors.New("repository entry is unsupported")
+	ErrRepositoryImmutableConflict = errors.New("immutable repository file conflicts with existing content")
+	ErrNestedRepository            = errors.New("nested repository boundary encountered")
 )
 
 type EntryKind string
 
 const (
-	EntryKindRegular EntryKind = "regular"
-	EntryKindSymlink EntryKind = "symlink"
+	EntryKindRegular   EntryKind = "regular"
+	EntryKindSymlink   EntryKind = "symlink"
+	EntryKindDirectory EntryKind = "directory"
 )
 
 type HashMode uint8
@@ -86,6 +88,34 @@ type WalkSummary struct {
 	Skipped       int64
 	Authoritative bool
 	PartialReason string
+}
+
+// DirectoryReadOptions identifies one bounded verifier page. Offset counts raw
+// directory entries, including markers and unsupported files, so a resumed
+// frontier never depends on the number of catalog-worthy observations.
+type DirectoryReadOptions struct {
+	Directory string
+	Offset    int64
+	Limit     int
+	ScanID    uuid.UUID
+	Settle    time.Duration
+	Now       time.Time
+}
+
+// DirectoryReadBatch is bounded by DirectoryReadOptions.Limit. Entries are
+// positive observations only; Authoritative states whether the completed
+// child set may later finalize absences.
+type DirectoryReadBatch struct {
+	Entries       []DirectoryReadEntry
+	Issues        []WalkIssue
+	NextOffset    int64
+	Done          bool
+	Authoritative bool
+}
+
+type DirectoryReadEntry struct {
+	Observation FileObservation
+	NextOffset  int64
 }
 
 type RepositoryFSFactory struct {
@@ -455,6 +485,119 @@ func (r *RepositoryFS) WritePrivateFileAtomic(repositoryPath RepositoryPath, rea
 	return written, syncRootDirectory(root, path.Dir(repositoryPath.String()))
 }
 
+// WritePrivateFileImmutable publishes a private-workspace file without ever
+// replacing an existing destination. A retry may reuse an existing regular
+// file only when its complete content is byte-for-byte identical; a different
+// file at the immutable path is a conflict and remains untouched.
+func (r *RepositoryFS) WritePrivateFileImmutable(repositoryPath RepositoryPath, reader io.Reader, perm fs.FileMode) (int64, error) {
+	if !repositoryPath.isPrivate() {
+		return 0, ErrRepositoryPathNamespace
+	}
+	if reader == nil {
+		return 0, errors.New("immutable file reader is required")
+	}
+	destination, err := repositoryPath.local()
+	if err != nil {
+		return 0, err
+	}
+	temporaryPath, err := ParsePrivateRepositoryPath(repositoryPath.String() + ".tmp-" + uuid.NewString())
+	if err != nil {
+		return 0, err
+	}
+	temporary, err := temporaryPath.local()
+	if err != nil {
+		return 0, err
+	}
+	root, done, err := r.withRoot()
+	if err != nil {
+		return 0, err
+	}
+	defer done()
+	file, err := root.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	if err != nil {
+		return 0, err
+	}
+	cleanup := true
+	defer func() {
+		_ = file.Close()
+		if cleanup {
+			_ = root.Remove(temporary)
+		}
+	}()
+
+	digest := sha256.New()
+	written, err := io.Copy(io.MultiWriter(file, digest), reader)
+	if err != nil {
+		return written, err
+	}
+	if written == 0 {
+		return 0, io.ErrUnexpectedEOF
+	}
+	if err := file.Sync(); err != nil {
+		return written, err
+	}
+	if err := file.Close(); err != nil {
+		return written, err
+	}
+
+	if err := root.Link(temporary, destination); err != nil {
+		if !errors.Is(err, fs.ErrExist) {
+			return written, err
+		}
+		existingSize, existingDigest, compareErr := hashRootRegularFile(root, destination)
+		if compareErr != nil {
+			return written, compareErr
+		}
+		if existingSize != written || !equalDigest(existingDigest, digest.Sum(nil)) {
+			return written, fmt.Errorf("%w: %s", ErrRepositoryImmutableConflict, repositoryPath.String())
+		}
+		return existingSize, nil
+	}
+	if err := syncRootDirectory(root, path.Dir(repositoryPath.String())); err != nil {
+		return written, err
+	}
+	if err := root.Remove(temporary); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return written, err
+	}
+	cleanup = false
+	if err := syncRootDirectory(root, path.Dir(repositoryPath.String())); err != nil {
+		return written, err
+	}
+	return written, nil
+}
+
+func hashRootRegularFile(root *os.Root, name string) (int64, []byte, error) {
+	info, err := root.Lstat(name)
+	if err != nil {
+		return 0, nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return 0, nil, fmt.Errorf("%w: immutable destination is not a regular file", ErrRepositoryImmutableConflict)
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer file.Close()
+	digest := sha256.New()
+	size, err := io.Copy(digest, file)
+	if err != nil {
+		return 0, nil, err
+	}
+	return size, digest.Sum(nil), nil
+}
+
+func equalDigest(left, right []byte) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	var difference byte
+	for index := range left {
+		difference |= left[index] ^ right[index]
+	}
+	return difference == 0
+}
+
 func (r *RepositoryFS) StatPrivate(repositoryPath RepositoryPath) (fs.FileInfo, error) {
 	if !repositoryPath.isPrivate() {
 		return nil, ErrRepositoryPathNamespace
@@ -509,6 +652,64 @@ func (r *RepositoryFS) RemovePrivate(repositoryPath RepositoryPath) error {
 	}
 	defer done()
 	return root.Remove(local)
+}
+
+// PrivateFile is one regular application-owned file discovered below a
+// validated private repository directory. Callers receive repository-relative
+// paths only; the rooted filesystem capability never leaks an absolute path.
+type PrivateFile struct {
+	Path    RepositoryPath
+	Size    int64
+	ModTime time.Time
+}
+
+// ListPrivateFiles walks one private subtree without following or accepting
+// non-regular entries. It is the bounded capability used by artifact garbage
+// collection; ordinary media code must not inspect the application-owned tree.
+func (r *RepositoryFS) ListPrivateFiles(ctx context.Context, directory RepositoryPath) ([]PrivateFile, error) {
+	if ctx == nil {
+		return nil, errors.New("private file walk context is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !directory.isPrivate() {
+		return nil, ErrRepositoryPathNamespace
+	}
+	root, done, err := r.withRoot()
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	files := make([]PrivateFile, 0)
+	err = fs.WalkDir(root.FS(), directory.String(), func(name string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if errors.Is(walkErr, fs.ErrNotExist) && name == directory.String() {
+				return fs.SkipDir
+			}
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("%w: private entry %s is not a regular file", ErrRepositoryEntryUnsupported, name)
+		}
+		privatePath, err := ParsePrivateRepositoryPath(name)
+		if err != nil {
+			return err
+		}
+		files = append(files, PrivateFile{Path: privatePath, Size: info.Size(), ModTime: info.ModTime()})
+		return nil
+	})
+	return files, err
 }
 
 func (r *RepositoryFS) StatMedia(repositoryPath RepositoryPath) (fs.FileInfo, error) {
@@ -711,7 +912,7 @@ func (r *RepositoryFS) WalkUserMedia(ctx context.Context, options WalkOptions) (
 			summary.Skipped++
 			return nil
 		}
-		observation, inspectErr := r.inspectMediaWithHeldRoot(ctx, root, repositoryPath, HashNone)
+		observation, inspectErr := r.observeMediaWithHeldRoot(ctx, root, repositoryPath)
 		if inspectErr != nil {
 			if errors.Is(inspectErr, ErrRepositoryEntryUnsupported) || entry.Type()&os.ModeSymlink != 0 {
 				summary.Skipped++
@@ -738,9 +939,168 @@ func (r *RepositoryFS) WalkUserMedia(ctx context.Context, options WalkOptions) (
 	return summary, nil
 }
 
-// inspectMediaWithHeldRoot avoids reacquiring the RepositoryFS mutex while a
-// walk already holds it.
-func (r *RepositoryFS) inspectMediaWithHeldRoot(ctx context.Context, root *os.Root, repositoryPath RepositoryPath, mode HashMode) (FileObservation, error) {
+// ReadUserMediaDirectory enumerates one bounded page without recursively
+// walking or reading file contents. A resumed page reopens the directory and
+// discards Offset entries in bounded chunks; change capture and the final
+// verifier, rather than directory ordering, provide convergence across edits.
+func (r *RepositoryFS) ReadUserMediaDirectory(ctx context.Context, options DirectoryReadOptions) (DirectoryReadBatch, error) {
+	batch := DirectoryReadBatch{Authoritative: true, NextOffset: options.Offset}
+	if err := ctx.Err(); err != nil {
+		return batch, err
+	}
+	if options.Offset < 0 {
+		return batch, fmt.Errorf("directory offset must be non-negative")
+	}
+	if options.Limit <= 0 || options.Limit > 256 {
+		return batch, fmt.Errorf("directory limit must be between 1 and 256")
+	}
+	if options.Now.IsZero() {
+		options.Now = time.Now().UTC()
+	}
+	directory := "."
+	if options.Directory != "" {
+		parsed, err := ParseUserMediaPath(options.Directory)
+		if err != nil {
+			return batch, err
+		}
+		directory, err = parsed.local()
+		if err != nil {
+			return batch, err
+		}
+	}
+
+	root, done, err := r.withRoot()
+	if err != nil {
+		return batch, err
+	}
+	defer done()
+	opened, err := root.Open(directory)
+	if err != nil {
+		return batch, classifyRepositoryEntryError(options.Directory, err)
+	}
+	defer opened.Close()
+	info, err := opened.Stat()
+	if err != nil {
+		return batch, err
+	}
+	if !info.IsDir() {
+		return batch, fmt.Errorf("%w: %s is not a directory", ErrRepositoryEntryUnsupported, options.Directory)
+	}
+
+	remaining := options.Offset
+	for remaining > 0 {
+		if err := ctx.Err(); err != nil {
+			return batch, err
+		}
+		pageSize := options.Limit
+		if int64(pageSize) > remaining {
+			pageSize = int(remaining)
+		}
+		skipped, readErr := opened.ReadDir(pageSize)
+		remaining -= int64(len(skipped))
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return batch, readErr
+		}
+		if len(skipped) == 0 || errors.Is(readErr, io.EOF) {
+			batch.Done = true
+			return batch, nil
+		}
+	}
+
+	entries, readErr := opened.ReadDir(options.Limit)
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return batch, readErr
+	}
+	batch.NextOffset += int64(len(entries))
+	batch.Done = errors.Is(readErr, io.EOF) || len(entries) == 0
+	batch.Entries = make([]DirectoryReadEntry, 0, len(entries))
+	for index, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return batch, err
+		}
+		name := entry.Name()
+		child := name
+		if options.Directory != "" {
+			child = path.Join(options.Directory, name)
+		}
+		if child == ".lumilio" || child == ".lumiliorepo" || child == ".lumilioroot" {
+			continue
+		}
+		if entry.IsDir() {
+			if _, markerErr := root.Stat(path.Join(child, ".lumiliorepo")); markerErr == nil {
+				batch.Authoritative = false
+				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "nested_repository", Err: ErrNestedRepository})
+				continue
+			} else if !errors.Is(markerErr, fs.ErrNotExist) {
+				batch.Authoritative = false
+				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "nested_repository_check", Err: markerErr})
+				continue
+			}
+		}
+		repositoryPath, parseErr := ParseUserMediaPath(child)
+		if parseErr != nil {
+			batch.Authoritative = false
+			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "invalid_path", Err: parseErr})
+			continue
+		}
+		if !entry.IsDir() && !fileutil.IsSupportedExtension(path.Ext(repositoryPath.String())) {
+			continue
+		}
+		observation, observeErr := r.observeNodeWithHeldRoot(ctx, root, repositoryPath, entry.IsDir())
+		if observeErr != nil {
+			if errors.Is(observeErr, ErrRepositoryEntryUnsupported) {
+				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "unsupported_entry", Err: observeErr})
+				continue
+			}
+			batch.Authoritative = false
+			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "inspect_error", Err: observeErr})
+			continue
+		}
+		observation.ScanID = options.ScanID
+		if !entry.IsDir() && options.Settle > 0 && options.Now.Sub(time.Unix(0, observation.ModTimeNS)) < options.Settle {
+			batch.Authoritative = false
+			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "settling"})
+			continue
+		}
+		batch.Entries = append(batch.Entries, DirectoryReadEntry{
+			Observation: observation,
+			NextOffset:  options.Offset + int64(index) + 1,
+		})
+	}
+	return batch, nil
+}
+
+func (r *RepositoryFS) observeNodeWithHeldRoot(
+	ctx context.Context,
+	root *os.Root,
+	repositoryPath RepositoryPath,
+	directory bool,
+) (FileObservation, error) {
+	if !directory {
+		return r.observeMediaWithHeldRoot(ctx, root, repositoryPath)
+	}
+	local, err := repositoryPath.local()
+	if err != nil {
+		return FileObservation{}, err
+	}
+	opened, err := root.Open(local)
+	if err != nil {
+		return FileObservation{}, err
+	}
+	defer opened.Close()
+	info, err := opened.Stat()
+	if err != nil || !info.IsDir() {
+		return FileObservation{}, ErrRepositoryEntryUnsupported
+	}
+	identityKind, identity, changeTime := platformFileIdentity(opened, info)
+	return newFileObservation(r.repositoryID, repositoryPath, EntryKindDirectory, info, identityKind, identity, changeTime), nil
+}
+
+// observeMediaWithHeldRoot avoids reacquiring the RepositoryFS mutex while a
+// walk already holds it. The walk performs no content read between metadata
+// snapshots, so one opened-handle snapshot is sufficient; content consumers
+// compare the observation token again before committing their work.
+func (r *RepositoryFS) observeMediaWithHeldRoot(ctx context.Context, root *os.Root, repositoryPath RepositoryPath) (FileObservation, error) {
 	local, err := repositoryPath.local()
 	if err != nil {
 		return FileObservation{}, err
@@ -768,16 +1128,7 @@ func (r *RepositoryFS) inspectMediaWithHeldRoot(ctx context.Context, root *os.Ro
 		return FileObservation{}, ErrRepositoryEntryUnsupported
 	}
 	identityKind, identity, changeTime := platformFileIdentity(opened, before)
-	observation := newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime)
-	after, err := opened.Stat()
-	if err != nil {
-		return FileObservation{}, err
-	}
-	afterKind, afterIdentity, afterChange := platformFileIdentity(opened, after)
-	if observation.ObservationToken != newFileObservation(r.repositoryID, repositoryPath, kind, after, afterKind, afterIdentity, afterChange).ObservationToken {
-		return FileObservation{}, ErrRepositoryFileUnstable
-	}
-	return observation, nil
+	return newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime), nil
 }
 
 func (s *WalkSummary) markPartial(repositoryPath, reason string, err error) {

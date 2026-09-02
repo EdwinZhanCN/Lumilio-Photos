@@ -5,7 +5,11 @@ SELECT
 FROM assets a
 WHERE
     a.is_deleted = false
-    AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
+      SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = sqlc.narg('repository_id')
+    ))
     AND (a.taken_time IS NOT NULL OR a.upload_time IS NOT NULL)
     AND COALESCE(a.taken_time, a.upload_time) >= sqlc.arg('start_time')
     AND COALESCE(a.taken_time, a.upload_time) <= sqlc.arg('end_time')

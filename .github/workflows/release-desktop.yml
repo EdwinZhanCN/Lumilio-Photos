@@ -28,9 +28,6 @@ jobs:
     spa:
         name: web SPA + panel + licenses
         runs-on: ubuntu-24.04
-        permissions:
-            contents: read
-            packages: read
         steps:
             - uses: actions/checkout@v7
 
@@ -59,12 +56,6 @@ jobs:
               run: |
                   curl -fsSL https://vite.plus | bash
                   echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
-
-            # @edwinzhancn/docts resolves from GitHub Packages (token required).
-            - name: Authenticate GitHub Packages
-              run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             # The notices generator runs `go list` over the desktop module,
             # whose //go:embed frontend needs frontend/dist to exist — so the

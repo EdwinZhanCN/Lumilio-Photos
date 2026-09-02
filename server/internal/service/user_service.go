@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
@@ -73,12 +74,18 @@ type UserService interface {
 type userService struct {
 	queries *repo.Queries
 	db      *sql.DB
+	writer  *catalogtx.Writer
 }
 
 func NewUserService(queries *repo.Queries, db *sql.DB) UserService {
+	return NewUserServiceWithWriter(queries, db, catalogtx.NewWriter(db, nil))
+}
+
+func NewUserServiceWithWriter(queries *repo.Queries, db *sql.DB, writer *catalogtx.Writer) UserService {
 	return &userService{
 		queries: queries,
 		db:      db,
+		writer:  writer,
 	}
 }
 
@@ -464,13 +471,13 @@ func (s *userService) withTx(ctx context.Context, fn func(*repo.Queries) error) 
 		return fn(s.queries)
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.writer.BeginTx(ctx, catalogtx.OperationUserMutation, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	if err := fn(s.queries.WithTx(tx)); err != nil {
+	if err := fn(s.queries.WithTx(tx.Raw())); err != nil {
 		return err
 	}
 

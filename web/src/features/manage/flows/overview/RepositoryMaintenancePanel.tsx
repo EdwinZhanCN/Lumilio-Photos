@@ -48,27 +48,18 @@ export default function RepositoryMaintenancePanel() {
     async (repository: RepositoryOption) => {
       try {
         const result = await scanRepository(repository.id);
-        const summaryValues = {
-          name: getStorageEntityDisplayName(repository, t),
-          discovered: result.discovered_count ?? 0,
-          updated: result.updated_count ?? 0,
-          moved: result.moved_count ?? 0,
-          deferred: result.deferred_count ?? 0,
-          ambiguous: result.ambiguous_count ?? 0,
-          deleted: result.deleted_count ?? 0,
-        };
         showMessage(
-          result.authoritative ? "success" : "info",
-          result.authoritative
+          result.coalesced ? "info" : "success",
+          result.coalesced
             ? t(
-                "manage.repositories.scanCompletedSummary",
-                "{{name}} scan complete: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous, {{deleted}} deleted.",
-                summaryValues,
+                "manage.repositories.scanCoalesced",
+                "A scan is already active for {{name}}; this request joined the existing operation.",
+                { name: getStorageEntityDisplayName(repository, t) },
               )
             : t(
-                "manage.repositories.scanPartialSummary",
-                "{{name}} scan was partial: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous. Missing files were not confirmed.",
-                summaryValues,
+                "manage.repositories.scanQueued",
+                "Scan queued for {{name}}. You can keep using Lumilio while it runs.",
+                { name: getStorageEntityDisplayName(repository, t) },
               ),
         );
       } catch (error) {

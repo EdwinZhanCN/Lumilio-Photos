@@ -303,12 +303,11 @@ type ConfigValidation struct {
 // Server manifest. The Desktop frontend edits this structure; Go patches the
 // authoritative TOML candidate and runs the real strict loader.
 type RuntimeConfigSettings struct {
-	NetworkMode           string `json:"networkMode"`
-	Listen                string `json:"listen"`
-	StoragePath           string `json:"storagePath"`
-	LoggingLevel          string `json:"loggingLevel"`
-	RepositoryScanEnabled bool   `json:"repositoryScanEnabled"`
-	HardwareAcceleration  string `json:"hardwareAcceleration"`
+	NetworkMode          string `json:"networkMode"`
+	Listen               string `json:"listen"`
+	StoragePath          string `json:"storagePath"`
+	LoggingLevel         string `json:"loggingLevel"`
+	HardwareAcceleration string `json:"hardwareAcceleration"`
 }
 
 type RuntimeConfigDraft struct {

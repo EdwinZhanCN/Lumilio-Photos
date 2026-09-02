@@ -9,7 +9,7 @@ description: Use when starting work large enough to need an execution plan,
 # Execution Plans
 
 A plan is a working document for large prospective work, not a decision
-archive. Plans live in `site/docs/internal/exec-plans/active/` — one file per
+archive. Plans live in `docs/exec-plans/active/` — one file per
 plan, no completed tier. Durable memory lives elsewhere: decisions in
 `.agents/decisions/`, escaped bugs in `.agents/postmortems/`, debt in
 `exec-plans/tech-debt-tracker.md`.

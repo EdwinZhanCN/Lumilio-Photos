@@ -59,6 +59,14 @@ export async function nextTOTPCode(secret: string, previous: string): Promise<st
   return code;
 }
 
+/** True only for the server's replay/invalid-code MFA rejection. */
+export function isMFAInvalidError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    (error.message.includes("mfa-invalid") || error.message.includes("invalid mfa code"))
+  );
+}
+
 export function saveBootstrapTOTP(value: BootstrapTOTP): void {
   mkdirSync(path.dirname(bootstrapTOTPPath), { recursive: true });
   writeFileSync(bootstrapTOTPPath, `${JSON.stringify(value)}\n`, { mode: 0o600 });

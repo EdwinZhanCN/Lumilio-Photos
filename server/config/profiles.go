@@ -128,6 +128,7 @@ func ptr[T any](value T) *T { return &value }
 // Desktop app-data directory, and a container volume.
 type layout struct {
 	database   string
+	queueDB    string
 	logs       string
 	storage    string
 	cloudState string
@@ -147,6 +148,7 @@ func containerLayout(stateDir, storageDir string) layout {
 	}
 	return layout{
 		database:   stateDir + "/library.sqlite3",
+		queueDB:    stateDir + "/river.sqlite3",
 		logs:       stateDir + "/logs",
 		storage:    storageDir,
 		cloudState: stateDir + "/cloud",
@@ -166,6 +168,7 @@ func desktopLayout() layout {
 	const state = "/Users/example/Library/Application Support/Lumilio"
 	return layout{
 		database:   state + "/app-state/library.sqlite3",
+		queueDB:    state + "/app-state/river.sqlite3",
 		logs:       state + "/app-state/logs",
 		storage:    "/Users/example/Pictures/Lumilio",
 		cloudState: state + "/app-state/cloud",
@@ -183,7 +186,7 @@ func baseManifest(environment string, deploymentID string, logLevel string, l la
 	return manifest{
 		SchemaVersion: ptr(SchemaVersion),
 		Environment:   ptr(environment),
-		Database:      &databaseManifest{Path: ptr(l.database)},
+		Database:      &databaseManifest{Path: ptr(l.database), QueuePath: ptr(l.queueDB)},
 		Server: &serverManifest{
 			Listen:             ptr("127.0.0.1:6680"),
 			CORSAllowedOrigins: ptr([]string{}),
@@ -212,11 +215,8 @@ func baseManifest(environment string, deploymentID string, logLevel string, l la
 			BackupsPath:    ptr(l.backups),
 		},
 		RepositoryScan: &repositoryScanManifest{
-			Enabled:            ptr(true),
-			IntervalSeconds:    ptr(300),
-			SettleSeconds:      ptr(5),
-			MaxConcurrentRepos: ptr(1),
-			BatchSize:          ptr(500),
+			IntervalSeconds: ptr(300),
+			SettleSeconds:   ptr(5),
 		},
 		Auth: &authManifest{
 			SecretKeyFile:   ptr(l.secretKey),
@@ -257,6 +257,18 @@ func baseManifest(environment string, deploymentID string, logLevel string, l la
 			ExifToolPath: ptr("exiftool"),
 			FFmpegPath:   ptr("ffmpeg"),
 			FFprobePath:  ptr("ffprobe"),
+		},
+		Execution: &executionManifest{
+			CPU:                  ptr(3),
+			DiskIO:               ptr(4),
+			ImageCodec:           ptr(2),
+			VideoCodec:           ptr(1),
+			Inference:            ptr(2),
+			MemoryMiB:            ptr(int64(768)),
+			MacroWorkers:         ptr(16),
+			MaxWaiting:           ptr(256),
+			FFmpegThreads:        ptr(3),
+			FFmpegSoftwarePreset: ptr("veryfast"),
 		},
 	}
 }

@@ -53,10 +53,6 @@ jobs:
                   platforms: linux/${{ matrix.arch }}
                   build-args: |
                       VERSION=${{ github.ref_name }}
-                  # The web-builder stage mounts this for GitHub Packages npm
-                  # auth used by @edwinzhancn/docts.
-                  secrets: |
-                      npmrc=//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
                   outputs: type=image,name=${{ env.IMAGE_BASE }}/lumilio-server,push-by-digest=true,name-canonical=true,push=true
                   cache-from: type=gha,scope=server-${{ matrix.arch }}
                   cache-to: type=gha,mode=max,scope=server-${{ matrix.arch }}

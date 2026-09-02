@@ -27,8 +27,9 @@ const migrationTable = "lumilio_schema_migrations"
 // other generation are rejected outright: experimental catalogs are never
 // upgraded in place.
 const (
-	schemaGeneration                 = 7
+	schemaGeneration                 = 8
 	currentGenerationBaselineVersion = 9
+	currentApplicationMigration      = 14
 )
 
 type embeddedMigration struct {
@@ -44,20 +45,28 @@ type appliedMigration struct {
 	checksum string
 }
 
-// Migrate applies Lumilio's embedded transactional migrations followed by
-// River's official SQLite migrations against the same single-writer pool.
+// Migrate applies the catalog migrations and, for standalone package tests,
+// River's schema on the same handle. Production calls MigrateCatalog for the
+// catalog and migrates its independent QueueDB separately.
 func (d *DB) Migrate(ctx context.Context) error {
+	if err := d.MigrateCatalog(ctx); err != nil {
+		return err
+	}
+	return MigrateRiver(ctx, d.SQL)
+}
+
+// MigrateCatalog applies the current catalog generation. Legacy translation was
+// removed: incompatible pre-production catalogs are rejected by
+// assertSchemaGeneration and can be recreated.
+func (d *DB) MigrateCatalog(ctx context.Context) error {
 	if err := assertSchemaGeneration(ctx, d.SQL); err != nil {
 		return err
 	}
 	if err := migrateApplication(ctx, d.SQL); err != nil {
 		return fmt.Errorf("migrate Lumilio schema: %w", err)
 	}
-	if err := vectorindex.Reconcile(ctx, d.SQL); err != nil {
+	if err := vectorindex.Reconcile(ctx, d.Writer, d.ReaderSQL); err != nil {
 		return fmt.Errorf("reconcile semantic Vec1 index: %w", err)
-	}
-	if err := migrateRiver(ctx, d.SQL); err != nil {
-		return fmt.Errorf("migrate River schema: %w", err)
 	}
 	if err := d.Check(ctx); err != nil {
 		return fmt.Errorf("post-migration integrity check: %w", err)
@@ -120,6 +129,37 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if err := validateAppliedMigrations(available, applied); err != nil {
+		return err
+	}
+
+	for index := 0; index < len(available); {
+		migration := available[index]
+		if _, ok := applied[migration.version]; ok {
+			index++
+			continue
+		}
+		group := []embeddedMigration{migration}
+
+		started := time.Now()
+		if err := applyMigrationGroup(ctx, database, group); err != nil {
+			return err
+		}
+		for _, appliedMigration := range group {
+			applied[appliedMigration.version] = structToApplied(appliedMigration)
+			log.Printf(
+				"Lumilio migration applied: version=%06d name=%s duration=%s",
+				appliedMigration.version,
+				appliedMigration.name,
+				time.Since(started),
+			)
+		}
+		index++
+	}
+	return nil
+}
+
+func validateAppliedMigrations(available []embeddedMigration, applied map[int64]appliedMigration) error {
 	known := make(map[int64]embeddedMigration, len(available))
 	for _, migration := range available {
 		known[migration.version] = migration
@@ -147,28 +187,16 @@ func migrateApplication(ctx context.Context, database *sql.DB) error {
 			)
 		}
 	}
-
-	for _, migration := range available {
-		if _, ok := applied[migration.version]; ok {
-			continue
-		}
-		started := time.Now()
-		if err := applyMigration(ctx, database, migration); err != nil {
-			return err
-		}
-		log.Printf(
-			"Lumilio migration applied: version=%06d name=%s duration=%s",
-			migration.version,
-			migration.name,
-			time.Since(started),
-		)
-	}
 	return nil
+}
+
+func structToApplied(migration embeddedMigration) appliedMigration {
+	return appliedMigration{name: migration.name, checksum: migration.checksum}
 }
 
 // currentGenerationMigrations excludes destructive baselines from older
 // experimental generations. Those files remain embedded and immutable for
-// auditability, but a fresh generation-7 catalog starts directly at migration
+// auditability, but a fresh generation-8 catalog starts directly at migration
 // 000009 and therefore never reads the historical generation-6 sequence.
 func currentGenerationMigrations(all []embeddedMigration) ([]embeddedMigration, error) {
 	var current []embeddedMigration
@@ -260,30 +288,46 @@ func readAppliedMigrations(ctx context.Context, database *sql.DB) (map[int64]app
 }
 
 func applyMigration(ctx context.Context, database *sql.DB, migration embeddedMigration) error {
+	return applyMigrationGroup(ctx, database, []embeddedMigration{migration})
+}
+
+func applyMigrationGroup(ctx context.Context, database *sql.DB, migrations []embeddedMigration) error {
+	if len(migrations) == 0 {
+		return nil
+	}
 	tx, err := database.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin migration %s: %w", migration.file, err)
+		return fmt.Errorf("begin migration group at %s: %w", migrations[0].file, err)
 	}
 	defer func() {
 		_ = tx.Rollback()
 	}()
-
-	if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
-		return fmt.Errorf("execute migration %s: %w", migration.file, err)
-	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO lumilio_schema_migrations (version, name, checksum, applied_at)
-		VALUES (?, ?, ?, ?)
-	`, migration.version, migration.name, migration.checksum, time.Now().UTC().UnixMicro()); err != nil {
-		return fmt.Errorf("record migration %s: %w", migration.file, err)
+	for _, migration := range migrations {
+		if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
+			return fmt.Errorf("execute migration %s: %w", migration.file, err)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO lumilio_schema_migrations (version, name, checksum, applied_at)
+			VALUES (?, ?, ?, ?)
+		`, migration.version, migration.name, migration.checksum, time.Now().UTC().UnixMicro()); err != nil {
+			return fmt.Errorf("record migration %s: %w", migration.file, err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit migration %s: %w", migration.file, err)
+		return fmt.Errorf(
+			"commit migration group %s..%s: %w",
+			migrations[0].file,
+			migrations[len(migrations)-1].file,
+			err,
+		)
 	}
 	return nil
 }
 
-func migrateRiver(ctx context.Context, database *sql.DB) error {
+// MigrateRiver applies only River's execution schema to the supplied queue
+// database. The catalog and queue files intentionally have independent
+// migration ledgers and lifecycle owners.
+func MigrateRiver(ctx context.Context, database *sql.DB) error {
 	migrator, err := rivermigrate.New(riversqlite.New(database), nil)
 	if err != nil {
 		return fmt.Errorf("initialize River migrator: %w", err)
@@ -301,4 +345,11 @@ func migrateRiver(ctx context.Context, database *sql.DB) error {
 		)
 	}
 	return nil
+}
+
+// migrateRiver is retained for package-local migration tests that exercise a
+// standalone catalog handle. Production bootstrap calls the exported helper
+// with QueueDB.SQL instead.
+func migrateRiver(ctx context.Context, database *sql.DB) error {
+	return MigrateRiver(ctx, database)
 }

@@ -18,6 +18,7 @@ const (
 	QuickHashThreshold = 100 * 1024 * 1024
 
 	QuickFingerprintVersion = "blake3-size-first-last-1m-v1"
+	fullHashBufferSize      = 1 * 1024 * 1024
 )
 
 // HashAlgorithm defines the hashing algorithm to use
@@ -44,6 +45,11 @@ type LayeredHashResult struct {
 	QuickFingerprintVersion *string
 	FileSize                int64
 }
+
+// readerOnly intentionally hides optional io.WriterTo implementations. A
+// fixed, larger CopyBuffer window keeps full hashing efficient and predictable
+// across os.File and io.SectionReader without changing single-pass semantics.
+type readerOnly struct{ io.Reader }
 
 // CalculateLayeredBLAKE3 always calculates a full BLAKE3 content hash. Large
 // files additionally receive a versioned quick fingerprint.
@@ -157,17 +163,18 @@ func CalculateQuickSHA256(filePath string) (string, error) {
 
 // calculateFullHash calculates the full hash of a file
 func calculateFullHash(reader io.Reader, algorithm HashAlgorithm) (string, error) {
+	buffer := make([]byte, fullHashBufferSize)
 	switch algorithm {
 	case AlgorithmBLAKE3:
 		hasher := blake3.New()
-		if _, err := io.Copy(hasher, reader); err != nil {
+		if _, err := io.CopyBuffer(hasher, readerOnly{reader}, buffer); err != nil {
 			return "", fmt.Errorf("failed to calculate BLAKE3 hash: %w", err)
 		}
 		return hex.EncodeToString(hasher.Sum(nil)), nil
 
 	case AlgorithmSHA256:
 		hasher := sha256.New()
-		if _, err := io.Copy(hasher, reader); err != nil {
+		if _, err := io.CopyBuffer(hasher, readerOnly{reader}, buffer); err != nil {
 			return "", fmt.Errorf("failed to calculate SHA256 hash: %w", err)
 		}
 		return hex.EncodeToString(hasher.Sum(nil)), nil

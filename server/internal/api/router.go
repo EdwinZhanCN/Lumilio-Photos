@@ -39,8 +39,8 @@ type AssetControllerInterface interface {
 	CreateUploadSession(c *gin.Context)
 	GetUploadConfig(c *gin.Context)
 	GetUploadProgress(c *gin.Context)
-	GetUploadJobStatus(c *gin.Context)
-	StreamUploadJobStatus(c *gin.Context)
+	GetUploadOperationStatus(c *gin.Context)
+	StreamUploadOperationStatus(c *gin.Context)
 	AddAssetToAlbum(c *gin.Context)
 	GetAssetTypes(c *gin.Context)
 	GetAssetThumbnail(c *gin.Context)
@@ -239,8 +239,10 @@ type RepositoryScanControllerInterface interface {
 	RenameRepository(c *gin.Context)
 	DeleteRepository(c *gin.Context)
 	QueueRepositoryScan(c *gin.Context)
+	GetRepositoryScan(c *gin.Context)
 	GetLatestRepositoryScan(c *gin.Context)
 	ListRepositoryScans(c *gin.Context)
+	CancelRepositoryScan(c *gin.Context)
 }
 
 type HostActionControllerInterface interface {
@@ -469,6 +471,8 @@ func NewRouter(
 			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
 			repositories.POST("/:id/scan", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
+			repositories.GET("/:id/scans/:operation_id", appInitializedMiddleware, repositoryScanController.GetRepositoryScan)
+			repositories.POST("/:id/scans/:operation_id/cancel", appInitializedMiddleware, repositoryScanController.CancelRepositoryScan)
 			repositories.GET("/:id/scans", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
 			repositories.POST("/:id/stacks/detect", appInitializedMiddleware, assetController.AutoDetectStacks)
 		}
@@ -535,8 +539,8 @@ func NewRouter(
 			assets.POST("/batch/sessions", assetController.CreateUploadSession)
 			assets.GET("/batch/config", assetController.GetUploadConfig)
 			assets.GET("/batch/progress", assetController.GetUploadProgress)
-			assets.GET("/batch/jobs", assetController.GetUploadJobStatus)
-			assets.GET("/batch/jobs/stream", assetController.StreamUploadJobStatus)
+			assets.GET("/batch/operations", assetController.GetUploadOperationStatus)
+			assets.GET("/batch/operations/stream", assetController.StreamUploadOperationStatus)
 			assets.POST("/download", assetController.DownloadAssets)
 			assets.GET("/:id", assetController.GetAsset)
 			assets.GET("/:id/exif", assetController.GetAssetExif)

@@ -41,7 +41,6 @@ export default function ServerTab() {
         ["passkey_available", formatBoolean(browserCapabilities.data?.passkey_available, t)],
         ["storage_root", runtime.storage_root],
         ["hardware_accel", runtime.hardware_accel],
-        ["repository_scan_enabled", formatBoolean(runtime.repository_scan_enabled, t)],
         ["repository_scan_interval_seconds", runtime.repository_scan_interval_seconds],
         ["log_level", runtime.log_level],
         ["lumen_discovery_enabled", formatBoolean(runtime.lumen_discovery_enabled, t)],

@@ -10,7 +10,7 @@ export const isDuplicateResult = (result: UploadProcessResult): boolean =>
 
 export const resolveResultStatus = (result: UploadProcessResult): FileUploadStatus => {
   if (isDuplicateResult(result)) return "duplicate";
-  if (!result.success || !result.task_id) return "failed";
+  if (!result.success || !result.receipt_id) return "failed";
   return "processing";
 };
 

@@ -1,6 +1,6 @@
-// Package sourcing defines the unified asset source abstraction that decouples
-// how assets are discovered (upload, scanner, cloud sync, import) from how they
-// are materialized into the repository and fed into the ingest pipeline.
+// Package sourcing defines the recoverable staged-source abstraction that
+// decouples upload and cloud acquisition from Repository commit and ROE
+// publication.
 package sourcing
 
 import (
@@ -43,7 +43,6 @@ type IngestSourceKind string
 
 const (
 	IngestSourceUpload IngestSourceKind = "upload" // HTTP upload
-	IngestSourceScan   IngestSourceKind = "scan"   // filesystem scanner
 	IngestSourceCloud  IngestSourceKind = "cloud"  // cloud sync (S3, iCloud, GDrive, etc.)
 )
 
@@ -51,6 +50,7 @@ const (
 // The SourceMaterializer consumes these to validate, materialize, and
 // enqueue into the asset ingest pipeline.
 type IngestSource struct {
+	CommitID                uuid.UUID // durable staging journal identity; River carries only this value
 	RepositoryID            uuid.UUID
 	OwnerID                 *int32 // nullable; when nil the materializer falls back to repository default
 	Kind                    IngestSourceKind

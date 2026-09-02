@@ -34,6 +34,7 @@ export function normalizeRepositoryOptions(data?: RepositoryListResponse): Repos
     rootId: repository.root_id ?? "",
     reachability: normalizeRepositoryReachability(repository.reachability),
     activity: normalizeRepositoryActivity(repository.activity),
+    pauseReason: repository.pause_reason ?? "",
   }));
 }
 
@@ -50,7 +51,7 @@ function normalizeRepositoryActivity(activity?: string): RepositoryActivity {
 }
 
 export function isRepositoryUnavailable(repository: RepositoryOption): boolean {
-  return repository.reachability !== "active";
+  return repository.reachability !== "active" || repository.activity === "paused";
 }
 
 export function getRepositoryEffectiveState(

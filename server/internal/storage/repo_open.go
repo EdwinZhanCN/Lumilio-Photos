@@ -150,9 +150,9 @@ func (rm *DefaultRepositoryManager) OpenRepository(
 		openRepositoryOperationResult{RepositoryID: databaseRepository.RepoID.String(), InitialScanQueued: false}); err != nil {
 		return nil, fmt.Errorf("repository opened but journal completion failed: %w", err)
 	}
-	// The scanner's enqueue path establishes a repository work lease of its
-	// own. Release the lifecycle locks before entering it, otherwise the
-	// enqueue path waits forever for the locks held by this function.
+	// The observation request establishes a repository work lease of its own.
+	// Release the lifecycle locks before entering it, otherwise the request
+	// waits forever for the locks held by this function.
 	releaseLocks()
 	if err := rm.ScheduleInitialRepositoryScan(ctx, databaseRepository.RepoID.String()); err != nil {
 		rm.logger.Warn("repository opened but initial scan could not be queued",

@@ -11,6 +11,9 @@ import (
 	"server/config"
 	"server/internal/db"
 	"server/internal/event"
+	"server/internal/testutil"
+
+	"github.com/google/uuid"
 )
 
 func TestRebuildOwnerPublishesAndRetainsStableIdentity(t *testing.T) {
@@ -35,13 +38,27 @@ VALUES('00000000-0000-0000-0000-000000000001','root','/events','default',1,1);
 INSERT INTO repositories(repo_id,name,path,reachability,activity,created_at,updated_at,default_owner_id,root_id)
 VALUES('00000000-0000-0000-0000-000000000002','repo','/events/repo','active','idle',1,1,1,
        '00000000-0000-0000-0000-000000000001');
-INSERT INTO assets(asset_id,owner_id,type,original_filename,mime_type,file_size,content_hash,
- upload_time,taken_time,repository_id,status,updated_at)
-VALUES
- ('00000000-0000-0000-0000-000000000011',1,'PHOTO','a.jpg','image/jpeg',1,'a',
-  1000000,1000000,'00000000-0000-0000-0000-000000000002','{"state":"completed"}',1),
- ('00000000-0000-0000-0000-000000000012',1,'PHOTO','b.jpg','image/jpeg',1,'b',
-  2000000,2000000,'00000000-0000-0000-0000-000000000002','{"state":"completed"}',1);
+`); err != nil {
+		t.Fatal(err)
+	}
+	repositoryID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	for _, fixture := range []struct {
+		id       string
+		filename string
+		taken    int64
+	}{
+		{id: "00000000-0000-0000-0000-000000000011", filename: "a.jpg", taken: 1_000_000},
+		{id: "00000000-0000-0000-0000-000000000012", filename: "b.jpg", taken: 2_000_000},
+	} {
+		if _, err := testutil.InsertAssetOccurrence(ctx, database.SQL, testutil.AssetOccurrenceParams{
+			AssetID: uuid.MustParse(fixture.id), RepositoryID: repositoryID, OwnerID: 1,
+			AssetType: "PHOTO", Filename: fixture.filename, MIMEType: "image/jpeg", FileSize: 1,
+			UploadTime: fixture.taken, TakenTime: &fixture.taken,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := database.SQL.ExecContext(ctx, `
 INSERT INTO media_items(media_item_id,owner_id,repository_id,media_kind,primary_asset_id,created_at,updated_at)
 VALUES
  ('00000000-0000-0000-0000-000000000021',1,'00000000-0000-0000-0000-000000000002','photo',

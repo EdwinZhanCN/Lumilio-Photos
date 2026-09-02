@@ -1409,6 +1409,8 @@
       "activityProcessing": "正在处理",
       "activityScanning": "正在扫描",
       "assetCount": "资源数量",
+      "cancelScan": "取消验证",
+      "cancelScanFailed": "无法请求取消验证。",
       "candidates": {
         "addSeparateConfirm": "是，作为独立资源库添加",
         "copyAdded": "已添加独立资源库。",
@@ -1553,19 +1555,27 @@
       "scanAll": "扫描全部资源库",
       "scanAllQueued_one": "已为 {{count}} 个库添加扫描队列。",
       "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
-      "scanAmbiguousHelp": "Lumilio 未猜测文件身份。请移除多余副本或恢复为一一对应的布局，然后再次扫描。",
-      "scanAuthoritative": "扫描完成",
-      "scanCompletedSummary": "{{name}} 扫描完成：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个，删除 {{deleted}} 个。",
-      "scanCountAmbiguous": "歧义",
-      "scanCountDeferred": "暂缓",
-      "scanCountDeleted": "删除",
-      "scanCountDiscovered": "发现",
-      "scanCountMoved": "移动",
-      "scanCountUpdated": "更新",
+      "scanAuthoritative": "验证完成",
+      "scanBytesHashed": "已哈希字节数",
+      "scanBytesQueued": "已排队字节数",
+      "scanCancellationRequested": "已请求取消。当前处理步骤将安全完成。",
+      "scanCancellationRequestedAction": "已请求取消",
+      "scanCoalesced": "{{name}} 已有扫描任务在运行；此次请求已并入现有操作。",
+      "scanCountDirectories": "已观察目录",
+      "scanCountFiles": "已观察文件",
+      "scanDirectoryErrors": "目录错误",
       "scanFailed": "加入扫描队列失败。",
-      "scanPartial": "部分扫描",
-      "scanPartialSummary": "{{name}} 本轮扫描不完整：发现 {{discovered}} 个，更新 {{updated}} 个，移动 {{moved}} 个，暂缓 {{deferred}} 个，存在歧义 {{ambiguous}} 个。本轮未确认缺失文件。",
-      "scanStatusRunning": "扫描正在进行或已排队，结果会显示在这里。",
+      "scanOutboxDepth": "待处理任务",
+      "scanPartial": "验证不完整",
+      "scanPartialHelp": "部分目录无法验证。此前有效的文件仍然可用。",
+      "scanPhaseCatchingUp": "正在同步变更",
+      "scanPhaseCrawling": "正在观察文件",
+      "scanPhaseFinalizing": "正在完成验证",
+      "scanPhaseQueued": "已排队",
+      "scanQueued": "已为 {{name}} 加入扫描队列。扫描运行时，你仍可继续使用流明集。",
+      "scanStatusCancelled": "验证已取消。此前有效的文件仍然可用。",
+      "scanStatusFailed": "验证因稳定错误而停止。此前有效的文件仍然可用。",
+      "scanStatusRunning": "扫描阶段：{{phase}}。后台任务运行时，你仍可继续使用流明集。",
       "sourceCloud": "云导入",
       "storageLocationAvailable": "可用",
       "storageLocationCapacity": "可用 {{available}}，总计 {{total}}",
@@ -1714,29 +1724,14 @@
       },
       "fetchError": "加载处理活动失败。",
       "kinds": {
-        "classify_zeroshot": "匹配已保存分类器",
-        "database_backup": "创建数据库备份",
-        "detect_stacks": "查找关联原片",
-        "discover_asset": "导入扫描发现的文件",
+        "analyze_asset": "读取媒体信息",
+        "backup_catalog": "创建目录备份",
+        "enrich_asset": "运行图像与媒体增强",
+        "generate_asset_derivatives": "生成预览图",
         "ingest_asset": "导入上传文件",
-        "match_live_photo": "匹配 Live Photo",
-        "metadata_asset": "读取媒体信息",
-        "process_bioclip": "识别自然与物种",
-        "process_face": "识别人像",
-        "process_ocr": "识别图片文字",
-        "process_ocr_outbox": "更新 OCR 搜索索引",
-        "process_phash": "分析重复照片",
-        "process_semantic": "建立视觉搜索索引",
-        "process_video_frames": "图像语义分析（视频）",
-        "rebuild_events": "重建事件",
-        "rebuild_location_clusters": "刷新地点",
-        "reindex_assets": "重建 AI 索引",
-        "retry_asset": "重试媒体处理",
-        "scan_repository": "扫描资源库文件夹",
-        "schedule_event_rebuilds": "安排事件重建",
-        "schedule_repository_scans": "安排资源库扫描",
-        "thumbnail_asset": "生成预览图",
-        "transcode_asset": "准备可播放媒体",
+        "rebuild_projection_batch": "重建目录投影",
+        "scan_repository_batch": "扫描资源库批次",
+        "transcode_media": "准备可播放媒体",
         "unknown": "其他后台任务 · {{name}}"
       },
       "loading": "正在加载处理活动...",
@@ -1753,96 +1748,12 @@
       },
       "noErrorSamples": "这个处理模块没有记录最近错误详情。",
       "queues": {
-        "classify_zeroshot": {
-          "description": "在视觉索引完成后匹配已保存的分类相册。",
-          "name": "零样本分类"
-        },
-        "db_backup": {
-          "description": "创建定时或管理员手动请求的数据库备份。",
-          "name": "数据库备份"
+        "catalog_macro": {
+          "description": "在共享资源限制下运行有界目录处理阶段。",
+          "name": "目录处理"
         },
         "default": {
           "description": "资源库的后台处理。"
-        },
-        "detect_stacks": {
-          "description": "查找 RAW+JPEG 以及相关媒体堆叠。",
-          "name": "堆叠检测"
-        },
-        "discover_asset": {
-          "description": "整理资源库扫描时发现的文件。",
-          "name": "扫描发现"
-        },
-        "event_scheduler": {
-          "description": "在后台投影需要刷新时安排事件重建。",
-          "name": "事件调度"
-        },
-        "ingest_asset": {
-          "description": "安全地把上传媒体放入资源库。",
-          "name": "导入"
-        },
-        "match_live_photo": {
-          "description": "配对 Apple Live Photo 的照片与视频文件。",
-          "name": "Live Photo 匹配"
-        },
-        "metadata_asset": {
-          "description": "读取 EXIF、拍摄时间、相机、位置和媒体信息。",
-          "name": "媒体信息"
-        },
-        "ocr_index": {
-          "description": "让提取出的 OCR 文字可用于搜索。",
-          "name": "OCR 搜索索引"
-        },
-        "process_bioclip": {
-          "description": "在启用时添加自然与物种标签。",
-          "name": "BioCLIP物种识别"
-        },
-        "process_face": {
-          "description": "查找人脸并更新人物分组。",
-          "name": "人物识别"
-        },
-        "process_ocr": {
-          "description": "从图片中提取可搜索文字。",
-          "name": "OCR文字识别"
-        },
-        "process_phash": {
-          "description": "计算用于重复照片检测的指纹。",
-          "name": "重复分析"
-        },
-        "process_semantic": {
-          "description": "建立用于搜索和 AI 整理的视觉向量。",
-          "name": "图像语义分析"
-        },
-        "process_video_frames": {
-          "description": "从代表性视频帧建立可搜索的语义向量。",
-          "name": "图像语义分析（视频）"
-        },
-        "rebuild_events": {
-          "description": "根据当前媒体数据重建事件。",
-          "name": "事件重建"
-        },
-        "rebuild_location_clusters": {
-          "description": "在媒体位置变化后刷新地点聚类。",
-          "name": "地点"
-        },
-        "reindex_assets": {
-          "description": "为已有照片补齐 AI 索引。",
-          "name": "AI 重建索引"
-        },
-        "retry_asset": {
-          "description": "在处理失败后重新尝试。",
-          "name": "重试"
-        },
-        "scan_repository": {
-          "description": "扫描资源库文件夹中的新增、变更或移除文件。",
-          "name": "资源库扫描"
-        },
-        "thumbnail_asset": {
-          "description": "生成媒体界面使用的预览图。",
-          "name": "预览图"
-        },
-        "transcode_asset": {
-          "description": "为浏览器播放准备视频和音频版本。",
-          "name": "播放媒体"
         },
         "unknown": {
           "name": "其他处理 · {{name}}"
@@ -1905,6 +1816,7 @@
       "auditTarget": "目标",
       "auditTime": "时间",
       "auditTitle": "生命周期历史",
+      "capacityExplanation": "可写空间来自文件系统；当 macOS 将可清理的 APFS 空间计入可用空间时，这个数字可能更低。Lumilio 会保留安全预留空间，再接受新的写入。",
       "capacityHeading": "容量",
       "capacityUnknown": "容量不可用",
       "capacityUsed": "已用容量",
@@ -1928,7 +1840,8 @@
       "riskMountChanged": "挂载身份已变化",
       "riskNetwork": "网络文件系统",
       "riskRemovable": "可移动存储",
-      "statAvailable": "可用",
+      "safetyReserve": "安全预留",
+      "statAvailable": "当前可写",
       "statusActive": "可用",
       "statUsed": "已用",
       "statusIdentityError": "身份不匹配",
@@ -1940,7 +1853,8 @@
       "technicalDetails": "技术详情",
       "totalCapacity": "共 {{total}}",
       "unlinkedTitle": "所属位置未知的资源库",
-      "updated": "检查于 {{time}}"
+      "updated": "检查于 {{time}}",
+      "uploadBudget": "可用于新写入"
     },
     "subtitles": {
       "capabilities": "ML 服务发现与 LLM Agent 运行状态",
@@ -2866,8 +2780,12 @@
       "clear_button": "清除",
       "default_upload_target_hint": "当前未选择具体工作资源库；上传会进入主/默认资源库。",
       "drag_drop_or_click": "拖拽或点击上传",
+      "low_space_blocked": "此资源库所在存储位置的可写空间不足，资源库已暂停。请释放空间，并等待容量检查完成后再上传。",
+      "low_space_title": "上传已暂停：空间不足",
       "no_files_selected_for_upload": "未选择要上传的文件",
       "no_valid_files_selected": "未选择有效文件",
+      "repository_unavailable_for_upload": "此资源库当前无法接受上传。",
+      "repository_unavailable_title": "暂时无法上传",
       "server_chunk_size": "服务器分块大小",
       "server_concurrency": "服务器并发数",
       "server_in_flight": "进行中的请求",

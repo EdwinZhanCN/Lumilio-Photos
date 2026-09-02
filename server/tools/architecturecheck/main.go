@@ -8,6 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,6 +41,16 @@ func main() {
 	}
 	fmt.Println("SQLite SQL checks passed")
 
+	if err := checkSQLiteConnectionArchitecture(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("SQLite connection architecture checks passed")
+
+	if err := checkSQLiteTransactionInventory(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("SQLite transaction inventory checks passed")
+
 	if err := checkBrowseArchitecture(root); err != nil {
 		fail(err)
 	}
@@ -62,6 +75,11 @@ func main() {
 		fail(err)
 	}
 	fmt.Println("API Problem architecture checks passed")
+
+	if err := checkAsyncPipelineArchitecture(root); err != nil {
+		fail(err)
+	}
+	fmt.Println("Async pipeline architecture checks passed")
 }
 
 func fail(err error) {
@@ -152,6 +170,472 @@ func checkSQLiteSQL(root string) error {
 		)
 	}
 	return nil
+}
+
+func checkSQLiteConnectionArchitecture(root string) error {
+	databasePath := filepath.Join(root, "server/internal/db/db.go")
+	databaseSource, err := os.ReadFile(databasePath)
+	if err != nil {
+		return fmt.Errorf("read SQLite connection boundary: %w", err)
+	}
+	databaseText := string(databaseSource)
+	for _, requirement := range []struct {
+		name    string
+		snippet string
+	}{
+		{name: "one physical writer", snippet: "database.SetMaxOpenConns(1)"},
+		{name: "read-only reader DSN", snippet: `"mode":          {"ro"}`},
+		{name: "query-only reader guard", snippet: `"_query_only":   {"on"}`},
+		{name: "bounded reader pool", snippet: "reader.SetMaxOpenConns(4)"},
+		{name: "default generated query router", snippet: "Queries:       repo.New(newQueryRouter(database, reader, writerCapability, readerCapability))"},
+		{name: "named writer capability", snippet: "Writer:        writerCapability"},
+		{name: "named reader capability", snippet: "Reader:        readerCapability"},
+		{name: "explicit checkpoint policy", snippet: `"PRAGMA wal_autocheckpoint = 0"`},
+	} {
+		if !strings.Contains(databaseText, requirement.snippet) {
+			return fmt.Errorf(
+				"SQLite connection architecture lost %s (%q); preserve one writer, query-only WAL readers, routed generated reads, and explicit checkpoint ownership",
+				requirement.name,
+				requirement.snippet,
+			)
+		}
+	}
+
+	appPath := filepath.Join(root, "server/app/app.go")
+	appSource, err := os.ReadFile(appPath)
+	if err != nil {
+		return fmt.Errorf("read production SQLite wiring: %w", err)
+	}
+	appText := string(appSource)
+	for _, requirement := range []struct {
+		name    string
+		snippet string
+	}{
+		{name: "River executor on queue writer and listener on queue readers", snippet: "queue.New(queueDatabase.SQL, queueDatabase.ReaderSQL, workers"},
+		{name: "Catalog commit scheduling wake", snippet: "db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))"},
+		{name: "Catalog-derived scheduler", snippet: "queue.NewScheduler(database.Reader, database.Writer, queueClient"},
+		{name: "Catalog scheduler wake consumption", snippet: "catalogScheduleWake.Signals()"},
+		{name: "writer wait and WAL monitor", snippet: "monitorSQLiteWriter(\n\t\tctx,\n\t\tdatabase"},
+		{name: "idle WAL checkpoint suppression", snippet: "walStateAlreadyCheckpointed(walState"},
+		{name: "independent queue WAL checkpoint", snippet: `checkpointWAL("queue"`},
+		{name: "backup source reader", snippet: "Source:   database.ReaderSQL"},
+		{name: "queue status reader", snippet: "handler.NewQueueHandler(queueDatabase.ReaderSQL)"},
+		{name: "event planning reader", snippet: "event.NewServiceWithCatalog(database.Writer, database.Reader"},
+		{name: "event HTTP catalog capabilities", snippet: "handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL"},
+		{name: "agent library reader", snippet: "core.NewAuthorizedLibraryFactory(queries, assetService, database.ReaderSQL)"},
+		{name: "classifier catalog capabilities", snippet: "service.NewClassifierServiceWithCatalog(sqlDB, readerDB, writer"},
+	} {
+		if !strings.Contains(appText, requirement.snippet) {
+			return fmt.Errorf(
+				"production SQLite wiring lost %s (%q); foreground/background planning reads must use the query-only pool",
+				requirement.name,
+				requirement.snippet,
+			)
+		}
+	}
+
+	for _, forbidden := range []struct {
+		name    string
+		pattern *regexp.Regexp
+	}{
+		{name: "raw production read on the writer", pattern: regexp.MustCompile(`\b(?:sqlDB|database\.SQL)\.(?:Query|QueryRow|Prepare)(?:Context)?\(`)},
+		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*\)`)},
+		{name: "backup copy bound to the writer", pattern: regexp.MustCompile(`Source:\s+sqlDB\b`)},
+		{name: "agent library bound to the writer", pattern: regexp.MustCompile(`NewAuthorizedLibraryFactory\(queries, assetService, sqlDB\)`)},
+	} {
+		if location := forbidden.pattern.FindStringIndex(appText); location != nil {
+			line := 1 + strings.Count(appText[:location[0]], "\n")
+			return fmt.Errorf(
+				"SQLite connection architecture found %s at server/app/app.go:%d; bind non-transactional reads to database.ReaderSQL or the routed database.Queries surface",
+				forbidden.name,
+				line,
+			)
+		}
+	}
+
+	bootstrapPath := filepath.Join(root, "server/internal/service/bootstrap_service.go")
+	bootstrapSource, err := os.ReadFile(bootstrapPath)
+	if err != nil {
+		return fmt.Errorf("read bootstrap SQLite boundary: %w", err)
+	}
+	bootstrapText := string(bootstrapSource)
+	if !strings.Contains(bootstrapText, "return s.compute(ctx)") {
+		return errors.New("bootstrap Phase lost its read-only derivation; setup status and initialization middleware must not wait for SQLite's writer")
+	}
+	if strings.Contains(bootstrapText, "return s.Reconcile(ctx)") {
+		return errors.New("bootstrap Phase calls Reconcile; foreground initialization reads must never persist through SQLite's sole writer")
+	}
+
+	runtimeStatusSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/runtime_status.go"))
+	if err != nil {
+		return fmt.Errorf("read storage runtime status boundary: %w", err)
+	}
+	if strings.Contains(string(runtimeStatusSource), "rm.Reconcile") {
+		return errors.New("storage runtime status performs reconciliation; GET/setup status must read the cached projection without acquiring SQLite's writer")
+	}
+
+	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/repository_roots.go"))
+	if err != nil {
+		return fmt.Errorf("read Storage Location list boundary: %w", err)
+	}
+	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error) {\n\tif err := rm.ReconcileRepositoryRoots(ctx)") {
+		return errors.New("ListRepositoryRoots reconciles on a foreground read; background storage reconciliation owns projection writes")
+	}
+
+	hostActionSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/host_action.go"))
+	if err != nil {
+		return fmt.Errorf("read host action list boundary: %w", err)
+	}
+	for _, forbidden := range []string{
+		"func (rm *DefaultRepositoryManager) ListPendingHostActions(ctx context.Context) ([]HostAction, error) {\n\tif err := rm.expirePendingHostActions(ctx)",
+		"func (rm *DefaultRepositoryManager) ListHostActionsForActor(ctx context.Context, actorUserID int32) ([]HostAction, error) {\n\tif err := rm.expirePendingHostActions(ctx)",
+	} {
+		if strings.Contains(string(hostActionSource), forbidden) {
+			return errors.New("host action list persists expiry on a foreground read; materialize expiry while reading and persist cleanup only at an explicit maintenance boundary")
+		}
+	}
+	handlerReconcile, err := scanGoLines(root, "server/internal/api/handler", func(relative, line string) bool {
+		if strings.HasSuffix(relative, "_test.go") {
+			return false
+		}
+		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileRepositoryRoots(")
+	})
+	if err != nil {
+		return err
+	}
+	if len(handlerReconcile) > 0 {
+		return fmt.Errorf(
+			"foreground HTTP handler performs storage reconciliation:\n%s\nStartup/background controllers own projection writes; GET handlers consume the latest reader projection",
+			strings.Join(handlerReconcile, "\n"),
+		)
+	}
+	return nil
+}
+
+// checkAsyncPipelineArchitecture protects the queue/control-plane seam. These
+// checks intentionally inspect the working tree (not only the Git index) so a
+// newly added worker cannot bypass the guard before it is staged.
+func checkAsyncPipelineArchitecture(root string) error {
+	legacy := regexp.MustCompile(`\b(?:ProcessSemantic|ProcessBioClip|ProcessOcr|ProcessFace|ProcessVideoFrames|ProcessPHash|ZeroshotClassify|DetectStacks|LivePhotoMatch|ObserveRepository|HashRepositoryNode|DrainRepositoryOutbox|ScheduleRepositoryScans|EventRebuild|MetadataWorker|ThumbnailWorker|TranscodeWorker)\b`)
+	legacyKinds := regexp.MustCompile(`(?i)\b(?:process_semantic|process_bioclip|process_ocr|process_face|process_video_frames|classify_zeroshot|process_phash|detect_stacks|match_live_photo|observe_repository|hash_repository_node|drain_repository_outbox|schedule_repository_scans|rebuild_events|metadata_asset|thumbnail_asset|transcode_asset)\b`)
+	violations, err := scanTextPaths(root, []string{"server/internal/queue/jobs", "server/internal/queue", "server/app"}, func(relative, line string) bool {
+		if strings.HasSuffix(relative, "_test.go") {
+			return false
+		}
+		return legacy.MatchString(line) || legacyKinds.MatchString(line)
+	})
+	if err != nil {
+		return err
+	}
+	if len(violations) > 0 {
+		return fmt.Errorf("legacy fine-grained queue contract remains reachable:\n%s", strings.Join(violations, "\n"))
+	}
+
+	allowedKinds := map[string]bool{
+		"IngestAsset": true, "AnalyzeAsset": true,
+		"GenerateAssetDerivatives": true, "TranscodeMedia": true,
+		"EnrichAsset": true, "ScanRepositoryBatch": true,
+		"RebuildProjectionBatch": true, "BackupCatalog": true,
+	}
+	registrations, err := scanGoLines(root, "server/app", func(_ string, line string) bool {
+		return strings.Contains(line, "river.AddWorker[")
+	})
+	if err != nil {
+		return err
+	}
+	registeredKinds := make(map[string]string, len(registrations))
+	for _, registration := range registrations {
+		start := strings.Index(registration, "river.AddWorker[") + len("river.AddWorker[")
+		end := strings.Index(registration[start:], "]")
+		if end < 0 {
+			return fmt.Errorf("River registration has no closed payload type: %s", registration)
+		}
+		kind := strings.TrimPrefix(strings.TrimSpace(registration[start:start+end]), "jobs.")
+		kind = strings.TrimSuffix(kind, "Args")
+		if !allowedKinds[kind] {
+			return fmt.Errorf("River registration is outside the closed macro catalog: %s", registration)
+		}
+		if previous, exists := registeredKinds[kind]; exists {
+			return fmt.Errorf("River macro kind %s is registered twice:\n%s\n%s", kind, previous, registration)
+		}
+		registeredKinds[kind] = registration
+	}
+	if len(registeredKinds) != len(allowedKinds) {
+		var missing []string
+		for kind := range allowedKinds {
+			if _, exists := registeredKinds[kind]; !exists {
+				missing = append(missing, kind)
+			}
+		}
+		return fmt.Errorf("closed River macro catalog has %d registrations, want %d; missing=%s", len(registeredKinds), len(allowedKinds), strings.Join(missing, ","))
+	}
+
+	appSource, err := os.ReadFile(filepath.Join(root, "server/app/app.go"))
+	if err != nil {
+		return fmt.Errorf("read app composition root: %w", err)
+	}
+	appText := string(appSource)
+	for _, forbidden := range []string{
+		"river.AddWorker[",
+		"switch args.ProjectionKind",
+		"ComputeMetadataTask(",
+		"ComputeThumbnailTask(",
+		"ProcessTranscodeTask(",
+		"runAssetEnrichment(",
+	} {
+		if strings.Contains(appText, forbidden) {
+			return fmt.Errorf("app.go owns macro scheduling algorithm %q; keep the composition root limited to construction and lifecycle", forbidden)
+		}
+	}
+
+	forbiddenImports, err := scanGoLines(root, "server/internal", func(relative, line string) bool {
+		if strings.HasSuffix(relative, "_test.go") || strings.HasPrefix(relative, "server/internal/queue/") || strings.HasPrefix(relative, "server/internal/db/sqlitespike/") || strings.HasPrefix(relative, "server/internal/api/handler/queue_handler.go") {
+			return false
+		}
+		return strings.Contains(line, "river_job") || strings.Contains(line, "river_jobs")
+	})
+	if err != nil {
+		return err
+	}
+	if len(forbiddenImports) > 0 {
+		return fmt.Errorf("product code consults River tables for correctness:\n%s", strings.Join(forbiddenImports, "\n"))
+	}
+
+	childInserts, err := scanGoLines(root, "server/internal/queue", func(relative, line string) bool {
+		if relative == "server/internal/queue/scheduler.go" || strings.HasSuffix(relative, "_test.go") {
+			return false
+		}
+		return strings.Contains(line, ".Insert(") || strings.Contains(line, ".InsertMany(")
+	})
+	if err != nil {
+		return err
+	}
+	if len(childInserts) > 0 {
+		return fmt.Errorf("queue worker inserts child River work:\n%s", strings.Join(childInserts, "\n"))
+	}
+
+	controllerWrites, err := scanROEControllerWriteCapabilities(root)
+	if err != nil {
+		return err
+	}
+
+	producerCapabilities, err := scanAsyncProducerCapabilities(root)
+	if err != nil {
+		return err
+	}
+	if len(producerCapabilities) > 0 {
+		return fmt.Errorf(
+			"asynchronous pipeline producers retain broad catalog/service capability:\n%s\nPreparers must own only narrow read/compute interfaces; catalog mutation belongs to coordinator handlers",
+			strings.Join(producerCapabilities, "\n"),
+		)
+	}
+	if len(controllerWrites) > 0 {
+		return fmt.Errorf(
+			"asynchronous ROE controller retains direct catalog-write capability:\n%s\nOnly foreground commands and the registered coordinator commit handler may own catalog writes",
+			strings.Join(controllerWrites, "\n"),
+		)
+	}
+
+	if source, readErr := os.ReadFile(filepath.Join(root, "server/internal/db/migration.go")); readErr != nil {
+		return fmt.Errorf("read catalog migration boundary: %w", readErr)
+	} else if strings.Contains(string(source), "MigrateWithPreflight") || strings.Contains(string(source), "DestructiveMigrationPreflight") {
+		return errors.New("obsolete catalog migration preflight remains in the migration boundary")
+	}
+
+	scatter, err := scanResourceLiteralScatter(root)
+	if err != nil {
+		return err
+	}
+	if len(scatter) > 0 {
+		return fmt.Errorf("pipeline runtime contains raw resource literals scatter:\n%s", strings.Join(scatter, "\n"))
+	}
+
+	govSites, err := scanGovernorConstructionSites(root)
+	if err != nil {
+		return err
+	}
+	if len(govSites) > 0 {
+		return fmt.Errorf("unauthorized Governor construction sites:\n%s", strings.Join(govSites, "\n"))
+	}
+
+	nakedFlags, err := scanProcessorNakedFFmpegFlags(root)
+	if err != nil {
+		return err
+	}
+	if len(nakedFlags) > 0 {
+		return fmt.Errorf("processor uses naked ffmpeg flags:\n%s", strings.Join(nakedFlags, "\n"))
+	}
+
+	return nil
+}
+
+func scanAsyncProducerCapabilities(root string) ([]string, error) {
+	targets := map[string]bool{
+		"server/internal/sourcing/materializer.go":          true,
+		"server/internal/storage/roe/materializer/hash.go":  true,
+		"server/internal/storage/roe/locations/resolver.go": true,
+		"server/internal/processors/asset_processor.go":     true,
+		"server/internal/queue/asset_work_fence.go":         true,
+		"server/internal/queue/enrichment_runner.go":        true,
+		"server/internal/queue/ml_image_loader.go":          true,
+		"server/internal/queue/projection_preparer.go":      true,
+	}
+	forbiddenServiceTypes := map[string]bool{
+		"SettingsService":      true,
+		"LumenService":         true,
+		"ClassifierService":    true,
+		"LocationService":      true,
+		"AssetIndexingService": true,
+	}
+	var violations []string
+	for relative := range targets {
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("stat async producer %s: %w", relative, err)
+		}
+		files := token.NewFileSet()
+		parsed, err := parser.ParseFile(files, path, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", relative, err)
+		}
+		aliases := map[string]string{}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			alias := filepath.Base(importPath)
+			if imported.Name != nil {
+				alias = imported.Name.Name
+			}
+			aliases[alias] = importPath
+			if importPath == "server/internal/db" {
+				position := files.Position(imported.Pos())
+				violations = append(violations, fmt.Sprintf("%s:%d:imports catalog database capability", relative, position.Line))
+			}
+		}
+		seen := map[token.Pos]bool{}
+		ast.Inspect(parsed, func(node ast.Node) bool {
+			if node == nil || seen[node.Pos()] {
+				return true
+			}
+			var capability string
+			switch value := node.(type) {
+			case *ast.StarExpr:
+				selector, ok := value.X.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+				qualifier, ok := selector.X.(*ast.Ident)
+				if !ok {
+					return true
+				}
+				switch aliases[qualifier.Name] {
+				case "database/sql":
+					if selector.Sel.Name == "DB" {
+						capability = "*sql.DB"
+					}
+				case "server/internal/db/repo":
+					if selector.Sel.Name == "Queries" {
+						capability = "*repo.Queries"
+					}
+				}
+			case *ast.SelectorExpr:
+				qualifier, ok := value.X.(*ast.Ident)
+				if !ok {
+					return true
+				}
+				if aliases[qualifier.Name] == "server/internal/service" && forbiddenServiceTypes[value.Sel.Name] {
+					capability = qualifier.Name + "." + value.Sel.Name
+				}
+			}
+			if capability != "" {
+				seen[node.Pos()] = true
+				position := files.Position(node.Pos())
+				violations = append(violations, fmt.Sprintf("%s:%d:owns broad capability %s", relative, position.Line, capability))
+			}
+			return true
+		})
+	}
+	return violations, nil
+}
+
+func scanROEControllerWriteCapabilities(root string) ([]string, error) {
+	const controllerDirectory = "server/internal/storage/roe/controller"
+	allowed := map[string]bool{
+		controllerDirectory + "/commands.go":              true,
+		controllerDirectory + "/commit_handler.go":        true,
+		controllerDirectory + "/directory_publication.go": true,
+	}
+	var violations []string
+	err := filepath.WalkDir(filepath.Join(root, controllerDirectory), func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		if allowed[relative] {
+			return nil
+		}
+
+		files := token.NewFileSet()
+		parsed, err := parser.ParseFile(files, path, nil, 0)
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", relative, err)
+		}
+		repoAliases := map[string]bool{}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			position := files.Position(imported.Pos())
+			switch importPath {
+			case "server/internal/db", "server/internal/db/catalogtx":
+				violations = append(violations, fmt.Sprintf("%s:%d:imports catalog write capability %s", relative, position.Line, importPath))
+			case "server/internal/db/repo":
+				alias := "repo"
+				if imported.Name != nil {
+					alias = imported.Name.Name
+				}
+				if alias == "." {
+					violations = append(violations, fmt.Sprintf("%s:%d:dot-imports catalog query capability", relative, position.Line))
+				} else {
+					repoAliases[alias] = true
+				}
+			}
+		}
+
+		seen := map[token.Pos]bool{}
+		ast.Inspect(parsed, func(node ast.Node) bool {
+			selector, ok := node.(*ast.SelectorExpr)
+			if !ok || seen[selector.Pos()] {
+				return true
+			}
+			capability := ""
+			switch selector.Sel.Name {
+			case "WithTx", "Writer", "Queries":
+				capability = selector.Sel.Name
+			}
+			if qualifier, ok := selector.X.(*ast.Ident); ok && repoAliases[qualifier.Name] &&
+				(selector.Sel.Name == "New" || selector.Sel.Name == "Queries") {
+				capability = qualifier.Name + "." + selector.Sel.Name
+			}
+			if capability != "" {
+				seen[selector.Pos()] = true
+				position := files.Position(selector.Pos())
+				violations = append(violations, fmt.Sprintf("%s:%d:references catalog write capability %s", relative, position.Line, capability))
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan asynchronous ROE controller capabilities: %w", err)
+	}
+	return violations, nil
 }
 
 func mixedSliceQueries(root string) ([]string, error) {
@@ -739,4 +1223,59 @@ func scanGoLines(root, directory string, match func(relative, line string) bool)
 		return nil, fmt.Errorf("scan %s Go files: %w", directory, err)
 	}
 	return matches, nil
+}
+
+func isResourceLiteralScatter(relative, line string) bool {
+	if strings.HasSuffix(relative, "_test.go") ||
+		relative == "server/internal/execution/demand.go" ||
+		relative == "server/internal/execution/budget.go" ||
+		strings.HasPrefix(relative, "server/tools/") {
+		return false
+	}
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") {
+		return false
+	}
+	return strings.Contains(line, "execution.Resources{") ||
+		(strings.HasPrefix(relative, "server/internal/execution/") && strings.Contains(line, "Resources{") && !strings.Contains(line, "func ") && !strings.Contains(line, "type ") && !strings.Contains(line, "return Resources{"))
+}
+
+func isGovernorConstructionViolation(relative, line string) bool {
+	if strings.HasSuffix(relative, "_test.go") ||
+		relative == "server/internal/execution/budget.go" ||
+		relative == "server/internal/execution/governor.go" ||
+		strings.HasPrefix(relative, "server/tools/") {
+		return false
+	}
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") {
+		return false
+	}
+	return strings.Contains(line, "execution.NewGovernor(") ||
+		(strings.HasPrefix(relative, "server/internal/execution/") && strings.Contains(line, "NewGovernor(") && !strings.Contains(line, "func NewGovernor("))
+}
+
+func isProcessorNakedFFmpegFlagViolation(relative, line string) bool {
+	if strings.HasSuffix(relative, "_test.go") ||
+		!strings.HasPrefix(relative, "server/internal/processors/") ||
+		strings.HasPrefix(relative, "server/tools/") {
+		return false
+	}
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") {
+		return false
+	}
+	return strings.Contains(line, `"-threads"`) || strings.Contains(line, `"-preset"`)
+}
+
+func scanResourceLiteralScatter(root string) ([]string, error) {
+	return scanGoLines(root, "server", isResourceLiteralScatter)
+}
+
+func scanGovernorConstructionSites(root string) ([]string, error) {
+	return scanGoLines(root, "server", isGovernorConstructionViolation)
+}
+
+func scanProcessorNakedFFmpegFlags(root string) ([]string, error) {
+	return scanGoLines(root, "server/internal/processors", isProcessorNakedFFmpegFlagViolation)
 }

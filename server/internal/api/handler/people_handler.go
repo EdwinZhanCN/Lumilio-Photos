@@ -335,32 +335,17 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	if person.RepresentativeAssetID == nil || person.CoverFaceImagePath == nil {
+	if person.RepresentativeAssetID == nil || person.CoverFaceImagePath == nil || person.CoverRepositoryID == nil {
 		api.WriteProblem(c, api.NotFound(errors.New("person cover not found")))
 		return
 	}
 
-	representativeAssetID, err := uuid.Parse(*person.RepresentativeAssetID)
-	if err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-
-	asset, err := h.assetService.GetAsset(c.Request.Context(), representativeAssetID)
-	if err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-	if !asset.RepositoryID.Valid {
-		api.WriteProblem(c, api.Internal(errors.New("cover asset has no repository")))
-		return
-	}
 	if h.repoResolver == nil || h.files == nil {
 		api.WriteProblem(c, api.Internal(errors.New("repository filesystem unavailable")))
 		return
 	}
 
-	repository, err := h.repoResolver.GetRepository(asset.RepositoryID.UUID.String())
+	repository, err := h.repoResolver.GetRepository(*person.CoverRepositoryID)
 	if err != nil {
 		api.WriteProblem(c, api.Internal(err))
 		return

@@ -6,25 +6,25 @@ import {
 
 describe("retry task asset type support", () => {
   it("allows photo retry tasks for metadata, thumbnails, and ML", () => {
-    expect(isRetryTaskSupportedForAssetType("metadata_asset", "PHOTO")).toBe(true);
-    expect(isRetryTaskSupportedForAssetType("thumbnail_asset", "PHOTO")).toBe(true);
-    expect(isRetryTaskSupportedForAssetType("process_semantic", "PHOTO")).toBe(true);
-    expect(isRetryTaskSupportedForAssetType("transcode_asset", "PHOTO")).toBe(false);
+    expect(isRetryTaskSupportedForAssetType("analyze", "PHOTO")).toBe(true);
+    expect(isRetryTaskSupportedForAssetType("derivatives", "PHOTO")).toBe(true);
+    expect(isRetryTaskSupportedForAssetType("enrich", "PHOTO")).toBe(true);
+    expect(isRetryTaskSupportedForAssetType("transcode", "PHOTO")).toBe(false);
   });
 
-  it("allows video retry tasks for metadata, thumbnails, and transcode only", () => {
+  it("allows video retry tasks for metadata, thumbnails, transcode, and enrichment", () => {
     const tasks = getRetryTasksByCategoryForAssetType("VIDEO");
 
-    expect(tasks.metadata.map((task) => task.key)).toEqual(["metadata_asset"]);
-    expect(tasks.media.map((task) => task.key)).toEqual(["thumbnail_asset", "transcode_asset"]);
-    expect(tasks.ml).toEqual([]);
+    expect(tasks.metadata.map((task) => task.key)).toEqual(["analyze"]);
+    expect(tasks.media.map((task) => task.key)).toEqual(["derivatives", "transcode"]);
+    expect(tasks.ml.map((task) => task.key)).toEqual(["enrich"]);
   });
 
   it("allows audio retry tasks for metadata and transcode only", () => {
     const tasks = getRetryTasksByCategoryForAssetType("AUDIO");
 
-    expect(tasks.metadata.map((task) => task.key)).toEqual(["metadata_asset"]);
-    expect(tasks.media.map((task) => task.key)).toEqual(["transcode_asset"]);
+    expect(tasks.metadata.map((task) => task.key)).toEqual(["analyze"]);
+    expect(tasks.media.map((task) => task.key)).toEqual(["transcode"]);
     expect(tasks.ml).toEqual([]);
   });
 });

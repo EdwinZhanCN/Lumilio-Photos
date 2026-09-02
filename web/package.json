@@ -10,7 +10,7 @@
     "e2e:down": "node e2e/support/environment.ts down",
     "e2e:logs": "node e2e/support/environment.ts logs",
     "e2e:seed": "vp run assets:sync && node e2e/support/seed.ts",
-    "e2e:seed:video-semantic": "vp run assets:sync -- --profile e2e && node e2e/support/seed.ts",
+    "e2e:seed:video-semantic": "vp run assets:sync && vp run assets:sync -- --profile e2e && node e2e/support/seed.ts",
     "e2e:test": "playwright test",
     "demo:seed": "node scripts/demo-seed.ts",
     "setup:depth": "node scripts/fetch-depth-model.ts",
