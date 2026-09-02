@@ -226,3 +226,64 @@ func TestSharedContentSeparatesAssetsByResolvedOwner(t *testing.T) {
 			contentsCount, assetsCount, ownersCount, locationsCount)
 	}
 }
+
+func TestRescanPreservesExistingNodeOwnerWhenDefaultChanges(t *testing.T) {
+	fixture := newControllerFixture(t, 8)
+	initialOwnerID := fixture.repository.DefaultOwnerID
+	if initialOwnerID == nil {
+		t.Fatal("fixture repository has no default owner")
+	}
+	uploadedOwner, err := fixture.database.Queries.CreateUser(fixture.ctx, repo.CreateUserParams{
+		Username: "uploaded-owner", Password: "unused", DisplayName: "Uploaded Owner",
+		Role: "user", WebauthnUserHandle: []byte("uploaded-owner-handle"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updatedRepository, err := fixture.database.Queries.UpdateRepository(fixture.ctx, repo.UpdateRepositoryParams{
+		RepoID: fixture.repository.RepoID, Name: fixture.repository.Name,
+		Config: fixture.repository.Config, DefaultOwnerID: &uploadedOwner.UserID,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.repository = updatedRepository
+	fixture.writeMedia(t, "uploaded.jpg", []byte("initial contents"))
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.runToTerminal(t, first.OperationID)
+	drainHashEffects(t, fixture)
+
+	updatedRepository, err = fixture.database.Queries.UpdateRepository(fixture.ctx, repo.UpdateRepositoryParams{
+		RepoID: fixture.repository.RepoID, Name: fixture.repository.Name,
+		Config: fixture.repository.Config, DefaultOwnerID: initialOwnerID,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.repository = updatedRepository
+	fixture.writeMedia(t, "uploaded.jpg", []byte("rescanned contents"))
+	second, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.runToTerminal(t, second.OperationID)
+	drainHashEffects(t, fixture)
+
+	var activeOwnerID int32
+	if err := fixture.database.ReaderSQL.QueryRowContext(fixture.ctx, `
+		SELECT asset.owner_id
+		FROM asset_locations location
+		JOIN assets asset ON asset.asset_id = location.asset_id
+		WHERE location.unbound_observation_revision IS NULL
+		  AND asset.original_filename = 'uploaded.jpg'`).Scan(&activeOwnerID); err != nil {
+		t.Fatal(err)
+	}
+	if activeOwnerID != uploadedOwner.UserID {
+		t.Fatalf("active asset owner = %d, want original node owner %d", activeOwnerID, uploadedOwner.UserID)
+	}
+}

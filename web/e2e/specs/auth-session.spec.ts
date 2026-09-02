@@ -244,7 +244,10 @@ test("@auth-hardening browser logout clears local credentials and revokes its re
 }) => {
   await new LoginPage(page).signIn(workspace.username, workspace.password);
 
-  const accountButton = page.getByRole("button", { name: workspace.username });
+  const accountButton = page
+    .locator("button[aria-controls]")
+    .filter({ hasText: workspace.username });
+  await expect(accountButton).toHaveCount(1);
   await accountButton.click();
 
   const browserRefreshCookie = (await page.context().cookies()).find(

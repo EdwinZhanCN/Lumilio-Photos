@@ -33,6 +33,7 @@ CREATE TEMP TABLE IF NOT EXISTS roe_directory_publication_stage (
     observation_id TEXT NOT NULL,
     candidate_node_id TEXT NOT NULL,
     resolved_node_id TEXT,
+    resolved_owner_id INTEGER,
     path_hint TEXT NOT NULL,
     name TEXT NOT NULL,
     name_key TEXT NOT NULL,
@@ -104,12 +105,6 @@ func (applier *commitApplier) publishDirectoryBatchSetBased(
 		nodeID := uuid.New()
 		observationID := uuid.New()
 		sourceEventKey := fmt.Sprintf("crawl:%s:%s:%d", run.RunID, parentNodeID, directoryEntry.NextOffset)
-		processingState := "applied"
-		var failureCode any
-		if observationNodeKind(observation.EntryKind) == "file" && ownerID == nil {
-			processingState = "terminal_unsupported"
-			failureCode = "default_owner_required"
-		}
 		placeholders = append(placeholders, "("+strings.TrimRight(strings.Repeat("?,", stageColumnCount), ",")+")")
 		args = append(args,
 			ordinal,
@@ -128,8 +123,8 @@ func (applier *commitApplier) publishDirectoryBatchSetBased(
 			optionalVolumeIdentityValue(observation),
 			observation.ObservationToken,
 			sourceEventKey,
-			processingState,
-			failureCode,
+			"applied",
+			nil,
 		)
 	}
 	insertStageSQL := `INSERT INTO temp.roe_directory_publication_stage (
@@ -246,11 +241,44 @@ WHERE excluded.repository_id = repository_nodes.repository_id
 		return publication, fmt.Errorf("publish staged repository nodes: %w", err)
 	}
 
+	// A repository node owns its attribution across re-observations. An upload
+	// can establish that attribution before an in-flight crawl reaches the same
+	// node; letting the crawl's repository default replace it would split one
+	// physical file into owner-specific Assets and strand the upload Asset.
+	if _, err := tx.ExecContext(ctx, `
+UPDATE temp.roe_directory_publication_stage AS stage
+SET resolved_owner_id = CASE WHEN stage.entry_kind = 'file' THEN COALESCE(
+    (
+        SELECT asset.owner_id
+        FROM asset_locations location
+        JOIN assets asset ON asset.asset_id = location.asset_id
+        WHERE location.node_id = stage.resolved_node_id
+          AND location.unbound_observation_revision IS NULL
+    ),
+    ?
+) END
+WHERE stage.already_present = 0
+`, optionalInt64PointerValue(ownerID)); err != nil {
+		return publication, fmt.Errorf("resolve staged repository owners: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE temp.roe_directory_publication_stage AS stage
+SET processing_state = CASE WHEN
+        stage.entry_kind = 'file' AND stage.resolved_owner_id IS NULL
+    THEN 'terminal_unsupported' ELSE 'applied' END,
+    failure_code = CASE WHEN
+        stage.entry_kind = 'file' AND stage.resolved_owner_id IS NULL
+    THEN 'default_owner_required' ELSE NULL END
+WHERE stage.already_present = 0
+`); err != nil {
+		return publication, fmt.Errorf("classify staged repository ownership: %w", err)
+	}
+
 	if _, err := tx.ExecContext(ctx, `
 UPDATE temp.roe_directory_publication_stage AS stage
 SET should_hash = CASE WHEN
     stage.entry_kind = 'file'
-    AND ? IS NOT NULL
+    AND stage.resolved_owner_id IS NOT NULL
     AND (
         stage.before_token IS NULL
         OR stage.before_token <> stage.observation_token
@@ -262,7 +290,7 @@ SET should_hash = CASE WHEN
     )
 THEN 1 ELSE 0 END
 WHERE stage.already_present = 0
-	`, optionalInt64PointerValue(ownerID)); err != nil {
+	`); err != nil {
 		return publication, fmt.Errorf("classify staged repository hash work: %w", err)
 	}
 
@@ -280,13 +308,13 @@ SELECT
     stage.entry_kind, stage.file_size, stage.modified_at_ns,
     stage.changed_at_ns, stage.native_identity_kind,
     stage.native_identity_value, stage.before_token, stage.observation_token,
-    ?, stage.resolved_node_id, 'pending', ?
+    stage.resolved_owner_id, stage.resolved_node_id, 'pending', ?
 FROM temp.roe_directory_publication_stage stage
 WHERE stage.already_present = 0
 ON CONFLICT (repository_id, source, source_event_key)
     WHERE source_event_key IS NOT NULL
 DO UPDATE SET created_at = repository_observations.created_at
-	`, run.RepositoryID, run.RunID, parentNodeID, optionalInt64PointerValue(ownerID), now); err != nil {
+	`, run.RepositoryID, run.RunID, parentNodeID, now); err != nil {
 		return publication, fmt.Errorf("publish staged repository observations: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `

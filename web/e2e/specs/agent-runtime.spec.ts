@@ -48,6 +48,12 @@ const test = base.extend<{ runtimeWorkspace: RuntimeWorkspace }>({
   },
 });
 
+// `runtimeWorkspace` is test-scoped, so it is created before a test body can
+// call `test.setTimeout()`. Keep the complete setup and assertion budget at
+// this file scope; the Radxa qualification host can legitimately spend more
+// than the default thirty seconds creating an isolated user and repository.
+test.describe.configure({ timeout: 120_000 });
+
 test.beforeEach(async ({ runtimeWorkspace: workspace }) => {
   const settings = await api<Settings>("/api/v1/settings/system", { token: workspace.token });
   expect(settings.llm).toMatchObject({

@@ -360,20 +360,25 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Cla
 		if err != nil {
 			return err
 		}
-		if result.AssetID != uuid.Nil {
-			artifacts := make([]commit.ThumbnailArtifact, 0, len(result.Artifacts))
-			for _, artifact := range result.Artifacts {
-				artifacts = append(artifacts, commit.ThumbnailArtifact{
-					RepositoryID: artifact.RepositoryID, Size: artifact.Size,
-					StoragePath: artifact.StoragePath, MimeType: artifact.MimeType,
-				})
-			}
-			if _, err := runtime.commits.ApplyAssetDerivatives(stepCtx, commit.AssetDerivativesApplied{
-				AssetID: result.AssetID, SourceFence: result.SourceContentID,
-				PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion, Artifacts: artifacts,
-			}); err != nil {
-				return err
-			}
+		// A stale source is intentionally a no-op in the processor. It must not
+		// acknowledge the derivative generation: no artifacts were committed, and
+		// marking this stage applied would let enrichment run without its required
+		// small thumbnail.
+		if result.AssetID == uuid.Nil {
+			return nil
+		}
+		artifacts := make([]commit.ThumbnailArtifact, 0, len(result.Artifacts))
+		for _, artifact := range result.Artifacts {
+			artifacts = append(artifacts, commit.ThumbnailArtifact{
+				RepositoryID: artifact.RepositoryID, Size: artifact.Size,
+				StoragePath: artifact.StoragePath, MimeType: artifact.MimeType,
+			})
+		}
+		if _, err := runtime.commits.ApplyAssetDerivatives(stepCtx, commit.AssetDerivativesApplied{
+			AssetID: result.AssetID, SourceFence: result.SourceContentID,
+			PipelineVersion: args.PipelineVersion, DesiredVersion: args.DesiredVersion, Artifacts: artifacts,
+		}); err != nil {
+			return err
 		}
 		return runtime.submitAssetStage(stepCtx, args.AssetID, args.SourceFence, "derivatives", args.PipelineVersion, args.DesiredVersion)
 	})
