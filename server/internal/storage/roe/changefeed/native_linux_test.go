@@ -5,6 +5,7 @@ package changefeed
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,6 +21,7 @@ import (
 func TestInotifyCapturesAfterWatchAndFailsClosedOnOverflowAndFreshInstance(t *testing.T) {
 	repository := repo.Repository{RepoID: uuid.New(), Path: t.TempDir()}
 	feed := newNative().(*inotifyFeed)
+	t.Cleanup(func() { _ = feed.Close() })
 	start, err := feed.Snapshot(context.Background(), repository)
 	if err != nil {
 		t.Fatal(err)
@@ -28,34 +30,25 @@ func TestInotifyCapturesAfterWatchAndFailsClosedOnOverflowAndFreshInstance(t *te
 	if err := os.Mkdir(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	// The root watch reports the directory creation independently. Advance past
+	// it before installing the child watch so its earlier notification cannot be
+	// mistaken for the later photo write.
+	if _, err := waitForInotifyPath(context.Background(), feed, repository, start, "album"); err != nil {
+		t.Fatal(err)
+	}
 	if err := feed.WatchDirectory(context.Background(), repository, "album"); err != nil {
+		t.Fatal(err)
+	}
+	beforeWrite, err := feed.Snapshot(context.Background(), repository)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(directory, "photo.jpg"), []byte("photo"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-
-	select {
-	case <-feed.Notifications():
-	case <-time.After(5 * time.Second):
-		t.Fatal("inotify emitted no repository notification")
-	}
-	through, err := feed.Snapshot(context.Background(), repository)
+	through, err := waitForInotifyPath(context.Background(), feed, repository, beforeWrite, "album/photo.jpg")
 	if err != nil {
 		t.Fatal(err)
-	}
-	batch, err := feed.Read(context.Background(), repository, start, through, 32)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, event := range batch.Events {
-		if event.Path == "album/photo.jpg" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("inotify batch = %+v, want album/photo.jpg", batch.Events)
 	}
 
 	feed.mu.Lock()
@@ -83,6 +76,40 @@ func TestInotifyCapturesAfterWatchAndFailsClosedOnOverflowAndFreshInstance(t *te
 	if _, err := restarted.Read(context.Background(), repository, start, fresh, 32); !errors.Is(err, ErrCursorInvalid) {
 		t.Fatalf("fresh-instance read error = %v", err)
 	}
+}
+
+func waitForInotifyPath(
+	ctx context.Context,
+	feed *inotifyFeed,
+	repository repo.Repository,
+	after Checkpoint,
+	wantPath string,
+) (Checkpoint, error) {
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		through, err := feed.Snapshot(ctx, repository)
+		if err != nil {
+			return Checkpoint{}, err
+		}
+		if !after.SamePosition(through) {
+			batch, err := feed.Read(ctx, repository, after, through, 32)
+			if err != nil {
+				return Checkpoint{}, err
+			}
+			for _, event := range batch.Events {
+				if event.Path == wantPath {
+					return batch.Next, nil
+				}
+			}
+			after = batch.Next
+			continue
+		}
+		select {
+		case <-feed.Notifications():
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	return Checkpoint{}, fmt.Errorf("inotify did not report %q before timeout", wantPath)
 }
 
 func TestInotifyNativeOverflowRecordInvalidatesCursorAndWakesController(t *testing.T) {
