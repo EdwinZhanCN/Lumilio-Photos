@@ -1,0 +1,528 @@
+name: Release
+
+# One immutable release identity produces every delivery artifact. Tag pushes
+# publish a GitHub Release only after the Desktop packages and multi-arch Server
+# image have all completed. Manual dispatches build edge artifacts and update
+# the mutable `edge` image tag without creating a GitHub Release.
+
+on:
+    push:
+        tags:
+            - "v*"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
+env:
+    IMAGE_BASE: ghcr.io/edwinzhancn
+
+jobs:
+    metadata:
+        name: Validate release identity
+        runs-on: ubuntu-24.04
+        outputs:
+            product_version: ${{ steps.release.outputs.product_version }}
+            platform_version: ${{ steps.release.outputs.platform_version }}
+            build_number: ${{ steps.release.outputs.build_number }}
+            artifact_ref: ${{ steps.release.outputs.artifact_ref }}
+            image_tag: ${{ steps.release.outputs.image_tag }}
+            tag_name: ${{ steps.release.outputs.tag_name }}
+            channel: ${{ steps.release.outputs.channel }}
+            is_release: ${{ steps.release.outputs.is_release }}
+            is_prerelease: ${{ steps.release.outputs.is_prerelease }}
+            short_sha: ${{ steps.release.outputs.short_sha }}
+        steps:
+            - uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0
+
+            - name: Derive and validate release metadata
+              id: release
+              run: bash .github/scripts/release-metadata.sh
+
+            - name: Require release tags to belong to main
+              if: steps.release.outputs.is_release == 'true'
+              run: |
+                  if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+                      echo "release tag ${GITHUB_REF_NAME} does not belong to main" >&2
+                      exit 1
+                  fi
+
+    spa:
+        name: Web SPA, Desktop panel, and licenses
+        needs: metadata
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - name: Enable pnpm via corepack
+              run: corepack enable
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+                  cache-dependency-path: web/pnpm-lock.yaml
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: desktop/go.mod
+                  cache-dependency-path: |
+                      desktop/go.sum
+                      server/go.sum
+
+            - name: Install Vite+
+              run: |
+                  curl -fsSL https://vite.plus | bash
+                  echo "$HOME/.vite-plus/bin" >> "$GITHUB_PATH"
+
+            - name: Build Desktop control panel
+              run: task ci:desktop:panel
+
+            - name: Build versioned Web SPA
+              env:
+                  VITE_APP_VERSION: ${{ needs.metadata.outputs.product_version }}
+              run: |
+                  task web:install:ci
+                  task web:build
+
+            - name: Generate third-party notices
+              run: task desktop:licenses
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: web-dist
+                  path: web/dist
+                  if-no-files-found: error
+                  retention-days: 1
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: panel-dist
+                  path: desktop/frontend/dist
+                  if-no-files-found: error
+                  retention-days: 1
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: third-party-notices
+                  path: desktop/licenses/THIRD_PARTY_NOTICES.txt
+                  if-no-files-found: error
+                  retention-days: 1
+
+    docker:
+        name: Server image (${{ matrix.arch }})
+        needs: metadata
+        runs-on: ${{ matrix.runner }}
+        permissions:
+            contents: read
+            packages: write
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - arch: amd64
+                      runner: ubuntu-24.04
+                    - arch: arm64
+                      runner: ubuntu-24.04-arm
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: docker/setup-buildx-action@v4
+
+            - uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build and push by digest
+              id: build
+              uses: docker/build-push-action@v7
+              with:
+                  context: .
+                  file: server/Dockerfile
+                  platforms: linux/${{ matrix.arch }}
+                  build-args: |
+                      VERSION=${{ needs.metadata.outputs.product_version }}
+                  labels: |
+                      org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+                      org.opencontainers.image.revision=${{ github.sha }}
+                      org.opencontainers.image.version=${{ needs.metadata.outputs.product_version }}
+                  outputs: type=image,name=${{ env.IMAGE_BASE }}/lumilio-server,push-by-digest=true,name-canonical=true,push=true
+                  cache-from: type=gha,scope=server-${{ matrix.arch }}
+                  cache-to: type=gha,mode=max,scope=server-${{ matrix.arch }}
+
+            - name: Export digest
+              run: |
+                  mkdir -p /tmp/digests
+                  digest="${{ steps.build.outputs.digest }}"
+                  touch "/tmp/digests/${digest#sha256:}"
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: digests-server-${{ matrix.arch }}
+                  path: /tmp/digests/*
+                  if-no-files-found: error
+                  retention-days: 1
+
+    docker-manifest:
+        name: Publish Server image manifest
+        needs: [metadata, docker]
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: read
+            packages: write
+        outputs:
+            image_ref: ${{ steps.image.outputs.image_ref }}
+            image_digest: ${{ steps.image.outputs.image_digest }}
+        steps:
+            - name: Download architecture digests
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: digests-server-*
+                  path: /tmp/digests
+                  merge-multiple: true
+
+            - uses: docker/setup-buildx-action@v4
+
+            - uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compute image tags
+              id: meta
+              uses: docker/metadata-action@v6
+              with:
+                  images: ${{ env.IMAGE_BASE }}/lumilio-server
+                  flavor: latest=false
+                  tags: |
+                      type=semver,pattern={{version}},value=${{ needs.metadata.outputs.product_version }},enable=${{ needs.metadata.outputs.is_release == 'true' }}
+                      type=semver,pattern={{major}}.{{minor}},value=${{ needs.metadata.outputs.product_version }},enable=${{ needs.metadata.outputs.is_release == 'true' && needs.metadata.outputs.is_prerelease != 'true' }}
+                      type=raw,value=latest,enable=${{ needs.metadata.outputs.is_release == 'true' && needs.metadata.outputs.is_prerelease != 'true' }}
+                      type=raw,value=edge,enable=${{ needs.metadata.outputs.is_release != 'true' }}
+                      type=sha,prefix=edge-,format=short,enable=${{ needs.metadata.outputs.is_release != 'true' }}
+
+            - name: Create and inspect multi-arch manifest
+              id: image
+              working-directory: /tmp/digests
+              run: |
+                  docker buildx imagetools create \
+                      $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< '${{ steps.meta.outputs.json }}') \
+                      $(printf '${{ env.IMAGE_BASE }}/lumilio-server@sha256:%s ' *)
+                  image_ref="${{ env.IMAGE_BASE }}/lumilio-server:${{ steps.meta.outputs.version }}"
+                  descriptor="$(docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}')"
+                  image_digest="$(jq -er '.digest' <<< "$descriptor")"
+                  docker buildx imagetools inspect "$image_ref"
+                  echo "image_ref=${image_ref}" >> "$GITHUB_OUTPUT"
+                  echo "image_digest=${image_digest}" >> "$GITHUB_OUTPUT"
+
+    dmg:
+        name: macOS DMG (${{ matrix.arch }})
+        needs: [metadata, spa]
+        runs-on: ${{ matrix.runner }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - arch: arm64
+                      runner: macos-15
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - name: Install build dependencies
+              run: brew install vips libraw dylibbundler create-dmg
+
+            - name: Record native dependency versions
+              run: |
+                  brew list --versions vips libraw $(brew deps vips libraw) \
+                      | sort > .brew-go-cache-key
+                  cat .brew-go-cache-key
+
+            - uses: actions/setup-go@v6
+              with:
+                  go-version-file: desktop/go.mod
+                  cache-dependency-path: |
+                      desktop/go.sum
+                      server/go.sum
+                      .brew-go-cache-key
+
+            - name: Install pinned wails3 CLI
+              run: |
+                  cd desktop
+                  W3_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)
+                  go install "github.com/wailsapp/wails/v3/cmd/wails3@${W3_VERSION}"
+                  echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+            - uses: actions/download-artifact@v8
+              with:
+                  name: web-dist
+                  path: web/dist
+
+            - uses: actions/download-artifact@v8
+              with:
+                  name: panel-dist
+                  path: desktop/frontend/dist
+
+            - uses: actions/download-artifact@v8
+              with:
+                  name: third-party-notices
+                  path: desktop/licenses
+
+            - name: Stage media tools
+              run: task desktop:resources
+
+            - name: Build app and DMG
+              env:
+                  LUMILIO_VERSION: ${{ needs.metadata.outputs.product_version }}
+                  LUMILIO_PLATFORM_VERSION: ${{ needs.metadata.outputs.platform_version }}
+                  LUMILIO_BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+                  LUMILIO_WEB_DIST_PREBUILT: "1"
+                  LUMILIO_FRONTEND_DIST_PREBUILT: "1"
+              run: task desktop:build:macos:dmg ARCH=${{ matrix.arch }}
+
+            - name: Name release artifact
+              run: |
+                  mv "desktop/bin/Lumilio-Photos-${{ matrix.arch }}.dmg" \
+                     "desktop/bin/Lumilio-Photos-${{ needs.metadata.outputs.artifact_ref }}-macos-${{ matrix.arch }}.dmg"
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: dmg-${{ matrix.arch }}
+                  path: desktop/bin/Lumilio-Photos-*-macos-${{ matrix.arch }}.dmg
+                  if-no-files-found: error
+
+    windows:
+        name: Windows installer and portable app
+        needs: [metadata, spa]
+        runs-on: windows-2025
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Task
+              uses: go-task/setup-task@v2
+              with:
+                  version: 3.52.0
+
+            - uses: msys2/setup-msys2@v2
+              with:
+                  msystem: MINGW64
+                  update: false
+                  path-type: inherit
+                  install: >-
+                      git
+                      zip
+                      mingw-w64-x86_64-go
+                      mingw-w64-x86_64-gcc
+                      mingw-w64-x86_64-pkgconf
+                      mingw-w64-x86_64-sqlite3
+                      mingw-w64-x86_64-libvips
+                      mingw-w64-x86_64-libraw
+                      mingw-w64-x86_64-ntldd
+
+            - uses: actions/download-artifact@v8
+              with:
+                  name: web-dist
+                  path: web/dist
+
+            - uses: actions/download-artifact@v8
+              with:
+                  name: panel-dist
+                  path: desktop/frontend/dist
+
+            - uses: actions/download-artifact@v8
+              with:
+                  name: third-party-notices
+                  path: desktop/licenses
+
+            - name: Stage media tools
+              shell: msys2 {0}
+              run: task desktop:resources
+
+            - name: Install pinned wails3 CLI
+              shell: msys2 {0}
+              run: |
+                  cd desktop
+                  W3_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)
+                  go install "github.com/wailsapp/wails/v3/cmd/wails3@${W3_VERSION}"
+                  echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+            - name: Build portable app
+              shell: msys2 {0}
+              env:
+                  LUMILIO_VERSION: ${{ needs.metadata.outputs.product_version }}
+                  LUMILIO_PLATFORM_VERSION: ${{ needs.metadata.outputs.platform_version }}
+                  LUMILIO_WEB_DIST_PREBUILT: "1"
+                  LUMILIO_FRONTEND_DIST_PREBUILT: "1"
+              run: task desktop:build:windows
+
+            - name: Package portable app
+              shell: pwsh
+              run: |
+                  Compress-Archive -Path "desktop/bin/windows/Lumilio Photos" `
+                      -DestinationPath "desktop/bin/Lumilio-Photos-${{ needs.metadata.outputs.artifact_ref }}-windows-amd64.zip"
+
+            - name: Build installer
+              shell: pwsh
+              run: |
+                  choco install innosetup --no-progress -y
+                  $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+                  & "$iscc" "/DAppVersion=${{ needs.metadata.outputs.product_version }}" "desktop/packaging/windows/lumilio.iss"
+                  if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: windows-amd64-setup
+                  path: desktop/bin/Lumilio-Photos-*-windows-amd64-setup.exe
+                  if-no-files-found: error
+
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: windows-amd64
+                  path: desktop/bin/Lumilio-Photos-*-windows-amd64.zip
+                  if-no-files-found: error
+
+    release:
+        name: Publish complete GitHub Release
+        needs: [metadata, docker-manifest, dmg, windows]
+        if: needs.metadata.outputs.is_release == 'true'
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Download Desktop artifacts
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: "{dmg-*,windows-amd64,windows-amd64-setup}"
+                  path: dist
+                  merge-multiple: true
+
+            - name: Build digest-pinned Server bundle
+              env:
+                  PRODUCT_VERSION: ${{ needs.metadata.outputs.product_version }}
+                  ARTIFACT_REF: ${{ needs.metadata.outputs.artifact_ref }}
+                  IMAGE_REF: ${{ needs.docker-manifest.outputs.image_ref }}
+                  IMAGE_DIGEST: ${{ needs.docker-manifest.outputs.image_digest }}
+              run: |
+                  bundle="Lumilio-Photos-${ARTIFACT_REF}-server"
+                  mkdir -p "dist/${bundle}"
+                  cp deploy/compose/compose.yml deploy/compose/caddy.compose.yml deploy/compose/acme.compose.yml "dist/${bundle}/"
+                  cat > "dist/${bundle}/.env" <<EOF
+                  LUMILIO_IMAGE=${IMAGE_REF%@*}@${IMAGE_DIGEST}
+                  LUMILIO_STORAGE=./lumilio/media
+                  LUMILIO_STATE=./lumilio/app-state
+                  EOF
+                  cat > "dist/${bundle}/README.md" <<EOF
+                  # Lumilio Photos Server ${PRODUCT_VERSION}
+
+                  This bundle pins the Server image by OCI digest. Create the two host
+                  directories before starting the default host-network deployment:
+
+                  \`\`\`bash
+                  mkdir -p ./lumilio/media ./lumilio/app-state
+                  docker compose up -d --wait
+                  \`\`\`
+
+                  The image is \`${IMAGE_REF%@*}@${IMAGE_DIGEST}\`.
+                  EOF
+                  tar -C dist -czf "dist/${bundle}.tar.gz" "${bundle}"
+                  rm -rf "dist/${bundle}"
+
+            - name: Write release manifest and checksums
+              env:
+                  PRODUCT_VERSION: ${{ needs.metadata.outputs.product_version }}
+                  RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
+                  IMAGE_REF: ${{ needs.docker-manifest.outputs.image_ref }}
+                  IMAGE_DIGEST: ${{ needs.docker-manifest.outputs.image_digest }}
+              run: |
+                  jq -n \
+                      --arg version "$PRODUCT_VERSION" \
+                      --arg tag "$GITHUB_REF_NAME" \
+                      --arg commit "$GITHUB_SHA" \
+                      --arg channel "$RELEASE_CHANNEL" \
+                      --arg image "$IMAGE_REF" \
+                      --arg digest "$IMAGE_DIGEST" \
+                      '{schemaVersion: 1, productVersion: $version, gitTag: $tag, gitCommit: $commit, channel: $channel, docker: {image: $image, digest: $digest}}' \
+                      > dist/release-manifest.json
+                  (
+                      cd dist
+                      sha256sum Lumilio-Photos-* release-manifest.json > SHA256SUMS.txt
+                  )
+
+            - name: Write release introduction
+              env:
+                  PRODUCT_VERSION: ${{ needs.metadata.outputs.product_version }}
+                  RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
+                  IS_PRERELEASE: ${{ needs.metadata.outputs.is_prerelease }}
+                  IMAGE_REF: ${{ needs.docker-manifest.outputs.image_ref }}
+                  IMAGE_DIGEST: ${{ needs.docker-manifest.outputs.image_digest }}
+              run: |
+                  if [[ "$IS_PRERELEASE" == "true" ]]; then
+                      release_kind="a ${RELEASE_CHANNEL} pre-release build for production testing"
+                  else
+                      release_kind="a stable release build"
+                  fi
+                  cat > dist/release-notes.md <<EOF
+                  This is Lumilio Photos ${PRODUCT_VERSION}, ${release_kind}.
+
+                  Desktop packages and the Linux Server image were built from commit \`${GITHUB_SHA}\`. Verify downloads with \`SHA256SUMS.txt\`.
+
+                  For Docker, use the attached Server bundle. It pins \`${IMAGE_REF%@*}@${IMAGE_DIGEST}\` and keeps media and application state in separate host directories.
+
+                  Before upgrading real data, create a Lumilio database snapshot and retain the previous application version or image digest. A database migrated by this build may require its matching pre-upgrade snapshot when rolling back.
+                  EOF
+
+            - uses: softprops/action-gh-release@v3
+              with:
+                  name: Lumilio Photos ${{ needs.metadata.outputs.product_version }}
+                  tag_name: ${{ needs.metadata.outputs.tag_name }}
+                  draft: true
+                  prerelease: ${{ needs.metadata.outputs.is_prerelease == 'true' }}
+                  make_latest: ${{ needs.metadata.outputs.is_prerelease != 'true' }}
+                  generate_release_notes: true
+                  body_path: dist/release-notes.md
+                  fail_on_unmatched_files: true
+                  files: |
+                      dist/Lumilio-Photos-*.dmg
+                      dist/Lumilio-Photos-*-windows-amd64-setup.exe
+                      dist/Lumilio-Photos-*.zip
+                      dist/Lumilio-Photos-*-server.tar.gz
+                      dist/release-manifest.json
+                      dist/SHA256SUMS.txt
+
+            - name: Verify and publish complete release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  IS_PRERELEASE: ${{ needs.metadata.outputs.is_prerelease }}
+              run: |
+                  find dist -maxdepth 1 -type f \
+                      ! -name release-notes.md \
+                      -printf '%f\n' | sort > /tmp/expected-assets
+                  gh release view "$GITHUB_REF_NAME" \
+                      --json assets --jq '.assets[].name' \
+                      | sort > /tmp/published-assets
+                  diff -u /tmp/expected-assets /tmp/published-assets
+                  if [[ "$IS_PRERELEASE" == "true" ]]; then
+                      gh release edit "$GITHUB_REF_NAME" --draft=false
+                  else
+                      gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+                  fi

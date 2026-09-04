@@ -99,19 +99,24 @@ the address currently used.
 
 ## Docker (Linux server / NAS)
 
-Requires Docker Engine with Compose 2.23.1 or newer on Linux. Download and
-start the default host-network deployment:
+Requires Docker Engine with Compose 2.23.1 or newer on Linux. Download the
+Server bundle and `SHA256SUMS.txt` from the same GitHub Release, verify the
+archive, and start its digest-pinned host-network deployment:
 
 ```bash
-mkdir lumilio-server && cd lumilio-server
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
-docker compose up -d
+sha256sum --check SHA256SUMS.txt --ignore-missing
+VERSION=release-version
+tar -xzf "Lumilio-Photos-v${VERSION}-server.tar.gz"
+cd "Lumilio-Photos-v${VERSION}-server"
+mkdir -p ./lumilio/media ./lumilio/app-state
+docker compose up -d --wait
 ```
 
 Open `http://<Linux-host-IP>:6680`. No domain, HTTPS URL, or hand-written TOML
-is required. Media and application state default to `./lumilio/media` and
-`./lumilio/app-state`; set `LUMILIO_STORAGE` and `LUMILIO_STATE` before startup
-to use other paths.
+is required. The bundle's `.env` pins `LUMILIO_IMAGE` by OCI digest and keeps
+media and application state at `./lumilio/media` and `./lumilio/app-state` by
+default. Edit `LUMILIO_STORAGE` and `LUMILIO_STATE` before startup to use other
+host paths; retain the previous bundle and database snapshot for rollback.
 
 The default Compose uses host networking so Lumen mDNS discovery works on the
 LAN. It does not need a `ports` mapping.

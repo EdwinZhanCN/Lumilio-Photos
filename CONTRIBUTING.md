@@ -183,6 +183,23 @@ catalog `desktop/internal/lumen/release_catalog.go`, and `task lumen:check`
 verifies catalog, `SHA256SUMS`, and consumer builds in CI). See
 `docs/lumen-catalog.md`.
 
+## Releases
+
+Release versions use `YY.TRAIN.PATCH[-beta.N|-rc.N]`; Git tags add `v`, for
+example `v26.1.0-beta.1`. Release tags must point to a commit already promoted
+from `dev` to `main`. Do not move or reuse a published tag.
+
+The tag starts one workflow that builds the macOS and Windows Desktop packages
+and the amd64/arm64 Server image before it creates the GitHub Release. The
+release includes `SHA256SUMS.txt`, `release-manifest.json`, and a Server bundle
+whose `.env` pins the OCI image digest. A manual dispatch publishes only
+Actions artifacts and the mutable `edge` image tag.
+
+Before tagging, verify the exact `main` commit's required checks. A beta remains
+on `beta.N` while features and business behavior change; use `rc.N` only after
+feature freeze. A rollback across a catalog migration pairs the previous app
+or image with its pre-upgrade database snapshot.
+
 ## Generated Code
 
 Update generated artifacts through their source tools; never hand-edit them:

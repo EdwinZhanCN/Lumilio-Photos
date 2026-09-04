@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ func buildWindows(ctx context.Context, root string, args []string) error {
 	app := filepath.Join(desktop, "bin", "windows", "Lumilio Photos")
 	exe := filepath.Join(app, "lumilio-photos.exe")
 	version := envOr("LUMILIO_VERSION", "0.0.0")
+	platformVersion := envOr("LUMILIO_PLATFORM_VERSION", strings.SplitN(version, "-", 2)[0])
 	fmt.Println("==> Cleaning previous build")
 	os.RemoveAll(app)
 	if err := os.MkdirAll(app, 0755); err != nil {
@@ -49,11 +51,16 @@ func buildWindows(ctx context.Context, root string, args []string) error {
 	os.Remove(syso)
 	if commandExists("wails3") {
 		fmt.Println("==> Generating Windows .syso resources")
+		versionInfo, err := writeWindowsVersionInfo(filepath.Join(desktop, "bin"), platformVersion, version)
+		if err != nil {
+			return err
+		}
+		defer os.Remove(versionInfo)
 		if err := runCmd(ctx, desktop, nil, "wails3", "generate", "syso",
 			"-arch", "amd64",
 			"-icon", filepath.Join(desktop, "build", "windows", "icon.ico"),
 			"-manifest", filepath.Join(desktop, "build", "windows", "wails.exe.manifest"),
-			"-info", filepath.Join(desktop, "build", "windows", "info.json"),
+			"-info", versionInfo,
 			"-out", syso); err != nil {
 			return err
 		}
@@ -117,6 +124,41 @@ func buildWindows(ctx context.Context, root string, args []string) error {
 	}
 	fmt.Printf("==> Built: %s\n", app)
 	return nil
+}
+
+func writeWindowsVersionInfo(directory, platformVersion, productVersion string) (string, error) {
+	payload := map[string]any{
+		"fixed": map[string]string{"file_version": platformVersion},
+		"info": map[string]any{
+			"0000": map[string]string{
+				"ProductVersion":  productVersion,
+				"CompanyName":     "Lumilio Photos",
+				"FileDescription": "Local-first photo management",
+				"LegalCopyright":  "(c) Lumilio Photos",
+				"ProductName":     "Lumilio Photos",
+				"Comments":        "Local-first photo management",
+			},
+		},
+	}
+	data, err := json.MarshalIndent(payload, "", "\t")
+	if err != nil {
+		return "", fmt.Errorf("encode Windows version info: %w", err)
+	}
+	file, err := os.CreateTemp(directory, ".lumilio-windows-version-*.json")
+	if err != nil {
+		return "", fmt.Errorf("create Windows version info: %w", err)
+	}
+	name := file.Name()
+	if _, err = file.Write(append(data, '\n')); err != nil {
+		file.Close()
+		os.Remove(name)
+		return "", fmt.Errorf("write Windows version info: %w", err)
+	}
+	if err = file.Close(); err != nil {
+		os.Remove(name)
+		return "", fmt.Errorf("close Windows version info: %w", err)
+	}
+	return name, nil
 }
 func collectWindowsDLLs(ctx context.Context, binary, dest string) error {
 	out, err := outputCmd(ctx, "", nil, "ntldd", "-R", binary)
