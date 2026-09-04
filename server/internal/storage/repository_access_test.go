@@ -17,21 +17,14 @@ func TestRepositoryAccessCoordinatorDoesNotStarveWaitingMutation(t *testing.T) {
 		release func()
 		err     error
 	}
-	writerStarted := make(chan struct{})
 	writerAcquired := make(chan acquisition, 1)
 	writerCtx, cancelWriter := context.WithTimeout(context.Background(), time.Second)
 	defer cancelWriter()
 	go func() {
-		close(writerStarted)
 		release, err := coordinator.AcquireMutationsContext(writerCtx, []uuid.UUID{repositoryID})
 		writerAcquired <- acquisition{release: release, err: err}
 	}()
-	<-writerStarted
-
-	// Give the mutation several old polling intervals to register as waiting.
-	// Once it is pending, a later reader must queue behind it instead of
-	// extending an unbounded stream of readers that starves the mutation.
-	time.Sleep(30 * time.Millisecond)
+	waitForRepositoryAccessWaiter(t, coordinator.lockFor(repositoryID), repositoryAccessWrite)
 	readerAcquired := make(chan acquisition, 1)
 	readerCtx, cancelReader := context.WithTimeout(context.Background(), time.Second)
 	defer cancelReader()
@@ -85,6 +78,27 @@ func TestRepositoryAccessCoordinatorDoesNotStarveWaitingMutation(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("later reader did not acquire after the mutation released")
 	}
+}
+
+func waitForRepositoryAccessWaiter(t *testing.T, lock *repositoryAccessLock, mode repositoryAccessMode) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		lock.mu.Lock()
+		found := false
+		for _, waiter := range lock.waiters {
+			if waiter.mode == mode {
+				found = true
+				break
+			}
+		}
+		lock.mu.Unlock()
+		if found {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("repository access waiter did not enter the queue")
 }
 
 func TestRepositoryAccessCoordinatorCancelledMutationStopsBlockingReaders(t *testing.T) {

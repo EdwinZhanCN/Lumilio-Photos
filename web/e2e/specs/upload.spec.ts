@@ -84,7 +84,7 @@ test("@smoke user completes the compact upload, album, viewer, Trash, and restor
   const gallery = new GalleryPage(page);
   await expect(async () => {
     await gallery.scopeTo(workspace.repositoryName);
-    await expect(page.getByLabel(new RegExp(workspace.uploadFilename, "i")).first()).toBeVisible({
+    await expect(page.getByLabel(new RegExp(workspace.uploadFilename, "i"))).toBeVisible({
       timeout: 5_000,
     });
   }).toPass({ timeout: 60_000 });

@@ -150,7 +150,7 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
     body: JSON.stringify({ title_override: title }),
   });
   await page.goto(`/collections/events/${survivor}`);
-  await expect(page.getByRole("heading", { name: title }).first()).toBeVisible();
+  await expect(page.getByRole("banner").getByRole("heading", { name: title })).toBeVisible();
 
   const share = await api<EventShare>(`/api/v1/events/${survivor}/share`, {
     method: "POST",

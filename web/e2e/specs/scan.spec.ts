@@ -44,7 +44,7 @@ test("@smoke administrator scans a real repository file and sees it", async ({
 
   await new LoginPage(page).signIn(workspace.username, workspace.password);
   await new GalleryPage(page).scopeTo(workspace.repositoryName);
-  await expect(page.getByLabel(new RegExp(workspace.scanFilename, "i")).first()).toBeVisible({
+  await expect(page.getByLabel(new RegExp(workspace.scanFilename, "i"))).toBeVisible({
     timeout: 60_000,
   });
 });

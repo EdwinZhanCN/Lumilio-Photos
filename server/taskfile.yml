@@ -39,6 +39,23 @@ tasks:
       - go clean -cache -testcache
       - go test -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./...
 
+  test:concurrency:ci:
+    desc: Race, shuffle, and repeat concurrency-sensitive Server packages
+    env:
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    cmds:
+      - >-
+        go test
+        -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}}
+        -race
+        -shuffle=on
+        -count=3
+        ./internal/cloud
+        ./internal/commit
+        ./internal/servertransport
+        ./internal/storage
+
   dev:
     desc: Start only the Go API against the development manifest
     deps:

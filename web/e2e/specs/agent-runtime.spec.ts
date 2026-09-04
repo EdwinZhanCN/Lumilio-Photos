@@ -1,5 +1,5 @@
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { expect, test as base } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import {
@@ -30,15 +30,21 @@ type Capabilities = components["schemas"]["dto.CapabilitiesResponseDTO"];
 type EffectStatus = components["schemas"]["handler.AgentEffectStatusResponse"];
 
 type RuntimeWorkspace = Workspace & { runtimeIndex: number };
+const invocationIdentity = randomUUID();
 
 const test = base.extend<{ runtimeWorkspace: RuntimeWorkspace }>({
   runtimeWorkspace: async ({ browserName }, use, testInfo) => {
-    // The shared E2E fixture is worker-scoped, but this slice deliberately owns
-    // one user and repository per test. Include repeat/retry identity so the
-    // three-pass stability run cannot inherit a prior scenario's server state.
-    const identity = [browserName, testInfo.testId, testInfo.repeatEachIndex, testInfo.retry].join(
-      ":",
-    );
+    // The shared E2E fixture is attempt-scoped, and this slice keeps its own
+    // workspace identity so helper-created peer users occupy deterministic,
+    // non-overlapping slots. Include repeat/retry identity so the three-pass
+    // stability run cannot inherit a prior scenario's server state.
+    const identity = [
+      invocationIdentity,
+      browserName,
+      testInfo.testId,
+      testInfo.repeatEachIndex,
+      testInfo.retry,
+    ].join(":");
     const slot = Number.parseInt(
       createHash("sha256").update(identity).digest("hex").slice(0, 10),
       16,

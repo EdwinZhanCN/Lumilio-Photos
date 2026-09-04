@@ -230,7 +230,7 @@ func TestCoordinatorBackpressureIsCancellationAware(t *testing.T) {
 	go coordinator.SubmitOperation(context.Background(), testOperation("first", 1, handler))
 	<-entered
 	go coordinator.SubmitOperation(context.Background(), testOperation("second", 1, handler))
-	time.Sleep(10 * time.Millisecond)
+	waitForCoordinatorState(t, coordinator, func(snapshot Snapshot) bool { return snapshot.Depth == 1 }, "queue to fill")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	_, err := coordinator.SubmitOperation(ctx, testOperation("third", 1, handler))
@@ -269,12 +269,13 @@ func TestCoordinatorStopUnblocksSubmissionWhenQueueIsFull(t *testing.T) {
 		_, _ = coordinator.SubmitOperation(context.Background(), testOperation("second", 1, handler))
 		close(secondDone)
 	}()
-	time.Sleep(10 * time.Millisecond)
+	waitForCoordinatorState(t, coordinator, func(snapshot Snapshot) bool { return snapshot.Depth == 1 }, "queue to fill")
 	thirdDone := make(chan error, 1)
 	go func() {
 		_, err := coordinator.SubmitOperation(context.Background(), testOperation("third", 1, handler))
 		thirdDone <- err
 	}()
+	waitForCoordinatorState(t, coordinator, func(snapshot Snapshot) bool { return snapshot.BlockedSubmitters == 1 }, "third submission to block")
 	stopDone := make(chan error, 1)
 	go func() {
 		stopDone <- coordinator.Stop(context.Background())
@@ -298,6 +299,21 @@ func TestCoordinatorStopUnblocksSubmissionWhenQueueIsFull(t *testing.T) {
 	}
 	<-firstDone
 	<-secondDone
+}
+
+func waitForCoordinatorState(t *testing.T, coordinator *Coordinator, predicate func(Snapshot) bool, description string) Snapshot {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		snapshot := coordinator.Snapshot()
+		if predicate(snapshot) {
+			return snapshot
+		}
+		time.Sleep(time.Millisecond)
+	}
+	snapshot := coordinator.Snapshot()
+	t.Fatalf("timed out waiting for %s; snapshot=%+v", description, snapshot)
+	return snapshot
 }
 
 func TestCoordinatorStopBeforeStartRejectsSubmit(t *testing.T) {

@@ -65,19 +65,27 @@ function serve(runtime = healthyRuntime, capabilities = publicCapabilities) {
 
 describe("CapabilitiesMonitor", () => {
   it("renders a stable loading state while both snapshots are pending", async () => {
+    let releaseSnapshots!: () => void;
+    const snapshotsPending = new Promise<void>((resolve) => {
+      releaseSnapshots = resolve;
+    });
     worker.use(
       http.get("*/api/v1/capabilities", async () => {
-        await new Promise((resolve) => setTimeout(resolve, 75));
+        await snapshotsPending;
         return HttpResponse.json(publicCapabilities);
       }),
       http.get("*/api/v1/admin/lumen/runtime", async () => {
-        await new Promise((resolve) => setTimeout(resolve, 75));
+        await snapshotsPending;
         return HttpResponse.json(healthyRuntime);
       }),
     );
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
 
-    await expect.element(screen.getByText("Loading...", { exact: true })).toBeVisible();
+    try {
+      await expect.element(screen.getByText("Loading...", { exact: true })).toBeVisible();
+    } finally {
+      releaseSnapshots();
+    }
     await expect.element(screen.getByText("Lumen discovery is healthy")).toBeVisible();
   });
 

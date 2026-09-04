@@ -44,12 +44,15 @@ func (provider blockingCredentialProvider) NewImporter(context.Context, repo.Clo
 }
 
 type blockingCloudProvider struct {
+	entered        chan struct{}
 	cancelObserved chan struct{}
 	release        chan struct{}
+	enteredOnce    sync.Once
 	once           sync.Once
 }
 
 func (provider *blockingCloudProvider) List(ctx context.Context, _ uuid.UUID, _ *Cursor, _ map[string]string) (*Page, error) {
+	provider.enteredOnce.Do(func() { close(provider.entered) })
 	<-ctx.Done()
 	provider.once.Do(func() { close(provider.cancelObserved) })
 	<-provider.release
@@ -116,7 +119,11 @@ func TestCloudImportCancelAndResumeKeepDurableReceipts(t *testing.T) {
 	}
 
 	service := NewCloudSyncService(catalog.Queries, nil, nil, nil, "", t.TempDir(), zap.NewNop()).(*cloudSyncService)
-	importer := &blockingCloudProvider{cancelObserved: make(chan struct{}), release: make(chan struct{})}
+	importer := &blockingCloudProvider{
+		entered:        make(chan struct{}),
+		cancelObserved: make(chan struct{}),
+		release:        make(chan struct{}),
+	}
 	service.registry = NewProviderRegistry(blockingCredentialProvider{importer: importer})
 	access := CredentialAccess{UserID: owner.UserID}
 	firstRunID, err := service.StartRepositoryImport(ctx, StartRepositoryImportInput{
@@ -126,6 +133,11 @@ func TestCloudImportCancelAndResumeKeepDurableReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForCloudRunStatus(t, catalog.Queries, firstRunID, ImportRunStatusRunning)
+	select {
+	case <-importer.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not enter provider List")
+	}
 	type cancelResult struct {
 		run repo.CloudImportRun
 		err error

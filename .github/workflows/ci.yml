@@ -289,6 +289,9 @@ jobs:
             - name: Run Server CI gate
               run: task server:test:ci
 
+            - name: Run Server concurrency gate
+              run: task server:test:concurrency:ci
+
     web:
         name: web (Task)
         needs: changes
