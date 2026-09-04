@@ -5,7 +5,7 @@ page_id: "admin/upgrade"
 audience: "管理员"
 platform: "Desktop、Server"
 baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-08-06"
+last_verified: "2026-09-03"
 verification_status: "verified"
 ---
 
@@ -35,7 +35,7 @@ code-evidence:
 
 ## Docker
 
-固定明确版本标签，拉取目标镜像，保留旧镜像，确认 Compose 和完整配置仍兼容。不要把 `latest` 的变化当作可审计升级计划。
+下载并验证目标 Release 的 Server bundle。它通过 `.env` 固定 OCI image digest；升级时保留上一份 bundle、旧 digest 和升级前数据库快照，并确认 Compose、挂载与完整配置仍兼容。不要把 `latest` 的变化当作可审计升级计划。
 
 ## 升级后
 

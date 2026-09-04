@@ -33,6 +33,13 @@ func TestCoordinatorSnapshotUsesBoundedHistogramsAndReportsPressure(t *testing.T
 	}
 	coordinator.Start()
 	defer coordinator.Stop(context.Background())
+	defer func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	}()
 
 	var submissions sync.WaitGroup
 	submissions.Add(2)
@@ -45,27 +52,33 @@ func TestCoordinatorSnapshotUsesBoundedHistogramsAndReportsPressure(t *testing.T
 		defer submissions.Done()
 		_, _ = coordinator.SubmitOperation(context.Background(), testOperation("queued", 1, handler))
 	}()
-	deadline := time.Now().Add(time.Second)
-	for coordinator.Snapshot().Depth != 1 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
-	if snapshot := coordinator.Snapshot(); snapshot.Depth != 1 {
-		close(release)
-		t.Fatalf("queue depth = %d, want full capacity", snapshot.Depth)
-	}
+	waitForCoordinatorState(t, coordinator, func(snapshot Snapshot) bool { return snapshot.Depth == 1 }, "queue to fill")
 
 	const canceled = 32
 	for index := range canceled {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
-		_, submitErr := coordinator.SubmitOperation(ctx, testOperation(string(rune('a'+index)), 1, handler))
+		ctx, cancel := context.WithCancel(context.Background())
+		submitDone := make(chan error, 1)
+		go func() {
+			_, submitErr := coordinator.SubmitOperation(ctx, testOperation(string(rune('a'+index)), 1, handler))
+			submitDone <- submitErr
+		}()
+		waitForCoordinatorState(t, coordinator, func(snapshot Snapshot) bool {
+			return snapshot.BlockedSubmitters == 1
+		}, "canceled submission to block")
 		cancel()
-		if !errors.Is(submitErr, context.DeadlineExceeded) {
+		select {
+		case submitErr := <-submitDone:
+			if !errors.Is(submitErr, context.Canceled) {
+				close(release)
+				t.Fatalf("blocked submission %d error = %v", index, submitErr)
+			}
+		case <-time.After(time.Second):
 			close(release)
-			t.Fatalf("blocked submission %d error = %v", index, submitErr)
+			t.Fatalf("blocked submission %d did not observe cancellation", index)
 		}
 	}
 	pressured := coordinator.Snapshot()
-	if pressured.Capacity != 1 || pressured.Depth != 1 || pressured.PeakDepth != 1 {
+	if pressured.Capacity != 1 || pressured.Depth != 1 || pressured.PeakDepth != 1 || pressured.BlockedSubmitters != 0 || pressured.PeakBlocked != 1 {
 		close(release)
 		t.Fatalf("pressured queue snapshot = %+v", pressured)
 	}

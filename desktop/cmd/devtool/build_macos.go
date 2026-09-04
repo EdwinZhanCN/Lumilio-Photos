@@ -41,6 +41,8 @@ func buildMacOS(ctx context.Context, root string, args []string) error {
 	fw := filepath.Join(app, "Contents", "Frameworks")
 	exe := filepath.Join(macos, "lumilio-photos")
 	version := envOr("LUMILIO_VERSION", "0.0.0")
+	platformVersion := envOr("LUMILIO_PLATFORM_VERSION", strings.SplitN(version, "-", 2)[0])
+	buildNumber := envOr("LUMILIO_BUILD_NUMBER", platformVersion)
 	fmt.Println("==> Cleaning previous bundle")
 	os.RemoveAll(app)
 	for _, d := range []string{macos, res, fw} {
@@ -70,7 +72,7 @@ func buildMacOS(ctx context.Context, root string, args []string) error {
 	if err := runCmd(ctx, desktop, env, "go", "build", "-tags=sqlite_fts5", "-trimpath", "-buildvcs=false", "-ldflags", ld, "-o", exe, "."); err != nil {
 		return err
 	}
-	if err := writeInfoPlist(filepath.Join(app, "Contents", "Info.plist"), version); err != nil {
+	if err := writeInfoPlist(filepath.Join(app, "Contents", "Info.plist"), platformVersion, buildNumber); err != nil {
 		return err
 	}
 	icon := filepath.Join(desktop, "build", "darwin", "icons.icns")
@@ -161,14 +163,14 @@ func buildMacOS(ctx context.Context, root string, args []string) error {
 	return nil
 }
 
-func writeInfoPlist(path, version string) error {
+func writeInfoPlist(path, platformVersion, buildNumber string) error {
 	s := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleName</key><string>Lumilio Photos</string><key>CFBundleDisplayName</key><string>Lumilio Photos</string>
 <key>CFBundleExecutable</key><string>lumilio-photos</string><key>CFBundleIdentifier</key><string>com.edwinzhan.lumilio-photos</string>
 <key>CFBundleIconFile</key><string>AppIcon</string><key>CFBundleIconName</key><string>appicon</string><key>CFBundlePackageType</key><string>APPL</string>
-	<key>CFBundleShortVersionString</key><string>` + version + `</string><key>CFBundleVersion</key><string>` + version + `</string>
+	<key>CFBundleShortVersionString</key><string>` + platformVersion + `</string><key>CFBundleVersion</key><string>` + buildNumber + `</string>
 <key>LSMinimumSystemVersion</key><string>12.0</string><key>NSHighResolutionCapable</key><true/><key>LSUIElement</key><true/>
 <key>NSLocalNetworkUsageDescription</key><string>Lumilio Photos discovers Lumen Intelligence servers on your local network via mDNS to enable optional AI features (semantic search, face recognition, OCR).</string>
 <key>NSDesktopFolderUsageDescription</key><string>Lumilio Photos needs access to folders you select on the Desktop to store and manage your photo repositories.</string>

@@ -15,6 +15,9 @@ useful; implementation plans belong in `exec-plans/`.
   Desktop App delivery targets; the App hosts the same complete `server/app`
   runtime in-process, so both Desktop CI jobs run the full Server and Desktop
   test suites plus a native CGo build.
+- Published versions use `YY.TRAIN.PATCH[-beta.N|-rc.N]`. One tag on `main`
+  builds every Desktop and Server artifact before creating the GitHub Release;
+  its Server bundle pins the multi-architecture image by OCI digest.
 - Runtime state has three non-overlapping owners: frontend preferences in browser localStorage; runtime-mutable settings in the SQLite catalog through Settings/Setup APIs; and runtime-immutable process configuration in a complete schema-versioned TOML manifest.
 - First-run bootstrap (`fresh → catalog_ready → admin_created → ready`) is an orthogonal state machine. It observes owner and primary-repository gates; it is not a fourth configuration source.
 - `server/config/examples/` holds one complete manifest per deployment scenario
