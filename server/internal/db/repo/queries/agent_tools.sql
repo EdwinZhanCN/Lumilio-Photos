@@ -111,6 +111,27 @@ WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filte
   AND owner_id = sqlc.arg('user_id')
   AND is_deleted = false;
 
+-- name: AgentReadOCRDocuments :many
+-- read_ocr observer: authoritative OCR result and ordered text rows for a
+-- bounded ref. Go restores ref order and formats per-document statuses.
+WITH filter_params AS (
+  SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json
+)
+SELECT
+    a.asset_id,
+    a.original_filename,
+    a.type,
+    CASE WHEN ocr.asset_id IS NULL THEN 0 ELSE 1 END AS has_ocr_result,
+    COALESCE(ocr.total_count, 0) AS region_count,
+    COALESCE(ti.text_content, '') AS text_content
+FROM assets a
+LEFT JOIN ocr_results ocr ON ocr.asset_id = a.asset_id
+LEFT JOIN ocr_text_items ti ON ti.asset_id = ocr.asset_id
+WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND a.owner_id = sqlc.arg('user_id')
+  AND a.is_deleted = false
+ORDER BY a.asset_id, ti.id ASC;
+
 -- name: AgentPeekAssets :many
 -- peek observer: minimal per-asset fields plus place + people; snapshot order
 -- restored in Go. place/people are correlated subqueries so each asset stays a

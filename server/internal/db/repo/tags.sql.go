@@ -92,7 +92,11 @@ WITH ranked AS (
   JOIN assets a ON a.asset_id = at.asset_id
   WHERE a.is_deleted = false
     AND (?3 IS NULL OR a.owner_id = ?3)
-    AND (?4 IS NULL OR a.repository_id = ?4)
+    AND (?4 IS NULL OR EXISTS (
+      SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = ?4
+    ))
     AND (?5 IS NULL OR at.source = ?5)
     AND (?6 IS NULL OR t.tag_name LIKE '%' || ?6 || '%')
 )

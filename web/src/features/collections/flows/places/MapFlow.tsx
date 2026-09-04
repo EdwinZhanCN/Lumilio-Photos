@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { MapIcon } from "lucide-react";
 import ErrorFallback from "@/components/ui/ErrorFallback";
@@ -16,15 +16,35 @@ import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
 
+function parseMapNumber(value: string | null, minimum: number, maximum: number) {
+  if (value === null || value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : undefined;
+}
+
 function MapViewContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   useBreadcrumbs([
     { label: t("sidebar.home", "Home"), to: "/" },
     { label: t("sidebar.collections", "Collections"), to: "/collections" },
     { label: t("collections.sections.places", "Places") },
   ]);
   const { scopedRepositoryId } = useBrowseScope();
+  const requestedLatitude = parseMapNumber(searchParams.get("lat"), -90, 90);
+  const requestedLongitude = parseMapNumber(searchParams.get("lng"), -180, 180);
+  const requestedZoom = parseMapNumber(searchParams.get("zoom"), 1, 20);
+  const requestedCenter = useMemo<[number, number] | undefined>(
+    () =>
+      requestedLatitude !== undefined && requestedLongitude !== undefined
+        ? [requestedLatitude, requestedLongitude]
+        : undefined,
+    [requestedLatitude, requestedLongitude],
+  );
+  const focusKey = requestedCenter
+    ? `${requestedCenter.join(":")}:${requestedZoom ?? 10}`
+    : "repository";
   const [viewport, setViewport] = useState<MapViewport | null>(null);
   const handleViewportChange = useCallback((nextViewport: MapViewport) => {
     setViewport((current) => {
@@ -55,16 +75,17 @@ function MapViewContent() {
     repositoryId: scopedRepositoryId,
   });
   const initialCenter = useMemo<[number, number] | undefined>(() => {
+    if (requestedCenter) return requestedCenter;
     const cluster = clusters[0];
     return typeof cluster?.centroid_latitude === "number" &&
       typeof cluster.centroid_longitude === "number"
       ? [cluster.centroid_latitude, cluster.centroid_longitude]
       : undefined;
-  }, [clusters]);
+  }, [clusters, requestedCenter]);
 
   useEffect(() => {
     setViewport(null);
-  }, [scopedRepositoryId]);
+  }, [focusKey, scopedRepositoryId]);
 
   const photoLocations = useMemo(
     () =>
@@ -123,12 +144,13 @@ function MapViewContent() {
 
       <div className="flex-1 min-h-0 relative">
         <MapComponent
-          key={`${scopedRepositoryId ?? "all"}:${initialCenter?.join(",") ?? "default"}`}
+          key={`${scopedRepositoryId ?? "all"}:${focusKey}:${initialCenter?.join(",") ?? "default"}`}
           photoLocations={photoLocations}
           onPointClick={(assetId) => navigate(`/assets/${assetId}`)}
           height="100%"
           rounded={false}
           center={initialCenter}
+          zoom={requestedZoom ?? 10}
           onViewportChange={handleViewportChange}
         />
 

@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-// OCRResultMeta 用于在 PhotoSpecificMetadata 中缓存 OCR 统计信息
+// OCRResultMeta is a standalone OCR summary; it is not stored in
+// PhotoSpecificMetadata.
 type OCRResultMeta struct {
 	HasOCR         bool      `json:"has_ocr"`            // 是否有 OCR 结果
 	TotalCount     int       `json:"total_count"`        // 文字区域总数

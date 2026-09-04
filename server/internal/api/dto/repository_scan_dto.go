@@ -3,6 +3,8 @@ package dto
 import (
 	"encoding/json"
 	"time"
+
+	"server/internal/api/problem"
 )
 
 type CreateRepositoryRequestDTO struct {
@@ -72,19 +74,6 @@ type CreateRepositoryResponseDTO struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// RepositoryConflictDTO describes a Create/Open recovery fact. ConflictType
-// determines whether the marker should be opened, diagnosed, relocated, or
-// registered as a separate repository.
-type RepositoryConflictDTO struct {
-	Code           int      `json:"code" example:"409"`
-	Message        string   `json:"message" example:"Repository identity is already registered"`
-	ConflictType   string   `json:"conflict_type" example:"repository_identity"`
-	RepositoryID   string   `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RegisteredPath string   `json:"registered_path,omitempty" example:"/Volumes/OldDrive/Photos"`
-	RequestedPath  string   `json:"requested_path,omitempty" example:"/Volumes/NewDrive/Photos"`
-	Actions        []string `json:"actions,omitempty" example:"relocate,copy"`
-}
-
 type RepositoryRootDTO struct {
 	ID                         string   `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Name                       string   `json:"name" example:"External Archive"`
@@ -139,6 +128,8 @@ type StorageDiagnosticDTO struct {
 	TargetType                 string     `json:"target_type"`
 	TargetID                   string     `json:"target_id"`
 	ParentTargetID             string     `json:"parent_target_id,omitempty"`
+	Kind                       string     `json:"kind,omitempty" example:"default" enums:"default,external"`
+	Role                       string     `json:"role,omitempty" example:"primary" enums:"primary,regular"`
 	Name                       string     `json:"name"`
 	Path                       string     `json:"path"`
 	CanonicalPath              string     `json:"canonical_path"`
@@ -147,6 +138,8 @@ type StorageDiagnosticDTO struct {
 	CapacityKnown              bool       `json:"capacity_known"`
 	TotalBytes                 uint64     `json:"total_bytes,omitempty"`
 	AvailableBytes             uint64     `json:"available_bytes,omitempty"`
+	SafetyMarginBytes          uint64     `json:"safety_margin_bytes,omitempty"`
+	WritableBudgetBytes        uint64     `json:"writable_budget_bytes,omitempty"`
 	Filesystem                 string     `json:"filesystem,omitempty"`
 	MountID                    string     `json:"mount_id,omitempty"`
 	MountSource                string     `json:"mount_source,omitempty"`
@@ -219,30 +212,35 @@ type RepositoryScanRequestDTO struct {
 }
 
 type RepositoryScanQueuedDTO struct {
-	JobID        int64  `json:"job_id" example:"12345"`
+	OperationID  string `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	RepositoryID string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Mode         string `json:"mode" example:"manual"`
 	Status       string `json:"status" example:"queued"`
+	Inserted     bool   `json:"inserted" example:"true"`
+	Coalesced    bool   `json:"coalesced" example:"false"`
 }
 
 type RepositoryScanRunDTO struct {
-	ScanID          string     `json:"scan_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RepositoryID    string     `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Mode            string     `json:"mode" example:"manual"`
-	RequestedBy     *string    `json:"requested_by,omitempty" example:"edwin"`
-	Status          string     `json:"status" example:"completed"`
-	StartedAt       time.Time  `json:"started_at"`
-	FinishedAt      *time.Time `json:"finished_at,omitempty"`
-	DiscoveredCount int64      `json:"discovered_count" example:"10"`
-	UpdatedCount    int64      `json:"updated_count" example:"2"`
-	MovedCount      int64      `json:"moved_count" example:"1"`
-	DeletedCount    int64      `json:"deleted_count" example:"1"`
-	SkippedCount    int64      `json:"skipped_count" example:"4"`
-	DeferredCount   int64      `json:"deferred_count" example:"1"`
-	AmbiguousCount  int64      `json:"ambiguous_count" example:"0"`
-	Authoritative   bool       `json:"authoritative" example:"true"`
-	PartialReason   *string    `json:"partial_reason,omitempty"`
-	Error           *string    `json:"error,omitempty"`
+	OperationID              string             `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RepositoryID             string             `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RequestedEpoch           int64              `json:"requested_epoch" example:"2"`
+	Mode                     string             `json:"mode" example:"manual"`
+	RequestedBy              *string            `json:"requested_by,omitempty" example:"edwin"`
+	CoalescedCount           int64              `json:"coalesced_count" example:"1"`
+	Status                   string             `json:"status" example:"completed"`
+	CreatedAt                time.Time          `json:"created_at"`
+	StartedAt                *time.Time         `json:"started_at,omitempty"`
+	FinishedAt               *time.Time         `json:"finished_at,omitempty"`
+	DirectoriesObserved      int64              `json:"directories_observed" example:"10"`
+	FilesObserved            int64              `json:"files_observed" example:"120"`
+	BytesQueued              int64              `json:"bytes_queued" example:"1048576"`
+	BytesHashed              int64              `json:"bytes_hashed" example:"524288"`
+	AuthoritativeDirectories int64              `json:"authoritative_directories" example:"8"`
+	ErrorDirectories         int64              `json:"error_directories" example:"1"`
+	OutboxDepth              int64              `json:"outbox_depth" example:"12"`
+	PartialCoverage          bool               `json:"partial_coverage" example:"true"`
+	CancellationRequested    bool               `json:"cancellation_requested" example:"false"`
+	Problem                  *problem.Reference `json:"problem,omitempty"`
 }
 
 type RepositoryScanRunListDTO struct {

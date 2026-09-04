@@ -31,19 +31,21 @@ flowchart LR
     PROCESS --> HASH["useGenerateHashcode"]
     HASH --> PRECHECK["precheckUploads"]
     PRECHECK --> TRANSPORT["Batch or chunk transport"]
-    TRANSPORT --> JOBS["waitForUploadJobs"]
+    TRANSPORT --> JOBS["waitForUploadOperations"]
     JOBS --> REFRESH["Refresh asset queries"]
 ```
 
 [UnifiedUploadSection](./flows/intake/UnifiedUploadSection.tsx) validates files, edits the queue, chooses the
-working repository, and starts processing. [NavbarUploadQueue](./flows/queue/NavbarUploadQueue.tsx) is a
+working repository, blocks starts while that Repository is paused or
+unreachable, and explains low writable-space recovery before hashing begins.
+[NavbarUploadQueue](./flows/queue/NavbarUploadQueue.tsx) is a
 compact global view over the same provider state and links back to Manage.
 
 [useGenerateHashcode](./modules/process/useGenerateHashcode.ts) fingerprints files before
 [precheckUploads](../../lib/upload/uploadTransport.ts). Known files are marked duplicate and skip transport;
 a failed precheck falls back to normal upload. Small files use
 [useBatchUploadMutation](./api/useUploadMutations.ts), large files use
-[useChunkedUploadMutation](./api/useUploadMutations.ts), and [waitForUploadJobs](../../lib/upload/uploadLifecycle.ts) follows
+[useChunkedUploadMutation](./api/useUploadMutations.ts), and [waitForUploadOperations](../../lib/upload/uploadLifecycle.ts) follows
 accepted ingest tasks to terminal backend state before asset queries refresh.
 
 ## Data
@@ -58,6 +60,10 @@ The browser fingerprint mirrors backend BLAKE3 policy: full content through
 chunks. Size accompanies the hash during duplicate checks. Per-file success,
 duplicate, transport failure, and ingest failure remain distinct so retryable
 `File` objects stay in the queue while completed files leave it.
+Fetch/XHR transport and materialization polling preserve shared Problem or
+Problem Reference values. [useUploadProcess](./modules/process/useUploadProcess.tsx) localizes them against
+the current language at the queue boundary, so persisted server prose never
+becomes per-file display state.
 
 The feature root is the narrow public entry for application-level queue UI
 and upload state. Hashing, transport, progress, and lifecycle helpers remain

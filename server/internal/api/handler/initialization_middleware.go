@@ -2,9 +2,9 @@ package handler
 
 import (
 	"errors"
-	"net/http"
 
 	"server/internal/api"
+	"server/internal/api/problem"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -15,14 +15,14 @@ import (
 func RequireAppInitialized(bootstrap service.BootstrapService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if bootstrap == nil {
-			api.GinError(c, http.StatusConflict, errors.New("app_not_initialized"), http.StatusConflict, "app_not_initialized")
+			api.WriteProblem(c, api.KnownProblem(problem.AppNotInitialized, errors.New("app_not_initialized")))
 			c.Abort()
 			return
 		}
 
 		ready, err := bootstrap.IsReady(c.Request.Context())
 		if err != nil || !ready {
-			api.GinError(c, http.StatusConflict, errors.New("app_not_initialized"), http.StatusConflict, "app_not_initialized")
+			api.WriteProblem(c, api.KnownProblem(problem.AppNotInitialized, errors.New("app_not_initialized")))
 			c.Abort()
 			return
 		}

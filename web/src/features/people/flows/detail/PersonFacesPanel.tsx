@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/features/notifications";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import {
   useMoveFace,
@@ -90,7 +91,7 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
       showMessage(
         "error",
         t("people.cover.error", "Failed to set cover: {{message}}", {
-          message: err instanceof Error ? err.message : String(err),
+          message: localizeAPIProblem(err, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -112,7 +113,7 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
       showMessage(
         "error",
         t("people.moveFace.bulkError", "Failed to move faces: {{message}}", {
-          message: err instanceof Error ? err.message : String(err),
+          message: localizeAPIProblem(err, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -133,7 +134,7 @@ export default function PersonFacesPanel({ personId }: PersonFacesPanelProps) {
       showMessage(
         "error",
         t("people.removeFace.bulkError", "Failed to remove faces: {{message}}", {
-          message: err instanceof Error ? err.message : String(err),
+          message: localizeAPIProblem(err, t, t("home.errors.unknown")),
         }),
       );
     }

@@ -11,12 +11,15 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
+import { $api } from "@/lib/http-commons/queryClient";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import UserAvatar from "@/components/ui/UserAvatar";
 import {
   DISPLAY_NAME_HINT,
   DISPLAY_NAME_MAX_LENGTH,
   createPasskeyCredential,
   getPasskeySupport,
+  getPasskeySupportMessage,
   useAuth,
   useBeginPasskeyEnrollment,
   useDeletePasskey,
@@ -96,16 +99,6 @@ function getPermissionDescription(key: string, t: ReturnType<typeof useI18n>["t"
     }),
   };
   return descriptions[key] ?? "";
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
 }
 
 function isValidUserDTO(value: unknown): value is UserDTO {
@@ -220,6 +213,13 @@ function PasskeysModal({
   onAdd,
   onDelete,
   feedback,
+  securityPassword,
+  setSecurityPassword,
+  securityCode,
+  setSecurityCode,
+  securityMethod,
+  setSecurityMethod,
+  securityVerifyPending,
   t,
 }: {
   passkeys: Schemas["dto.PasskeyCredentialSummaryDTO"][];
@@ -238,6 +238,13 @@ function PasskeysModal({
   onAdd: () => void;
   onDelete: (id: number) => void;
   feedback: FeedbackState;
+  securityPassword: string;
+  setSecurityPassword: (value: string) => void;
+  securityCode: string;
+  setSecurityCode: (value: string) => void;
+  securityMethod: "totp" | "recovery_code";
+  setSecurityMethod: (value: "totp" | "recovery_code") => void;
+  securityVerifyPending: boolean;
   t: ReturnType<typeof useI18n>["t"];
 }) {
   return (
@@ -270,6 +277,52 @@ function PasskeysModal({
             <span>{feedback.message}</span>
           </div>
         )}
+        <div className="mt-4 rounded-2xl border border-base-300 bg-base-200/30 p-4">
+          <p className="text-sm font-semibold text-base-content">
+            {t("settings.account.mfa.passkeySecurityTitle", {
+              defaultValue: "Confirm account security",
+            })}
+          </p>
+          <p className="mt-1 text-xs text-base-content/60">
+            {t("settings.account.mfa.passkeySecurityHint", {
+              defaultValue:
+                "Enter your password and a current authenticator code before changing passkeys.",
+            })}
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <input
+              type="password"
+              className="input input-bordered input-sm w-full"
+              placeholder={t("auth.login.password", { defaultValue: "Password" })}
+              autoComplete="current-password"
+              value={securityPassword}
+              onChange={(event) => setSecurityPassword(event.target.value)}
+            />
+            <select
+              className="select select-bordered select-sm w-full"
+              value={securityMethod}
+              onChange={(event) =>
+                setSecurityMethod(event.target.value as "totp" | "recovery_code")
+              }
+            >
+              <option value="totp">
+                {t("auth.mfa.totpCode", { defaultValue: "Authenticator code" })}
+              </option>
+              <option value="recovery_code">
+                {t("auth.mfa.recoveryCode", { defaultValue: "Recovery code" })}
+              </option>
+            </select>
+            <input
+              inputMode="numeric"
+              className="input input-bordered input-sm w-full"
+              placeholder={t("settings.account.mfa.totpCode", {
+                defaultValue: "Authenticator code",
+              })}
+              value={securityCode}
+              onChange={(event) => setSecurityCode(event.target.value)}
+            />
+          </div>
+        </div>
         <div className="mt-5 space-y-2.5">
           {passkeysLoading ? (
             <div className="flex items-center justify-center gap-3 rounded-2xl border border-base-300 bg-base-200/50 px-5 py-6">
@@ -293,9 +346,7 @@ function PasskeysModal({
                         defaultValue:
                           "Add a passkey to sign in with your device's biometrics or security key.",
                       })
-                    : passkeySupport.reasonKey
-                      ? t(passkeySupport.reasonKey)
-                      : ""}
+                    : getPasskeySupportMessage(t, passkeySupport.reasonKey)}
                 </p>
               </div>
             </div>
@@ -323,7 +374,7 @@ function PasskeysModal({
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm btn-square text-error"
-                  disabled={deleteIsPending || !passkey.passkey_id}
+                  disabled={deleteIsPending || securityVerifyPending || !passkey.passkey_id}
                   onClick={() => onDelete(passkey.passkey_id ?? 0)}
                   title={t("common.remove", { defaultValue: "Remove" })}
                 >
@@ -345,7 +396,14 @@ function PasskeysModal({
           <button
             type="button"
             className={`btn btn-primary btn-sm gap-1.5 ${passkeyBusy ? "loading" : ""}`}
-            disabled={!passkeySupport.supported || !totpEnabled || passkeyBusy}
+            disabled={
+              !passkeySupport.supported ||
+              !totpEnabled ||
+              passkeyBusy ||
+              securityVerifyPending ||
+              !securityPassword ||
+              !securityCode
+            }
             onClick={onAdd}
           >
             <Plus className="size-4" />
@@ -367,7 +425,7 @@ function PasskeysModal({
 
 export default function AccountTab() {
   const { t } = useI18n();
-  const { user, dispatch } = useAuth();
+  const { user, dispatch, completeAuth } = useAuth();
   const navigate = useNavigate();
   const mfaStatusQuery = useMFAStatus();
   const passkeysQuery = usePasskeys();
@@ -375,6 +433,7 @@ export default function AccountTab() {
   const beginPasskeyEnrollment = useBeginPasskeyEnrollment();
   const verifyPasskeyEnrollment = useVerifyPasskeyEnrollment();
   const deletePasskeyMutation = useDeletePasskey();
+  const securityVerifyMutation = $api.useMutation("post", "/api/v1/auth/security/verify");
 
   const [displayName, setDisplayName] = useState(() => user?.display_name ?? "");
   const [avatarAssetId, setAvatarAssetId] = useState(() => user?.avatar_asset_id ?? "");
@@ -383,6 +442,9 @@ export default function AccountTab() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileJustSaved, setProfileJustSaved] = useState(false);
   const [securityFeedback, setSecurityFeedback] = useState<FeedbackState>(null);
+  const [securityPassword, setSecurityPassword] = useState("");
+  const [securityCode, setSecurityCode] = useState("");
+  const [securityMethod, setSecurityMethod] = useState<"totp" | "recovery_code">("totp");
   const profileSavedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
 
@@ -430,7 +492,8 @@ export default function AccountTab() {
   const passkeyBusy =
     beginPasskeyEnrollment.isPending ||
     verifyPasskeyEnrollment.isPending ||
-    deletePasskeyMutation.isPending;
+    deletePasskeyMutation.isPending ||
+    securityVerifyMutation.isPending;
 
   const handleMFAToggle = () => {
     if (mfaIsLoading || mfaLoadError || !mfaStatus) return;
@@ -457,11 +520,12 @@ export default function AccountTab() {
         body: { display_name: displayName, avatar_asset_id: avatarAssetId },
       });
       if (!isValidUserDTO(response)) {
-        throw new Error(
+        setProfileError(
           t("settings.account.invalidProfileResponse", {
             defaultValue: "Profile saved, but the server returned an invalid user payload.",
           }),
         );
+        return;
       }
       dispatch({ type: "SET_USER", payload: response });
       setProfileTouched(false);
@@ -470,8 +534,9 @@ export default function AccountTab() {
       profileSavedTimer.current = setTimeout(() => setProfileJustSaved(false), 2500);
     } catch (error) {
       setProfileError(
-        getErrorMessage(
+        localizeProblem(
           error,
+          t,
           t("settings.account.saveError", { defaultValue: "Failed to update profile." }),
         ),
       );
@@ -481,19 +546,44 @@ export default function AccountTab() {
   const handleAddPasskey = async () => {
     setSecurityFeedback(null);
     try {
+      const security = await securityVerifyMutation.mutateAsync({
+        body: {
+          current_password: securityPassword,
+          code: securityCode,
+          method: securityMethod,
+          purpose: "passkey_mutation",
+        },
+      });
+      if (!security?.security_token) throw new Error("Security verification failed.");
       const optionsResponse = await beginPasskeyEnrollment.mutateAsync({});
       if (!optionsResponse.challenge_token) {
         throw new Error("Failed to start passkey enrollment.");
       }
       const credential = await createPasskeyCredential(optionsResponse.options);
-      await verifyPasskeyEnrollment.mutateAsync({
-        body: { challenge_token: optionsResponse.challenge_token, credential },
+      const response = await verifyPasskeyEnrollment.mutateAsync({
+        body: {
+          challenge_token: optionsResponse.challenge_token,
+          credential,
+          security_token: security.security_token,
+        },
       });
-      setSecurityFeedback({ tone: "success", message: "Passkey added successfully." });
+      if (!response.session) throw new Error("Session replacement was not returned.");
+      await completeAuth(response.session);
+      setSecurityPassword("");
+      setSecurityCode("");
+      setSecurityMethod("totp");
+      setSecurityFeedback({
+        tone: "success",
+        message: t("settings.account.passkeys.added", "Passkey added successfully."),
+      });
     } catch (error) {
       setSecurityFeedback({
         tone: "error",
-        message: getErrorMessage(error, "Failed to add passkey."),
+        message: localizeProblem(
+          error,
+          t,
+          t("settings.account.passkeys.addFailed", "Failed to add passkey."),
+        ),
       });
     }
   };
@@ -501,16 +591,43 @@ export default function AccountTab() {
   const handleDeletePasskey = async (passkeyID: number) => {
     setSecurityFeedback(null);
     if (!Number.isFinite(passkeyID) || passkeyID <= 0) {
-      setSecurityFeedback({ tone: "error", message: "Invalid passkey ID." });
+      setSecurityFeedback({
+        tone: "error",
+        message: t("settings.account.passkeys.invalidID", "Invalid passkey ID."),
+      });
       return;
     }
     try {
-      await deletePasskeyMutation.mutateAsync({ params: { path: { id: passkeyID } } });
-      setSecurityFeedback({ tone: "success", message: "Passkey removed successfully." });
+      const security = await securityVerifyMutation.mutateAsync({
+        body: {
+          current_password: securityPassword,
+          code: securityCode,
+          method: securityMethod,
+          purpose: "passkey_mutation",
+        },
+      });
+      if (!security?.security_token) throw new Error("Security verification failed.");
+      const response = await deletePasskeyMutation.mutateAsync({
+        params: { path: { id: passkeyID } },
+        body: { security_token: security.security_token },
+      });
+      if (!response.session) throw new Error("Session replacement was not returned.");
+      await completeAuth(response.session);
+      setSecurityPassword("");
+      setSecurityCode("");
+      setSecurityMethod("totp");
+      setSecurityFeedback({
+        tone: "success",
+        message: t("settings.account.passkeys.removed", "Passkey removed successfully."),
+      });
     } catch (error) {
       setSecurityFeedback({
         tone: "error",
-        message: getErrorMessage(error, "Failed to remove passkey."),
+        message: localizeProblem(
+          error,
+          t,
+          t("settings.account.passkeys.removeFailed", "Failed to remove passkey."),
+        ),
       });
     }
   };
@@ -714,9 +831,7 @@ export default function AccountTab() {
                   ? t("settings.account.mfa.passkeyDescription", {
                       defaultValue: "Use your device's native passkey flow for sign-in.",
                     })
-                  : passkeySupport.reasonKey
-                    ? t(passkeySupport.reasonKey)
-                    : ""
+                  : getPasskeySupportMessage(t, passkeySupport.reasonKey)
           }
           value={
             <span className={`badge badge-sm ${passkeysBadge.cls}`}>{passkeysBadge.label}</span>
@@ -731,7 +846,7 @@ export default function AccountTab() {
         isDirty={isDirty}
         isSaving={updateProfileMutation.isPending}
         justSaved={profileJustSaved}
-        error={profileError}
+        localizedError={profileError}
         canSave={isDirty && !updateProfileMutation.isPending}
         onSave={() => void handleProfileSave()}
         onReset={resetProfileDraft}
@@ -769,6 +884,13 @@ export default function AccountTab() {
         onAdd={() => void handleAddPasskey()}
         onDelete={(id) => void handleDeletePasskey(id)}
         feedback={securityFeedback}
+        securityPassword={securityPassword}
+        setSecurityPassword={setSecurityPassword}
+        securityCode={securityCode}
+        setSecurityCode={setSecurityCode}
+        securityMethod={securityMethod}
+        setSecurityMethod={setSecurityMethod}
+        securityVerifyPending={securityVerifyMutation.isPending}
         t={t}
       />
     </div>

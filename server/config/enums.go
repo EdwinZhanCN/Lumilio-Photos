@@ -12,6 +12,5 @@ var (
 	tlsModeValues       = []string{string(TLSModeOff), string(TLSModeACME)}
 	logLevelValues      = []string{"debug", "info", "warn", "error"}
 	logFormatValues     = []string{"console", "json"}
-	geocodingProviders  = []string{"disabled", "nominatim"}
 	hardwareAccelValues = []string{"auto", "vaapi", "nvenc", "qsv", "videotoolbox", "none"}
 )

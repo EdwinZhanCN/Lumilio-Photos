@@ -6,6 +6,7 @@ import {
   removeMediaToken,
   saveMediaToken,
 } from "@/lib/http-commons/auth.ts";
+import { normalizeProblem } from "@/lib/http-commons/problem";
 
 const MEDIA_TOKEN_REFRESH_BUFFER_MS = 60_000;
 const MEDIA_TOKEN_REFRESH_INTERVAL_MS = 60_000;
@@ -27,13 +28,13 @@ const requestMediaToken = async (): Promise<string | null> => {
     return null;
   }
   if (error || !data) {
-    throw new Error(`media token request failed: ${JSON.stringify(error)}`);
+    throw error ? normalizeProblem(error) : normalizeProblem(undefined);
   }
 
   const token = data.token;
   const expiresAt = data.expires_at;
   if (!token || !expiresAt) {
-    throw new Error("media token response is missing required fields");
+    throw normalizeProblem(undefined);
   }
 
   saveMediaToken(token, expiresAt);

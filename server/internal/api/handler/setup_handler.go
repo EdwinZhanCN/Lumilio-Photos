@@ -24,12 +24,12 @@ func NewSetupHandler(setupService *service.SetupService) *SetupHandler {
 // @Tags setup
 // @Produce json
 // @Success 200 {object} dto.SetupStatusDTO "Setup status retrieved successfully"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/setup/status [get]
 func (h *SetupHandler) GetSetupStatus(c *gin.Context) {
 	status, err := h.setupService.Status(c.Request.Context())
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load setup status")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, dto.ToSetupStatusDTO(status))

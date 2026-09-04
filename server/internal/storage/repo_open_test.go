@@ -74,6 +74,17 @@ func TestOpenRepositoryIsolatesPrivateStateAndSchedulesInitialScan(t *testing.T)
 
 	var scanned []string
 	manager.SetInitialScanEnqueuer(func(_ context.Context, repositoryID string) error {
+		enqueueContext, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+		defer cancel()
+		_, releaseWork, err := manager.BeginRepositoryWork(
+			enqueueContext, repositoryID, dbtypes.RepositoryActivityScanning,
+		)
+		if err != nil {
+			return err
+		}
+		if err := releaseWork(); err != nil {
+			return err
+		}
 		scanned = append(scanned, repositoryID)
 		return nil
 	})

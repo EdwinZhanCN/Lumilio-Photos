@@ -4,7 +4,8 @@ import (
 	"time"
 )
 
-// ClassifyResultMeta 用于在 PhotoSpecificMetadata 中缓存分类统计信息
+// ClassifyResultMeta is a standalone classification summary; it is not stored
+// in PhotoSpecificMetadata.
 type ClassifyResultMeta struct {
 	HasClassification bool      `json:"has_classification"` // 是否有分类结果
 	TopLabel          string    `json:"top_label"`          // 最高置信度的标签

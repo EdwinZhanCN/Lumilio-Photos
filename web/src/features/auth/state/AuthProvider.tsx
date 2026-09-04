@@ -9,6 +9,7 @@ import { ensureMediaToken, getMediaTokenRefreshIntervalMs } from "@/lib/assets/m
 import { useGlobal } from "@/contexts/GlobalContext.tsx";
 import { resetSession } from "./resetSession.ts";
 import { registerSessionExpiredHandler } from "@/lib/http-commons/sessionEvents.ts";
+import { getProblemType } from "@/lib/http-commons/problem";
 
 interface AuthContextType extends AuthState {
   dispatch: React.Dispatch<AuthAction>;
@@ -57,9 +58,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatu
   );
 
   const getApiMessage = (error: unknown, fallback: string) => {
-    if (!error || typeof error !== "object") return fallback;
-    const apiError = error as { message?: string; error?: string };
-    return apiError.message || apiError.error || fallback;
+    switch (getProblemType(error)) {
+      case "https://lumilio.org/problems/auth/invalid-credentials":
+        return "apiErrors.auth.invalidCredentials";
+      case "https://lumilio.org/problems/auth/mfa-invalid":
+        return "apiErrors.auth.mfaInvalid";
+      case "https://lumilio.org/problems/auth/rate-limited":
+        return "apiErrors.auth.rateLimited";
+      case "https://lumilio.org/problems/auth/session-expired":
+        return "apiErrors.auth.sessionExpired";
+      default:
+        return fallback;
+    }
   };
 
   const completeAuth = async (response: AuthResponse): Promise<User> => {
@@ -68,10 +78,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, resetFeatu
       throw new Error("auth.errors.invalidSessionResponse");
     }
 
-    saveToken(token, csrfToken);
-    await ensureMediaToken(true);
-    dispatch({ type: "AUTH_SUCCESS", payload: user });
-    return user;
+    try {
+      saveToken(token, csrfToken);
+      await ensureMediaToken(true);
+      dispatch({ type: "AUTH_SUCCESS", payload: user });
+      return user;
+    } catch (error) {
+      // A security mutation may already have revoked the previous session
+      // before the replacement response reaches the browser. Never leave a
+      // stale access/CSRF pair in storage when installing the replacement
+      // session fails part-way through.
+      await resetClientSession();
+      dispatch({ type: "AUTH_FAILURE", payload: "auth.errors.invalidSessionResponse" });
+      throw error;
+    }
   };
 
   useEffect(() => {

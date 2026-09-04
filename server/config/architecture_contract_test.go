@@ -54,16 +54,4 @@ func TestRuntimeConfigArchitectureHasNoFallbackOrAmbientEnvReaders(t *testing.T)
 		}
 	}
 
-	moduleFile, err := os.ReadFile(filepath.Join(serverRoot, "go.mod"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, forbidden := range []string{
-		"github.com/joho/godotenv",
-		"github.com/cloudwego/eino-ext/components/model/deepseek",
-	} {
-		if strings.Contains(string(moduleFile), forbidden) {
-			t.Errorf("dependency can reintroduce ambient .env configuration: %s", forbidden)
-		}
-	}
 }

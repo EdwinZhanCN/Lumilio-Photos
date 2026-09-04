@@ -17,23 +17,26 @@ import (
 	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/execution"
 	"server/internal/storage"
 	"server/internal/utils/exif"
-	"server/internal/utils/imaging"
+	fileutil "server/internal/utils/file"
 	"server/internal/utils/sysproc"
 )
 
 // VideoInfo holds video metadata.
 type VideoInfo struct {
-	Width    int
-	Height   int
-	Duration float64
-	Codec    string
-	Format   string
+	Width     int
+	Height    int
+	Duration  float64
+	Codec     string
+	Bitrate   int     // bit/s
+	FrameRate float64 // fps
+	Format    string
 }
 
 // extractVideoMetadata updates the asset with ffprobe/EXIF-derived metadata.
-func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.Asset, reader io.Reader, videoInfo *VideoInfo) error {
+func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.Asset, fileSize int64, reader io.Reader, videoInfo *VideoInfo) (MetadataResult, error) {
 	config := &exif.Config{
 		ExifToolPath: ap.toolsConfig.ExifToolCommand(),
 		MaxFileSize:  20 * 1024 * 1024 * 1024, // 20GB
@@ -49,93 +52,46 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 		Reader:    reader,
 		AssetType: dbtypes.AssetTypeVideo,
 		Filename:  asset.OriginalFilename,
-		Size:      asset.FileSize,
+		Size:      fileSize,
 	}
 
 	result, err := extractor.ExtractFromStream(ctx, req)
 	if err != nil {
-		return fmt.Errorf("extract metadata: %w", err)
+		return MetadataResult{}, fmt.Errorf("extract metadata: %w", err)
 	}
 	if result.Error != nil {
-		return fmt.Errorf("extract metadata: %w", result.Error)
+		return MetadataResult{}, fmt.Errorf("extract metadata: %w", result.Error)
 	}
 
 	meta, ok := result.Metadata.(*dbtypes.VideoSpecificMetadata)
 	if !ok {
-		return fmt.Errorf("unexpected metadata type for video: %T", result.Metadata)
+		return MetadataResult{}, fmt.Errorf("unexpected metadata type for video: %T", result.Metadata)
 	}
 
-	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID, videoInfo.Duration); err != nil {
-		return fmt.Errorf("update duration: %w", err)
+	if videoInfo.Codec != "" {
+		meta.Codec = videoInfo.Codec
 	}
-	if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID, int32(videoInfo.Width), int32(videoInfo.Height)); err != nil {
-		return fmt.Errorf("update dimensions: %w", err)
+	if videoInfo.Bitrate > 0 {
+		meta.Bitrate = videoInfo.Bitrate
+	}
+	if videoInfo.FrameRate > 0 {
+		meta.FrameRate = videoInfo.FrameRate
+	}
+	common := result.Common
+	if videoInfo.Width > 0 && videoInfo.Height > 0 {
+		width, height := int32(videoInfo.Width), int32(videoInfo.Height)
+		common.Width, common.Height = &width, &height
+	}
+	if videoInfo.Duration > 0 {
+		duration := videoInfo.Duration
+		common.Duration = &duration
 	}
 	sm, err := dbtypes.MarshalMeta(meta)
 	if err != nil {
-		return fmt.Errorf("marshal metadata: %w", err)
+		return MetadataResult{}, fmt.Errorf("marshal metadata: %w", err)
 	}
-	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID, sm, result.Raw); err != nil {
-		return fmt.Errorf("save metadata: %w", err)
-	}
-	ap.reconcileComponentRelation(ctx, asset, false, asset.MimeType)
-	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
-	ap.enqueueDetectStacks(ctx, asset)
-
-	return nil
-}
-
-// transcodeVideoSmart applies a best-effort, resource-aware transcoding strategy.
-// Constrains by the longer side: landscape videos are capped at 1080p height,
-// portrait videos are capped at 1080p width.
-func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, videoPath string, videoInfo *VideoInfo, cfg config.TranscodeConfig) error {
-	maxDimension := 1080
-	longSide := videoInfo.Width
-	if videoInfo.Height > longSide {
-		longSide = videoInfo.Height
-	}
-
-	isLandscape := videoInfo.Width >= videoInfo.Height
-
-	// Already within bounds: copy if H.264 MP4, otherwise transcode at original size.
-	if longSide <= maxDimension {
-		if isLandscape && strings.ToLower(videoInfo.Format) == "mp4" && strings.Contains(strings.ToLower(videoInfo.Codec), "h264") {
-			return copyVideoAsWebVersion(files, sourcePath, asset, "web")
-		}
-		scaleFilter := buildScaleFilter(videoInfo.Width, videoInfo.Height, videoInfo.Width, videoInfo.Height)
-		outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, scaleFilter, videoInfo.Width, videoInfo.Height, cfg)
-		if err != nil {
-			return fmt.Errorf("transcode to mp4: %w", err)
-		}
-		defer os.Remove(outputPath)
-		return ap.saveTranscodedVideo(files, asset, outputPath, "web")
-	}
-
-	// Scale down: constrain the longer side to maxDimension, let ffmpeg compute
-	// the other dimension precisely with -2 (preserves aspect ratio, ensures even).
-	var scaleFilter string
-	var approxWidth, approxHeight int
-	if isLandscape {
-		scaleFilter = fmt.Sprintf("scale=-2:%d", maxDimension)
-		approxWidth = int(float64(maxDimension) * float64(videoInfo.Width) / float64(videoInfo.Height))
-		approxHeight = maxDimension
-	} else {
-		scaleFilter = fmt.Sprintf("scale=%d:-2", maxDimension)
-		approxWidth = maxDimension
-		approxHeight = int(float64(maxDimension) * float64(videoInfo.Height) / float64(videoInfo.Width))
-	}
-
-	outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, scaleFilter, approxWidth, approxHeight, cfg)
-	if err != nil {
-		return fmt.Errorf("transcode to %dp: %w", maxDimension, err)
-	}
-	defer os.Remove(outputPath)
-
-	if err := ap.saveTranscodedVideo(files, asset, outputPath, "web"); err != nil {
-		return fmt.Errorf("save %dp version: %w", maxDimension, err)
-	}
-
-	return nil
+	relation := repo.InitialMediaRelation(&fileutil.ValidationResult{MimeType: asset.MimeType}, asset.OriginalFilename)
+	return MetadataResult{AssetID: asset.AssetID, SourceContentID: asset.ContentID, Metadata: sm, Common: common, ExifRaw: dbtypes.JSON(result.Raw), ComponentRelation: string(relation)}, nil
 }
 
 // buildScaleFilter returns an ffmpeg scale filter string. Uses -2 for one
@@ -166,7 +122,7 @@ func bitrateForResolution(width, height int) (maxrate, bufsize string) {
 func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath string, scaleFilter string, approxWidth, approxHeight int, cfg config.TranscodeConfig) (string, error) {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_%d_%s.mp4", approxHeight, filepath.Base(inputPath)))
 
-	args := buildTranscodeArgs(inputPath, outputPath, scaleFilter, approxWidth, approxHeight, cfg)
+	args := buildTranscodeArgs(inputPath, outputPath, scaleFilter, approxWidth, approxHeight, cfg, ap.toolSession)
 	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), args...)
 	sysproc.HideConsole(cmd)
 
@@ -177,9 +133,9 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
-// resolveHardwareAccel translates "auto" or requested hardware acceleration mode
+// ResolveHardwareAccel translates "auto" or requested hardware acceleration mode
 // to the actual acceleration backend supported by the host operating system/hardware.
-func resolveHardwareAccel(mode string) string {
+func ResolveHardwareAccel(mode string) string {
 	mode = strings.ToLower(strings.TrimSpace(mode))
 	if mode != "auto" {
 		return mode
@@ -193,11 +149,16 @@ func resolveHardwareAccel(mode string) string {
 	return "none"
 }
 
-func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, approxHeight int, cfg config.TranscodeConfig) []string {
+func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, approxHeight int, cfg config.TranscodeConfig, session execution.ToolSession) []string {
 	scaleExpr := scaleFilter[len("scale="):] // w:h portion, reused for VAAPI
 	maxrate, bufsize := bitrateForResolution(approxWidth, approxHeight)
 
-	accel := resolveHardwareAccel(cfg.HardwareAccel)
+	accel := session.HardwareAccel
+	if accel == "" {
+		// The runtime always passes the resolved session. Keeping this branch
+		// makes the pure argv builder usable by narrowly scoped unit tests.
+		accel = cfg.HardwareAccel
+	}
 
 	switch accel {
 	case "vaapi":
@@ -223,12 +184,14 @@ func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, 
 			outputPath,
 		}
 	case "nvenc":
-		return []string{
+		args := []string{
 			"-i", inputPath,
 			"-map", "0:v:0",
 			"-map", "0:a?",
 			"-c:v", "h264_nvenc",
-			"-preset", "p4",
+		}
+		args = append(args, session.NVENCPresetArg()...)
+		args = append(args,
 			"-qp", "23",
 			"-maxrate", maxrate,
 			"-bufsize", bufsize,
@@ -241,7 +204,8 @@ func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, 
 			"-f", "mp4",
 			"-y",
 			outputPath,
-		}
+		)
+		return args
 	case "qsv":
 		return []string{
 			"-i", inputPath,
@@ -281,12 +245,14 @@ func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, 
 			outputPath,
 		}
 	default:
-		return []string{
+		args := []string{
 			"-i", inputPath,
 			"-map", "0:v:0",
 			"-map", "0:a?",
 			"-c:v", "libx264",
-			"-preset", "medium",
+		}
+		args = append(args, session.FFmpegPresetArg()...)
+		args = append(args,
 			"-crf", "23",
 			"-maxrate", maxrate,
 			"-bufsize", bufsize,
@@ -296,40 +262,43 @@ func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, 
 			"-b:a", "128k",
 			"-movflags", "+faststart",
 			"-avoid_negative_ts", "make_zero",
-			"-threads", "0",
+		)
+		args = append(args, session.FFmpegThreadsArg()...)
+		args = append(args,
 			"-f", "mp4",
 			"-y",
 			outputPath,
-		}
+		)
+		return args
 	}
 }
 
 // copyVideoAsWebVersion saves the provided video file as the web version.
-func copyVideoAsWebVersion(files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, version string) error {
+func copyVideoAsWebVersion(ctx context.Context, files *storage.RepositoryFS, sourcePath storage.RepositoryPath, asset *repo.Asset, pipelineVersion, version string) error {
 	videoFile, err := files.OpenMedia(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open video file: %w", err)
 	}
 	defer videoFile.Close()
 
-	return saveVideoVersion(files, videoFile, asset, version)
+	return saveVideoVersion(ctx, files, videoFile, asset, pipelineVersion, version)
 }
 
 // saveTranscodedVideo saves a transcoded output as the web version.
-func (ap *AssetProcessor) saveTranscodedVideo(files *storage.RepositoryFS, asset *repo.Asset, outputPath, version string) error {
+func (ap *AssetProcessor) saveTranscodedVideo(ctx context.Context, files *storage.RepositoryFS, asset *repo.Asset, outputPath, pipelineVersion, version string) error {
 	transcodedFile, err := os.Open(outputPath)
 	if err != nil {
 		return fmt.Errorf("open transcoded file: %w", err)
 	}
 	defer transcodedFile.Close()
 
-	return saveVideoVersion(files, transcodedFile, asset, version)
+	return saveVideoVersion(ctx, files, transcodedFile, asset, pipelineVersion, version)
 }
 
-// generateVideoThumbnail creates thumbnails from a representative video frame.
-func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, files *storage.RepositoryFS, asset *repo.Asset, videoPath string, info *VideoInfo, cfg config.TranscodeConfig) error {
+// extractVideoThumbnailFrame creates one representative JPEG. Scaling and
+// publication are separate runtime admissions.
+func (ap *AssetProcessor) extractVideoThumbnailFrame(ctx context.Context, asset *repo.Asset, videoPath string, info *VideoInfo) (string, error) {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_%s.jpg", asset.AssetID))
-	defer os.Remove(outputPath)
 
 	thumbnailTime := "00:00:01"
 	if info.Duration > 0 && info.Duration < 10 {
@@ -339,7 +308,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, files *sto
 
 	args := []string{}
 
-	accel := resolveHardwareAccel(cfg.HardwareAccel)
+	accel := ap.toolSession.HardwareAccel
 	switch accel {
 	case "vaapi":
 		args = append(args,
@@ -366,7 +335,9 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, files *sto
 		"-vframes", "1",
 		"-q:v", "2",
 		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
-		"-threads", "1",
+	)
+	args = append(args, ap.toolSession.FFmpegThreadsArg()...)
+	args = append(args,
 		"-f", "mjpeg",
 		"-y",
 		outputPath,
@@ -379,37 +350,10 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, files *sto
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("generate thumbnail: %w\nstderr: %s", err, stderr.String())
+		_ = os.Remove(outputPath)
+		return "", fmt.Errorf("generate thumbnail: %w\nstderr: %s", err, stderr.String())
 	}
-
-	thumbnailFile, err := os.Open(outputPath)
-	if err != nil {
-		return fmt.Errorf("open thumbnail: %w", err)
-	}
-	defer thumbnailFile.Close()
-
-	outputs := make(map[string]io.Writer, len(thumbnailSizes))
-	buffers := make(map[string]*bytes.Buffer, len(thumbnailSizes))
-	for name := range thumbnailSizes {
-		buf := &bytes.Buffer{}
-		buffers[name] = buf
-		outputs[name] = buf
-	}
-
-	if err := imaging.StreamThumbnails(thumbnailFile, thumbnailSizes, outputs); err != nil {
-		return fmt.Errorf("generate thumbnails: %w", err)
-	}
-
-	for name, buf := range buffers {
-		if buf.Len() == 0 {
-			continue
-		}
-		if err := ap.saveThumbnail(ctx, files, buf, asset, name); err != nil {
-			return fmt.Errorf("save thumbnail %s: %w", name, err)
-		}
-	}
-
-	return nil
+	return outputPath, nil
 }
 
 // getVideoInfo probes the video using ffprobe to collect dimensions, codec, format, and duration.
@@ -429,45 +373,67 @@ func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
 		return nil, fmt.Errorf("ffprobe failed: %w", err)
 	}
 
-	var probeData struct {
+	var data struct {
 		Streams []struct {
-			Width     int    `json:"width"`
-			Height    int    `json:"height"`
-			CodecName string `json:"codec_name"`
-			Duration  string `json:"duration"`
+			Width      int    `json:"width"`
+			Height     int    `json:"height"`
+			CodecName  string `json:"codec_name"`
+			RFrameRate string `json:"r_frame_rate"`
+			Duration   string `json:"duration"`
+			BitRate    string `json:"bit_rate"`
 		} `json:"streams"`
 		Format struct {
 			FormatName string `json:"format_name"`
 			Duration   string `json:"duration"`
+			BitRate    string `json:"bit_rate"`
 		} `json:"format"`
 	}
 
-	if err := json.Unmarshal(output, &probeData); err != nil {
-		return nil, fmt.Errorf("parse ffprobe json: %w", err)
+	if err := json.Unmarshal(output, &data); err != nil {
+		return nil, fmt.Errorf("parse ffprobe output: %w", err)
 	}
 
 	info := &VideoInfo{}
-
-	if len(probeData.Streams) > 0 {
-		stream := probeData.Streams[0]
-		info.Width = stream.Width
-		info.Height = stream.Height
-		info.Codec = stream.CodecName
-
-		if stream.Duration != "" {
-			if duration, err := strconv.ParseFloat(stream.Duration, 64); err == nil {
-				info.Duration = duration
-			}
+	if len(data.Streams) > 0 {
+		s := data.Streams[0]
+		info.Width = s.Width
+		info.Height = s.Height
+		info.Codec = s.CodecName
+		info.FrameRate = parseFrameRate(s.RFrameRate)
+		if d, err := strconv.ParseFloat(s.Duration, 64); err == nil {
+			info.Duration = d
+		}
+		if b, err := strconv.Atoi(s.BitRate); err == nil {
+			info.Bitrate = b
 		}
 	}
 
-	info.Format = probeData.Format.FormatName
-
-	if info.Duration == 0 && probeData.Format.Duration != "" {
-		if duration, err := strconv.ParseFloat(probeData.Format.Duration, 64); err == nil {
-			info.Duration = duration
+	info.Format = data.Format.FormatName
+	if info.Duration == 0 {
+		if d, err := strconv.ParseFloat(data.Format.Duration, 64); err == nil {
+			info.Duration = d
+		}
+	}
+	if info.Bitrate == 0 {
+		if b, err := strconv.Atoi(data.Format.BitRate); err == nil {
+			info.Bitrate = b
 		}
 	}
 
 	return info, nil
+}
+
+func parseFrameRate(s string) float64 {
+	parts := strings.Split(s, "/")
+	if len(parts) == 2 {
+		num, err1 := strconv.ParseFloat(parts[0], 64)
+		den, err2 := strconv.ParseFloat(parts[1], 64)
+		if err1 == nil && err2 == nil && den != 0 {
+			return num / den
+		}
+	}
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return f
+	}
+	return 0
 }

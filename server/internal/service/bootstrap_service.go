@@ -18,38 +18,47 @@ const (
 
 // BootstrapService is the single source of truth for the first-run bootstrap
 // phase. The phase is computed from the setup gates (admin user and exactly one
-// active primary repository) in one place and cached in system_state, so request
-// paths read one column instead of re-probing.
+// active primary repository) in one place and cached in system_state. Request
+// paths trust the terminal cached value and otherwise derive the current phase
+// through the query-only reader; they never reconcile or wait for the writer.
 type BootstrapService interface {
-	// Phase returns the cached bootstrap phase.
+	// Phase returns the terminal cached phase or derives the current phase using
+	// read-only setup gates.
 	Phase(ctx context.Context) (string, error)
 	// Reconcile recomputes the phase from the gates, persists it, and returns it.
-	// Called at startup and after each setup transition.
+	// Called at startup or another explicit maintenance boundary, never from a
+	// foreground status read.
 	Reconcile(ctx context.Context) (string, error)
 	// IsReady reports whether the system has completed first-run setup.
 	IsReady(ctx context.Context) (bool, error)
 }
 
 type bootstrapService struct {
-	queries *repo.Queries
+	queries     *repo.Queries
+	readQueries *repo.Queries
 }
 
 func NewBootstrapService(queries *repo.Queries) BootstrapService {
-	return &bootstrapService{queries: queries}
+	return &bootstrapService{queries: queries, readQueries: queries}
+}
+
+func NewBootstrapServiceWithReader(queries *repo.Queries, readQueries *repo.Queries) BootstrapService {
+	return &bootstrapService{queries: queries, readQueries: readQueries}
 }
 
 func (s *bootstrapService) Phase(ctx context.Context) (string, error) {
-	state, err := s.queries.GetSystemState(ctx)
+	state, err := s.readQueries.GetSystemState(ctx)
 	if err != nil {
 		return "", fmt.Errorf("get system state: %w", err)
 	}
-	// Once ready, trust the cached value (fast path). While still setting up,
-	// recompute from the gates so the phase advances as setup progresses without
-	// every transition having to call Reconcile.
+	// Once ready, trust the durable cached value (fast path). While still setting
+	// up, derive the live phase strictly through the reader. Setup status and the
+	// initialization middleware are foreground request paths and must not queue
+	// behind SQLite's sole writer merely to persist this cache.
 	if state.BootstrapPhase == BootstrapPhaseReady {
 		return BootstrapPhaseReady, nil
 	}
-	return s.Reconcile(ctx)
+	return s.compute(ctx)
 }
 
 func (s *bootstrapService) IsReady(ctx context.Context) (bool, error) {
@@ -61,7 +70,7 @@ func (s *bootstrapService) IsReady(ctx context.Context) (bool, error) {
 }
 
 func (s *bootstrapService) Reconcile(ctx context.Context) (string, error) {
-	state, err := s.queries.GetSystemState(ctx)
+	state, err := s.readQueries.GetSystemState(ctx)
 	if err != nil {
 		return "", fmt.Errorf("get system state: %w", err)
 	}
@@ -85,7 +94,7 @@ func (s *bootstrapService) Reconcile(ctx context.Context) (string, error) {
 // compute derives the phase from the setup gates. It is the only place these
 // gates are evaluated.
 func (s *bootstrapService) compute(ctx context.Context) (string, error) {
-	admins, err := s.queries.CountActiveUsersByRole(ctx, string(UserRoleAdmin))
+	admins, err := s.readQueries.CountActiveUsersByRole(ctx, string(UserRoleAdmin))
 	if err != nil {
 		return "", fmt.Errorf("count admin users: %w", err)
 	}
@@ -93,7 +102,7 @@ func (s *bootstrapService) compute(ctx context.Context) (string, error) {
 		return BootstrapPhaseCatalogReady, nil
 	}
 
-	primaries, err := s.queries.CountPrimaryRepositories(ctx)
+	primaries, err := s.readQueries.CountPrimaryRepositories(ctx)
 	if err != nil {
 		return "", fmt.Errorf("count primary repositories: %w", err)
 	}

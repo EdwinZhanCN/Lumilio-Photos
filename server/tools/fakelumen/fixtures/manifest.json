@@ -1,0 +1,4 @@
+{
+  "schemaVersion": 1,
+  "note": "No recorded Lumen fixtures yet. Replay advertises deterministic SigLIP, BioCLIP, OCR, and Face capabilities. It serves a constant 768-dim embedding, empty valid BioCLIP/Face results, and two stable ordered OCR lines so queue/storage paths can run keyless and GPU-less. General seeding keeps optional tasks disabled. Record real model fixtures per .agents/skills/lumilio-lumen-fixtures/SKILL.md; recording overwrites this manifest with the upstream capability set."
+}

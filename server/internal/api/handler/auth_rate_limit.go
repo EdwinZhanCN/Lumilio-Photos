@@ -7,13 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"server/config"
 	"server/internal/api"
+	"server/internal/api/problem"
 	"server/internal/api/ratelimit"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +27,7 @@ const (
 	authRateScopePasskeyVerify  = "passkey_verify"
 	authRateScopeMFAVerify      = "mfa_verify"
 	authRateScopeRefresh        = "refresh"
+	authRateScopeSecurityVerify = "security_verify"
 )
 
 // AuthRateLimiter applies independent network and subject policies at the HTTP
@@ -132,13 +133,7 @@ func (h *AuthHandler) writeAuthRateLimit(c *gin.Context, scope, dimension, diges
 		zap.String("key_digest", digest),
 		zap.Int64("retry_after_seconds", seconds),
 	)
-	api.GinError(
-		c,
-		http.StatusTooManyRequests,
-		errors.New("authentication rate limit exceeded"),
-		http.StatusTooManyRequests,
-		"Too many authentication attempts. Try again later.",
-	)
+	api.WriteProblem(c, problem.NewRateLimited(errors.New("authentication rate limit exceeded"), seconds))
 	c.Abort()
 }
 

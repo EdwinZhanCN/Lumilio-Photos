@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangleIcon, KeyRoundIcon, MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import UserAvatar from "@/components/ui/UserAvatar";
 import PhotoPicker from "@/features/assets/picker";
+import { copyText } from "@/lib/clipboard";
 import {
   DISPLAY_NAME_HINT,
   DISPLAY_NAME_MAX_LENGTH,
@@ -13,11 +15,7 @@ import {
   normalizeUsernameInput,
   useAuth,
 } from "@/features/auth";
-import {
-  useAdminUpdateUser,
-  useResetUserAccess,
-  useUsers,
-} from "@/features/users";
+import { useAdminUpdateUser, useResetUserAccess, useUsers } from "@/features/users";
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import { SettingsDropdown } from "../../components/SettingsDropdown";
 import { SettingsSaveBar } from "../../components/SettingsSaveBar";
@@ -28,20 +26,6 @@ import {
 } from "../../model/userEditor";
 
 type FeedbackState = { tone: "success" | "error"; message: string } | null;
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
-}
-
-async function copyToClipboard(value: string) {
-  await navigator.clipboard.writeText(value);
-}
 
 export default function UsersTab() {
   const { t } = useI18n();
@@ -135,8 +119,9 @@ export default function UsersTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(
+        message: localizeProblem(
           error,
+          t,
           t("settings.users.saveError", { defaultValue: "Failed to update user." }),
         ),
       });
@@ -169,8 +154,9 @@ export default function UsersTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(
+        message: localizeProblem(
           error,
+          t,
           t("settings.users.resetAccessError", { defaultValue: "Failed to reset access." }),
         ),
       });
@@ -180,10 +166,14 @@ export default function UsersTab() {
   const handleCopyTemporaryPassword = async () => {
     if (!resetAccessState?.temporaryPassword) return;
     try {
-      await copyToClipboard(resetAccessState.temporaryPassword);
+      await copyText(resetAccessState.temporaryPassword);
       setCopiedTemporaryPassword(true);
     } catch {
       setCopiedTemporaryPassword(false);
+      setFeedback({
+        tone: "error",
+        message: t("common.copyFailed", { defaultValue: "Copy failed." }),
+      });
     }
   };
 

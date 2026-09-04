@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from "react";
 import {
   ChevronDown,
+  CircleStop,
   Cloud,
   CloudDownload,
   Copy,
@@ -17,7 +18,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 import type { RepositoryOption } from "../../types";
 import { useRepositoryAssetCount } from "../../api/useRepositoryAssetCount";
-import { getRepositoryDisplayName } from "../../model/repositoryDisplayName";
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
 import { getRepositoryEffectiveState } from "../../model/repositoryOptions";
 import RemoveRepositoryModal from "./RemoveRepositoryModal";
 import RenameRepositoryModal from "./RenameRepositoryModal";
@@ -60,12 +61,25 @@ export default function RepositoryRow({
     "get",
     "/api/v1/repositories/{id}/scans/latest",
     { params: { path: { id: repository.id } } },
-    { enabled: Boolean(repository.id), retry: false, staleTime: 30_000 },
+    {
+      enabled: Boolean(repository.id),
+      retry: false,
+      staleTime: 1_000,
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        return isActiveScanStatus(status) ? 1_000 : false;
+      },
+    },
+  );
+  const cancelScanMutation = $api.useMutation(
+    "post",
+    "/api/v1/repositories/{id}/scans/{operation_id}/cancel",
   );
   const latestScan = scanQuery.data;
+  const isBackgroundScanning = isActiveScanStatus(latestScan?.status);
   const cloudStatus = cloudStatusQuery.data;
   const latestRun = cloudStatus?.latest_run;
-  const name = getRepositoryDisplayName(repository, t);
+  const name = getStorageEntityDisplayName(repository, t);
   const [expanded, setExpanded] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
@@ -79,6 +93,18 @@ export default function RepositoryRow({
   const lifecycle = getLifecycleIndicator(effectiveState, t);
 
   const toggleExpanded = () => setExpanded((current) => !current);
+  const cancelActiveScan = async () => {
+    if (!latestScan?.operation_id) return;
+    await cancelScanMutation.mutateAsync({
+      params: {
+        path: {
+          id: repository.id,
+          operation_id: latestScan.operation_id,
+        },
+      },
+    });
+    await scanQuery.refetch();
+  };
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
@@ -101,11 +127,6 @@ export default function RepositoryRow({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="truncate text-sm font-medium text-base-content">{name}</span>
-              {repository.isPrimary && (
-                <span className="badge badge-primary badge-sm badge-soft">
-                  {t("manage.repositories.primaryBadge")}
-                </span>
-              )}
               {hasCloudBinding && (
                 <span className="badge badge-info badge-sm badge-soft">
                   {t("manage.repositories.sourceCloud")}
@@ -162,16 +183,18 @@ export default function RepositoryRow({
               className="dropdown-content menu menu-sm z-dropdown mb-1 w-60 rounded-box border border-base-300 bg-base-100 shadow-xl"
             >
               <li className="menu-title">{t("manage.repositories.menuGroupManage", "Manage")}</li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => setRenameOpen(true)}
-                  disabled={isBusy || isUnavailable}
-                >
-                  <Pencil size={15} />
-                  {t("manage.repositories.rename", "Rename repository")}
-                </button>
-              </li>
+              {repository.role !== "primary" ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setRenameOpen(true)}
+                    disabled={isBusy || isUnavailable}
+                  >
+                    <Pencil size={15} />
+                    {t("manage.repositories.rename", "Rename Repository")}
+                  </button>
+                </li>
+              ) : null}
               <li>
                 <button
                   type="button"
@@ -182,6 +205,30 @@ export default function RepositoryRow({
                   {t("manage.repositories.manageCloudSources", "Manage cloud sources")}
                 </button>
               </li>
+              {isBackgroundScanning ? (
+                <li>
+                  <button
+                    type="button"
+                    className="text-warning"
+                    onClick={() => void cancelActiveScan()}
+                    disabled={
+                      cancelScanMutation.isPending || Boolean(latestScan?.cancellation_requested)
+                    }
+                  >
+                    {cancelScanMutation.isPending ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : (
+                      <CircleStop size={15} />
+                    )}
+                    {latestScan?.cancellation_requested
+                      ? t(
+                          "manage.repositories.scanCancellationRequestedAction",
+                          "Cancellation requested",
+                        )
+                      : t("manage.repositories.cancelScan", "Cancel verification")}
+                  </button>
+                </li>
+              ) : null}
               {isUnavailable && onLocate ? (
                 <li>
                   <button type="button" onClick={() => onLocate(repository)} disabled={isBusy}>
@@ -197,9 +244,9 @@ export default function RepositoryRow({
                 <button
                   type="button"
                   onClick={() => onScan(repository)}
-                  disabled={isBusy || isUnavailable}
+                  disabled={isScanning || isUnavailable}
                 >
-                  {isScanning ? (
+                  {isScanning || isBackgroundScanning ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
                     <RefreshCcw size={15} />
@@ -272,7 +319,7 @@ export default function RepositoryRow({
                   </button>
                 </li>
               )}
-              {!repository.isPrimary && (
+              {repository.role !== "primary" && (
                 <>
                   <li className="menu-title">
                     {t("manage.repositories.menuGroupDanger", "Danger zone")}
@@ -303,61 +350,91 @@ export default function RepositoryRow({
       {expanded ? (
         <div className="px-3 pb-3">
           <div className="space-y-3 rounded-lg border border-base-200 bg-base-200/30 p-3">
-            {latestScan?.status === "completed" && (
+            {(latestScan?.status === "completed" || latestScan?.status === "partial") && (
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`badge badge-sm badge-soft ${
-                      latestScan.authoritative ? "badge-success" : "badge-warning"
+                      latestScan.status === "completed" ? "badge-success" : "badge-warning"
                     }`}
                   >
-                    {latestScan.authoritative
-                      ? t("manage.repositories.scanAuthoritative", "Scan complete")
-                      : t("manage.repositories.scanPartial", "Partial scan")}
+                    {latestScan.status === "completed"
+                      ? t("manage.repositories.scanAuthoritative", "Verification complete")
+                      : t("manage.repositories.scanPartial", "Verification partial")}
                   </span>
-                  {(latestScan.ambiguous_count ?? 0) > 0 && (
+                  {latestScan.partial_coverage && (
                     <span className="text-xs text-warning">
                       {t(
-                        "manage.repositories.scanAmbiguousHelp",
-                        "No identity guess was made. Remove extra copies or restore a one-to-one layout, then scan again.",
+                        "manage.repositories.scanPartialHelp",
+                        "Some directories could not be verified. Previously valid files remain available.",
                       )}
                     </span>
                   )}
                 </div>
                 <div className="stats mt-2 w-full border border-base-200 bg-base-100 shadow-none sm:stats-horizontal">
                   <ScanStat
-                    label={t("manage.repositories.scanCountDiscovered", "Discovered")}
-                    value={latestScan.discovered_count ?? 0}
+                    label={t("manage.repositories.scanCountDirectories", "Directories")}
+                    value={latestScan.directories_observed ?? 0}
                   />
                   <ScanStat
-                    label={t("manage.repositories.scanCountUpdated", "Updated")}
-                    value={latestScan.updated_count ?? 0}
+                    label={t("manage.repositories.scanCountFiles", "Files observed")}
+                    value={latestScan.files_observed ?? 0}
                   />
                   <ScanStat
-                    label={t("manage.repositories.scanCountMoved", "Moved")}
-                    value={latestScan.moved_count ?? 0}
+                    label={t("manage.repositories.scanBytesQueued", "Bytes queued")}
+                    value={latestScan.bytes_queued ?? 0}
                   />
                   <ScanStat
-                    label={t("manage.repositories.scanCountDeferred", "Deferred")}
-                    value={latestScan.deferred_count ?? 0}
+                    label={t("manage.repositories.scanBytesHashed", "Bytes hashed")}
+                    value={latestScan.bytes_hashed ?? 0}
                   />
                   <ScanStat
-                    label={t("manage.repositories.scanCountAmbiguous", "Ambiguous")}
-                    value={latestScan.ambiguous_count ?? 0}
-                    tone={(latestScan.ambiguous_count ?? 0) > 0 ? "text-warning" : undefined}
+                    label={t("manage.repositories.scanOutboxDepth", "Pending work")}
+                    value={latestScan.outbox_depth ?? 0}
                   />
                   <ScanStat
-                    label={t("manage.repositories.scanCountDeleted", "Deleted")}
-                    value={latestScan.deleted_count ?? 0}
+                    label={t("manage.repositories.scanDirectoryErrors", "Directory errors")}
+                    value={latestScan.error_directories ?? 0}
+                    tone={(latestScan.error_directories ?? 0) > 0 ? "text-warning" : undefined}
                   />
                 </div>
               </div>
             )}
-            {latestScan && latestScan.status !== "completed" && (
+            {latestScan && isActiveScanStatus(latestScan.status) && (
+              <p className="text-xs text-base-content/55">
+                {latestScan.cancellation_requested
+                  ? t(
+                      "manage.repositories.scanCancellationRequested",
+                      "Cancellation requested. The current bounded step will finish safely.",
+                    )
+                  : t(
+                      "manage.repositories.scanStatusRunning",
+                      "Scan phase: {{phase}}. You can keep using Lumilio while background work runs.",
+                      { phase: scanPhaseLabel(latestScan.status, t) },
+                    )}
+              </p>
+            )}
+            {cancelScanMutation.isError && (
+              <p className="text-xs text-error">
+                {t(
+                  "manage.repositories.cancelScanFailed",
+                  "Could not request verification cancellation.",
+                )}
+              </p>
+            )}
+            {latestScan?.status === "failed" && (
+              <p className="text-xs text-error">
+                {t(
+                  "manage.repositories.scanStatusFailed",
+                  "Verification stopped after a stable error. Previously valid files remain available.",
+                )}
+              </p>
+            )}
+            {latestScan?.status === "cancelled" && (
               <p className="text-xs text-base-content/55">
                 {t(
-                  "manage.repositories.scanStatusRunning",
-                  "A scan is in progress or queued; results will appear here.",
+                  "manage.repositories.scanStatusCancelled",
+                  "Verification was cancelled. Previously valid files remain available.",
                 )}
               </p>
             )}
@@ -381,11 +458,13 @@ export default function RepositoryRow({
         </div>
       ) : null}
 
-      <RenameRepositoryModal
-        repository={repository}
-        isOpen={renameOpen}
-        onClose={() => setRenameOpen(false)}
-      />
+      {repository.role !== "primary" ? (
+        <RenameRepositoryModal
+          repository={repository}
+          isOpen={renameOpen}
+          onClose={() => setRenameOpen(false)}
+        />
+      ) : null}
       <RemoveRepositoryModal
         repository={repository}
         isOpen={removeOpen}
@@ -399,6 +478,30 @@ export default function RepositoryRow({
       />
     </li>
   );
+}
+
+type ActiveScanStatus = "queued" | "crawling" | "catching_up" | "finalizing";
+
+function isActiveScanStatus(status?: string): status is ActiveScanStatus {
+  return (
+    status === "queued" ||
+    status === "crawling" ||
+    status === "catching_up" ||
+    status === "finalizing"
+  );
+}
+
+function scanPhaseLabel(status: ActiveScanStatus, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (status) {
+    case "crawling":
+      return t("manage.repositories.scanPhaseCrawling", "Observing files");
+    case "catching_up":
+      return t("manage.repositories.scanPhaseCatchingUp", "Catching up with changes");
+    case "finalizing":
+      return t("manage.repositories.scanPhaseFinalizing", "Finalizing verification");
+    default:
+      return t("manage.repositories.scanPhaseQueued", "Queued");
+  }
 }
 
 function ScanStat({ label, value, tone }: { label: string; value: number; tone?: string }) {

@@ -10,6 +10,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -46,21 +47,21 @@ func (h *HostActionHandler) GetNativeHostCapability(c *gin.Context) {
 // @Param Idempotency-Key header string false "Stable request identifier"
 // @Param request body dto.CreateHostActionRequestDTO true "Native host action"
 // @Success 200 {object} dto.HostActionDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 409 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 409 {object} api.ProblemResponse
 // @Router /api/v1/host-actions [post]
 func (h *HostActionHandler) CreateHostAction(c *gin.Context) {
 	if h == nil || h.manager == nil {
-		api.GinInternalError(c, errors.New("repository manager unavailable"), "Repository manager unavailable")
+		api.WriteProblem(c, api.Internal(errors.New("repository manager unavailable")))
 		return
 	}
 	if !h.nativeHostAvailable {
-		api.GinError(c, http.StatusConflict, errors.New("native_host_unavailable"), http.StatusConflict, "A native Desktop host is not connected")
+		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, errors.New("native_host_unavailable")))
 		return
 	}
 	var req dto.CreateHostActionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid native host action")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	requestID := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
@@ -89,9 +90,9 @@ func (h *HostActionHandler) CreateHostAction(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, storage.ErrHostActionConflict) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Idempotency key was already used for another native host action")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 		} else {
-			api.GinBadRequest(c, err, "Invalid native host action")
+			api.WriteProblem(c, api.BadRequest(err))
 		}
 		return
 	}
@@ -105,7 +106,7 @@ func (h *HostActionHandler) CreateHostAction(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Host action ID"
 // @Success 200 {object} dto.HostActionDTO
-// @Failure 404 {object} api.ErrorResponse
+// @Failure 404 {object} api.ProblemResponse
 // @Router /api/v1/host-actions/{id} [get]
 func (h *HostActionHandler) GetHostAction(c *gin.Context) {
 	action, err := h.ownedHostAction(c)
@@ -126,12 +127,12 @@ func (h *HostActionHandler) GetHostAction(c *gin.Context) {
 func (h *HostActionHandler) ListHostActions(c *gin.Context) {
 	actorUserID := adminIDFromContext(c)
 	if actorUserID == nil {
-		api.GinError(c, http.StatusForbidden, errors.New("administrator identity unavailable"), http.StatusForbidden, "Administrator identity unavailable")
+		api.WriteProblem(c, api.StatusProblem(http.StatusForbidden, errors.New("administrator identity unavailable")))
 		return
 	}
 	actions, err := h.manager.ListHostActionsForActor(c.Request.Context(), *actorUserID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to list native host actions")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	items := make([]dto.HostActionDTO, 0, len(actions))
@@ -150,13 +151,13 @@ func (h *HostActionHandler) ListHostActions(c *gin.Context) {
 // @Param id path string true "Host action ID"
 // @Param request body dto.ResolveHostActionRequestDTO true "Recovery decision"
 // @Success 200 {object} dto.HostActionDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 409 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 409 {object} api.ProblemResponse
 // @Router /api/v1/host-actions/{id}/resolve [post]
 func (h *HostActionHandler) ResolveHostAction(c *gin.Context) {
 	var req dto.ResolveHostActionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid recovery decision")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if _, err := h.ownedHostAction(c); err != nil {
@@ -166,9 +167,9 @@ func (h *HostActionHandler) ResolveHostAction(c *gin.Context) {
 	action, err := h.manager.ResolveHostAction(c.Request.Context(), c.Param("id"), req.Resolution, req.RiskConfirmation)
 	if err != nil {
 		if errors.Is(err, storage.ErrHostActionDecisionNeeded) || errors.Is(err, storage.ErrRepositoryOriginalOnline) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Native host action cannot use that recovery decision")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 		} else {
-			api.GinBadRequest(c, err, "Failed to resolve native host action")
+			api.WriteProblem(c, api.BadRequest(err))
 		}
 		return
 	}
@@ -182,7 +183,7 @@ func (h *HostActionHandler) ResolveHostAction(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Host action ID"
 // @Success 200 {object} dto.HostActionDTO
-// @Failure 409 {object} api.ErrorResponse
+// @Failure 409 {object} api.ProblemResponse
 // @Router /api/v1/host-actions/{id} [delete]
 func (h *HostActionHandler) CancelHostAction(c *gin.Context) {
 	if _, err := h.ownedHostAction(c); err != nil {
@@ -192,11 +193,11 @@ func (h *HostActionHandler) CancelHostAction(c *gin.Context) {
 	action, err := h.manager.CancelHostAction(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		if errors.Is(err, storage.ErrHostActionNotPending) {
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Native host action is no longer pending")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 		} else if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Native host action not found")
+			api.WriteProblem(c, api.NotFound(err))
 		} else {
-			api.GinBadRequest(c, err, "Failed to cancel native host action")
+			api.WriteProblem(c, api.BadRequest(err))
 		}
 		return
 	}
@@ -219,11 +220,11 @@ func (h *HostActionHandler) ownedHostAction(c *gin.Context) (storage.HostAction,
 
 func writeHostActionOwnershipError(c *gin.Context, err error) {
 	if errors.Is(err, errHostActionNotOwned) {
-		api.GinError(c, http.StatusForbidden, err, http.StatusForbidden, "Native host action belongs to another administrator")
+		api.WriteProblem(c, api.StatusProblem(http.StatusForbidden, err))
 	} else if errors.Is(err, sql.ErrNoRows) {
-		api.GinNotFound(c, err, "Native host action not found")
+		api.WriteProblem(c, api.NotFound(err))
 	} else {
-		api.GinBadRequest(c, err, "Invalid native host action")
+		api.WriteProblem(c, api.BadRequest(err))
 	}
 }
 
@@ -246,11 +247,20 @@ func toHostActionDTO(action storage.HostAction) dto.HostActionDTO {
 			}
 		}
 	}
+	var operationProblem *problem.Reference
+	switch action.Status {
+	case storage.HostActionExpired:
+		value := problem.ReferenceFor(problem.HostActionExpired, action.ActionID, true)
+		operationProblem = &value
+	case storage.HostActionFailed:
+		value := problem.ReferenceFor(problem.HostActionFailed, action.ActionID, true)
+		operationProblem = &value
+	}
 	return dto.HostActionDTO{
 		ID: action.ActionID, RequestID: action.RequestID, Kind: string(action.Kind), Actor: action.Actor,
 		Purpose: action.Summary.Purpose, Name: action.Summary.Name, ExpectedVersion: action.ExpectedVersion,
 		RootID: action.Summary.RootID, RepositoryID: action.Summary.RepositoryID,
-		Status: string(action.Status), Result: result, ErrorCode: action.ErrorCode, ErrorMessage: action.ErrorMessage,
+		Status: string(action.Status), Result: result, Problem: operationProblem,
 		ExpiresAt: action.ExpiresAt, CreatedAt: action.CreatedAt, UpdatedAt: action.UpdatedAt, CompletedAt: action.CompletedAt,
 	}
 }

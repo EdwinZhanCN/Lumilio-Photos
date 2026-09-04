@@ -63,21 +63,34 @@
  * ## Data
  *
  * {@link useRepositoryOptions} adapts the server repository list through
- * {@link normalizeRepositoryOptions}. {@link useRepositoryRoots} reads
- * admin-visible Storage Locations. {@link useRepositoryAssetCount} provides the
- * row-sized typed asset count.
+ * {@link normalizeRepositoryOptions}. {@link useRepositoryRoots} reads and
+ * normalizes admin-visible Storage Locations. Both expose the discriminated
+ * {@link StorageEntity} presentation contract: transport `name` becomes
+ * explicit `rawName`, while stable Storage Location `kind` and Repository
+ * `role` determine reserved product names through
+ * {@link getStorageEntityDisplayName}. UI consumers never infer identity from
+ * seeded English names. {@link useRepositoryAssetCount} provides the row-sized
+ * typed asset count.
  * {@link useNativeHostCapability} gates Desktop handoff entry points and
  * {@link useNativeHostAction} resumes an outstanding task after refresh.
  * {@link useRepositoryCandidates} provides the bounded standalone directory
  * classification surface.
  * {@link useStorageDiagnostics}, lifecycle audit, and support-bundle queries
  * are exported for the admin-only Server Monitor storage view. Diagnostics
- * carry the owning Storage Location id for each repository so the monitor does
- * not infer filesystem hierarchy from path strings.
+ * carry the owning Storage Location id plus Storage Location `kind` or
+ * Repository `role`, so the monitor neither infers filesystem hierarchy from
+ * path strings nor renders transport names as product copy.
  *
- * {@link useRepositoryScan} starts scans and stack detection.
- * {@link waitForRepositoryScan} follows a scan run to a terminal state before
- * repository-aware list/search queries are invalidated.
+ * {@link useRepositoryScan} starts scans and stack detection. A scan mutation
+ * settles when the Server transaction returns its immutable operation id and
+ * inserted/coalesced fact; it never waits for background crawl or processing.
+ * Repository rows poll the latest durable operation only while it is active,
+ * keeping operation progress in TanStack Query rather than request-local
+ * spinner state or timestamp correlation.
+ * Repository conflicts use the exact generated Problem subtype for safe
+ * recovery facts. Scan and native-host terminal states retain a Problem
+ * Reference, and their flows call {@link localizeProblemReference} only when
+ * rendering; persisted English failure text is not part of the contract.
  * {@link RepositoryReachability} carries storage availability while
  * {@link RepositoryActivity} carries current work; neither is guessed from
  * missing data. Consumers must use the root `index.ts`, which
@@ -93,7 +106,6 @@ import type { useRepositoryOptions } from "./api/useRepositoryOptions.ts";
 import type { useRepositoryRoots } from "./api/useRepositoryRoots.ts";
 import type { useRepositoryScan } from "./api/useRepositoryScan.ts";
 import type { useStorageDiagnostics } from "./api/useStorageDiagnostics.ts";
-import type { waitForRepositoryScan } from "./api/waitForRepositoryScan.ts";
 import type { StorageStrategyPicker } from "./components/StorageStrategyPicker.tsx";
 import type BrowseScopeSelect from "./flows/browse-scope/BrowseScopeSelect.tsx";
 import type { useBrowseScope } from "./flows/browse-scope/useBrowseScope.ts";
@@ -102,7 +114,9 @@ import type AddRepositoryModal from "./flows/manage/AddRepositoryModal.tsx";
 import type NativeHostActionModal from "./flows/manage/NativeHostActionModal.tsx";
 import type RepositoryCandidateModal from "./flows/manage/RepositoryCandidateModal.tsx";
 import type { useWorkingRepository } from "./flows/working-repository/useWorkingRepository.ts";
+import type { localizeProblemReference } from "../../lib/http-commons/problem.ts";
 import type { normalizeRepositoryOptions } from "./model/repositoryOptions.ts";
-import type { RepositoryActivity, RepositoryReachability } from "./types.ts";
+import type { getStorageEntityDisplayName } from "./model/storageEntities.ts";
+import type { RepositoryActivity, RepositoryReachability, StorageEntity } from "./types.ts";
 
 export {};

@@ -62,21 +62,34 @@ come through the Cloud public entry rather than being reimplemented here.
 ## Data
 
 [useRepositoryOptions](./api/useRepositoryOptions.ts) adapts the server repository list through
-[normalizeRepositoryOptions](./model/repositoryOptions.ts). [useRepositoryRoots](./api/useRepositoryRoots.ts) reads
-admin-visible Storage Locations. [useRepositoryAssetCount](./api/useRepositoryAssetCount.ts) provides the
-row-sized typed asset count.
+[normalizeRepositoryOptions](./model/repositoryOptions.ts). [useRepositoryRoots](./api/useRepositoryRoots.ts) reads and
+normalizes admin-visible Storage Locations. Both expose the discriminated
+[StorageEntity](./types.ts) presentation contract: transport `name` becomes
+explicit `rawName`, while stable Storage Location `kind` and Repository
+`role` determine reserved product names through
+[getStorageEntityDisplayName](./model/storageEntities.ts). UI consumers never infer identity from
+seeded English names. [useRepositoryAssetCount](./api/useRepositoryAssetCount.ts) provides the row-sized
+typed asset count.
 [useNativeHostCapability](./api/useNativeHostActions.ts) gates Desktop handoff entry points and
 [useNativeHostAction](./api/useNativeHostActions.ts) resumes an outstanding task after refresh.
 [useRepositoryCandidates](./api/useRepositoryCandidates.ts) provides the bounded standalone directory
 classification surface.
 [useStorageDiagnostics](./api/useStorageDiagnostics.ts), lifecycle audit, and support-bundle queries
 are exported for the admin-only Server Monitor storage view. Diagnostics
-carry the owning Storage Location id for each repository so the monitor does
-not infer filesystem hierarchy from path strings.
+carry the owning Storage Location id plus Storage Location `kind` or
+Repository `role`, so the monitor neither infers filesystem hierarchy from
+path strings nor renders transport names as product copy.
 
-[useRepositoryScan](./api/useRepositoryScan.ts) starts scans and stack detection.
-[waitForRepositoryScan](./api/waitForRepositoryScan.ts) follows a scan run to a terminal state before
-repository-aware list/search queries are invalidated.
+[useRepositoryScan](./api/useRepositoryScan.ts) starts scans and stack detection. A scan mutation
+settles when the Server transaction returns its immutable operation id and
+inserted/coalesced fact; it never waits for background crawl or processing.
+Repository rows poll the latest durable operation only while it is active,
+keeping operation progress in TanStack Query rather than request-local
+spinner state or timestamp correlation.
+Repository conflicts use the exact generated Problem subtype for safe
+recovery facts. Scan and native-host terminal states retain a Problem
+Reference, and their flows call [localizeProblemReference](../../lib/http-commons/problem.ts) only when
+rendering; persisted English failure text is not part of the contract.
 [RepositoryReachability](./types.ts) carries storage availability while
 [RepositoryActivity](./types.ts) carries current work; neither is guessed from
 missing data. Consumers must use the root `index.ts`, which

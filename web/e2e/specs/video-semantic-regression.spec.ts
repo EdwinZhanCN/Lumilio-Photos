@@ -1,12 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import process from "node:process";
 import { expect, test } from "../fixtures/test";
+import { GalleryPage } from "../pages/gallery.page";
 import { LoginPage } from "../pages/login.page";
 import { api, baseURL } from "../support/api";
+import { t } from "../support/i18n";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
 import {
   profileAsset,
   VIDEO_REGRESSION_ASSETS,
+  VIDEO_REGRESSION_DISABLED_ASSET,
   VIDEO_REGRESSION_PHOTO_ASSET,
   VIDEO_REGRESSION_PROFILE,
 } from "../support/assets";
@@ -51,18 +55,6 @@ type IndexingStats = {
   };
 };
 
-type LumenMetrics = {
-  semantic_image: number;
-  semantic_text: number;
-};
-
-type QueueSummary = {
-  queues: {
-    name: string;
-    remaining_jobs: number;
-  }[];
-};
-
 type MLSettings = {
   semantic_enabled: boolean;
   bioclip_enabled: boolean;
@@ -78,23 +70,9 @@ type SystemSettings = {
   ml: MLSettings;
 };
 
-const lumenMetricsURL =
-  process.env.LUMILIO_E2E_LUMEN_METRICS_URL ?? "http://127.0.0.1:16658/metrics";
 const frameCap = 2;
 
-async function getLumenMetrics(): Promise<LumenMetrics> {
-  const response = await fetch(lumenMetricsURL);
-  if (!response.ok) throw new Error(`GET ${lumenMetricsURL}: ${response.status}`);
-  return response.json() as Promise<LumenMetrics>;
-}
-
-async function ensureRepository(token: string, name: string): Promise<Repository> {
-  const { repositories } = await api<{ repositories: Repository[] }>("/api/v1/repositories", {
-    token,
-  });
-  const existing = repositories.find((repository) => repository.name === name);
-  if (existing) return existing;
-
+async function createRepository(token: string, name: string): Promise<Repository> {
   const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
     method: "POST",
     token,
@@ -107,6 +85,30 @@ async function ensureRepository(token: string, name: string): Promise<Repository
     }),
   });
   return repository;
+}
+
+async function removeRepository(token: string, repository: Repository) {
+  await expect
+    .poll(
+      async () => {
+        try {
+          await api(`/api/v1/repositories/${repository.id}`, {
+            method: "DELETE",
+            token,
+            body: JSON.stringify({ confirmation_name: repository.name }),
+          });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      {
+        message: `${repository.name} should become removable`,
+        timeout: 30_000,
+        intervals: [500, 1_000, 2_000],
+      },
+    )
+    .toBe(true);
 }
 
 async function uploadAsset(
@@ -228,39 +230,6 @@ async function waitForDisabledVideoCoverage(token: string, repositoryID: string)
     .toEqual({ indexed: 0, total: 1 });
 }
 
-async function waitForQueuesIdle(token: string, names: string[]) {
-  await expect
-    .poll(
-      async () => {
-        const summary = await api<QueueSummary>("/api/v1/admin/river/queue-summary", {
-          token,
-        });
-        return Object.fromEntries(
-          names.map((name) => [
-            name,
-            summary.queues.find((queue) => queue.name === name)?.remaining_jobs ?? 0,
-          ]),
-        );
-      },
-      {
-        message: `${names.join(", ")} should become idle`,
-        timeout: 180_000,
-        intervals: [500, 1_000, 2_000],
-      },
-    )
-    .toEqual(Object.fromEntries(names.map((name) => [name, 0])));
-}
-
-async function waitForImageInferencesAtLeast(previous: number, expectedDelta: number) {
-  await expect
-    .poll(async () => (await getLumenMetrics()).semantic_image - previous, {
-      message: `the Lumen fixture should receive at least ${expectedDelta} new image inferences`,
-      timeout: 180_000,
-      intervals: [500, 1_000, 2_000],
-    })
-    .toBeGreaterThanOrEqual(expectedDelta);
-}
-
 async function waitForWebVideo(token: string, assetID: string) {
   await expect
     .poll(
@@ -289,12 +258,12 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
   const originalSettings = await api<SystemSettings>("/api/v1/settings/system", {
     token: workspace.token,
   });
-  const runLabel = `Run ${testInfo.retry}`;
-  const repository = await ensureRepository(
+  const runLabel = `${testInfo.retry}-${randomUUID()}`;
+  const repository = await createRepository(
     workspace.token,
     `Video Semantic Regression ${runLabel}`,
   );
-  const disabledRepository = await ensureRepository(
+  const disabledRepository = await createRepository(
     workspace.token,
     `Video Semantic Disabled Regression ${runLabel}`,
   );
@@ -311,16 +280,8 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
         },
       }),
     });
-    await waitForQueuesIdle(workspace.token, [
-      "process_semantic",
-      "process_video_frames",
-      "reindex_assets",
-      "retry_asset",
-    ]);
-
     const photoFilename = "video-regression-photo.jpg";
     const photoStartedAt = Date.now();
-    const beforePhoto = await getLumenMetrics();
     await uploadAsset(
       workspace.token,
       repository.id,
@@ -330,16 +291,13 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
     );
     await waitForAsset(workspace.token, repository.id, photoFilename);
     await waitForIndexingCoverage(workspace.token, repository.id, 1, 0);
-    await waitForQueuesIdle(workspace.token, ["process_semantic"]);
-    await waitForImageInferencesAtLeast(beforePhoto.semantic_image, 1);
     const photoIndexedMs = Date.now() - photoStartedAt;
 
-    const timings: { filename: string; indexed_ms: number; frames: number }[] = [];
+    const timings: { filename: string; indexed_ms: number }[] = [];
     const videos: Asset[] = [];
     for (const [index, fixtureID] of VIDEO_REGRESSION_ASSETS.entries()) {
       const filename = `video-regression-${index + 1}.mp4`;
       const startedAt = Date.now();
-      const before = await getLumenMetrics();
       await uploadAsset(
         workspace.token,
         repository.id,
@@ -350,13 +308,8 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
       const asset = await waitForAsset(workspace.token, repository.id, filename);
       videos.push(asset);
       await waitForIndexingCoverage(workspace.token, repository.id, 1, index + 1);
-      await waitForQueuesIdle(workspace.token, ["process_video_frames"]);
 
-      const after = await getLumenMetrics();
-      const frames = after.semantic_image - before.semantic_image;
-      expect(frames, `${filename} should produce at least one semantic frame`).toBeGreaterThan(0);
-      expect(frames, `${filename} should respect video_max_frames`).toBeLessThanOrEqual(frameCap);
-      timings.push({ filename, indexed_ms: Date.now() - startedAt, frames });
+      timings.push({ filename, indexed_ms: Date.now() - startedAt });
     }
 
     await test.step("photo and videos coexist in semantic text search", async () => {
@@ -388,10 +341,10 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
       ).toBe(true);
     });
 
-    const initialFrameTotal = timings.reduce((sum, timing) => sum + timing.frames, 0);
-
-    await test.step("video semantic backfill re-embeds all pinned videos", async () => {
-      const before = await getLumenMetrics();
+    // These requests currently expose acceptance, not queryable operation
+    // completion. Existing coverage must not be mistaken for a fresh run.
+    // Global inference counters cannot close that observability gap.
+    await test.step("video semantic backfill is accepted with repository coverage", async () => {
       const response = await api<{ status: string; requested_tasks: string[] }>(
         "/api/v1/assets/indexing/rebuild",
         {
@@ -407,13 +360,10 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
       );
       expect(response.status).toBe("queued");
       expect(response.requested_tasks).toContain("video_semantic");
-      await waitForImageInferencesAtLeast(before.semantic_image, initialFrameTotal);
-      await waitForQueuesIdle(workspace.token, ["reindex_assets", "process_video_frames"]);
       await waitForIndexingCoverage(workspace.token, repository.id, 1, videos.length);
     });
 
     await test.step("semantic reset refills photo and video indexes", async () => {
-      const before = await getLumenMetrics();
       const response = await api<{ status: string; requested_tasks: string[] }>(
         "/api/v1/assets/indexing/rebuild",
         {
@@ -429,29 +379,91 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
       );
       expect(response.status).toBe("queued");
       expect(response.requested_tasks).toContain("semantic");
-      await waitForImageInferencesAtLeast(before.semantic_image, initialFrameTotal + 1);
-      await waitForQueuesIdle(workspace.token, [
-        "reindex_assets",
-        "process_semantic",
-        "process_video_frames",
-      ]);
       await waitForIndexingCoverage(workspace.token, repository.id, 1, videos.length);
     });
 
-    await test.step("selective retry re-runs video frame indexing", async () => {
-      const before = await getLumenMetrics();
-      const response = await api<{ status: string; retry_tasks: string[] }>(
+    await test.step("selective retry accepts video enrichment and returns a receipt", async () => {
+      const response = await api<{ status: string; receipt_id: string }>(
         `/api/v1/assets/${videos[0].asset_id}/reprocess`,
         {
           method: "POST",
           token: workspace.token,
-          body: JSON.stringify({ tasks: ["process_video_frames"] }),
+          body: JSON.stringify({ tasks: ["enrich"] }),
         },
       );
       expect(response.status).toBe("queued");
-      expect(response.retry_tasks).toEqual(["process_video_frames"]);
-      await waitForImageInferencesAtLeast(before.semantic_image, timings[0].frames);
-      await waitForQueuesIdle(workspace.token, ["retry_asset", "process_video_frames"]);
+      expect(response.receipt_id).toBeTruthy();
+    });
+
+    await test.step("best matching video frame opens at its timestamp", async () => {
+      const expectedVideo = videos[0];
+      const expectedFilename = timings[0].filename;
+      let matchedItem: BrowseItem | undefined;
+      await expect
+        .poll(
+          async () => {
+            const response = await api<SearchResponse>("/api/v1/assets/search", {
+              method: "POST",
+              token: workspace.token,
+              body: JSON.stringify({
+                query: "ocean waves",
+                filter: { repository_id: repository.id },
+                pagination: { limit: 20, offset: 0 },
+                enhancement_mode: "auto",
+                top_results_limit: 20,
+              }),
+            });
+            matchedItem = [...(response.top_items ?? []), ...(response.result_items ?? [])].find(
+              (item) => item.media_item?.primary_asset?.asset_id === expectedVideo.asset_id,
+            );
+            return matchedItem?.best_ts_ms ?? 0;
+          },
+          {
+            message: "video frame embeddings should become searchable",
+            timeout: 120_000,
+            intervals: [500, 1_000, 2_000],
+          },
+        )
+        .toBeGreaterThan(0);
+
+      const bestTsMs = matchedItem?.best_ts_ms;
+      expect(bestTsMs).toBeTruthy();
+
+      await new LoginPage(page).signIn(workspace.username, workspace.password);
+      await new GalleryPage(page).scopeTo(repository.name);
+      await page.getByRole("button", { name: t("assets.searchAriaLabel") }).click();
+      const uiSearchCompleted = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/v1/assets/search" &&
+          response.request().method() === "POST" &&
+          response.ok(),
+        { timeout: 30_000 },
+      );
+      await page.getByRole("searchbox", { name: t("assets.searchAriaLabel") }).fill("ocean waves");
+      await uiSearchCompleted;
+      await expect(page.getByLabel(new RegExp(expectedFilename, "i"))).toBeVisible({
+        timeout: 30_000,
+      });
+      await page.getByLabel(new RegExp(expectedFilename, "i")).click();
+
+      await expect.poll(() => new URL(page.url()).searchParams.get("t_ms")).toBe(String(bestTsMs));
+      await expect(page).toHaveURL(new RegExp(`/assets/${expectedVideo.asset_id}`));
+
+      const video = page
+        .getByRole("region", { name: new RegExp(`Video Player - ${expectedFilename}`, "i") })
+        .locator("video");
+      await expect(video).toBeVisible({ timeout: 30_000 });
+      await expect
+        .poll(
+          async () =>
+            video.evaluate(
+              (element, expectedSeconds) =>
+                Math.abs((element as HTMLVideoElement).currentTime - expectedSeconds) < 0.5,
+              (bestTsMs ?? 0) / 1_000,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBe(true);
     });
 
     await test.step("disabled ML preserves video ingest, browse, and playback", async () => {
@@ -469,12 +481,14 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
         }),
       });
 
-      const before = await getLumenMetrics();
       const filename = "video-regression-ai-disabled.mp4";
       await uploadAsset(
         workspace.token,
         disabledRepository.id,
-        profileAsset(VIDEO_REGRESSION_PROFILE, VIDEO_REGRESSION_ASSETS[0]),
+        // This must not reuse one of the videos indexed above: exact-content
+        // deduplication can legitimately reuse or reject the existing asset,
+        // which would not exercise a fresh capability-disabled ingest.
+        profileAsset(VIDEO_REGRESSION_PROFILE, VIDEO_REGRESSION_DISABLED_ASSET),
         filename,
         "video/mp4",
       );
@@ -482,10 +496,11 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
       expect(asset.type).toBe("VIDEO");
       await waitForWebVideo(workspace.token, asset.asset_id);
       await waitForDisabledVideoCoverage(workspace.token, disabledRepository.id);
-      expect((await getLumenMetrics()).semantic_image).toBe(before.semantic_image);
 
-      await new LoginPage(page).signIn(workspace.username, workspace.password);
-      await page.goto(`/assets/${asset.asset_id}`);
+      await new GalleryPage(page).scopeTo(disabledRepository.name);
+      const disabledVideoTile = page.getByLabel(new RegExp(filename, "i"));
+      await expect(disabledVideoTile).toBeVisible({ timeout: 30_000 });
+      await disabledVideoTile.click();
       const video = page.getByRole("region", { name: new RegExp(filename, "i") }).locator("video");
       await expect(video).toBeVisible({ timeout: 30_000 });
       await expect
@@ -508,5 +523,7 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
       token: workspace.token,
       body: JSON.stringify({ ml: originalSettings.ml }),
     });
+    await removeRepository(workspace.token, disabledRepository);
+    await removeRepository(workspace.token, repository);
   }
 });

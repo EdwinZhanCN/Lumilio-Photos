@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import type { RepositoryOption } from "../../types";
-import { getRepositoryDisplayName } from "../../model/repositoryDisplayName";
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
 import { isRepositoryUnavailable } from "../../model/repositoryOptions";
 import { useRepositoryOptions } from "../../api/useRepositoryOptions";
 
@@ -42,7 +42,7 @@ export function useWorkingRepository() {
     // the next upload is refused, so only fall back to a reachable one. An
     // explicit user choice is left alone even when it goes offline.
     const reachable = repositories.filter((repository) => !isRepositoryUnavailable(repository));
-    const fallback = reachable.find((repository) => repository.isPrimary) ?? reachable[0];
+    const fallback = reachable.find((repository) => repository.role === "primary") ?? reachable[0];
     if (fallback && normalizedWorkingRepositoryId !== fallback.id) {
       setWorkingRepositoryId(fallback.id);
     }
@@ -55,7 +55,7 @@ export function useWorkingRepository() {
   ]);
 
   const scopeLabel = selectedRepository
-    ? getRepositoryDisplayName(selectedRepository, t)
+    ? getStorageEntityDisplayName(selectedRepository, t)
     : normalizedWorkingRepositoryId
       ? repositoriesQuery.isLoading
         ? t("common.loading")
@@ -63,7 +63,7 @@ export function useWorkingRepository() {
             defaultValue: "Repository options unavailable",
           })
       : t("navbar.repository.all", {
-          defaultValue: "All repositories",
+          defaultValue: "All Repositories",
         });
 
   const scopeDescription = selectedRepository?.path
@@ -74,7 +74,7 @@ export function useWorkingRepository() {
         })
       : t("settings.serverSettings.workingRepositoryHint", {
           defaultValue:
-            "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
+            "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support Repository filtering.",
         });
 
   return {
@@ -86,7 +86,7 @@ export function useWorkingRepository() {
     scopeLabel,
     scopeDescription,
     getRepositoryLabel: useCallback(
-      (repository: RepositoryOption) => getRepositoryDisplayName(repository, t),
+      (repository: RepositoryOption) => getStorageEntityDisplayName(repository, t),
       [t],
     ),
     setWorkingRepositoryId,

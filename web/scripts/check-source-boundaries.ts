@@ -42,6 +42,23 @@ const featureDirectoryExceptions = new Map([["assets", new Set(["map", "picker"]
 // APIs directly.
 const appImportEntrypoints = new Set(["main.tsx"]);
 
+// Storage identity is presentation-sensitive: feature UI consumes the
+// Repositories-owned normalized model, never transport DTOs with raw `name`.
+const storageTransportDtoPattern =
+  /dto\.(?:IndexingRepositoryListResponseDTO|IndexingRepositoryOptionDTO|ListRepositoryRootsResponseDTO|RepositoryDTO|RepositoryRootDTO|StorageDiagnosticDTO|StorageDiagnosticsResponseDTO)/;
+const storageTransportAdapterFiles = new Set([
+  "features/repositories/model/storageEntities.ts",
+  "features/repositories/model/repositoryOptions.ts",
+  "features/repositories/types.ts",
+]);
+const storagePresentationQueryPattern =
+  /\$api\.useQuery\s*\(\s*["']get["']\s*,\s*["']\/api\/v1\/(?:assets\/indexing\/repositories|repository-roots|repositories\/storage-diagnostics)["']/;
+const storagePresentationQueryFiles = new Set([
+  "features/repositories/api/useRepositoryOptions.ts",
+  "features/repositories/api/useRepositoryRoots.ts",
+  "features/repositories/api/useStorageDiagnostics.ts",
+]);
+
 // Worker entry points are lower-layer files but may register specific
 // feature-owned, worker-safe runners. Keep this list exact and review additions.
 const allowedLowerLayerFeatureImports = new Map([
@@ -333,6 +350,24 @@ for (const filename of files) {
   const featureSection = importerFeature ? importerParts[2] : null;
   const isFlowLocalState = featureSection === "flows" && importerParts.length >= 5;
   const basename = path.basename(importerRelative);
+
+  if (
+    storageTransportDtoPattern.test(sourceText) &&
+    !storageTransportAdapterFiles.has(importerRelative)
+  ) {
+    violations.push(
+      `${importerRelative}: storage transport DTOs must be normalized by the Repositories presentation model`,
+    );
+  }
+
+  if (
+    storagePresentationQueryPattern.test(sourceText) &&
+    !storagePresentationQueryFiles.has(importerRelative)
+  ) {
+    violations.push(
+      `${importerRelative}: storage presentation queries must use the Repositories API adapters`,
+    );
+  }
 
   if (
     importerFeature &&

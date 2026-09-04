@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
@@ -65,9 +66,9 @@ func (e *RepositoryConflictError) Error() string {
 
 // RelocateRepository points an existing repository at a new on-disk location.
 //
-// Assets are untouched by construction: assets.storage_path is
-// repository-relative (UNIQUE (repository_id, storage_path)), so every consumer
-// re-derives absolute paths from repositories.path. Relocate is one UPDATE.
+// Assets and Locations are untouched by construction: repository node paths
+// are relative graph projections, so every consumer resolves the new root
+// through RepositoryFS. Relocate is one UPDATE.
 func (rm *DefaultRepositoryManager) RelocateRepository(ctx context.Context, id string, newPath string, requests ...LifecycleRequest) (*repo.Repository, error) {
 	return rm.relocateRepository(ctx, id, newPath, nil, requests...)
 }
@@ -139,12 +140,12 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		return nil, fmt.Errorf("%w: repository is busy: %v", ErrRepositoryBusy, err)
 	}
 	defer releaseMutation()
-	tx, err := rm.database.BeginTx(ctx, nil)
+	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRelocate, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin repository relocation: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	queries := rm.queries.WithTx(tx)
+	queries := rm.queries.WithTx(tx.Raw())
 	dbRepo, err := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
 		RepoID:       repoUUID,
 		Path:         cleanPath,
@@ -266,9 +267,17 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	}
 	newID = *operation.TargetID
 	releaseRoot := rm.acquireRepositoryRootRead(rootID)
-	defer releaseRoot()
 	releaseMutation := rm.acquireRepositoryMutation(previousUUID)
-	defer releaseMutation()
+	locksReleased := false
+	releaseLocks := func() {
+		if locksReleased {
+			return
+		}
+		locksReleased = true
+		releaseMutation()
+		releaseRoot()
+	}
+	defer releaseLocks()
 	rollbackData, err := planRepositoryPrivateStateIsolation(cleanPath, "copied-from-"+previousID)
 	if err != nil {
 		_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err,
@@ -316,6 +325,10 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		registerRepositoryCopyOperationResult{RepositoryID: dbRepo.RepoID.String(), InitialScanQueued: false}); err != nil {
 		return nil, fmt.Errorf("repository copy registered but journal completion failed: %w", err)
 	}
+	// The observation request establishes a repository work lease of its own.
+	// Release the lifecycle locks before entering it, otherwise the request
+	// waits forever for the locks held by this function.
+	releaseLocks()
 	if rm.initialScan != nil {
 		if err := rm.ScheduleInitialRepositoryScan(ctx, dbRepo.RepoID.String()); err != nil {
 			rm.logger.Warn("repository copy registered but initial scan could not be queued",

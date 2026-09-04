@@ -17,7 +17,7 @@ func TestRepositoryCloudBindingsAllowMultipleScopedSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
-	baseline, err := migrations.FS.ReadFile("000003_vec1_baseline.up.sql")
+	baseline, err := migrations.FS.ReadFile("000009_auth_security_baseline.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -68,7 +68,8 @@ SELECT r.repo_id || ':' || a.gps_geohash_7,count(DISTINCT emi.media_item_id)
 FROM event_media_items emi
 JOIN media_items mi ON mi.media_item_id=emi.media_item_id AND mi.owner_id=emi.owner_id
 JOIN assets a ON a.asset_id=mi.primary_asset_id AND a.owner_id=emi.owner_id
-JOIN repositories r ON r.repo_id=a.repository_id
+JOIN active_asset_occurrences occurrence ON occurrence.asset_id=a.asset_id
+JOIN repositories r ON r.repo_id=occurrence.repository_id
 WHERE emi.event_id=? AND emi.owner_id=? AND a.gps_geohash_7 IS NOT NULL
 GROUP BY r.repo_id,a.gps_geohash_7 ORDER BY r.repo_id,a.gps_geohash_7`,
 			"location_cell", "occurred_at", "current_gps"},

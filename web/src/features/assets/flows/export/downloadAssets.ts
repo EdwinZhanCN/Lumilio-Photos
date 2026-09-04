@@ -1,6 +1,7 @@
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
 import { getToken } from "@/lib/http-commons/auth";
+import { readProblemResponse } from "@/lib/http-commons/problem";
 
 export function filenameFromContentDisposition(
   contentDisposition: string | null,
@@ -32,7 +33,7 @@ async function downloadArchive(assetIds: string[]): Promise<void> {
     headers,
     body: JSON.stringify({ asset_ids: assetIds }),
   });
-  if (!response.ok) throw new Error(`Bulk download failed with ${response.status}`);
+  if (!response.ok) throw await readProblemResponse(response);
 
   triggerBrowserDownload(
     await response.blob(),
@@ -45,7 +46,7 @@ async function downloadIndividualAssets(assetIds: string[], assets?: Asset[]): P
   for (const assetId of assetIds) {
     try {
       const response = await fetch(assetUrls.getOriginalFileUrl(assetId));
-      if (!response.ok) throw new Error(`Asset download failed with ${response.status}`);
+      if (!response.ok) throw await readProblemResponse(response);
 
       const asset = assets?.find((candidate) => candidate.asset_id === assetId);
       const filename =

@@ -83,14 +83,20 @@ LIMIT ?3;
 -- name: GetFaceClusteringCandidates :many
 SELECT
     fi.*,
-    a.repository_id,
+    occurrence.repository_id,
     a.owner_id
 FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
+JOIN (
+    SELECT asset_id, MIN(repository_id) AS repository_id
+    FROM active_asset_occurrences
+    WHERE sqlc.narg('repository_id') IS NULL
+       OR repository_id = sqlc.narg('repository_id')
+    GROUP BY asset_id
+) occurrence ON occurrence.asset_id = a.asset_id
 WHERE COALESCE(a.is_deleted, false) = false
-  AND (sqlc.narg('repository_id') IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND fi.embedding IS NOT NULL
   AND fi.confidence >= sqlc.arg('min_confidence')
   AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
-ORDER BY a.repository_id ASC, a.owner_id ASC NULLS FIRST, fi.embedding_model ASC NULLS FIRST, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC;
+ORDER BY occurrence.repository_id ASC, a.owner_id ASC, fi.embedding_model ASC NULLS FIRST, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC;

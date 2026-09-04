@@ -7,7 +7,82 @@ package repo
 
 import (
 	"context"
+
+	"server/internal/db/dbtypes"
 )
+
+const consumePendingTOTPEnrollment = `-- name: ConsumePendingTOTPEnrollment :execrows
+UPDATE pending_totp_enrollments
+SET consumed_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+WHERE enrollment_id = ?1
+  AND user_id = ?2
+  AND auth_version = ?3
+  AND consumed_at IS NULL
+  AND expires_at > CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+`
+
+type ConsumePendingTOTPEnrollmentParams struct {
+	EnrollmentID string `db:"enrollment_id" json:"enrollment_id"`
+	UserID       int32  `db:"user_id" json:"user_id"`
+	AuthVersion  int64  `db:"auth_version" json:"auth_version"`
+}
+
+func (q *Queries) ConsumePendingTOTPEnrollment(ctx context.Context, arg ConsumePendingTOTPEnrollmentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, consumePendingTOTPEnrollment, arg.EnrollmentID, arg.UserID, arg.AuthVersion)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const createPendingTOTPEnrollment = `-- name: CreatePendingTOTPEnrollment :one
+INSERT INTO pending_totp_enrollments (
+  enrollment_id,
+  user_id,
+  secret_ciphertext,
+  auth_version,
+  created_at,
+  expires_at
+)
+VALUES (
+  ?1,
+  ?2,
+  ?3,
+  ?4,
+  CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+  ?5
+)
+RETURNING enrollment_id, user_id, secret_ciphertext, auth_version, created_at, expires_at, consumed_at
+`
+
+type CreatePendingTOTPEnrollmentParams struct {
+	EnrollmentID     string            `db:"enrollment_id" json:"enrollment_id"`
+	UserID           int32             `db:"user_id" json:"user_id"`
+	SecretCiphertext []byte            `db:"secret_ciphertext" json:"secret_ciphertext"`
+	AuthVersion      int64             `db:"auth_version" json:"auth_version"`
+	ExpiresAt        dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+}
+
+func (q *Queries) CreatePendingTOTPEnrollment(ctx context.Context, arg CreatePendingTOTPEnrollmentParams) (PendingTotpEnrollment, error) {
+	row := q.db.QueryRowContext(ctx, createPendingTOTPEnrollment,
+		arg.EnrollmentID,
+		arg.UserID,
+		arg.SecretCiphertext,
+		arg.AuthVersion,
+		arg.ExpiresAt,
+	)
+	var i PendingTotpEnrollment
+	err := row.Scan(
+		&i.EnrollmentID,
+		&i.UserID,
+		&i.SecretCiphertext,
+		&i.AuthVersion,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+	)
+	return i, err
+}
 
 const createUserRecoveryCode = `-- name: CreateUserRecoveryCode :exec
 INSERT INTO user_mfa_recovery_codes (user_id, code_hash, created_at)
@@ -21,6 +96,16 @@ type CreateUserRecoveryCodeParams struct {
 
 func (q *Queries) CreateUserRecoveryCode(ctx context.Context, arg CreateUserRecoveryCodeParams) error {
 	_, err := q.db.ExecContext(ctx, createUserRecoveryCode, arg.UserID, arg.CodeHash)
+	return err
+}
+
+const deletePendingTOTPEnrollments = `-- name: DeletePendingTOTPEnrollments :exec
+DELETE FROM pending_totp_enrollments
+WHERE user_id = ?1
+`
+
+func (q *Queries) DeletePendingTOTPEnrollments(ctx context.Context, userID int32) error {
+	_, err := q.db.ExecContext(ctx, deletePendingTOTPEnrollments, userID)
 	return err
 }
 
@@ -44,12 +129,49 @@ func (q *Queries) DeleteUserTOTPCredential(ctx context.Context, userID int32) er
 	return err
 }
 
+const getPendingTOTPEnrollment = `-- name: GetPendingTOTPEnrollment :one
+SELECT enrollment_id, user_id, secret_ciphertext, auth_version, created_at, expires_at, consumed_at
+FROM pending_totp_enrollments
+WHERE enrollment_id = ?1
+  AND user_id = ?2
+  AND auth_version = ?3
+  AND consumed_at IS NULL
+  AND expires_at > CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+`
+
+type GetPendingTOTPEnrollmentParams struct {
+	EnrollmentID string `db:"enrollment_id" json:"enrollment_id"`
+	UserID       int32  `db:"user_id" json:"user_id"`
+	AuthVersion  int64  `db:"auth_version" json:"auth_version"`
+}
+
+func (q *Queries) GetPendingTOTPEnrollment(ctx context.Context, arg GetPendingTOTPEnrollmentParams) (PendingTotpEnrollment, error) {
+	row := q.db.QueryRowContext(ctx, getPendingTOTPEnrollment, arg.EnrollmentID, arg.UserID, arg.AuthVersion)
+	var i PendingTotpEnrollment
+	err := row.Scan(
+		&i.EnrollmentID,
+		&i.UserID,
+		&i.SecretCiphertext,
+		&i.AuthVersion,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+	)
+	return i, err
+}
+
 const getUserMFAStatus = `-- name: GetUserMFAStatus :one
 SELECT
-  (totp.user_id IS NOT NULL) AS totp_enabled,
+  CASE WHEN totp.user_id IS NULL THEN 0 ELSE 1 END AS totp_enabled,
   COALESCE(passkeys.passkey_count, 0) AS passkey_count,
   COALESCE(recovery.recovery_codes_remaining, 0) AS recovery_codes_remaining,
-  recovery.recovery_codes_generated_at
+  CAST(COALESCE((
+    SELECT created_at
+    FROM user_mfa_recovery_codes latest_recovery
+    WHERE latest_recovery.user_id = u.user_id
+    ORDER BY created_at DESC
+    LIMIT 1
+  ), 0) AS INTEGER) AS recovery_codes_generated_at
 FROM users u
 LEFT JOIN user_mfa_totp_credentials totp ON totp.user_id = u.user_id
 LEFT JOIN (
@@ -62,8 +184,7 @@ LEFT JOIN (
 LEFT JOIN (
   SELECT
     user_mfa_recovery_codes.user_id,
-    COUNT(*) FILTER (WHERE user_mfa_recovery_codes.used_at IS NULL) AS recovery_codes_remaining,
-    MAX(user_mfa_recovery_codes.created_at) AS recovery_codes_generated_at
+    COUNT(*) FILTER (WHERE user_mfa_recovery_codes.used_at IS NULL) AS recovery_codes_remaining
   FROM user_mfa_recovery_codes
   GROUP BY user_mfa_recovery_codes.user_id
 ) recovery ON recovery.user_id = u.user_id
@@ -71,10 +192,10 @@ WHERE u.user_id = ?1
 `
 
 type GetUserMFAStatusRow struct {
-	TotpEnabled              interface{} `db:"totp_enabled" json:"totp_enabled"`
-	PasskeyCount             int64       `db:"passkey_count" json:"passkey_count"`
-	RecoveryCodesRemaining   int64       `db:"recovery_codes_remaining" json:"recovery_codes_remaining"`
-	RecoveryCodesGeneratedAt interface{} `db:"recovery_codes_generated_at" json:"recovery_codes_generated_at"`
+	TotpEnabled              int64 `db:"totp_enabled" json:"totp_enabled"`
+	PasskeyCount             int64 `db:"passkey_count" json:"passkey_count"`
+	RecoveryCodesRemaining   int64 `db:"recovery_codes_remaining" json:"recovery_codes_remaining"`
+	RecoveryCodesGeneratedAt int64 `db:"recovery_codes_generated_at" json:"recovery_codes_generated_at"`
 }
 
 func (q *Queries) GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error) {
@@ -90,7 +211,7 @@ func (q *Queries) GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMF
 }
 
 const getUserTOTPCredential = `-- name: GetUserTOTPCredential :one
-SELECT user_id, secret_ciphertext, created_at, updated_at, enabled_at, last_used_at
+SELECT user_id, secret_ciphertext, created_at, updated_at, enabled_at, last_used_at, credential_version, last_used_counter
 FROM user_mfa_totp_credentials
 WHERE user_id = ?1
 `
@@ -105,20 +226,10 @@ func (q *Queries) GetUserTOTPCredential(ctx context.Context, userID int32) (User
 		&i.UpdatedAt,
 		&i.EnabledAt,
 		&i.LastUsedAt,
+		&i.CredentialVersion,
+		&i.LastUsedCounter,
 	)
 	return i, err
-}
-
-const updateUserTOTPLastUsed = `-- name: UpdateUserTOTPLastUsed :exec
-UPDATE user_mfa_totp_credentials
-SET last_used_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
-    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE user_id = ?1
-`
-
-func (q *Queries) UpdateUserTOTPLastUsed(ctx context.Context, userID int32) error {
-	_, err := q.db.ExecContext(ctx, updateUserTOTPLastUsed, userID)
-	return err
 }
 
 const upsertUserTOTPCredential = `-- name: UpsertUserTOTPCredential :one
@@ -127,30 +238,35 @@ INSERT INTO user_mfa_totp_credentials (
   secret_ciphertext,
   enabled_at,
   created_at,
-  updated_at
+  updated_at,
+  last_used_counter
 )
 VALUES (
     ?1,
     ?2,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
-    CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+    CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    ?3
 )
 ON CONFLICT (user_id) DO UPDATE
 SET secret_ciphertext = EXCLUDED.secret_ciphertext,
     enabled_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
-    last_used_at = NULL
-RETURNING user_id, secret_ciphertext, created_at, updated_at, enabled_at, last_used_at
+    last_used_at = NULL,
+    credential_version = user_mfa_totp_credentials.credential_version + 1,
+    last_used_counter = EXCLUDED.last_used_counter
+RETURNING user_id, secret_ciphertext, created_at, updated_at, enabled_at, last_used_at, credential_version, last_used_counter
 `
 
 type UpsertUserTOTPCredentialParams struct {
 	UserID           int32  `db:"user_id" json:"user_id"`
 	SecretCiphertext []byte `db:"secret_ciphertext" json:"secret_ciphertext"`
+	LastUsedCounter  int64  `db:"last_used_counter" json:"last_used_counter"`
 }
 
 func (q *Queries) UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error) {
-	row := q.db.QueryRowContext(ctx, upsertUserTOTPCredential, arg.UserID, arg.SecretCiphertext)
+	row := q.db.QueryRowContext(ctx, upsertUserTOTPCredential, arg.UserID, arg.SecretCiphertext, arg.LastUsedCounter)
 	var i UserMfaTotpCredential
 	err := row.Scan(
 		&i.UserID,
@@ -159,6 +275,8 @@ func (q *Queries) UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTO
 		&i.UpdatedAt,
 		&i.EnabledAt,
 		&i.LastUsedAt,
+		&i.CredentialVersion,
+		&i.LastUsedCounter,
 	)
 	return i, err
 }
@@ -182,4 +300,26 @@ func (q *Queries) UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams
 	var recovery_code_id int64
 	err := row.Scan(&recovery_code_id)
 	return recovery_code_id, err
+}
+
+const useTOTPCode = `-- name: UseTOTPCode :execrows
+UPDATE user_mfa_totp_credentials
+SET last_used_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
+    last_used_counter = ?2
+WHERE user_id = ?1
+  AND last_used_counter < ?2
+`
+
+type UseTOTPCodeParams struct {
+	UserID          int32 `db:"user_id" json:"user_id"`
+	LastUsedCounter int64 `db:"last_used_counter" json:"last_used_counter"`
+}
+
+func (q *Queries) UseTOTPCode(ctx context.Context, arg UseTOTPCodeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, useTOTPCode, arg.UserID, arg.LastUsedCounter)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

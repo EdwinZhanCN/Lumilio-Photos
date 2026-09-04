@@ -18,7 +18,7 @@ export interface CollectionHeroEdit {
 }
 
 export interface CollectionHeroProps {
-  /** The big primary title (album name, person name, trip title). */
+  /** The big primary title (album name, person name, Event title). */
   title: ReactNode;
   /** Optional mono code badge, e.g. "ALBUM #12". */
   code?: ReactNode;
@@ -43,7 +43,7 @@ export interface CollectionHeroProps {
 
 /**
  * The shared hero block at the top of a scoped collection view (album, person,
- * trip). Composes `CollectionTitle` + `MetaStatRow` and an optional edit button
+ * event). Composes `CollectionTitle` + `MetaStatRow` and an optional edit button
  * that toggles a page-supplied `editModal`, so detail routes stop hand-wiring
  * the same title/stat/edit assembly. Rendered by `AssetsGalleryPage` via its
  * `hero` slot.

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
@@ -20,9 +21,14 @@ const effectReceiptRetention = 30 * 24 * time.Hour
 
 type EffectRuntime struct {
 	pool     *sql.DB
+	writer   *catalogtx.Writer
 	queries  *repo.Queries
 	registry *ToolRegistry
 }
+
+// MaxTagsPerEffect bounds the cross-product of one confirmed asset set and
+// tag vocabulary inside the single atomic writer statement.
+const MaxTagsPerEffect = 32
 
 type EffectReceipt struct {
 	EffectID         string `json:"effect_id"`
@@ -34,8 +40,8 @@ type EffectReceipt struct {
 	AlreadyCommitted bool   `json:"already_committed,omitempty"`
 }
 
-func NewEffectRuntime(pool *sql.DB, queries *repo.Queries, registry *ToolRegistry) *EffectRuntime {
-	return &EffectRuntime{pool: pool, queries: queries, registry: registry}
+func NewEffectRuntime(pool *sql.DB, writer *catalogtx.Writer, queries *repo.Queries, registry *ToolRegistry) *EffectRuntime {
+	return &EffectRuntime{pool: pool, writer: writer, queries: queries, registry: registry}
 }
 
 func nullableEffectUUID(id uuid.UUID) uuid.NullUUID {
@@ -50,7 +56,7 @@ func (r *EffectRuntime) Prepare(ctx context.Context, userID int32, threadID stri
 	// committed mutation when the SSE transport drops. Opportunistic bounded
 	// cleanup avoids turning this journal into unbounded conversation history.
 	cutoff := time.Now().Add(-effectReceiptRetention).UnixMilli()
-	_, _ = r.pool.ExecContext(ctx, `DELETE FROM agent_pending_effects
+	_, _ = r.writer.ExecContext(ctx, catalogtx.OperationAgentEffectCleanup, `DELETE FROM agent_pending_effects
 		WHERE user_id = ? AND status IN ('committed', 'rejected', 'cancelled', 'failed') AND updated_at < ?`, userID, cutoff)
 	policy, ok := r.registry.EffectPolicy(toolName)
 	if !ok || !policy.Confirmation {
@@ -124,12 +130,12 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 	if r == nil || r.pool == nil {
 		return EffectReceipt{}, errors.New("effect runtime unavailable")
 	}
-	tx, err := r.pool.BeginTx(ctx, nil)
+	tx, err := r.writer.BeginTx(ctx, catalogtx.OperationAgentEffectCommit, nil)
 	if err != nil {
 		return EffectReceipt{}, err
 	}
 	defer tx.Rollback()
-	q := r.queries.WithTx(tx)
+	q := r.queries.WithTx(tx.Raw())
 	effect, err := q.GetPendingAgentEffectForUpdate(ctx, repo.GetPendingAgentEffectForUpdateParams{
 		EffectID: effectID, UserID: userID, ThreadID: threadID,
 	})
@@ -200,7 +206,10 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		if err := json.Unmarshal(effect.Payload, &payload); err != nil {
 			return EffectReceipt{}, err
 		}
-		if err := applyTagsTx(ctx, q, []uuid.UUID(effect.MembershipSnapshot), payload.Mode, payload.Tags); err != nil {
+		if len(payload.Tags) == 0 || len(payload.Tags) > MaxTagsPerEffect {
+			return EffectReceipt{}, fmt.Errorf("tag effect contains %d tags; limit is %d", len(payload.Tags), MaxTagsPerEffect)
+		}
+		if err := applyTagsTx(ctx, tx.Raw(), []uuid.UUID(effect.MembershipSnapshot), payload.Mode, payload.Tags); err != nil {
 			return EffectReceipt{}, err
 		}
 		receipt.Message = fmt.Sprintf("Applied tag change to %d assets", receipt.Count)
@@ -217,7 +226,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		if err != nil {
 			return EffectReceipt{}, err
 		}
-		if err := addAssetsToAlbumTx(ctx, q, album.AlbumID, []uuid.UUID(effect.MembershipSnapshot)); err != nil {
+		if err := addAssetsToAlbumTx(ctx, tx.Raw(), album.AlbumID, []uuid.UUID(effect.MembershipSnapshot)); err != nil {
 			return EffectReceipt{}, err
 		}
 		receipt.AlbumID = int(album.AlbumID)
@@ -233,7 +242,7 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 		if err != nil || album.UserID != userID {
 			return EffectReceipt{}, sql.ErrNoRows
 		}
-		if err := addAssetsToAlbumTx(ctx, q, target.AlbumID, []uuid.UUID(effect.MembershipSnapshot)); err != nil {
+		if err := addAssetsToAlbumTx(ctx, tx.Raw(), target.AlbumID, []uuid.UUID(effect.MembershipSnapshot)); err != nil {
 			return EffectReceipt{}, err
 		}
 		receipt.AlbumID = int(target.AlbumID)
@@ -263,44 +272,61 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 	return receipt, nil
 }
 
-func addAssetsToAlbumTx(ctx context.Context, q *repo.Queries, albumID int32, ids []uuid.UUID) error {
-	for i, id := range ids {
-		if err := q.AddAssetToAlbum(ctx, repo.AddAssetToAlbumParams{
-			AssetID: id, AlbumID: albumID, Position: int64(i),
-		}); err != nil {
-			return err
-		}
+func addAssetsToAlbumTx(ctx context.Context, tx *sql.Tx, albumID int32, ids []uuid.UUID) error {
+	idsJSON, err := json.Marshal(ids)
+	if err != nil {
+		return fmt.Errorf("encode album membership: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, `
+INSERT OR IGNORE INTO album_assets (album_id, asset_id, position, added_time)
+SELECT ?, CAST(value AS TEXT), CAST(key AS INTEGER),
+       CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+FROM json_each(?)`, albumID, idsJSON)
+	if err != nil {
+		return fmt.Errorf("bulk add album membership: %w", err)
 	}
 	return nil
 }
 
-func applyTagsTx(ctx context.Context, q *repo.Queries, assets []uuid.UUID, mode string, names []string) error {
-	tagIDs := make([]int32, 0, len(names))
-	for _, name := range names {
-		tag, err := q.GetTagByName(ctx, name)
-		if errors.Is(err, sql.ErrNoRows) && mode == "add" {
-			tag, err = q.CreateTag(ctx, repo.CreateTagParams{TagName: name})
-		}
-		if errors.Is(err, sql.ErrNoRows) && mode == "remove" {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		tagIDs = append(tagIDs, tag.TagID)
+func applyTagsTx(ctx context.Context, tx *sql.Tx, assets []uuid.UUID, mode string, names []string) error {
+	assetsJSON, err := json.Marshal(assets)
+	if err != nil {
+		return fmt.Errorf("encode tag asset membership: %w", err)
 	}
-	for _, assetID := range assets {
-		for _, tagID := range tagIDs {
-			if mode == "remove" {
-				if err := q.RemoveTagFromAsset(ctx, repo.RemoveTagFromAssetParams{AssetID: assetID, TagID: tagID}); err != nil {
-					return err
-				}
-			} else if err := q.AddTagToAsset(ctx, repo.AddTagToAssetParams{
-				AssetID: assetID, TagID: tagID, Confidence: 1, Source: "user",
-			}); err != nil {
-				return err
-			}
+	namesJSON, err := json.Marshal(names)
+	if err != nil {
+		return fmt.Errorf("encode tag names: %w", err)
+	}
+	if mode == "remove" {
+		_, err = tx.ExecContext(ctx, `
+DELETE FROM asset_tags
+WHERE asset_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+  AND tag_id IN (
+    SELECT tags.tag_id
+    FROM tags JOIN json_each(?) AS requested
+      ON tags.tag_name=CAST(requested.value AS TEXT)
+  )`, assetsJSON, namesJSON)
+	} else {
+		if _, err = tx.ExecContext(ctx, `
+INSERT INTO tags (tag_name, is_ai_generated)
+SELECT DISTINCT CAST(value AS TEXT), 0
+FROM json_each(?)
+WHERE CAST(value AS TEXT) <> ''
+ON CONFLICT(tag_name) DO NOTHING`, namesJSON); err != nil {
+			return fmt.Errorf("bulk ensure tag definitions: %w", err)
 		}
+		_, err = tx.ExecContext(ctx, `
+INSERT INTO asset_tags (asset_id, tag_id, confidence, source)
+SELECT CAST(asset.value AS TEXT), tags.tag_id, 1.0, 'user'
+FROM json_each(?) AS asset
+CROSS JOIN json_each(?) AS requested
+JOIN tags ON tags.tag_name=CAST(requested.value AS TEXT)
+WHERE true
+ON CONFLICT (asset_id, tag_id) DO UPDATE
+SET confidence = excluded.confidence, source = excluded.source`, assetsJSON, namesJSON)
+	}
+	if err != nil {
+		return fmt.Errorf("bulk apply tag membership: %w", err)
 	}
 	return nil
 }

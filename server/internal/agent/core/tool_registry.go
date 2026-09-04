@@ -157,6 +157,7 @@ var modeToolSets = map[string]map[string]bool{
 		"lookup_people":   true,
 		"describe":        true,
 		"inspect":         true,
+		"read_ocr":        true,
 		"peek":            true,
 		"combine":         true,
 		"show":            true,

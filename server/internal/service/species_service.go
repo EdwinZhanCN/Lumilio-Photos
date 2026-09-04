@@ -22,6 +22,23 @@ type SpeciesService interface {
 	GetTopSpeciesLabels(ctx context.Context, limit int) ([]repo.GetTopSpeciesLabelsRow, error)
 }
 
+// ApplySpeciesPredictionsTx replaces an asset's computed species facts inside
+// a caller-owned catalog transaction.
+func ApplySpeciesPredictionsTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
+	if queries == nil || assetID == uuid.Nil {
+		return fmt.Errorf("species prediction commit is incomplete")
+	}
+	if err := queries.DeleteSpeciesPredictionsByAsset(ctx, assetID); err != nil {
+		return fmt.Errorf("failed to delete existing species predictions: %w", err)
+	}
+	for _, pred := range predictions {
+		if _, err := queries.CreateSpeciesPrediction(ctx, repo.CreateSpeciesPredictionParams{AssetID: assetID, Label: pred.Label, Score: float64(pred.Score)}); err != nil {
+			return fmt.Errorf("failed to create species prediction: %w", err)
+		}
+	}
+	return nil
+}
+
 type speciesService struct {
 	queries *repo.Queries
 }
@@ -35,24 +52,7 @@ func NewSpeciesService(queries *repo.Queries) SpeciesService {
 
 // SaveSpeciesPredictions saves species predictions to database
 func (s *speciesService) SaveSpeciesPredictions(ctx context.Context, assetID uuid.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
-	// Delete existing predictions first
-	if err := s.queries.DeleteSpeciesPredictionsByAsset(ctx, assetID); err != nil {
-		return fmt.Errorf("failed to delete existing species predictions: %w", err)
-	}
-
-	// Insert new predictions
-	for _, pred := range predictions {
-		params := repo.CreateSpeciesPredictionParams{
-			AssetID: assetID,
-			Label:   pred.Label,
-			Score:   float64(pred.Score),
-		}
-		if _, err := s.queries.CreateSpeciesPrediction(ctx, params); err != nil {
-			return fmt.Errorf("failed to create species prediction: %w", err)
-		}
-	}
-
-	return nil
+	return ApplySpeciesPredictionsTx(ctx, s.queries, assetID, predictions)
 }
 
 // GetSpeciesPredictionsByAsset retrieves all species predictions for an asset

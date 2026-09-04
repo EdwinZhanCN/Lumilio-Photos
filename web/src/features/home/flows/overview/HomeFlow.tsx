@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../../api/useFeaturedPhotos";
 import { AlertTriangleIcon, CameraIcon, HomeIcon, SparklesIcon } from "lucide-react";
 import { useVisibleOnce } from "@/lib/utils/useVisibleOnce";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 
 const SpacetimeMapCard = lazy(() => import("./SpacetimeMapCard"));
 
@@ -115,7 +116,7 @@ function Home() {
                 <AlertTriangleIcon className="size-5" />
                 <span>
                   {t("home.errors.featuredLoadFailed", {
-                    message: error instanceof Error ? error.message : t("home.errors.unknown"),
+                    message: localizeAPIProblem(error, t, t("home.errors.unknown")),
                   })}
                 </span>
               </div>

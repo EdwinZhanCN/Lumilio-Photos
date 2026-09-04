@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 
 	"github.com/google/uuid"
@@ -161,7 +162,7 @@ func (rm *DefaultRepositoryManager) CreateHostAction(ctx context.Context, input 
 	if actor == "" {
 		actor = "web:admin"
 	}
-	_, err = rm.database.ExecContext(ctx, `
+	_, err = rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		INSERT INTO host_actions (
 			action_id, request_id, request_hash, kind, actor, actor_user_id,
 			session_id, request_summary, expected_version, nonce, status,
@@ -203,18 +204,15 @@ func (rm *DefaultRepositoryManager) GetHostAction(ctx context.Context, id string
 	if _, err := uuid.Parse(strings.TrimSpace(id)); err != nil {
 		return HostAction{}, fmt.Errorf("invalid host action id: %w", err)
 	}
-	return rm.scanHostAction(rm.database.QueryRowContext(ctx, hostActionSelect+" WHERE action_id = ?", id))
+	return rm.scanHostAction(rm.readerDatabase.QueryRowContext(ctx, hostActionSelect+" WHERE action_id = ?", id))
 }
 
 func (rm *DefaultRepositoryManager) getHostActionByRequestID(ctx context.Context, requestID string) (HostAction, error) {
-	return rm.scanHostAction(rm.database.QueryRowContext(ctx, hostActionSelect+" WHERE request_id = ?", requestID))
+	return rm.scanHostAction(rm.readerDatabase.QueryRowContext(ctx, hostActionSelect+" WHERE request_id = ?", requestID))
 }
 
 func (rm *DefaultRepositoryManager) ListPendingHostActions(ctx context.Context) ([]HostAction, error) {
-	if err := rm.expirePendingHostActions(ctx); err != nil {
-		return nil, err
-	}
-	rows, err := rm.database.QueryContext(ctx, hostActionSelect+" WHERE status IN ('pending', 'needs_decision') ORDER BY created_at")
+	rows, err := rm.readerDatabase.QueryContext(ctx, hostActionSelect+" WHERE status IN ('pending', 'needs_decision') ORDER BY created_at")
 	if err != nil {
 		return nil, fmt.Errorf("list pending host actions: %w", err)
 	}
@@ -225,6 +223,9 @@ func (rm *DefaultRepositoryManager) ListPendingHostActions(ctx context.Context) 
 		if err != nil {
 			return nil, err
 		}
+		if action.Status == HostActionExpired {
+			continue
+		}
 		actions = append(actions, action)
 	}
 	return actions, rows.Err()
@@ -232,7 +233,7 @@ func (rm *DefaultRepositoryManager) ListPendingHostActions(ctx context.Context) 
 
 func (rm *DefaultRepositoryManager) expirePendingHostActions(ctx context.Context) error {
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	if _, err := rm.database.ExecContext(ctx, `
+	if _, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions
 		SET status = 'expired', error_code = 'expired',
 			error_message = 'Native host approval expired', updated_at = ?, completed_at = ?
@@ -264,10 +265,10 @@ func (rm *DefaultRepositoryManager) SetHostActionExpectedVersion(ctx context.Con
 		return action, nil
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	result, err := rm.database.ExecContext(ctx, `
+	result, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions SET expected_version = ?, updated_at = ?
-		WHERE action_id = ? AND status = 'pending' AND expected_version = 0
-	`, version, now, actionID)
+		WHERE action_id = ? AND status = 'pending' AND expected_version = 0 AND expires_at > ?
+	`, version, now, actionID, now)
 	if err != nil {
 		return HostAction{}, fmt.Errorf("bind host action expected version: %w", err)
 	}
@@ -284,7 +285,7 @@ func (rm *DefaultRepositoryManager) SetHostActionExpectedVersion(ctx context.Con
 // row that neither Web nor Desktop can finish.
 func (rm *DefaultRepositoryManager) RecoverHostActions(ctx context.Context) error {
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	if _, err := rm.database.ExecContext(ctx, `
+	if _, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions
 		SET status = 'pending', host_instance_id = '', selected_path = NULL,
 			error_code = 'interrupted',
@@ -294,17 +295,14 @@ func (rm *DefaultRepositoryManager) RecoverHostActions(ctx context.Context) erro
 	`, now); err != nil {
 		return fmt.Errorf("recover interrupted host actions: %w", err)
 	}
-	return nil
+	return rm.expirePendingHostActions(ctx)
 }
 
 // ListHostActionsForActor returns durable unfinished work owned by one Web
 // actor. It is intentionally actor-scoped so a refreshed browser can recover
 // its tasks without exposing another administrator's workflow.
 func (rm *DefaultRepositoryManager) ListHostActionsForActor(ctx context.Context, actorUserID int32) ([]HostAction, error) {
-	if err := rm.expirePendingHostActions(ctx); err != nil {
-		return nil, err
-	}
-	rows, err := rm.database.QueryContext(ctx, hostActionSelect+`
+	rows, err := rm.readerDatabase.QueryContext(ctx, hostActionSelect+`
 		WHERE actor_user_id = ? AND status IN ('pending', 'running', 'needs_decision')
 		ORDER BY created_at DESC`, actorUserID)
 	if err != nil {
@@ -316,6 +314,9 @@ func (rm *DefaultRepositoryManager) ListHostActionsForActor(ctx context.Context,
 		action, scanErr := rm.scanHostAction(rows)
 		if scanErr != nil {
 			return nil, scanErr
+		}
+		if action.Status == HostActionExpired {
+			continue
 		}
 		actions = append(actions, action)
 	}
@@ -355,10 +356,10 @@ func (rm *DefaultRepositoryManager) ExecuteHostAction(ctx context.Context, actio
 	if resumingRiskDecision {
 		expectedStatus = HostActionNeedsDecision
 	}
-	result, err := rm.database.ExecContext(ctx, `
+	result, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions SET status = 'running', host_instance_id = ?, selected_path = ?, updated_at = ?
-		WHERE action_id = ? AND status = ?
-	`, strings.TrimSpace(hostInstanceID), cleanPath, now, actionID, expectedStatus)
+		WHERE action_id = ? AND status = ? AND expires_at > ?
+	`, strings.TrimSpace(hostInstanceID), cleanPath, now, actionID, expectedStatus, now)
 	if err != nil {
 		return HostAction{}, fmt.Errorf("claim host action: %w", err)
 	}
@@ -472,7 +473,7 @@ func (rm *DefaultRepositoryManager) ResolveHostAction(ctx context.Context, actio
 		return HostAction{}, fmt.Errorf("resolution %q is not allowed for this conflict", resolution)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	result, err := rm.database.ExecContext(ctx, `
+	result, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions SET status = 'running', updated_at = ?
 		WHERE action_id = ? AND status = 'needs_decision'
 	`, now, actionID)
@@ -577,12 +578,12 @@ func (rm *DefaultRepositoryManager) hostActionRiskWarnings(ctx context.Context, 
 
 func (rm *DefaultRepositoryManager) CancelHostAction(ctx context.Context, actionID string) (HostAction, error) {
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	result, err := rm.database.ExecContext(ctx, `
+	result, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions
 		SET status = 'cancelled', error_code = 'cancelled', error_message = 'Cancelled by administrator',
 			updated_at = ?, completed_at = ?
-		WHERE action_id = ? AND status IN ('pending', 'needs_decision')
-	`, now, now, actionID)
+		WHERE action_id = ? AND status IN ('pending', 'needs_decision') AND expires_at > ?
+	`, now, now, actionID, now)
 	if err != nil {
 		return HostAction{}, err
 	}
@@ -602,7 +603,7 @@ func (rm *DefaultRepositoryManager) storeHostActionConflict(ctx context.Context,
 		return HostAction{}, err
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	_, err = rm.database.ExecContext(ctx, `
+	_, err = rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryHostActionMutation, `
 		UPDATE host_actions
 		SET status = 'needs_decision', selected_path = ?, result = ?,
 			error_code = 'identity_conflict', error_message = ?, updated_at = ?
@@ -641,7 +642,7 @@ func (rm *DefaultRepositoryManager) finishHostAction(ctx context.Context, action
 		encoded = string(data)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	tx, err := rm.database.BeginTx(ctx, nil)
+	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryHostActionFinish, nil)
 	if err != nil {
 		return fmt.Errorf("begin host action completion: %w", err)
 	}
@@ -662,7 +663,7 @@ func (rm *DefaultRepositoryManager) finishHostAction(ctx context.Context, action
 	if changed, _ := updateResult.RowsAffected(); changed == 0 {
 		return tx.Commit()
 	}
-	if _, err := recordLifecycleAuditWithQueries(ctx, rm.queries.WithTx(tx), hostActionAuditInput(action, status, result, code, message)); err != nil {
+	if _, err := recordLifecycleAuditWithQueries(ctx, rm.queries.WithTx(tx.Raw()), hostActionAuditInput(action, status, result, code, message)); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -774,6 +775,14 @@ func (rm *DefaultRepositoryManager) scanHostAction(row hostActionScanner) (HostA
 	if completedAt.Valid {
 		value := completedAt.Time
 		action.CompletedAt = &value
+	}
+	if (action.Status == HostActionPending || action.Status == HostActionNeedsDecision) &&
+		!time.Now().UTC().Before(action.ExpiresAt) {
+		action.Status = HostActionExpired
+		action.ErrorCode = "expired"
+		action.ErrorMessage = "Native host approval expired"
+		completedAt := action.ExpiresAt
+		action.CompletedAt = &completedAt
 	}
 	return action, nil
 }

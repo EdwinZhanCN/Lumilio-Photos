@@ -6,7 +6,6 @@ import Manage from "@/features/manage/routes/Manage";
 import Collections from "@/features/collections/routes/Collections";
 import Albums from "@/features/collections/routes/Albums";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
-import TripDetails from "@/features/collections/routes/TripDetails";
 import People from "@/features/collections/routes/People";
 import Utilities from "@/features/collections/routes/Utilities";
 import Duplicates from "@/features/collections/routes/Duplicates";
@@ -127,14 +126,6 @@ export const appRoutes: RouteDefinition[] = [
   {
     path: "/collections/map",
     element: <MapView />,
-  },
-  {
-    path: "/collections/places/:tripId",
-    element: <TripDetails />,
-  },
-  {
-    path: "/collections/places/:tripId/:assetId",
-    element: <TripDetails />,
   },
   {
     path: "/collections/people",

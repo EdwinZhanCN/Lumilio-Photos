@@ -5,14 +5,14 @@ import { t } from "@test/i18n";
 import RemoveRepositoryModal from "./RemoveRepositoryModal";
 
 const repository = {
+  entityType: "repository" as const,
   id: "00000000-0000-0000-0000-000000000002",
-  name: "Family Archive",
+  rawName: "Family Archive",
   path: "/storage/family",
   role: "regular" as const,
   rootId: "00000000-0000-0000-0000-000000000001",
   reachability: "active" as const,
   activity: "idle" as const,
-  isPrimary: false,
 };
 
 describe("RemoveRepositoryModal", () => {
@@ -22,7 +22,7 @@ describe("RemoveRepositoryModal", () => {
       http.get("*/api/v1/repositories/:id/removal-impact", () =>
         HttpResponse.json({
           repository_id: repository.id,
-          repository_name: repository.name,
+          repository_name: repository.rawName,
           asset_count: 2,
           files_preserved: true,
         }),
@@ -45,12 +45,12 @@ describe("RemoveRepositoryModal", () => {
     });
     await expect.element(action).toBeDisabled();
     const confirmation = screen.getByLabelText(
-      t("manage.repositories.removeConfirmationLabel", { name: repository.name }),
+      t("manage.repositories.removeConfirmationLabel", { name: repository.rawName }),
       { exact: true },
     );
     await confirmation.fill("Family archive");
     await expect.element(action).toBeDisabled();
-    await confirmation.fill(repository.name);
+    await confirmation.fill(repository.rawName);
     await expect.element(action).toBeEnabled();
     await action.click();
     await vi.waitFor(() => expect(removeCalls).toBe(1));

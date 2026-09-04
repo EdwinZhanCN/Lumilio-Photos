@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Copy, FolderOpen, RefreshCw, X } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import {
   type RepositoryCandidate,
   useOpenRepositoryCandidate,
@@ -44,9 +45,11 @@ export default function RepositoryCandidateModal({
     } catch (reason: unknown) {
       showMessage(
         "error",
-        reason instanceof Error
-          ? reason.message
-          : t("manage.repositories.candidates.openFailed", "Repository could not be opened."),
+        localizeAPIProblem(
+          reason,
+          t,
+          t("manage.repositories.candidates.openFailed", "Repository could not be opened."),
+        ),
       );
     }
   };
@@ -66,18 +69,20 @@ export default function RepositoryCandidateModal({
         "success",
         resolution === "update_location"
           ? t("manage.repositories.candidates.relocated", "Repository location updated.")
-          : t("manage.repositories.candidates.copyAdded", "Separate repository added."),
+          : t("manage.repositories.candidates.copyAdded", "Separate Repository added."),
       );
       onClose();
     } catch (reason: unknown) {
       showMessage(
         "error",
-        reason instanceof Error
-          ? reason.message
-          : t(
-              "manage.repositories.candidates.resolveFailed",
-              "Repository decision could not be applied.",
-            ),
+        localizeAPIProblem(
+          reason,
+          t,
+          t(
+            "manage.repositories.candidates.resolveFailed",
+            "Repository decision could not be applied.",
+          ),
+        ),
       );
     }
   };
@@ -235,7 +240,7 @@ export default function RepositoryCandidateModal({
                           <Copy size={15} />
                           {t(
                             "manage.repositories.hostAction.addSeparate",
-                            "Add as separate repository",
+                            "Add as separate Repository",
                           )}
                         </button>
                       ) : null}
@@ -250,7 +255,7 @@ export default function RepositoryCandidateModal({
                       <span className="min-w-0 flex-1">
                         {t(
                           "manage.repositories.candidates.copyConfirmation",
-                          "Add this as a separate repository? Lumilio will create a new identity and isolate copied private state. This is not synchronization or a backup link.",
+                          "Add this as a separate Repository? Lumilio will create a new identity and isolate copied private state. This is not synchronization or a backup link.",
                         )}
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
@@ -270,7 +275,7 @@ export default function RepositoryCandidateModal({
                         >
                           {t(
                             "manage.repositories.candidates.addSeparateConfirm",
-                            "Yes, add as separate repository",
+                            "Yes, add as separate Repository",
                           )}
                         </button>
                       </span>
@@ -305,9 +310,9 @@ function candidateLabel(
     case "empty_writable":
       return t("manage.repositories.candidates.emptyWritable", "Empty and writable");
     case "nonempty_unmarked":
-      return t("manage.repositories.candidates.nonempty", "Not a repository");
+      return t("manage.repositories.candidates.nonempty", "Not a Repository");
     case "marker_invalid":
-      return t("manage.repositories.candidates.invalidMarker", "Invalid repository marker");
+      return t("manage.repositories.candidates.invalidMarker", "Invalid Repository marker");
     case "identity_error":
       return t("manage.repositories.candidates.identityError", "Identity already registered");
     default:

@@ -4,6 +4,9 @@ export default defineConfig({
   testDir: "./e2e/specs",
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
+  // Keep retry artifacts while flakes are being eliminated, but never let a
+  // retry-assisted pass make the required CI job green.
+  failOnFlakyTests: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI

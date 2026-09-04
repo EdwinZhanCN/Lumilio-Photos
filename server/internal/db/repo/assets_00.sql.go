@@ -54,6 +54,29 @@ func (q *Queries) AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) er
 	return err
 }
 
+const addTagToAssetIfMissing = `-- name: AddTagToAssetIfMissing :exec
+INSERT INTO asset_tags (asset_id, tag_id, confidence, source)
+VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT (asset_id, tag_id) DO NOTHING
+`
+
+type AddTagToAssetIfMissingParams struct {
+	AssetID    uuid.UUID `db:"asset_id" json:"asset_id"`
+	TagID      int32     `db:"tag_id" json:"tag_id"`
+	Confidence float64   `db:"confidence" json:"confidence"`
+	Source     string    `db:"source" json:"source"`
+}
+
+func (q *Queries) AddTagToAssetIfMissing(ctx context.Context, arg AddTagToAssetIfMissingParams) error {
+	_, err := q.db.ExecContext(ctx, addTagToAssetIfMissing,
+		arg.AssetID,
+		arg.TagID,
+		arg.Confidence,
+		arg.Source,
+	)
+	return err
+}
+
 const attachAssetToMediaItem = `-- name: AttachAssetToMediaItem :exec
 INSERT INTO media_item_assets (
     asset_id,
@@ -143,23 +166,6 @@ func (q *Queries) BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAsset
 	return err
 }
 
-const bulkUpdateAssetStatus = `-- name: BulkUpdateAssetStatus :exec
-UPDATE assets
-SET status = ?1
-WHERE CAST(?2 AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false
-`
-
-type BulkUpdateAssetStatusParams struct {
-	Status   dbtypes.JSON `db:"status" json:"status"`
-	AssetIds *string      `db:"asset_ids" json:"asset_ids"`
-}
-
-func (q *Queries) BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error {
-	_, err := q.db.ExecContext(ctx, bulkUpdateAssetStatus, arg.Status, arg.AssetIds)
-	return err
-}
-
 const countAssetsByRating = `-- name: CountAssetsByRating :many
 SELECT rating, COUNT(*) as count
 FROM assets
@@ -232,12 +238,18 @@ func (q *Queries) CountAssetsByStatusAndOwner(ctx context.Context, arg CountAsse
 const countAssetsByStatusAndRepository = `-- name: CountAssetsByStatusAndRepository :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND repository_id = ?2 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = ?1
+  AND is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = ?2
+  )
 `
 
 type CountAssetsByStatusAndRepositoryParams struct {
-	Status       dbtypes.JSON  `db:"status" json:"status"`
-	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	Status       dbtypes.JSON `db:"status" json:"status"`
+	RepositoryID uuid.UUID    `db:"repository_id" json:"repository_id"`
 }
 
 func (q *Queries) CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error) {
@@ -264,52 +276,42 @@ func (q *Queries) CountLikedAssets(ctx context.Context, ownerID interface{}) (in
 
 const createAsset = `-- name: CreateAsset :one
 INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, storage_path, mime_type,
-    file_size, content_hash, quick_fingerprint, quick_fingerprint_version,
-    width, height, duration, taken_time, specific_metadata, rating, liked, repository_id, status,
+    asset_id, owner_id, content_id, type, original_filename, mime_type,
+    width, height, duration, taken_time, specific_metadata, rating, liked, status,
     upload_time, updated_at
 ) VALUES (
-    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19,
+    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
+RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
 `
 
 type CreateAssetParams struct {
-	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
-	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
-	Type                    string                   `db:"type" json:"type"`
-	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
-	StoragePath             *string                  `db:"storage_path" json:"storage_path"`
-	MimeType                string                   `db:"mime_type" json:"mime_type"`
-	FileSize                int64                    `db:"file_size" json:"file_size"`
-	ContentHash             string                   `db:"content_hash" json:"content_hash"`
-	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int64                   `db:"width" json:"width"`
-	Height                  *int64                   `db:"height" json:"height"`
-	Duration                *float64                 `db:"duration" json:"duration"`
-	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
-	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int64                   `db:"rating" json:"rating"`
-	Liked                   bool                     `db:"liked" json:"liked"`
-	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
-	Status                  dbtypes.JSON             `db:"status" json:"status"`
+	AssetID          uuid.UUID                `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	ContentID        uuid.UUID                `db:"content_id" json:"content_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	Width            *int64                   `db:"width" json:"width"`
+	Height           *int64                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	TakenTime        dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating           *int64                   `db:"rating" json:"rating"`
+	Liked            bool                     `db:"liked" json:"liked"`
+	Status           dbtypes.JSON             `db:"status" json:"status"`
 }
 
 func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error) {
 	row := q.db.QueryRowContext(ctx, createAsset,
 		arg.AssetID,
 		arg.OwnerID,
+		arg.ContentID,
 		arg.Type,
 		arg.OriginalFilename,
-		arg.StoragePath,
 		arg.MimeType,
-		arg.FileSize,
-		arg.ContentHash,
-		arg.QuickFingerprint,
-		arg.QuickFingerprintVersion,
 		arg.Width,
 		arg.Height,
 		arg.Duration,
@@ -317,21 +319,16 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		arg.SpecificMetadata,
 		arg.Rating,
 		arg.Liked,
-		arg.RepositoryID,
 		arg.Status,
 	)
 	var i Asset
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -343,7 +340,6 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,
@@ -397,20 +393,22 @@ func (q *Queries) CreateMediaItemForAsset(ctx context.Context, arg CreateMediaIt
 }
 
 const createThumbnail = `-- name: CreateThumbnail :one
-INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, created_at)
-VALUES (?1, ?2, ?3, ?4, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
+INSERT INTO thumbnails (asset_id, size, storage_path, mime_type, repository_id, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5, CAST(unixepoch('subsec') * 1000000 AS INTEGER))
 ON CONFLICT (asset_id, size) DO UPDATE
 SET storage_path = EXCLUDED.storage_path,
     mime_type = EXCLUDED.mime_type,
+    repository_id = EXCLUDED.repository_id,
     created_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-RETURNING thumbnail_id, asset_id, size, storage_path, mime_type, created_at
+RETURNING thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id
 `
 
 type CreateThumbnailParams struct {
-	AssetID     uuid.UUID `db:"asset_id" json:"asset_id"`
-	Size        string    `db:"size" json:"size"`
-	StoragePath string    `db:"storage_path" json:"storage_path"`
-	MimeType    string    `db:"mime_type" json:"mime_type"`
+	AssetID      uuid.UUID `db:"asset_id" json:"asset_id"`
+	Size         string    `db:"size" json:"size"`
+	StoragePath  string    `db:"storage_path" json:"storage_path"`
+	MimeType     string    `db:"mime_type" json:"mime_type"`
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
 }
 
 func (q *Queries) CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error) {
@@ -419,6 +417,7 @@ func (q *Queries) CreateThumbnail(ctx context.Context, arg CreateThumbnailParams
 		arg.Size,
 		arg.StoragePath,
 		arg.MimeType,
+		arg.RepositoryID,
 	)
 	var i Thumbnail
 	err := row.Scan(
@@ -428,6 +427,7 @@ func (q *Queries) CreateThumbnail(ctx context.Context, arg CreateThumbnailParams
 		&i.StoragePath,
 		&i.MimeType,
 		&i.CreatedAt,
+		&i.RepositoryID,
 	)
 	return i, err
 }
@@ -444,29 +444,36 @@ func (q *Queries) DeleteAsset(ctx context.Context, assetID uuid.UUID) error {
 }
 
 const getAssetByContentHashAndRepository = `-- name: GetAssetByContentHashAndRepository :one
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE content_hash = ?1 AND repository_id = ?2 AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE content_id IN (
+    SELECT content_objects.content_id
+    FROM content_objects
+    WHERE content_objects.full_hash = ?1
+  )
+  AND is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = ?2
+  )
+LIMIT 1
 `
 
 type GetAssetByContentHashAndRepositoryParams struct {
-	ContentHash  string        `db:"content_hash" json:"content_hash"`
-	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
+	FullHash     string    `db:"full_hash" json:"full_hash"`
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
 }
 
 func (q *Queries) GetAssetByContentHashAndRepository(ctx context.Context, arg GetAssetByContentHashAndRepositoryParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, getAssetByContentHashAndRepository, arg.ContentHash, arg.RepositoryID)
+	row := q.db.QueryRowContext(ctx, getAssetByContentHashAndRepository, arg.FullHash, arg.RepositoryID)
 	var i Asset
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -478,7 +485,6 @@ func (q *Queries) GetAssetByContentHashAndRepository(ctx context.Context, arg Ge
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,
@@ -491,7 +497,7 @@ func (q *Queries) GetAssetByContentHashAndRepository(ctx context.Context, arg Ge
 }
 
 const getAssetByID = `-- name: GetAssetByID :one
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id = ?1 AND is_deleted = false
 `
 
@@ -501,14 +507,10 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, e
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -520,7 +522,6 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, e
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,
@@ -533,7 +534,7 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, e
 }
 
 const getAssetByIDAny = `-- name: GetAssetByIDAny :one
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id = ?1
 `
 
@@ -543,14 +544,10 @@ func (q *Queries) GetAssetByIDAny(ctx context.Context, assetID uuid.UUID) (Asset
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -562,55 +559,6 @@ func (q *Queries) GetAssetByIDAny(ctx context.Context, assetID uuid.UUID) (Asset
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
-}
-
-const getAssetByRepositoryAndStoragePathAny = `-- name: GetAssetByRepositoryAndStoragePathAny :one
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE repository_id = ?1 AND storage_path = ?2
-LIMIT 1
-`
-
-type GetAssetByRepositoryAndStoragePathAnyParams struct {
-	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	StoragePath  *string       `db:"storage_path" json:"storage_path"`
-}
-
-func (q *Queries) GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, getAssetByRepositoryAndStoragePathAny, arg.RepositoryID, arg.StoragePath)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,
@@ -673,12 +621,17 @@ func (q *Queries) GetAssetStatsForOwner(ctx context.Context, ownerID *int32) (Ge
 }
 
 const getAssetsByContentHash = `-- name: GetAssetsByContentHash :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE content_hash = ?1 AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE content_id IN (
+    SELECT content_objects.content_id
+    FROM content_objects
+    WHERE content_objects.full_hash = ?1
+  )
+  AND is_deleted = false
 `
 
-func (q *Queries) GetAssetsByContentHash(ctx context.Context, contentHash string) ([]Asset, error) {
-	rows, err := q.db.QueryContext(ctx, getAssetsByContentHash, contentHash)
+func (q *Queries) GetAssetsByContentHash(ctx context.Context, fullHash string) ([]Asset, error) {
+	rows, err := q.db.QueryContext(ctx, getAssetsByContentHash, fullHash)
 	if err != nil {
 		return nil, err
 	}
@@ -689,14 +642,10 @@ func (q *Queries) GetAssetsByContentHash(ctx context.Context, contentHash string
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -708,7 +657,6 @@ func (q *Queries) GetAssetsByContentHash(ctx context.Context, contentHash string
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -730,64 +678,8 @@ func (q *Queries) GetAssetsByContentHash(ctx context.Context, contentHash string
 	return items, nil
 }
 
-const getAssetsByContentHashesAndRepository = `-- name: GetAssetsByContentHashesAndRepository :many
-WITH filter_params AS (
-  SELECT CAST(?2 AS TEXT) AS content_hashes_json
-)
-SELECT asset_id, content_hash, file_size, original_filename, storage_path
-FROM assets
-WHERE content_hash IN (
-    SELECT CAST(value AS TEXT)
-    FROM json_each((SELECT content_hashes_json FROM filter_params))
-  )
-  AND repository_id = ?1
-  AND is_deleted = false
-`
-
-type GetAssetsByContentHashesAndRepositoryParams struct {
-	RepositoryID  uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	ContentHashes *string       `db:"content_hashes" json:"content_hashes"`
-}
-
-type GetAssetsByContentHashesAndRepositoryRow struct {
-	AssetID          uuid.UUID `db:"asset_id" json:"asset_id"`
-	ContentHash      string    `db:"content_hash" json:"content_hash"`
-	FileSize         int64     `db:"file_size" json:"file_size"`
-	OriginalFilename string    `db:"original_filename" json:"original_filename"`
-	StoragePath      *string   `db:"storage_path" json:"storage_path"`
-}
-
-func (q *Queries) GetAssetsByContentHashesAndRepository(ctx context.Context, arg GetAssetsByContentHashesAndRepositoryParams) ([]GetAssetsByContentHashesAndRepositoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAssetsByContentHashesAndRepository, arg.RepositoryID, arg.ContentHashes)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetAssetsByContentHashesAndRepositoryRow
-	for rows.Next() {
-		var i GetAssetsByContentHashesAndRepositoryRow
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.ContentHash,
-			&i.FileSize,
-			&i.OriginalFilename,
-			&i.StoragePath,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getAssetsByIDs = `-- name: GetAssetsByIDs :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id IN (/*SLICE:asset_ids*/?)
   AND is_deleted = false
 `
@@ -814,14 +706,10 @@ func (q *Queries) GetAssetsByIDs(ctx context.Context, assetIds []uuid.UUID) ([]A
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -833,7 +721,6 @@ func (q *Queries) GetAssetsByIDs(ctx context.Context, assetIds []uuid.UUID) ([]A
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -856,7 +743,7 @@ func (q *Queries) GetAssetsByIDs(ctx context.Context, assetIds []uuid.UUID) ([]A
 }
 
 const getAssetsByIDsAny = `-- name: GetAssetsByIDsAny :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id IN (/*SLICE:asset_ids*/?)
 `
 
@@ -882,14 +769,10 @@ func (q *Queries) GetAssetsByIDsAny(ctx context.Context, assetIds []uuid.UUID) (
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -901,7 +784,6 @@ func (q *Queries) GetAssetsByIDsAny(ctx context.Context, assetIds []uuid.UUID) (
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -927,7 +809,7 @@ const getAssetsByIDsForOwner = `-- name: GetAssetsByIDsForOwner :many
 WITH filter_params AS (
   SELECT CAST(?2 AS TEXT) AS asset_ids_json
 )
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = ?1
   AND is_deleted = false
@@ -950,14 +832,10 @@ func (q *Queries) GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDs
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -969,7 +847,6 @@ func (q *Queries) GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDs
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -992,7 +869,7 @@ func (q *Queries) GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDs
 }
 
 const getAssetsByOwner = `-- name: GetAssetsByOwner :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE owner_id = ?1 AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT ?2 OFFSET ?3
@@ -1016,14 +893,10 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1035,7 +908,6 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1063,7 +935,7 @@ WITH filter_params AS (
     CAST(?4 AS TEXT) AS types_json,
     CAST(?5 AS TEXT) AS sort_order
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN filter_params
 WHERE a.owner_id = ?1
   AND a.type IN (SELECT value FROM json_each(filter_params.types_json))
@@ -1100,14 +972,10 @@ func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAss
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1119,7 +987,6 @@ func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAss
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1143,7 +1010,7 @@ func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAss
 
 const getAssetsByOwnerSorted = `-- name: GetAssetsByOwnerSorted :many
 WITH sort_params AS (SELECT CAST(?4 AS TEXT) AS sort_order)
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN sort_params
 WHERE a.owner_id = ?1 AND a.is_deleted = false
 ORDER BY
@@ -1176,14 +1043,10 @@ func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwn
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1195,7 +1058,6 @@ func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwn
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1219,7 +1081,7 @@ func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwn
 
 const getAssetsByOwnerWithRatingLiked = `-- name: GetAssetsByOwnerWithRatingLiked :many
 WITH sort_params AS (SELECT CAST(?6 AS TEXT) AS sort_by)
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN sort_params
 WHERE a.owner_id = ?1
   AND a.is_deleted = false
@@ -1262,14 +1124,10 @@ func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAs
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1281,7 +1139,6 @@ func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAs
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1303,64 +1160,8 @@ func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAs
 	return items, nil
 }
 
-const getAssetsByQuickFingerprintsAndRepository = `-- name: GetAssetsByQuickFingerprintsAndRepository :many
-WITH filter_params AS (
-  SELECT CAST(?2 AS TEXT) AS quick_fingerprints_json
-)
-SELECT asset_id, quick_fingerprint, quick_fingerprint_version, file_size, original_filename
-FROM assets
-WHERE quick_fingerprint IN (
-    SELECT CAST(value AS TEXT)
-    FROM json_each((SELECT quick_fingerprints_json FROM filter_params))
-  )
-  AND repository_id = ?1
-  AND is_deleted = false
-`
-
-type GetAssetsByQuickFingerprintsAndRepositoryParams struct {
-	RepositoryID      uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	QuickFingerprints *string       `db:"quick_fingerprints" json:"quick_fingerprints"`
-}
-
-type GetAssetsByQuickFingerprintsAndRepositoryRow struct {
-	AssetID                 uuid.UUID `db:"asset_id" json:"asset_id"`
-	QuickFingerprint        *string   `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string   `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	FileSize                int64     `db:"file_size" json:"file_size"`
-	OriginalFilename        string    `db:"original_filename" json:"original_filename"`
-}
-
-func (q *Queries) GetAssetsByQuickFingerprintsAndRepository(ctx context.Context, arg GetAssetsByQuickFingerprintsAndRepositoryParams) ([]GetAssetsByQuickFingerprintsAndRepositoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAssetsByQuickFingerprintsAndRepository, arg.RepositoryID, arg.QuickFingerprints)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetAssetsByQuickFingerprintsAndRepositoryRow
-	for rows.Next() {
-		var i GetAssetsByQuickFingerprintsAndRepositoryRow
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
-			&i.FileSize,
-			&i.OriginalFilename,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getAssetsByRating = `-- name: GetAssetsByRating :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
   AND rating = ?1
   AND (?2 IS NULL OR owner_id = ?2)
@@ -1392,14 +1193,10 @@ func (q *Queries) GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingPa
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1411,7 +1208,6 @@ func (q *Queries) GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingPa
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1434,7 +1230,7 @@ func (q *Queries) GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingPa
 }
 
 const getAssetsByRatingAndType = `-- name: GetAssetsByRatingAndType :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
   AND rating = ?1
   AND type = ?2
@@ -1469,14 +1265,10 @@ func (q *Queries) GetAssetsByRatingAndType(ctx context.Context, arg GetAssetsByR
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1488,7 +1280,6 @@ func (q *Queries) GetAssetsByRatingAndType(ctx context.Context, arg GetAssetsByR
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1511,7 +1302,7 @@ func (q *Queries) GetAssetsByRatingAndType(ctx context.Context, arg GetAssetsByR
 }
 
 const getAssetsByRatingRange = `-- name: GetAssetsByRatingRange :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
   AND rating IS NOT NULL
   AND rating >= ?1
@@ -1547,14 +1338,10 @@ func (q *Queries) GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRat
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1566,7 +1353,6 @@ func (q *Queries) GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRat
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1589,7 +1375,7 @@ func (q *Queries) GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRat
 }
 
 const getAssetsByStatus = `-- name: GetAssetsByStatus :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT ?2 OFFSET ?3
@@ -1613,14 +1399,10 @@ func (q *Queries) GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusPa
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1632,7 +1414,6 @@ func (q *Queries) GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusPa
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1655,7 +1436,7 @@ func (q *Queries) GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusPa
 }
 
 const getAssetsByStatusAndOwner = `-- name: GetAssetsByStatusAndOwner :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT ?3 OFFSET ?4
@@ -1685,14 +1466,10 @@ func (q *Queries) GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsBy
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1704,7 +1481,6 @@ func (q *Queries) GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsBy
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1727,17 +1503,23 @@ func (q *Queries) GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsBy
 }
 
 const getAssetsByStatusAndRepository = `-- name: GetAssetsByStatusAndRepository :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND repository_id = ?2 AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE json_extract(status, char(36) || '.state') = ?1
+  AND is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = ?2
+  )
 ORDER BY upload_time DESC
 LIMIT ?3 OFFSET ?4
 `
 
 type GetAssetsByStatusAndRepositoryParams struct {
-	Status       dbtypes.JSON  `db:"status" json:"status"`
-	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	Limit        int64         `db:"limit" json:"limit"`
-	Offset       int64         `db:"offset" json:"offset"`
+	Status       dbtypes.JSON `db:"status" json:"status"`
+	RepositoryID uuid.UUID    `db:"repository_id" json:"repository_id"`
+	Limit        int64        `db:"limit" json:"limit"`
+	Offset       int64        `db:"offset" json:"offset"`
 }
 
 func (q *Queries) GetAssetsByStatusAndRepository(ctx context.Context, arg GetAssetsByStatusAndRepositoryParams) ([]Asset, error) {
@@ -1757,14 +1539,10 @@ func (q *Queries) GetAssetsByStatusAndRepository(ctx context.Context, arg GetAss
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1776,7 +1554,6 @@ func (q *Queries) GetAssetsByStatusAndRepository(ctx context.Context, arg GetAss
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1799,7 +1576,7 @@ func (q *Queries) GetAssetsByStatusAndRepository(ctx context.Context, arg GetAss
 }
 
 const getAssetsByType = `-- name: GetAssetsByType :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE type = ?1 AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT ?2 OFFSET ?3
@@ -1823,14 +1600,10 @@ func (q *Queries) GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1842,7 +1615,6 @@ func (q *Queries) GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1870,7 +1642,7 @@ WITH filter_params AS (
     CAST(?3 AS TEXT) AS types_json,
     CAST(?4 AS TEXT) AS sort_order
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN filter_params
 WHERE a.type IN (SELECT value FROM json_each(filter_params.types_json))
   AND a.is_deleted = false
@@ -1904,14 +1676,10 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1923,7 +1691,6 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -1946,7 +1713,7 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 }
 
 const getAssetsWithErrors = `-- name: GetAssetsWithErrors :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE json_extract(status, char(36) || '.state') = 'failed' AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT ?1 OFFSET ?2
@@ -1969,14 +1736,10 @@ func (q *Queries) GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErro
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -1988,7 +1751,6 @@ func (q *Queries) GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErro
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -2011,7 +1773,7 @@ func (q *Queries) GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErro
 }
 
 const getAssetsWithWarnings = `-- name: GetAssetsWithWarnings :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE json_extract(status, char(36) || '.state') = 'warning' AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT ?1 OFFSET ?2
@@ -2034,14 +1796,10 @@ func (q *Queries) GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWa
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -2053,7 +1811,6 @@ func (q *Queries) GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWa
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -2178,7 +1935,7 @@ func (q *Queries) GetDistinctLenses(ctx context.Context) ([]interface{}, error) 
 }
 
 const getLikedAssets = `-- name: GetLikedAssets :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
   AND liked = true
   AND (?1 IS NULL OR owner_id = ?1)
@@ -2204,14 +1961,10 @@ func (q *Queries) GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) 
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -2223,7 +1976,6 @@ func (q *Queries) GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) 
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -2246,7 +1998,7 @@ func (q *Queries) GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) 
 }
 
 const getLikedAssetsByOwner = `-- name: GetLikedAssetsByOwner :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
   AND liked = true
   AND owner_id = ?1
@@ -2272,14 +2024,10 @@ func (q *Queries) GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsB
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -2291,7 +2039,6 @@ func (q *Queries) GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsB
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -2314,7 +2061,7 @@ func (q *Queries) GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsB
 }
 
 const getLikedAssetsByType = `-- name: GetLikedAssetsByType :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
   AND liked = true
   AND type = ?1
@@ -2347,14 +2094,10 @@ func (q *Queries) GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsBy
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -2366,7 +2109,6 @@ func (q *Queries) GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsBy
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -2390,6 +2132,20 @@ func (q *Queries) GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsBy
 
 const getRepositoryAssetStats = `-- name: GetRepositoryAssetStats :one
 
+WITH scoped AS (
+  SELECT DISTINCT
+    asset.asset_id,
+    asset.type,
+    asset.liked,
+    asset.rating,
+    asset.upload_time,
+    occurrence.file_size
+  FROM assets asset
+  JOIN active_asset_occurrences occurrence ON occurrence.asset_id = asset.asset_id
+  WHERE asset.is_deleted = false
+    AND occurrence.repository_id = ?1
+    AND (?2 IS NULL OR asset.owner_id = ?2)
+)
 SELECT
   COUNT(*) as total_assets,
   COUNT(CASE WHEN type = 'PHOTO' THEN 1 END) as photo_count,
@@ -2401,15 +2157,12 @@ SELECT
   SUM(file_size) as total_size,
   MIN(upload_time) as oldest_upload,
   MAX(upload_time) as newest_upload
-FROM assets
-WHERE is_deleted = false
-  AND repository_id = ?1
-  AND (?2 IS NULL OR owner_id = ?2)
+FROM scoped
 `
 
 type GetRepositoryAssetStatsParams struct {
-	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	OwnerID      interface{}   `db:"owner_id" json:"owner_id"`
+	RepositoryID uuid.UUID   `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
 }
 
 type GetRepositoryAssetStatsRow struct {
@@ -2445,7 +2198,7 @@ func (q *Queries) GetRepositoryAssetStats(ctx context.Context, arg GetRepository
 }
 
 const getThumbnailByAssetAndSize = `-- name: GetThumbnailByAssetAndSize :one
-SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at FROM thumbnails
+SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id FROM thumbnails
 WHERE asset_id = ?1 AND size = ?2
 `
 
@@ -2464,12 +2217,13 @@ func (q *Queries) GetThumbnailByAssetAndSize(ctx context.Context, arg GetThumbna
 		&i.StoragePath,
 		&i.MimeType,
 		&i.CreatedAt,
+		&i.RepositoryID,
 	)
 	return i, err
 }
 
 const getThumbnailByID = `-- name: GetThumbnailByID :one
-SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at FROM thumbnails WHERE thumbnail_id = ?1
+SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id FROM thumbnails WHERE thumbnail_id = ?1
 `
 
 func (q *Queries) GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error) {
@@ -2482,12 +2236,13 @@ func (q *Queries) GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thum
 		&i.StoragePath,
 		&i.MimeType,
 		&i.CreatedAt,
+		&i.RepositoryID,
 	)
 	return i, err
 }
 
 const getThumbnailsByAsset = `-- name: GetThumbnailsByAsset :many
-SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at FROM thumbnails
+SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at, repository_id FROM thumbnails
 WHERE asset_id = ?1
 ORDER BY CASE size
     WHEN 'small' THEN 1
@@ -2512,6 +2267,7 @@ func (q *Queries) GetThumbnailsByAsset(ctx context.Context, assetID uuid.UUID) (
 			&i.StoragePath,
 			&i.MimeType,
 			&i.CreatedAt,
+			&i.RepositoryID,
 		); err != nil {
 			return nil, err
 		}
@@ -2527,7 +2283,7 @@ func (q *Queries) GetThumbnailsByAsset(ctx context.Context, assetID uuid.UUID) (
 }
 
 const getTopRatedAssets = `-- name: GetTopRatedAssets :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
   AND rating IS NOT NULL
   AND rating >= ?1
@@ -2560,14 +2316,10 @@ func (q *Queries) GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsPa
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -2579,67 +2331,6 @@ func (q *Queries) GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsPa
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-			&i.GpsLatitude,
-			&i.GpsLongitude,
-			&i.GpsGeohash5,
-			&i.GpsGeohash7,
-			&i.ExifRaw,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAssetsByRepositoryAny = `-- name: ListAssetsByRepositoryAny :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE repository_id = ?1
-  AND storage_path IS NOT NULL
-ORDER BY storage_path ASC
-`
-
-func (q *Queries) ListAssetsByRepositoryAny(ctx context.Context, repositoryID uuid.NullUUID) ([]Asset, error) {
-	rows, err := q.db.QueryContext(ctx, listAssetsByRepositoryAny, repositoryID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Asset
-	for rows.Next() {
-		var i Asset
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -2697,68 +2388,6 @@ func (q *Queries) LockAuthorizedAssetIDs(ctx context.Context, arg LockAuthorized
 		return nil, err
 	}
 	return items, nil
-}
-
-const moveAssetWithinRepository = `-- name: MoveAssetWithinRepository :one
-UPDATE assets
-SET
-    storage_path = ?1,
-    original_filename = ?2,
-    is_deleted = false,
-    deleted_at = NULL,
-    updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE asset_id = ?3
-  AND repository_id = ?4
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-type MoveAssetWithinRepositoryParams struct {
-	StoragePath      *string       `db:"storage_path" json:"storage_path"`
-	OriginalFilename string        `db:"original_filename" json:"original_filename"`
-	AssetID          uuid.UUID     `db:"asset_id" json:"asset_id"`
-	RepositoryID     uuid.NullUUID `db:"repository_id" json:"repository_id"`
-}
-
-func (q *Queries) MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, moveAssetWithinRepository,
-		arg.StoragePath,
-		arg.OriginalFilename,
-		arg.AssetID,
-		arg.RepositoryID,
-	)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.RepositoryID,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
 }
 
 const reconcileMediaItemComponentRelation = `-- name: ReconcileMediaItemComponentRelation :exec
@@ -2829,54 +2458,6 @@ func (q *Queries) RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAsset
 	return err
 }
 
-const resetAssetStatusForRetry = `-- name: ResetAssetStatusForRetry :one
-UPDATE assets
-SET status = json_set(
-    status,
-    char(36) || '.state',
-    '"processing"'
-)
-WHERE asset_id = ?1 AND json_extract(status, char(36) || '.state') IN ('warning', 'failed')
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-func (q *Queries) ResetAssetStatusForRetry(ctx context.Context, assetID uuid.UUID) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, resetAssetStatusForRetry, assetID)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.RepositoryID,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
-}
-
 const restoreAsset = `-- name: RestoreAsset :exec
 UPDATE assets
 SET is_deleted = false, deleted_at = NULL
@@ -2889,7 +2470,7 @@ func (q *Queries) RestoreAsset(ctx context.Context, assetID uuid.UUID) error {
 }
 
 const searchAssets = `-- name: SearchAssets :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE is_deleted = false
 AND (?1 IS NULL OR original_filename LIKE '%' || ?1 || '%')
 AND (?2 IS NULL OR type = ?2)
@@ -2921,14 +2502,10 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -2940,7 +2517,6 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -2962,32 +2538,11 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 	return items, nil
 }
 
-const softDeleteAssetByRepositoryAndStoragePath = `-- name: SoftDeleteAssetByRepositoryAndStoragePath :execrows
-UPDATE assets
-SET is_deleted = true, deleted_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE repository_id = ?1
-  AND storage_path = ?2
-  AND is_deleted = false
-`
-
-type SoftDeleteAssetByRepositoryAndStoragePathParams struct {
-	RepositoryID uuid.NullUUID `db:"repository_id" json:"repository_id"`
-	StoragePath  *string       `db:"storage_path" json:"storage_path"`
-}
-
-func (q *Queries) SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, softDeleteAssetByRepositoryAndStoragePath, arg.RepositoryID, arg.StoragePath)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const updateAsset = `-- name: UpdateAsset :one
 UPDATE assets
 SET original_filename = ?2, specific_metadata = ?3
 WHERE asset_id = ?1
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
+RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
 `
 
 type UpdateAssetParams struct {
@@ -3002,14 +2557,10 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 	err := row.Scan(
 		&i.AssetID,
 		&i.OwnerID,
+		&i.ContentID,
 		&i.Type,
 		&i.OriginalFilename,
-		&i.StoragePath,
 		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
 		&i.Width,
 		&i.Height,
 		&i.Duration,
@@ -3021,7 +2572,6 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
-		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
 		&i.GpsLatitude,
@@ -3086,6 +2636,64 @@ func (q *Queries) UpdateAssetDuration(ctx context.Context, arg UpdateAssetDurati
 	return err
 }
 
+const updateAssetExtractedMetadata = `-- name: UpdateAssetExtractedMetadata :exec
+UPDATE assets
+SET specific_metadata = ?1,
+    exif_raw = ?2,
+    taken_time = CASE
+        WHEN ?3 IS NOT NULL THEN ?3
+        ELSE COALESCE(taken_time, upload_time)
+    END,
+    capture_offset_minutes = COALESCE(
+        ?4,
+        capture_offset_minutes
+    ),
+    gps_latitude = ?5,
+    gps_longitude = ?6,
+    gps_geohash_5 = ?7,
+    gps_geohash_7 = ?8,
+    width = COALESCE(?9, width),
+    height = COALESCE(?10, height),
+    duration = COALESCE(?11, duration),
+    rating = COALESCE(?12, rating)
+WHERE asset_id = ?13
+`
+
+type UpdateAssetExtractedMetadataParams struct {
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	TakenTime            interface{}              `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	Width                *int64                   `db:"width" json:"width"`
+	Height               *int64                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	Rating               *int64                   `db:"rating" json:"rating"`
+	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetExtractedMetadata(ctx context.Context, arg UpdateAssetExtractedMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, updateAssetExtractedMetadata,
+		arg.SpecificMetadata,
+		arg.ExifRaw,
+		arg.TakenTime,
+		arg.CaptureOffsetMinutes,
+		arg.GpsLatitude,
+		arg.GpsLongitude,
+		arg.GpsGeohash5,
+		arg.GpsGeohash7,
+		arg.Width,
+		arg.Height,
+		arg.Duration,
+		arg.Rating,
+		arg.AssetID,
+	)
+	return err
+}
+
 const updateAssetLike = `-- name: UpdateAssetLike :exec
 UPDATE assets
 SET liked = ?1
@@ -3115,52 +2723,6 @@ type UpdateAssetMetadataParams struct {
 
 func (q *Queries) UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error {
 	_, err := q.db.ExecContext(ctx, updateAssetMetadata, arg.AssetID, arg.SpecificMetadata)
-	return err
-}
-
-const updateAssetMetadataWithTakenTime = `-- name: UpdateAssetMetadataWithTakenTime :exec
-UPDATE assets
-SET specific_metadata = ?1,
-    exif_raw = COALESCE(?2, exif_raw),
-    taken_time = CASE
-        WHEN ?3 IS NOT NULL THEN ?3
-        ELSE COALESCE(taken_time, upload_time)
-    END,
-    capture_offset_minutes = COALESCE(
-        ?4,
-        capture_offset_minutes
-    ),
-    gps_latitude = ?5,
-    gps_longitude = ?6,
-    gps_geohash_5 = ?7,
-    gps_geohash_7 = ?8
-WHERE asset_id = ?9
-`
-
-type UpdateAssetMetadataWithTakenTimeParams struct {
-	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
-	TakenTime            interface{}              `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
-	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
-	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
-	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
-}
-
-func (q *Queries) UpdateAssetMetadataWithTakenTime(ctx context.Context, arg UpdateAssetMetadataWithTakenTimeParams) error {
-	_, err := q.db.ExecContext(ctx, updateAssetMetadataWithTakenTime,
-		arg.SpecificMetadata,
-		arg.ExifRaw,
-		arg.TakenTime,
-		arg.CaptureOffsetMinutes,
-		arg.GpsLatitude,
-		arg.GpsLongitude,
-		arg.GpsGeohash5,
-		arg.GpsGeohash7,
-		arg.AssetID,
-	)
 	return err
 }
 
@@ -3196,229 +2758,4 @@ type UpdateAssetRatingAndLikeParams struct {
 func (q *Queries) UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error {
 	_, err := q.db.ExecContext(ctx, updateAssetRatingAndLike, arg.Rating, arg.Liked, arg.AssetID)
 	return err
-}
-
-const updateAssetStatus = `-- name: UpdateAssetStatus :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-type UpdateAssetStatusParams struct {
-	AssetID uuid.UUID    `db:"asset_id" json:"asset_id"`
-	Status  dbtypes.JSON `db:"status" json:"status"`
-}
-
-func (q *Queries) UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, updateAssetStatus, arg.AssetID, arg.Status)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.RepositoryID,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
-}
-
-const updateAssetStatusWithErrors = `-- name: UpdateAssetStatusWithErrors :one
-UPDATE assets
-SET status = ?2
-WHERE asset_id = ?1
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-type UpdateAssetStatusWithErrorsParams struct {
-	AssetID uuid.UUID    `db:"asset_id" json:"asset_id"`
-	Status  dbtypes.JSON `db:"status" json:"status"`
-}
-
-func (q *Queries) UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, updateAssetStatusWithErrors, arg.AssetID, arg.Status)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.RepositoryID,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
-}
-
-const updateAssetStoragePathAndStatus = `-- name: UpdateAssetStoragePathAndStatus :one
-UPDATE assets
-SET
-    storage_path = ?2,
-    status = ?3
-WHERE asset_id = ?1
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-type UpdateAssetStoragePathAndStatusParams struct {
-	AssetID     uuid.UUID    `db:"asset_id" json:"asset_id"`
-	StoragePath *string      `db:"storage_path" json:"storage_path"`
-	Status      dbtypes.JSON `db:"status" json:"status"`
-}
-
-func (q *Queries) UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, updateAssetStoragePathAndStatus, arg.AssetID, arg.StoragePath, arg.Status)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.RepositoryID,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
-}
-
-const updateDiscoveredAssetByID = `-- name: UpdateDiscoveredAssetByID :one
-UPDATE assets
-SET original_filename = ?2,
-    mime_type = ?3,
-    file_size = ?4,
-    content_hash = ?5,
-    quick_fingerprint = ?6,
-    quick_fingerprint_version = ?7,
-    taken_time = ?8,
-    status = ?9,
-    is_deleted = false,
-    deleted_at = NULL
-WHERE asset_id = ?1
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, content_hash, quick_fingerprint, quick_fingerprint_version, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
-`
-
-type UpdateDiscoveredAssetByIDParams struct {
-	AssetID                 uuid.UUID         `db:"asset_id" json:"asset_id"`
-	OriginalFilename        string            `db:"original_filename" json:"original_filename"`
-	MimeType                string            `db:"mime_type" json:"mime_type"`
-	FileSize                int64             `db:"file_size" json:"file_size"`
-	ContentHash             string            `db:"content_hash" json:"content_hash"`
-	QuickFingerprint        *string           `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string           `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	TakenTime               dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
-	Status                  dbtypes.JSON      `db:"status" json:"status"`
-}
-
-func (q *Queries) UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error) {
-	row := q.db.QueryRowContext(ctx, updateDiscoveredAssetByID,
-		arg.AssetID,
-		arg.OriginalFilename,
-		arg.MimeType,
-		arg.FileSize,
-		arg.ContentHash,
-		arg.QuickFingerprint,
-		arg.QuickFingerprintVersion,
-		arg.TakenTime,
-		arg.Status,
-	)
-	var i Asset
-	err := row.Scan(
-		&i.AssetID,
-		&i.OwnerID,
-		&i.Type,
-		&i.OriginalFilename,
-		&i.StoragePath,
-		&i.MimeType,
-		&i.FileSize,
-		&i.ContentHash,
-		&i.QuickFingerprint,
-		&i.QuickFingerprintVersion,
-		&i.Width,
-		&i.Height,
-		&i.Duration,
-		&i.UploadTime,
-		&i.TakenTime,
-		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.SpecificMetadata,
-		&i.Rating,
-		&i.Liked,
-		&i.RepositoryID,
-		&i.Status,
-		&i.UpdatedAt,
-		&i.GpsLatitude,
-		&i.GpsLongitude,
-		&i.GpsGeohash5,
-		&i.GpsGeohash7,
-		&i.ExifRaw,
-	)
-	return i, err
 }

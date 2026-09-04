@@ -28,15 +28,15 @@ func NewClassifierHandler(classifierService service.ClassifierService) *Classifi
 // @Security BearerAuth
 // @Param request body dto.ClassifierPreviewRequestDTO true "Prompts and threshold"
 // @Success 200 {object} dto.ClassifierPreviewResponseDTO "Preview matches retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 503 {object} api.ErrorResponse "Classification unavailable"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 503 {object} api.ProblemResponse "Classification unavailable"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/classifiers/preview [post]
 func (h *ClassifierHandler) PreviewClassifier(c *gin.Context) {
 	var req dto.ClassifierPreviewRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -49,10 +49,10 @@ func (h *ClassifierHandler) PreviewClassifier(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, http.StatusServiceUnavailable, err, http.StatusServiceUnavailable, "Classification is unavailable")
+			api.WriteProblem(c, api.StatusProblem(http.StatusServiceUnavailable, err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to run classifier preview")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 

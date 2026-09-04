@@ -3,6 +3,7 @@ import { CalendarRange, EyeOff, Merge, Pencil } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useMessage } from "@/features/notifications";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import type { EventDetail, EventPatch } from "../../../model/event";
 import { eventTitle } from "../../../model/event";
 import EventPicker from "./EventPicker";
@@ -68,7 +69,7 @@ export default function EventEditModal({
       showMessage(
         "error",
         t("events.edit.error", "Failed to update Event: {{message}}", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -91,7 +92,7 @@ export default function EventEditModal({
       showMessage(
         "error",
         t("events.mergeError", "Failed to merge Events: {{message}}", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
       setConfirmingMerge(false);

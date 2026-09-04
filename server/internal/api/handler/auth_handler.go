@@ -8,6 +8,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/httporigin"
 	"server/internal/service"
 
@@ -40,14 +41,14 @@ func NewAuthHandler(authService *service.AuthService, rateLimiter *AuthRateLimit
 // @Produce json
 // @Param request body dto.RegistrationStartRequestDTO true "Registration data"
 // @Success 200 {object} dto.AuthResponseDTO "Account created successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 409 {object} api.ErrorResponse "User already exists"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 409 {object} api.ProblemResponse "User already exists"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/register/start [post]
 func (h *AuthHandler) StartRegistration(c *gin.Context) {
 	var req dto.RegistrationStartRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -59,13 +60,13 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 		switch {
 		case errors.Is(err, service.ErrInvalidUsernameFormat),
 			errors.Is(err, service.ErrWeakPassword):
-			api.GinBadRequest(c, err, err.Error())
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		case errors.Is(err, service.ErrUserAlreadyExists):
-			api.GinError(c, 409, err, http.StatusConflict, "User already exists")
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to register user")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -80,9 +81,9 @@ func (h *AuthHandler) StartRegistration(c *gin.Context) {
 // @Produce json
 // @Param request body dto.LoginOptionsRequestDTO true "Username to probe"
 // @Success 200 {object} dto.LoginOptionsResponseDTO "Login options for the username"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 429 {object} api.ProblemResponse "Too many authentication attempts"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/login/options [post]
 func (h *AuthHandler) GetLoginOptions(c *gin.Context) {
 	if !h.allowAuthNetwork(c, authRateScopeLoginOptions) {
@@ -91,17 +92,17 @@ func (h *AuthHandler) GetLoginOptions(c *gin.Context) {
 
 	var req dto.LoginOptionsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	options, err := h.authService.GetLoginOptions(c.Request.Context(), req.Username)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidUsernameFormat) {
-			api.GinBadRequest(c, err, err.Error())
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to load login options")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -128,7 +129,7 @@ func (h *AuthHandler) GetLoginOptions(c *gin.Context) {
 func (h *AuthHandler) GetBrowserCapabilities(c *gin.Context) {
 	resolved, ok := api.RequestOriginContext(c)
 	if !ok || h.originPolicy == nil {
-		api.GinBadRequest(c, errors.New("request origin policy was not resolved"), "invalid_request_origin")
+		api.WriteProblem(c, api.BadRequest(errors.New("request origin policy was not resolved")))
 		return
 	}
 	available, reason := h.originPolicy.PasskeyAvailability(resolved)
@@ -148,10 +149,10 @@ func (h *AuthHandler) GetBrowserCapabilities(c *gin.Context) {
 // @Produce json
 // @Param request body dto.LoginRequestDTO true "Login credentials"
 // @Success 200 {object} dto.AuthResponseDTO "Login successful"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Invalid credentials"
-// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Invalid credentials"
+// @Failure 429 {object} api.ProblemResponse "Too many authentication attempts"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	if !h.allowAuthNetwork(c, authRateScopeLogin) {
@@ -160,7 +161,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var req dto.LoginRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if !h.allowAuthUsername(c, authRateScopeLogin, req.Username) {
@@ -173,10 +174,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrUserNotFound) || errors.Is(err, service.ErrInvalidPassword) {
-			api.GinUnauthorized(c, errors.New("Username or password is incorrect"), "Invalid credentials")
+			api.WriteProblem(c, api.KnownProblem(problem.InvalidCredentials, err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to login")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -193,25 +194,25 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Produce json
 // @Param request body dto.CompleteRequiredPasswordChangeRequestDTO true "Password change payload"
 // @Success 200 {object} dto.AuthResponseDTO "Password changed and session issued"
-// @Failure 400 {object} api.ErrorResponse "Invalid password"
-// @Failure 401 {object} api.ErrorResponse "Invalid or expired password change token"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid password"
+// @Failure 401 {object} api.ProblemResponse "Invalid or expired password change token"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/password-change/complete [post]
 func (h *AuthHandler) CompleteRequiredPasswordChange(c *gin.Context) {
 	var req dto.CompleteRequiredPasswordChangeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	response, err := h.authService.CompleteRequiredPasswordChange(c.Request.Context(), req.PasswordChangeToken, req.NewPassword)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrWeakPassword):
-			api.GinBadRequest(c, err, err.Error())
+			api.WriteProblem(c, api.BadRequest(err))
 		case errors.Is(err, service.ErrInvalidPasswordChangeToken):
-			api.GinUnauthorized(c, err, "Invalid or expired password change token")
+			api.WriteProblem(c, api.Unauthorized(err))
 		default:
-			api.GinInternalError(c, err, "Failed to change password")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -224,10 +225,10 @@ func (h *AuthHandler) CompleteRequiredPasswordChange(c *gin.Context) {
 // @Tags auth
 // @Produce json
 // @Success 200 {object} dto.AuthResponseDTO "Token refreshed successfully"
-// @Failure 403 {object} api.ErrorResponse "Invalid CSRF token"
-// @Failure 401 {object} api.ErrorResponse "Invalid or expired refresh token"
-// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 403 {object} api.ProblemResponse "Invalid CSRF token"
+// @Failure 401 {object} api.ProblemResponse "Invalid or expired refresh token"
+// @Failure 429 {object} api.ProblemResponse "Too many authentication attempts"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	refreshToken, ok := h.requireRefreshCookie(c)
@@ -251,10 +252,10 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 			errors.Is(err, service.ErrExpiredToken) ||
 			errors.Is(err, service.ErrPasswordChangeRequired) {
 			h.clearAuthCookies(c)
-			api.GinUnauthorized(c, err, "Invalid or expired refresh token")
+			api.WriteProblem(c, api.KnownProblem(problem.SessionExpired, err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to refresh token")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -268,8 +269,8 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Tags auth
 // @Produce json
 // @Success 200 {object} api.SuccessResponse "Logout successful"
-// @Failure 403 {object} api.ErrorResponse "Invalid CSRF token"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 403 {object} api.ProblemResponse "Invalid CSRF token"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	refreshToken, err := c.Cookie(refreshCookieName)
@@ -279,7 +280,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid refresh cookie")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if !h.requireCSRFToken(c, refreshToken) {
@@ -289,7 +290,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	err = h.authService.RevokeRefreshToken(refreshToken)
 	if err != nil {
 		if !errors.Is(err, service.ErrTokenNotFound) {
-			api.GinInternalError(c, err, "Failed to logout")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 	}
@@ -306,8 +307,8 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.UserDTO "User information retrieved successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -326,8 +327,8 @@ func (h *AuthHandler) Me(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.MediaTokenDTO "Media token issued successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/media-token [get]
 func (h *AuthHandler) GetMediaToken(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -337,7 +338,7 @@ func (h *AuthHandler) GetMediaToken(c *gin.Context) {
 
 	token, expiresAt, err := h.authService.GenerateMediaToken(c.Request.Context(), user.UserID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to generate media token")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -352,7 +353,7 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, err := h.authenticateRequest(c)
 		if err != nil {
-			api.GinUnauthorized(c, errors.New("Invalid or expired token"), "Unauthorized")
+			api.WriteProblem(c, api.KnownProblem(problem.SessionExpired, err))
 			c.Abort()
 			return
 		}

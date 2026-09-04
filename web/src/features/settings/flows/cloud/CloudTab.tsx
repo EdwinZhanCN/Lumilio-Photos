@@ -12,6 +12,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import {
   useCloudCredentials,
   useCloudProviders,
@@ -146,7 +147,7 @@ export default function CloudTab() {
         setSuccessMsg(t("settings.cloud.messages.connected"));
       }
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.createFailed"));
+      setErrorMsg(localizeProblem(error, t, t("settings.cloud.errors.createFailed")));
     }
   };
 
@@ -164,7 +165,7 @@ export default function CloudTab() {
       setIsAddOpen(false);
       setSuccessMsg(t("settings.cloud.messages.verified"));
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.verifyFailed"));
+      setErrorMsg(localizeProblem(error, t, t("settings.cloud.errors.verifyFailed")));
     }
   };
 
@@ -176,9 +177,7 @@ export default function CloudTab() {
       await disconnectCredential.mutateAsync({ params: { path: { id: credential.id ?? "" } } });
       setSuccessMsg(t("settings.cloud.messages.disconnected"));
     } catch (error) {
-      setErrorMsg(
-        error instanceof Error ? error.message : t("settings.cloud.errors.disconnectFailed"),
-      );
+      setErrorMsg(localizeProblem(error, t, t("settings.cloud.errors.disconnectFailed")));
     }
   };
 
@@ -206,9 +205,7 @@ export default function CloudTab() {
         setIsAddOpen(true);
       }
     } catch (error) {
-      setErrorMsg(
-        error instanceof Error ? error.message : t("settings.cloud.errors.reconnectFailed"),
-      );
+      setErrorMsg(localizeProblem(error, t, t("settings.cloud.errors.reconnectFailed")));
     }
   };
 
@@ -220,7 +217,7 @@ export default function CloudTab() {
       await removeCredential.mutateAsync({ params: { path: { id: credential.id ?? "" } } });
       setSuccessMsg(t("settings.cloud.messages.removed"));
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.removeFailed"));
+      setErrorMsg(localizeProblem(error, t, t("settings.cloud.errors.removeFailed")));
     }
   };
 

@@ -66,7 +66,7 @@ export default function AboutTab() {
           description={REPOSITORY}
           control={
             <a className="btn btn-link btn-sm" href={REPOSITORY} target="_blank" rel="noreferrer">
-              {t("settings.about.openRepository", "Open repository")}
+              {t("settings.about.openRepository", "Open Repository")}
               <ExternalLinkIcon className="size-3.5" />
             </a>
           }

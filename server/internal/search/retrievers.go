@@ -38,7 +38,10 @@ func (r *EmbeddingRetriever) Source() string  { return SourceEmbedding }
 func (r *EmbeddingRetriever) Weight() float64 { return r.weight }
 
 func (r *EmbeddingRetriever) Retrieve(ctx context.Context, req Request) ([]Candidate, error) {
-	if r == nil || r.pool == nil || r.embed == nil || r.resolveSpace == nil {
+	if r == nil || r.pool == nil || r.resolveSpace == nil {
+		return nil, fmt.Errorf("embedding retriever is not configured")
+	}
+	if req.QueryEmbedding == nil && r.embed == nil {
 		return nil, fmt.Errorf("embedding retriever is not configured")
 	}
 
@@ -165,9 +168,15 @@ func squareRootCandidateDistances(candidates []Candidate) {
 }
 
 func (r *EmbeddingRetriever) resolveQuerySpace(ctx context.Context, req Request) (QueryEmbedding, repo.EmbeddingSpace, error) {
-	embedding, err := r.embed(ctx, req.Query, true)
-	if err != nil {
-		return QueryEmbedding{}, repo.EmbeddingSpace{}, err
+	var embedding QueryEmbedding
+	if req.QueryEmbedding != nil {
+		embedding = *req.QueryEmbedding
+	} else {
+		var err error
+		embedding, err = r.embed(ctx, req.Query, true)
+		if err != nil {
+			return QueryEmbedding{}, repo.EmbeddingSpace{}, err
+		}
 	}
 	if len(embedding.Vector) == 0 {
 		return QueryEmbedding{}, repo.EmbeddingSpace{}, fmt.Errorf("query embedding is empty")
@@ -279,10 +288,9 @@ func (r *BleveOCRRetriever) Retrieve(ctx context.Context, req Request) ([]Candid
 		AssetTypes: req.Filter.AssetTypes,
 		IsDeleted:  req.Filter.IsDeleted != nil && *req.Filter.IsDeleted,
 	}
-	if req.Filter.RepositoryID != nil {
-		repositoryID := req.Filter.RepositoryID.String()
-		filters.RepositoryID = &repositoryID
-	}
+	// One Asset may have Locations in several repositories, while the compact
+	// Bleve document stores only one representative repository. The SQLite
+	// post-filter below checks every active Location without false negatives.
 
 	candidates := make([]Candidate, 0, req.TopK)
 	seen := make(map[uuid.UUID]struct{})

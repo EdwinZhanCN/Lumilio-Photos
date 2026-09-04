@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
@@ -156,7 +157,7 @@ type renameRepositoryOperationResult struct {
 }
 
 func (rm *DefaultRepositoryManager) markInitialScanQueued(ctx context.Context, operationID string) error {
-	result, err := rm.database.ExecContext(ctx, `
+	result, err := rm.writer.ExecContext(ctx, catalogtx.OperationRepositoryLifecycleMarkScanQueued, `
 		UPDATE lifecycle_operations
 		SET result = json_set(result, '$.initial_scan_queued', json('true')), updated_at = ?
 		WHERE operation_id = ? AND status = 'completed'
@@ -171,14 +172,14 @@ func (rm *DefaultRepositoryManager) markInitialScanQueued(ctx context.Context, o
 }
 
 // RetryPendingInitialRepositoryScans closes the crash window between durable
-// repository registration and River insertion. The lifecycle result remains
-// false until the queue has accepted the scan, so restart and a low-frequency
-// runtime retry can safely finish the handoff.
+// repository registration and Catalog-derived scan scheduling. The lifecycle
+// result remains false until the queue has accepted the scan, so restart and a
+// low-frequency runtime retry can safely finish the handoff.
 func (rm *DefaultRepositoryManager) RetryPendingInitialRepositoryScans(ctx context.Context) error {
 	if rm.initialScan == nil {
 		return errors.New("initial repository scan queue is unavailable")
 	}
-	rows, err := rm.database.QueryContext(ctx, `
+	rows, err := rm.readerDatabase.QueryContext(ctx, `
 		SELECT operation_id, target_id
 		FROM lifecycle_operations
 		WHERE kind IN ('open_repository', 'register_repository_copy')
@@ -331,12 +332,12 @@ func (rm *DefaultRepositoryManager) completeLifecycleOperationWithAuditResult(ct
 	if err != nil {
 		return err
 	}
-	tx, err := rm.database.BeginTx(ctx, nil)
+	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryLifecycleComplete, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	queries := rm.queries.WithTx(tx)
+	queries := rm.queries.WithTx(tx.Raw())
 	operation, lookupErr := queries.GetLifecycleOperation(ctx, operationID)
 	if lookupErr != nil {
 		return lookupErr
@@ -398,12 +399,12 @@ func (rm *DefaultRepositoryManager) failLifecycleOperationWithAuditResult(
 		message := cause.Error()
 		errorText = &message
 	}
-	tx, beginErr := rm.database.BeginTx(ctx, nil)
+	tx, beginErr := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryLifecycleFail, nil)
 	if beginErr != nil {
 		return beginErr
 	}
 	defer func() { _ = tx.Rollback() }()
-	queries := rm.queries.WithTx(tx)
+	queries := rm.queries.WithTx(tx.Raw())
 	operation, lookupErr := queries.GetLifecycleOperation(ctx, operationID)
 	if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
 		return lookupErr

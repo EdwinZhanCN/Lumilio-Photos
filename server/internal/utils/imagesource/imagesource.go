@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/davidbyttow/govips/v2/vips"
@@ -136,4 +137,66 @@ func mlRGB(source []byte, purpose Purpose) (*imaging.RGBImage, error) {
 	default:
 		return nil, fmt.Errorf("unsupported image purpose: %s", purpose)
 	}
+}
+
+// semanticThumbnailBounds is the catalog medium derivative (800px) that
+// DBMLImageLoader feeds to semantic_image_embed. Live image search must use
+// the same size so query and index vectors share a preprocess.
+var semanticThumbnailBounds = [2]int{800, 800}
+
+// PrepareSemanticThumbnail opens a photo the same way ingest does (RAW via
+// OpenPhoto) and returns an in-memory medium WebP. Nothing is written to the
+// repository thumbnail store.
+func PrepareSemanticThumbnail(ctx context.Context, fullPath, originalFilename string) ([]byte, error) {
+	reader, err := OpenPhoto(ctx, fullPath, originalFilename)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	return encodeSemanticThumbnail(reader)
+}
+
+// PrepareSemanticThumbnailBytes builds the same medium WebP from in-memory
+// bytes. RAW payloads are staged to a temp file so LibRaw can use a path.
+func PrepareSemanticThumbnailBytes(ctx context.Context, source []byte, originalFilename string) ([]byte, error) {
+	if len(source) == 0 {
+		return nil, fmt.Errorf("empty image source")
+	}
+	if raw.IsRAWFile(originalFilename) {
+		ext := filepath.Ext(originalFilename)
+		if ext == "" {
+			ext = ".raw"
+		}
+		tmp, err := os.CreateTemp("", "search-query-*"+ext)
+		if err != nil {
+			return nil, fmt.Errorf("stage RAW query image: %w", err)
+		}
+		tmpName := tmp.Name()
+		defer os.Remove(tmpName)
+		if _, err := tmp.Write(source); err != nil {
+			tmp.Close()
+			return nil, fmt.Errorf("stage RAW query image: %w", err)
+		}
+		if err := tmp.Close(); err != nil {
+			return nil, fmt.Errorf("stage RAW query image: %w", err)
+		}
+		return PrepareSemanticThumbnail(ctx, tmpName, originalFilename)
+	}
+	return encodeSemanticThumbnail(bytes.NewReader(source))
+}
+
+func encodeSemanticThumbnail(reader io.Reader) ([]byte, error) {
+	var buf bytes.Buffer
+	err := imaging.StreamThumbnails(
+		reader,
+		map[string][2]int{"medium": semanticThumbnailBounds},
+		map[string]io.Writer{"medium": &buf},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if buf.Len() == 0 {
+		return nil, fmt.Errorf("empty semantic thumbnail")
+	}
+	return buf.Bytes(), nil
 }

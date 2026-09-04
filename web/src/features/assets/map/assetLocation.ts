@@ -1,6 +1,5 @@
 import { autoConvertCoordinates } from "@/lib/geo/coordinateConversion";
 import type { Asset } from "@/lib/http-commons";
-import { isPhotoMetadata } from "@/lib/http-commons";
 import type { PhotoLocation } from "./types";
 
 /**
@@ -11,15 +10,12 @@ export const assetToPhotoLocation = (
   asset: Asset,
   useGaodeMap: boolean = false,
 ): PhotoLocation | null => {
-  const metadata = asset.specific_metadata;
-
-  // Check if metadata is photo metadata with GPS data
-  if (!isPhotoMetadata(asset.type, metadata)) {
+  if (asset.type !== "PHOTO") {
     return null;
   }
 
-  const latitude = metadata.gps_latitude;
-  const longitude = metadata.gps_longitude;
+  const latitude = asset.gps_latitude;
+  const longitude = asset.gps_longitude;
 
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     return null;
@@ -32,7 +28,7 @@ export const assetToPhotoLocation = (
     id: asset.asset_id || `asset-${Date.now()}`,
     position: [convertedCoords.latitude, convertedCoords.longitude],
     title: asset.original_filename || "Photo",
-    description: metadata.description,
+    description: asset.specific_metadata?.description,
     asset: asset,
   };
 };

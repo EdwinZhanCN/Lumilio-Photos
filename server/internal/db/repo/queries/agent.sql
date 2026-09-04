@@ -48,6 +48,18 @@ VALUES (
 )
 RETURNING *;
 
+-- name: CreatePreparedAgentRun :one
+INSERT INTO agent_runs (
+    run_id, user_id, thread_id, status, started_at, created_at, updated_at,
+    activation_state
+)
+VALUES (
+    sqlc.arg('run_id'), sqlc.arg('user_id'), sqlc.arg('thread_id'), 'running',
+    sqlc.arg('started_at'), sqlc.arg('created_at'), sqlc.arg('updated_at'),
+    'prepared_resume'
+)
+RETURNING *;
+
 -- name: SetAgentThreadActiveRun :exec
 UPDATE agent_threads
 SET active_run_id = sqlc.arg('run_id'),
@@ -84,7 +96,11 @@ RETURNING *;
 
 -- name: FinishAgentRun :exec
 UPDATE agent_runs
-SET status = @status,
+SET status = ?1,
+    activation_state = CASE
+        WHEN ?1 IN ('cancelled', 'completed', 'failed') THEN 'terminal'
+        ELSE activation_state
+    END,
     finished_at = CASE
         WHEN ?1 IN ('cancelled', 'completed', 'failed')
             THEN COALESCE(finished_at, sqlc.arg('updated_at'))
@@ -116,6 +132,7 @@ WHERE user_id = sqlc.arg('user_id')
 -- name: ClearAwaitingAgentRun :exec
 UPDATE agent_runs
 SET status = 'completed',
+    activation_state = 'terminal',
     finished_at = COALESCE(finished_at, sqlc.arg('updated_at')),
     updated_at = sqlc.arg('updated_at')
 WHERE run_id = sqlc.arg('run_id')

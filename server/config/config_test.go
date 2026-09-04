@@ -12,10 +12,11 @@ import (
 	"time"
 )
 
-const completeManifest = `schema_version = 3
+const completeManifest = `schema_version = 6
 environment = "development"
 [database]
 path = "data/app-state/library.sqlite3"
+queue_path = "data/app-state/river.sqlite3"
 [server]
 listen = "127.0.0.1:6680"
 cors_allowed_origins = ["http://LOCALHOST:6657", "http://localhost:6657"]
@@ -39,16 +40,8 @@ path = "data/storage"
 cloud_state_path = "data/app-state/cloud"
 backups_path = "data/app-state/backups"
 [repository_scan]
-enabled = true
 interval_seconds = 300
 settle_seconds = 5
-max_concurrent_repos = 1
-batch_size = 500
-[geocoding]
-provider = "disabled"
-nominatim_endpoint = "https://nominatim.openstreetmap.org/reverse"
-language = "en"
-user_agent = "Lumilio-Photos/1.0"
 [auth]
 secret_key_file = "data/app-state/secrets/key"
 access_token_ttl = "15m"
@@ -85,6 +78,17 @@ chunk_max_bytes = 262144
 exiftool_path = "exiftool"
 ffmpeg_path = "bin/ffmpeg"
 ffprobe_path = "/opt/ffprobe"
+[execution]
+cpu = 3
+disk_io = 4
+image_codec = 2
+video_codec = 1
+inference = 2
+memory_mib = 768
+macro_workers = 16
+max_waiting = 256
+ffmpeg_threads = 3
+ffmpeg_software_preset = "veryfast"
 `
 
 func writeManifestFixture(t *testing.T, contents string) string {
@@ -125,6 +129,9 @@ func TestLoadAppConfigStrictCompleteManifest(t *testing.T) {
 	if cfg.Auth.AccessTokenTTL != 15*time.Minute || !cfg.Auth.Passkey.Enabled {
 		t.Fatalf("auth config = %+v", cfg.Auth)
 	}
+	if cfg.Execution.CPU != 3 || cfg.Execution.DiskIO != 4 || cfg.Execution.MemoryMiB != 768 {
+		t.Fatalf("execution config = %+v", cfg.Execution)
+	}
 }
 
 func TestLoadAppConfigBytesPreservesManifestBase(t *testing.T) {
@@ -150,9 +157,12 @@ func TestResolvePathKeepsPOSIXAbsolutePathsAbsolute(t *testing.T) {
 
 func TestLoadAppConfigRejectsUnknownRemovedAndMissingFields(t *testing.T) {
 	for name, contents := range map[string]string{
-		"unknown":        completeManifest + "\nunknown_field = true\n",
-		"primary origin": strings.Replace(completeManifest, `listen = "127.0.0.1:6680"`, "listen = \"127.0.0.1:6680\"\nprimary_origin = \"https://photos.example.com\"", 1),
-		"proxy mode":     strings.Replace(completeManifest, "trusted_cidrs = []", "mode = \"required\"\ntrusted_cidrs = []", 1),
+		"unknown":                     completeManifest + "\nunknown_field = true\n",
+		"primary origin":              strings.Replace(completeManifest, `listen = "127.0.0.1:6680"`, "listen = \"127.0.0.1:6680\"\nprimary_origin = \"https://photos.example.com\"", 1),
+		"proxy mode":                  strings.Replace(completeManifest, "trusted_cidrs = []", "mode = \"required\"\ntrusted_cidrs = []", 1),
+		"repository scan enabled":     strings.Replace(completeManifest, "interval_seconds = 300", "enabled = false\ninterval_seconds = 300", 1),
+		"repository scan concurrency": strings.Replace(completeManifest, "settle_seconds = 5", "settle_seconds = 5\nmax_concurrent_repos = 1", 1),
+		"repository scan batch size":  strings.Replace(completeManifest, "settle_seconds = 5", "settle_seconds = 5\nbatch_size = 500", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := LoadAppConfig(writeManifestFixture(t, contents))

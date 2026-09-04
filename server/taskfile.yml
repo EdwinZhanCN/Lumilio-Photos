@@ -30,7 +30,6 @@ tasks:
 
   test:ci:
     desc: Run Go Server tests in CI mode with a clean cache
-    internal: true
     env:
       CGO_ENABLED: '1'
       GOFLAGS: -buildvcs=false
@@ -39,6 +38,23 @@ tasks:
       # rebuild from clean build and test caches like the Desktop CI task.
       - go clean -cache -testcache
       - go test -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}} ./...
+
+  test:concurrency:ci:
+    desc: Race, shuffle, and repeat concurrency-sensitive Server packages
+    env:
+      CGO_ENABLED: '1'
+      GOFLAGS: -buildvcs=false
+    cmds:
+      - >-
+        go test
+        -tags={{.GO_BUILD_TAGS | default "sqlite_fts5"}}
+        -race
+        -shuffle=on
+        -count=3
+        ./internal/cloud
+        ./internal/commit
+        ./internal/servertransport
+        ./internal/storage
 
   dev:
     desc: Start only the Go API against the development manifest
@@ -63,6 +79,7 @@ tasks:
     desc: Generate the OpenAPI spec (server/docs/swagger.yaml)
     cmds:
       - swag init --v3.1 -g cmd/main.go -o docs/
+      - go run ./tools/openapinormalize
 
   config-examples:
     desc: Regenerate the config schema and example manifests from profiles.go

@@ -1,6 +1,5 @@
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
-import type { UseQueryResult } from "@tanstack/react-query";
 import type { AgentServerAvailability } from "./types";
 
 type CapabilitiesResponseDTO = components["schemas"]["dto.CapabilitiesResponseDTO"];
@@ -12,8 +11,13 @@ type MLTaskCapability = {
 
 export type Capabilities = {
   ml: {
+    discoveryState: "disabled" | "starting" | "healthy" | "degraded";
     discoveredNodeCount: number;
     activeNodeCount: number;
+    connectingNodeCount: number;
+    unavailableNodeCount: number;
+    pendingNodeCount: number;
+    incompatibleNodeCount: number;
     tasks: {
       clipImageEmbed: MLTaskCapability;
       semanticTextEmbed: MLTaskCapability;
@@ -52,8 +56,13 @@ function normalizeCapabilities(data?: CapabilitiesResponseDTO): Capabilities | u
 
   return {
     ml: {
+      discoveryState: data.ml?.discovery_state ?? "disabled",
       discoveredNodeCount: data.ml?.discovered_node_count ?? 0,
       activeNodeCount: data.ml?.active_node_count ?? 0,
+      connectingNodeCount: data.ml?.connecting_node_count ?? 0,
+      unavailableNodeCount: data.ml?.unavailable_node_count ?? 0,
+      pendingNodeCount: data.ml?.pending_node_count ?? 0,
+      incompatibleNodeCount: data.ml?.incompatible_node_count ?? 0,
       tasks: {
         clipImageEmbed: normalizeTaskCapability(data.ml?.tasks?.semantic_image_embed),
         semanticTextEmbed: normalizeTaskCapability(data.ml?.tasks?.semantic_text_embed),
@@ -64,8 +73,7 @@ function normalizeCapabilities(data?: CapabilitiesResponseDTO): Capabilities | u
     },
     llm: {
       availability: (() => {
-        const wire = (data.llm as typeof data.llm & { availability?: string } | undefined)
-          ?.availability;
+        const wire = data.llm?.availability;
         if (wire === "disabled" || wire === "not_configured" || wire === "ready") return wire;
         if (!data.llm?.agent_enabled) return "disabled";
         return data.llm?.configured ? "ready" : "not_configured";
@@ -78,12 +86,7 @@ function normalizeCapabilities(data?: CapabilitiesResponseDTO): Capabilities | u
   };
 }
 
-export function useCapabilities(refetchInterval?: number | false): UseQueryResult<
-  CapabilitiesResponseDTO,
-  unknown
-> & {
-  capabilities?: Capabilities;
-} {
+export function useCapabilities(refetchInterval?: number | false) {
   const query = $api.useQuery(
     "get",
     "/api/v1/capabilities",
@@ -91,7 +94,7 @@ export function useCapabilities(refetchInterval?: number | false): UseQueryResul
     {
       refetchInterval,
     },
-  ) as UseQueryResult<CapabilitiesResponseDTO, unknown>;
+  );
 
   return {
     ...query,

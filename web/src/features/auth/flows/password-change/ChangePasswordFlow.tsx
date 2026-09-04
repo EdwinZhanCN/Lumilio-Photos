@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, Info, KeyRound, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { useAuth } from "../../state/useAuth.ts";
 import { useChangeMyPassword } from "@/features/users";
 import { usePasswordConfirmation } from "../../hooks/usePasswordConfirmation.ts";
@@ -19,18 +20,6 @@ type ReturnState = {
     hash?: string;
   };
 };
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
-}
 
 export default function ChangePasswordFlow(): React.ReactNode {
   const { t } = useI18n();
@@ -82,8 +71,9 @@ export default function ChangePasswordFlow(): React.ReactNode {
       void navigate("/login", { replace: true });
     } catch (error) {
       setErrorMessage(
-        getErrorMessage(
+        localizeProblem(
           error,
+          t,
           t("auth.changePassword.error", {
             defaultValue: "Failed to change password.",
           }),

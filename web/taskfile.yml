@@ -63,15 +63,10 @@ tasks:
       - vp node scripts/check-source-boundaries.ts
       - vp test
 
-  test:coverage:
-    desc: Run unit tests with coverage
+  docs:
+    desc: Render every feature doc.ts into its sibling doc.md
     cmds:
-      - vp test run --coverage
-
-  test:watch:
-    desc: Run unit tests in watch mode
-    cmds:
-      - vp test watch
+      - vp node scripts/render-feature-docs.ts
 
   e2e:up:
     desc: Start the isolated E2E Compose environment
@@ -82,11 +77,6 @@ tasks:
     desc: Stop the isolated E2E Compose environment
     cmds:
       - vp run e2e:down
-
-  e2e:logs:
-    desc: Show E2E service logs
-    cmds:
-      - vp run e2e:logs
 
   e2e:seed:
     desc: Sync assets and seed the E2E environment
@@ -114,6 +104,15 @@ tasks:
       - task: e2e:seed
       - vp run e2e:test --grep @auth-hardening --workers=1
 
+  test:auth-totp:
+    desc: Run the fresh first-admin TOTP bootstrap regression
+    env:
+      CI: "1"
+    cmds:
+      # This slice intentionally runs before e2e:seed on the disposable
+      # environment so the browser owns the first-admin ceremony.
+      - vp run e2e:test --grep @auth-totp --workers=1
+
   test:video-semantic:
     desc: Run the video semantic regression
     env:
@@ -129,6 +128,14 @@ tasks:
     cmds:
       - task: e2e:seed
       - vp run e2e:test --grep @agent-trust --workers=1
+
+  test:agent-runtime:
+    desc: Run the keyless real Lumilio Agent runtime regression
+    env:
+      CI: "1"
+    cmds:
+      - task: e2e:seed
+      - vp run e2e:test --grep @agent-runtime --workers=1
 
   test:backup-recovery:
     desc: Run the database backup and recovery regression

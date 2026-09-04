@@ -6,7 +6,7 @@ type TranslateFn = ReturnType<typeof useI18n>["t"];
 export function repositoryNameErrorMessage(error: RepositoryNameError, t: TranslateFn): string {
   switch (error) {
     case "required":
-      return t("manage.repositories.createNameRequired", "Enter a repository name.");
+      return t("manage.repositories.createNameRequired", "Enter a Repository name.");
     case "leadingOrTrailingSpace":
       return t(
         "manage.repositories.createNameEdgeSpace",

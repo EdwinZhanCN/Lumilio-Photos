@@ -11,11 +11,13 @@ import (
 func parseDateTime(dateStr string) (time.Time, error) {
 	// Common datetime formats used in EXIF data
 	formats := []string{
-		"2006:01:02 15:04:05",        // Standard EXIF format
-		"2006-01-02 15:04:05",        // ISO format variant
-		"2006:01:02 15:04:05-07:00",  // EXIF with timezone
-		"2006-01-02T15:04:05Z",       // ISO 8601 UTC
-		"2006-01-02T15:04:05-07:00",  // ISO 8601 with timezone
+		"2006:01:02 15:04:05",       // Standard EXIF format
+		"2006-01-02 15:04:05",       // ISO format variant
+		"2006:01:02 15:04:05-07:00", // EXIF with timezone
+		"2006:01:02 15:04:05.999999999-07:00",
+		"2006-01-02T15:04:05Z",      // ISO 8601 UTC
+		"2006-01-02T15:04:05-07:00", // ISO 8601 with timezone
+		"2006-01-02T15:04:05.999999999-07:00",
 		"2006:01:02 15:04:05.000",    // EXIF with milliseconds
 		"2006-01-02T15:04:05.000Z",   // ISO with milliseconds
 		"2006:01:02 15:04:05.000000", // EXIF with microseconds
@@ -78,6 +80,8 @@ func parseLocalDateTime(dateStr string) (time.Time, error) {
 		"2006:01:02 15:04:05",
 		"2006-01-02 15:04:05",
 		"2006-01-02T15:04:05",
+		"2006:01:02 15:04:05.999999999",
+		"2006-01-02T15:04:05.999999999",
 		"2006:01:02 15:04:05.000",
 		"2006-01-02T15:04:05.000",
 		"2006:01:02 15:04:05.000000",

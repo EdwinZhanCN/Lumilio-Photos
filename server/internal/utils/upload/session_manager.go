@@ -33,7 +33,7 @@ type UploadSession struct {
 	LastActivity      time.Time      `json:"last_activity"`
 	BytesReceived     int64          `json:"bytes_received"`
 	Error             string         `json:"error,omitempty"`
-	TaskID            *int64         `json:"task_id,omitempty"`
+	ReceiptID         *string        `json:"receipt_id,omitempty"`
 	ChunkFiles        map[int]string `json:"chunk_files,omitempty"` // private repository-relative paths
 	ChunkSizes        map[int]int64  `json:"chunk_sizes,omitempty"`
 }
@@ -132,8 +132,8 @@ func (sm *SessionManager) SetSessionError(sessionID, message string) bool {
 	return sm.mutate(sessionID, func(session *UploadSession) { session.Error, session.Status = message, "failed" })
 }
 
-func (sm *SessionManager) SetSessionTaskID(sessionID string, taskID int64) bool {
-	return sm.mutate(sessionID, func(session *UploadSession) { session.TaskID = &taskID })
+func (sm *SessionManager) SetSessionReceiptID(sessionID, receiptID string) bool {
+	return sm.mutate(sessionID, func(session *UploadSession) { session.ReceiptID = &receiptID })
 }
 
 func (sm *SessionManager) DeleteSession(sessionID string) bool {

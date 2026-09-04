@@ -7,6 +7,7 @@ import {
   type RepositoryStorageStrategy,
 } from "@/features/repositories";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { usePreference } from "@/lib/preferences/preferences";
 import { setupStatusQueryKey, useSetupStatus } from "../../api/useSetupStatus.ts";
 import { useRegistrationFlow } from "../registration/useRegistrationFlow.ts";
@@ -24,15 +25,6 @@ export function buildBootstrapPrimaryRepositoryRequest(
   riskConfirmation?: boolean,
 ) {
   return { name, role: "primary" as const, storageStrategy, riskConfirmation };
-}
-
-function apiMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const record = error as { message?: string; error?: string };
-    return record.message || record.error || fallback;
-  }
-  return fallback;
 }
 
 export function useBootstrapFlow() {
@@ -92,10 +84,11 @@ export function useBootstrapFlow() {
   };
 
   const repoError = createRepositoryMutation.error
-    ? apiMessage(
+    ? localizeProblem(
         createRepositoryMutation.error,
+        t,
         t("auth.primaryRepository.error", {
-          defaultValue: "Failed to create the primary repository.",
+          defaultValue: "Failed to create the Primary Repository.",
         }),
       )
     : null;

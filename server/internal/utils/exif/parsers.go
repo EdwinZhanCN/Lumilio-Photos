@@ -1,7 +1,7 @@
 package exif
 
 import (
-	"fmt"
+	"encoding/json"
 	"server/internal/db/dbtypes"
 	"strconv"
 	"strings"
@@ -13,8 +13,8 @@ import (
 var (
 	// TakenTime priority fields - from most specific to most generic
 	takenTimeFields = []string{
-		"DateTimeOriginal",       // Original capture time - highest priority
 		"SubSecDateTimeOriginal", // High precision original time
+		"DateTimeOriginal",       // Original capture time
 		"CreateDate",             // File creation time
 		"DateTime",               // General datetime
 		"ModifyDate",             // Last modification time
@@ -62,18 +62,17 @@ var (
 
 	// FocalLength priority fields
 	focalLengthFields = []string{
-		"FocalLength",             // Standard focal length
-		"FocalLengthIn35mmFilm",   // 35mm equivalent
-		"FocalLengthIn35mmFormat", // 35mm format equivalent
+		"FocalLength", // Physical focal length; do not mix in 35mm equivalents.
 	}
 
 	// Description priority fields
 	descriptionFields = []string{
-		"ImageDescription", // Specific image description
-		"UserComment",      // User comment
+		"Description",      // XMP dc:description
+		"Caption-Abstract", // IPTC caption/abstract
+		"ImageDescription", // EXIF image description
+		"UserComment",      // EXIF user comment
 		"XPComment",        // Windows XP comment
-		"Caption",          // Caption field
-		"Description",      // Generic description
+		"Caption",          // Generic caption fallback
 	}
 
 	// Exposure bias priority fields
@@ -120,17 +119,17 @@ var (
 	// VideoCameraModel priority fields
 	videoCameraModelFields = []string{
 		"Model",           // Standard model
-		"Make",            // Make of the device
 		"CameraModelName", // Camera model name
 		"RecorderModel",   // Recorder model (for videos)
 	}
 
 	// VideoDescription priority fields
 	videoDescriptionFields = []string{
-		"Description", // Generic description
-		"Comment",     // Comment
-		"Title",       // Title
-		"Synopsis",    // Synopsis
+		"Description",      // XMP/general description
+		"Caption-Abstract", // IPTC caption/abstract
+		"Comment",          // Comment
+		"Title",            // Title
+		"Synopsis",         // Synopsis
 	}
 
 	// AudioCodec priority fields
@@ -199,8 +198,8 @@ var (
 
 	// AudioDescription priority fields
 	audioDescriptionFields = []string{
-		"Comment",     // Comment
 		"Description", // Description
+		"Comment",     // Comment
 		"Lyrics",      // Lyrics
 		"Synopsis",    // Synopsis
 	}
@@ -210,12 +209,7 @@ var (
 func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadata {
 	metadata := &dbtypes.PhotoSpecificMetadata{}
 
-	metadata.TakenTime, metadata.CaptureOffsetMinutes = parseCaptureTimestamp(rawData, []captureTimePair{
-		{TimeField: "DateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
-		{TimeField: "SubSecDateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
-		{TimeField: "CreateDate", OffsetFields: []string{"OffsetTimeDigitized", "OffsetTime", "TimeZoneOffset"}},
-		{TimeField: "DateTime", OffsetFields: []string{"OffsetTime", "TimeZoneOffset"}},
-	}, takenTimeFields)
+	metadata.CameraMake = firstNormalizedString(rawData, []string{"Make", "Manufacturer"})
 
 	// Parse CameraModel using priority-based field list
 	for _, field := range cameraModelFields {
@@ -286,20 +280,6 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse GPS Latitude
-	if lat, exists := rawData["GPSLatitude"]; exists {
-		if val, err := parseGPSCoordinate(lat); err == nil {
-			metadata.GPSLatitude = &val
-		}
-	}
-
-	// Parse GPS Longitude
-	if lon, exists := rawData["GPSLongitude"]; exists {
-		if val, err := parseGPSCoordinate(lon); err == nil {
-			metadata.GPSLongitude = &val
-		}
-	}
-
 	// Parse Description using priority-based field list
 	for _, field := range descriptionFields {
 		if desc, exists := rawData[field]; exists {
@@ -311,63 +291,11 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse Resolution (MP) from ImageWidth and ImageHeight
-	if widthStr, wOk := rawData["ImageWidth"]; wOk {
-		if heightStr, hOk := rawData["ImageHeight"]; hOk {
-			parseInt := func(s string) (int, bool) {
-				s = normalizeString(s)
-				if s == "" {
-					return 0, false
-				}
-				// Prefer first token in case of "4032 pixels"
-				if fields := strings.Fields(s); len(fields) > 0 {
-					s = fields[0]
-				}
-				if val, err := strconv.Atoi(s); err == nil {
-					return val, true
-				}
-				// Fallback: strip non-digits
-				digits := make([]rune, 0, len(s))
-				for _, r := range s {
-					if r >= '0' && r <= '9' {
-						digits = append(digits, r)
-					} else if len(digits) > 0 {
-						// stop at first non-digit after seeing digits
-						break
-					}
-				}
-				if len(digits) == 0 {
-					return 0, false
-				}
-				if val, err := strconv.Atoi(string(digits)); err == nil {
-					return val, true
-				}
-				return 0, false
-			}
-
-			if w, ok1 := parseInt(widthStr); ok1 {
-				if h, ok2 := parseInt(heightStr); ok2 && w > 0 && h > 0 {
-					// Check orientation and correct dimensions if needed
-					correctedWidth, correctedHeight := correctDimensionsByOrientation(w, h, rawData["Orientation"])
-
-					// Keep Resolution as an integer number of megapixels (rounded)
-					pixels := w * h
-					mpInt := (pixels + 500_000) / 1_000_000
-					metadata.Resolution = fmt.Sprintf("%dMP", mpInt)
-					// Also set Dimensions if not already set from ImageSize
-					if metadata.Dimensions == "" {
-						metadata.Dimensions = fmt.Sprintf("%dx%d", correctedWidth, correctedHeight)
-					}
-				}
-			}
-		}
-	}
-
 	// Parse Exposure bias using priority-based field list
 	for _, field := range exposureBiasFields {
 		if ebStr, exists := rawData[field]; exists {
-			if val, err := strconv.ParseFloat(ebStr, 32); err == nil {
-				metadata.Exposure = float32(val)
+			if val, err := parseRationalFloat32(ebStr); err == nil {
+				metadata.ExposureCompensation = &val
 				break
 			}
 		}
@@ -376,6 +304,170 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 	metadata.ContentIdentifier = extractContentIdentifier(rawData)
 
 	return metadata
+}
+
+func parseCommonMetadata(rawData map[string]string, rawJSON json.RawMessage, assetType dbtypes.AssetType) dbtypes.CommonMetadata {
+	common := dbtypes.CommonMetadata{}
+
+	switch assetType {
+	case dbtypes.AssetTypePhoto:
+		common.TakenTime, common.CaptureOffsetMinutes = parseCaptureTimestamp(rawData, []captureTimePair{
+			{TimeField: "SubSecDateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+			{TimeField: "DateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+			{TimeField: "CreateDate", OffsetFields: []string{"OffsetTimeDigitized", "OffsetTime", "TimeZoneOffset"}},
+			{TimeField: "DateTime", OffsetFields: []string{"OffsetTime", "TimeZoneOffset"}},
+		}, takenTimeFields)
+		common.Width, common.Height = parsePhotoDimensions(rawData)
+	case dbtypes.AssetTypeVideo:
+		common.TakenTime, common.CaptureOffsetMinutes = parseCaptureTimestamp(rawData, []captureTimePair{
+			{TimeField: "CreationDate", OffsetFields: []string{"TimeZone", "TimeZoneOffset"}},
+			{TimeField: "SubSecDateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+			{TimeField: "DateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+			{TimeField: "CreateDate", OffsetFields: []string{"OffsetTimeDigitized", "OffsetTime", "TimeZoneOffset"}},
+			{TimeField: "MediaCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
+			{TimeField: "TrackCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
+		}, recordedTimeFields)
+	}
+
+	if latitude, err := parseGPSCoordinate(rawData["GPSLatitude"]); err == nil {
+		common.GPSLatitude = &latitude
+	}
+	if longitude, err := parseGPSCoordinate(rawData["GPSLongitude"]); err == nil {
+		common.GPSLongitude = &longitude
+	}
+	if rating, ok := parseEmbeddedRating(rawData["Rating"]); ok {
+		common.Rating = &rating
+	}
+	common.Keywords = parseEmbeddedKeywords(rawJSON)
+
+	return common
+}
+
+func parsePhotoDimensions(rawData map[string]string) (*int32, *int32) {
+	width, widthOK := parsePositiveDimension(rawData["ImageWidth"])
+	height, heightOK := parsePositiveDimension(rawData["ImageHeight"])
+	if !widthOK || !heightOK {
+		return nil, nil
+	}
+
+	width, height = correctDimensionsByOrientation(width, height, rawData["Orientation"])
+	w, h := int32(width), int32(height)
+	return &w, &h
+}
+
+func parsePositiveDimension(value string) (int, bool) {
+	value = normalizeString(value)
+	if fields := strings.Fields(value); len(fields) > 0 {
+		value = fields[0]
+	}
+	if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
+		return parsed, true
+	}
+
+	digits := make([]rune, 0, len(value))
+	for _, char := range value {
+		if char >= '0' && char <= '9' {
+			digits = append(digits, char)
+		} else if len(digits) > 0 {
+			break
+		}
+	}
+	parsed, err := strconv.Atoi(string(digits))
+	return parsed, err == nil && parsed > 0
+}
+
+func parseEmbeddedRating(value string) (int32, bool) {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || parsed < 1 || parsed > 5 || parsed != float64(int32(parsed)) {
+		return 0, false
+	}
+	return int32(parsed), true
+}
+
+func parseEmbeddedKeywords(rawJSON json.RawMessage) []string {
+	if len(rawJSON) == 0 {
+		return nil
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(rawJSON, &raw); err != nil {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	keywords := make([]string, 0)
+	for _, field := range []string{"Keywords", "Subject", "HierarchicalSubject"} {
+		for _, keyword := range metadataStringValues(raw[field]) {
+			keyword = normalizeString(keyword)
+			key := strings.ToLower(keyword)
+			if keyword == "" {
+				continue
+			}
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			keywords = append(keywords, keyword)
+		}
+	}
+	return keywords
+}
+
+func metadataStringValues(value any) []string {
+	switch typed := value.(type) {
+	case string:
+		return []string{typed}
+	case []any:
+		values := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if text, ok := item.(string); ok {
+				values = append(values, text)
+			}
+		}
+		return values
+	default:
+		return nil
+	}
+}
+
+func firstNormalizedString(rawData map[string]string, fields []string) string {
+	for _, field := range fields {
+		if value := normalizeString(rawData[field]); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func parseRationalFloat32(value string) (float32, error) {
+	value = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(value), "EV"))
+	parts := strings.Fields(value)
+	if len(parts) == 2 {
+		whole, wholeErr := strconv.ParseFloat(parts[0], 32)
+		fraction, fractionErr := parseRationalFloat32(parts[1])
+		if wholeErr == nil && fractionErr == nil {
+			if whole < 0 {
+				return float32(whole) - fraction, nil
+			}
+			return float32(whole) + fraction, nil
+		}
+	}
+	if numerator, denominator, ok := strings.Cut(value, "/"); ok {
+		n, numeratorErr := strconv.ParseFloat(strings.TrimSpace(numerator), 32)
+		d, denominatorErr := strconv.ParseFloat(strings.TrimSpace(denominator), 32)
+		if numeratorErr != nil {
+			return 0, numeratorErr
+		}
+		if denominatorErr != nil {
+			return 0, denominatorErr
+		}
+		if d == 0 {
+			return 0, strconv.ErrSyntax
+		}
+		return float32(n / d), nil
+	}
+	parsed, err := strconv.ParseFloat(value, 32)
+	return float32(parsed), err
 }
 
 // correctDimensionsByOrientation corrects width and height based on EXIF Orientation
@@ -477,14 +569,7 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	metadata.RecordedTime, metadata.CaptureOffsetMinutes = parseCaptureTimestamp(rawData, []captureTimePair{
-		{TimeField: "CreationDate", OffsetFields: []string{"TimeZone", "TimeZoneOffset"}},
-		{TimeField: "DateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
-		{TimeField: "SubSecDateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
-		{TimeField: "CreateDate", OffsetFields: []string{"OffsetTimeDigitized", "OffsetTime", "TimeZoneOffset"}},
-		{TimeField: "MediaCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
-		{TimeField: "TrackCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
-	}, recordedTimeFields)
+	metadata.CameraMake = firstNormalizedString(rawData, []string{"Make", "Manufacturer"})
 
 	// Parse CameraModel using priority-based field list
 	for _, field := range videoCameraModelFields {
@@ -494,20 +579,6 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 				metadata.CameraModel = normalized
 				break
 			}
-		}
-	}
-
-	// Parse GPS Latitude
-	if lat, exists := rawData["GPSLatitude"]; exists {
-		if val, err := parseGPSCoordinate(lat); err == nil {
-			metadata.GPSLatitude = &val
-		}
-	}
-
-	// Parse GPS Longitude
-	if lon, exists := rawData["GPSLongitude"]; exists {
-		if val, err := parseGPSCoordinate(lon); err == nil {
-			metadata.GPSLongitude = &val
 		}
 	}
 

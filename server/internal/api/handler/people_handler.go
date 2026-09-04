@@ -58,8 +58,8 @@ func NewPeopleHandler(
 // @Param limit query int false "Maximum number of results (max 100)" default(24)
 // @Param offset query int false "Number of results to skip" default(0)
 // @Success 200 {object} dto.ListPeopleResponseDTO "People listed successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people [get]
 func (h *PeopleHandler) ListPeople(c *gin.Context) {
 	limit, offset := parseListPagination(c, 24, 100)
@@ -72,7 +72,7 @@ func (h *PeopleHandler) ListPeople(c *gin.Context) {
 	people, total, err := h.faceService.ListPeople(c.Request.Context(), repositoryID, scopedOwnerIDFromContext(c), includeHidden, limit, offset)
 	if err != nil {
 		log.Printf("Failed to list people: %v", err)
-		api.GinInternalError(c, err, "Failed to list people")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -96,9 +96,9 @@ func (h *PeopleHandler) ListPeople(c *gin.Context) {
 // @Produce json
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.FaceClusterRebuildResponseDTO "People clusters rebuilt successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/rebuild [post]
 // @Security BearerAuth
 func (h *PeopleHandler) RebuildPeople(c *gin.Context) {
@@ -110,7 +110,7 @@ func (h *PeopleHandler) RebuildPeople(c *gin.Context) {
 	result, err := h.faceService.RebuildFaceClusters(c.Request.Context(), repositoryID, scopedOwnerIDFromContext(c))
 	if err != nil {
 		log.Printf("Failed to rebuild people clusters: %v", err)
-		api.GinInternalError(c, err, "Failed to rebuild people clusters")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -125,9 +125,9 @@ func (h *PeopleHandler) RebuildPeople(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.PersonDetailDTO "Person fetched successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id} [get]
 func (h *PeopleHandler) GetPerson(c *gin.Context) {
 	personID, ok := parsePersonID(c)
@@ -142,11 +142,11 @@ func (h *PeopleHandler) GetPerson(c *gin.Context) {
 	person, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to fetch person %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to fetch person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -162,9 +162,9 @@ func (h *PeopleHandler) GetPerson(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param request body dto.UpdatePersonRequestDTO true "Person update payload"
 // @Success 200 {object} dto.PersonDetailDTO "Person updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id} [patch]
 // @Security BearerAuth
 func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
@@ -175,37 +175,37 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 
 	var req dto.UpdatePersonRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		api.GinBadRequest(c, errors.New("name cannot be empty"), "Name cannot be empty")
+		api.WriteProblem(c, api.BadRequest(errors.New("name cannot be empty")))
 		return
 	}
 
 	_, err := h.faceService.GetPerson(c.Request.Context(), personID, uuid.NullUUID{}, scopedOwnerIDFromContext(c))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to authorize person update %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to load person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	if _, err := h.faceService.RenamePerson(c.Request.Context(), personID, name); err != nil {
 		log.Printf("Failed to rename person %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to update person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	person, err := h.faceService.GetPerson(c.Request.Context(), personID, uuid.NullUUID{}, scopedOwnerIDFromContext(c))
 	if err != nil {
 		log.Printf("Failed to reload person %d after rename: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to reload person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -221,10 +221,10 @@ func (h *PeopleHandler) UpdatePerson(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param request body dto.AssetQueryRequestDTO true "Asset query parameters"
 // @Success 200 {object} dto.QueryAssetsResponseDTO "Assets listed successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person not found"
-// @Failure 503 {object} api.ErrorResponse "Image Semantic Analysis unavailable"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person not found"
+// @Failure 503 {object} api.ProblemResponse "Image Semantic Analysis unavailable"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/assets/list [post]
 func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 	personID, ok := parsePersonID(c)
@@ -234,21 +234,21 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 
 	var req dto.AssetQueryRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	normalizeAssetQueryPagination(&req.Pagination)
 	if err := validateAssetQuerySearchType(req.SearchType); err != nil {
-		api.GinBadRequest(c, err, "Search type must be 'filename' or 'semantic'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
-		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := validateStackMode(req.StackMode); err != nil {
-		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if req.SearchType == "" {
@@ -257,23 +257,23 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 
 	repositoryID, err := parseRepositoryUUIDFromAssetFilter(req.Filter)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid repository_id filter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	if _, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to authorize person assets %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to load person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	params, err := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid filter parameters")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	params.PersonID = &personID
@@ -282,15 +282,15 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 	result, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidBrowseFilter) {
-			api.GinBadRequest(c, err, "Invalid browse filter combination")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			api.GinError(c, 503, err, 503, "Image Semantic Analysis is currently unavailable")
+			api.WriteProblem(c, api.StatusProblem(503, err))
 			return
 		}
 		log.Printf("Failed to list assets for person %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to query person assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -305,10 +305,10 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {file} binary "Face crop"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Person cover not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Person cover not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/cover [get]
 func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 	personID, ok := parsePersonID(c)
@@ -328,58 +328,43 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 	person, err := h.faceService.GetPerson(c.Request.Context(), personID, repositoryID, ownerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to fetch person cover %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to load person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	if person.RepresentativeAssetID == nil || person.CoverFaceImagePath == nil {
-		api.GinNotFound(c, errors.New("person cover not found"), "Person cover not found")
-		return
-	}
-
-	representativeAssetID, err := uuid.Parse(*person.RepresentativeAssetID)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve person cover")
+	if person.RepresentativeAssetID == nil || person.CoverFaceImagePath == nil || person.CoverRepositoryID == nil {
+		api.WriteProblem(c, api.NotFound(errors.New("person cover not found")))
 		return
 	}
 
-	asset, err := h.assetService.GetAsset(c.Request.Context(), representativeAssetID)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve person cover asset")
-		return
-	}
-	if !asset.RepositoryID.Valid {
-		api.GinInternalError(c, errors.New("cover asset has no repository"), "Failed to resolve person cover repository")
-		return
-	}
 	if h.repoResolver == nil || h.files == nil {
-		api.GinInternalError(c, errors.New("repository filesystem unavailable"), "Failed to resolve person cover repository")
+		api.WriteProblem(c, api.Internal(errors.New("repository filesystem unavailable")))
 		return
 	}
 
-	repository, err := h.repoResolver.GetRepository(asset.RepositoryID.UUID.String())
+	repository, err := h.repoResolver.GetRepository(*person.CoverRepositoryID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve person cover repository")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, *person.CoverFaceImagePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Person cover file not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to access person cover file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	fileInfo, err := file.Stat()
 	if err != nil {
 		_ = file.Close()
 		_ = repositoryFS.Close()
-		api.GinInternalError(c, err, "Failed to access person cover file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -408,9 +393,9 @@ func (h *PeopleHandler) GetPersonCover(c *gin.Context) {
 // @Param limit query int false "Maximum number of results (max 200)" default(60)
 // @Param offset query int false "Number of results to skip" default(0)
 // @Success 200 {object} dto.ListPersonFacesResponseDTO "Faces listed successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/faces [get]
 func (h *PeopleHandler) ListPersonFaces(c *gin.Context) {
 	personID, ok := parsePersonID(c)
@@ -426,11 +411,11 @@ func (h *PeopleHandler) ListPersonFaces(c *gin.Context) {
 	faces, total, err := h.faceService.ListPersonFaces(c.Request.Context(), personID, repositoryID, scopedOwnerIDFromContext(c), limit, offset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to list faces for person %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to list person faces")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -456,10 +441,10 @@ func (h *PeopleHandler) ListPersonFaces(c *gin.Context) {
 // @Param faceId path int true "Face ID"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {file} binary "Face crop"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Face crop not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Face crop not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/faces/{faceId}/crop [get]
 func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 	personID, ok := parsePersonID(c)
@@ -482,38 +467,38 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 	crop, err := h.faceService.GetPersonFaceCrop(c.Request.Context(), personID, faceID, repositoryID, ownerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Face crop not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to load face crop %d/%d: %v", personID, faceID, err)
-		api.GinInternalError(c, err, "Failed to load face crop")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	if h.repoResolver == nil || h.files == nil {
-		api.GinInternalError(c, errors.New("repository filesystem unavailable"), "Failed to resolve face crop repository")
+		api.WriteProblem(c, api.Internal(errors.New("repository filesystem unavailable")))
 		return
 	}
 
 	repository, err := h.repoResolver.GetRepository(crop.RepositoryID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to resolve face crop repository")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, crop.FaceImagePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Face crop file not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to access face crop file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	fileInfo, err := file.Stat()
 	if err != nil {
 		_ = file.Close()
 		_ = repositoryFS.Close()
-		api.GinInternalError(c, err, "Failed to access face crop file")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -541,9 +526,9 @@ func (h *PeopleHandler) GetPersonFaceCrop(c *gin.Context) {
 // @Param id path int true "Target person ID"
 // @Param request body dto.MergePeopleRequestDTO true "Merge payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "People merged successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/merge [post]
 // @Security BearerAuth
 func (h *PeopleHandler) MergePeople(c *gin.Context) {
@@ -554,26 +539,26 @@ func (h *PeopleHandler) MergePeople(c *gin.Context) {
 
 	var req dto.MergePeopleRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if len(req.SourcePersonIDs) == 0 {
-		api.GinBadRequest(c, errors.New("source_person_ids cannot be empty"), "Select at least one person to merge")
+		api.WriteProblem(c, api.BadRequest(errors.New("source_person_ids cannot be empty")))
 		return
 	}
 
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.MergePeople(c.Request.Context(), personID, req.SourcePersonIDs, ownerID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		if errors.Is(err, service.ErrPeopleCrossOwner) {
-			api.GinBadRequest(c, err, "People belong to different owners")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		log.Printf("Failed to merge people into %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to merge people")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -590,9 +575,9 @@ func (h *PeopleHandler) MergePeople(c *gin.Context) {
 // @Param faceId path int true "Face ID"
 // @Param request body dto.MoveFaceRequestDTO true "Move payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Face moved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person or face not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person or face not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/faces/{faceId}/move [post]
 // @Security BearerAuth
 func (h *PeopleHandler) MoveFace(c *gin.Context) {
@@ -607,26 +592,26 @@ func (h *PeopleHandler) MoveFace(c *gin.Context) {
 
 	var req dto.MoveFaceRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if req.TargetPersonID == personID {
-		api.GinBadRequest(c, errors.New("target person must differ from source"), "Pick a different target person")
+		api.WriteProblem(c, api.BadRequest(errors.New("target person must differ from source")))
 		return
 	}
 
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.MoveFace(c.Request.Context(), faceID, req.TargetPersonID, ownerID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person or face not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		if errors.Is(err, service.ErrPeopleCrossOwner) {
-			api.GinBadRequest(c, err, "Face and target person belong to different owners")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		log.Printf("Failed to move face %d to person %d: %v", faceID, req.TargetPersonID, err)
-		api.GinInternalError(c, err, "Failed to move face")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -641,9 +626,9 @@ func (h *PeopleHandler) MoveFace(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param faceId path int true "Face ID"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Face removed successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person or face not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person or face not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/faces/{faceId}/remove [post]
 // @Security BearerAuth
 func (h *PeopleHandler) RemoveFace(c *gin.Context) {
@@ -659,11 +644,11 @@ func (h *PeopleHandler) RemoveFace(c *gin.Context) {
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.RemoveFaceFromPerson(c.Request.Context(), faceID, personID, ownerID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person or face not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to remove face %d from person %d: %v", faceID, personID, err)
-		api.GinInternalError(c, err, "Failed to remove face")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -679,9 +664,9 @@ func (h *PeopleHandler) RemoveFace(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param request body dto.SetPersonCoverRequestDTO true "Cover payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Cover updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person or face not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person or face not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/cover [put]
 // @Security BearerAuth
 func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
@@ -692,18 +677,18 @@ func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
 
 	var req dto.SetPersonCoverRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	ownerID := scopedOwnerIDFromContext(c)
 	if err := h.faceService.SetPersonCover(c.Request.Context(), personID, req.FaceID, ownerID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person or face not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to set cover for person %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to set person cover")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -719,9 +704,9 @@ func (h *PeopleHandler) SetPersonCover(c *gin.Context) {
 // @Param id path int true "Person ID"
 // @Param request body dto.SetPersonHiddenRequestDTO true "Hidden payload"
 // @Success 200 {object} dto.PersonCorrectionResponseDTO "Hidden state updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 404 {object} api.ErrorResponse "Person not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 404 {object} api.ProblemResponse "Person not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/people/{id}/hidden [put]
 // @Security BearerAuth
 func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
@@ -732,7 +717,7 @@ func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
 
 	var req dto.SetPersonHiddenRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -740,11 +725,11 @@ func (h *PeopleHandler) SetPersonHidden(c *gin.Context) {
 	person, err := h.faceService.SetPersonHidden(c.Request.Context(), personID, req.Hidden, ownerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			api.GinNotFound(c, err, "Person not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("Failed to set hidden state for person %d: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to update person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -764,7 +749,7 @@ func (h *PeopleHandler) respondWithCorrectedPerson(c *gin.Context, personID int3
 			return
 		}
 		log.Printf("Failed to reload person %d after correction: %v", personID, err)
-		api.GinInternalError(c, err, "Failed to reload person")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -776,7 +761,7 @@ func parseFaceID(c *gin.Context) (int32, bool) {
 	rawID := strings.TrimSpace(c.Param("faceId"))
 	faceID, err := strconv.ParseInt(rawID, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid face ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return 0, false
 	}
 	return int32(faceID), true
@@ -798,7 +783,7 @@ func parsePersonID(c *gin.Context) (int32, bool) {
 	rawID := strings.TrimSpace(c.Param("id"))
 	personID, err := strconv.ParseInt(rawID, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid person ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return 0, false
 	}
 	return int32(personID), true
@@ -860,17 +845,17 @@ func (h *PeopleHandler) resolveMediaOwnerScope(c *gin.Context) (*int32, bool) {
 
 	mediaToken := strings.TrimSpace(c.Query("mt"))
 	if mediaToken == "" {
-		api.GinUnauthorized(c, errors.New("authentication required"), "Authentication required to access this face crop")
+		api.WriteProblem(c, api.Unauthorized(errors.New("authentication required")))
 		return nil, false
 	}
 	if h.authService == nil {
-		api.GinUnauthorized(c, errors.New("media token authentication unavailable"), "Authentication required to access this face crop")
+		api.WriteProblem(c, api.Unauthorized(errors.New("media token authentication unavailable")))
 		return nil, false
 	}
 
 	claims, err := h.authService.ValidateMediaToken(c.Request.Context(), mediaToken)
 	if err != nil {
-		api.GinUnauthorized(c, errors.New("invalid or expired media token"), "Authentication required to access this face crop")
+		api.WriteProblem(c, api.Unauthorized(errors.New("invalid or expired media token")))
 		return nil, false
 	}
 	if service.IsAdminRole(claims.Role) {

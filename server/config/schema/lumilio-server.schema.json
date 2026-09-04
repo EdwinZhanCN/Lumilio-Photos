@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lumilio.org/schema/lumilio-server-v3.schema.json",
+  "$id": "https://lumilio.org/schema/lumilio-server-v6.schema.json",
   "properties": {
     "schema_version": {
       "type": "integer",
@@ -20,12 +20,17 @@
         "path": {
           "type": "string",
           "description": "SQLite catalog file. Relative paths resolve from the manifest directory.\n\":memory:\" is rejected because the catalog must survive a restart."
+        },
+        "queue_path": {
+          "type": "string",
+          "description": "Independent River execution-state file. Relative paths resolve from the\nmanifest directory and the file must differ from path."
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "path"
+        "path",
+        "queue_path"
       ]
     },
     "server": {
@@ -181,10 +186,6 @@
     },
     "repository_scan": {
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether to periodically reconcile repositories against the catalog."
-        },
         "interval_seconds": {
           "type": "integer",
           "description": "Seconds between scan sweeps."
@@ -192,56 +193,13 @@
         "settle_seconds": {
           "type": "integer",
           "description": "Seconds a file must stay unmodified before it is considered complete."
-        },
-        "max_concurrent_repos": {
-          "type": "integer",
-          "description": "Repositories scanned concurrently."
-        },
-        "batch_size": {
-          "type": "integer",
-          "description": "Files per scan batch."
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "enabled",
         "interval_seconds",
-        "settle_seconds",
-        "max_concurrent_repos",
-        "batch_size"
-      ]
-    },
-    "geocoding": {
-      "properties": {
-        "provider": {
-          "type": "string",
-          "enum": [
-            "disabled",
-            "nominatim"
-          ],
-          "description": "Reverse-geocoding backend. \"disabled\" keeps coordinates local and makes\nno network calls."
-        },
-        "nominatim_endpoint": {
-          "type": "string",
-          "description": "Nominatim reverse endpoint. Read only when provider = \"nominatim\"."
-        },
-        "language": {
-          "type": "string",
-          "description": "Preferred language for returned place names."
-        },
-        "user_agent": {
-          "type": "string",
-          "description": "User-Agent presented to the provider. Public Nominatim requires a real\ncontact string in its usage policy."
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "provider",
-        "nominatim_endpoint",
-        "language",
-        "user_agent"
+        "settle_seconds"
       ]
     },
     "auth": {
@@ -454,6 +412,64 @@
         "ffmpeg_path",
         "ffprobe_path"
       ]
+    },
+    "execution": {
+      "properties": {
+        "cpu": {
+          "type": "integer",
+          "description": "Bound on concurrent CPU-intensive pipeline execution."
+        },
+        "disk_io": {
+          "type": "integer",
+          "description": "Bound on concurrent disk IO operations during pipeline steps."
+        },
+        "image_codec": {
+          "type": "integer",
+          "description": "Bound on concurrent image decoding and encoding operations."
+        },
+        "video_codec": {
+          "type": "integer",
+          "description": "Bound on concurrent video decoding and transcode operations."
+        },
+        "inference": {
+          "type": "integer",
+          "description": "Bound on concurrent machine-learning model inference tasks."
+        },
+        "memory_mib": {
+          "type": "integer",
+          "description": "Total memory limit in MiB allocated for bounded pipeline execution."
+        },
+        "macro_workers": {
+          "type": "integer",
+          "description": "Maximum number of concurrent River macro workers."
+        },
+        "max_waiting": {
+          "type": "integer",
+          "description": "Maximum number of admitted tasks queued waiting for execution resources."
+        },
+        "ffmpeg_threads": {
+          "type": "integer",
+          "description": "Number of threads allocated for video transcode processes."
+        },
+        "ffmpeg_software_preset": {
+          "type": "string",
+          "description": "FFmpeg software transcode preset speed."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "cpu",
+        "disk_io",
+        "image_codec",
+        "video_codec",
+        "inference",
+        "memory_mib",
+        "macro_workers",
+        "max_waiting",
+        "ffmpeg_threads",
+        "ffmpeg_software_preset"
+      ]
     }
   },
   "additionalProperties": false,
@@ -466,12 +482,12 @@
     "logging",
     "storage",
     "repository_scan",
-    "geocoding",
     "auth",
     "transcode",
     "lumen",
-    "tools"
+    "tools",
+    "execution"
   ],
-  "title": "Lumilio Photos runtime manifest (schema v3)",
+  "title": "Lumilio Photos runtime manifest (schema v6)",
   "description": "Complete runtime configuration. There are no code defaults, no configuration file search, and no environment-variable overrides: every key below must be present in the file."
 }

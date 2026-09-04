@@ -6,11 +6,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"server/config"
 	"server/internal/db"
 	"server/internal/search/bleveocr"
+	"server/internal/testutil"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
@@ -23,17 +25,20 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	index, err := bleveocr.Open(ctx, database.Path, database.Queries, false, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, index.Close()) })
-	writer := bleveocr.NewWriter(database.SQL, database.Queries, index)
-	ocrService := NewOCRService(database.Queries, database.SQL)
-	assetService, err := NewAssetService(database.Queries, database.SQL, nil, nil, index)
+	writer := bleveocr.NewWriter(database.SQL, database.Writer, database.Queries, index)
+	notifier := &recordingOCRIndexNotifier{}
+	ocrService := NewOCRServiceWithNotifier(database.Queries, database.SQL, database.Writer, notifier)
+	assetService, err := NewAssetServiceWithNotifier(database.Queries, database.SQL, nil, nil, index, notifier)
 	require.NoError(t, err)
 
 	require.NoError(t, ocrService.SaveOCRResults(ctx, assetID, ocrFixture("Running invoice 2025", 0.95), 12))
+	require.Equal(t, int32(1), notifier.Count())
 	require.Equal(t, int64(1), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Equal(t, []string{assetID.String()}, serviceSearchIDs(t, index, "invoice", false))
 
 	require.NoError(t, ocrService.SaveOCRResults(ctx, assetID, ocrFixture("Updated bicycle X-T5", 0.90), 8))
+	require.Equal(t, int32(2), notifier.Count())
 	require.Equal(t, int64(2), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Empty(t, serviceSearchIDs(t, index, "invoice", false))
@@ -41,6 +46,7 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 
 	err = ocrService.SaveOCRResults(ctx, assetID, ocrFixture("must roll back", 2), 1)
 	require.Error(t, err)
+	require.Equal(t, int32(2), notifier.Count())
 	require.Equal(t, int64(2), ocrRevision(t, database, assetID))
 	require.Equal(t, 0, serviceOutboxCount(t, database))
 	items, err := database.Queries.GetOCRTextItemsByAsset(ctx, assetID)
@@ -49,22 +55,37 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	require.Equal(t, "Updated bicycle X-T5", items[0].TextContent)
 
 	require.NoError(t, assetService.DeleteAsset(ctx, assetID))
+	require.Equal(t, int32(3), notifier.Count())
 	require.Equal(t, int64(3), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Empty(t, serviceSearchIDs(t, index, "bicycle", false))
 	require.Equal(t, []string{assetID.String()}, serviceSearchIDs(t, index, "bicycle", true))
 
 	require.NoError(t, assetService.RestoreAsset(ctx, assetID))
+	require.Equal(t, int32(4), notifier.Count())
 	require.Equal(t, int64(4), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Equal(t, []string{assetID.String()}, serviceSearchIDs(t, index, "bicycle", false))
 
 	require.NoError(t, ocrService.DeleteOCRResults(ctx, assetID))
+	require.Equal(t, int32(5), notifier.Count())
 	require.Equal(t, int64(5), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Empty(t, serviceSearchIDs(t, index, "bicycle", false))
 	_, err = database.Queries.GetOCRResultByAsset(ctx, assetID)
 	require.Error(t, err)
+}
+
+type recordingOCRIndexNotifier struct {
+	count atomic.Int32
+}
+
+func (n *recordingOCRIndexNotifier) Notify() {
+	n.count.Add(1)
+}
+
+func (n *recordingOCRIndexNotifier) Count() int32 {
+	return n.count.Load()
 }
 
 func openOCRServiceTestDatabase(t *testing.T) (*db.DB, uuid.UUID) {
@@ -91,11 +112,12 @@ INSERT INTO repository_roots (
 INSERT INTO repositories (
     repo_id, name, path, created_at, updated_at, default_owner_id, root_id
 ) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-INSERT INTO assets (
-    asset_id, owner_id, type, original_filename, mime_type, file_size,
-    content_hash, upload_time, repository_id, updated_at
-) VALUES (?, 1, 'PHOTO', 'ocr.jpg', 'image/jpeg', 1, 'hash', 1, ?, 1);
-`, rootID, repositoryID, rootID, assetID, repositoryID)
+`, rootID, repositoryID, rootID)
+	require.NoError(t, err)
+	_, err = testutil.InsertAssetOccurrence(context.Background(), database.SQL, testutil.AssetOccurrenceParams{
+		AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1,
+		AssetType: "PHOTO", Filename: "ocr.jpg", MIMEType: "image/jpeg", FileSize: 1,
+	})
 	require.NoError(t, err)
 	return database, assetID
 }

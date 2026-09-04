@@ -3,6 +3,13 @@ import { useMessage } from "@/features/notifications";
 import type { Asset } from "@/lib/assets/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { isExportSupported } from "../model/mediaTypes";
+import { useI18n } from "@/lib/i18n";
+import {
+  isAbortProblem,
+  localizeAPIProblem,
+  normalizeProblem,
+  readProblemResponse,
+} from "@/lib/http-commons/problem";
 
 export interface ExportOptions {
   format: "jpeg" | "png" | "webp" | "avif" | "original";
@@ -47,6 +54,7 @@ const EXTENSION_BY_FORMAT: Record<string, string> = {
  */
 export const useExportImage = (): useExportImageReturn => {
   const showMessage = useMessage();
+  const { t } = useI18n();
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
@@ -58,7 +66,7 @@ export const useExportImage = (): useExportImageReturn => {
   const downloadOriginal = useCallback(
     async (asset: Asset): Promise<void> => {
       if (!asset.asset_id) {
-        showMessage("error", "No image available for download");
+        showMessage("error", t("assets.export.noDownload", "No image is available for download."));
         return;
       }
 
@@ -66,7 +74,7 @@ export const useExportImage = (): useExportImageReturn => {
       setExportProgress({
         processed: 0,
         total: 1,
-        currentFile: "Downloading original...",
+        currentFile: t("assets.export.downloadingOriginal", "Downloading original…"),
       });
       abortControllerRef.current = new AbortController();
 
@@ -76,17 +84,20 @@ export const useExportImage = (): useExportImageReturn => {
           credentials: "include",
         });
         if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.statusText}`);
+          throw await readProblemResponse(response);
         }
 
         const blob = await response.blob();
         downloadBlob(blob, asset.original_filename || "download");
-        showMessage("success", "Image downloaded successfully");
+        showMessage("success", t("assets.export.downloaded", "Image downloaded."));
       } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          showMessage("info", "Download cancelled");
+        if (isAbortProblem(error)) {
+          showMessage("info", t("assets.export.downloadCancelled", "Download cancelled."));
         } else {
-          showMessage("error", error instanceof Error ? error.message : "Download failed");
+          showMessage(
+            "error",
+            localizeAPIProblem(error, t, t("assets.export.downloadFailed", "Download failed.")),
+          );
         }
       } finally {
         setIsExporting(false);
@@ -94,13 +105,13 @@ export const useExportImage = (): useExportImageReturn => {
         abortControllerRef.current = null;
       }
     },
-    [showMessage],
+    [showMessage, t],
   );
 
   const fetchExport = useCallback(
     async (asset: Asset, options: ExportOptions, signal: AbortSignal): Promise<void> => {
       const assetId = asset.asset_id;
-      if (!assetId) throw new Error("No image available for export");
+      if (!assetId) throw normalizeProblem(undefined);
 
       if (options.format === "original") {
         const response = await fetch(assetUrls.getOriginalFileUrl(assetId), {
@@ -108,7 +119,7 @@ export const useExportImage = (): useExportImageReturn => {
           credentials: "include",
         });
         if (!response.ok) {
-          throw new Error(`Export failed: ${response.statusText}`);
+          throw await readProblemResponse(response);
         }
         downloadBlob(await response.blob(), asset.original_filename || "download");
         return;
@@ -125,8 +136,7 @@ export const useExportImage = (): useExportImageReturn => {
 
       const response = await fetch(url, { signal, credentials: "include" });
       if (!response.ok) {
-        const message = await safeErrorMessage(response);
-        throw new Error(message);
+        throw await readProblemResponse(response);
       }
       const ext = EXTENSION_BY_FORMAT[options.format] ?? options.format;
       downloadBlob(await response.blob(), `${base}.${ext}`);
@@ -140,11 +150,17 @@ export const useExportImage = (): useExportImageReturn => {
   const exportImage = useCallback(
     async (asset: Asset, options: ExportOptions): Promise<void> => {
       if (!asset.asset_id) {
-        showMessage("error", "No image available for export");
+        showMessage("error", t("assets.export.noExport", "No image is available for export."));
         return;
       }
       if (options.format !== "original" && !isExportSupported(asset)) {
-        showMessage("info", "Export conversion is unavailable for video and audio assets.");
+        showMessage(
+          "info",
+          t(
+            "assets.export.conversionUnavailable",
+            "Export conversion is unavailable for video and audio assets.",
+          ),
+        );
         return;
       }
 
@@ -159,12 +175,12 @@ export const useExportImage = (): useExportImageReturn => {
       try {
         await fetchExport(asset, options, abortControllerRef.current.signal);
         setExportProgress((prev) => (prev ? { ...prev, processed: 100 } : null));
-        showMessage("success", "Image exported successfully");
+        showMessage("success", t("assets.export.exported", "Image exported."));
       } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
+        if (isAbortProblem(error)) {
           return;
         }
-        const message = error instanceof Error ? error.message : "Export failed";
+        const message = localizeAPIProblem(error, t, t("assets.export.failed", "Export failed."));
         showMessage("error", message);
         setExportProgress((prev) => (prev ? { ...prev, error: message } : null));
       } finally {
@@ -173,7 +189,7 @@ export const useExportImage = (): useExportImageReturn => {
         setTimeout(() => setExportProgress(null), 3000);
       }
     },
-    [fetchExport, showMessage],
+    [fetchExport, showMessage, t],
   );
 
   /**
@@ -182,7 +198,7 @@ export const useExportImage = (): useExportImageReturn => {
   const exportMultiple = useCallback(
     async (assets: Asset[], options: ExportOptions): Promise<void> => {
       if (assets.length === 0) {
-        showMessage("info", "No images selected for export");
+        showMessage("info", t("assets.export.noneSelected", "No images are selected for export."));
         return;
       }
 
@@ -210,7 +226,7 @@ export const useExportImage = (): useExportImageReturn => {
             await fetchExport(asset, options, signal);
             successCount++;
           } catch (error) {
-            if (error instanceof Error && error.name === "AbortError") break;
+            if (isAbortProblem(error)) break;
             console.warn(`Failed to export ${asset.original_filename}:`, error);
           }
         }
@@ -218,10 +234,13 @@ export const useExportImage = (): useExportImageReturn => {
         if (successCount > 0) {
           showMessage(
             successCount === assets.length ? "success" : "info",
-            `Export completed. Successfully exported ${successCount} of ${assets.length} images.`,
+            t("assets.export.multipleCompleted", "Exported {{count}} of {{total}} images.", {
+              count: successCount,
+              total: assets.length,
+            }),
           );
         } else {
-          showMessage("error", "Export failed for all images.");
+          showMessage("error", t("assets.export.allFailed", "No images could be exported."));
         }
       } finally {
         setIsExporting(false);
@@ -229,7 +248,7 @@ export const useExportImage = (): useExportImageReturn => {
         setTimeout(() => setExportProgress(null), 3000);
       }
     },
-    [fetchExport, showMessage],
+    [fetchExport, showMessage, t],
   );
 
   /**
@@ -239,8 +258,8 @@ export const useExportImage = (): useExportImageReturn => {
     abortControllerRef.current?.abort();
     setIsExporting(false);
     setExportProgress(null);
-    showMessage("info", "Export cancelled");
-  }, [showMessage]);
+    showMessage("info", t("assets.export.cancelled", "Export cancelled."));
+  }, [showMessage, t]);
 
   return {
     isExporting,
@@ -257,15 +276,6 @@ function toServerQuality(quality: number): number {
   if (!Number.isFinite(quality) || quality <= 0) return 0;
   const scaled = quality <= 1 ? Math.round(quality * 100) : Math.round(quality);
   return Math.max(1, Math.min(100, scaled));
-}
-
-async function safeErrorMessage(response: Response): Promise<string> {
-  try {
-    const data = (await response.json()) as { message?: string; error?: string };
-    return data.message || data.error || `Export failed: ${response.statusText}`;
-  } catch {
-    return `Export failed: ${response.statusText}`;
-  }
 }
 
 function baseFilename(asset: Asset, options: ExportOptions): string {

@@ -123,17 +123,23 @@ func TestACMEServesHTTPSChallengeAndRedirect(t *testing.T) {
 func TestACMEAcquisitionFailureClosesBothListeners(t *testing.T) {
 	manager := newFakeCertificateManager(t)
 	manager.manageErr = errors.New("fixture issuer unavailable")
-	httpsAddr := unusedAddress(t)
-	httpAddr := unusedAddress(t)
+	var listeners []net.Listener
+	listen := func(network, address string) (net.Listener, error) {
+		listener, err := net.Listen(network, address)
+		if err == nil {
+			listeners = append(listeners, listener)
+		}
+		return listener, err
+	}
 
-	runtime, err := start(
+	runtime, err := startACMEWithListen(
 		context.Background(),
 		config.ServerConfig{
-			Listen: httpsAddr,
+			Listen: "127.0.0.1:0",
 			TLS: config.TLSConfig{
 				Hostname:   "photos.example.com",
 				Mode:       config.TLSModeACME,
-				HTTPListen: httpAddr,
+				HTTPListen: "127.0.0.1:0",
 			},
 		},
 		http.NotFoundHandler(),
@@ -141,6 +147,7 @@ func TestACMEAcquisitionFailureClosesBothListeners(t *testing.T) {
 		func(config.ServerConfig, *zap.Logger) (certificateManager, error) {
 			return manager, nil
 		},
+		listen,
 	)
 	if runtime != nil {
 		t.Fatal("runtime must be nil after certificate failure")
@@ -151,22 +158,26 @@ func TestACMEAcquisitionFailureClosesBothListeners(t *testing.T) {
 	if !manager.stopped {
 		t.Fatal("certificate manager was not stopped")
 	}
-	assertAddressReusable(t, httpsAddr)
-	assertAddressReusable(t, httpAddr)
+	if len(listeners) != 2 {
+		t.Fatalf("bound listener count = %d, want 2", len(listeners))
+	}
+	for _, listener := range listeners {
+		if err := listener.Close(); !errors.Is(err, net.ErrClosed) {
+			t.Fatalf("listener %s remained open after certificate failure: %v", listener.Addr(), err)
+		}
+	}
 }
 
 func TestACMEShutdownReleasesBothPorts(t *testing.T) {
 	manager := newFakeCertificateManager(t)
-	httpsAddr := unusedAddress(t)
-	httpAddr := unusedAddress(t)
 	runtime, err := start(
 		context.Background(),
 		config.ServerConfig{
-			Listen: httpsAddr,
+			Listen: "127.0.0.1:0",
 			TLS: config.TLSConfig{
 				Hostname:   "photos.example.com",
 				Mode:       config.TLSModeACME,
-				HTTPListen: httpAddr,
+				HTTPListen: "127.0.0.1:0",
 			},
 		},
 		http.NotFoundHandler(),
@@ -178,6 +189,8 @@ func TestACMEShutdownReleasesBothPorts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start ACME transport: %v", err)
 	}
+	httpsAddr := runtime.listeners[0].Addr().String()
+	httpAddr := runtime.listeners[1].Addr().String()
 	shutdownRuntime(t, runtime)
 	if !manager.stopped {
 		t.Fatal("certificate manager was not stopped")
@@ -291,19 +304,6 @@ func shutdownRuntime(t *testing.T, runtime *Runtime) {
 	if err := runtime.Shutdown(ctx); err != nil {
 		t.Fatalf("shutdown runtime: %v", err)
 	}
-}
-
-func unusedAddress(t *testing.T) string {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	address := listener.Addr().String()
-	if err := listener.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return address
 }
 
 func assertAddressReusable(t *testing.T, address string) {

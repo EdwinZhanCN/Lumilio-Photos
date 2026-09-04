@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 )
 
@@ -31,8 +33,9 @@ func (s *CheckpointStore) Get(ctx context.Context, key string) ([]byte, bool, er
 
 func (s *CheckpointStore) Set(ctx context.Context, key string, data []byte) error {
 	err := s.q.UpsertCheckpoint(ctx, repo.UpsertCheckpointParams{
-		ID:   key,
-		Data: data,
+		ID:        key,
+		Data:      data,
+		UpdatedAt: dbtypes.NewTimestamp(time.Now()),
 	})
 	if err != nil {
 		return fmt.Errorf("save checkpoint: %w", err)

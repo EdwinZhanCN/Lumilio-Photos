@@ -1,18 +1,18 @@
 import { HardDrive, X } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { formatBytes } from "@/lib/utils/formatters";
-import type { components } from "@/lib/http-commons/schema";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useRemoveStorageLocation } from "../../api/useRemoveStorageLocation";
-
-type RepositoryRoot = components["schemas"]["dto.RepositoryRootDTO"];
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
+import type { StorageLocationOption } from "../../types";
 
 export default function RemoveStorageLocationModal({
   root,
   isOpen,
   onClose,
 }: {
-  root: RepositoryRoot | null;
+  root: StorageLocationOption | null;
   isOpen: boolean;
   onClose: () => void;
 }) {
@@ -21,6 +21,7 @@ export default function RemoveStorageLocationModal({
   const removeStorageLocation = useRemoveStorageLocation();
 
   if (!isOpen || !root || !root.id) return null;
+  const displayName = getStorageEntityDisplayName(root, t);
 
   const handleRemove = async () => {
     if (!root.id || !root.can_remove || removeStorageLocation.isPending) return;
@@ -34,12 +35,14 @@ export default function RemoveStorageLocationModal({
     } catch (reason: unknown) {
       showMessage(
         "error",
-        reason instanceof Error
-          ? reason.message
-          : t(
-              "manage.repositories.storageLocationRemoveFailed",
-              "Storage Location could not be removed.",
-            ),
+        localizeAPIProblem(
+          reason,
+          t,
+          t(
+            "manage.repositories.storageLocationRemoveFailed",
+            "Storage Location could not be removed.",
+          ),
+        ),
       );
     }
   };
@@ -56,7 +59,7 @@ export default function RemoveStorageLocationModal({
               <h3 className="text-base font-semibold">
                 {t("manage.repositories.storageLocationRemoveTitle", "Remove Storage Location")}
               </h3>
-              <p className="text-sm text-base-content/60">{root.name}</p>
+              <p className="text-sm text-base-content/60">{displayName}</p>
             </div>
           </div>
           <button
@@ -74,7 +77,7 @@ export default function RemoveStorageLocationModal({
           {t(
             "manage.repositories.storageLocationRemoveConfirmation",
             'Remove "{{name}}" from Lumilio? Its folder, .lumilioroot marker, and every file on disk will be preserved.',
-            { name: root.name ?? "" },
+            { name: displayName },
           )}
         </p>
 
@@ -93,7 +96,7 @@ export default function RemoveStorageLocationModal({
               : t("manage.repositories.storageLocationCapacityUnknown", "Capacity unavailable")}
             {` · ${t(
               "manage.repositories.storageLocationRepositoryCount",
-              "{{count}} repositories",
+              "{{count}} Repositories",
               { count: root.repository_count ?? 0 },
             )}`}
           </div>

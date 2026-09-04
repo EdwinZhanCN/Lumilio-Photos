@@ -24,8 +24,8 @@ export function MetaStat({
 
 /**
  * The dotted metadata strip shown under a collection detail title (items count,
- * date range, etc.). Previously hand-rolled and drifting between AlbumDetails,
- * TripDetails and PersonDetails — this is the single source. `dense` is the
+ * date range, etc.). Previously hand-rolled and drifting between collection
+ * detail flows — this is the single source. `dense` is the
  * compact variant used when a scrollable hero collapses.
  */
 export function MetaStatRow({

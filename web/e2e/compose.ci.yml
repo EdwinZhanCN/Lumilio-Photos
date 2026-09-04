@@ -1,5 +1,11 @@
 # CI-only overlay: cache both image builds in the GitHub Actions cache backend.
 services:
+  agent-model-fixture:
+    build:
+      cache_from:
+        - type=gha,scope=e2e-agent-model-fixture
+      cache_to:
+        - type=gha,scope=e2e-agent-model-fixture,mode=max
   lumen-fixture:
     build:
       cache_from:

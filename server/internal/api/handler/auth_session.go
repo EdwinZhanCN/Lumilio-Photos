@@ -9,6 +9,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -26,11 +27,27 @@ func (h *AuthHandler) writeAuthResponse(c *gin.Context, response *service.AuthRe
 		return
 	}
 
+	csrfToken, ok := h.installBrowserSession(c, response)
+	if !ok {
+		return
+	}
+	payload.CSRFToken = csrfToken
+	api.JSONOK(c, payload)
+}
+
+// installBrowserSession is the single transport boundary for a newly issued
+// browser session. Security-setting mutations use this same writer so cookie,
+// CSRF and refresh-session replacement semantics cannot drift by endpoint.
+func (h *AuthHandler) installBrowserSession(c *gin.Context, response *service.AuthResponse) (string, bool) {
+	if response == nil || response.RefreshToken == "" {
+		return "", true
+	}
+
 	sameSite, secure, err := sessionCookiePolicy(c)
 	if err != nil {
 		_ = h.authService.RevokeRefreshToken(response.RefreshToken)
-		api.GinBadRequest(c, err, "Credentialed cross-origin sessions require HTTPS")
-		return
+		api.WriteProblem(c, api.BadRequest(err))
+		return "", false
 	}
 	if previousRefreshToken, cookieErr := c.Cookie(refreshCookieName); cookieErr == nil &&
 		previousRefreshToken != "" &&
@@ -38,8 +55,8 @@ func (h *AuthHandler) writeAuthResponse(c *gin.Context, response *service.AuthRe
 		if revokeErr := h.authService.RevokeRefreshToken(previousRefreshToken); revokeErr != nil &&
 			!errors.Is(revokeErr, service.ErrTokenNotFound) {
 			_ = h.authService.RevokeRefreshToken(response.RefreshToken)
-			api.GinInternalError(c, revokeErr, "Failed to replace existing browser session")
-			return
+			api.WriteProblem(c, api.Internal(revokeErr))
+			return "", false
 		}
 	}
 
@@ -53,8 +70,7 @@ func (h *AuthHandler) writeAuthResponse(c *gin.Context, response *service.AuthRe
 		Secure:   secure,
 		SameSite: sameSite,
 	})
-	payload.CSRFToken = h.authService.CSRFTokenForRefresh(response.RefreshToken)
-	api.JSONOK(c, payload)
+	return h.authService.CSRFTokenForRefresh(response.RefreshToken), true
 }
 
 func (h *AuthHandler) requireRefreshCookie(c *gin.Context) (string, bool) {
@@ -63,7 +79,7 @@ func (h *AuthHandler) requireRefreshCookie(c *gin.Context) (string, bool) {
 		if err == nil {
 			err = errors.New("refresh cookie is empty")
 		}
-		api.GinUnauthorized(c, err, "Invalid or expired refresh token")
+		api.WriteProblem(c, api.KnownProblem(problem.SessionExpired, err))
 		return "", false
 	}
 	return refreshToken, true
@@ -72,7 +88,7 @@ func (h *AuthHandler) requireRefreshCookie(c *gin.Context) (string, bool) {
 func (h *AuthHandler) requireCSRFToken(c *gin.Context, refreshToken string) bool {
 	csrfToken := strings.TrimSpace(c.GetHeader(csrfHeaderName))
 	if !h.authService.ValidateCSRFToken(refreshToken, csrfToken) {
-		api.GinForbidden(c, errors.New("invalid CSRF token"), "Invalid CSRF token")
+		api.WriteProblem(c, api.Forbidden(errors.New("invalid CSRF token")))
 		return false
 	}
 	return true
@@ -100,7 +116,7 @@ func (h *AuthHandler) clearAuthCookies(c *gin.Context) {
 // @Tags auth
 // @Produce json
 // @Success 200 {object} dto.CSRFTokenDTO "CSRF token issued"
-// @Failure 401 {object} api.ErrorResponse "No refresh-cookie session"
+// @Failure 401 {object} api.ProblemResponse "No refresh-cookie session"
 // @Router /api/v1/auth/csrf [get]
 func (h *AuthHandler) GetCSRFToken(c *gin.Context) {
 	refreshToken, ok := h.requireRefreshCookie(c)

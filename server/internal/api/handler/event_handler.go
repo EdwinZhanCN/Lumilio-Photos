@@ -12,30 +12,32 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/catalogtx"
 	"server/internal/event"
-	"server/internal/queue/jobs"
+	"server/internal/pipeline"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 )
 
 type EventHandler struct {
 	service   *event.Service
 	db        *sql.DB
+	writer    *catalogtx.Writer
+	reader    *sql.DB
 	shares    service.ResolvedSnapshotShareService
 	relations *event.RelationService
-	queue     *river.Client[*sql.Tx]
 }
 
-func NewEventHandler(eventService *event.Service, db *sql.DB, shares service.ResolvedSnapshotShareService, queues ...*river.Client[*sql.Tx]) *EventHandler {
+func NewEventHandler(eventService *event.Service, db *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
+	return NewEventHandlerWithReader(eventService, db, catalogtx.NewWriter(db, nil), db, shares)
+}
+
+func NewEventHandlerWithReader(eventService *event.Service, db *sql.DB, writer *catalogtx.Writer, reader *sql.DB, shares service.ResolvedSnapshotShareService) *EventHandler {
 	handler := &EventHandler{
-		service: eventService, db: db, shares: shares,
-		relations: event.NewRelationService(db),
-	}
-	if len(queues) > 0 {
-		handler.queue = queues[0]
+		service: eventService, db: db, writer: writer, reader: reader, shares: shares,
+		relations: event.NewRelationService(reader),
 	}
 	return handler
 }
@@ -78,7 +80,7 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 	if raw := c.Query("limit"); raw != "" {
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > 100 {
-			api.GinBadRequest(c, errors.New("invalid limit"), "Invalid limit")
+			api.WriteProblem(c, api.BadRequest(errors.New("invalid limit")))
 			return
 		}
 		limit = value
@@ -89,11 +91,11 @@ func (h *EventHandler) ListEvents(c *gin.Context) {
 		if err != nil || json.Unmarshal(body, &cursor) != nil || cursor.Version != 1 ||
 			uuid.Validate(cursor.EventID) != nil || cursor.RepositoryID != repositoryFilter ||
 			cursor.IncludeHidden != includeHidden {
-			api.GinBadRequest(c, errors.New("invalid cursor"), "Invalid cursor")
+			api.WriteProblem(c, api.BadRequest(errors.New("invalid cursor")))
 			return
 		}
 	}
-	rows, err := h.db.QueryContext(c, `
+	rows, err := h.reader.QueryContext(c, `
 SELECT e.event_id FROM events e
 WHERE e.owner_id=? AND e.status='active' AND (? OR e.is_hidden=0)
 AND (?='' OR EXISTS (
@@ -101,14 +103,22 @@ AND (?='' OR EXISTS (
   FROM event_media_items emi
   JOIN media_items mi
     ON mi.media_item_id=emi.media_item_id AND mi.owner_id=emi.owner_id
-  WHERE emi.event_id=e.event_id AND emi.owner_id=e.owner_id AND mi.repository_id=?
+  WHERE emi.event_id=e.event_id AND emi.owner_id=e.owner_id
+    AND EXISTS (
+      SELECT 1
+      FROM media_item_assets scoped_membership
+      JOIN active_asset_occurrences occurrence
+        ON occurrence.asset_id=scoped_membership.asset_id
+      WHERE scoped_membership.media_item_id=mi.media_item_id
+        AND occurrence.repository_id=?
+    )
 ))
 AND (?='' OR e.start_at<? OR (e.start_at=? AND e.event_id<?))
 ORDER BY e.start_at DESC,e.event_id DESC LIMIT ?`,
 		ownerID, includeHidden, repositoryFilter, repositoryFilter,
 		cursor.EventID, cursor.StartAt, cursor.StartAt, cursor.EventID, limit+1)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to list Events")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	defer rows.Close()
@@ -116,7 +126,7 @@ ORDER BY e.start_at DESC,e.event_id DESC LIMIT ?`,
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			api.GinInternalError(c, err, "Failed to list Events")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		ids = append(ids, id)
@@ -129,13 +139,13 @@ ORDER BY e.start_at DESC,e.event_id DESC LIMIT ?`,
 	for _, id := range ids {
 		summary, err := h.service.Resolver().Resolve(c, ownerID, id)
 		if err != nil {
-			api.GinInternalError(c, err, "Failed to resolve Event")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		if repositoryFilter != "" {
 			summary, err = h.service.Resolver().ProjectToRepository(c, ownerID, summary, repositoryFilter)
 			if err != nil {
-				api.GinInternalError(c, err, "Failed to project Event")
+				api.WriteProblem(c, api.Internal(err))
 				return
 			}
 		}
@@ -205,7 +215,7 @@ func (h *EventHandler) GetEventAssets(c *gin.Context) {
 	if raw := c.Query("limit"); raw != "" {
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > 500 {
-			api.GinBadRequest(c, errors.New("invalid limit"), "Invalid limit")
+			api.WriteProblem(c, api.BadRequest(errors.New("invalid limit")))
 			return
 		}
 		limit = value
@@ -249,12 +259,12 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 	}
 	var request dto.EventPatchRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid Event update")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if (request.TitleOverride != nil && request.ClearTitleOverride) ||
 		(request.CoverMediaItemID != nil && request.ClearCoverOverride) {
-		api.GinBadRequest(c, errors.New("contradictory set and clear"), "Contradictory Event update")
+		api.WriteProblem(c, api.BadRequest(errors.New("contradictory set and clear")))
 		return
 	}
 	summary, err := h.service.Resolver().Resolve(c, ownerID, c.Param("id"))
@@ -268,7 +278,7 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 	} else if request.TitleOverride != nil {
 		value := strings.TrimSpace(*request.TitleOverride)
 		if value == "" {
-			api.GinBadRequest(c, errors.New("empty title"), "Title cannot be empty")
+			api.WriteProblem(c, api.BadRequest(errors.New("empty title")))
 			return
 		}
 		title = &value
@@ -281,7 +291,7 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 		cover = nil
 	} else if request.CoverMediaItemID != nil {
 		if uuid.Validate(*request.CoverMediaItemID) != nil {
-			api.GinBadRequest(c, errors.New("invalid cover"), "Invalid cover")
+			api.WriteProblem(c, api.BadRequest(errors.New("invalid cover")))
 			return
 		}
 		cover = request.CoverMediaItemID
@@ -290,7 +300,7 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 	if request.IsHidden != nil {
 		hidden = *request.IsHidden
 	}
-	result, err := h.db.ExecContext(c, `
+	result, err := h.writer.ExecContext(c, catalogtx.OperationEventPatch, `
 UPDATE events SET title_override=?,cover_override_media_item_id=?,is_hidden=?,updated_at=?
 WHERE event_id=? AND owner_id=? AND status='active'`,
 		title, cover, hidden, apiNowMicros(), summary.EventID, ownerID)
@@ -325,37 +335,33 @@ func (h *EventHandler) RebuildEvents(c *gin.Context) {
 	}
 	var request dto.EventRebuildRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid rebuild request")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	ownerID := int32(user.UserID)
 	if request.OwnerID != nil && *request.OwnerID != ownerID {
 		if !currentUserIsAdmin(c) {
-			api.GinForbidden(c, errors.New("admin required"), "Admin access required")
+			api.WriteProblem(c, api.Forbidden(errors.New("admin required")))
 			return
 		}
 		ownerID = *request.OwnerID
 	}
-	if h.queue == nil {
-		api.GinInternalError(c, errors.New("Event rebuild queue unavailable"), "Event rebuild queue unavailable")
-		return
-	}
 	now := apiNowMicros()
-	tx, err := h.db.BeginTx(c, nil)
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventRebuildRequest, nil)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to enqueue Event rebuild")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(c, `
 INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,revision,source_revision,published_revision,updated_at)
-VALUES(?,?,?,0,0,0,?) ON CONFLICT(owner_id) DO NOTHING`, ownerID, event.AlgorithmVersion, now, now); err != nil {
-		api.GinInternalError(c, err, "Failed to initialize Event rebuild")
+VALUES(?,?,?,0,1,0,?) ON CONFLICT(owner_id) DO NOTHING`, ownerID, event.AlgorithmVersion, now, now); err != nil {
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	var requestedRevision int64
 	if err := tx.QueryRowContext(c, `SELECT source_revision FROM event_owner_state WHERE owner_id=?`, ownerID).Scan(&requestedRevision); err != nil {
-		api.GinInternalError(c, err, "Failed to read Event revision")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	runID := ""
@@ -364,7 +370,7 @@ SELECT run_id FROM event_rebuild_runs
 WHERE owner_id=? AND state IN ('queued','running')
 	ORDER BY requested_at,run_id LIMIT 1`, ownerID).Scan(&runID)
 	if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
-		api.GinInternalError(c, lookupErr, "Failed to inspect Event rebuild runs")
+		api.WriteProblem(c, api.Internal(lookupErr))
 		return
 	}
 	if runID == "" {
@@ -372,18 +378,16 @@ WHERE owner_id=? AND state IN ('queued','running')
 		if _, err := tx.ExecContext(c, `
 INSERT INTO event_rebuild_runs(run_id,owner_id,state,requested_revision,requested_at)
 VALUES(?,?, 'queued',?,?)`, runID, ownerID, requestedRevision, now); err != nil {
-			api.GinInternalError(c, err, "Failed to record Event rebuild")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 	}
-	args := jobs.EventRebuildArgs{OwnerID: ownerID, Force: true}
-	opts := args.InsertOpts()
-	if _, err := h.queue.InsertTx(c, tx, args, &opts); err != nil {
-		api.GinInternalError(c, err, "Failed to enqueue Event rebuild")
+	if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(requestedRevision), true); err != nil {
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	if err := tx.Commit(); err != nil {
-		api.GinInternalError(c, err, "Failed to commit Event rebuild")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	c.JSON(http.StatusAccepted, dto.EventRebuildAcceptedDTO{RunID: runID, OwnerID: ownerID, RequestedRevision: requestedRevision})
@@ -403,7 +407,7 @@ func (h *EventHandler) GetRebuildStatus(c *gin.Context) {
 	}
 	var response dto.EventRebuildStatusDTO
 	var paused int
-	err := h.db.QueryRowContext(c, `
+	err := h.reader.QueryRowContext(c, `
 SELECT active_algorithm_version,automatic_rebuild_paused,revision,source_revision,published_revision,
  (SELECT count(*) FROM event_dirty_ranges WHERE owner_id=?)
 FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
@@ -415,23 +419,23 @@ FROM event_owner_state WHERE owner_id=?`, ownerID, ownerID).
 		return
 	}
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load Event rebuild status")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	response.Initialized, response.Paused = true, paused != 0
 	response.Pending = response.SourceRevision > response.PublishedRevision
-	rows, rowsErr := h.db.QueryContext(c, `
+	rows, rowsErr := h.reader.QueryContext(c, `
 SELECT run_id,state,COALESCE(error_code,'') FROM event_rebuild_runs
 WHERE owner_id=? ORDER BY requested_at DESC,run_id DESC LIMIT 20`, ownerID)
 	if rowsErr != nil {
-		api.GinInternalError(c, rowsErr, "Failed to read Event rebuild runs")
+		api.WriteProblem(c, api.Internal(rowsErr))
 		return
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var runID, state, errorCode string
 		if err := rows.Scan(&runID, &state, &errorCode); err != nil {
-			api.GinInternalError(c, err, "Failed to read Event rebuild runs")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		switch state {
@@ -454,7 +458,7 @@ WHERE owner_id=? ORDER BY requested_at DESC,run_id DESC LIMIT 20`, ownerID)
 		}
 	}
 	if err := rows.Err(); err != nil {
-		api.GinInternalError(c, err, "Failed to read Event rebuild runs")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, response)
@@ -475,20 +479,20 @@ func (h *EventHandler) SetRebuildState(c *gin.Context) {
 	}
 	var request dto.EventRebuildStateRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid rebuild state")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if request.OwnerID != nil && *request.OwnerID != ownerID {
 		if !currentUserIsAdmin(c) {
-			api.GinForbidden(c, errors.New("admin required"), "Admin access required")
+			api.WriteProblem(c, api.Forbidden(errors.New("admin required")))
 			return
 		}
 		ownerID = *request.OwnerID
 	}
 	now := apiNowMicros()
-	tx, err := h.db.BeginTx(c, nil)
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventRebuildState, nil)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to update rebuild state")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	defer tx.Rollback()
@@ -497,14 +501,14 @@ INSERT INTO event_owner_state(owner_id,active_algorithm_version,initialized_at,a
 VALUES(?,?,?, ?,0,0,0,?)
 ON CONFLICT(owner_id) DO UPDATE SET automatic_rebuild_paused=excluded.automatic_rebuild_paused,
 updated_at=excluded.updated_at`, ownerID, event.AlgorithmVersion, now, request.Paused, now); err != nil {
-		api.GinInternalError(c, err, "Failed to update rebuild state")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
-	if !request.Paused && h.queue != nil {
+	if !request.Paused {
 		var sourceRevision, publishedRevision int64
 		if err := tx.QueryRowContext(c, `SELECT source_revision,published_revision FROM event_owner_state WHERE owner_id=?`, ownerID).
 			Scan(&sourceRevision, &publishedRevision); err != nil {
-			api.GinInternalError(c, err, "Failed to read rebuild state")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		if sourceRevision > publishedRevision {
@@ -513,20 +517,18 @@ updated_at=excluded.updated_at`, ownerID, event.AlgorithmVersion, now, request.P
 			if queued == 0 {
 				_, err = tx.ExecContext(c, `INSERT INTO event_rebuild_runs(run_id,owner_id,state,requested_revision,requested_at) VALUES(?,?, 'queued',?,?)`, uuid.NewString(), ownerID, sourceRevision, now)
 				if err != nil {
-					api.GinInternalError(c, err, "Failed to record rebuild run")
+					api.WriteProblem(c, api.Internal(err))
 					return
 				}
 			}
-			args := jobs.EventRebuildArgs{OwnerID: ownerID}
-			opts := args.InsertOpts()
-			if _, err := h.queue.InsertTx(c, tx, args, &opts); err != nil {
-				api.GinInternalError(c, err, "Failed to resume rebuild")
+			if err := pipeline.RequestEventProjectionTx(c, tx.Raw(), ownerID, uint64(sourceRevision), false); err != nil {
+				api.WriteProblem(c, api.Internal(err))
 				return
 			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		api.GinInternalError(c, err, "Failed to update rebuild state")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	h.GetRebuildStatus(c)
@@ -548,22 +550,22 @@ func (h *EventHandler) ShareEvent(c *gin.Context) {
 	}
 	var request dto.EventShareRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid Event share request")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	ownerID := int32(user.UserID)
-	tx, err := h.db.BeginTx(c, &sql.TxOptions{ReadOnly: false})
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventShare, &sql.TxOptions{ReadOnly: false})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to begin Event share snapshot")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	defer tx.Rollback()
-	summary, err := event.ResolveTx(c, tx, ownerID, c.Param("id"))
+	summary, err := event.ResolveTx(c, tx.Raw(), ownerID, c.Param("id"))
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
-	assets, _, err := event.OrderedAssetsTx(c, tx, ownerID, summary.EventID, service.ShareLinkMaxAssets+1)
+	assets, _, err := event.OrderedAssetsTx(c, tx.Raw(), ownerID, summary.EventID, service.ShareLinkMaxAssets+1)
 	if err != nil {
 		h.respondError(c, err)
 		return
@@ -576,12 +578,12 @@ func (h *EventHandler) ShareEvent(c *gin.Context) {
 	for _, asset := range assets {
 		id, err := uuid.Parse(asset.AssetID)
 		if err != nil {
-			api.GinInternalError(c, err, "Invalid resolved Event asset")
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		ids = append(ids, id)
 	}
-	link, token, err := h.shares.CreateResolvedSnapshotTx(c, tx, service.ShareLinkCreateParams{
+	link, token, err := h.shares.CreateResolvedSnapshotTx(c, tx.Raw(), service.ShareLinkCreateParams{
 		OwnerID: ownerID, OwnerScope: &ownerID, Title: request.Title,
 		Description: request.Description, ExpiresInDays: request.ExpiresInDays,
 		AllowDownload: request.AllowDownload, IncludeOriginals: request.IncludeOriginals,
@@ -590,12 +592,12 @@ func (h *EventHandler) ShareEvent(c *gin.Context) {
 		if errors.Is(err, service.ErrShareLinkTooLarge) {
 			eventConflict(c, err, "event_share_too_large")
 		} else {
-			api.GinInternalError(c, err, "Failed to share Event")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
 	if err := tx.Commit(); err != nil {
-		api.GinInternalError(c, err, "Failed to commit Event share")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, dto.CreateShareLinkResponseDTO{ShareLinkDTO: dto.ToShareLinkDTO(link), Token: token})
@@ -645,7 +647,7 @@ func (h *EventHandler) GetPersonEvents(c *gin.Context) {
 // @Router /api/v1/people/{id}/relations [get]
 func (h *EventHandler) GetPersonRelations(c *gin.Context) {
 	if c.Query("relation") != "co_occurs_with" {
-		api.GinBadRequest(c, errors.New("unsupported relation"), "relation must be co_occurs_with")
+		api.WriteProblem(c, api.BadRequest(errors.New("unsupported relation")))
 		return
 	}
 	h.getPersonRelations(c, "co_occurs_with")
@@ -658,7 +660,7 @@ func (h *EventHandler) getPersonRelations(c *gin.Context, relation string) {
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
 	if err != nil || id <= 0 {
-		api.GinBadRequest(c, errors.New("invalid Person ID"), "Invalid Person ID")
+		api.WriteProblem(c, api.BadRequest(errors.New("invalid Person ID")))
 		return
 	}
 	result, err := h.relations.ForPerson(c, ownerID, int32(id))
@@ -692,7 +694,7 @@ func (h *EventHandler) MergeEvents(c *gin.Context) {
 	}
 	var request dto.EventMergeRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid Event merge")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	summary, err := h.service.Merge(c, ownerID, request.EventIDs, request.SurvivorEventID)
@@ -719,7 +721,7 @@ func (h *EventHandler) SplitEvent(c *gin.Context) {
 	}
 	var request dto.EventSplitRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid Event split")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	summary, err := h.service.Split(c, ownerID, c.Param("id"), request.BeforeMediaItemID)
@@ -767,7 +769,7 @@ func (h *EventHandler) AddEventMembers(c *gin.Context) {
 	}
 	var request dto.EventAddMembersRequestDTO
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GinBadRequest(c, err, "Invalid Event members")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	summary, err := h.service.AddAssets(c, ownerID, c.Param("id"), request.AssetIDs)
@@ -780,7 +782,7 @@ func (h *EventHandler) AddEventMembers(c *gin.Context) {
 
 func (h *EventHandler) pending(c *gin.Context, ownerID int32) bool {
 	var pending bool
-	_ = h.db.QueryRowContext(c, `
+	_ = h.reader.QueryRowContext(c, `
 SELECT source_revision>published_revision FROM event_owner_state WHERE owner_id=?`, ownerID).Scan(&pending)
 	return pending
 }
@@ -788,12 +790,12 @@ SELECT source_revision>published_revision FROM event_owner_state WHERE owner_id=
 func (h *EventHandler) respondError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, event.ErrNotFound):
-		api.GinNotFound(c, err, "Event not found")
+		api.WriteProblem(c, api.NotFound(err))
 	case errors.Is(err, event.ErrConstraintConflict), errors.Is(err, event.ErrWouldBeEmpty),
 		errors.Is(err, event.ErrPaused), errors.Is(err, event.ErrStaleRevision):
 		eventConflict(c, err, "Event conflict")
 	default:
-		api.GinInternalError(c, err, "Event operation failed")
+		api.WriteProblem(c, api.Internal(err))
 	}
 }
 
@@ -822,5 +824,5 @@ func apiNowMicros() int64 { return timeNow().UnixMicro() }
 var timeNow = func() time.Time { return time.Now().UTC() }
 
 func eventConflict(c *gin.Context, err error, message string) {
-	api.GinError(c, http.StatusConflict, err, http.StatusConflict, message)
+	api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 }

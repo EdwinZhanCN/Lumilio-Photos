@@ -1,152 +1,53 @@
-// Command fakelumen provides the deterministic external inference boundary used
-// by the isolated browser E2E stack. It implements the public Lumen gRPC
-// contract, advertises only semantic image/text embedding, and returns one
-// stable 768-dimensional vector for every request. Product code still exercises
-// discovery, gRPC streaming, image preprocessing, queues, SQLite vector
-// storage, retrieval, and best-frame selection; only model inference is faked.
+// Command fakelumen is the record/replay boundary for Lumen ML inference in
+// tests and the isolated browser E2E stack. It implements the public Lumen
+// gRPC contract in two modes:
+//
+//   - replay (default): serve recorded fixtures looked up by
+//     (task, sha256(payload)). Without a recorded capability set it advertises
+//     the deterministic builtin SigLIP capability and answers every semantic
+//     request with one constant 768-dimensional vector — the legacy behavior.
+//     Misses fall back to deterministic builtin responses and are counted per
+//     task in the metrics endpoint; -strict turns a miss into an error.
+//
+//   - record (-record -upstream <addr> -fixtures <dir>): proxy every inference
+//     to a real Lumen Hub, stream the answer back, and persist each exchange
+//     as a reviewed fixture. The upstream capability set is persisted so a
+//     later replay advertises exactly what the recording hub advertised.
+//
+// Product code exercises discovery, gRPC streaming, image preprocessing,
+// queues, SQLite vector storage, retrieval, and best-frame selection either
+// way; only model inference is replayed. See
+// .agents/skills/lumilio-lumen-fixtures/SKILL.md for the workflow.
 package main
 
 import (
 	"context"
-	"encoding/json"
+	"embed"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"sync/atomic"
 	"syscall"
 	"time"
 
-	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	pb "github.com/edwinzhancn/lumen-sdk/proto"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
 	defaultAddress        = ":50051"
 	defaultMetricsAddress = ":50052"
-	modelID               = "lumilio-e2e-deterministic-v1"
 )
 
-type inferenceMetrics struct {
-	semanticImage atomic.Uint64
-	semanticText  atomic.Uint64
-}
-
-type inferenceServer struct {
-	pb.UnimplementedInferenceServer
-	result  []byte
-	metrics *inferenceMetrics
-}
-
-func newInferenceServer() (*inferenceServer, error) {
-	vector := make([]float32, 768)
-	vector[0] = 1
-	result, err := json.Marshal(types.EmbeddingV1{
-		Vector:  vector,
-		Dim:     len(vector),
-		ModelID: modelID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("marshal deterministic embedding: %w", err)
-	}
-	return &inferenceServer{result: result, metrics: &inferenceMetrics{}}, nil
-}
-
-func semanticCapability() *pb.Capability {
-	return &pb.Capability{
-		ServiceName:     types.ServiceSigLIP,
-		ModelIds:        []string{modelID},
-		Runtime:         "e2e-deterministic",
-		MaxConcurrency:  8,
-		Precisions:      []string{"fp32"},
-		ProtocolVersion: "1.0.0",
-		Tasks: []*pb.IOTask{
-			{
-				Name:        types.TaskSemanticTextEmbed,
-				InputMimes:  []string{"text/plain"},
-				OutputMimes: []string{"application/json;schema=embedding_v1"},
-			},
-			{
-				Name:                    types.TaskSemanticImageEmbed,
-				InputMimes:              []string{"image/jpeg", "image/png", "image/webp", types.DefaultTensorMIME},
-				OutputMimes:             []string{"application/json;schema=embedding_v1"},
-				TensorPreprocessId:      types.PreprocessSigLIP2BasePatch16_224Image,
-				TensorBatchingSupported: true,
-			},
-		},
-	}
-}
-
-func (s *inferenceServer) GetCapabilities(context.Context, *emptypb.Empty) (*pb.Capability, error) {
-	return semanticCapability(), nil
-}
-
-func (s *inferenceServer) StreamCapabilities(_ *emptypb.Empty, stream grpc.ServerStreamingServer[pb.Capability]) error {
-	return stream.Send(semanticCapability())
-}
-
-func (s *inferenceServer) Health(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
-}
-
-func (s *inferenceServer) Infer(stream grpc.BidiStreamingServer[pb.InferRequest, pb.InferResponse]) error {
-	var request *pb.InferRequest
-	for {
-		chunk, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if request == nil {
-			request = &pb.InferRequest{
-				CorrelationId: chunk.GetCorrelationId(),
-				Task:          chunk.GetTask(),
-				PayloadMime:   chunk.GetPayloadMime(),
-				Meta:          cloneStrings(chunk.GetMeta()),
-			}
-		}
-		request.Payload = append(request.Payload, chunk.GetPayload()...)
-	}
-
-	if request == nil {
-		return status.Error(codes.InvalidArgument, "inference request is empty")
-	}
-	switch request.GetTask() {
-	case types.TaskSemanticImageEmbed:
-		s.metrics.semanticImage.Add(1)
-	case types.TaskSemanticTextEmbed:
-		s.metrics.semanticText.Add(1)
-	default:
-		return status.Errorf(codes.Unimplemented, "unsupported E2E task %q", request.GetTask())
-	}
-
-	return stream.Send(&pb.InferResponse{
-		CorrelationId: request.GetCorrelationId(),
-		IsFinal:       true,
-		Result:        s.result,
-		ResultMime:    "application/json;schema=embedding_v1",
-	})
-}
-
-func cloneStrings(source map[string]string) map[string]string {
-	cloned := make(map[string]string, len(source))
-	for key, value := range source {
-		cloned[key] = value
-	}
-	return cloned
-}
+//go:embed all:fixtures
+var embeddedFixtures embed.FS
 
 func runHealthCheck(endpoint string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -160,38 +61,71 @@ func runHealthCheck(endpoint string) error {
 	return err
 }
 
-func metricsHandler(metrics *inferenceMetrics) http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]uint64{
-			"semantic_image": metrics.semanticImage.Load(),
-			"semantic_text":  metrics.semanticText.Load(),
-		})
-	})
-	return mux
+type options struct {
+	address        string
+	metricsAddress string
+	fixturesDir    string
+	record         bool
+	upstream       string
+	strict         bool
 }
 
-func run(address string, metricsAddress string) error {
-	listener, err := net.Listen("tcp", address)
+func buildServer(opts options) (*inferenceServer, func(), error) {
+	var store *fixtureStore
+	var err error
+	if opts.fixturesDir != "" {
+		store, err = openFixtureDir(opts.fixturesDir)
+	} else {
+		var embedded fs.FS
+		embedded, err = fs.Sub(embeddedFixtures, "fixtures")
+		if err == nil {
+			store, err = loadFixtureStore(embedded)
+		}
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !opts.record {
+		return newReplayServer(store, opts.strict), func() {}, nil
+	}
+
+	if opts.upstream == "" {
+		return nil, nil, errors.New("-record requires -upstream <host:port>")
+	}
+	if opts.fixturesDir == "" {
+		return nil, nil, errors.New("-record requires -fixtures <dir> to persist recordings")
+	}
+	conn, err := grpc.NewClient(opts.upstream, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, nil, fmt.Errorf("dial upstream %s: %w", opts.upstream, err)
+	}
+	cleanup := func() { _ = conn.Close() }
+	return newRecordServer(store, pb.NewInferenceClient(conn), opts.upstream), cleanup, nil
+}
+
+func run(opts options) error {
+	listener, err := net.Listen("tcp", opts.address)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
-	metricsListener, err := net.Listen("tcp", metricsAddress)
+	metricsListener, err := net.Listen("tcp", opts.metricsAddress)
 	if err != nil {
 		return err
 	}
 	defer metricsListener.Close()
 
-	service, err := newInferenceServer()
+	service, cleanup, err := buildServer(opts)
 	if err != nil {
 		return err
 	}
+	defer cleanup()
+
 	server := grpc.NewServer()
 	pb.RegisterInferenceServer(server, service)
 	metricsServer := &http.Server{
-		Handler:           metricsHandler(service.metrics),
+		Handler:           metricsHandler(service),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -206,10 +140,15 @@ func run(address string, metricsAddress string) error {
 	}()
 
 	log.Printf(
-		"deterministic Lumen E2E fixture listening on %s (metrics %s)",
+		"fakelumen %s mode listening on %s (metrics %s, fixtures loaded %d)",
+		service.mode,
 		listener.Addr(),
 		metricsListener.Addr(),
+		service.store.size(),
 	)
+	if service.mode == modeRecord {
+		log.Printf("recording upstream %s into %s", opts.upstream, opts.fixturesDir)
+	}
 	select {
 	case <-ctx.Done():
 	case err := <-serveErrors:
@@ -228,8 +167,13 @@ func run(address string, metricsAddress string) error {
 }
 
 func main() {
-	address := flag.String("listen", defaultAddress, "gRPC listen address")
-	metricsAddress := flag.String("metrics-listen", defaultMetricsAddress, "HTTP metrics listen address")
+	opts := options{}
+	flag.StringVar(&opts.address, "listen", defaultAddress, "gRPC listen address")
+	flag.StringVar(&opts.metricsAddress, "metrics-listen", defaultMetricsAddress, "HTTP metrics listen address")
+	flag.StringVar(&opts.fixturesDir, "fixtures", "", "fixture directory (defaults to the embedded fixture set; required with -record)")
+	flag.BoolVar(&opts.record, "record", false, "proxy inference to -upstream and persist fixtures")
+	flag.StringVar(&opts.upstream, "upstream", "", "real Lumen Hub address for -record")
+	flag.BoolVar(&opts.strict, "strict", false, "fail replay misses instead of serving the builtin fallback")
 	healthCheck := flag.String("health-check", "", "probe an existing fixture endpoint")
 	flag.Parse()
 
@@ -237,7 +181,7 @@ func main() {
 	if *healthCheck != "" {
 		err = runHealthCheck(*healthCheck)
 	} else {
-		err = run(*address, *metricsAddress)
+		err = run(opts)
 	}
 	if err != nil {
 		log.Fatal(err)

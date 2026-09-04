@@ -7,6 +7,7 @@ import {
   Dispatch,
   SetStateAction,
 } from "react";
+import { createUUID } from "@/lib/uuid";
 
 export type GlobalMessageType = "success" | "error" | "hint" | "info";
 
@@ -90,10 +91,7 @@ export default function GlobalProvider({ children }: GlobalProviderProps) {
       const trimmed = message.trim();
       if (!trimmed) return null;
 
-      const id =
-        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const id = createUUID();
 
       setNotifications((prev) => {
         const next: GlobalNotification = {

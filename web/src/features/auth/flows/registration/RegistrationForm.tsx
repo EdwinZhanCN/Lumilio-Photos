@@ -58,6 +58,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     totpSetup,
     totpCode,
     setTotpCode,
+    passkeySecurityCode,
+    setPasskeySecurityCode,
     recoveryCodes,
     displayError,
     isBusy,
@@ -244,10 +246,33 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   "No password to remember. Your passkey stays on this device and can’t be phished.",
               })}
             />
+            <Field
+              label={t("auth.register.passkeySecurityCode", {
+                defaultValue: "Current authenticator code",
+              })}
+              hint={t("auth.register.passkeySecurityCodeHint", {
+                defaultValue:
+                  "Enter a fresh code from your authenticator before adding this passkey.",
+              })}
+            >
+              <TextInput
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={passkeySecurityCode}
+                onChange={(event) =>
+                  setPasskeySecurityCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                required
+              />
+            </Field>
             <Btn
               variant="primary"
               icon={Fingerprint}
               loading={isBusy}
+              disabled={passkeySecurityCode.length < 6}
               onClick={() => void handleCreatePasskey()}
             >
               {t("auth.register.passkeyAction", {

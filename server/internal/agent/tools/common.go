@@ -124,6 +124,7 @@ func RegisterAll() {
 	RegisterDescribe()
 	RegisterPeek()
 	RegisterInspect()
+	RegisterReadOCR()
 	// Terminals
 	RegisterShow()
 	RegisterBulkLike()

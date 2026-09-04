@@ -40,3 +40,19 @@ func TestSnapshotFilenameRejectsUnsafeNames(t *testing.T) {
 		}
 	}
 }
+
+func TestProtectedSnapshotFilenameRoundTrip(t *testing.T) {
+	base := FileName(time.Date(2026, 8, 22, 10, 0, 0, 0, time.UTC))
+	for _, name := range []string{RestorePointPrefix + base} {
+		info, ok := ParseSnapshotName(name)
+		if !ok || !info.CreatedAt.Equal(time.Date(2026, 8, 22, 10, 0, 0, 0, time.UTC)) {
+			t.Fatalf("ParseSnapshotName(%q) = %+v, %t", name, info, ok)
+		}
+		if !IsProtectedSnapshotName(name) {
+			t.Fatalf("IsProtectedSnapshotName(%q) = false", name)
+		}
+		if IsRoutineName(name) {
+			t.Fatalf("protected snapshot %q was classified as routine", name)
+		}
+	}
+}

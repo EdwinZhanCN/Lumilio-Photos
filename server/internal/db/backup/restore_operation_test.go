@@ -80,10 +80,7 @@ func TestRestoreOperationTracksSuccessfulRollback(t *testing.T) {
 	if receipt.Status != RestoreOperationRolledBack || !receipt.Terminal() {
 		t.Fatalf("rolled-back operation = %+v", receipt)
 	}
-	if receipt.ErrorCode != "restore_health_check_failed" {
-		t.Fatalf("error code = %q", receipt.ErrorCode)
-	}
-	if receipt.Message == "" || receipt.CompletedAt == nil {
+	if receipt.CompletedAt == nil {
 		t.Fatalf("rolled-back receipt is incomplete: %+v", receipt)
 	}
 }
@@ -139,8 +136,5 @@ func TestFailRestoreOperationIfCurrentDoesNotOverwriteLaterReceipt(t *testing.T)
 	}
 	if failed.Status != RestoreOperationFailed || !failed.Terminal() || failed.CompletedAt == nil {
 		t.Fatalf("failed operation = %+v", failed)
-	}
-	if failed.ErrorCode != "restore_restart_rejected" {
-		t.Fatalf("error code = %q", failed.ErrorCode)
 	}
 }

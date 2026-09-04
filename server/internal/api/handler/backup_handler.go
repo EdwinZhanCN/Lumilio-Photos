@@ -1,13 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,13 +25,13 @@ import (
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.BackupListDTO "Backups listed successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/settings/backups [get]
 func (h *SettingsHandler) ListBackups(c *gin.Context) {
 	entries, err := h.backupService.List(c.Request.Context())
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to list backups")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, dto.ToBackupListDTO(entries))
@@ -43,12 +44,12 @@ func (h *SettingsHandler) ListBackups(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 202 {object} api.SuccessResponse "Backup enqueued"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/settings/backups [post]
 func (h *SettingsHandler) CreateBackup(c *gin.Context) {
 	if err := h.backupService.TriggerNow(c.Request.Context()); err != nil {
-		api.GinInternalError(c, err, "Failed to enqueue backup")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	c.JSON(http.StatusAccepted, api.SuccessResponse{Message: "backup enqueued"})
@@ -62,15 +63,15 @@ func (h *SettingsHandler) CreateBackup(c *gin.Context) {
 // @Security BearerAuth
 // @Param name path string true "Backup file name"
 // @Success 200 {file} file "Backup file"
-// @Failure 400 {object} api.ErrorResponse "Invalid backup name"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Backup not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid backup name"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Backup not found"
 // @Router /api/v1/settings/backups/{name}/download [get]
 func (h *SettingsHandler) DownloadBackup(c *gin.Context) {
 	name := c.Param("name")
 	path, err := h.backupService.ResolvePath(name)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid backup name")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	c.FileAttachment(path, name)
@@ -84,18 +85,18 @@ func (h *SettingsHandler) DownloadBackup(c *gin.Context) {
 // @Security BearerAuth
 // @Param name path string true "Backup file name"
 // @Success 200 {object} api.SuccessResponse "Backup deleted"
-// @Failure 400 {object} api.ErrorResponse "Invalid backup name"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid backup name"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/settings/backups/{name} [delete]
 func (h *SettingsHandler) DeleteBackup(c *gin.Context) {
 	name := c.Param("name")
 	if err := h.backupService.Delete(c.Request.Context(), name); err != nil {
-		if strings.Contains(err.Error(), "invalid backup name") {
-			api.GinBadRequest(c, err, "Invalid backup name")
+		if errors.Is(err, service.ErrInvalidBackupName) {
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to delete backup")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, api.SuccessResponse{Message: "backup deleted"})
@@ -110,22 +111,22 @@ func (h *SettingsHandler) DeleteBackup(c *gin.Context) {
 // @Security BearerAuth
 // @Param name path string true "Backup file name"
 // @Success 202 {object} dto.RestoreOperationDTO "Restore accepted"
-// @Failure 400 {object} api.ErrorResponse "Invalid backup name"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 409 {object} api.ErrorResponse "Another restore is already in progress"
-// @Failure 500 {object} api.ErrorResponse "Restore could not be staged"
+// @Failure 400 {object} api.ProblemResponse "Invalid backup name"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 409 {object} api.ProblemResponse "Another restore is already in progress"
+// @Failure 500 {object} api.ProblemResponse "Restore could not be staged"
 // @Router /api/v1/settings/backups/{name}/restore [post]
 func (h *SettingsHandler) RestoreBackup(c *gin.Context) {
 	name := c.Param("name")
 	operation, err := h.backupService.Restore(c.Request.Context(), name)
 	if err != nil {
 		switch {
-		case strings.Contains(err.Error(), "invalid backup name"):
-			api.GinBadRequest(c, err, "Invalid backup name")
-		case strings.Contains(err.Error(), "already in progress"):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "Another restore is already in progress")
+		case errors.Is(err, service.ErrInvalidBackupName):
+			api.WriteProblem(c, api.BadRequest(err))
+		case errors.Is(err, service.ErrRestoreInProgress):
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 		default:
-			api.GinInternalError(c, err, "Restore could not be staged")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -147,18 +148,18 @@ func (h *SettingsHandler) RestoreBackup(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Restore operation ID"
 // @Success 200 {object} dto.RestoreOperationDTO "Restore operation"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Restore operation not found"
-// @Failure 500 {object} api.ErrorResponse "Restore operation could not be read"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Restore operation not found"
+// @Failure 500 {object} api.ProblemResponse "Restore operation could not be read"
 // @Router /api/v1/settings/backup-restores/{id} [get]
 func (h *SettingsHandler) GetRestoreOperation(c *gin.Context) {
 	operation, err := h.backupService.GetRestoreOperation(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			api.GinNotFound(c, err, "Restore operation not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to read restore operation")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, dto.ToRestoreOperationDTO(operation))
@@ -172,18 +173,18 @@ func (h *SettingsHandler) GetRestoreOperation(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.RestoreOperationDTO "Latest restore operation"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "No restore operation exists"
-// @Failure 500 {object} api.ErrorResponse "Restore operation could not be read"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "No restore operation exists"
+// @Failure 500 {object} api.ProblemResponse "Restore operation could not be read"
 // @Router /api/v1/settings/backup-restores/latest [get]
 func (h *SettingsHandler) GetLatestRestoreOperation(c *gin.Context) {
 	operation, err := h.backupService.LatestRestoreOperation(c.Request.Context())
 	if err != nil {
 		if os.IsNotExist(err) {
-			api.GinNotFound(c, err, "Restore operation not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
-		api.GinInternalError(c, err, "Failed to read restore operation")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, dto.ToRestoreOperationDTO(operation))

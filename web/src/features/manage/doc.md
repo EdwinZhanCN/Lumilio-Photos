@@ -40,8 +40,9 @@ prevents gallery pages from hiding expensive operational work.
 ## Data
 
 Repository lists come from [useRepositoryOptions](../repositories/index.ts).
-[useRepositoryScan](../repositories/index.ts) follows scan runs through
-[waitForRepositoryScan](../repositories/index.ts) before invalidating repository-aware views.
+[useRepositoryScan](../repositories/index.ts) settles from the durable enqueue receipt and
+invalidates repository-aware views; Repository rows own active-operation
+polling through TanStack Query without extending mutation lifetime.
 [useDetectDuplicates](../collections/index.ts), [useRebuildPeopleClusters](../people/index.ts), and
 [useStartRepositoryCloudImport](../cloud/index.ts) remain public commands of their owning
 features.

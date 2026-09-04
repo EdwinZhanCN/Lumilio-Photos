@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"server/internal/api/problem"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 )
@@ -21,17 +22,16 @@ type BatchUploadRequestDTO struct {
 
 // ReprocessAssetRequestDTO represents the request structure for asset reprocessing
 type ReprocessAssetRequestDTO struct {
-	Tasks          []string `json:"tasks" binding:"omitempty" example:"thumbnail_small,thumbnail_medium,transcode_1080p"`
+	Tasks          []string `json:"tasks" binding:"omitempty" example:"analyze,derivatives,enrich"`
 	ForceFullRetry bool     `json:"force_full_retry,omitempty" example:"false"`
 }
 
 // ReprocessAssetResponseDTO represents the response structure for asset reprocessing
 type ReprocessAssetResponseDTO struct {
-	AssetID     string   `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Status      string   `json:"status" example:"queued"`
-	Message     string   `json:"message" example:"Reprocessing job queued successfully"`
-	FailedTasks []string `json:"failed_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
-	RetryTasks  []string `json:"retry_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
+	AssetID   string `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ReceiptID string `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
+	Status    string `json:"status" example:"queued"`
+	Message   string `json:"message" example:"Reprocessing request accepted"`
 }
 
 type RebuildAssetIndexesRequestDTO struct {
@@ -39,16 +39,17 @@ type RebuildAssetIndexesRequestDTO struct {
 	Tasks        []string `json:"tasks,omitempty" example:"semantic,ocr"`
 	Limit        int      `json:"limit,omitempty" minimum:"1" maximum:"500" example:"200"`
 	MissingOnly  *bool    `json:"missing_only,omitempty" example:"true"`
-	// ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use
-	// after switching the embedding model (drop+refill) so no two models' vectors
-	// are mixed. Honored only when the semantic task is included.
+	// ResetSemantic globally wipes all photo and video semantic vectors and
+	// rebuilds both lanes from scratch. Use after switching the embedding model
+	// (drop+refill) so no two models' vectors are mixed. Repository-scoped resets
+	// are rejected; the semantic task must be included.
 	ResetSemantic *bool `json:"reset_semantic,omitempty" example:"false"`
 }
 
 type RebuildAssetIndexesResponseDTO struct {
 	Status         string   `json:"status" example:"queued"`
 	Message        string   `json:"message" example:"Index rebuild job queued successfully"`
-	JobID          int64    `json:"job_id" example:"123"`
+	ReceiptID      string   `json:"receipt_id,omitempty" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
 	RequestedTasks []string `json:"requested_tasks"`
 	DisabledTasks  []string `json:"disabled_tasks,omitempty"`
 	Limit          int      `json:"limit" example:"200"`
@@ -71,6 +72,7 @@ type IndexingRepositoryOptionDTO struct {
 	// so scanning never masks storage availability.
 	Reachability string `json:"reachability" example:"active"`
 	Activity     string `json:"activity" example:"idle"`
+	PauseReason  string `json:"pause_reason,omitempty" example:"low_space"`
 	IsPrimary    bool   `json:"is_primary" example:"false"`
 }
 
@@ -101,7 +103,7 @@ type AssetIndexingStatsResponseDTO struct {
 
 // UploadResponseDTO represents the response structure for file upload
 type UploadResponseDTO struct {
-	TaskID      int64  `json:"task_id" example:"12345"`
+	ReceiptID   string `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
 	Status      string `json:"status" example:"processing"`
 	FileName    string `json:"file_name" example:"photo.jpg"`
 	Size        int64  `json:"size" example:"1048576"`
@@ -116,15 +118,15 @@ type BatchUploadResponseDTO struct {
 
 // BatchUploadResultDTO represents a single result in a batch upload
 type BatchUploadResultDTO struct {
-	Success     bool    `json:"success"`
-	SessionID   string  `json:"session_id,omitempty"`
-	FileName    string  `json:"file_name,omitempty"`
-	ContentHash string  `json:"content_hash"`
-	TaskID      *int64  `json:"task_id,omitempty"`
-	Status      *string `json:"status,omitempty"`
-	Size        *int64  `json:"size,omitempty"`
-	Message     *string `json:"message,omitempty"`
-	Error       *string `json:"error,omitempty"`
+	Success     bool               `json:"success"`
+	SessionID   string             `json:"session_id,omitempty"`
+	FileName    string             `json:"file_name,omitempty"`
+	ContentHash string             `json:"content_hash"`
+	ReceiptID   *string            `json:"receipt_id,omitempty"`
+	Status      *string            `json:"status,omitempty"`
+	Size        *int64             `json:"size,omitempty"`
+	Message     *string            `json:"message,omitempty"`
+	Problem     *problem.Reference `json:"problem,omitempty"`
 }
 
 // UploadPrecheckFileDTO is one candidate file in an upload precheck request.
@@ -184,12 +186,12 @@ type CreateUploadSessionRequestDTO struct {
 }
 
 type UploadSessionResponseDTO struct {
-	SessionID      string `json:"session_id"`
-	Status         string `json:"status"`
-	TotalChunks    int    `json:"total_chunks"`
-	ReceivedChunks []int  `json:"received_chunks"`
-	BytesReceived  int64  `json:"bytes_received"`
-	TaskID         *int64 `json:"task_id,omitempty"`
+	SessionID      string  `json:"session_id"`
+	Status         string  `json:"status"`
+	TotalChunks    int     `json:"total_chunks"`
+	ReceivedChunks []int   `json:"received_chunks"`
+	BytesReceived  int64   `json:"bytes_received"`
+	ReceiptID      *string `json:"receipt_id,omitempty"`
 }
 
 func stringPtr(value string) *string {
@@ -225,38 +227,39 @@ type UploadProgressResponseDTO struct {
 	Summary  ProgressSummaryDTO   `json:"summary"`
 }
 
-// UploadJobStatusDTO reports whether an accepted upload has been materialized
-// by the ingest queue. Only jobs owned by the current caller are returned.
-type UploadJobStatusDTO struct {
-	TaskID   int64   `json:"task_id" example:"12345"`
-	FileName string  `json:"file_name" example:"photo.jpg"`
-	Status   string  `json:"status" example:"completed"`
-	Terminal bool    `json:"terminal" example:"true"`
-	Success  bool    `json:"success" example:"true"`
-	Error    *string `json:"error,omitempty" example:"failed to materialize asset"`
+// UploadOperationStatusDTO reports catalog-owned ingest receipt state. It is
+// independent of the disposable queue database.
+type UploadOperationStatusDTO struct {
+	ReceiptID string             `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
+	FileName  string             `json:"file_name" example:"photo.jpg"`
+	Status    string             `json:"status" example:"completed"`
+	Terminal  bool               `json:"terminal" example:"true"`
+	Success   bool               `json:"success" example:"true"`
+	Problem   *problem.Reference `json:"problem,omitempty"`
 }
 
-type UploadJobStatusResponseDTO struct {
-	Jobs []UploadJobStatusDTO `json:"jobs"`
+type UploadOperationStatusResponseDTO struct {
+	Operations []UploadOperationStatusDTO `json:"operations"`
 }
 
 // AssetDTO represents an asset
 type AssetDTO struct {
 	AssetID              string                          `json:"asset_id"`
 	OwnerID              *int32                          `json:"owner_id"`
-	RepositoryID         *string                         `json:"repository_id,omitempty"`
+	ContentID            string                          `json:"content_id"`
 	Type                 string                          `json:"type"`
 	OriginalFilename     string                          `json:"original_filename"`
-	StoragePath          string                          `json:"storage_path"`
 	MimeType             string                          `json:"mime_type"`
-	FileSize             int64                           `json:"file_size"`
-	Hash                 *string                         `json:"hash"`
+	FileSize             *int64                          `json:"file_size,omitempty"`
+	Hash                 *string                         `json:"hash,omitempty"`
 	Width                *int32                          `json:"width"`
 	Height               *int32                          `json:"height"`
 	Duration             *float64                        `json:"duration"`
 	UploadTime           time.Time                       `json:"upload_time"`
 	TakenTime            *time.Time                      `json:"taken_time,omitempty"`
 	CaptureOffsetMinutes *int16                          `json:"capture_offset_minutes,omitempty"`
+	GPSLatitude          *float64                        `json:"gps_latitude,omitempty"`
+	GPSLongitude         *float64                        `json:"gps_longitude,omitempty"`
 	Rating               *int32                          `json:"rating,omitempty"`
 	Liked                *bool                           `json:"liked,omitempty"`
 	IsDeleted            *bool                           `json:"is_deleted"`
@@ -478,10 +481,6 @@ type AssetGroupDTO struct {
 // ToAssetDTO converts a repo.Asset to AssetDTO
 func ToAssetDTO(a repo.Asset) AssetDTO {
 	id := a.AssetID.String()
-	var storagePath string
-	if a.StoragePath != nil {
-		storagePath = *a.StoragePath
-	}
 	var uploadTime time.Time
 	if a.UploadTime.Valid {
 		uploadTime = a.UploadTime.Time
@@ -490,11 +489,6 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	if a.DeletedAt.Valid {
 		t := a.DeletedAt.Time
 		deletedAt = &t
-	}
-	var repositoryID *string
-	if a.RepositoryID.Valid {
-		repoUUID := a.RepositoryID.UUID.String()
-		repositoryID = &repoUUID
 	}
 	var takenTime *time.Time
 	if a.TakenTime.Valid {
@@ -526,19 +520,18 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	return AssetDTO{
 		AssetID:              id,
 		OwnerID:              a.OwnerID,
-		RepositoryID:         repositoryID,
+		ContentID:            a.ContentID.String(),
 		Type:                 a.Type,
 		OriginalFilename:     a.OriginalFilename,
-		StoragePath:          storagePath,
 		MimeType:             a.MimeType,
-		FileSize:             a.FileSize,
-		Hash:                 stringPtr(a.ContentHash),
 		Width:                width,
 		Height:               height,
 		Duration:             a.Duration,
 		UploadTime:           uploadTime,
 		TakenTime:            takenTime,
 		CaptureOffsetMinutes: captureOffsetMinutes,
+		GPSLatitude:          a.GpsLatitude,
+		GPSLongitude:         a.GpsLongitude,
 		Rating:               rating,
 		Liked:                &liked,
 		IsDeleted:            &isDeleted,
@@ -664,6 +657,18 @@ type AssetOCRResultDTO struct {
 	TextItems        []AssetOCRTextItemDTO `json:"text_items"`
 }
 
+// assetOCRResultAggregate is the SQLite JSON-aggregate shape. Timestamps are
+// stored as Unix microseconds and must be converted before constructing the
+// RFC3339/time-based public DTO.
+type assetOCRResultAggregate struct {
+	ModelID          string                `json:"model_id"`
+	TotalCount       *int32                `json:"total_count,omitempty"`
+	ProcessingTimeMs *int32                `json:"processing_time_ms,omitempty"`
+	CreatedAt        *int64                `json:"created_at,omitempty"`
+	UpdatedAt        *int64                `json:"updated_at,omitempty"`
+	TextItems        []AssetOCRTextItemDTO `json:"text_items"`
+}
+
 // AssetFaceItemDTO mirrors one detected face produced by GetAssetWithRelations.
 // BoundingBox and Expression are freeform JSON and are left untyped.
 type AssetFaceItemDTO struct {
@@ -719,10 +724,6 @@ type AssetDetailIncludes struct {
 // raw JSON ([]byte); malformed or empty blobs degrade to nil rather than erroring.
 func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) AssetDetailDTO {
 	id := r.AssetID.String()
-	var storagePath string
-	if r.StoragePath != nil {
-		storagePath = *r.StoragePath
-	}
 	var uploadTime time.Time
 	if r.UploadTime.Valid {
 		uploadTime = r.UploadTime.Time
@@ -736,11 +737,6 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 	if r.DeletedAt.Valid {
 		t := r.DeletedAt.Time
 		deletedAt = &t
-	}
-	var repositoryID *string
-	if r.RepositoryID.Valid {
-		repoUUID := r.RepositoryID.UUID.String()
-		repositoryID = &repoUUID
 	}
 	var width *int32
 	if r.Width != nil {
@@ -768,12 +764,11 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 	base := AssetDTO{
 		AssetID:              id,
 		OwnerID:              r.OwnerID,
-		RepositoryID:         repositoryID,
+		ContentID:            r.ContentID.String(),
 		Type:                 r.Type,
 		OriginalFilename:     r.OriginalFilename,
-		StoragePath:          storagePath,
 		MimeType:             r.MimeType,
-		FileSize:             r.FileSize,
+		FileSize:             &r.FileSize,
 		Hash:                 stringPtr(r.ContentHash),
 		Width:                width,
 		Height:               height,
@@ -781,6 +776,8 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		UploadTime:           uploadTime,
 		TakenTime:            takenTime,
 		CaptureOffsetMinutes: captureOffsetMinutes,
+		GPSLatitude:          r.GpsLatitude,
+		GPSLongitude:         r.GpsLongitude,
 		Rating:               rating,
 		Liked:                &liked,
 		IsDeleted:            &isDeleted,
@@ -817,9 +814,16 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		}
 	}
 	if inc.OCR {
-		var ocr AssetOCRResultDTO
-		if unmarshalJSONColumn(r.OcrResult, &ocr) {
-			detail.OcrResult = &ocr
+		var aggregate assetOCRResultAggregate
+		if unmarshalJSONColumn(r.OcrResult, &aggregate) {
+			detail.OcrResult = &AssetOCRResultDTO{
+				ModelID:          aggregate.ModelID,
+				TotalCount:       aggregate.TotalCount,
+				ProcessingTimeMs: aggregate.ProcessingTimeMs,
+				CreatedAt:        timeFromUnixMicro(aggregate.CreatedAt),
+				UpdatedAt:        timeFromUnixMicro(aggregate.UpdatedAt),
+				TextItems:        aggregate.TextItems,
+			}
 		}
 	}
 	if inc.Faces {
@@ -830,6 +834,14 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 	}
 
 	return detail
+}
+
+func timeFromUnixMicro(value *int64) *time.Time {
+	if value == nil {
+		return nil
+	}
+	converted := time.UnixMicro(*value).UTC()
+	return &converted
 }
 
 func unmarshalJSONColumn(value any, target any) bool {
@@ -1097,13 +1109,14 @@ type FilterAssetsRequestDTO struct {
 
 // SearchAssetsRequestDTO represents the request structure for searching assets
 type SearchAssetsRequestDTO struct {
-	Query           string         `json:"query,omitempty" example:"red bird on branch"`
-	Filter          AssetFilterDTO `json:"filter,omitempty"`
-	SortBy          string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
-	ViewerTimezone  string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
-	Pagination      PaginationDTO  `json:"pagination"`
-	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
-	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"200" minimum:"1" maximum:"200"`
+	Query            string         `json:"query,omitempty" example:"red bird on branch"`
+	SimilarToAssetID *string        `json:"similar_to_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Filter           AssetFilterDTO `json:"filter,omitempty"`
+	SortBy           string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
+	ViewerTimezone   string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
+	Pagination       PaginationDTO  `json:"pagination"`
+	EnhancementMode  string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
+	TopResultsLimit  int            `json:"top_results_limit,omitempty" example:"200" minimum:"1" maximum:"200"`
 	// StackMode is no longer part of the search contract: search results are
 	// always flat by media item. The field only remains bindable so handlers
 	// can reject requests that still send it.

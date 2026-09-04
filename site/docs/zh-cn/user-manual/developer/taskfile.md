@@ -33,8 +33,10 @@ code-evidence:
 | `task compose:test` | 验证所有 Compose |
 | `task ci:site` | 安装并构建文档站 |
 | `task dto` | 生成 OpenAPI、前端类型和 API 文档 |
+| `task verify:generated` | 重新生成已提交产物并检查 drift |
 | `task config:examples` | 生成配置 schema 与示例 |
 | `task lumen:check` | 离线验证 Lumen 锁、目录和协议意图 |
+| `task lumen:record` | 对真实 Hub 录制 fakelumen fixtures |
 | `task assets:check` | 离线验证资源锁 |
 
 模块目录内也可以使用各自 Taskfile 的普通任务名。新增命令时保持根编排边界和模块所有权。

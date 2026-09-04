@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import type { RepositoryOption } from "../../types";
-import { getRepositoryDisplayName } from "../../model/repositoryDisplayName";
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
 import { useRepositoryOptions } from "../../api/useRepositoryOptions";
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
@@ -28,12 +28,12 @@ export function useBrowseScope() {
   );
 
   const scopeLabel = selectedRepository
-    ? getRepositoryDisplayName(selectedRepository, t as TranslateFn)
+    ? getStorageEntityDisplayName(selectedRepository, t as TranslateFn)
     : normalizedBrowseId
       ? repositoriesQuery.isLoading
         ? t("common.loading")
         : t("navbar.repository.unavailable", { defaultValue: "Repository options unavailable" })
-      : t("navbar.repository.all", { defaultValue: "All repositories" });
+      : t("navbar.repository.all", { defaultValue: "All Repositories" });
 
   return {
     repositories,
@@ -43,7 +43,7 @@ export function useBrowseScope() {
     selectedRepository,
     scopeLabel,
     getRepositoryLabel: useCallback(
-      (repository: RepositoryOption) => getRepositoryDisplayName(repository, t as TranslateFn),
+      (repository: RepositoryOption) => getStorageEntityDisplayName(repository, t as TranslateFn),
       [t],
     ),
     setBrowseRepositoryId,

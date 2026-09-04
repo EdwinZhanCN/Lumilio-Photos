@@ -2,12 +2,15 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"server/config"
+	"server/internal/api/problem"
 	"server/internal/httporigin"
 	"server/internal/version"
 
@@ -36,8 +39,8 @@ type AssetControllerInterface interface {
 	CreateUploadSession(c *gin.Context)
 	GetUploadConfig(c *gin.Context)
 	GetUploadProgress(c *gin.Context)
-	GetUploadJobStatus(c *gin.Context)
-	StreamUploadJobStatus(c *gin.Context)
+	GetUploadOperationStatus(c *gin.Context)
+	StreamUploadOperationStatus(c *gin.Context)
 	AddAssetToAlbum(c *gin.Context)
 	GetAssetTypes(c *gin.Context)
 	GetAssetThumbnail(c *gin.Context)
@@ -45,6 +48,7 @@ type AssetControllerInterface interface {
 	// New filtering and search operations
 	QueryAssets(c *gin.Context)              // POST /assets/list - Unified asset listing, filtering, and search
 	SearchAssets(c *gin.Context)             // POST /assets/search - Sectioned search with top results and fallback results
+	SearchAssetsByImage(c *gin.Context)      // POST /assets/search/by-image - Visual search from an uploaded image
 	ListIndexingRepositories(c *gin.Context) // GET /assets/indexing/repositories - List repositories for indexing filters
 	GetIndexingStats(c *gin.Context)         // GET /assets/indexing/stats - Index coverage and queue status
 	RebuildAssetIndexes(c *gin.Context)      // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
@@ -97,6 +101,7 @@ type AuthControllerInterface interface {
 	Me(c *gin.Context)
 	GetMediaToken(c *gin.Context)
 	VerifyMFA(c *gin.Context)
+	VerifySecurity(c *gin.Context)
 	GetMFAStatus(c *gin.Context)
 	ListPasskeys(c *gin.Context)
 	BeginPasskeyEnrollment(c *gin.Context)
@@ -189,6 +194,7 @@ type AgentControllerInterface interface {
 // CapabilitiesControllerInterface defines the interface for public system capability controllers.
 type CapabilitiesControllerInterface interface {
 	GetCapabilities(c *gin.Context) // GET /capabilities - Get de-sensitized runtime capabilities
+	GetLumenRuntime(c *gin.Context) // GET /admin/lumen/runtime - Get administrator Lumen diagnostics
 }
 
 type SettingsControllerInterface interface {
@@ -233,8 +239,10 @@ type RepositoryScanControllerInterface interface {
 	RenameRepository(c *gin.Context)
 	DeleteRepository(c *gin.Context)
 	QueueRepositoryScan(c *gin.Context)
+	GetRepositoryScan(c *gin.Context)
 	GetLatestRepositoryScan(c *gin.Context)
 	ListRepositoryScans(c *gin.Context)
+	CancelRepositoryScan(c *gin.Context)
 }
 
 type HostActionControllerInterface interface {
@@ -343,8 +351,11 @@ func NewRouter(
 	logger *zap.Logger,
 ) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Recovery())
 	r.Use(requestErrorLogger(logger))
+	r.Use(gin.CustomRecovery(func(c *gin.Context, recovered any) {
+		WriteProblem(c, Internal(fmt.Errorf("panic: %v\n%s", recovered, debug.Stack())))
+		c.Abort()
+	}))
 	r.Use(originPolicyMiddleware(originPolicy))
 	trustedSessionOrigin := trustedSessionOriginMiddleware(originPolicy)
 
@@ -415,6 +426,7 @@ func NewRouter(
 			auth.POST("/passkeys/login/options", authController.BeginPasskeyLogin)
 			auth.POST("/passkeys/login/verify", trustedSessionOrigin, authController.VerifyPasskeyLogin)
 			auth.POST("/mfa/verify", trustedSessionOrigin, authController.VerifyMFA)
+			auth.POST("/security/verify", authController.AuthMiddleware(), trustedSessionOrigin, authController.VerifySecurity)
 			auth.GET("/csrf", authController.GetCSRFToken)
 			auth.POST("/refresh", trustedSessionOrigin, authController.RefreshToken)
 			auth.POST("/logout", trustedSessionOrigin, authController.Logout)
@@ -459,6 +471,8 @@ func NewRouter(
 			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
 			repositories.POST("/:id/scan", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
+			repositories.GET("/:id/scans/:operation_id", appInitializedMiddleware, repositoryScanController.GetRepositoryScan)
+			repositories.POST("/:id/scans/:operation_id/cancel", appInitializedMiddleware, repositoryScanController.CancelRepositoryScan)
 			repositories.GET("/:id/scans", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
 			repositories.POST("/:id/stacks/detect", appInitializedMiddleware, assetController.AutoDetectStacks)
 		}
@@ -519,13 +533,14 @@ func NewRouter(
 			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.RebuildAssetIndexes)
 			assets.POST("/list", assetController.QueryAssets)
 			assets.POST("/search", assetController.SearchAssets)
+			assets.POST("/search/by-image", assetController.SearchAssetsByImage)
 			assets.POST("/precheck", assetController.PrecheckUpload)
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.POST("/batch/sessions", assetController.CreateUploadSession)
 			assets.GET("/batch/config", assetController.GetUploadConfig)
 			assets.GET("/batch/progress", assetController.GetUploadProgress)
-			assets.GET("/batch/jobs", assetController.GetUploadJobStatus)
-			assets.GET("/batch/jobs/stream", assetController.StreamUploadJobStatus)
+			assets.GET("/batch/operations", assetController.GetUploadOperationStatus)
+			assets.GET("/batch/operations/stream", assetController.StreamUploadOperationStatus)
 			assets.POST("/download", assetController.DownloadAssets)
 			assets.GET("/:id", assetController.GetAsset)
 			assets.GET("/:id/exif", assetController.GetAssetExif)
@@ -665,6 +680,10 @@ func NewRouter(
 		admin := v1.Group("/admin")
 		admin.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
+			lumen := admin.Group("/lumen")
+			{
+				lumen.GET("/runtime", capabilitiesController.GetLumenRuntime)
+			}
 			river := admin.Group("/river")
 			{
 				river.GET("/queue-summary", queueController.GetQueueSummary)
@@ -774,6 +793,17 @@ func requestErrorLogger(logger *zap.Logger) gin.HandlerFunc {
 		if len(c.Errors) > 0 {
 			fields = append(fields, zap.String("gin_errors", c.Errors.String()))
 		}
+		if instance, ok := c.Get(problemInstanceContextKey); ok {
+			fields = append(fields, zap.String("problem_instance", instance.(string)))
+		}
+		if problemType, ok := c.Get(problemTypeContextKey); ok {
+			fields = append(fields, zap.String("problem_type", problemType.(string)))
+		}
+		if cause, ok := c.Get(problemCauseContextKey); ok {
+			if problemCause, valid := cause.(error); valid {
+				fields = append(fields, zap.Error(problemCause))
+			}
+		}
 
 		if status >= http.StatusInternalServerError {
 			logger.Error("http request failed", fields...)
@@ -830,7 +860,7 @@ func trustedSessionOriginMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 			if referer != "" {
 				parsed, err := url.Parse(referer)
 				if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-					GinForbidden(c, errors.New("invalid request referer"), "Untrusted request origin")
+					WriteProblem(c, KnownProblem(problem.UntrustedOrigin, errors.New("invalid request referer")))
 					c.Abort()
 					return
 				}
@@ -840,7 +870,7 @@ func trustedSessionOriginMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 
 		if origin == "" {
 			if strings.EqualFold(strings.TrimSpace(c.GetHeader("Sec-Fetch-Site")), "cross-site") {
-				GinForbidden(c, errors.New("cross-site request has no verifiable origin"), "Untrusted request origin")
+				WriteProblem(c, KnownProblem(problem.UntrustedOrigin, errors.New("cross-site request has no verifiable origin")))
 				c.Abort()
 				return
 			}
@@ -852,7 +882,7 @@ func trustedSessionOriginMiddleware(policy *httporigin.Policy) gin.HandlerFunc {
 		resolved, resolvedOK := RequestOriginContext(c)
 		configured := err == nil && policy.IsCORSAllowed(normalized)
 		if err != nil || !resolvedOK || (normalized != resolved.TargetOrigin && !configured) {
-			GinForbidden(c, errors.New("request origin is not trusted"), "Untrusted request origin")
+			WriteProblem(c, KnownProblem(problem.UntrustedOrigin, errors.New("request origin is not trusted")))
 			c.Abort()
 			return
 		}

@@ -39,19 +39,19 @@ func NewDuplicateHandler(duplicateService service.DuplicateService, queries *rep
 // @Produce json
 // @Param repository_id query string false "Repository UUID to scope the summary"
 // @Success 200 {object} dto.DuplicateSummaryDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/duplicates/summary [get]
 func (h *DuplicateHandler) GetDuplicateSummary(c *gin.Context) {
 	repoID, err := optionalRepositoryUUIDParam(c.Query("repository_id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid repository_id")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	summary, err := h.duplicateService.GetSummary(c.Request.Context(), repoID, ownerScopeID(c))
 	if err != nil {
 		log.Printf("get duplicate summary failed: %v", err)
-		api.GinInternalError(c, err, "Failed to load duplicate summary")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, toDuplicateSummaryDTO(summary))
@@ -68,13 +68,13 @@ func (h *DuplicateHandler) GetDuplicateSummary(c *gin.Context) {
 // @Param limit query int false "Page size" default(20)
 // @Param offset query int false "Page offset" default(0)
 // @Success 200 {object} dto.ListDuplicateGroupsResponseDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/duplicates/groups [get]
 func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 	repoID, err := optionalRepositoryUUIDParam(c.Query("repository_id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid repository_id")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -83,7 +83,7 @@ func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 		status = service.DuplicateStatusPending
 	}
 	if !isValidDuplicateStatus(status) {
-		api.GinBadRequest(c, errors.New("invalid status"), "Invalid status")
+		api.WriteProblem(c, api.BadRequest(errors.New("invalid status")))
 		return
 	}
 
@@ -98,14 +98,14 @@ func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("list duplicate groups failed: %v", err)
-		api.GinInternalError(c, err, "Failed to list duplicate groups")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	groups, err := h.materializeGroups(c.Request.Context(), result.Groups, false)
 	if err != nil {
 		log.Printf("materialize duplicate groups failed: %v", err)
-		api.GinInternalError(c, err, "Failed to load duplicate group assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -125,32 +125,32 @@ func (h *DuplicateHandler) ListDuplicateGroups(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Duplicate group UUID"
 // @Success 200 {object} dto.DuplicateGroupDTO
-// @Failure 404 {object} api.ErrorResponse
+// @Failure 404 {object} api.ProblemResponse
 // @Router /api/v1/duplicates/groups/{id} [get]
 func (h *DuplicateHandler) GetDuplicateGroup(c *gin.Context) {
 	groupID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid duplicate group id")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	detail, err := h.duplicateService.GetGroup(c.Request.Context(), groupID, ownerScopeID(c))
 	if err != nil {
 		if errors.Is(err, service.ErrDuplicateGroupNotFound) {
-			api.GinNotFound(c, err, "Duplicate group not found")
+			api.WriteProblem(c, api.NotFound(err))
 			return
 		}
 		log.Printf("get duplicate group failed: %v", err)
-		api.GinInternalError(c, err, "Failed to load duplicate group")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	groups, err := h.materializeGroups(c.Request.Context(), []service.DuplicateGroupDetail{detail}, true)
 	if err != nil {
 		log.Printf("materialize duplicate group failed: %v", err)
-		api.GinInternalError(c, err, "Failed to load duplicate group assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	if len(groups) == 0 {
-		api.GinNotFound(c, errors.New("group disappeared"), "Duplicate group not found")
+		api.WriteProblem(c, api.NotFound(errors.New("group disappeared")))
 		return
 	}
 	api.JSONOK(c, groups[0])
@@ -164,24 +164,24 @@ func (h *DuplicateHandler) GetDuplicateGroup(c *gin.Context) {
 // @Produce json
 // @Param request body dto.DetectDuplicatesRequestDTO true "Repository to scan"
 // @Success 200 {object} dto.DetectDuplicatesResponseDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/duplicates/detect [post]
 func (h *DuplicateHandler) DetectDuplicates(c *gin.Context) {
 	var req dto.DetectDuplicatesRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	repoID, err := uuid.Parse(req.RepositoryID)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid repository_id")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	result, err := h.duplicateService.DetectForRepository(c.Request.Context(), repoID)
 	if err != nil {
 		log.Printf("duplicate detection failed: %v", err)
-		api.GinInternalError(c, err, "Duplicate detection failed")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	api.JSONOK(c, dto.DetectDuplicatesResponseDTO{
@@ -203,33 +203,33 @@ func (h *DuplicateHandler) DetectDuplicates(c *gin.Context) {
 // @Param id path string true "Duplicate group UUID"
 // @Param request body dto.MergeDuplicateGroupRequestDTO true "Merge configuration"
 // @Success 200 {object} dto.MergeDuplicateGroupResponseDTO
-// @Failure 400 {object} api.ErrorResponse
-// @Failure 404 {object} api.ErrorResponse
-// @Failure 409 {object} api.ErrorResponse
-// @Failure 500 {object} api.ErrorResponse
+// @Failure 400 {object} api.ProblemResponse
+// @Failure 404 {object} api.ProblemResponse
+// @Failure 409 {object} api.ProblemResponse
+// @Failure 500 {object} api.ProblemResponse
 // @Router /api/v1/duplicates/groups/{id}/merge [post]
 func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 	groupID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid duplicate group id")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.MergeDuplicateGroupRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request body")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	keeperID, err := uuid.Parse(req.KeeperAssetID)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid keeper_asset_id")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	duplicates := make([]uuid.UUID, 0, len(req.DuplicateAssetIDs))
 	for _, raw := range req.DuplicateAssetIDs {
 		id, parseErr := uuid.Parse(raw)
 		if parseErr != nil {
-			api.GinBadRequest(c, parseErr, "Invalid duplicate_asset_ids entry")
+			api.WriteProblem(c, api.BadRequest(parseErr))
 			return
 		}
 		duplicates = append(duplicates, id)
@@ -255,14 +255,14 @@ func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrDuplicateGroupNotFound):
-			api.GinNotFound(c, err, "Duplicate group not found")
+			api.WriteProblem(c, api.NotFound(err))
 		case errors.Is(err, service.ErrDuplicateGroupAlreadyResolved):
-			api.GinError(c, 409, err, 409, "Duplicate group already resolved")
+			api.WriteProblem(c, api.StatusProblem(409, err))
 		case errors.Is(err, service.ErrDuplicateKeeperInvalid):
-			api.GinBadRequest(c, err, "Invalid keeper or duplicate selection")
+			api.WriteProblem(c, api.BadRequest(err))
 		default:
 			log.Printf("merge duplicate group failed: %v", err)
-			api.GinInternalError(c, err, "Failed to merge duplicate group")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -287,24 +287,24 @@ func (h *DuplicateHandler) MergeDuplicateGroup(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Duplicate group UUID"
 // @Success 200 {object} dto.MessageResponseDTO
-// @Failure 404 {object} api.ErrorResponse
-// @Failure 409 {object} api.ErrorResponse
+// @Failure 404 {object} api.ProblemResponse
+// @Failure 409 {object} api.ProblemResponse
 // @Router /api/v1/duplicates/groups/{id}/dismiss [post]
 func (h *DuplicateHandler) DismissDuplicateGroup(c *gin.Context) {
 	groupID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid duplicate group id")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if err := h.duplicateService.DismissGroup(c.Request.Context(), groupID, ownerScopeID(c)); err != nil {
 		switch {
 		case errors.Is(err, service.ErrDuplicateGroupNotFound):
-			api.GinNotFound(c, err, "Duplicate group not found")
+			api.WriteProblem(c, api.NotFound(err))
 		case errors.Is(err, service.ErrDuplicateGroupAlreadyResolved):
-			api.GinError(c, 409, err, 409, "Duplicate group already resolved")
+			api.WriteProblem(c, api.StatusProblem(409, err))
 		default:
 			log.Printf("dismiss duplicate group failed: %v", err)
-			api.GinInternalError(c, err, "Failed to dismiss duplicate group")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}

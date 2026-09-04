@@ -9,7 +9,7 @@ import (
 
 // libvips global state is initialized once per process. ConcurrencyLevel is set
 // to 1 so each vips op runs single-threaded internally; outer parallelism comes
-// from River worker goroutines (queue_setup.go). That combination:
+// from ImageCodec slots admitted by the process-wide execution governor. That combination:
 //   - avoids libvips/libexif races that produced corrupted ("rainbow stripe") WebP
 //     when separate AutoRotate + Process ops ran concurrently under bimg;
 //   - in Docker import benchmarks (~750-thumb set), beat libvips default

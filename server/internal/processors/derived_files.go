@@ -4,59 +4,41 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
 
+	"server/internal/artifact"
 	"server/internal/db/repo"
 	"server/internal/storage"
 )
 
-func (ap *AssetProcessor) saveThumbnail(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, size string) error {
-	privatePath, err := derivedPath("thumbnails", size, fmt.Sprintf("%s_%s.webp", asset.ContentHash, size))
+// saveThumbnail, saveVideoVersion, and saveAudioVersion all share the one
+// immutable artifact implementation. There is no second path writer for media
+// derivatives: every result is addressed by source fence, stage, and pipeline
+// version before the coordinator activates its catalog reference.
+func (ap *AssetProcessor) saveThumbnail(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, pipelineVersion, size string) (DerivedArtifact, error) {
+	published, err := publishDerived(ctx, files, reader, asset, "derivatives", pipelineVersion, size+".webp")
 	if err != nil {
-		return err
+		return DerivedArtifact{}, err
 	}
-	if err := writeDerived(files, privatePath, reader); err != nil {
-		return err
-	}
-	if _, err := ap.assetService.CreateThumbnail(ctx, asset.AssetID, size, privatePath.String()); err != nil {
-		return fmt.Errorf("record thumbnail: %w", err)
-	}
-	return nil
+	return DerivedArtifact{AssetID: asset.AssetID, SourceFence: asset.ContentID, RepositoryID: files.RepositoryID(), Size: size, StoragePath: published.Path, MimeType: "image/webp"}, nil
 }
 
-func saveVideoVersion(files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, version string) error {
-	privatePath, err := derivedPath("videos", version, fmt.Sprintf("%s_%s.mp4", asset.ContentHash, version))
-	if err != nil {
-		return err
-	}
-	return writeDerived(files, privatePath, reader)
+func saveVideoVersion(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, pipelineVersion, version string) error {
+	_, err := publishDerived(ctx, files, reader, asset, "transcode", pipelineVersion, version+".mp4")
+	return err
 }
 
-func saveAudioVersion(files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, version string) error {
-	privatePath, err := derivedPath("audios", version, fmt.Sprintf("%s_%s.mp3", asset.ContentHash, version))
-	if err != nil {
-		return err
-	}
-	return writeDerived(files, privatePath, reader)
+func saveAudioVersion(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, pipelineVersion, version string) error {
+	_, err := publishDerived(ctx, files, reader, asset, "transcode", pipelineVersion, version+".mp3")
+	return err
 }
 
-func derivedPath(kind, version, filename string) (storage.RepositoryPath, error) {
-	return storage.ParsePrivateRepositoryPath(path.Join(".lumilio/assets", kind, version, filename))
-}
-
-func writeDerived(files *storage.RepositoryFS, privatePath storage.RepositoryPath, reader io.Reader) error {
-	if files == nil || reader == nil {
-		return fmt.Errorf("derived file destination and reader are required")
+func publishDerived(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, stage, pipelineVersion, name string) (artifact.Published, error) {
+	if files == nil || reader == nil || asset == nil || asset.ContentID.String() == "" || pipelineVersion == "" {
+		return artifact.Published{}, fmt.Errorf("derived artifact destination, reader, asset, and pipeline version are required")
 	}
-	directory, err := storage.ParsePrivateRepositoryPath(path.Dir(privatePath.String()))
+	store, err := artifact.NewStore(files)
 	if err != nil {
-		return err
+		return artifact.Published{}, err
 	}
-	if err := files.MkdirAllPrivate(directory, 0o755); err != nil {
-		return fmt.Errorf("create derived directory: %w", err)
-	}
-	if _, err := files.WritePrivateFileAtomic(privatePath, reader, 0o644); err != nil {
-		return fmt.Errorf("write derived file: %w", err)
-	}
-	return nil
+	return store.Publish(ctx, artifact.Identity{SourceFence: asset.ContentID.String(), Stage: stage, PipelineVersion: pipelineVersion, Name: name}, reader)
 }

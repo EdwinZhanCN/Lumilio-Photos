@@ -27,7 +27,7 @@ interface UsePhotoStatsReturn {
   availableYears: number[];
   heatmapLoading: boolean;
   isLoading: boolean;
-  error: string | null;
+  error: unknown;
   refetch: () => Promise<void>;
 }
 
@@ -106,12 +106,7 @@ export function usePhotoStats(options: UsePhotoStatsOptions = {}): UsePhotoStats
     availableYears: yearsQuery.data?.years ?? [],
     heatmapLoading: heatmapQuery.isFetching,
     isLoading: queries.some((query) => query.isLoading),
-    error:
-      firstError instanceof Error
-        ? firstError.message
-        : firstError
-          ? "Failed to fetch statistics"
-          : null,
+    error: firstError ?? null,
     refetch,
   };
 }

@@ -99,10 +99,11 @@ tasks:
       - web:test
 
   dto:
-    desc: Generate OpenAPI, TypeScript types, and API documentation
+    desc: Generate OpenAPI, TypeScript types, Problem pages, and API documentation
     cmds:
       - task: server:openapi
       - task: web:openapi-types
+      - go -C server run ./tools/problemcatalog ../site/docs/public/problems
       - task: site:openapi-docs
 
   architecture:check:
@@ -114,6 +115,7 @@ tasks:
     desc: Validate every Docker Compose configuration
     cmds:
       - docker compose -f deploy/compose/compose.yml config --quiet
+      - docker compose -f deploy/compose/dev.compose.yml config --quiet
       - >-
         LUMILIO_STORAGE=/srv/lumilio/media
         LUMILIO_STATE=/srv/lumilio/state
@@ -127,6 +129,7 @@ tasks:
       - docker compose -f deploy/compose/lumen-vulkan.compose.yml config --quiet
       - docker compose -f deploy/compose/lumen-cuda.compose.yml config --quiet
       - docker compose -f web/e2e/compose.yml -f web/e2e/compose.ci.yml config --quiet
+      - docker compose -f web/e2e/compose.yml -f web/e2e/compose.record.yml config --quiet
       # Official Lumen Compose files are host-network only: mDNS discovery needs
       # the host LAN, so bridge mode, port mapping, and Host Broker are not
       # supported deployment paths. Assertions run on `docker compose config`
@@ -184,6 +187,13 @@ tasks:
         go -C server run ./tools/lumenlock sync "{{.ROOT_DIR}}"
         {{if .RELEASE}}--release {{.RELEASE}}{{end}}
 
+  lumen:record:
+    desc: Start the E2E stack with fakelumen recording against a real Hub
+    env:
+      LUMILIO_E2E_COMPOSE_EXTRA: '{{joinPath .ROOT_DIR "web" "e2e" "compose.record.yml"}}'
+    cmds:
+      - task: web:e2e:up
+
   dependencies:verify:
     desc: Verify both cross-repository pins against their producer repositories
     cmds:
@@ -237,6 +247,21 @@ tasks:
     cmds:
       - cargo install wasm-pack --locked
 
+  wasm:blake3:
+    desc: Rebuild the single-threaded browser BLAKE3 package
+    preconditions:
+      - sh: command -v wasm-pack >/dev/null 2>&1
+        msg: Run `task wasm:setup` to install wasm-pack first
+    cmds:
+      - wasm-pack build wasm/blake3-wasm --target web --no-pack
+      - >-
+        cp
+        wasm/blake3-wasm/pkg/blake3_wasm.d.ts
+        wasm/blake3-wasm/pkg/blake3_wasm.js
+        wasm/blake3-wasm/pkg/blake3_wasm_bg.wasm
+        wasm/blake3-wasm/pkg/blake3_wasm_bg.wasm.d.ts
+        web/src/wasm/blake3/
+
   tools:swag:
     internal: true
     status:
@@ -244,8 +269,18 @@ tasks:
     cmds:
       - go install github.com/swaggo/swag/v2/cmd/swag@v2.0.0-rc5
 
-  # CI contracts. GitHub Actions provisions runners, native packages, caches,
-  # credentials, and artifacts; these tasks own repository command semantics.
+  verify:generated:
+    desc: Regenerate checked-in artifacts and fail if any of them drifted
+    cmds:
+      - task: tools:install
+      - task: dto
+      - task: config:examples
+      - task: web:docs
+      - git diff --exit-code -- server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
+
+  # CI contracts exist only when they orchestrate more than one module target.
+  # One-to-one wrappers are forbidden: workflows call the module target
+  # (web:test, server:test:ci, web:e2e:up, …) directly.
   ci:architecture:
     desc: Run architecture, Compose, and cross-repository catalog CI gates
     cmds:
@@ -253,78 +288,6 @@ tasks:
       - task: compose:test
       - task: lumen:check
       - task: assets:check
-
-  ci:server:
-    desc: Run the standalone Server CI gate
-    cmds:
-      - task: server:test:ci
-
-  ci:web:
-    desc: Install and test the Web application in CI mode
-    cmds:
-      - task: ci:web:install
-      - task: ci:web:test
-
-  ci:web:install:
-    desc: Install Web dependencies with the CI lockfile contract
-    cmds:
-      - task: web:install:ci
-
-  ci:web:test:
-    desc: Run the Web checks and unit tests with CI behavior
-    cmds:
-      - task: web:test
-
-  ci:web:build:
-    desc: Install and build the Web application in CI mode
-    cmds:
-      - task: ci:web:install
-      - task: web:build
-
-  ci:web:playwright:install:
-    desc: Install the CI Playwright browser and system dependencies
-    cmds:
-      - task: web:playwright:install
-
-  ci:web:playwright:install:deps:
-    desc: Install CI Playwright system dependencies for a cached browser
-    cmds:
-      - task: web:playwright:install:deps
-
-  ci:web:e2e:up:
-    desc: Start the isolated CI E2E environment
-    cmds:
-      - task: web:e2e:up
-
-  ci:web:e2e:down:
-    desc: Stop the isolated CI E2E environment
-    cmds:
-      - task: web:e2e:down
-
-  ci:web:e2e:browser:
-    desc: Run the CI Chromium smoke regression
-    cmds:
-      - task: web:test:browser
-
-  ci:web:e2e:auth-hardening:
-    desc: Run the CI authentication hardening regression
-    cmds:
-      - task: web:test:auth-hardening
-
-  ci:web:e2e:agent-trust:
-    desc: Run the deterministic Lumilio Agent trust-contract regression
-    cmds:
-      - task: web:test:agent-trust
-
-  ci:web:e2e:video-semantic:
-    desc: Run the CI video semantic regression
-    cmds:
-      - task: web:test:video-semantic
-
-  ci:web:e2e:backup-recovery:
-    desc: Run the CI database backup and recovery regression
-    cmds:
-      - task: web:test:backup-recovery
 
   ci:site:
     desc: Install and build the documentation site in CI mode

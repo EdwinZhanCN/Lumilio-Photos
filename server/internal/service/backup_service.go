@@ -8,18 +8,23 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"server/internal/db/backup"
-	"server/internal/queue/jobs"
+	"server/internal/db/catalogtx"
+	"server/internal/pipeline"
 
-	"github.com/riverqueue/river"
+	"github.com/google/uuid"
 )
 
 // BackupEntry is one finalized SQLite snapshot with manifest provenance.
 type RestoreOperation = backup.RestoreOperation
+
+var (
+	ErrInvalidBackupName = errors.New("invalid backup name")
+	ErrRestoreInProgress = backup.ErrRestoreInProgress
+)
 
 type BackupEntry struct {
 	Name          string
@@ -57,16 +62,16 @@ type BackupRuntime struct {
 }
 
 type backupService struct {
-	rt          BackupRuntime
-	queueClient *river.Client[*sql.Tx]
-	restore     sync.Mutex
+	rt      BackupRuntime
+	writer  *catalogtx.Writer
+	restore sync.Mutex
 }
 
-func NewBackupService(rt BackupRuntime, queueClient *river.Client[*sql.Tx]) BackupService {
+func NewBackupService(rt BackupRuntime, writer *catalogtx.Writer) BackupService {
 	if rt.Logf == nil {
 		rt.Logf = func(string, ...any) {}
 	}
-	return &backupService{rt: rt, queueClient: queueClient}
+	return &backupService{rt: rt, writer: writer}
 }
 
 func (s *backupService) List(_ context.Context) ([]BackupEntry, error) {
@@ -84,8 +89,7 @@ func (s *backupService) List(_ context.Context) ([]BackupEntry, error) {
 			continue
 		}
 		name := entry.Name()
-		base, restorePoint := trimRestorePoint(name)
-		info, ok := backup.ParseName(base)
+		info, ok := backup.ParseSnapshotName(name)
 		if !ok {
 			continue
 		}
@@ -103,7 +107,7 @@ func (s *backupService) List(_ context.Context) ([]BackupEntry, error) {
 			CreatedAt:     info.CreatedAt,
 			AppVersion:    manifest.AppVersion,
 			SQLiteVersion: manifest.SQLiteVersion,
-			RestorePoint:  restorePoint,
+			RestorePoint:  backup.IsProtectedSnapshotName(name),
 		})
 	}
 	sortBackupEntries(out)
@@ -111,17 +115,18 @@ func (s *backupService) List(_ context.Context) ([]BackupEntry, error) {
 }
 
 func (s *backupService) TriggerNow(ctx context.Context) error {
-	if s.queueClient == nil {
-		return errors.New("backup queue is unavailable")
+	if s.writer == nil {
+		return errors.New("catalog writer is unavailable")
 	}
-	_, err := s.queueClient.Insert(ctx, jobs.DatabaseBackupArgs{Force: true}, nil)
-	return err
+	receiptID := uuid.New()
+	return s.writer.Transact(ctx, catalogtx.OperationBackupRequest, nil, func(tx *sql.Tx) error {
+		return pipeline.RequestBackupTx(ctx, tx, receiptID, true)
+	})
 }
 
 func (s *backupService) ResolvePath(name string) (string, error) {
-	base, _ := trimRestorePoint(name)
-	if _, ok := backup.ParseName(base); !ok || filepath.Base(name) != name {
-		return "", fmt.Errorf("invalid backup name %q", name)
+	if _, ok := backup.ParseSnapshotName(name); !ok || filepath.Base(name) != name {
+		return "", fmt.Errorf("%w: %q", ErrInvalidBackupName, name)
 	}
 	return filepath.Join(s.rt.Dir, name), nil
 }
@@ -149,7 +154,7 @@ func (s *backupService) Restore(ctx context.Context, name string) (backup.Restor
 		return backup.RestoreOperation{}, fmt.Errorf("backup %s: %w", name, err)
 	}
 	if !s.restore.TryLock() {
-		return backup.RestoreOperation{}, errors.New("another restore is already in progress")
+		return backup.RestoreOperation{}, ErrRestoreInProgress
 	}
 	defer s.restore.Unlock()
 
@@ -210,10 +215,6 @@ func (s *backupService) GetRestoreOperation(_ context.Context, operationID strin
 
 func (s *backupService) LatestRestoreOperation(_ context.Context) (backup.RestoreOperation, error) {
 	return backup.ReadLatestRestoreOperation(s.rt.ActivePath)
-}
-
-func trimRestorePoint(name string) (string, bool) {
-	return strings.CutPrefix(name, backup.RestorePointPrefix)
 }
 
 func sortBackupEntries(entries []BackupEntry) {

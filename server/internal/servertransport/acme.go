@@ -158,17 +158,28 @@ func startACME(
 	logger *zap.Logger,
 	newManager certificateManagerFactory,
 ) (*Runtime, error) {
+	return startACMEWithListen(ctx, cfg, handler, logger, newManager, net.Listen)
+}
+
+func startACMEWithListen(
+	ctx context.Context,
+	cfg config.ServerConfig,
+	handler http.Handler,
+	logger *zap.Logger,
+	newManager certificateManagerFactory,
+	listen func(network, address string) (net.Listener, error),
+) (*Runtime, error) {
 	manager, err := newManager(cfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("initialize ACME certificate manager: %w", err)
 	}
 
-	httpsListener, err := net.Listen("tcp", cfg.Listen)
+	httpsListener, err := listen("tcp", cfg.Listen)
 	if err != nil {
 		manager.Stop()
 		return nil, fmt.Errorf("listen for ACME HTTPS on %s: %w", cfg.Listen, err)
 	}
-	httpListener, err := net.Listen("tcp", cfg.TLS.HTTPListen)
+	httpListener, err := listen("tcp", cfg.TLS.HTTPListen)
 	if err != nil {
 		_ = httpsListener.Close()
 		manager.Stop()

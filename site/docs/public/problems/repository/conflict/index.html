@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Repository conflict · Lumilio API Problem</title>
+  <style>body{max-width:52rem;margin:4rem auto;padding:0 1.5rem;font:16px/1.6 system-ui,sans-serif;color:#202124}code{background:#f3f4f6;padding:.15rem .35rem;border-radius:.25rem}dt{font-weight:700;margin-top:1rem}dd{margin-left:0}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #ddd;padding:.6rem}</style>
+</head>
+<body>
+  <p><a href="/problems/">Lumilio API Problems</a></p>
+  <h1>Repository conflict</h1>
+  <dl>
+    <dt>Type</dt><dd><code>https://lumilio.org/problems/repository/conflict</code></dd>
+    <dt>Normal HTTP status</dt><dd>409</dd>
+    <dt>Definition</dt><dd>Repository state requires an explicit recovery choice.</dd>
+    <dt>Recovery</dt><dd>Choose one of the response&#39;s allowed recovery actions, then retry.</dd>
+  </dl>
+  <h2>Extension members</h2>
+  <table><thead><tr><th>Name</th><th>Schema</th><th>Meaning</th></tr></thead><tbody><tr><td><code>conflict_type</code></td><td>string</td><td>Stable recovery classification.</td></tr><tr><td><code>repository_id</code></td><td>string</td><td>Safe Repository identity, when known.</td></tr><tr><td><code>actions</code></td><td>array[string]</td><td>Stable recovery actions allowed for this conflict.</td></tr></tbody></table>
+  <p>Runtime clients identify this condition by <code>type</code>; they do not dereference this page automatically.</p>
+</body>
+</html>

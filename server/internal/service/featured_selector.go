@@ -119,7 +119,7 @@ func SelectFeaturedPhotos(candidates []repo.Asset, options FeaturedSelectionOpti
 			assetID:      id,
 			weight:       weight,
 			aesKey:       aesKey,
-			dayBucket:    buildDayBucket(asset, meta),
+			dayBucket:    buildDayBucket(asset),
 			cameraBucket: buildCameraBucket(meta),
 			aspectBucket: buildAspectBucket(asset),
 		})
@@ -192,7 +192,7 @@ func computeFeatureWeight(
 ) float64 {
 	const minWeight = 0.05
 
-	taken := resolveTakenTime(asset, meta)
+	taken := resolveTakenTime(asset)
 	if taken.IsZero() {
 		taken = now
 	}
@@ -222,7 +222,7 @@ func computeFeatureWeight(
 	}
 
 	metadataRichness := 0.0
-	if meta.TakenTime != nil {
+	if asset.TakenTime.Valid {
 		metadataRichness += 0.20
 	}
 	if strings.TrimSpace(meta.CameraModel) != "" {
@@ -231,7 +231,7 @@ func computeFeatureWeight(
 	if strings.TrimSpace(meta.LensModel) != "" {
 		metadataRichness += 0.15
 	}
-	if hasValidGPS(meta) {
+	if hasValidGPS(asset) {
 		metadataRichness += 0.20
 	}
 	if strings.TrimSpace(meta.ExposureTime) != "" {
@@ -267,10 +267,7 @@ func deterministicUnit(seed, assetID string) float64 {
 	return u
 }
 
-func resolveTakenTime(asset repo.Asset, meta dbtypes.PhotoSpecificMetadata) time.Time {
-	if meta.TakenTime != nil {
-		return meta.TakenTime.UTC()
-	}
+func resolveTakenTime(asset repo.Asset) time.Time {
 	if asset.TakenTime.Valid {
 		return asset.TakenTime.Time.UTC()
 	}
@@ -280,8 +277,8 @@ func resolveTakenTime(asset repo.Asset, meta dbtypes.PhotoSpecificMetadata) time
 	return time.Time{}
 }
 
-func buildDayBucket(asset repo.Asset, meta dbtypes.PhotoSpecificMetadata) string {
-	t := resolveTakenTime(asset, meta)
+func buildDayBucket(asset repo.Asset) string {
+	t := resolveTakenTime(asset)
 	if t.IsZero() {
 		return ""
 	}
@@ -345,12 +342,12 @@ func isFinite(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0)
 }
 
-func hasValidGPS(meta dbtypes.PhotoSpecificMetadata) bool {
-	if meta.GPSLatitude == nil || meta.GPSLongitude == nil {
+func hasValidGPS(asset repo.Asset) bool {
+	if asset.GpsLatitude == nil || asset.GpsLongitude == nil {
 		return false
 	}
-	lat := *meta.GPSLatitude
-	lng := *meta.GPSLongitude
+	lat := *asset.GpsLatitude
+	lng := *asset.GpsLongitude
 	if !isFinite(lat) || !isFinite(lng) {
 		return false
 	}

@@ -4,7 +4,7 @@ import { useDetectDuplicates } from "@/features/collections";
 import { useEventRebuild, useEventRebuildStatus } from "@/features/events";
 import { useRebuildPeopleClusters } from "@/features/people";
 import {
-  getRepositoryDisplayName,
+  getStorageEntityDisplayName,
   RepositoryGrid,
   type RepositoryOption,
   useRepositoryOptions,
@@ -13,6 +13,7 @@ import {
 import { useMessage } from "@/features/notifications";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 
 export default function RepositoryMaintenancePanel() {
   const { t } = useI18n();
@@ -47,34 +48,22 @@ export default function RepositoryMaintenancePanel() {
     async (repository: RepositoryOption) => {
       try {
         const result = await scanRepository(repository.id);
-        const summaryValues = {
-          name: getRepositoryDisplayName(repository, t),
-          discovered: result.discovered_count ?? 0,
-          updated: result.updated_count ?? 0,
-          moved: result.moved_count ?? 0,
-          deferred: result.deferred_count ?? 0,
-          ambiguous: result.ambiguous_count ?? 0,
-          deleted: result.deleted_count ?? 0,
-        };
         showMessage(
-          result.authoritative ? "success" : "info",
-          result.authoritative
+          result.coalesced ? "info" : "success",
+          result.coalesced
             ? t(
-                "manage.repositories.scanCompletedSummary",
-                "{{name}} scan complete: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous, {{deleted}} deleted.",
-                summaryValues,
+                "manage.repositories.scanCoalesced",
+                "A scan is already active for {{name}}; this request joined the existing operation.",
+                { name: getStorageEntityDisplayName(repository, t) },
               )
             : t(
-                "manage.repositories.scanPartialSummary",
-                "{{name}} scan was partial: {{discovered}} discovered, {{updated}} updated, {{moved}} moved, {{deferred}} deferred, {{ambiguous}} ambiguous. Missing files were not confirmed.",
-                summaryValues,
+                "manage.repositories.scanQueued",
+                "Scan queued for {{name}}. You can keep using Lumilio while it runs.",
+                { name: getStorageEntityDisplayName(repository, t) },
               ),
         );
       } catch (error) {
-        showMessage(
-          "error",
-          error instanceof Error ? error.message : t("manage.repositories.scanFailed"),
-        );
+        showMessage("error", localizeAPIProblem(error, t, t("manage.repositories.scanFailed")));
       }
     },
     [scanRepository, showMessage, t],
@@ -87,14 +76,14 @@ export default function RepositoryMaintenancePanel() {
         showMessage(
           "success",
           t("manage.repositories.detectStacksCompleted", {
-            name: getRepositoryDisplayName(repository, t),
+            name: getStorageEntityDisplayName(repository, t),
             count: created,
           }),
         );
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error ? error.message : t("manage.repositories.detectStacksFailed"),
+          localizeAPIProblem(error, t, t("manage.repositories.detectStacksFailed")),
         );
       }
     },
@@ -120,8 +109,7 @@ export default function RepositoryMaintenancePanel() {
         showMessage(
           "error",
           t("duplicates.scanError", {
-            message:
-              error instanceof Error ? error.message : t("manage.repositories.duplicateScanFailed"),
+            message: localizeAPIProblem(error, t, t("manage.repositories.duplicateScanFailed")),
           }),
         );
       }
@@ -146,7 +134,7 @@ export default function RepositoryMaintenancePanel() {
         });
         showMessage("success", t("manage.repositories.rebuildLocationQueued"));
       } catch (error) {
-        showMessage("error", error instanceof Error ? error.message : String(error));
+        showMessage("error", localizeAPIProblem(error, t, t("home.errors.unknown")));
       }
     },
     [locationRebuildMutation, showMessage, t],
@@ -170,13 +158,13 @@ export default function RepositoryMaintenancePanel() {
         showMessage(
           "success",
           t("manage.repositories.cloudImportStarted", {
-            name: getRepositoryDisplayName(repository, t),
+            name: getStorageEntityDisplayName(repository, t),
           }),
         );
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error ? error.message : t("manage.repositories.cloudImportFailed"),
+          localizeAPIProblem(error, t, t("manage.repositories.cloudImportFailed")),
         );
       }
     },
@@ -198,7 +186,7 @@ export default function RepositoryMaintenancePanel() {
       showMessage(
         "error",
         t("people.rebuild.error", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -217,7 +205,7 @@ export default function RepositoryMaintenancePanel() {
       showMessage(
         "error",
         t("events.rebuild.error", "Failed to rebuild Events: {{message}}", {
-          message: error instanceof Error ? error.message : String(error),
+          message: localizeAPIProblem(error, t, t("home.errors.unknown")),
         }),
       );
     }
@@ -233,10 +221,7 @@ export default function RepositoryMaintenancePanel() {
         }),
       );
     } catch (error) {
-      showMessage(
-        "error",
-        error instanceof Error ? error.message : t("manage.repositories.scanFailed"),
-      );
+      showMessage("error", localizeAPIProblem(error, t, t("manage.repositories.scanFailed")));
     }
   }, [repositoryIds, scanRepositories, showMessage, t]);
 

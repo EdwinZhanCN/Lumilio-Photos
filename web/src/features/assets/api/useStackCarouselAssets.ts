@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Asset, StackMemberDTO } from "@/lib/assets/types";
 import client from "@/lib/http-commons/client";
 import { useAssetStackDetails } from "./useAssetStackDetails";
+import { normalizeProblem } from "@/lib/http-commons/problem";
 
 const isAsset = (value: unknown): value is Asset => {
   if (!value || typeof value !== "object") {
@@ -93,15 +94,11 @@ export const useStackCarouselAssets = (asset: Asset, open: boolean) => {
 
   const error = useMemo(() => {
     if (stackQuery.isError) {
-      return stackQuery.error instanceof Error
-        ? stackQuery.error.message
-        : "Failed to load stack details";
+      return stackQuery.error;
     }
 
     if (assetsQuery.isError) {
-      return assetsQuery.error instanceof Error
-        ? assetsQuery.error.message
-        : "Failed to load stack assets";
+      return assetsQuery.error;
     }
 
     if (
@@ -111,7 +108,7 @@ export const useStackCarouselAssets = (asset: Asset, open: boolean) => {
       members.length > 0 &&
       (assetsQuery.data?.length ?? 0) === 0
     ) {
-      return "No stack assets available";
+      return normalizeProblem(undefined);
     }
 
     return null;

@@ -4,6 +4,7 @@ import { uploadReducer, initialState } from "./reducer";
 import { useMessage } from "@/features/notifications";
 import { UploadContext } from "./context.ts";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 
 /**
  * Provider component that manages upload state and operations.
@@ -100,8 +101,11 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "CLEAR_FILES" });
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : t("upload.UploadProvider.upload_failed_generic");
+      const errorMessage = localizeAPIProblem(
+        error,
+        t,
+        t("upload.UploadProvider.upload_failed_generic"),
+      );
       showMessage("error", errorMessage);
     }
   }, [state.files, uploadProcess, showMessage, t]);

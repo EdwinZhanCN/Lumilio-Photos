@@ -1,6 +1,5 @@
 import { Check, Image as ImageIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useI18n } from "@/lib/i18n";
 import { AssetBrowserScope } from "../flows/browse/selection/AssetBrowserScope";
 import SquareGallery from "../flows/browse/gallery/SquareGallery/SquareGallery";
@@ -69,18 +68,13 @@ function PhotoPickerContent({
   const { clear: clearSelection, setEnabled: setSelectionEnabled } = useAssetSelectionActions();
   const selection = useAssetSelection();
 
-  const { browseGroups, browseItems, isLoading, isLoadingMore, fetchMore, hasMore, viewKey } =
+  const { browseGroups, browseItems, isLoading, isLoadingMore, fetchMore, hasMore } =
     useAssetBrowser({
       withGroups: true,
       sortBy,
       constraint,
       userFilter,
     });
-
-  const layoutKey = useMemo(() => {
-    const itemIds = (browseItems ?? []).map((item) => item.id);
-    return `${viewKey}:${itemIds.join(",")}`;
-  }, [viewKey, browseItems]);
 
   useEffect(() => {
     clearSelection();
@@ -151,10 +145,9 @@ function PhotoPickerContent({
           "delete-assets",
         ]}
       />
-      <div className="custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto">
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
         <SquareGallery
           browseGroups={browseGroups}
-          key={layoutKey}
           openCarousel={() => {}}
           onLoadMore={fetchMore}
           hasMore={hasMore}
@@ -196,23 +189,21 @@ export default function PhotoPicker({
   );
 
   return (
-    <WorkerProvider preload={["justified"]}>
-      <AssetBrowserScope
-        scopeId={scopeId}
-        defaultSelectionMode={selectionMode}
-        initialSelection={{ selectionMode }}
-      >
-        <PhotoPickerContent
-          onSelect={onSelect}
-          onConfirm={onConfirm}
-          selectionMode={selectionMode}
-          confirmLabel={confirmLabel}
-          isConfirming={isConfirming}
-          title={title}
-          initialFilters={pickerInitialFilters}
-          lockedFields={pickerLockedFields}
-        />
-      </AssetBrowserScope>
-    </WorkerProvider>
+    <AssetBrowserScope
+      scopeId={scopeId}
+      defaultSelectionMode={selectionMode}
+      initialSelection={{ selectionMode }}
+    >
+      <PhotoPickerContent
+        onSelect={onSelect}
+        onConfirm={onConfirm}
+        selectionMode={selectionMode}
+        confirmLabel={confirmLabel}
+        isConfirming={isConfirming}
+        title={title}
+        initialFilters={pickerInitialFilters}
+        lockedFields={pickerLockedFields}
+      />
+    </AssetBrowserScope>
   );
 }

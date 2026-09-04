@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 
 	"server/config"
@@ -52,6 +53,9 @@ func TestNewLumenServiceFromAppConfigDisabled(t *testing.T) {
 			}
 			if nodes := svc.GetNodes(); len(nodes) != 0 {
 				t.Fatalf("disabled service should report no nodes, got %d", len(nodes))
+			}
+			if snapshot := svc.RuntimeSnapshot(); snapshot.DiscoveryState != discovery.BackendDisabled || len(snapshot.Nodes) != 0 {
+				t.Fatalf("disabled runtime snapshot = %+v", snapshot)
 			}
 			if err := svc.Close(); err != nil {
 				t.Fatalf("disabled Close: %v", err)

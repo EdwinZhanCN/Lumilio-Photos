@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -11,13 +10,13 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 )
 
 func optionalUUIDToString(value any) *string {
@@ -85,12 +84,10 @@ func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
 		AssetDTO: dto.ToAssetDTO(repo.Asset{
 			AssetID:              row.AssetID,
 			OwnerID:              row.OwnerID,
+			ContentID:            row.ContentID,
 			Type:                 row.Type,
 			OriginalFilename:     row.OriginalFilename,
-			StoragePath:          row.StoragePath,
 			MimeType:             row.MimeType,
-			FileSize:             row.FileSize,
-			ContentHash:          row.ContentHash,
 			Width:                row.Width,
 			Height:               row.Height,
 			Duration:             row.Duration,
@@ -102,7 +99,6 @@ func toAlbumAssetDTO(row repo.GetAlbumAssetsScopedRow) dto.AlbumAssetDTO {
 			SpecificMetadata:     row.SpecificMetadata,
 			Rating:               row.Rating,
 			Liked:                row.Liked,
-			RepositoryID:         row.RepositoryID,
 			Status:               row.Status,
 			UpdatedAt:            row.UpdatedAt,
 			GpsLatitude:          row.GpsLatitude,
@@ -172,7 +168,7 @@ func toScopedAlbumListItemDTO(row repo.GetAlbumsByUserScopedRow) dto.GetAlbumRes
 type AlbumHandler struct {
 	albumService    *service.AlbumService
 	queries         *repo.Queries
-	queueClient     *river.Client[*sql.Tx]
+	writer          *catalogtx.Writer
 	settingsService service.SettingsService
 	runtimeChecker  service.LumenService
 }
@@ -181,14 +177,14 @@ type AlbumHandler struct {
 func NewAlbumHandler(
 	albumService *service.AlbumService,
 	queries *repo.Queries,
-	queueClient *river.Client[*sql.Tx],
+	writer *catalogtx.Writer,
 	settingsService service.SettingsService,
 	runtimeChecker service.LumenService,
 ) *AlbumHandler {
 	return &AlbumHandler{
 		albumService:    albumService,
 		queries:         queries,
-		queueClient:     queueClient,
+		writer:          writer,
 		settingsService: settingsService,
 		runtimeChecker:  runtimeChecker,
 	}
@@ -202,22 +198,22 @@ func NewAlbumHandler(
 // @Produce json
 // @Param request body dto.CreateAlbumRequestDTO true "Album creation data"
 // @Success 200 {object} dto.GetAlbumResponseDTO "Album created successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Failed to create album"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Failed to create album"
 // @Router /api/v1/albums [post]
 // @Security BearerAuth
 func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 	// Get user ID from JWT claims (set by auth middleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
-		api.GinUnauthorized(c, errors.New("user ID not found in token"), "Unauthorized")
+		api.WriteProblem(c, api.Unauthorized(errors.New("user ID not found in token")))
 		return
 	}
 
 	var req dto.CreateAlbumRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -236,7 +232,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 	if req.CoverAssetID != nil && *req.CoverAssetID != "" {
 		coverAssetUUID, err := uuid.Parse(*req.CoverAssetID)
 		if err != nil {
-			api.GinBadRequest(c, err, "Invalid cover asset ID")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		params.CoverAssetID = uuid.NullUUID{UUID: coverAssetUUID, Valid: true}
@@ -245,7 +241,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 	album, err := (*h.albumService).CreateNewAlbum(c.Request.Context(), params)
 	if err != nil {
 		log.Printf("Failed to create album: %v", err)
-		api.GinInternalError(c, err, "Failed to create album")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -270,15 +266,15 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 // @Param id path int true "Album ID"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.GetAlbumResponseDTO "Album retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album ID"
-// @Failure 404 {object} api.ErrorResponse "Album not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid album ID"
+// @Failure 404 {object} api.ProblemResponse "Album not found"
 // @Router /api/v1/albums/{id} [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
 	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -296,7 +292,7 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 		RepositoryID: repositoryID,
 	})
 	if err != nil {
-		api.GinNotFound(c, err, "Album not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
@@ -313,16 +309,16 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 // @Param offset query int false "Number of results to skip for pagination" default(0)
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.ListAlbumsResponseDTO "Albums retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid parameters"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Failed to retrieve albums"
+// @Failure 400 {object} api.ProblemResponse "Invalid parameters"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Failed to retrieve albums"
 // @Router /api/v1/albums [get]
 // @Security BearerAuth
 func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	// Get user ID from JWT claims
 	userID, exists := c.Get("user_id")
 	if !exists {
-		api.GinUnauthorized(c, errors.New("user ID not found in token"), "Unauthorized")
+		api.WriteProblem(c, api.Unauthorized(errors.New("user ID not found in token")))
 		return
 	}
 
@@ -354,7 +350,7 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Failed to count albums for user %d: %v", userID.(int), err)
-		api.GinInternalError(c, err, "Failed to retrieve albums")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -366,7 +362,7 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Failed to retrieve albums for user %d: %v", userID.(int), err)
-		api.GinInternalError(c, err, "Failed to retrieve albums")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -394,24 +390,24 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 // @Param id path int true "Album ID"
 // @Param request body dto.UpdateAlbumRequestDTO true "Album update data"
 // @Success 200 {object} dto.GetAlbumResponseDTO "Album updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album ID or request data"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 404 {object} api.ErrorResponse "Album not found"
-// @Failure 500 {object} api.ErrorResponse "Failed to update album"
+// @Failure 400 {object} api.ProblemResponse "Invalid album ID or request data"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 404 {object} api.ProblemResponse "Album not found"
+// @Failure 500 {object} api.ProblemResponse "Failed to update album"
 // @Router /api/v1/albums/{id} [put]
 // @Security BearerAuth
 func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
 	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.UpdateAlbumRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -442,7 +438,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 	if req.CoverAssetID != nil {
 		coverAssetUUID, err := uuid.Parse(*req.CoverAssetID)
 		if err != nil {
-			api.GinBadRequest(c, err, "Invalid cover asset ID")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		updateParams.CoverAssetID = uuid.NullUUID{UUID: coverAssetUUID, Valid: true}
@@ -451,7 +447,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 	updatedAlbum, err := h.queries.UpdateAlbum(c.Request.Context(), updateParams)
 	if err != nil {
 		log.Printf("Failed to update album %d: %v", albumID, err)
-		api.GinInternalError(c, err, "Failed to update album")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -479,18 +475,18 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Success 200 {object} api.SuccessResponse "Album deleted successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album ID"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 404 {object} api.ErrorResponse "Album not found"
-// @Failure 500 {object} api.ErrorResponse "Failed to delete album"
+// @Failure 400 {object} api.ProblemResponse "Invalid album ID"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 404 {object} api.ProblemResponse "Album not found"
+// @Failure 500 {object} api.ProblemResponse "Failed to delete album"
 // @Router /api/v1/albums/{id} [delete]
 // @Security BearerAuth
 func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
 	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -501,7 +497,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 	err = (*h.albumService).DeleteAlbum(c.Request.Context(), int32(albumID))
 	if err != nil {
 		log.Printf("Failed to delete album %d: %v", albumID, err)
-		api.GinInternalError(c, err, "Failed to delete album")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -517,16 +513,16 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 // @Param id path int true "Album ID"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} dto.AlbumAssetsResponseDTO "Assets retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album ID"
-// @Failure 404 {object} api.ErrorResponse "Album not found"
-// @Failure 500 {object} api.ErrorResponse "Failed to retrieve album assets"
+// @Failure 400 {object} api.ProblemResponse "Invalid album ID"
+// @Failure 404 {object} api.ProblemResponse "Album not found"
+// @Failure 500 {object} api.ProblemResponse "Failed to retrieve album assets"
 // @Router /api/v1/albums/{id}/assets [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 	albumIDStr := c.Param("id")
 	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -545,7 +541,7 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Failed to retrieve assets for album %d: %v", albumID, err)
-		api.GinInternalError(c, err, "Failed to retrieve album assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -571,29 +567,29 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 // @Param assetId path string true "Asset ID (UUID format)"
 // @Param request body dto.AddAssetToAlbumRequestDTO false "Asset position in album"
 // @Success 200 {object} api.SuccessResponse "Asset added to album successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album ID or asset ID"
-// @Failure 404 {object} api.ErrorResponse "Album not found"
-// @Failure 500 {object} api.ErrorResponse "Failed to add asset to album"
+// @Failure 400 {object} api.ProblemResponse "Invalid album ID or asset ID"
+// @Failure 404 {object} api.ProblemResponse "Album not found"
+// @Failure 500 {object} api.ProblemResponse "Failed to add asset to album"
 // @Router /api/v1/albums/{id}/assets/{assetId} [post]
 // @Security BearerAuth
 func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
 	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	assetIDStr := c.Param("assetId")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.AddAssetToAlbumRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -604,14 +600,14 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 
 	asset, err := h.queries.GetAssetByID(c.Request.Context(), assetID)
 	if err != nil {
-		api.GinNotFound(c, err, "Asset not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if !ensureOwnerAccess(c, asset.OwnerID, "Authentication required to modify this asset", "You don't have permission to modify this asset") {
 		return
 	}
 	if asset.OwnerID != nil && *asset.OwnerID != album.UserID && !currentUserIsAdmin(c) {
-		api.GinForbidden(c, errors.New("cross-user album access denied"), "Asset and album must belong to the same user")
+		api.WriteProblem(c, api.Forbidden(errors.New("cross-user album access denied")))
 		return
 	}
 
@@ -624,7 +620,7 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 	err = h.queries.AddAssetToAlbum(c.Request.Context(), params)
 	if err != nil {
 		log.Printf("Failed to add asset %s to album %d: %v", assetID, albumID, err)
-		api.GinInternalError(c, err, "Failed to add asset to album")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	h.enqueueBioClipForAddedAsset(c.Request.Context(), *album, asset)
@@ -640,17 +636,17 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Success 200 {object} dto.RebuildAlbumBioClipResponseDTO "BioCLIP jobs queued successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album or album type"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 403 {object} api.ErrorResponse "Forbidden"
-// @Failure 404 {object} api.ErrorResponse "Album not found"
-// @Failure 503 {object} api.ErrorResponse "BioCLIP unavailable"
+// @Failure 400 {object} api.ProblemResponse "Invalid album or album type"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 403 {object} api.ProblemResponse "Forbidden"
+// @Failure 404 {object} api.ProblemResponse "Album not found"
+// @Failure 503 {object} api.ProblemResponse "BioCLIP unavailable"
 // @Router /api/v1/albums/{id}/bioclip/rebuild [post]
 // @Security BearerAuth
 func (h *AlbumHandler) RebuildAlbumBioClip(c *gin.Context) {
 	albumID, err := strconv.ParseInt(c.Param("id"), 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -659,34 +655,34 @@ func (h *AlbumHandler) RebuildAlbumBioClip(c *gin.Context) {
 		return
 	}
 	if album.AlbumType != repo.AlbumTypeBio {
-		api.GinBadRequest(c, errors.New("album is not a bio album"), "Album is not a bio album")
+		api.WriteProblem(c, api.BadRequest(errors.New("album is not a bio album")))
 		return
 	}
 
-	if h.queueClient == nil {
-		api.GinError(c, http.StatusServiceUnavailable, errors.New("queue client is not configured"), http.StatusServiceUnavailable, "BioCLIP queue is unavailable")
+	if h.writer == nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusServiceUnavailable, errors.New("catalog writer is not configured")))
 		return
 	}
 	available, err := bioClipRuntimeAvailable(c.Request.Context(), h.settingsService, h.runtimeChecker)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to check BioCLIP availability")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	if !available {
-		api.GinError(c, http.StatusServiceUnavailable, errors.New("bioclip is unavailable"), http.StatusServiceUnavailable, "BioCLIP is unavailable")
+		api.WriteProblem(c, api.StatusProblem(http.StatusServiceUnavailable, errors.New("bioclip is unavailable")))
 		return
 	}
 
 	assets, err := h.queries.ListBioAlbumAssetsMissingSpeciesPredictions(c.Request.Context(), album.AlbumID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load bio album assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
 	queued := 0
 	for _, asset := range assets {
-		if err := enqueueBioClipAsset(c.Request.Context(), h.queueClient, asset); err != nil {
-			api.GinInternalError(c, err, "Failed to queue BioCLIP job")
+		if err := requestBioClipAsset(c.Request.Context(), h.writer, asset); err != nil {
+			api.WriteProblem(c, api.Internal(err))
 			return
 		}
 		queued++
@@ -711,7 +707,7 @@ func (h *AlbumHandler) enqueueBioClipForAddedAsset(ctx context.Context, album re
 	if !available {
 		return
 	}
-	if err := enqueueBioClipAsset(ctx, h.queueClient, asset); err != nil {
+	if err := requestBioClipAsset(ctx, h.writer, asset); err != nil {
 		log.Printf("Failed to queue BioCLIP for album %d asset %s: %v", album.AlbumID, asset.AssetID.String(), err)
 	}
 }
@@ -725,22 +721,22 @@ func (h *AlbumHandler) enqueueBioClipForAddedAsset(ctx context.Context, album re
 // @Param id path int true "Album ID"
 // @Param assetId path string true "Asset ID (UUID format)"
 // @Success 200 {object} api.SuccessResponse "Asset removed from album successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album ID or asset ID"
-// @Failure 500 {object} api.ErrorResponse "Failed to remove asset from album"
+// @Failure 400 {object} api.ProblemResponse "Invalid album ID or asset ID"
+// @Failure 500 {object} api.ProblemResponse "Failed to remove asset from album"
 // @Router /api/v1/albums/{id}/assets/{assetId} [delete]
 // @Security BearerAuth
 func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
 	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	assetIDStr := c.Param("assetId")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -756,7 +752,7 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 	err = h.queries.RemoveAssetFromAlbum(c.Request.Context(), params)
 	if err != nil {
 		log.Printf("Failed to remove asset %s from album %d: %v", assetID, albumID, err)
-		api.GinInternalError(c, err, "Failed to remove asset from album")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -773,28 +769,28 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 // @Param assetId path string true "Asset ID (UUID format)"
 // @Param request body dto.UpdateAssetPositionRequestDTO true "New position data"
 // @Success 200 {object} api.SuccessResponse "Asset position updated successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid album ID or asset ID"
-// @Failure 500 {object} api.ErrorResponse "Failed to update asset position"
+// @Failure 400 {object} api.ProblemResponse "Invalid album ID or asset ID"
+// @Failure 500 {object} api.ProblemResponse "Failed to update asset position"
 // @Router /api/v1/albums/{id}/assets/{assetId}/position [put]
 // @Security BearerAuth
 func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
 	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid album ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	assetIDStr := c.Param("assetId")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var req dto.UpdateAssetPositionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -811,7 +807,7 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 	err = h.queries.UpdateAssetPositionInAlbum(c.Request.Context(), params)
 	if err != nil {
 		log.Printf("Failed to update asset position in album: %v", err)
-		api.GinInternalError(c, err, "Failed to update asset position")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -826,21 +822,21 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)"
 // @Success 200 {object} dto.AssetAlbumsResponseDTO "Albums retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid asset ID"
-// @Failure 500 {object} api.ErrorResponse "Failed to retrieve asset albums"
+// @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
+// @Failure 500 {object} api.ProblemResponse "Failed to retrieve asset albums"
 // @Router /api/v1/assets/{id}/albums [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid asset ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	asset, err := h.queries.GetAssetByID(c.Request.Context(), assetID)
 	if err != nil {
-		api.GinNotFound(c, err, "Asset not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if !ensureOwnerAccess(c, asset.OwnerID, "Authentication required to access this asset", "You don't have permission to access this asset") {
@@ -850,7 +846,7 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 	albums, err := h.queries.GetAssetAlbums(c.Request.Context(), assetID)
 	if err != nil {
 		log.Printf("Failed to retrieve albums for asset %s: %v", assetID, err)
-		api.GinInternalError(c, err, "Failed to retrieve asset albums")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 

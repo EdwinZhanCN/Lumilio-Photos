@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vite-plus/test";
 import zeroperlWasmUrl from "@colorhythm/exiftool-wasm/dist/esm/zeroperl-mqcadjqm.wasm?url";
+import { installRandomUUIDCompatibility } from "@/lib/uuid";
 import { preserveExif } from "./exif";
 
 // Real Chromium + the ExifTool wasm (no GPU needed, so this runs headless in
@@ -27,37 +28,46 @@ async function jpeg(color: string): Promise<Blob> {
 
 describe("preserveExif", () => {
   it("copies descriptive tags onto the export and resets Orientation", async () => {
-    const { writeMetadata, parseMetadata } = await import("@colorhythm/exiftool-wasm");
+    const nativeRandomUUID = Object.getOwnPropertyDescriptor(crypto, "randomUUID");
+    Object.defineProperty(crypto, "randomUUID", { configurable: true, value: undefined });
+    expect(installRandomUUIDCompatibility()).toBe(true);
 
-    // A source that carries EXIF, including a non-upright Orientation.
-    const stamped = await writeMetadata(
-      { name: "original.jpg", data: await jpeg("rgb(120,120,120)") },
-      { "EXIF:Make": "TESTCAM", "EXIF:Model": "M1", "EXIF:Orientation": 6 },
-      { args: ["-n", "-m"], fetch: wasmFetch },
-    );
-    expect(stamped.success).toBe(true);
-    if (!stamped.success) return;
-    const original = new Blob([stamped.data], { type: "image/jpeg" });
+    try {
+      const { writeMetadata, parseMetadata } = await import("@colorhythm/exiftool-wasm");
 
-    // A freshly re-encoded export (canvas strips all metadata).
-    const exported = await jpeg("rgb(200,50,50)");
-    const withExif = await preserveExif(exported, original, {
-      format: "image/jpeg",
-      width: 80,
-      height: 60,
-    });
+      // A source that carries EXIF, including a non-upright Orientation.
+      const stamped = await writeMetadata(
+        { name: "original.jpg", data: await jpeg("rgb(120,120,120)") },
+        { "EXIF:Make": "TESTCAM", "EXIF:Model": "M1", "EXIF:Orientation": 6 },
+        { args: ["-n", "-m"], fetch: wasmFetch },
+      );
+      expect(stamped.success).toBe(true);
+      if (!stamped.success) return;
+      const original = new Blob([stamped.data], { type: "image/jpeg" });
 
-    const read = await parseMetadata(
-      { name: "out.jpg", data: withExif },
-      { args: ["-json", "-n"], fetch: wasmFetch },
-    );
-    expect(read.success).toBe(true);
-    if (!read.success) return;
-    const tags = (JSON.parse(read.data) as Array<Record<string, unknown>>)[0];
+      // A freshly re-encoded export (canvas strips all metadata).
+      const exported = await jpeg("rgb(200,50,50)");
+      const withExif = await preserveExif(exported, original, {
+        format: "image/jpeg",
+        width: 80,
+        height: 60,
+      });
 
-    expect(tags.Make).toBe("TESTCAM");
-    expect(tags.Model).toBe("M1");
-    expect(tags.Orientation).toBe(1); // reset — rotation is baked into pixels
+      const read = await parseMetadata(
+        { name: "out.jpg", data: withExif },
+        { args: ["-json", "-n"], fetch: wasmFetch },
+      );
+      expect(read.success).toBe(true);
+      if (!read.success) return;
+      const tags = (JSON.parse(read.data) as Array<Record<string, unknown>>)[0];
+
+      expect(tags.Make).toBe("TESTCAM");
+      expect(tags.Model).toBe("M1");
+      expect(tags.Orientation).toBe(1); // reset — rotation is baked into pixels
+    } finally {
+      if (nativeRandomUUID) Object.defineProperty(crypto, "randomUUID", nativeRandomUUID);
+      else Reflect.deleteProperty(crypto, "randomUUID");
+    }
   });
 
   it("returns PNG exports untouched (PNG carries no EXIF)", async () => {

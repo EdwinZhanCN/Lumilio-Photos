@@ -6,6 +6,60 @@ import RepositoryGrid from "./RepositoryGrid";
 import RepositoryRow from "./RepositoryRow";
 
 describe("RepositoryGrid", () => {
+  it("uses the canonical product name for the default Storage Location", async () => {
+    worker.use(
+      http.get("*/api/v1/host-actions/native-capability", () =>
+        HttpResponse.json({ available: false }),
+      ),
+      http.get("*/api/v1/repository-roots", () =>
+        HttpResponse.json({
+          roots: [
+            {
+              id: "8df0b4a5-5c67-44d9-80d0-ea4119ae26f9",
+              name: "legacy default name",
+              path: "/storage",
+              kind: "default",
+              status: "active",
+              writable: true,
+              repository_count: 0,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const noop = vi.fn();
+    const screen = await renderWithProviders(
+      <RepositoryGrid
+        repositories={[]}
+        repositoryIds={[]}
+        isLoading={false}
+        isError={false}
+        isScanning={false}
+        isRebuildingEvents={false}
+        isRebuildingPeople={false}
+        scanningIds={new Set()}
+        detectingIds={new Set()}
+        rebuildingLocationId={null}
+        onScanRepository={noop}
+        onDetectStacks={noop}
+        onDuplicateScan={noop}
+        onLocationRebuild={noop}
+        onCloudImport={noop}
+        onScanAll={noop}
+        onRebuildEvents={noop}
+        onRebuildPeople={noop}
+      />,
+    );
+
+    await expect
+      .element(screen.getByText(t("productTerms.defaultStorageLocation"), { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText("legacy default name", { exact: true }))
+      .not.toBeInTheDocument();
+  });
+
   it("shows unfinished native host actions without requiring a modal to be open", async () => {
     worker.use(
       http.get("*/api/v1/host-actions/native-capability", () =>
@@ -61,6 +115,87 @@ describe("RepositoryGrid", () => {
 });
 
 describe("RepositoryRow", () => {
+  it("requests cancellation for the exact active scan receipt", async () => {
+    const repositoryID = "11111111-1111-1111-1111-111111111111";
+    const operationID = "22222222-2222-2222-2222-222222222222";
+    let cancellationRequested = false;
+    let cancelledOperation: string | undefined;
+    worker.use(
+      http.post("*/api/v1/assets/list", () =>
+        HttpResponse.json({ items: [], total_media_items: 0 }),
+      ),
+      http.get("*/api/v1/repositories/:id/cloud", () => HttpResponse.json({ sources: [] })),
+      http.get("*/api/v1/repositories/:id/scans/latest", () =>
+        HttpResponse.json({
+          operation_id: operationID,
+          repository_id: repositoryID,
+          requested_epoch: 1,
+          mode: "manual",
+          status: "crawling",
+          cancellation_requested: cancellationRequested,
+          created_at: "2026-08-22T00:00:00Z",
+        }),
+      ),
+      http.post("*/api/v1/repositories/:id/scans/:operation_id/cancel", ({ params }) => {
+        cancelledOperation = String(params.operation_id);
+        cancellationRequested = true;
+        return HttpResponse.json({
+          operation_id: operationID,
+          repository_id: repositoryID,
+          requested_epoch: 1,
+          mode: "manual",
+          status: "crawling",
+          cancellation_requested: true,
+          created_at: "2026-08-22T00:00:00Z",
+        });
+      }),
+      http.get("*/api/v1/cloud/credentials", () => HttpResponse.json({ credentials: [] })),
+    );
+    const noop = vi.fn();
+    const screen = await renderWithProviders(
+      <ul className="list">
+        <RepositoryRow
+          repository={{
+            entityType: "repository",
+            id: repositoryID,
+            rawName: "Family",
+            path: "/storage/family",
+            role: "regular",
+            rootId: "a8bdfcf7-f7cf-47fe-bf2e-cce5ea4236a9",
+            reachability: "active",
+            activity: "scanning",
+          }}
+          rootStatus="active"
+          isScanning={false}
+          isDetecting={false}
+          isDuplicateScanning={false}
+          isRebuildingLocation={false}
+          isCloudImporting={false}
+          onScan={noop}
+          onDetectStacks={noop}
+          onDuplicateScan={noop}
+          onLocationRebuild={noop}
+          onCloudImport={noop}
+        />
+      </ul>,
+    );
+
+    await screen.getByText("Family", { exact: true }).click();
+    await screen
+      .getByRole("button", { name: "Repository actions for Family", exact: true })
+      .click();
+    await screen
+      .getByRole("button", { name: t("manage.repositories.cancelScan"), exact: true })
+      .click();
+
+    await expect.poll(() => cancelledOperation).toBe(operationID);
+    await expect
+      .element(
+        screen.getByText(t("manage.repositories.scanCancellationRequested"), { exact: true }),
+      )
+      .toBeVisible();
+  });
+
   it("renames the repository through the rename modal", async () => {
     let renameBody: unknown;
     worker.use(
@@ -88,14 +223,14 @@ describe("RepositoryRow", () => {
       <ul className="list">
         <RepositoryRow
           repository={{
+            entityType: "repository",
             id: "9ae85f87-adc0-44e0-92de-37380b217ce5",
-            name: "Before",
+            rawName: "Before",
             path: "/storage/stable-folder",
             role: "regular",
             rootId: "a8bdfcf7-f7cf-47fe-bf2e-cce5ea4236a9",
             reachability: "active",
             activity: "idle",
-            isPrimary: false,
           }}
           rootStatus="active"
           isScanning={false}

@@ -14,11 +14,14 @@ import (
 )
 
 type semanticTestLumenStub struct {
-	fastCalls   int
-	normalCalls int
-	available   bool
-	modelID     string
-	vector      []float32
+	fastCalls           int
+	normalCalls         int
+	imageCalls          int
+	lastImage           *imagesource.MLImage
+	available           bool
+	imageEmbedAvailable bool
+	modelID             string
+	vector              []float32
 }
 
 func (s *semanticTestLumenStub) SemanticTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
@@ -31,8 +34,10 @@ func (s *semanticTestLumenStub) SemanticTextEmbedFast(context.Context, []byte) (
 	return &types.EmbeddingV1{ModelID: s.modelID, Vector: append([]float32(nil), s.vector...)}, nil
 }
 
-func (s *semanticTestLumenStub) SemanticImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
-	panic("not implemented")
+func (s *semanticTestLumenStub) SemanticImageEmbed(_ context.Context, imageData *imagesource.MLImage) (*types.EmbeddingV1, error) {
+	s.imageCalls++
+	s.lastImage = imageData
+	return &types.EmbeddingV1{ModelID: s.modelID, Vector: append([]float32(nil), s.vector...)}, nil
 }
 
 func (s *semanticTestLumenStub) BioClipClassify(context.Context, *imagesource.MLImage, int) ([]types.Label, error) {
@@ -56,7 +61,14 @@ func (s *semanticTestLumenStub) WarmupTasks(context.Context, []string) map[strin
 }
 
 func (s *semanticTestLumenStub) IsTaskAvailable(taskName string) bool {
-	return s.available && taskName == "semantic_text_embed"
+	switch taskName {
+	case types.TaskSemanticImageEmbed:
+		return s.imageEmbedAvailable
+	case types.TaskSemanticTextEmbed:
+		return s.available
+	default:
+		return false
+	}
 }
 
 func (s *semanticTestLumenStub) Start(context.Context) error {
@@ -73,6 +85,10 @@ func (s *semanticTestLumenStub) PoolStats() PoolStats {
 
 func (s *semanticTestLumenStub) GetNodes() []*discovery.NodeInfo {
 	return nil
+}
+
+func (s *semanticTestLumenStub) RuntimeSnapshot() LumenRuntimeSnapshot {
+	return NewDisabledLumenService().RuntimeSnapshot()
 }
 
 type semanticTestEmbeddingStub struct {
@@ -108,6 +124,10 @@ func (s *semanticTestEmbeddingStub) ResolveDefaultSearchSpace(ctx context.Contex
 }
 
 func (s *semanticTestEmbeddingStub) GetPrimaryEmbeddingVector(context.Context, uuid.UUID, EmbeddingType) (PrimaryEmbedding, error) {
+	return PrimaryEmbedding{}, nil
+}
+
+func (s *semanticTestEmbeddingStub) GetSearchQueryEmbedding(context.Context, uuid.UUID) (PrimaryEmbedding, error) {
 	return PrimaryEmbedding{}, nil
 }
 

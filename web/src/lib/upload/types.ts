@@ -47,5 +47,5 @@ export interface UploadSessionState {
   total_chunks: number;
   received_chunks: number[];
   bytes_received: number;
-  task_id?: number;
+  receipt_id?: string;
 }

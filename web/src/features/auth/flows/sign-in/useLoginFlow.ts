@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { $api } from "@/lib/http-commons/queryClient";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { useI18n } from "@/lib/i18n.tsx";
 import { USERNAME_MIN_LENGTH } from "../../model/credentialPolicy.ts";
 import { useBrowserCapabilities } from "../../api/useBrowserCapabilities.ts";
-import { getPasskeyCredential, getPasskeySupport } from "../../modules/webauthn/webauthn.ts";
+import {
+  getPasskeyCredential,
+  getPasskeySupport,
+  getPasskeySupportMessage,
+} from "../../modules/webauthn/webauthn.ts";
 import { storeRequiredPasswordChangeChallenge } from "../../state/passwordChangeChallenge.ts";
 import { useAuth } from "../../state/useAuth.ts";
 import type { MFAMethod, User } from "../../types.ts";
@@ -24,18 +29,6 @@ type LoginChallenge = {
 };
 
 export type LoginStep = "identify" | "passkey" | "password" | "mfa";
-
-function getApiMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (error && typeof error === "object") {
-    const apiError = error as { message?: string; error?: string };
-    if (apiError.message) return apiError.message;
-    if (apiError.error) return apiError.error;
-  }
-  return fallback;
-}
 
 export function useLoginFlow() {
   const { t } = useI18n();
@@ -70,7 +63,7 @@ export function useLoginFlow() {
   const passkeyBusy = passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
   const identifyBusy = loginOptionsMutation.isPending;
   const displayError = optionsError ?? passkeyError ?? error;
-  const passkeySupportReason = passkeySupport.reasonKey ? t(passkeySupport.reasonKey) : null;
+  const passkeySupportReason = getPasskeySupportMessage(t, passkeySupport.reasonKey);
   const passkeyEnvironmentAvailable = browserCapabilities.data?.passkey_available === true;
   const passkeyEnvironmentReason = (() => {
     switch (browserCapabilities.data?.passkey_unavailable_reason) {
@@ -171,8 +164,9 @@ export function useLoginFlow() {
       goToPassword(note);
     } catch (identifyError) {
       setOptionsError(
-        getApiMessage(
+        localizeProblem(
           identifyError,
+          t,
           t("auth.login.optionsError", {
             defaultValue: "Unable to continue with this username.",
           }),
@@ -239,7 +233,7 @@ export function useLoginFlow() {
       await completeAuth(verifyData);
       void navigate(redirectTo, { replace: true });
     } catch (passkeyAuthError) {
-      setPasskeyError(getApiMessage(passkeyAuthError, t("auth.login.passkeyUnavailable")));
+      setPasskeyError(localizeProblem(passkeyAuthError, t, t("auth.login.passkeyUnavailable")));
     }
   };
 

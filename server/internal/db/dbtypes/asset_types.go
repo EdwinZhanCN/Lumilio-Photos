@@ -61,35 +61,27 @@ func (s SpecificMetadata) MarshalJSON() ([]byte, error) {
 
 // PhotoSpecificMetadata ----- 各类具体的 metadata 结构（仅用于 JSON 编解码；与持久化解耦）-----
 type PhotoSpecificMetadata struct {
-	TakenTime            *time.Time `json:"taken_time,omitempty"`
-	CaptureOffsetMinutes *int16     `json:"capture_offset_minutes,omitempty"`
-	CameraModel          string     `json:"camera_model,omitempty"`
-	LensModel            string     `json:"lens_model,omitempty"`
-	ExposureTime         string     `json:"exposure_time,omitempty"`
-	FNumber              float32    `json:"f_number,omitempty"`
-	FocalLength          float32    `json:"focal_length,omitempty"`
-	IsoSpeed             int        `json:"iso_speed,omitempty"`
-	Exposure             float32    `json:"exposure"`
-	Dimensions           string     `json:"dimensions,omitempty"`
-	Resolution           string     `json:"resolution,omitempty"`
-	GPSLatitude          *float64   `json:"gps_latitude,omitempty"`
-	GPSLongitude         *float64   `json:"gps_longitude,omitempty"`
-	Description          string     `json:"description,omitempty"`
-	IsRAW                bool       `json:"is_raw,omitempty"`
-	ContentIdentifier    string     `json:"content_identifier,omitempty"`
+	CameraMake           string   `json:"camera_make,omitempty"`
+	CameraModel          string   `json:"camera_model,omitempty"`
+	LensModel            string   `json:"lens_model,omitempty"`
+	ExposureTime         string   `json:"exposure_time,omitempty"`
+	FNumber              float32  `json:"f_number,omitempty"`
+	FocalLength          float32  `json:"focal_length,omitempty"`
+	IsoSpeed             int      `json:"iso_speed,omitempty"`
+	ExposureCompensation *float32 `json:"exposure_compensation,omitempty"`
+	Description          string   `json:"description,omitempty"`
+	IsRAW                bool     `json:"is_raw,omitempty"`
+	ContentIdentifier    string   `json:"content_identifier,omitempty"`
 }
 
 type VideoSpecificMetadata struct {
-	Codec                string     `json:"codec,omitempty" example:"H.264"`
-	Bitrate              int        `json:"bitrate,omitempty" example:"1000000"`
-	FrameRate            float64    `json:"frame_rate,omitempty" example:"30.0"`
-	RecordedTime         *time.Time `json:"recorded_time,omitempty" example:"2023-01-01T00:00:00Z"`
-	CaptureOffsetMinutes *int16     `json:"capture_offset_minutes,omitempty"`
-	CameraModel          string     `json:"camera_model,omitempty" example:"Canon EOS 5D Mark IV"`
-	GPSLatitude          *float64   `json:"gps_latitude,omitempty" example:"37.7749"`
-	GPSLongitude         *float64   `json:"gps_longitude,omitempty" example:"-122.4194"`
-	Description          string     `json:"description,omitempty" example:"A beautiful sunset over the ocean"`
-	ContentIdentifier    string     `json:"content_identifier,omitempty"`
+	Codec             string  `json:"codec,omitempty" example:"H.264"`
+	Bitrate           int     `json:"bitrate,omitempty" example:"1000000"`
+	FrameRate         float64 `json:"frame_rate,omitempty" example:"30.0"`
+	CameraMake        string  `json:"camera_make,omitempty" example:"Canon"`
+	CameraModel       string  `json:"camera_model,omitempty" example:"Canon EOS 5D Mark IV"`
+	Description       string  `json:"description,omitempty" example:"A beautiful sunset over the ocean"`
+	ContentIdentifier string  `json:"content_identifier,omitempty"`
 }
 
 type AudioSpecificMetadata struct {
@@ -103,6 +95,21 @@ type AudioSpecificMetadata struct {
 	Genre       string `json:"genre,omitempty" example:"Pop"`
 	Year        int    `json:"year,omitempty" example:"2023"`
 	Description string `json:"description,omitempty" example:"Song Description"`
+}
+
+// CommonMetadata is the normalized, non-JSON projection produced alongside
+// media-specific metadata. These fields belong to indexed asset columns or
+// normalized relations rather than specific_metadata.
+type CommonMetadata struct {
+	TakenTime            *time.Time
+	CaptureOffsetMinutes *int16
+	GPSLatitude          *float64
+	GPSLongitude         *float64
+	Width                *int32
+	Height               *int32
+	Duration             *float64
+	Rating               *int32
+	Keywords             []string
 }
 
 // ----- 便捷（反）序列化函数 -----

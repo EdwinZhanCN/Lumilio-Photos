@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-pub use wasm_bindgen_rayon::init_thread_pool;
 use blake3::Hasher;
 
 /// Fast single-pass hashing for small buffers.

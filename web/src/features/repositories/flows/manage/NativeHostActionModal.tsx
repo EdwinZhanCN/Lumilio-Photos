@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
+import { localizeAPIProblem, localizeProblemReference } from "@/lib/http-commons/problem";
+import { createUUID } from "@/lib/uuid";
 import {
   type HostAction,
   type HostActionKind,
@@ -42,7 +44,7 @@ export default function NativeHostActionModal({
   const [name, setName] = useState("");
   const [confirmSeparate, setConfirmSeparate] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const requestID = useRef(crypto.randomUUID());
+  const requestID = useRef(createUUID());
   const persistenceScope = rootId || repositoryId || "new";
   const shouldPoll = Boolean(action?.id && !terminalStatuses.has(action.status ?? ""));
   const actionQuery = useNativeHostAction(action?.id ?? "", shouldPoll);
@@ -96,7 +98,7 @@ export default function NativeHostActionModal({
     setName("");
     setConfirmSeparate(false);
     setError(null);
-    requestID.current = crypto.randomUUID();
+    requestID.current = createUUID();
   }, [isOpen]);
 
   const title = hostActionTitle(kind, t);
@@ -131,7 +133,7 @@ export default function NativeHostActionModal({
           purpose,
           root_id: rootId,
           repository_id: repositoryId,
-          session_id: crypto.randomUUID(),
+          session_id: createUUID(),
           expires_in_seconds: 600,
         },
       });
@@ -141,6 +143,7 @@ export default function NativeHostActionModal({
       setError(
         actionErrorMessage(
           reason,
+          t,
           t(
             "manage.repositories.hostAction.createFailed",
             "The Desktop request could not be created.",
@@ -163,6 +166,7 @@ export default function NativeHostActionModal({
       setError(
         actionErrorMessage(
           reason,
+          t,
           t(
             "manage.repositories.hostAction.resolveFailed",
             "The recovery decision could not be applied.",
@@ -185,6 +189,7 @@ export default function NativeHostActionModal({
       setError(
         actionErrorMessage(
           reason,
+          t,
           t("manage.repositories.hostAction.cancelFailed", "The request could not be cancelled."),
         ),
       );
@@ -337,7 +342,7 @@ export default function NativeHostActionModal({
                 <span>
                   {t(
                     "manage.repositories.hostAction.copyConfirmation",
-                    "I understand this creates a separate repository identity and isolates copied private state before scanning.",
+                    "I understand this creates a separate Repository identity and isolates copied private state before scanning.",
                   )}
                 </span>
               </label>
@@ -368,7 +373,7 @@ export default function NativeHostActionModal({
                   onClick={() => void resolve("add_separate")}
                   disabled={busy || !confirmSeparate}
                 >
-                  {t("manage.repositories.hostAction.addSeparate", "Add as separate repository")}
+                  {t("manage.repositories.hostAction.addSeparate", "Add as separate Repository")}
                 </button>
               ) : null}
             </div>
@@ -393,11 +398,14 @@ export default function NativeHostActionModal({
             <div role="alert" className="alert alert-error alert-soft text-sm">
               <AlertTriangle className="size-5 shrink-0" />
               <span>
-                {action.error_message ||
+                {localizeProblemReference(
+                  action.problem,
+                  t,
                   t(
                     "manage.repositories.hostAction.ended",
                     "The Desktop request ended before it completed.",
-                  )}
+                  ),
+                )}
               </span>
             </div>
             <div className="modal-action">
@@ -425,8 +433,12 @@ export default function NativeHostActionModal({
   );
 }
 
-function actionErrorMessage(reason: unknown, fallback: string): string {
-  return reason instanceof Error && reason.message ? reason.message : fallback;
+function actionErrorMessage(
+  reason: unknown,
+  t: ReturnType<typeof useI18n>["t"],
+  fallback: string,
+): string {
+  return localizeAPIProblem(reason, t, fallback);
 }
 
 function hostActionTitle(kind: HostActionKind, t: ReturnType<typeof useI18n>["t"]): string {
@@ -447,7 +459,7 @@ function hostActionPurpose(kind: HostActionKind, t: ReturnType<typeof useI18n>["
     case "authorize_storage_location":
       return t(
         "manage.repositories.hostAction.addPurpose",
-        "Choose and authorize a folder for repositories",
+        "Choose and authorize a folder for Repositories",
       );
     case "locate_storage_location":
       return t(
@@ -457,12 +469,12 @@ function hostActionPurpose(kind: HostActionKind, t: ReturnType<typeof useI18n>["
     case "locate_repository":
       return t(
         "manage.repositories.hostAction.locateRepositoryPurpose",
-        "Choose the current folder for this moved repository",
+        "Choose the current folder for this moved Repository",
       );
     default:
       return t(
         "manage.repositories.hostAction.openPurpose",
-        "Choose a folder that contains an existing repository",
+        "Choose a folder that contains an existing Repository",
       );
   }
 }

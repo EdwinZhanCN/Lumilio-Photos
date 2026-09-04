@@ -44,9 +44,8 @@
  * activity queries without merging them into client state.
  *
  * {@link useMapPhotoAssets} requests a bounded map-point preview after the map
- * becomes visible. {@link useLocationClusters} supplies the place count. Trips
- * may drain those paginated sources elsewhere because grouping requires a
- * complete dataset; Home deliberately does not.
+ * becomes visible. {@link useLocationClusters} supplies the place count. Home
+ * deliberately does not drain either paginated source.
  *
  * @module
  */

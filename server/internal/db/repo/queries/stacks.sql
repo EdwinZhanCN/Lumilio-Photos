@@ -209,8 +209,12 @@ SELECT a.asset_id,
        CAST(lower(a.original_filename) AS TEXT) AS base_name
 FROM assets a
 JOIN media_item_assets mia ON mia.asset_id = a.asset_id
-WHERE a.repository_id = ?1
-  AND a.is_deleted = false
+WHERE a.is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  )
   AND a.type = 'PHOTO'
 ORDER BY base_name, a.original_filename;
 
@@ -321,9 +325,12 @@ WITH identified AS (
          CAST(json_extract(a.specific_metadata, '$.content_identifier') AS TEXT) AS content_identifier
   FROM assets a
   JOIN media_item_assets mia ON mia.asset_id = a.asset_id
-  WHERE a.repository_id = sqlc.arg('repository_id')
-    AND a.owner_id IS NOT NULL
-    AND a.is_deleted = false
+  WHERE a.is_deleted = false
+    AND EXISTS (
+      SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = sqlc.arg('repository_id')
+    )
     AND a.type IN ('PHOTO', 'VIDEO')
     AND NULLIF(json_extract(a.specific_metadata, '$.content_identifier'), '') IS NOT NULL
 ),

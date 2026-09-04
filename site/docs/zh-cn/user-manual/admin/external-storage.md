@@ -5,21 +5,22 @@ page_id: "admin/external-storage"
 audience: "管理员"
 platform: "Desktop、Server"
 baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-08-06"
+last_verified: "2026-08-22"
 verification_status: "verified"
 ---
 
 <!--
 code-evidence:
 - server/internal/storage/repository_roots.go
-- server/internal/storage/scanner/scanner.go
+- server/internal/storage/roe/controller/controller.go
+- server/internal/storage/roe/changefeed
 - server/docker-entrypoint.go
 - desktop/internal/storage/controller.go
 -->
 
 # 外置磁盘与网络存储
 
-外置盘和网络卷必须在流明集启动或扫描前稳定挂载。路径存在但指向空目录，比明确离线更危险，因为应用可能把它当作可访问位置。
+外置盘和网络卷应在流明集启动或扫描前稳定挂载。流明集会同时检查资源库标记和卷身份；仅有同名空目录不会被解释为所有文件都已删除。
 
 ## Desktop
 
@@ -31,7 +32,9 @@ code-evidence:
 
 ## 扫描与断连
 
-完整扫描遇到部分遍历错误时会避免大规模缺失协调，但持续断连仍会产生读取、派生和任务失败。维护期间先停止导入和扫描，再卸载磁盘。
+网络卷、可移动卷和不支持可靠日志的文件系统会保留受限的实时提示，并依赖周期完整验证。离线、权限错误、通知溢出或卷身份不匹配时，观察会暂停安全缺失确认，保留先前有效位置；已确认的新文件仍可逐步出现。可移动卷上的缺失还需要经过持久稳定等待。
+
+持续断连仍会产生读取、派生和任务重试。维护期间先停止导入并取消或等待活动观察，再卸载磁盘；重新连接后保持原有 `.lumilioroot` 和 `.lumiliorepo` 身份，让恢复操作重新验证变化。
 
 ## 备份
 

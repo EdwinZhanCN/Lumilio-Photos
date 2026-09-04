@@ -2,26 +2,27 @@ import type { components } from "@/lib/http-commons/schema.d.ts";
 import { client } from "@/lib/http-commons/queryClient";
 import { getToken } from "@/lib/http-commons/auth";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
+import { normalizeProblem, readProblemResponse } from "@/lib/http-commons/problem";
 
-type UploadJobStatus = components["schemas"]["dto.UploadJobStatusDTO"];
+type UploadOperationStatus = components["schemas"]["dto.UploadOperationStatusDTO"];
 
-export interface WaitForUploadJobsOptions {
+export interface WaitForUploadOperationsOptions {
   intervalMs?: number;
   timeoutMs?: number;
   signal?: AbortSignal;
-  onUpdate?: (job: UploadJobStatus) => void;
+  onUpdate?: (operation: UploadOperationStatus) => void;
 }
 
-/** Backend `/batch/jobs` and `/batch/jobs/stream` accept at most this many IDs. */
-export const UPLOAD_JOB_ID_LIMIT = 100;
+/** Backend operation status endpoints accept at most this many receipt IDs. */
+export const UPLOAD_RECEIPT_ID_LIMIT = 100;
 
-export const chunkUploadJobIds = (
-  taskIds: number[],
-  limit: number = UPLOAD_JOB_ID_LIMIT,
-): number[][] => {
-  const ids = Array.from(new Set(taskIds));
+export const chunkUploadReceiptIds = (
+  receiptIds: string[],
+  limit: number = UPLOAD_RECEIPT_ID_LIMIT,
+): string[][] => {
+  const ids = Array.from(new Set(receiptIds));
   if (ids.length === 0) return [];
-  const chunks: number[][] = [];
+  const chunks: string[][] = [];
   for (let index = 0; index < ids.length; index += limit) {
     chunks.push(ids.slice(index, index + limit));
   }
@@ -42,11 +43,11 @@ const wait = (durationMs: number, signal?: AbortSignal): Promise<void> =>
   });
 
 /** Waits until every accepted upload reaches a backend ingest terminal state. */
-async function pollUploadJobs(
-  taskIds: number[],
-  options: WaitForUploadJobsOptions = {},
-): Promise<UploadJobStatus[]> {
-  const ids = Array.from(new Set(taskIds));
+async function pollUploadOperations(
+  receiptIds: string[],
+  options: WaitForUploadOperationsOptions = {},
+): Promise<UploadOperationStatus[]> {
+  const ids = Array.from(new Set(receiptIds));
   if (ids.length === 0) return [];
 
   const intervalMs = options.intervalMs ?? 750;
@@ -55,20 +56,21 @@ async function pollUploadJobs(
 
   while (Date.now() <= deadline) {
     options.signal?.throwIfAborted();
-    const { data, error } = await client.GET("/api/v1/assets/batch/jobs", {
-      params: { query: { task_ids: ids.join(",") } },
+    const { data, error } = await client.GET("/api/v1/assets/batch/operations", {
+      params: { query: { receipt_ids: ids.join(",") } },
       signal: options.signal,
     });
-    if (error) throw new Error(error.error || error.message || "Failed to load upload status");
+    if (error) throw normalizeProblem(error);
 
-    const jobs = data?.jobs ?? [];
-    jobs.forEach((job) => options.onUpdate?.(job));
+    const operations = data?.operations ?? [];
+    operations.forEach((operation) => options.onUpdate?.(operation));
     const byId = new Map(
-      jobs
+      operations
         .filter(
-          (job): job is UploadJobStatus & { task_id: number } => typeof job.task_id === "number",
+          (operation): operation is UploadOperationStatus & { receipt_id: string } =>
+            typeof operation.receipt_id === "string",
         )
-        .map((job) => [job.task_id, job] as const),
+        .map((operation) => [operation.receipt_id, operation] as const),
     );
     if (ids.every((id) => byId.get(id)?.terminal)) {
       return ids.map((id) => byId.get(id)!);
@@ -79,83 +81,86 @@ async function pollUploadJobs(
   throw new Error("Timed out waiting for uploaded files to finish processing");
 }
 
-async function streamUploadJobs(
-  ids: number[],
-  options: WaitForUploadJobsOptions,
-): Promise<UploadJobStatus[]> {
-  const latest = new Map<number, UploadJobStatus>();
+async function streamUploadOperations(
+  ids: string[],
+  options: WaitForUploadOperationsOptions,
+): Promise<UploadOperationStatus[]> {
+  const latest = new Map<string, UploadOperationStatus>();
   const baseUrl = import.meta.env.VITE_API_URL ?? "";
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  await fetchEventSource(`${baseUrl}/api/v1/assets/batch/jobs/stream?task_ids=${ids.join(",")}`, {
-    headers,
-    signal: options.signal,
-    openWhenHidden: true,
-    onopen: async (response) => {
-      if (!response.ok)
-        throw new Error(`Upload status stream failed with status ${response.status}`);
+  await fetchEventSource(
+    `${baseUrl}/api/v1/assets/batch/operations/stream?receipt_ids=${ids.join(",")}`,
+    {
+      headers,
+      signal: options.signal,
+      openWhenHidden: true,
+      onopen: async (response) => {
+        if (!response.ok) throw await readProblemResponse(response);
+      },
+      onmessage: (message) => {
+        if (message.event !== "operations" && message.event !== "done") return;
+        const payload = JSON.parse(message.data) as { operations?: UploadOperationStatus[] };
+        for (const operation of payload.operations ?? []) {
+          if (typeof operation.receipt_id === "string") latest.set(operation.receipt_id, operation);
+          options.onUpdate?.(operation);
+        }
+        if (message.event === "done") throw new UploadStreamComplete();
+      },
+      onerror: (error) => {
+        throw error;
+      },
     },
-    onmessage: (message) => {
-      if (message.event !== "jobs" && message.event !== "done") return;
-      const payload = JSON.parse(message.data) as { jobs?: UploadJobStatus[] };
-      for (const job of payload.jobs ?? []) {
-        if (typeof job.task_id === "number") latest.set(job.task_id, job);
-        options.onUpdate?.(job);
-      }
-      if (message.event === "done") throw new UploadStreamComplete();
-    },
-    onerror: (error) => {
-      throw error;
-    },
-  }).catch((error: unknown) => {
+  ).catch((error: unknown) => {
     if (!(error instanceof UploadStreamComplete)) throw error;
   });
-  const jobs = ids
+  const operations = ids
     .map((id) => latest.get(id))
-    .filter((job): job is UploadJobStatus => Boolean(job));
-  if (jobs.length !== ids.length || !jobs.every((job) => job.terminal))
-    throw new Error("Upload status stream ended early");
-  return jobs;
+    .filter((operation): operation is UploadOperationStatus => Boolean(operation));
+  if (operations.length !== ids.length || !operations.every((operation) => operation.terminal)) {
+    throw normalizeProblem(undefined);
+  }
+  return operations;
 }
 
 class UploadStreamComplete extends Error {}
 
-async function waitForUploadJobsBatch(
-  taskIds: number[],
-  options: WaitForUploadJobsOptions = {},
-): Promise<UploadJobStatus[]> {
-  const ids = Array.from(new Set(taskIds));
+async function waitForUploadOperationsBatch(
+  receiptIds: string[],
+  options: WaitForUploadOperationsOptions = {},
+): Promise<UploadOperationStatus[]> {
+  const ids = Array.from(new Set(receiptIds));
   if (ids.length === 0) return [];
   try {
-    return await streamUploadJobs(ids, options);
+    return await streamUploadOperations(ids, options);
   } catch (error) {
     if (options.signal?.aborted) throw error;
-    return pollUploadJobs(ids, options);
+    return pollUploadOperations(ids, options);
   }
 }
 
-/** Uses SSE first and falls back to /batch/jobs polling if streaming is unavailable. */
-export async function waitForUploadJobs(
-  taskIds: number[],
-  options: WaitForUploadJobsOptions = {},
-): Promise<UploadJobStatus[]> {
-  const batches = chunkUploadJobIds(taskIds);
+/** Uses SSE first and falls back to operation polling if streaming is unavailable. */
+export async function waitForUploadOperations(
+  receiptIds: string[],
+  options: WaitForUploadOperationsOptions = {},
+): Promise<UploadOperationStatus[]> {
+  const batches = chunkUploadReceiptIds(receiptIds);
   if (batches.length === 0) return [];
-  if (batches.length === 1) return waitForUploadJobsBatch(batches[0], options);
+  if (batches.length === 1) return waitForUploadOperationsBatch(batches[0], options);
 
   const settled = await Promise.allSettled(
-    batches.map((batch) => waitForUploadJobsBatch(batch, options)),
+    batches.map((batch) => waitForUploadOperationsBatch(batch, options)),
   );
-  const jobs: UploadJobStatus[] = [];
+  const operations: UploadOperationStatus[] = [];
   let firstError: unknown;
   for (const result of settled) {
     if (result.status === "fulfilled") {
-      jobs.push(...result.value);
+      operations.push(...result.value);
       continue;
     }
     firstError ??= result.reason;
   }
   if (firstError) throw firstError;
-  return jobs;
+  return operations;
 }

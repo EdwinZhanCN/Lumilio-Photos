@@ -1,29 +1,24 @@
 package handler
 
 import (
-	"database/sql"
 	"log"
 	"strings"
 
 	"server/internal/api"
 	"server/internal/api/dto"
-	"server/internal/queue/jobs"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
 )
 
 type LocationHandler struct {
 	locationService service.LocationService
-	queueClient     *river.Client[*sql.Tx]
 }
 
-func NewLocationHandler(locationService service.LocationService, queueClient *river.Client[*sql.Tx]) *LocationHandler {
+func NewLocationHandler(locationService service.LocationService) *LocationHandler {
 	return &LocationHandler{
 		locationService: locationService,
-		queueClient:     queueClient,
 	}
 }
 
@@ -38,25 +33,25 @@ func NewLocationHandler(locationService service.LocationService, queueClient *ri
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Param geohash query string false "Optional geohash filter"
 // @Success 200 {object} dto.LocationClusterListResponseDTO "Location clusters retrieved successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request parameters"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request parameters"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/locations/clusters [get]
 func (h *LocationHandler) ListLocationClusters(c *gin.Context) {
 	limit, err := parseIntQueryWithRange(c, "limit", 100, 1, 1000)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid limit parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	offset, err := parseIntQueryWithRange(c, "offset", 0, 0, 10000000)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid offset parameter")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var repositoryID *string
 	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
 		if _, err := uuid.Parse(rawRepoID); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		repositoryID = &rawRepoID
@@ -75,7 +70,7 @@ func (h *LocationHandler) ListLocationClusters(c *gin.Context) {
 	}))
 	if err != nil {
 		log.Printf("Failed to query location clusters: %v", err)
-		api.GinInternalError(c, err, "Failed to query location clusters")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -116,45 +111,36 @@ func (h *LocationHandler) ListLocationClusters(c *gin.Context) {
 // @Produce json
 // @Param request body dto.RebuildLocationClustersRequestDTO false "Rebuild request"
 // @Success 200 {object} dto.RebuildLocationClustersResponseDTO "Location cluster rebuild queued successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request body"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request body"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/locations/rebuild [post]
 func (h *LocationHandler) RebuildLocationClusters(c *gin.Context) {
 	var req dto.RebuildLocationClustersRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	var repositoryID *string
 	if rawRepoID := strings.TrimSpace(req.RepositoryID); rawRepoID != "" {
 		if _, err := uuid.Parse(rawRepoID); err != nil {
-			api.GinBadRequest(c, err, "Invalid repository_id")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		repositoryID = &rawRepoID
 	}
 
-	args := jobs.RebuildLocationClustersArgs{
-		RepositoryID: repositoryID,
-	}
-	opts := args.InsertOpts()
-	opts.Queue = "rebuild_location_clusters"
-	jobResult, err := h.queueClient.Insert(c.Request.Context(), args, &opts)
+	receiptID, err := h.locationService.RequestLocationRebuild(c.Request.Context(), repositoryID, ownerScopeID(c))
 	if err != nil {
 		log.Printf("Failed to enqueue location cluster rebuild: %v", err)
-		api.GinInternalError(c, err, "Failed to enqueue location cluster rebuild")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
-	jobID := int64(0)
-	if jobResult != nil && jobResult.Job != nil {
-		jobID = jobResult.Job.ID
-	}
 	api.JSONOK(c, dto.RebuildLocationClustersResponseDTO{
 		Status:       "queued",
 		Message:      "Location cluster rebuild queued successfully",
-		JobID:        jobID,
+		ReceiptID:    receiptID.String(),
 		RepositoryID: repositoryID,
 	})
 }

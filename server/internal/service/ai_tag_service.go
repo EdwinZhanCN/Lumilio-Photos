@@ -30,6 +30,31 @@ type AIGeneratedTagService interface {
 	ReplaceAssetAIGeneratedTags(ctx context.Context, assetID uuid.UUID, tags []AIGeneratedTag, sources []string) error
 }
 
+// ApplyAIGeneratedTagsTx replaces generated tags inside a caller-owned catalog
+// transaction. User tags remain untouched because only the supplied generated
+// sources are removed.
+func ApplyAIGeneratedTagsTx(ctx context.Context, queries *repo.Queries, assetID uuid.UUID, tags []AIGeneratedTag, sources []string) error {
+	if queries == nil || assetID == uuid.Nil {
+		return fmt.Errorf("generated tag commit is incomplete")
+	}
+	normalizedSources := normalizeAssetTagSources(sources)
+	if len(normalizedSources) > 0 {
+		if err := queries.RemoveAssetTagsBySources(ctx, repo.RemoveAssetTagsBySourcesParams{AssetID: assetID, Sources: dbtypes.StringsJSONParam(normalizedSources)}); err != nil {
+			return fmt.Errorf("remove existing ai tags: %w", err)
+		}
+	}
+	for _, tag := range dedupeAIGeneratedTags(tags) {
+		dbTag, err := getOrCreateTagByNameTx(ctx, queries, tag.Name, tag.Category)
+		if err != nil {
+			return err
+		}
+		if err := queries.AddTagToAsset(ctx, repo.AddTagToAssetParams{AssetID: assetID, TagID: dbTag.TagID, Confidence: float64(tag.Confidence), Source: normalizeAssetTagSource(tag.Source)}); err != nil {
+			return fmt.Errorf("attach tag %q to asset: %w", tag.Name, err)
+		}
+	}
+	return nil
+}
+
 type aiGeneratedTagService struct {
 	queries *repo.Queries
 }
@@ -39,38 +64,11 @@ func NewAIGeneratedTagService(queries *repo.Queries) AIGeneratedTagService {
 }
 
 func (s *aiGeneratedTagService) ReplaceAssetAIGeneratedTags(ctx context.Context, assetID uuid.UUID, tags []AIGeneratedTag, sources []string) error {
-	normalizedSources := normalizeAssetTagSources(sources)
-	if len(normalizedSources) > 0 {
-		if err := s.queries.RemoveAssetTagsBySources(ctx, repo.RemoveAssetTagsBySourcesParams{
-			AssetID: assetID,
-			Sources: dbtypes.StringsJSONParam(normalizedSources),
-		}); err != nil {
-			return fmt.Errorf("remove existing ai tags: %w", err)
-		}
-	}
-
-	deduped := dedupeAIGeneratedTags(tags)
-	for _, tag := range deduped {
-		dbTag, err := s.getOrCreateTagByName(ctx, tag.Name, tag.Category)
-		if err != nil {
-			return err
-		}
-
-		if err := s.queries.AddTagToAsset(ctx, repo.AddTagToAssetParams{
-			AssetID:    assetID,
-			TagID:      dbTag.TagID,
-			Confidence: float64(tag.Confidence),
-			Source:     normalizeAssetTagSource(tag.Source),
-		}); err != nil {
-			return fmt.Errorf("attach tag %q to asset: %w", tag.Name, err)
-		}
-	}
-
-	return nil
+	return ApplyAIGeneratedTagsTx(ctx, s.queries, assetID, tags, sources)
 }
 
-func (s *aiGeneratedTagService) getOrCreateTagByName(ctx context.Context, name, category string) (*repo.Tag, error) {
-	tag, err := s.queries.GetTagByName(ctx, name)
+func getOrCreateTagByNameTx(ctx context.Context, queries *repo.Queries, name, category string) (*repo.Tag, error) {
+	tag, err := queries.GetTagByName(ctx, name)
 	if err == nil {
 		return &tag, nil
 	}
@@ -83,7 +81,7 @@ func (s *aiGeneratedTagService) getOrCreateTagByName(ctx context.Context, name, 
 		params.Category = &category
 	}
 
-	dbTag, err := s.queries.CreateTag(ctx, params)
+	dbTag, err := queries.CreateTag(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("create tag %q: %w", name, err)
 	}

@@ -9,9 +9,141 @@
 package settings
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
+
+const (
+	GeocodingProviderDisabled  = "disabled"
+	GeocodingProviderNominatim = "nominatim"
+	DefaultGeocodingEndpoint   = "https://nominatim.openstreetmap.org/reverse"
+	DefaultGeocodingLanguage   = "en"
+	DefaultGeocodingUserAgent  = "Lumilio-Photos/1.0"
+	MaxGeocodingEndpointBytes  = 2048
+	MaxGeocodingLanguageBytes  = 64
+	MaxGeocodingUserAgentBytes = 512
+)
+
+// Geocoding is the complete administrator-owned reverse-geocoding aggregate.
+// It is persisted in SQLite and deliberately has no representation in the
+// runtime-immutable TOML manifest.
+type Geocoding struct {
+	Provider          string
+	NominatimEndpoint string
+	Language          string
+	UserAgent         string
+}
+
+func DefaultGeocoding() Geocoding {
+	return Geocoding{
+		Provider:          GeocodingProviderDisabled,
+		NominatimEndpoint: DefaultGeocodingEndpoint,
+		Language:          DefaultGeocodingLanguage,
+		UserAgent:         DefaultGeocodingUserAgent,
+	}
+}
+
+// Normalize validates and canonicalizes one aggregate before persistence or
+// comparison. The endpoint intentionally permits loopback and private-network
+// hosts: an authenticated administrator may operate a local Nominatim server.
+func (c Geocoding) Normalize() (Geocoding, error) {
+	provider := strings.ToLower(strings.TrimSpace(c.Provider))
+	if provider != GeocodingProviderDisabled && provider != GeocodingProviderNominatim {
+		return Geocoding{}, fmt.Errorf("geocoding provider must be %q or %q", GeocodingProviderDisabled, GeocodingProviderNominatim)
+	}
+
+	endpoint, err := normalizeGeocodingEndpoint(c.NominatimEndpoint)
+	if err != nil {
+		return Geocoding{}, err
+	}
+	if err := validateGeocodingText("language", c.Language, MaxGeocodingLanguageBytes, true); err != nil {
+		return Geocoding{}, err
+	}
+	if err := validateGeocodingText("user agent", c.UserAgent, MaxGeocodingUserAgentBytes, true); err != nil {
+		return Geocoding{}, err
+	}
+	language := strings.ToLower(strings.TrimSpace(c.Language))
+	userAgent := strings.TrimSpace(c.UserAgent)
+
+	return Geocoding{
+		Provider:          provider,
+		NominatimEndpoint: endpoint,
+		Language:          language,
+		UserAgent:         userAgent,
+	}, nil
+}
+
+func (c Geocoding) Validate() error {
+	_, err := c.Normalize()
+	return err
+}
+
+func (c Geocoding) IsEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(c.Provider), GeocodingProviderNominatim)
+}
+
+// SourceKey identifies the provider result source. User-Agent is excluded by
+// design: it changes request identity, not the place-name result identity.
+func (c Geocoding) SourceKey() string {
+	normalized, err := c.Normalize()
+	if err != nil {
+		return ""
+	}
+	digest := sha256.Sum256([]byte(normalized.Provider + normalized.NominatimEndpoint + normalized.Language))
+	return hex.EncodeToString(digest[:])
+}
+
+func normalizeGeocodingEndpoint(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if err := validateGeocodingText("endpoint", trimmed, MaxGeocodingEndpointBytes, false); err != nil {
+		return "", err
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("geocoding endpoint is not a valid URL: %w", err)
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", errors.New("geocoding endpoint must use http or https")
+	}
+	if parsed.Host == "" {
+		return "", errors.New("geocoding endpoint must have a host")
+	}
+	if parsed.User != nil {
+		return "", errors.New("geocoding endpoint must not contain credentials")
+	}
+	if parsed.Fragment != "" {
+		return "", errors.New("geocoding endpoint must not contain a fragment")
+	}
+	parsed.Host = strings.ToLower(parsed.Host)
+	canonical := parsed.String()
+	if len([]byte(canonical)) > MaxGeocodingEndpointBytes {
+		return "", fmt.Errorf("geocoding endpoint must be at most %d bytes", MaxGeocodingEndpointBytes)
+	}
+	return canonical, nil
+}
+
+func validateGeocodingText(name, value string, maxBytes int, rejectHeaderControls bool) error {
+	if rejectHeaderControls {
+		for _, byteValue := range []byte(value) {
+			if byteValue < 0x20 || byteValue == 0x7f {
+				return fmt.Errorf("geocoding %s contains invalid HTTP header bytes", name)
+			}
+		}
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("geocoding %s must be non-empty", name)
+	}
+	if len([]byte(value)) > maxBytes {
+		return fmt.Errorf("geocoding %s must be at most %d bytes", name, maxBytes)
+	}
+	return nil
+}
 
 // LLM holds the effective LLM settings, including the plaintext API key needed
 // to construct a chat model. The API surface never exposes the key directly;
@@ -24,26 +156,14 @@ type LLM struct {
 	BaseURL      string
 }
 
-func NormalizeLLMProvider(raw string) string {
-	return strings.ToLower(strings.TrimSpace(raw))
-}
-
-func IsSupportedLLMProvider(provider string) bool {
-	switch NormalizeLLMProvider(provider) {
-	case "ark", "openai", "deepseek", "ollama":
-		return true
-	default:
-		return false
-	}
-}
-
 func (c LLM) EffectiveProvider() string {
 	return NormalizeLLMProvider(c.Provider)
 }
 
 func (c LLM) ValidateConfiguration() error {
 	provider := c.EffectiveProvider()
-	if !IsSupportedLLMProvider(provider) {
+	descriptor, ok := LookupLLMProvider(provider)
+	if !ok {
 		if provider == "" {
 			return fmt.Errorf("llm provider is required")
 		}
@@ -52,15 +172,10 @@ func (c LLM) ValidateConfiguration() error {
 	if strings.TrimSpace(c.ModelName) == "" {
 		return fmt.Errorf("llm model name is required")
 	}
-	if provider == "ollama" || provider == "deepseek" {
-		if strings.TrimSpace(c.BaseURL) == "" {
-			return fmt.Errorf("%s base URL is required", provider)
-		}
-		if provider == "ollama" {
-			return nil
-		}
+	if descriptor.BaseURLRequired && strings.TrimSpace(c.BaseURL) == "" {
+		return fmt.Errorf("%s base URL is required", provider)
 	}
-	if strings.TrimSpace(c.APIKey) == "" {
+	if descriptor.APIKeyRequired && strings.TrimSpace(c.APIKey) == "" {
 		return fmt.Errorf("llm API key is required for provider %q", provider)
 	}
 	return nil
@@ -127,7 +242,7 @@ func (c ML) HasRuntimeDemand() bool {
 }
 
 // Backup holds the runtime-mutable database-backup settings. Seed values are
-// the settings table's column defaults (see migration 000007), so this type has
+// the settings table's column defaults (see migration 000008), so this type has
 // no entry in Default.
 type Backup struct {
 	Enabled       bool
@@ -139,8 +254,9 @@ type Backup struct {
 // service. Repository behaviour defaults are owned by the storage package, not
 // here.
 type Settings struct {
-	LLM LLM
-	ML  ML
+	LLM       LLM
+	ML        ML
+	Geocoding Geocoding
 }
 
 // Default returns the program-fixed default settings used to seed the database
@@ -167,7 +283,8 @@ func Default(environment string) Settings {
 		}
 	}
 	return Settings{
-		LLM: LLM{},
-		ML:  ml,
+		LLM:       LLM{},
+		ML:        ml,
+		Geocoding: DefaultGeocoding(),
 	}
 }

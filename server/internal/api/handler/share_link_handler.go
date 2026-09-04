@@ -16,6 +16,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
+	roelocations "server/internal/storage/roe/locations"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,6 +31,13 @@ type ShareLinkHandler struct {
 	assetService service.AssetService
 	queries      *repo.Queries
 	files        *storage.RepositoryFSFactory
+	locations    *roelocations.Resolver
+}
+
+func (h *ShareLinkHandler) SetLocationResolver(resolver *roelocations.Resolver) {
+	if h != nil {
+		h.locations = resolver
+	}
 }
 
 // NewShareLinkHandler constructs the share link handler.
@@ -48,15 +56,15 @@ func NewShareLinkHandler(shareService service.ShareLinkService, assetService ser
 // @Produce json
 // @Param request body dto.CreateShareLinkRequestDTO true "Share link creation data"
 // @Success 200 {object} dto.CreateShareLinkResponseDTO "Share link created successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request or source"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Failed to create share link"
+// @Failure 400 {object} api.ProblemResponse "Invalid request or source"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Failed to create share link"
 // @Router /api/v1/share-links [post]
 // @Security BearerAuth
 func (h *ShareLinkHandler) NewShareLink(c *gin.Context) {
 	var req dto.CreateShareLinkRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	user, ok := requireCurrentUser(c)
@@ -68,7 +76,7 @@ func (h *ShareLinkHandler) NewShareLink(c *gin.Context) {
 	for _, raw := range req.AssetIDs {
 		id, err := uuid.Parse(raw)
 		if err != nil {
-			api.GinBadRequest(c, err, "Invalid asset ID in asset_ids")
+			api.WriteProblem(c, api.BadRequest(err))
 			return
 		}
 		explicitIDs = append(explicitIDs, id)
@@ -103,7 +111,7 @@ func (h *ShareLinkHandler) NewShareLink(c *gin.Context) {
 // @Tags share-links
 // @Produce json
 // @Success 200 {object} dto.ListShareLinksResponseDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
 // @Router /api/v1/share-links [get]
 // @Security BearerAuth
 func (h *ShareLinkHandler) ListShareLinks(c *gin.Context) {
@@ -113,7 +121,7 @@ func (h *ShareLinkHandler) ListShareLinks(c *gin.Context) {
 	}
 	links, err := h.service.List(c.Request.Context(), int32(user.UserID))
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to list share links")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	items := make([]dto.ShareLinkDTO, 0, len(links))
@@ -130,8 +138,8 @@ func (h *ShareLinkHandler) ListShareLinks(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Share ID"
 // @Success 200 {object} dto.ShareLinkDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Share link not found"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Share link not found"
 // @Router /api/v1/share-links/{id} [get]
 // @Security BearerAuth
 func (h *ShareLinkHandler) GetShareLink(c *gin.Context) {
@@ -141,7 +149,7 @@ func (h *ShareLinkHandler) GetShareLink(c *gin.Context) {
 	}
 	shareID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Share link not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	link, err := h.service.Get(c.Request.Context(), int32(user.UserID), shareID)
@@ -161,15 +169,15 @@ func (h *ShareLinkHandler) GetShareLink(c *gin.Context) {
 // @Param id path string true "Share ID"
 // @Param request body dto.UpdateShareLinkRequestDTO true "Share link update"
 // @Success 200 {object} dto.ShareLinkDTO
-// @Failure 400 {object} api.ErrorResponse "Invalid request"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Share link not found"
+// @Failure 400 {object} api.ProblemResponse "Invalid request"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Share link not found"
 // @Router /api/v1/share-links/{id} [patch]
 // @Security BearerAuth
 func (h *ShareLinkHandler) UpdateShareLink(c *gin.Context) {
 	var req dto.UpdateShareLinkRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	user, ok := requireCurrentUser(c)
@@ -178,7 +186,7 @@ func (h *ShareLinkHandler) UpdateShareLink(c *gin.Context) {
 	}
 	shareID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Share link not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	link, err := h.service.UpdateSettings(c.Request.Context(), int32(user.UserID), shareID, service.ShareLinkUpdateParams{
@@ -202,8 +210,8 @@ func (h *ShareLinkHandler) UpdateShareLink(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Share ID"
 // @Success 200 {object} dto.ShareLinkDTO
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Share link not found"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Share link not found"
 // @Router /api/v1/share-links/{id}/revoke [post]
 // @Security BearerAuth
 func (h *ShareLinkHandler) RevokeShareLink(c *gin.Context) {
@@ -213,7 +221,7 @@ func (h *ShareLinkHandler) RevokeShareLink(c *gin.Context) {
 	}
 	shareID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Share link not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	link, err := h.service.Revoke(c.Request.Context(), int32(user.UserID), shareID)
@@ -232,9 +240,9 @@ func (h *ShareLinkHandler) RevokeShareLink(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Share ID"
 // @Success 200 {object} api.SuccessResponse
-// @Failure 400 {object} api.ErrorResponse "Share link must be expired or revoked first"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Share link not found"
+// @Failure 400 {object} api.ProblemResponse "Share link must be expired or revoked first"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Share link not found"
 // @Router /api/v1/share-links/{id} [delete]
 // @Security BearerAuth
 func (h *ShareLinkHandler) DeleteShareLink(c *gin.Context) {
@@ -244,17 +252,17 @@ func (h *ShareLinkHandler) DeleteShareLink(c *gin.Context) {
 	}
 	shareID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.GinNotFound(c, err, "Share link not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 	if err := h.service.Delete(c.Request.Context(), int32(user.UserID), shareID); err != nil {
 		switch {
 		case errors.Is(err, service.ErrShareLinkNotFound):
-			api.GinNotFound(c, err, "Share link not found")
+			api.WriteProblem(c, api.NotFound(err))
 		case errors.Is(err, service.ErrShareLinkNotDeletable):
-			api.GinBadRequest(c, err, "Share link must be expired or revoked before it can be deleted")
+			api.WriteProblem(c, api.BadRequest(err))
 		default:
-			api.GinInternalError(c, err, "Failed to delete share link")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -266,18 +274,18 @@ func writeShareLinkCreateError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrShareLinkTooLarge),
 		errors.Is(err, service.ErrShareLinkSourceEmpty),
 		errors.Is(err, service.ErrShareLinkInvalidSource):
-		api.GinBadRequest(c, err, err.Error())
+		api.WriteProblem(c, api.BadRequest(err))
 	default:
-		api.GinInternalError(c, err, "Failed to create share link")
+		api.WriteProblem(c, api.Internal(err))
 	}
 }
 
 func writeShareLinkLookupError(c *gin.Context, err error) {
 	if errors.Is(err, service.ErrShareLinkNotFound) {
-		api.GinNotFound(c, err, "Share link not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
-	api.GinInternalError(c, err, "Failed to access share link")
+	api.WriteProblem(c, api.Internal(err))
 }
 
 // --- Public (token-authorized) endpoints ---------------------------------
@@ -288,12 +296,12 @@ func writeShareLinkLookupError(c *gin.Context, err error) {
 func (h *ShareLinkHandler) resolvePublicShare(c *gin.Context) (repo.ShareLink, bool) {
 	token := strings.TrimSpace(c.Param("token"))
 	if token == "" {
-		api.GinNotFound(c, errors.New("missing token"), "Share not found or no longer available")
+		api.WriteProblem(c, api.NotFound(errors.New("missing token")))
 		return repo.ShareLink{}, false
 	}
 	link, err := h.service.ResolvePublic(c.Request.Context(), token)
 	if err != nil {
-		api.GinNotFound(c, err, "Share not found or no longer available")
+		api.WriteProblem(c, api.NotFound(err))
 		return repo.ShareLink{}, false
 	}
 	return link, true
@@ -304,16 +312,16 @@ func (h *ShareLinkHandler) resolvePublicShare(c *gin.Context) (repo.ShareLink, b
 func (h *ShareLinkHandler) resolvePublicShareAsset(c *gin.Context, link repo.ShareLink) (*repo.Asset, bool) {
 	assetID, err := uuid.Parse(c.Param("assetId"))
 	if err != nil {
-		api.GinNotFound(c, err, "Asset not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return nil, false
 	}
 	if !h.service.AssetInShare(link, assetID) {
-		api.GinNotFound(c, errors.New("asset not in share"), "Asset not found")
+		api.WriteProblem(c, api.NotFound(errors.New("asset not in share")))
 		return nil, false
 	}
 	asset, err := h.assetService.GetAssetAny(c.Request.Context(), assetID)
 	if err != nil {
-		api.GinNotFound(c, err, "Asset not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return nil, false
 	}
 	return asset, true
@@ -326,7 +334,7 @@ func (h *ShareLinkHandler) resolvePublicShareAsset(c *gin.Context, link repo.Sha
 // @Produce json
 // @Param token path string true "Share token"
 // @Success 200 {object} dto.PublicShareMetadataDTO
-// @Failure 404 {object} api.ErrorResponse "Share not found or no longer available"
+// @Failure 404 {object} api.ProblemResponse "Share not found or no longer available"
 // @Router /api/v1/public/shares/{token} [get]
 func (h *ShareLinkHandler) GetPublicShare(c *gin.Context) {
 	link, ok := h.resolvePublicShare(c)
@@ -349,8 +357,8 @@ func (h *ShareLinkHandler) GetPublicShare(c *gin.Context) {
 // @Param token path string true "Share token"
 // @Param request body dto.PublicShareAssetListRequestDTO true "Pagination"
 // @Success 200 {object} dto.PublicShareAssetListResponseDTO
-// @Failure 404 {object} api.ErrorResponse "Share not found or no longer available"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 404 {object} api.ProblemResponse "Share not found or no longer available"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/public/shares/{token}/assets/list [post]
 func (h *ShareLinkHandler) ListPublicShareAssets(c *gin.Context) {
 	link, ok := h.resolvePublicShare(c)
@@ -379,7 +387,7 @@ func (h *ShareLinkHandler) ListPublicShareAssets(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Failed to list public share assets: %v", err)
-		api.GinInternalError(c, err, "Failed to list share assets")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -409,7 +417,7 @@ func (h *ShareLinkHandler) ListPublicShareAssets(c *gin.Context) {
 // @Param assetId path string true "Asset ID"
 // @Param size query string false "Thumbnail size" default(medium) Enums(small,medium,large)
 // @Success 200 {file} string "Thumbnail image file"
-// @Failure 404 {object} api.ErrorResponse "Not found"
+// @Failure 404 {object} api.ProblemResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/thumbnail [get]
 func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 	link, ok := h.resolvePublicShare(c)
@@ -423,24 +431,24 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 
 	size := c.DefaultQuery("size", "medium")
 	if size != "small" && size != "medium" && size != "large" {
-		api.GinBadRequest(c, errors.New("invalid size parameter"), "Invalid size parameter. Must be 'small', 'medium', or 'large'")
+		api.WriteProblem(c, api.BadRequest(errors.New("invalid size parameter")))
 		return
 	}
 
 	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), asset.AssetID, size)
 	if err != nil {
-		api.GinNotFound(c, err, "Thumbnail not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
-	repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
+	repository, err := h.queries.GetRepository(c.Request.Context(), thumbnail.RepositoryID)
 	if err != nil {
 		respondRepositoryResolveError(c, err, "Failed to resolve repository")
 		return
 	}
-	repositoryFS, file, err := openRepositoryPrivate(h.files, *repository, thumbnail.StoragePath)
+	repositoryFS, file, err := openRepositoryPrivate(h.files, repository, thumbnail.StoragePath)
 	if err != nil {
-		api.GinNotFound(c, err, "Thumbnail file not found")
+		api.WriteProblem(c, api.NotFound(err))
 		return
 	}
 
@@ -459,7 +467,7 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 // @Param token path string true "Share token"
 // @Param assetId path string true "Asset ID"
 // @Success 200 {file} file "Web-optimized video file"
-// @Failure 404 {object} api.ErrorResponse "Not found"
+// @Failure 404 {object} api.ProblemResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/web-video [get]
 func (h *ShareLinkHandler) GetPublicShareWebVideo(c *gin.Context) {
 	h.servePublicShareWebMedia(c, "VIDEO", "videos", "_web.mp4", "video/mp4", "Video file not found")
@@ -474,7 +482,7 @@ func (h *ShareLinkHandler) GetPublicShareWebVideo(c *gin.Context) {
 // @Param token path string true "Share token"
 // @Param assetId path string true "Asset ID"
 // @Success 200 {file} file "Web-optimized audio file"
-// @Failure 404 {object} api.ErrorResponse "Not found"
+// @Failure 404 {object} api.ProblemResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/web-audio [get]
 func (h *ShareLinkHandler) GetPublicShareWebAudio(c *gin.Context) {
 	h.servePublicShareWebMedia(c, "AUDIO", "audios", "_web.mp3", "audio/mpeg", "Audio file not found")
@@ -492,26 +500,15 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, d
 		return
 	}
 	if asset.Type != assetType {
-		api.GinBadRequest(c, fmt.Errorf("asset is not %s", strings.ToLower(assetType)), "Asset type mismatch")
+		api.WriteProblem(c, api.BadRequest(fmt.Errorf("asset is not %s", strings.ToLower(assetType))))
 		return
 	}
-	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.GinNotFound(c, errors.New("asset storage path is empty"), notFoundMessage)
-		return
-	}
-
-	repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to access repository")
-		return
-	}
-
-	repositoryFS, file, err := openWebOrOriginal(h.files, *repository, asset, derivedKind, webSuffix)
+	repositoryFS, file, err := openWebOrOriginal(c.Request.Context(), h.locations, asset, derivedKind, webSuffix)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, notFoundMessage)
+			api.WriteProblem(c, api.NotFound(err))
 		} else {
-			api.GinInternalError(c, err, "Failed to access repository file")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -531,8 +528,8 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, d
 // @Param token path string true "Share token"
 // @Param assetId path string true "Asset ID"
 // @Success 200 {file} file "Original file content"
-// @Failure 403 {object} api.ErrorResponse "Original downloads are not enabled for this share"
-// @Failure 404 {object} api.ErrorResponse "Not found"
+// @Failure 403 {object} api.ProblemResponse "Original downloads are not enabled for this share"
+// @Failure 404 {object} api.ProblemResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/original [get]
 func (h *ShareLinkHandler) GetPublicShareOriginal(c *gin.Context) {
 	link, ok := h.resolvePublicShare(c)
@@ -540,29 +537,19 @@ func (h *ShareLinkHandler) GetPublicShareOriginal(c *gin.Context) {
 		return
 	}
 	if !link.AllowDownload || !link.IncludeOriginals {
-		api.GinForbidden(c, errors.New("original downloads are not enabled for this share"), "Original downloads are not enabled for this share")
+		api.WriteProblem(c, api.Forbidden(errors.New("original downloads are not enabled for this share")))
 		return
 	}
 	asset, ok := h.resolvePublicShareAsset(c, link)
 	if !ok {
 		return
 	}
-	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		api.GinNotFound(c, errors.New("asset storage path is empty"), "Original file not found")
-		return
-	}
-
-	repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
-	if err != nil {
-		api.GinInternalError(c, err, "Failed to access repository")
-		return
-	}
-	repositoryFS, file, err := openRepositoryMedia(h.files, *repository, *asset.StoragePath)
+	opened, err := h.locations.OpenAsset(c.Request.Context(), asset.AssetID)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			api.GinNotFound(c, err, "Original file not found")
+			api.WriteProblem(c, api.NotFound(err))
 		} else {
-			api.GinInternalError(c, err, "Failed to access original file")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -570,7 +557,7 @@ func (h *ShareLinkHandler) GetPublicShareOriginal(c *gin.Context) {
 	c.Header("Cache-Control", "private, max-age=0, no-store")
 	c.Header("Content-Type", asset.MimeType)
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", asset.OriginalFilename))
-	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
+	serveRepositoryFile(c, opened.Repository, opened.File, asset.OriginalFilename)
 }
 
 // DownloadPublicShare serves the share's assets (or a requested subset) as a
@@ -583,8 +570,8 @@ func (h *ShareLinkHandler) GetPublicShareOriginal(c *gin.Context) {
 // @Param token path string true "Share token"
 // @Param request body dto.PublicShareDownloadRequestDTO false "Optional asset ID subset"
 // @Success 200 {file} file "Zip archive"
-// @Failure 403 {object} api.ErrorResponse "Downloads are not enabled for this share"
-// @Failure 404 {object} api.ErrorResponse "Not found"
+// @Failure 403 {object} api.ProblemResponse "Downloads are not enabled for this share"
+// @Failure 404 {object} api.ProblemResponse "Not found"
 // @Router /api/v1/public/shares/{token}/download [post]
 func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 	link, ok := h.resolvePublicShare(c)
@@ -592,7 +579,7 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 		return
 	}
 	if !link.AllowDownload {
-		api.GinForbidden(c, errors.New("downloads are not enabled for this share"), "Downloads are not enabled for this share")
+		api.WriteProblem(c, api.Forbidden(errors.New("downloads are not enabled for this share")))
 		return
 	}
 
@@ -620,33 +607,16 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 		if err != nil {
 			continue
 		}
-		if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-			continue
-		}
-		repository, err := getRepositoryForAsset(c.Request.Context(), h.queries, asset)
-		if err != nil {
-			continue
-		}
-		repositoryPath, parseErr := storage.ParseUserMediaPath(*asset.StoragePath)
-		if parseErr != nil {
-			continue
-		}
-		repositoryFS, openErr := h.files.Open(*repository)
+		opened, openErr := h.locations.OpenAsset(c.Request.Context(), asset.AssetID)
 		if openErr != nil {
-			continue
-		}
-		opened, openErr := repositoryFS.OpenMedia(repositoryPath)
-		if openErr != nil {
-			_ = repositoryFS.Close()
 			continue
 		}
 		_ = opened.Close()
-		_ = repositoryFS.Close()
-		files = append(files, assetDownloadFile{asset: *asset, repository: *repository, path: repositoryPath})
+		files = append(files, assetDownloadFile{asset: *asset})
 	}
 
 	if len(files) == 0 {
-		api.GinNotFound(c, errors.New("no downloadable files in this share"), "No downloadable files in this share")
+		api.WriteProblem(c, api.NotFound(errors.New("no downloadable files in this share")))
 		return
 	}
 
@@ -659,7 +629,7 @@ func (h *ShareLinkHandler) DownloadPublicShare(c *gin.Context) {
 	zipWriter := zip.NewWriter(c.Writer)
 	archiveNames := make(map[string]int, len(files))
 	for _, file := range files {
-		if err := writeAssetToZip(h.files, zipWriter, archiveNames, file); err != nil {
+		if err := writeAssetToZip(c.Request.Context(), h.locations, zipWriter, archiveNames, file); err != nil {
 			log.Printf("Failed to write share asset to zip: %v", err)
 			_ = zipWriter.Close()
 			return

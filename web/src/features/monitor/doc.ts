@@ -14,7 +14,7 @@
  * {@link QueueSummaryList} keeps only expanded rows and transient copied status;
  * {@link MLMonitor} keeps its confirmation dialog and missing-only/full choice.
  *
- * Queue, capability, and indexing results remain TanStack Query server state.
+ * Queue, capability, Lumen runtime, and indexing results remain TanStack Query server state.
  * The route checks the authenticated user before monitor queries render.
  *
  * ## Flows
@@ -36,7 +36,8 @@
  * {@link MLMonitor} combines coverage, repository options, and one confirmed
  * rebuild command. {@link CapabilitiesMonitor} is display-only; durable ML and
  * agent settings stay in Settings. {@link StorageMonitor} groups repositories
- * below their owning Storage Locations and exposes capacity, mount, risk, and
+ * below their owning Storage Locations and exposes filesystem-writable capacity,
+ * the server-owned safety reserve and resulting write budget, mount, risk, and
  * redacted support-bundle diagnostics in a fixed-height master-detail pane
  * whose tree and detail column scroll independently.
  * {@link LifecycleHistory} renders the durable lifecycle audit below the pane.
@@ -45,7 +46,11 @@
  *
  * Queue stats and summary endpoints poll every five seconds. Queue summaries
  * include bounded error samples suitable for copied diagnostics.
- * {@link useCapabilities} also polls every five seconds.
+ * {@link useCapabilities} and {@link useLumenRuntime} poll every five seconds.
+ * The public capability snapshot supplies de-sensitized task availability;
+ * the administrator runtime snapshot supplies typed discovery-backend,
+ * transport, compatibility, and node diagnostics. Refresh observes both
+ * snapshots and never restarts or rescans discovery.
  *
  * {@link useAssetIndexingStats} polls repository-aware coverage every fifteen
  * seconds. {@link AssetIndexingStats} distinguishes photo and video totals and
@@ -71,5 +76,6 @@ import type { QueueSummaryList } from "./flows/overview/QueueSummaryList.tsx";
 import type { StatMonitor } from "./flows/overview/StatMonitor.tsx";
 import type { StorageMonitor } from "./flows/overview/StorageMonitor.tsx";
 import type { useCapabilities } from "../../lib/capabilities/useCapabilities.ts";
+import type { useLumenRuntime } from "./api/useLumenRuntime.ts";
 
 export {};

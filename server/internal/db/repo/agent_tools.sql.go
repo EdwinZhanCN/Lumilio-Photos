@@ -424,6 +424,72 @@ func (q *Queries) AgentRankAssetIDsByUploadTime(ctx context.Context, arg AgentRa
 	return items, nil
 }
 
+const agentReadOCRDocuments = `-- name: AgentReadOCRDocuments :many
+WITH filter_params AS (
+  SELECT CAST(?2 AS TEXT) AS asset_ids_json
+)
+SELECT
+    a.asset_id,
+    a.original_filename,
+    a.type,
+    CASE WHEN ocr.asset_id IS NULL THEN 0 ELSE 1 END AS has_ocr_result,
+    COALESCE(ocr.total_count, 0) AS region_count,
+    COALESCE(ti.text_content, '') AS text_content
+FROM assets a
+LEFT JOIN ocr_results ocr ON ocr.asset_id = a.asset_id
+LEFT JOIN ocr_text_items ti ON ti.asset_id = ocr.asset_id
+WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
+  AND a.owner_id = ?1
+  AND a.is_deleted = false
+ORDER BY a.asset_id, ti.id ASC
+`
+
+type AgentReadOCRDocumentsParams struct {
+	UserID   *int32  `db:"user_id" json:"user_id"`
+	AssetIds *string `db:"asset_ids" json:"asset_ids"`
+}
+
+type AgentReadOCRDocumentsRow struct {
+	AssetID          uuid.UUID `db:"asset_id" json:"asset_id"`
+	OriginalFilename string    `db:"original_filename" json:"original_filename"`
+	Type             string    `db:"type" json:"type"`
+	HasOcrResult     int64     `db:"has_ocr_result" json:"has_ocr_result"`
+	RegionCount      int64     `db:"region_count" json:"region_count"`
+	TextContent      string    `db:"text_content" json:"text_content"`
+}
+
+// read_ocr observer: authoritative OCR result and ordered text rows for a
+// bounded ref. Go restores ref order and formats per-document statuses.
+func (q *Queries) AgentReadOCRDocuments(ctx context.Context, arg AgentReadOCRDocumentsParams) ([]AgentReadOCRDocumentsRow, error) {
+	rows, err := q.db.QueryContext(ctx, agentReadOCRDocuments, arg.UserID, arg.AssetIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentReadOCRDocumentsRow
+	for rows.Next() {
+		var i AgentReadOCRDocumentsRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OriginalFilename,
+			&i.Type,
+			&i.HasOcrResult,
+			&i.RegionCount,
+			&i.TextContent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetIDsByPersonIDs = `-- name: GetAssetIDsByPersonIDs :many
 
 WITH filter_params AS (

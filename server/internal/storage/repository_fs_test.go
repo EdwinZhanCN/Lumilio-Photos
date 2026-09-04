@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -107,6 +108,45 @@ func TestRepositoryFSWalkStopsAtNestedRepositoryBoundary(t *testing.T) {
 		if observation.Path.String() == "nested/must-not-scan.jpg" {
 			t.Fatal("walk crossed nested .lumiliorepo boundary")
 		}
+	}
+}
+
+func TestRepositoryFSReadDirectoryResumesInBoundedPages(t *testing.T) {
+	t.Parallel()
+
+	repository := createRepositoryFSTestRoot(t)
+	for _, name := range []string{"a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg", "f.jpg", "g.jpg"} {
+		writeRepositoryFSTestFile(t, repository.Path, filepath.Join("wide", name), []byte(name))
+	}
+	repositoryFS := openRepositoryFSTestFS(t, repository)
+	offset := int64(0)
+	observed := make(map[string]bool)
+	for turns := 0; ; turns++ {
+		if turns > 8 {
+			t.Fatal("bounded directory reader did not reach EOF")
+		}
+		batch, err := repositoryFS.ReadUserMediaDirectory(context.Background(), DirectoryReadOptions{
+			Directory: "wide", Offset: offset, Limit: 2, ScanID: uuid.New(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(batch.Entries) > 2 {
+			t.Fatalf("batch entries = %d, want at most 2", len(batch.Entries))
+		}
+		for _, entry := range batch.Entries {
+			observed[entry.Observation.Path.String()] = true
+		}
+		if batch.Done {
+			break
+		}
+		if batch.NextOffset <= offset {
+			t.Fatalf("offset did not advance: %d -> %d", offset, batch.NextOffset)
+		}
+		offset = batch.NextOffset
+	}
+	if len(observed) != 7 {
+		t.Fatalf("observed entries = %d, want 7: %#v", len(observed), observed)
 	}
 }
 
@@ -308,6 +348,41 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 		t.Fatalf("factory used stale repository path: %v", err)
 	}
 	_ = opened.Close()
+}
+
+func TestRepositoryFSImmutablePrivateWriteNeverReplacesExistingContent(t *testing.T) {
+	t.Parallel()
+
+	repository := createRepositoryFSTestRoot(t)
+	repositoryFS := openRepositoryFSTestFS(t, repository)
+	destination, err := ParsePrivateRepositoryPath(".lumilio/assets/thumbnails/v1/asset_small.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory, err := ParsePrivateRepositoryPath(path.Dir(destination.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repositoryFS.MkdirAllPrivate(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if written, err := repositoryFS.WritePrivateFileImmutable(destination, bytes.NewReader([]byte("first")), 0o644); err != nil || written != 5 {
+		t.Fatalf("first immutable write = %d/%v", written, err)
+	}
+	if written, err := repositoryFS.WritePrivateFileImmutable(destination, bytes.NewReader([]byte("first")), 0o644); err != nil || written != 5 {
+		t.Fatalf("identical retry = %d/%v", written, err)
+	}
+	if _, err := repositoryFS.WritePrivateFileImmutable(destination, bytes.NewReader([]byte("second")), 0o644); !errors.Is(err, ErrRepositoryImmutableConflict) {
+		t.Fatalf("different retry error = %v, want immutable conflict", err)
+	}
+	contents, err := repositoryFS.ReadPrivateFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "first" {
+		t.Fatalf("immutable content = %q, want first", contents)
+	}
 }
 
 func createRepositoryFSTestRoot(t *testing.T) repo.Repository {

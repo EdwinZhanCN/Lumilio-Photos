@@ -12,6 +12,7 @@ import (
 
 	"server/config"
 	"server/internal/api"
+	"server/internal/api/problem"
 	"server/internal/httporigin"
 	"server/internal/service"
 
@@ -104,6 +105,12 @@ func TestGetCSRFTokenRequiresRefreshCookieAndBindsResponse(t *testing.T) {
 		handler.GetCSRFToken(context)
 
 		require.Equal(t, http.StatusUnauthorized, recorder.Code)
+		require.Equal(t, api.ProblemMediaType, recorder.Header().Get("Content-Type"))
+		var payload problem.Details
+		require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+		require.Equal(t, problem.SessionExpired.Type, payload.Type)
+		require.Equal(t, http.StatusUnauthorized, payload.Status)
+		require.Regexp(t, `^urn:lumilio:problem:[0-9a-f]{32}$`, payload.Instance)
 	})
 
 	t.Run("bound token", func(t *testing.T) {

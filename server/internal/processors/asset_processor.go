@@ -1,54 +1,85 @@
 package processors
 
 import (
+	"context"
 	"database/sql"
+	"errors"
+
+	"github.com/edwinzhancn/lumen-sdk/pkg/types"
+	"github.com/google/uuid"
 
 	"server/config"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/execution"
 	"server/internal/logging"
-	"server/internal/service"
-	"server/internal/sourcing"
+	"server/internal/settings"
 	"server/internal/storage"
+	"server/internal/storage/roe/locations"
+	"server/internal/utils/imagesource"
 
-	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 )
 
 // AssetProcessor holds shared dependencies for per-task processors.
 type AssetProcessor struct {
-	database          *sql.DB
-	assetService      service.AssetService
-	queries           *repo.Queries
-	files             *storage.RepositoryFSFactory
-	repositories      storage.RepositoryManager
-	materializer      *sourcing.SourceMaterializer
-	queueClient       *river.Client[*sql.Tx]
-	settingsService   service.SettingsService
-	embeddingService  service.EmbeddingService
-	lumenService      service.LumenService
-	transcodeConfig   config.TranscodeConfig
-	toolsConfig       config.ToolsConfig
-	logger            *zap.Logger
-	auditProvider     logging.RepositoryAuditProvider
-	beforeRetryInsert func(queue string) error
+	readerDatabase   QueryRower
+	reader           AssetReader
+	files            *storage.RepositoryFSFactory
+	locationResolver AssetLocationResolver
+	materializer     SourceCommitMaterializer
+	settingsService  MLSettingsReader
+	lumenService     ImageEmbedder
+	transcodeConfig  config.TranscodeConfig
+	toolsConfig      config.ToolsConfig
+	toolSession      execution.ToolSession
+	logger           *zap.Logger
+	auditProvider    logging.RepositoryAuditProvider
+}
+
+type QueryRower interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+type AssetReader interface {
+	GetAssetByID(context.Context, uuid.UUID) (repo.Asset, error)
+	GetContentObjectByID(context.Context, uuid.UUID) (repo.ContentObject, error)
+	GetRepository(context.Context, uuid.UUID) (repo.Repository, error)
+}
+
+type AssetLocationResolver interface {
+	LocalAssetPath(context.Context, uuid.UUID) (*locations.OpenedMedia, string, error)
+}
+
+type SourceCommitMaterializer interface {
+	MaterializeCommit(context.Context, uuid.UUID) (*repo.Asset, error)
+}
+
+type MLSettingsReader interface {
+	GetEffectiveMLConfig(context.Context) (settings.ML, error)
+}
+
+type ImageEmbedder interface {
+	SemanticImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error)
+}
+
+func (ap *AssetProcessor) SetLocationResolver(resolver AssetLocationResolver) {
+	ap.locationResolver = resolver
 }
 
 // NewAssetProcessor constructs the processor with required dependencies.
 func NewAssetProcessor(
-	database *sql.DB,
-	assetService service.AssetService,
-	queries *repo.Queries,
-	materializer *sourcing.SourceMaterializer,
-	queueClient *river.Client[*sql.Tx],
-	settingsService service.SettingsService,
-	embeddingService service.EmbeddingService,
-	lumenService service.LumenService,
+	reader AssetReader,
+	readerDatabase QueryRower,
+	materializer SourceCommitMaterializer,
+	settingsService MLSettingsReader,
+	lumenService ImageEmbedder,
 	transcodeConfig config.TranscodeConfig,
 	toolsConfig config.ToolsConfig,
+	toolSession execution.ToolSession,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 	files *storage.RepositoryFSFactory,
-	repositories storage.RepositoryManager,
 ) *AssetProcessor {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -57,21 +88,30 @@ func NewAssetProcessor(
 		auditProvider = logging.NewRepositoryAuditProvider(logger, false)
 	}
 	return &AssetProcessor{
-		database:         database,
-		assetService:     assetService,
-		queries:          queries,
-		files:            files,
-		repositories:     repositories,
-		materializer:     materializer,
-		queueClient:      queueClient,
-		settingsService:  settingsService,
-		embeddingService: embeddingService,
-		lumenService:     lumenService,
-		transcodeConfig:  transcodeConfig,
-		toolsConfig:      toolsConfig,
-		logger:           logger.With(zap.String("component", "processor")),
-		auditProvider:    auditProvider,
+		readerDatabase:  readerDatabase,
+		reader:          reader,
+		files:           files,
+		materializer:    materializer,
+		settingsService: settingsService,
+		lumenService:    lumenService,
+		transcodeConfig: transcodeConfig,
+		toolsConfig:     toolsConfig,
+		toolSession:     toolSession,
+		logger:          logger.With(zap.String("component", "processor")),
+		auditProvider:   auditProvider,
 	}
+}
+
+// AssetMediaType returns the typed media category for an asset.
+func (ap *AssetProcessor) AssetMediaType(ctx context.Context, assetID uuid.UUID) (dbtypes.AssetType, error) {
+	if ap == nil || ap.reader == nil {
+		return "", errors.New("asset processor reader is not configured")
+	}
+	asset, err := ap.reader.GetAssetByID(ctx, assetID)
+	if err != nil {
+		return "", err
+	}
+	return dbtypes.AssetType(asset.Type), nil
 }
 
 func (ap *AssetProcessor) repoAudit(repoPath string) logging.RepositoryAuditLogger {

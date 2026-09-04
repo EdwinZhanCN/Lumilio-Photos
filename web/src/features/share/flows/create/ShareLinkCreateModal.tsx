@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Check, Copy, Link2, Share2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useMessage } from "@/features/notifications";
+import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/lib/i18n.tsx";
 import { shareUrls } from "../../model/shareUrls";
 
@@ -87,7 +88,7 @@ export function ShareLinkCreateModal<T extends CreatedShareLink>({
   const handleCopy = async () => {
     if (!created?.token) return;
     try {
-      await navigator.clipboard.writeText(shareUrls.publicShareUrl(created.token));
+      await copyText(shareUrls.publicShareUrl(created.token));
       setCopied(true);
       showMessage("success", t("share.create.copied", "Link copied to clipboard."));
     } catch (error) {

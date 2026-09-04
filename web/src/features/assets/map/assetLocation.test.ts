@@ -9,10 +9,10 @@ describe("assetToPhotoLocation", () => {
       asset_id: "asset-1",
       type: "PHOTO",
       original_filename: "beijing.jpg",
+      gps_latitude: 39.9042,
+      gps_longitude: 116.4074,
       specific_metadata: {
         description: "City view",
-        gps_latitude: 39.9042,
-        gps_longitude: 116.4074,
       },
     } as Asset;
 
@@ -29,7 +29,8 @@ describe("assetToPhotoLocation", () => {
     const video = { type: "VIDEO", specific_metadata: {} } as Asset;
     const photoWithoutLongitude = {
       type: "PHOTO",
-      specific_metadata: { gps_latitude: 39.9042 },
+      gps_latitude: 39.9042,
+      specific_metadata: {},
     } as Asset;
 
     expect(assetToPhotoLocation(video)).toBeNull();

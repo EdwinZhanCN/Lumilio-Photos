@@ -8,6 +8,7 @@ import { BrowseScopeSelect, useBrowseScope } from "@/features/repositories";
 import { CollectionErrorAlert, LoadMoreButton } from "@/components/collection";
 import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { usePeople } from "@/features/people";
 import PeopleCollectionGrid from "./PeopleCollectionGrid";
 
@@ -66,7 +67,7 @@ function PeopleContent() {
           {isError && (
             <CollectionErrorAlert
               message={t("collections.messages.loadPeopleError", {
-                message: error instanceof Error ? error.message : t("home.errors.unknown"),
+                message: localizeAPIProblem(error, t, t("home.errors.unknown")),
               })}
             />
           )}

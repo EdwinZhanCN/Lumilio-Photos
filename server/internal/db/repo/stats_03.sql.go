@@ -16,7 +16,11 @@ SELECT
 FROM assets a
 WHERE
     a.is_deleted = false
-    AND (?1 IS NULL OR a.repository_id = ?1)
+    AND (?1 IS NULL OR EXISTS (
+      SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = ?1
+    ))
     AND (a.taken_time IS NOT NULL OR a.upload_time IS NOT NULL)
 GROUP BY month
 ORDER BY month DESC

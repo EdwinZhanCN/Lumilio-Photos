@@ -1,26 +1,17 @@
 import { useMemo, useState } from "react";
 import {
   AlertCircle,
-  Brain,
   CheckCircle2,
   ChevronDown,
   Clock,
   Copy,
-  FileSearch,
-  Fingerprint,
-  FolderSearch,
-  ImageIcon,
   Layers3,
   Loader2,
-  MapPinned,
-  RefreshCw,
-  ScanSearch,
-  Sparkles,
-  TextSearch,
-  UsersRound,
-  Video,
+  Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useMessage } from "@/features/notifications";
+import { copyText } from "@/lib/clipboard";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import type { QueueErrorSampleDTO, QueueSummaryDTO } from "../../types";
@@ -38,29 +29,8 @@ type QueueCopy = {
 };
 
 const QUEUE_PRESENTATION: Record<string, QueuePresentation> = {
-  ingest_asset: { icon: ImageIcon, tone: "text-primary bg-primary/10" },
-  discover_asset: { icon: FileSearch, tone: "text-info bg-info/10" },
-  metadata_asset: { icon: ScanSearch, tone: "text-secondary bg-secondary/10" },
-  thumbnail_asset: { icon: Sparkles, tone: "text-success bg-success/10" },
-  transcode_asset: { icon: Video, tone: "text-accent bg-accent/10" },
-  retry_asset: { icon: RefreshCw, tone: "text-warning bg-warning/10" },
-  reindex_assets: { icon: Brain, tone: "text-primary bg-primary/10" },
-  rebuild_location_clusters: { icon: MapPinned, tone: "text-info bg-info/10" },
-  scan_repository: { icon: FolderSearch, tone: "text-info bg-info/10" },
-  detect_stacks: { icon: Layers3, tone: "text-secondary bg-secondary/10" },
-  match_live_photo: { icon: Layers3, tone: "text-success bg-success/10" },
-  process_semantic: { icon: Brain, tone: "text-primary bg-primary/10" },
-  process_bioclip: { icon: Sparkles, tone: "text-success bg-success/10" },
-  process_ocr: { icon: TextSearch, tone: "text-accent bg-accent/10" },
-  process_face: { icon: UsersRound, tone: "text-secondary bg-secondary/10" },
-  classify_zeroshot: { icon: Brain, tone: "text-primary bg-primary/10" },
-  process_phash: { icon: Fingerprint, tone: "text-warning bg-warning/10" },
+  catalog_macro: { icon: Workflow, tone: "text-primary bg-primary/10" },
 };
-
-function humanizeQueueName(name?: string): string {
-  if (!name) return "";
-  return name.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
 
 function getPresentation(name?: string): QueuePresentation {
   return (
@@ -73,103 +43,43 @@ function getPresentation(name?: string): QueuePresentation {
 
 function getQueueCopy(t: TFunction): Record<string, QueueCopy> {
   return {
-    classify_zeroshot: {
-      name: t("monitor.queueSummary.queues.classify_zeroshot.name"),
-      description: t("monitor.queueSummary.queues.classify_zeroshot.description"),
-    },
-    detect_stacks: {
-      name: t("monitor.queueSummary.queues.detect_stacks.name"),
-      description: t("monitor.queueSummary.queues.detect_stacks.description"),
-    },
-    discover_asset: {
-      name: t("monitor.queueSummary.queues.discover_asset.name"),
-      description: t("monitor.queueSummary.queues.discover_asset.description"),
-    },
-    ingest_asset: {
-      name: t("monitor.queueSummary.queues.ingest_asset.name"),
-      description: t("monitor.queueSummary.queues.ingest_asset.description"),
-    },
-    match_live_photo: {
-      name: t("monitor.queueSummary.queues.match_live_photo.name"),
-      description: t("monitor.queueSummary.queues.match_live_photo.description"),
-    },
-    metadata_asset: {
-      name: t("monitor.queueSummary.queues.metadata_asset.name"),
-      description: t("monitor.queueSummary.queues.metadata_asset.description"),
-    },
-    process_bioclip: {
-      name: t("monitor.queueSummary.queues.process_bioclip.name", {
-        defaultValue: "BioCLIP Species Recognition",
+    catalog_macro: {
+      name: t("monitor.queueSummary.queues.catalog_macro.name", {
+        defaultValue: "Catalog processing",
       }),
-      description: t("monitor.queueSummary.queues.process_bioclip.description"),
-    },
-    process_face: {
-      name: t("monitor.queueSummary.queues.process_face.name", {
-        defaultValue: "Person Recognition",
+      description: t("monitor.queueSummary.queues.catalog_macro.description", {
+        defaultValue: "Runs bounded catalog pipeline stages with shared resource limits.",
       }),
-      description: t("monitor.queueSummary.queues.process_face.description"),
-    },
-    process_ocr: {
-      name: t("monitor.queueSummary.queues.process_ocr.name", {
-        defaultValue: "OCR Text Recognition",
-      }),
-      description: t("monitor.queueSummary.queues.process_ocr.description"),
-    },
-    process_phash: {
-      name: t("monitor.queueSummary.queues.process_phash.name"),
-      description: t("monitor.queueSummary.queues.process_phash.description"),
-    },
-    process_semantic: {
-      name: t("monitor.queueSummary.queues.process_semantic.name"),
-      description: t("monitor.queueSummary.queues.process_semantic.description"),
-    },
-    rebuild_location_clusters: {
-      name: t("monitor.queueSummary.queues.rebuild_location_clusters.name"),
-      description: t("monitor.queueSummary.queues.rebuild_location_clusters.description"),
-    },
-    reindex_assets: {
-      name: t("monitor.queueSummary.queues.reindex_assets.name"),
-      description: t("monitor.queueSummary.queues.reindex_assets.description"),
-    },
-    retry_asset: {
-      name: t("monitor.queueSummary.queues.retry_asset.name"),
-      description: t("monitor.queueSummary.queues.retry_asset.description"),
-    },
-    scan_repository: {
-      name: t("monitor.queueSummary.queues.scan_repository.name"),
-      description: t("monitor.queueSummary.queues.scan_repository.description"),
-    },
-    thumbnail_asset: {
-      name: t("monitor.queueSummary.queues.thumbnail_asset.name"),
-      description: t("monitor.queueSummary.queues.thumbnail_asset.description"),
-    },
-    transcode_asset: {
-      name: t("monitor.queueSummary.queues.transcode_asset.name"),
-      description: t("monitor.queueSummary.queues.transcode_asset.description"),
     },
   };
 }
 
 function getKindLabels(t: TFunction): Record<string, string> {
   return {
-    classify_zeroshot: t("monitor.queueSummary.kinds.classify_zeroshot"),
-    detect_stacks: t("monitor.queueSummary.kinds.detect_stacks"),
-    discover_asset: t("monitor.queueSummary.kinds.discover_asset"),
-    ingest_asset: t("monitor.queueSummary.kinds.ingest_asset"),
-    match_live_photo: t("monitor.queueSummary.kinds.match_live_photo"),
-    metadata_asset: t("monitor.queueSummary.kinds.metadata_asset"),
-    process_bioclip: t("monitor.queueSummary.kinds.process_bioclip"),
-    process_face: t("monitor.queueSummary.kinds.process_face"),
-    process_ocr: t("monitor.queueSummary.kinds.process_ocr"),
-    process_phash: t("monitor.queueSummary.kinds.process_phash"),
-    process_semantic: t("monitor.queueSummary.kinds.process_semantic"),
-    rebuild_location_clusters: t("monitor.queueSummary.kinds.rebuild_location_clusters"),
-    reindex_assets: t("monitor.queueSummary.kinds.reindex_assets"),
-    retry_asset: t("monitor.queueSummary.kinds.retry_asset"),
-    scan_repository: t("monitor.queueSummary.kinds.scan_repository"),
-    schedule_repository_scans: t("monitor.queueSummary.kinds.schedule_repository_scans"),
-    thumbnail_asset: t("monitor.queueSummary.kinds.thumbnail_asset"),
-    transcode_asset: t("monitor.queueSummary.kinds.transcode_asset"),
+    analyze_asset: t("monitor.queueSummary.kinds.analyze_asset", {
+      defaultValue: "Read media information",
+    }),
+    backup_catalog: t("monitor.queueSummary.kinds.backup_catalog", {
+      defaultValue: "Create catalog backup",
+    }),
+    enrich_asset: t("monitor.queueSummary.kinds.enrich_asset", {
+      defaultValue: "Run image and media enrichment",
+    }),
+    generate_asset_derivatives: t("monitor.queueSummary.kinds.generate_asset_derivatives", {
+      defaultValue: "Build previews",
+    }),
+    ingest_asset: t("monitor.queueSummary.kinds.ingest_asset", {
+      defaultValue: "Import uploaded file",
+    }),
+    rebuild_projection_batch: t("monitor.queueSummary.kinds.rebuild_projection_batch", {
+      defaultValue: "Rebuild catalog projection",
+    }),
+    scan_repository_batch: t("monitor.queueSummary.kinds.scan_repository_batch", {
+      defaultValue: "Scan Repository batch",
+    }),
+    transcode_media: t("monitor.queueSummary.kinds.transcode_media", {
+      defaultValue: "Prepare playable media",
+    }),
   };
 }
 
@@ -266,6 +176,7 @@ function buildDiagnosticText(queueName: string, sample: QueueErrorSampleDTO) {
 
 export function QueueSummaryList() {
   const { t, i18n } = useI18n();
+  const showMessage = useMessage();
   const [expandedQueues, setExpandedQueues] = useState<Set<string>>(new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -311,11 +222,16 @@ export function QueueSummaryList() {
 
   const copyDiagnostic = async (queueName: string, sample: QueueErrorSampleDTO) => {
     const key = `${queueName}:${sample.job_id}`;
-    await navigator.clipboard.writeText(buildDiagnosticText(queueName, sample));
-    setCopiedKey(key);
-    window.setTimeout(() => {
-      setCopiedKey((current) => (current === key ? null : current));
-    }, 1600);
+    try {
+      await copyText(buildDiagnosticText(queueName, sample));
+      setCopiedKey(key);
+      window.setTimeout(() => {
+        setCopiedKey((current) => (current === key ? null : current));
+      }, 1600);
+    } catch {
+      setCopiedKey(null);
+      showMessage("error", t("common.copyFailed", { defaultValue: "Copy failed." }));
+    }
   };
 
   if (summaryQuery.isLoading) {
@@ -373,7 +289,12 @@ export function QueueSummaryList() {
         {queues.map((queue) => {
           const queueName = queue.name ?? "";
           const copy = queueCopy[queueName];
-          const displayName = copy?.name ?? humanizeQueueName(queueName);
+          const displayName =
+            copy?.name ??
+            t("monitor.queueSummary.queues.unknown.name", {
+              defaultValue: "Other processing · {{name}}",
+              name: queueName || t("common.unknown", { defaultValue: "Unknown" }),
+            });
           const description =
             copy?.description ?? t("monitor.queueSummary.queues.default.description");
           const presentation = getPresentation(queueName);
@@ -502,7 +423,11 @@ export function QueueSummaryList() {
                             errorStateLabels[sample.state ?? ""] ??
                             t("monitor.queueSummary.errorStates.unknown");
                           const kindLabel =
-                            kindLabels[sample.kind ?? ""] ?? humanizeQueueName(sample.kind);
+                            kindLabels[sample.kind ?? ""] ??
+                            t("monitor.queueSummary.kinds.unknown", {
+                              defaultValue: "Other background task · {{name}}",
+                              name: sample.kind || t("common.unknown", { defaultValue: "Unknown" }),
+                            });
 
                           return (
                             <div

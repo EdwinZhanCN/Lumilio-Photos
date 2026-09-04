@@ -24,6 +24,32 @@ func TestNormalizeRequestedIndexingTasks_IgnoresBioCLIP(t *testing.T) {
 	}
 }
 
+func TestExpandSemanticResetTasks_RefillsPhotoAndVideoSearchIndex(t *testing.T) {
+	tasks := expandSemanticResetTasks([]AssetIndexingTask{
+		AssetIndexingTaskOCR,
+		AssetIndexingTaskSemanticImage,
+	})
+
+	if !containsIndexingTask(tasks, AssetIndexingTaskSemanticImage) {
+		t.Fatal("semantic reset lost the photo semantic lane")
+	}
+	if !containsIndexingTask(tasks, AssetIndexingTaskVideoSemantic) {
+		t.Fatal("semantic reset must refill video frame embeddings after the shared index is deleted")
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("semantic reset tasks = %#v, want semantic, video_semantic, and OCR", tasks)
+	}
+}
+
+func TestExpandSemanticResetTasks_LeavesNonSemanticRequestUnchanged(t *testing.T) {
+	tasks := []AssetIndexingTask{AssetIndexingTaskOCR}
+	got := expandSemanticResetTasks(tasks)
+
+	if len(got) != 1 || got[0] != AssetIndexingTaskOCR {
+		t.Fatalf("non-semantic reset tasks = %#v, want OCR only", got)
+	}
+}
+
 func TestNormalizeReindexAssetsInput_OffsetClampedToNonNegative(t *testing.T) {
 	cases := []struct {
 		name   string

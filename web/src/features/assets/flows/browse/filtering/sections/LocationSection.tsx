@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { MapComponent } from "../../../../map";
 import type { AssetLocationBBox } from "../../../../model/filter";
 import { centerToBBox, EMPTY_LOCATION_BBOX, isZeroBBox } from "../filterState";
+import { getCurrentLocationCapability } from "./locationCapability";
 import { SectionShell } from "./SectionShell";
 
 interface LocationSectionProps {
@@ -24,16 +25,56 @@ export const LocationSection = memo(function LocationSection({
   const [locationRadiusKm, setLocationRadiusKm] = useState(5);
   const [locationCenterLat, setLocationCenterLat] = useState(0);
   const [locationCenterLon, setLocationCenterLon] = useState(0);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const { t } = useI18n();
+  const currentLocationCapability = getCurrentLocationCapability();
+  const currentLocationUnavailableMessage =
+    currentLocationCapability === "secure-context-required"
+      ? t("assets.filterTool.locationSection.secure_context_required", {
+          defaultValue: "Current location requires HTTPS or localhost.",
+        })
+      : currentLocationCapability === "unsupported"
+        ? t("assets.filterTool.locationSection.current_location_unsupported", {
+            defaultValue: "Current location is not supported by this browser.",
+          })
+        : null;
 
   const setCurrentLocationAsCenter = useCallback(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((position) => {
-      const { latitude, longitude } = position.coords;
-      setLocationCenterLat(latitude);
-      setLocationCenterLon(longitude);
-    });
-  }, []);
+    const capability = getCurrentLocationCapability();
+    if (capability !== "available") {
+      setLocationError(
+        capability === "secure-context-required"
+          ? t("assets.filterTool.locationSection.secure_context_required", {
+              defaultValue: "Current location requires HTTPS or localhost.",
+            })
+          : t("assets.filterTool.locationSection.current_location_unsupported", {
+              defaultValue: "Current location is not supported by this browser.",
+            }),
+      );
+      return;
+    }
+
+    setLocating(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocationCenterLat(latitude);
+        setLocationCenterLon(longitude);
+        setLocating(false);
+      },
+      () => {
+        setLocating(false);
+        setLocationError(
+          t("assets.filterTool.locationSection.current_location_error", {
+            defaultValue: "Could not access your current location.",
+          }),
+        );
+      },
+      { enableHighAccuracy: false, maximumAge: 30_000, timeout: 10_000 },
+    );
+  }, [t]);
 
   const computeBBoxFromCenter = useCallback(() => {
     const newBBox = centerToBBox(locationCenterLat, locationCenterLon, locationRadiusKm);
@@ -111,12 +152,22 @@ export const LocationSection = memo(function LocationSection({
             <button
               type="button"
               className="btn btn-xs btn-ghost flex-1"
-              disabled={locked}
+              disabled={locked || locating || currentLocationCapability !== "available"}
+              title={currentLocationUnavailableMessage ?? undefined}
               onClick={setCurrentLocationAsCenter}
             >
-              {t("assets.filterTool.locationSection.use_current_location")}
+              {locating
+                ? t("assets.filterTool.locationSection.locating", {
+                    defaultValue: "Locating…",
+                  })
+                : t("assets.filterTool.locationSection.use_current_location")}
             </button>
           </div>
+          {(locationError || currentLocationUnavailableMessage) && (
+            <p className="text-xs text-warning" role="status">
+              {locationError ?? currentLocationUnavailableMessage}
+            </p>
+          )}
         </div>
       </SectionShell>
 
@@ -177,14 +228,25 @@ export const LocationSection = memo(function LocationSection({
                 <button
                   type="button"
                   className="btn btn-sm btn-outline flex-1"
+                  disabled={locating || currentLocationCapability !== "available"}
+                  title={currentLocationUnavailableMessage ?? undefined}
                   onClick={setCurrentLocationAsCenter}
                 >
-                  {t("assets.filterTool.locationSection.use_current_location")}
+                  {locating
+                    ? t("assets.filterTool.locationSection.locating", {
+                        defaultValue: "Locating…",
+                      })
+                    : t("assets.filterTool.locationSection.use_current_location")}
                 </button>
                 <button type="button" className="btn btn-sm flex-1" onClick={computeBBoxFromCenter}>
                   {t("assets.filterTool.locationSection.generate_bbox")}
                 </button>
               </div>
+              {(locationError || currentLocationUnavailableMessage) && (
+                <p className="mt-2 text-xs text-warning" role="status">
+                  {locationError ?? currentLocationUnavailableMessage}
+                </p>
+              )}
 
               <div className="mt-4">
                 <div className="text-sm opacity-70 mb-2">

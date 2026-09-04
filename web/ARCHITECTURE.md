@@ -132,14 +132,14 @@ cd web
 vp test run path/to/changed.test.ts
 vp node scripts/check-source-boundaries.ts
 cd ..
-make web-test
+task web:test
 ```
 
-If no direct test covers the change, run the nearest characterization tests plus typecheck, lint, and `vp node scripts/check-source-boundaries.ts`; add coverage when behavior is being changed or moved without it. The full gate remains required.
+If no direct test covers the change, run the nearest characterization tests plus typecheck, lint, and `vp node scripts/check-source-boundaries.ts`; add coverage when behavior is being changed or moved without it. The full gate remains required. Select broader evidence per [lumilio-select-checks](../.agents/skills/lumilio-select-checks/SKILL.md).
 
-`make web-test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `vp node scripts/check-source-boundaries.ts` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, non-standard feature roots, misplaced shared-state or persistence modules, reusable server queries under `hooks/`, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded from the runtime graph; `doc.ts` links are checked by the documentation lint rule instead.
+`task web:test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `vp node scripts/check-source-boundaries.ts` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, non-standard feature roots, misplaced shared-state or persistence modules, reusable server queries under `hooks/`, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded from the runtime graph; `doc.ts` links are checked by the documentation lint rule instead.
 
-Also run `make web-browser-test` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths. It builds the production app, enforces the bundle budget, and runs the browser smoke suite.
+Also run `vp run test:bundle` from `web/` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths: it builds the production app and enforces the bundle budget. Browser-capability tests (`*.browser.test.ts`) run in real Chromium as part of `task web:test`.
 
 ## Placement decision
 
@@ -163,5 +163,5 @@ Do not create a new feature for a single generic helper. Do create one when a ca
 - Remove the old path; do not leave compatibility re-export shims.
 - Check that lower layers do not import a feature and that no runtime or feature cycle was introduced.
 - Search for the old path and update real `doc.ts` references; never hand-edit generated `doc.md` files.
-- Run focused tests, the source-boundary checker, `make web-test`, and `make web-browser-test` when the browser-runtime criteria above apply.
+- Run focused tests, the source-boundary checker, `task web:test`, and `vp run test:bundle` when the browser-runtime criteria above apply.
 - Review the final diff for accidental behavior, DOM, styling, generated-file, or public-contract changes.

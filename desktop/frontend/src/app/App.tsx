@@ -2095,7 +2095,7 @@ function storageLocationDescription(
     details.push(t("storage.capacityUnknown", "Capacity unavailable"));
   }
   details.push(
-    t("storage.repositoryCount", "{{count}} repositories", { count: item.repositoryCount }),
+    t("storage.repositoryCount", "{{count}} Repositories", { count: item.repositoryCount }),
   );
   return details.join(" · ");
 }

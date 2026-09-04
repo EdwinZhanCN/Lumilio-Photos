@@ -6,7 +6,7 @@ import { useUploadConfig } from "../../api/useUploadQueries";
 import { validateFile, getValidationErrorMessage } from "../../model/validate-file.ts";
 import { getAcceptString } from "../../model/accept-file-extensions.ts";
 import { useMessage } from "@/features/notifications";
-import { Upload, Info, FolderPlus, FolderUp, X } from "lucide-react";
+import { Upload, Info, FolderPlus, FolderUp, TriangleAlert, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 import { useWorkingRepository } from "@/features/repositories";
 
@@ -34,10 +34,17 @@ function UnifiedUploadSection(): React.JSX.Element {
     getRepositoryLabel,
   } = useWorkingRepository();
   const primaryRepository = useMemo(
-    () => repositories.find((repository) => repository.isPrimary),
+    () => repositories.find((repository) => repository.role === "primary"),
     [repositories],
   );
   const uploadTargetRepository = selectedRepository ?? primaryRepository;
+  const uploadBlocked =
+    !uploadTargetRepository ||
+    uploadTargetRepository.reachability !== "active" ||
+    uploadTargetRepository.activity === "paused";
+  const lowSpaceBlocked =
+    uploadTargetRepository?.activity === "paused" &&
+    uploadTargetRepository.pauseReason === "low_space";
   const uploadTargetDescription = uploadTargetRepository?.path
     ? uploadTargetRepository.path
     : t("upload.UnifiedUploadSection.default_upload_target_hint");
@@ -87,6 +94,21 @@ function UnifiedUploadSection(): React.JSX.Element {
   const handleUpload = async () => {
     if (fileCount === 0) {
       showMessage("info", t("upload.UnifiedUploadSection.no_files_selected_for_upload"));
+      return;
+    }
+    if (uploadBlocked) {
+      showMessage(
+        "error",
+        lowSpaceBlocked
+          ? t(
+              "upload.UnifiedUploadSection.low_space_blocked",
+              "This Repository is paused because its Storage Location is low on writable space. Free space and wait for the capacity check before uploading.",
+            )
+          : t(
+              "upload.UnifiedUploadSection.repository_unavailable_for_upload",
+              "This Repository is not currently available for uploads.",
+            ),
+      );
       return;
     }
     await uploadFiles();
@@ -151,6 +173,33 @@ function UnifiedUploadSection(): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {uploadBlocked ? (
+        <div role="alert" className="alert alert-warning mt-3 items-start text-sm">
+          <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-medium">
+              {lowSpaceBlocked
+                ? t("upload.UnifiedUploadSection.low_space_title", "Upload paused: low space")
+                : t(
+                    "upload.UnifiedUploadSection.repository_unavailable_title",
+                    "Upload unavailable",
+                  )}
+            </p>
+            <p className="mt-1 text-base-content/70">
+              {lowSpaceBlocked
+                ? t(
+                    "upload.UnifiedUploadSection.low_space_blocked",
+                    "This Repository is paused because its Storage Location is low on writable space. Free space and wait for the capacity check before uploading.",
+                  )
+                : t(
+                    "upload.UnifiedUploadSection.repository_unavailable_for_upload",
+                    "This Repository is not currently available for uploads.",
+                  )}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-col gap-2 rounded-lg border border-base-300 bg-base-200/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
@@ -238,7 +287,7 @@ function UnifiedUploadSection(): React.JSX.Element {
           <button
             onClick={handleUpload}
             className="btn btn-primary btn-sm gap-2"
-            disabled={fileCount === 0 || isProcessing}
+            disabled={fileCount === 0 || isProcessing || uploadBlocked}
           >
             <Upload className="w-4 h-4" />
             {isProcessing

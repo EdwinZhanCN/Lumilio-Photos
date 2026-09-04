@@ -15,7 +15,9 @@ func TestRepositoryTerminologyTechnicalContextAllowlistIsNarrow(t *testing.T) {
 	for _, line := range []string{
 		"Open your Library",
 		"The storage root is offline",
+		"The Repository Root is offline",
 		"打开图库",
+		"资源库根不可用",
 	} {
 		if allowedRepositoryTermContext("site/docs/en/example.md", line) {
 			t.Fatalf("product synonym unexpectedly allowed: %q", line)
@@ -64,5 +66,43 @@ func TestMarkdownCapabilityLabelGateDistinguishesFeatureProse(t *testing.T) {
 		if retiredMarkdownCapabilityLabel("site/docs/en/example.md", line) {
 			t.Fatalf("canonical label or feature prose rejected: %q", line)
 		}
+	}
+}
+
+func TestExecutionCouplingArchitecturePredicates(t *testing.T) {
+	// 1. Resource literal scatter
+	if !isResourceLiteralScatter("server/app/pipeline_runtime.go", "err := engine.Run(ctx, execution.Resources{CPU: 1}, work)") {
+		t.Fatal("planted execution.Resources literal in pipeline_runtime was not detected")
+	}
+	if isResourceLiteralScatter("server/internal/execution/demand.go", "Resources{CPU: 1, DiskIO: 1}") {
+		t.Fatal("Resources literal in demand.go unexpectedly flagged")
+	}
+	if isResourceLiteralScatter("server/app/pipeline_runtime_test.go", "res := execution.Resources{CPU: 1}") {
+		t.Fatal("Resources literal in test file unexpectedly flagged")
+	}
+
+	// 2. Governor construction sites
+	if !isGovernorConstructionViolation("server/app/app.go", "gov, err := execution.NewGovernor(capacity, 256)") {
+		t.Fatal("planted execution.NewGovernor in app.go was not detected")
+	}
+	if isGovernorConstructionViolation("server/internal/execution/budget.go", "return execution.NewGovernor(capacity, maxWaiting)") {
+		t.Fatal("NewGovernor call in budget.go unexpectedly flagged")
+	}
+	if isGovernorConstructionViolation("server/app/app_test.go", "gov, _ := execution.NewGovernor(capacity, 16)") {
+		t.Fatal("NewGovernor call in test file unexpectedly flagged")
+	}
+
+	// 3. Processor naked flags
+	if !isProcessorNakedFFmpegFlagViolation("server/internal/processors/video_helpers.go", `"-threads", "0"`) {
+		t.Fatal("naked -threads flag in processors was not detected")
+	}
+	if !isProcessorNakedFFmpegFlagViolation("server/internal/processors/video_helpers.go", `"-preset", "medium"`) {
+		t.Fatal("naked -preset flag in processors was not detected")
+	}
+	if isProcessorNakedFFmpegFlagViolation("server/internal/processors/video_helpers_test.go", `"-threads", "0"`) {
+		t.Fatal("flag in processors test file unexpectedly flagged")
+	}
+	if isProcessorNakedFFmpegFlagViolation("server/internal/other/something.go", `"-threads", "0"`) {
+		t.Fatal("flag in non-processors file unexpectedly flagged")
 	}
 }

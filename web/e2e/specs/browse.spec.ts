@@ -1,8 +1,10 @@
 import { test } from "../fixtures/test";
 
 /**
- * Core browsing paths that ADR-006 assigns to E2E rather than the Vitest
- * integration project: they exercise the full AssetBrowser — the WASM justified
+ * Core browsing paths that the test-layer assignment decision
+ * (.agents/decisions/2026-08-14-frontend-test-layer-assignment.md) assigns to
+ * E2E rather than the Vitest integration project: they exercise the full
+ * AssetBrowser — the WASM justified
  * layout, viewport virtualization, URL/route state and real selection — which is
  * only honest against the real gallery and first-party API.
  *
@@ -18,14 +20,11 @@ import { test } from "../fixtures/test";
  *      features/assets/model/browseItems.test.ts)
  */
 
-test.fixme(
-  "removing selected assets from an album issues per-asset DELETEs and refreshes",
-  async () => {
-    // TODO: sign in, open an album with >=2 assets, enter selection mode, select
-    // two, run "Remove from this album", confirm, and assert both are gone and
-    // the originals remain in the library (album membership only).
-  },
-);
+test.fixme("removing selected assets from an album issues per-asset DELETEs and refreshes", async () => {
+  // TODO: sign in, open an album with >=2 assets, enter selection mode, select
+  // two, run "Remove from this album", confirm, and assert both are gone and
+  // the originals remain in the library (album membership only).
+});
 
 test.fixme("the photo picker returns the representative asset of a chosen stack", async () => {
   // TODO: open a picker (e.g. user avatar), the gallery is locked to PHOTO, pick

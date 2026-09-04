@@ -19,12 +19,11 @@ func testSearchAsset(t *testing.T, rawID string, filename string) repo.Asset {
 	assetID, err := uuid.Parse(rawID)
 	require.NoError(t, err)
 
-	path := "/tmp/" + filename
 	return repo.Asset{
 		AssetID:          assetID,
+		ContentID:        uuid.New(),
 		Type:             "PHOTO",
 		OriginalFilename: filename,
-		StoragePath:      &path,
 		MimeType:         "image/jpeg",
 		UploadTime:       dbtypes.NewTimestamp(time.Unix(1700000000, 0)),
 	}

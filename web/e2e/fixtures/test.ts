@@ -1,21 +1,32 @@
+import { createHash, randomUUID } from "node:crypto";
 import { test as base, expect } from "playwright/test";
 import { provisionWorkspace, type Workspace } from "../support/workspace";
 
+// Separate invocations against the same disposable stack must not reuse state.
+const invocationIdentity = randomUUID();
+
 /**
- * `workspace` is worker-scoped: each Playwright worker gets its own admin user
- * and repository, so parallel workers never scan or upload into shared state.
+ * Every attempt gets its own admin user and repository. Including the test,
+ * repeat and retry in the identity prevents a failed attempt from leaving
+ * mutable server state that changes the result of the next attempt.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- Playwright's
-// own signature for "no extra test-scoped fixtures".
-export const test = base.extend<{}, { workspace: Workspace }>({
+export const test = base.extend<{ workspace: Workspace }>({
   workspace: [
-    // Playwright parses this parameter to infer fixture dependencies and
-    // rejects a named one.
-    // eslint-disable-next-line no-empty-pattern
-    async ({}, use, workerInfo) => {
-      await use(await provisionWorkspace(workerInfo.parallelIndex));
+    async ({ browserName }, use, testInfo) => {
+      const identity = [
+        invocationIdentity,
+        browserName,
+        testInfo.testId,
+        testInfo.repeatEachIndex,
+        testInfo.retry,
+      ].join(":");
+      const attemptIndex = Number.parseInt(
+        createHash("sha256").update(identity).digest("hex").slice(0, 10),
+        16,
+      );
+      await use(await provisionWorkspace(attemptIndex));
     },
-    { scope: "worker" },
+    { timeout: 120_000 },
   ],
 });
 

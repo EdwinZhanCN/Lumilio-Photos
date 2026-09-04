@@ -1,62 +1,50 @@
 package handler
 
 import (
+	"database/sql"
+	"net/http/httptest"
 	"testing"
 
-	"github.com/riverqueue/river/rivertype"
-	"github.com/stretchr/testify/require"
-
-	"server/internal/api/dto"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestUploadJobStatusForCallerEnforcesOwnershipAndTerminalState(t *testing.T) {
-	row := &rivertype.JobRow{
-		ID:          42,
-		EncodedArgs: []byte(`{"userId":"7","fileName":"photo.jpg"}`),
-		State:       rivertype.JobStateDiscarded,
-		Errors:      []rivertype.AttemptError{{Error: "materialization failed"}},
+func TestLoadUploadOperationStatusesReadsOwnedIngestReceipt(t *testing.T) {
+	database, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	for _, statement := range []string{
+		`CREATE TABLE catalog_operation_receipts (receipt_id TEXT PRIMARY KEY, kind TEXT NOT NULL, subject_id TEXT NOT NULL, state TEXT NOT NULL, terminal_error TEXT)`,
+		`CREATE TABLE repository_staging_commits (commit_id TEXT PRIMARY KEY, original_filename TEXT NOT NULL, owner_id INTEGER NOT NULL)`,
+	} {
+		if _, err := database.Exec(statement); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commitID := uuid.New()
+	receiptID := uuid.New()
+	if _, err := database.Exec(`INSERT INTO repository_staging_commits(commit_id, original_filename, owner_id) VALUES (?, ?, ?)`, commitID.String(), "owned.jpg", 7); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(`INSERT INTO catalog_operation_receipts(receipt_id, kind, subject_id, state) VALUES (?, 'ingest', ?, 'completed')`, receiptID.String(), commitID.String()); err != nil {
+		t.Fatal(err)
 	}
 
-	_, ok := uploadJobStatusForCaller(row, "8")
-	require.False(t, ok)
-
-	status, ok := uploadJobStatusForCaller(row, "7")
-	require.True(t, ok)
-	require.Equal(t, int64(42), status.TaskID)
-	require.Equal(t, "photo.jpg", status.FileName)
-	require.True(t, status.Terminal)
-	require.False(t, status.Success)
-	require.NotNil(t, status.Error)
-	require.Equal(t, "materialization failed", *status.Error)
-}
-
-func TestUploadJobStatusForCallerReportsRunningAsNonTerminal(t *testing.T) {
-	status, ok := uploadJobStatusForCaller(&rivertype.JobRow{
-		ID:          43,
-		EncodedArgs: []byte(`{"userId":"anonymous","fileName":"photo.jpg"}`),
-		State:       rivertype.JobStateRunning,
-	}, "anonymous")
-
-	require.True(t, ok)
-	require.False(t, status.Terminal)
-	require.False(t, status.Success)
-}
-
-func TestAllRequestedUploadJobsTerminalRequiresFullCoverage(t *testing.T) {
-	requested := []int64{1, 2, 3}
-	partial := []dto.UploadJobStatusDTO{
-		{TaskID: 1, Terminal: true, Success: true},
-		{TaskID: 2, Terminal: true, Success: true},
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Set("user_id", int32(7))
+	statuses, err := (&AssetHandler{database: database}).loadUploadOperationStatuses(context, receiptID.String())
+	if err != nil {
+		t.Fatalf("load upload operation statuses: %v", err)
 	}
-	require.False(t, allRequestedUploadJobsTerminal(requested, partial))
-
-	complete := []dto.UploadJobStatusDTO{
-		{TaskID: 1, Terminal: true, Success: true},
-		{TaskID: 2, Terminal: true, Success: true},
-		{TaskID: 3, Terminal: false, Success: false},
+	if len(statuses) != 1 {
+		t.Fatalf("status count = %d, want 1", len(statuses))
 	}
-	require.False(t, allRequestedUploadJobsTerminal(requested, complete))
-
-	complete[2].Terminal = true
-	require.True(t, allRequestedUploadJobsTerminal(requested, complete))
+	status := statuses[0]
+	if status.ReceiptID != receiptID.String() || status.FileName != "owned.jpg" || status.Status != "completed" || !status.Terminal || !status.Success {
+		t.Fatalf("unexpected upload status: %+v", status)
+	}
 }

@@ -219,7 +219,14 @@ func (c *TransactionController) Apply(requestID string, expectedVersion uint64, 
 		if err := c.store.WriteJournal(journal); err != nil {
 			return c.fail(receipt, err)
 		}
-		if _, err := lifecycle.Start("config-start-"+receipt.OperationID, c.state.Get().Runtime.Version); err != nil {
+		startVersion := c.state.Get().Runtime.Version
+		if _, err := lifecycle.Start("config-start-"+receipt.OperationID, startVersion); err != nil {
+			return c.rollbackCandidate(receipt, journal, err)
+		}
+		ctx, cancel = context.WithTimeout(context.Background(), transactionBudget)
+		err = c.waitRunningFrom(ctx, startVersion)
+		cancel()
+		if err != nil {
 			return c.rollbackCandidate(receipt, journal, err)
 		}
 	} else {
@@ -233,16 +240,16 @@ func (c *TransactionController) Apply(requestID string, expectedVersion uint64, 
 		if err := c.store.WriteJournal(journal); err != nil {
 			return c.fail(receipt, err)
 		}
-		if _, err := c.lifecycle.Restart("config-restart-"+receipt.OperationID, c.state.Get().Runtime.Version); err != nil {
+		startVersion := c.state.Get().Runtime.Version
+		if _, err := c.lifecycle.Restart("config-restart-"+receipt.OperationID, startVersion); err != nil {
 			return c.rollbackCandidate(receipt, journal, err)
 		}
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), transactionBudget)
-	err = c.waitRunning(ctx)
-	cancel()
-	if err != nil {
-		return c.rollbackCandidate(receipt, journal, err)
+		ctx, cancel := context.WithTimeout(context.Background(), transactionBudget)
+		err = c.waitRunningFrom(ctx, startVersion)
+		cancel()
+		if err != nil {
+			return c.rollbackCandidate(receipt, journal, err)
+		}
 	}
 	journal.Phase = PhaseCommitting
 	if err := c.store.WriteJournal(journal); err != nil {
@@ -286,11 +293,12 @@ func (c *TransactionController) rollbackCandidate(receipt dto.OperationReceipt, 
 		return c.fail(receipt, err)
 	}
 	if lifecycle, ok := c.lifecycle.(stagedLifecycle); ok && journal.PreviousFingerprint != "" {
-		if _, err := lifecycle.Start("config-rollback-"+receipt.OperationID, c.state.Get().Runtime.Version); err != nil {
+		startVersion := c.state.Get().Runtime.Version
+		if _, err := lifecycle.Start("config-rollback-"+receipt.OperationID, startVersion); err != nil {
 			return c.fail(receipt, err)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), transactionBudget)
-		err := c.waitRunning(ctx)
+		err := c.waitRunningFrom(ctx, startVersion)
 		cancel()
 		if err != nil {
 			return c.fail(receipt, err)
@@ -411,7 +419,7 @@ func (c *TransactionController) rollback(receipt dto.OperationReceipt, previous 
 	return c.fail(receipt, cause)
 }
 
-func (c *TransactionController) waitRunning(ctx context.Context) error {
+func (c *TransactionController) waitRunningFrom(ctx context.Context, startVersion uint64) error {
 	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -419,7 +427,7 @@ func (c *TransactionController) waitRunning(ctx context.Context) error {
 		if snapshot.Phase == dto.RuntimeRunning && snapshot.Ownership == dto.OwnershipHeld {
 			return nil
 		}
-		if snapshot.Phase == dto.RuntimeFailed {
+		if snapshot.Version > startVersion && snapshot.Phase == dto.RuntimeFailed {
 			return operation.NewError(dto.ErrorRuntimeNotReady, "candidate runtime configuration failed to start")
 		}
 		select {

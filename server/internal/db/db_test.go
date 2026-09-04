@@ -6,23 +6,70 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"server/config"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	migrations "server/migrations"
 
 	"github.com/google/uuid"
+	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
 var insertColumnsPattern = regexp.MustCompile(`(?is)INSERT(?:\s+OR\s+\w+)?\s+INTO\s+([a-z_][a-z0-9_]*)\s*\(([^)]*)\)`)
+
+func TestTelemetryReconcilesStatementAdmissionWithDBStats(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	database, err := Open(ctx, config.DatabaseConfig{Path: filepath.Join(secureTempDir(t), "telemetry.sqlite3")})
+	if err != nil {
+		t.Fatalf("open catalog: %v", err)
+	}
+	defer database.Close(context.Background())
+
+	held, err := database.SQL.Conn(ctx)
+	if err != nil {
+		t.Fatalf("hold writer: %v", err)
+	}
+	before := database.TelemetrySnapshot()
+	admissionCtx, admissionCancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer admissionCancel()
+	_, err = database.Writer.ExecContext(
+		admissionCtx,
+		catalogtx.OperationCatalogGeneratedWriterExec,
+		`CREATE TABLE never_admitted(value TEXT)`,
+	)
+	_ = held.Close()
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("writer statement = %v, want deadline exceeded", err)
+	}
+	after := database.TelemetrySnapshot()
+	if after.Writer.WaitCount < before.Writer.WaitCount+1 {
+		t.Fatalf("writer WaitCount = %d, want at least %d", after.Writer.WaitCount, before.Writer.WaitCount+1)
+	}
+	if after.Writer.WaitDuration <= before.Writer.WaitDuration {
+		t.Fatalf("writer WaitDuration did not increase: before=%s after=%s", before.Writer.WaitDuration, after.Writer.WaitDuration)
+	}
+	report, ok := after.Catalog.Statement(catalogtx.OperationCatalogGeneratedWriterExec)
+	if !ok {
+		t.Fatal("statement admission histogram omitted generated writer operation")
+	}
+	if report.Admission.Count != 1 || report.Cancellations.DeadlineExceeded != 1 || report.Outcomes.Failed != 1 {
+		t.Fatalf("statement report = %+v, want one admission deadline", report)
+	}
+}
 
 func TestOpenMigrateAndReopenSQLiteCatalog(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -85,7 +132,7 @@ func TestOpenMigrateAndReopenSQLiteCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inspect reopened catalog: %v", err)
 	}
-	if info.ApplicationMigration != 6 || info.RiverMigration == 0 || info.LibraryID == "" {
+	if info.ApplicationMigration != currentApplicationMigration || info.RiverMigration == 0 || info.LibraryID == "" {
 		t.Fatalf("unexpected catalog identity: %+v", info)
 	}
 }
@@ -140,7 +187,7 @@ func TestConnectionPolicySurvivesPhysicalConnectionReplacement(t *testing.T) {
 		{name: "foreign_keys", want: 1},
 		{name: "busy_timeout", want: 5000},
 		{name: "temp_store", want: 2},
-		{name: "wal_autocheckpoint", want: 1000},
+		{name: "wal_autocheckpoint", want: 0},
 	}
 	for _, check := range checks {
 		var got int
@@ -150,6 +197,307 @@ func TestConnectionPolicySurvivesPhysicalConnectionReplacement(t *testing.T) {
 		if got != check.want {
 			t.Fatalf("replacement PRAGMA %s = %d, want %d", check.name, got, check.want)
 		}
+	}
+}
+
+func TestQueryOnlyReaderPoolStaysAvailableDuringWriterTransaction(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "reader-pool.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if database.ReaderSQL == nil || database.ReaderQueries == nil {
+		t.Fatal("query-only reader surface was not initialized")
+	}
+	if got := database.ReaderSQL.Stats().MaxOpenConnections; got != 4 {
+		t.Fatalf("reader max open connections = %d, want 4", got)
+	}
+
+	if _, err := database.SQL.ExecContext(ctx, `CREATE TABLE reader_pool_probe (id INTEGER PRIMARY KEY)`); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := database.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `INSERT INTO reader_pool_probe (id) VALUES (1)`); err != nil {
+		t.Fatal(err)
+	}
+
+	readCtx, readCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer readCancel()
+	var count int
+	if err := database.ReaderSQL.QueryRowContext(readCtx, `SELECT count(*) FROM reader_pool_probe`).Scan(&count); err != nil {
+		t.Fatalf("reader was blocked by active writer transaction: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("reader observed uncommitted writer row: count=%d", count)
+	}
+
+	_, err = database.ReaderQueries.CreateUser(ctx, repo.CreateUserParams{
+		Username:           "reader-write",
+		Password:           "not-used",
+		DisplayName:        "Reader Write",
+		Role:               "admin",
+		WebauthnUserHandle: []byte("reader-write-handle"),
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "readonly") {
+		t.Fatalf("generated write through reader error = %v, want readonly failure", err)
+	}
+}
+
+func TestPassiveCheckpointIsExplicitWriterMaintenance(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "explicit-checkpoint.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	for index := 0; index < 32; index++ {
+		if _, err := database.SQL.ExecContext(ctx, `
+			UPDATE system_state
+			SET updated_at = updated_at + 1
+			WHERE id = 1
+		`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	walBytes, err := database.WALSize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if walBytes == 0 {
+		t.Fatal("WAL remained empty before explicit checkpoint")
+	}
+	result, err := database.PassiveCheckpoint(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.LogPages == 0 || result.Checkpointed == 0 {
+		t.Fatalf("checkpoint result = %+v, want copied WAL pages", result)
+	}
+}
+
+func TestDefaultQueriesRouteReadsAwayFromWriterTransaction(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "default-query-routing.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err := database.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE system_state SET updated_at = updated_at WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+
+	readCtx, readCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer readCancel()
+	count, err := database.Queries.CountUsers(readCtx)
+	if err != nil {
+		t.Fatalf("default generated read waited for the writer connection: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("CountUsers() = %d, want 0", count)
+	}
+}
+
+func TestForegroundReadStaysAvailableWithQueuedWriter(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "queued-writer-routing.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	holder, err := database.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := holder.ExecContext(ctx, `UPDATE system_state SET updated_at = updated_at WHERE id = 1`); err != nil {
+		_ = holder.Rollback()
+		t.Fatal(err)
+	}
+
+	baselineWaits := database.SQL.Stats().WaitCount
+	writeResult := make(chan error, 1)
+	go func() {
+		_, writeErr := database.Queries.SetBootstrapPhase(ctx, "ready")
+		writeResult <- writeErr
+	}()
+
+	waitDeadline := time.Now().Add(time.Second)
+	for database.SQL.Stats().WaitCount == baselineWaits && time.Now().Before(waitDeadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if database.SQL.Stats().WaitCount == baselineWaits {
+		_ = holder.Rollback()
+		t.Fatal("second writer did not enter the single-writer connection queue")
+	}
+
+	readCtx, readCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer readCancel()
+	if _, err := database.Queries.CountUsers(readCtx); err != nil {
+		_ = holder.Rollback()
+		t.Fatalf("foreground read waited behind queued writers: %v", err)
+	}
+
+	if err := holder.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-writeResult; err != nil {
+		t.Fatalf("queued writer did not complete after the holder released: %v", err)
+	}
+}
+
+func TestSQLiteStatementReadOnlyClassification(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		readOnly bool
+	}{
+		{name: "sqlc select", query: "-- name: CountUsers :one\nSELECT count(*) FROM users", readOnly: true},
+		{name: "read cte", query: "WITH selected AS (SELECT id FROM assets) SELECT count(*) FROM selected", readOnly: true},
+		{name: "recursive read cte", query: "WITH RECURSIVE tree(id) AS (SELECT 1 UNION ALL SELECT id + 1 FROM tree WHERE id < 3) SELECT id FROM tree", readOnly: true},
+		{name: "cte update returning", query: "WITH selected AS (SELECT id FROM assets) UPDATE assets SET rating = 1 WHERE asset_id IN (SELECT id FROM selected) RETURNING asset_id", readOnly: false},
+		{name: "insert returning", query: "INSERT INTO users(username) VALUES (?) RETURNING user_id", readOnly: false},
+		{name: "read pragma fails closed", query: "PRAGMA table_info(users)", readOnly: false},
+		{name: "mutating pragma fails closed", query: "PRAGMA user_version = 7", readOnly: false},
+		{name: "leading comments", query: " /* catalog read */ -- next\n SELECT 1", readOnly: true},
+		{name: "unknown fails to writer", query: "BROKEN WHATEVER", readOnly: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := sqliteStatementReadOnly(test.query); got != test.readOnly {
+				t.Fatalf("sqliteStatementReadOnly() = %t, want %t (verb=%q)", got, test.readOnly, sqliteStatementKeyword(test.query))
+			}
+		})
+	}
+}
+
+func TestQueryRouterMatchesSQLiteForEveryGeneratedStatement(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	database, err := Open(ctx, config.DatabaseConfig{
+		Path: filepath.Join(secureTempDir(t), "query-router-corpus.sqlite3"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close(context.Background())
+	if err := database.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	type statement struct {
+		name, query string
+	}
+	var statements []statement
+	files, err := filepath.Glob(filepath.Join("repo", "*.sql.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse generated SQL %s: %v", file, err)
+		}
+		ast.Inspect(parsed, func(node ast.Node) bool {
+			declaration, ok := node.(*ast.ValueSpec)
+			if !ok || len(declaration.Names) != 1 || len(declaration.Values) != 1 {
+				return true
+			}
+			literal, ok := declaration.Values[0].(*ast.BasicLit)
+			if !ok || literal.Kind != token.STRING {
+				return true
+			}
+			query, unquoteErr := strconv.Unquote(literal.Value)
+			if unquoteErr != nil || !strings.Contains(query, "-- name:") {
+				return true
+			}
+			statements = append(statements, statement{name: declaration.Names[0].Name, query: query})
+			return true
+		})
+	}
+	if len(statements) < 100 {
+		t.Fatalf("generated SQL corpus contains only %d statements", len(statements))
+	}
+
+	connection, err := database.SQL.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	err = connection.Raw(func(driverConnection any) error {
+		sqliteConnection, ok := SQLiteDriverConnection(driverConnection)
+		if !ok {
+			return fmt.Errorf("SQLite driver connection is %T", driverConnection)
+		}
+		for _, candidate := range statements {
+			prepared, prepareErr := sqliteConnection.Prepare(candidate.query)
+			if prepareErr != nil {
+				t.Errorf("prepare generated statement %s: %v", candidate.name, prepareErr)
+				continue
+			}
+			sqliteStatement, ok := prepared.(*sqlite3.SQLiteStmt)
+			if !ok {
+				_ = prepared.Close()
+				t.Errorf("generated statement %s prepared as %T", candidate.name, prepared)
+				continue
+			}
+			wantReadOnly := sqliteStatement.Readonly()
+			gotReadOnly := sqliteStatementReadOnly(candidate.query)
+			if closeErr := prepared.Close(); closeErr != nil {
+				t.Errorf("close generated statement %s: %v", candidate.name, closeErr)
+			}
+			if gotReadOnly != wantReadOnly {
+				t.Errorf(
+					"query router classified %s read_only=%t, SQLite says %t",
+					candidate.name,
+					gotReadOnly,
+					wantReadOnly,
+				)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -168,7 +516,7 @@ func TestMigrationLedgerRejectsHistoricalChecksumChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
-		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 3
+		UPDATE lumilio_schema_migrations SET checksum = ? WHERE version = 9
 	`, strings.Repeat("0", 64)); err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +585,7 @@ func TestOpenRejectsOldGenerationBeforeDerivedModuleChecks(t *testing.T) {
 }
 
 func TestBioAlbumSchemaAndQueryLiteralsShareDomainValue(t *testing.T) {
-	baseline, err := migrations.FS.ReadFile("000003_vec1_baseline.up.sql")
+	baseline, err := migrations.FS.ReadFile("000009_auth_security_baseline.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,8 +698,13 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 
 	repositoryID := uuid.New()
 	rootID := uuid.New()
+	repositoryRootNodeID := uuid.New()
+	fileNodeID := uuid.New()
+	contentID := uuid.New()
 	assetID := uuid.New()
+	locationID := uuid.New()
 	mediaItemID := uuid.New()
+	fullHash := strings.Repeat("a", 64)
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO repository_roots (root_id, name, path, kind, created_at, updated_at)
 		VALUES (?, 'Test root', '/', 'external', 1, 1)
@@ -366,16 +719,36 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		t.Fatalf("insert repository: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
+		INSERT INTO repository_nodes (
+			node_id, repository_id, parent_node_id, name, name_key, kind,
+			observation_revision, created_at, updated_at
+		) VALUES
+			(?, ?, NULL, '', '', 'directory', 1, 1, 1),
+			(?, ?, ?, 'IMG_0001.jpg', 'IMG_0001.jpg', 'file', 1, 1, 1)
+	`, repositoryRootNodeID, repositoryID, fileNodeID, repositoryID, repositoryRootNodeID); err != nil {
+		t.Fatalf("insert repository nodes: %v", err)
+	}
+	if _, err := database.SQL.ExecContext(ctx, `
+		INSERT INTO content_objects (content_id, hash_algorithm, full_hash, file_size, created_at)
+		VALUES (?, 'blake3-v1', ?, 1, 1)
+	`, contentID, fullHash); err != nil {
+		t.Fatalf("insert content object: %v", err)
+	}
+	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO assets (
-			asset_id, owner_id, type, original_filename, mime_type, file_size,
-			content_hash, upload_time, repository_id, updated_at,
-			gps_latitude, gps_longitude, gps_geohash_7
-		) VALUES (
-			?, ?, 'PHOTO', 'IMG_0001.jpg', 'image/jpeg', 1, 'hash', 1, ?, 1,
-			40.7128, -74.0060, 'dr5regw'
-		)
-	`, assetID, user.UserID, repositoryID); err != nil {
+			asset_id, owner_id, content_id, type, original_filename, mime_type,
+			upload_time, updated_at, gps_latitude, gps_longitude, gps_geohash_7
+		) VALUES (?, ?, ?, 'PHOTO', 'IMG_0001.jpg', 'image/jpeg', 1, 1,
+			40.7128, -74.0060, 'dr5regw')
+	`, assetID, user.UserID, contentID); err != nil {
 		t.Fatalf("insert asset: %v", err)
+	}
+	if _, err := database.SQL.ExecContext(ctx, `
+		INSERT INTO asset_locations (
+			location_id, node_id, asset_id, bound_observation_revision, created_at, updated_at
+		) VALUES (?, ?, ?, 1, 1, 1)
+	`, locationID, fileNodeID, assetID); err != nil {
+		t.Fatalf("insert asset location: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO media_items (
@@ -418,7 +791,7 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 
 	candidates, err := database.Queries.FindCandidatesForStackingByName(
 		ctx,
-		uuid.NullUUID{UUID: repositoryID, Valid: true},
+		repositoryID,
 	)
 	if err != nil {
 		t.Fatalf("find stacking candidates: %v", err)
@@ -427,15 +800,21 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		t.Fatalf("stacking candidates = %+v, want one non-RAW candidate", candidates)
 	}
 
+	jsonString := func(value *string) string {
+		if value == nil {
+			return "[]"
+		}
+		return *value
+	}
 	for name, hashes := range map[string][]string{
 		"empty": nil,
-		"many":  {"hash", "missing"},
+		"many":  {fullHash, strings.Repeat("b", 64)},
 	} {
-		rows, err := database.Queries.GetAssetsByContentHashesAndRepository(
+		rows, err := database.Queries.ListAssetFullHashPrecheckMatches(
 			ctx,
-			repo.GetAssetsByContentHashesAndRepositoryParams{
-				ContentHashes: dbtypes.StringsJSONParam(hashes),
-				RepositoryID:  uuid.NullUUID{UUID: repositoryID, Valid: true},
+			repo.ListAssetFullHashPrecheckMatchesParams{
+				FullHashes:   jsonString(dbtypes.StringsJSONParam(hashes)),
+				RepositoryID: repositoryID,
 			},
 		)
 		if err != nil {
@@ -449,11 +828,11 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 			t.Fatalf("assets for %s content hash list = %d, want %d", name, len(rows), want)
 		}
 	}
-	if rows, err := database.Queries.GetAssetsByQuickFingerprintsAndRepository(
+	if rows, err := database.Queries.ListAssetQuickFingerprintPrecheckMatches(
 		ctx,
-		repo.GetAssetsByQuickFingerprintsAndRepositoryParams{
-			QuickFingerprints: dbtypes.StringsJSONParam(nil),
-			RepositoryID:      uuid.NullUUID{UUID: repositoryID, Valid: true},
+		repo.ListAssetQuickFingerprintPrecheckMatchesParams{
+			QuickFingerprints: jsonString(dbtypes.StringsJSONParam(nil)),
+			RepositoryID:      repositoryID,
 		},
 	); err != nil || len(rows) != 0 {
 		t.Fatalf("assets for empty quick fingerprint list = %d, %v; want 0, nil", len(rows), err)
@@ -493,31 +872,32 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("query asset facet with JSON IDs and fixed limit: %v", err)
 	}
-	locationCandidates, err := database.Queries.ListLocationClusterCandidatesForScope(
+	locationMembers, err := database.Queries.ListDesiredLocationClusterMembersForScope(
 		ctx,
-		repo.ListLocationClusterCandidatesForScopeParams{
-			RepositoryID: uuid.NullUUID{UUID: repositoryID, Valid: true},
+		repo.ListDesiredLocationClusterMembersForScopeParams{
+			RepositoryID: repositoryID,
 			OwnerID:      &user.UserID,
 		},
 	)
 	if err != nil {
-		t.Fatalf("list location cluster candidates: %v", err)
+		t.Fatalf("list desired location cluster members: %v", err)
 	}
-	if len(locationCandidates) != 1 || !locationCandidates[0].RepositoryID.Valid ||
-		locationCandidates[0].Geohash == nil || locationCandidates[0].CentroidLatitude == nil ||
-		locationCandidates[0].CentroidLongitude == nil {
-		t.Fatalf("location cluster candidates = %+v, want one complete aggregate", locationCandidates)
+	if len(locationMembers) != 1 || locationMembers[0].AssetID != assetID ||
+		locationMembers[0].Geohash == nil || locationMembers[0].Latitude == nil ||
+		locationMembers[0].Longitude == nil {
+		t.Fatalf("desired location cluster members = %+v, want one complete member", locationMembers)
 	}
 	clusterID := uuid.New()
 	cluster, err := database.Queries.CreateLocationCluster(ctx, repo.CreateLocationClusterParams{
 		ClusterID:         clusterID,
-		OwnerID:           locationCandidates[0].OwnerID,
-		RepositoryID:      locationCandidates[0].RepositoryID.UUID,
-		Geohash:           *locationCandidates[0].Geohash,
+		OwnerID:           &user.UserID,
+		RepositoryID:      repositoryID,
+		Geohash:           *locationMembers[0].Geohash,
 		Precision:         7,
-		CentroidLatitude:  *locationCandidates[0].CentroidLatitude,
-		CentroidLongitude: *locationCandidates[0].CentroidLongitude,
-		PhotoCount:        locationCandidates[0].PhotoCount,
+		CentroidLatitude:  *locationMembers[0].Latitude,
+		CentroidLongitude: *locationMembers[0].Longitude,
+		PhotoCount:        1,
+		GeocodeStatus:     "disabled",
 		CreatedAt:         dbtypes.NewTimestamp(time.Now().UTC()),
 		UpdatedAt:         dbtypes.NewTimestamp(time.Now().UTC()),
 	})
@@ -527,14 +907,12 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 	if cluster.ClusterID != clusterID || cluster.RepositoryID != repositoryID || cluster.PhotoCount != 1 {
 		t.Fatalf("location cluster = %+v, want populated Go UUID cluster", cluster)
 	}
-	if err := database.Queries.InsertLocationClusterAssetsForScope(
-		ctx,
-		repo.InsertLocationClusterAssetsForScopeParams{
-			RepositoryID: uuid.NullUUID{UUID: repositoryID, Valid: true},
-			OwnerID:      &user.UserID,
-		},
-	); err != nil {
-		t.Fatalf("insert location cluster memberships: %v", err)
+	if _, err := database.Queries.InsertLocationClusterAsset(ctx, repo.InsertLocationClusterAssetParams{
+		ClusterID: clusterID,
+		AssetID:   locationMembers[0].AssetID,
+		CreatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+	}); err != nil {
+		t.Fatalf("insert one location cluster membership: %v", err)
 	}
 	var locationMemberships int
 	if err := database.SQL.QueryRowContext(

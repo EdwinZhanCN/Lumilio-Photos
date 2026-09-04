@@ -19,7 +19,7 @@ import (
 
 type TagAssetsInput struct {
 	RefID string   `json:"ref_id" jsonschema:"description=Ref of the asset set to tag/untag,required"`
-	Tags  []string `json:"tags" jsonschema:"description=Tag names to add or remove,minItems=1"`
+	Tags  []string `json:"tags" jsonschema:"description=Tag names to add or remove,minItems=1,maxItems=32"`
 	Mode  string   `json:"mode" jsonschema:"enum=add,enum=remove,default=add"`
 }
 
@@ -106,6 +106,11 @@ func RegisterTagAssets() {
 			tagNames := normalizeTagNames(input.Tags)
 			if len(tagNames) == 0 {
 				refErr := ref.InvalidArgument("tags must contain at least one non-empty name")
+				sendError(deps, info.Name, execID, start, refErr)
+				return &TagAssetsOutput{Error: refErr}, nil
+			}
+			if len(tagNames) > core.MaxTagsPerEffect {
+				refErr := ref.LimitExceeded(len(tagNames), core.MaxTagsPerEffect)
 				sendError(deps, info.Name, execID, start, refErr)
 				return &TagAssetsOutput{Error: refErr}, nil
 			}

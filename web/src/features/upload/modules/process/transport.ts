@@ -1,16 +1,13 @@
-import type {
-  BatchUploadResponse,
-  BatchUploadResult,
-  UploadPrecheckResult,
-} from "@/lib/upload/types";
+import type { BatchUploadResponse, UploadPrecheckResult } from "@/lib/upload/types";
 import { clearResumableSessionId, precheckUploads } from "@/lib/upload/uploadTransport";
-import { waitForUploadJobs } from "@/lib/upload/uploadLifecycle";
+import { waitForUploadOperations } from "@/lib/upload/uploadLifecycle";
 import type { BatchUploadVariables, ChunkedUploadVariables } from "../../api/useUploadMutations.ts";
 import { QUICK_FINGERPRINT_VERSION, QUICK_HASH_THRESHOLD } from "./config.ts";
 import { createSemaphore } from "./concurrency.ts";
 import { DUPLICATE_STATUS, isDuplicateResult, resolveResultStatus } from "./results.ts";
 import type {
   FileUploadSession,
+  UploadProcessResult,
   UploadProcessMessages,
   UploadProgressCallbacks,
   UploadRunResult,
@@ -21,6 +18,7 @@ export interface UploadTransportDependencies extends UploadProgressCallbacks {
   repositoryId?: string;
   config: UploadTransportConfig;
   messages: Pick<UploadProcessMessages, "noResult" | "processFailed" | "uploadFailed">;
+  localizeProblem: (problem: unknown, fallback: string) => string;
   batchUpload: (variables: BatchUploadVariables) => Promise<BatchUploadResponse>;
   chunkedUpload: (variables: ChunkedUploadVariables) => Promise<BatchUploadResponse>;
 }
@@ -32,15 +30,12 @@ export interface UploadTransport {
   getResult: () => UploadRunResult;
 }
 
-const getErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof Error ? error.message : fallback;
-
 const transportSessionId = (session: FileUploadSession): string =>
   session.uploadSessionId ?? session.sessionId;
 
 /** Prefer server session_id; fall back to file_name for older responses. */
 export const matchBatchUploadResult = (
-  result: BatchUploadResult,
+  result: UploadProcessResult,
   sessionsByUploadId: Map<string, FileUploadSession>,
   sessionsByFileName: Map<string, FileUploadSession[]>,
 ): FileUploadSession | undefined => {
@@ -65,20 +60,28 @@ export const createUploadTransport = (
   dependencies: UploadTransportDependencies,
 ): UploadTransport => {
   const semaphore = createSemaphore(dependencies.config.maxConcurrentUploads);
-  const results: BatchUploadResult[] = [];
-  const resultSessions = new Map<BatchUploadResult, FileUploadSession>();
-  const materializationSessions = new Map<number, FileUploadSession>();
-  const materializationResults = new Map<number, BatchUploadResult>();
+  const results: UploadProcessResult[] = [];
+  const resultSessions = new Map<UploadProcessResult, FileUploadSession>();
+  const materializationSessions = new Map<string, FileUploadSession>();
+  const materializationResults = new Map<string, UploadProcessResult>();
 
-  const recordResult = (result: BatchUploadResult, session: FileUploadSession): void => {
+  const recordResult = (result: UploadProcessResult, session: FileUploadSession): void => {
     const normalizedResult =
-      result.success && !isDuplicateResult(result) && !result.task_id
+      result.success && !isDuplicateResult(result) && !result.receipt_id
         ? {
             ...result,
             success: false,
-            error: dependencies.messages.noResult,
+            localError: dependencies.messages.noResult,
           }
-        : result;
+        : !result.success
+          ? {
+              ...result,
+              localError: dependencies.localizeProblem(
+                result.problem,
+                result.message || result.localError || dependencies.messages.uploadFailed,
+              ),
+            }
+          : result;
 
     results.push(normalizedResult);
     resultSessions.set(normalizedResult, session);
@@ -87,28 +90,28 @@ export const createUploadTransport = (
       progress: normalizedResult.success ? 100 : 0,
       error: normalizedResult.success
         ? undefined
-        : normalizedResult.message || normalizedResult.error || dependencies.messages.uploadFailed,
+        : normalizedResult.localError || dependencies.messages.uploadFailed,
     });
 
     if (
       normalizedResult.success &&
-      (isDuplicateResult(normalizedResult) || Boolean(normalizedResult.task_id))
+      (isDuplicateResult(normalizedResult) || Boolean(normalizedResult.receipt_id))
     ) {
       if (session.shouldUseChunks) {
         clearResumableSessionId(session.file, dependencies.repositoryId, session.hash);
       }
-      if (normalizedResult.task_id) {
-        materializationSessions.set(normalizedResult.task_id, session);
-        materializationResults.set(normalizedResult.task_id, normalizedResult);
+      if (normalizedResult.receipt_id) {
+        materializationSessions.set(normalizedResult.receipt_id, session);
+        materializationResults.set(normalizedResult.receipt_id, normalizedResult);
       }
     }
   };
 
   const recordFailure = (session: FileUploadSession, error: string): void => {
-    const result: BatchUploadResult = {
+    const result: UploadProcessResult = {
       success: false,
       file_name: session.file.name,
-      error,
+      localError: error,
     };
     results.push(result);
     resultSessions.set(result, session);
@@ -207,7 +210,7 @@ export const createUploadTransport = (
         recordFailure(session, dependencies.messages.noResult);
       });
     } catch (error) {
-      const message = getErrorMessage(error, dependencies.messages.uploadFailed);
+      const message = dependencies.localizeProblem(error, dependencies.messages.uploadFailed);
       sessions.forEach((session) => recordFailure(session, message));
     } finally {
       semaphore.release();
@@ -239,28 +242,31 @@ export const createUploadTransport = (
       const result = response.results?.[0] ?? {
         success: false,
         file_name: session.file.name,
-        error: dependencies.messages.noResult,
+        localError: dependencies.messages.noResult,
       };
       recordResult(result, session);
     } catch (error) {
-      recordFailure(candidate, getErrorMessage(error, dependencies.messages.uploadFailed));
+      recordFailure(
+        candidate,
+        dependencies.localizeProblem(error, dependencies.messages.uploadFailed),
+      );
     } finally {
       semaphore.release();
     }
   };
 
   const waitForMaterialization = async (): Promise<void> => {
-    const taskIds = Array.from(materializationSessions.keys());
-    if (taskIds.length === 0) return;
+    const receiptIds = Array.from(materializationSessions.keys());
+    if (receiptIds.length === 0) return;
 
-    const settledTerminal = new Set<number>();
+    const settledTerminal = new Set<string>();
     try {
-      await waitForUploadJobs(taskIds, {
-        onUpdate: (job) => {
-          if (!job.task_id) return;
-          const session = materializationSessions.get(job.task_id);
+      await waitForUploadOperations(receiptIds, {
+        onUpdate: (operation) => {
+          if (!operation.receipt_id) return;
+          const session = materializationSessions.get(operation.receipt_id);
           if (!session) return;
-          if (!job.terminal) {
+          if (!operation.terminal) {
             dependencies.updateFileProgress(session.sessionId, {
               status: "processing",
               progress: 100,
@@ -268,28 +274,36 @@ export const createUploadTransport = (
             return;
           }
 
-          settledTerminal.add(job.task_id);
-          const result = materializationResults.get(job.task_id);
-          if (!job.success && result) {
+          settledTerminal.add(operation.receipt_id);
+          const result = materializationResults.get(operation.receipt_id);
+          if (!operation.success && result) {
             result.success = false;
-            result.error = job.error || dependencies.messages.processFailed;
+            result.localError = dependencies.localizeProblem(
+              operation.problem,
+              dependencies.messages.processFailed,
+            );
           }
           dependencies.updateFileProgress(session.sessionId, {
-            status: job.success ? "completed" : "failed",
-            progress: job.success ? 100 : 0,
-            error: job.success ? undefined : job.error || dependencies.messages.processFailed,
+            status: operation.success ? "completed" : "failed",
+            progress: operation.success ? 100 : 0,
+            error: operation.success
+              ? undefined
+              : dependencies.localizeProblem(
+                  operation.problem,
+                  dependencies.messages.processFailed,
+                ),
           });
         },
       });
     } catch (error) {
-      const message = getErrorMessage(error, dependencies.messages.processFailed);
-      taskIds.forEach((taskId) => {
-        if (settledTerminal.has(taskId)) return;
-        const session = materializationSessions.get(taskId);
-        const result = materializationResults.get(taskId);
+      const message = dependencies.localizeProblem(error, dependencies.messages.processFailed);
+      receiptIds.forEach((receiptId) => {
+        if (settledTerminal.has(receiptId)) return;
+        const session = materializationSessions.get(receiptId);
+        const result = materializationResults.get(receiptId);
         if (result) {
           result.success = false;
-          result.error = message;
+          result.localError = message;
         }
         if (session) {
           dependencies.updateFileProgress(session.sessionId, {

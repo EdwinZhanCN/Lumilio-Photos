@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import MediaThumbnail from "../media/MediaThumbnail";
 import StackedThumbnail from "../media/StackedThumbnail";
 import { useSelectionKeyboard } from "../../selection/useSelectionKeyboard";
@@ -143,28 +143,38 @@ function VirtualSquareGrid({
   const cellSize =
     containerWidth > 0
       ? Math.max(1, (containerWidth - GRID_GAP_PX * (columnCount - 1)) / columnCount)
-      : 200;
+      : 0;
   const rowCount = Math.ceil(items.length / columnCount);
-  const contentHeight = Math.max(0, rowCount * cellSize + Math.max(0, rowCount - 1) * GRID_GAP_PX);
+  const contentHeight =
+    cellSize > 0 ? Math.max(0, rowCount * cellSize + Math.max(0, rowCount - 1) * GRID_GAP_PX) : 0;
   const viewportWindow = useGalleryViewportWindow(gridRef, contentHeight);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = gridRef.current;
     if (!element) return;
     const media = window.matchMedia("(min-width: 768px)");
-    const update = () => {
-      setContainerWidth(element.getBoundingClientRect().width || element.clientWidth);
+    const update = (measuredWidth = element.clientWidth) => {
+      const nextWidth = Math.max(0, measuredWidth);
+      setContainerWidth((currentWidth) =>
+        Math.abs(currentWidth - nextWidth) < 0.5 ? currentWidth : nextWidth,
+      );
       setIsDesktop(media.matches);
     };
     update();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver((entries) => {
+            update(entries[0]?.contentRect.width ?? element.clientWidth);
+          });
     observer?.observe(element);
-    media.addEventListener("change", update);
-    window.addEventListener("resize", update, { passive: true });
+    const measureLayoutWidth = () => update(element.clientWidth);
+    media.addEventListener("change", measureLayoutWidth);
+    window.addEventListener("resize", measureLayoutWidth, { passive: true });
     return () => {
       observer?.disconnect();
-      media.removeEventListener("change", update);
-      window.removeEventListener("resize", update);
+      media.removeEventListener("change", measureLayoutWidth);
+      window.removeEventListener("resize", measureLayoutWidth);
     };
   }, []);
 
@@ -176,39 +186,40 @@ function VirtualSquareGrid({
       style={{ height: contentHeight }}
       data-gallery-total={items.length}
     >
-      {items.map((item, index) => {
-        const row = Math.floor(index / columnCount);
-        const column = index % columnCount;
-        const top = row * (cellSize + GRID_GAP_PX);
-        if (!intersectsGalleryWindow(top, cellSize, viewportWindow)) return null;
-        const asset = getBrowseItemAsset(item);
-        const assetId = asset.asset_id;
-        const thumbnailUrl = assetId ? assetUrls.getThumbnailUrl(assetId, "medium") : undefined;
+      {cellSize > 0 &&
+        items.map((item, index) => {
+          const row = Math.floor(index / columnCount);
+          const column = index % columnCount;
+          const top = row * (cellSize + GRID_GAP_PX);
+          if (!intersectsGalleryWindow(top, cellSize, viewportWindow)) return null;
+          const asset = getBrowseItemAsset(item);
+          const assetId = asset.asset_id;
+          const thumbnailUrl = assetId ? assetUrls.getThumbnailUrl(assetId, "medium") : undefined;
 
-        return (
-          <div
-            key={`${groupKey}-${item.id}`}
-            className="absolute"
-            style={{
-              top,
-              left: column * (cellSize + GRID_GAP_PX),
-              width: cellSize,
-              height: cellSize,
-            }}
-          >
-            <SquareGalleryItem
-              item={item}
-              asset={asset}
-              thumbnailUrl={thumbnailUrl}
-              render3DCard={render3DCard}
-              caption={renderTileCaption?.(asset, index, groupKey)}
-              isSelected={selection.isSelected(item.id)}
-              isSelectionMode={selection.enabled}
-              onItemClick={onItemClick}
-            />
-          </div>
-        );
-      })}
+          return (
+            <div
+              key={`${groupKey}-${item.id}`}
+              className="absolute"
+              style={{
+                top,
+                left: column * (cellSize + GRID_GAP_PX),
+                width: cellSize,
+                height: cellSize,
+              }}
+            >
+              <SquareGalleryItem
+                item={item}
+                asset={asset}
+                thumbnailUrl={thumbnailUrl}
+                render3DCard={render3DCard}
+                caption={renderTileCaption?.(asset, index, groupKey)}
+                isSelected={selection.isSelected(item.id)}
+                isSelectionMode={selection.enabled}
+                onItemClick={onItemClick}
+              />
+            </div>
+          );
+        })}
     </div>
   );
 }

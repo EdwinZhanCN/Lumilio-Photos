@@ -16,8 +16,16 @@
  * Rich server-backed editors use {@link useDraftSettings}: a local draft,
  * dirty/reset/save state, and explicit commit through
  * {@link SettingsSaveBar}. {@link useAISettingsDraft} adapts LLM credentials
- * and semantic, video-semantic, BioCLIP, OCR, and face switches. Server facts
- * remain Query data and are not copied into the preferences store.
+ * and semantic, video-semantic, BioCLIP, OCR, and face switches. Its provider
+ * dropdown and required-field checks consume the Server-advertised descriptor
+ * contract through {@link normalizeProviderDescriptors}; the Web keeps only
+ * the exhaustive localized label boundary for known product IDs. Optional
+ * endpoints remain empty so the pinned provider adapter applies its
+ * deterministic default; the Web does not duplicate provider endpoint
+ * defaults. Server facts remain Query data and are not copied into the
+ * preferences store.
+ * {@link useGeocodingSettingsDraft} gives the Server tab an explicit local
+ * draft for the provider, endpoint, language, and User-Agent aggregate.
  *
  * The active settings tab is the `tab` URL parameter. Repository browse and
  * upload preferences are owned by Repositories; authentication reset clears
@@ -48,6 +56,9 @@
  * create, download, restore, and delete interaction. A successful restore
  * reloads the application because the entire catalog and every cached server
  * fact have changed.
+ * {@link GeocodingSection} owns the manual-save reverse-geocoding editor. It
+ * keeps privacy-sensitive endpoint and User-Agent edits local until the admin
+ * explicitly saves them.
  *
  * ## Data
  *
@@ -58,7 +69,9 @@
  * configuration and is display-only.
  *
  * {@link useBackups} owns the backup list and temporary post-create polling;
- * {@link useRestoreBackup} performs catalog replacement. Cloud tabs consume
+ * {@link useRestoreBackup} performs catalog replacement. Restore polling keeps
+ * the durable Problem Reference and {@link BackupSection} localizes it only at
+ * presentation, allowing a language change during recovery. Cloud tabs consume
  * the Cloud public entry, and user/account tabs consume Users/Auth public
  * entries. The Settings root `index.ts` exposes only preference effects and
  * the narrow preference hook required by application composition.
@@ -77,9 +90,12 @@ import type { SettingsPage } from "./components/SettingsPage.tsx";
 import type { SettingsSaveBar } from "./components/SettingsSaveBar.tsx";
 import type { useAISettingsDraft } from "./flows/ai/useAISettingsDraft.ts";
 import type BackupSection from "./flows/server/BackupSection.tsx";
+import type GeocodingSection from "./flows/server/GeocodingSection.tsx";
+import type { useGeocodingSettingsDraft } from "./flows/server/useGeocodingSettingsDraft.ts";
 import type Settings from "./flows/shell/SettingsPageFlow.tsx";
 import type SettingsShell from "./flows/shell/SettingsShell.tsx";
 import type { useDraftSettings } from "./hooks/useDraftSettings.ts";
+import type { normalizeProviderDescriptors } from "./model/llmProviders.ts";
 import type { PREFERENCES_STORAGE_KEY } from "./state/registry.ts";
 import type {
   useDebouncedPreference,

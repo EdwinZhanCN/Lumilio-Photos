@@ -41,6 +41,8 @@ export function useAssetBrowser(options: AssetBrowserOptions = {}): AssetBrowser
     constraint,
     userFilter = {},
     searchQuery = "",
+    similarAssetId = "",
+    fileQuery = null,
     viewKey,
     ...viewOptions
   } = options;
@@ -57,18 +59,37 @@ export function useAssetBrowser(options: AssetBrowserOptions = {}): AssetBrowser
     [scopedConstraint, userFilter],
   );
   const normalizedQuery = searchQuery.trim();
+  const normalizedSimilar = similarAssetId.trim();
+  const fileIdentity = fileQuery
+    ? `${fileQuery.name}:${fileQuery.size}:${fileQuery.lastModified}`
+    : "";
+  const searchActive =
+    normalizedQuery.length > 0 || normalizedSimilar.length > 0 || Boolean(fileQuery);
   const definition = useMemo<AssetViewDefinition>(
     () => ({
       types: DEFAULT_ASSET_TYPES,
       filter: effectiveFilter,
       sortBy,
       pageSize,
-      key: viewKey,
-      search: normalizedQuery ? { query: normalizedQuery } : undefined,
+      key: fileIdentity ? `${viewKey ?? ""}:file:${fileIdentity}` : viewKey,
+      search: searchActive
+        ? {
+            query: normalizedQuery || undefined,
+            similarAssetId: normalizedSimilar || undefined,
+          }
+        : undefined,
     }),
-    [effectiveFilter, normalizedQuery, pageSize, sortBy, viewKey],
+    [
+      effectiveFilter,
+      fileIdentity,
+      normalizedQuery,
+      normalizedSimilar,
+      pageSize,
+      searchActive,
+      sortBy,
+      viewKey,
+    ],
   );
-  const searchActive = normalizedQuery.length > 0;
 
   const listView = useAssetsList(definition, {
     ...viewOptions,
@@ -77,6 +98,7 @@ export function useAssetBrowser(options: AssetBrowserOptions = {}): AssetBrowser
   });
   const searchView = useAssetsSearch(definition, {
     ...viewOptions,
+    fileQuery,
     withGroups: viewOptions.withGroups ?? true,
     disabled: viewOptions.disabled || !searchActive,
   });

@@ -377,75 +377,10 @@ func (q *Queries) GetDuplicateSummary(ctx context.Context, arg GetDuplicateSumma
 	return i, err
 }
 
-const getExactDuplicateCandidates = `-- name: GetExactDuplicateCandidates :many
-SELECT a.asset_id, a.owner_id, a.content_hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
-FROM assets a
-WHERE a.is_deleted = false
-  AND a.type = 'PHOTO'
-  AND a.repository_id = ?1
-  AND EXISTS (
-    SELECT 1 FROM assets b
-    WHERE b.is_deleted = false
-      AND b.type = 'PHOTO'
-      AND b.repository_id = a.repository_id
-      AND b.owner_id IS a.owner_id
-      AND b.content_hash = a.content_hash
-      AND b.file_size = a.file_size
-      AND b.asset_id <> a.asset_id
-  )
-ORDER BY a.owner_id, a.content_hash, a.file_size, a.asset_id
-`
-
-type GetExactDuplicateCandidatesRow struct {
-	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32            `db:"owner_id" json:"owner_id"`
-	ContentHash      string            `db:"content_hash" json:"content_hash"`
-	FileSize         int64             `db:"file_size" json:"file_size"`
-	OriginalFilename string            `db:"original_filename" json:"original_filename"`
-	TakenTime        dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
-	UploadTime       dbtypes.Timestamp `db:"upload_time" json:"upload_time"`
-	Rating           *int64            `db:"rating" json:"rating"`
-}
-
-// Returns assets in a repository that share the exact same (content_hash, file_size)
-// with at least one other asset of the same owner. Only photos are considered,
-// and only non-deleted assets. Results are ordered so members of the same
-// duplicate set (owner included in the grouping key) are adjacent.
-func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID uuid.NullUUID) ([]GetExactDuplicateCandidatesRow, error) {
-	rows, err := q.db.QueryContext(ctx, getExactDuplicateCandidates, repositoryID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetExactDuplicateCandidatesRow
-	for rows.Next() {
-		var i GetExactDuplicateCandidatesRow
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.ContentHash,
-			&i.FileSize,
-			&i.OriginalFilename,
-			&i.TakenTime,
-			&i.UploadTime,
-			&i.Rating,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getPHashEmbeddingsByAssetIDs = `-- name: GetPHashEmbeddingsByAssetIDs :many
-SELECT a.asset_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+SELECT a.asset_id, content.file_size, a.taken_time, a.upload_time, a.rating, e.vector
 FROM assets a
+JOIN content_objects content ON content.content_id = a.content_id
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
@@ -511,8 +446,12 @@ SELECT mia.asset_id, COALESCE(asm.stack_id, mia.media_item_id) AS stack_id
 FROM media_item_assets mia
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mia.media_item_id
 INNER JOIN assets a ON a.asset_id = mia.asset_id
-WHERE a.repository_id = ?1
-  AND a.is_deleted = false
+WHERE a.is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  )
 `
 
 type GetStackMembershipForRepositoryRow struct {
@@ -526,7 +465,7 @@ type GetStackMembershipForRepositoryRow struct {
 // Each asset is mapped to its presentation stack when present, otherwise to
 // its logical media item. This skips duplicate edges both within RAW/JPEG or
 // Live Photo components and within intentional burst/manual stacks.
-func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositoryID uuid.NullUUID) ([]GetStackMembershipForRepositoryRow, error) {
+func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositoryID uuid.UUID) ([]GetStackMembershipForRepositoryRow, error) {
 	rows, err := q.db.QueryContext(ctx, getStackMembershipForRepository, repositoryID)
 	if err != nil {
 		return nil, err
@@ -687,12 +626,19 @@ func (q *Queries) ListDuplicateGroups(ctx context.Context, arg ListDuplicateGrou
 }
 
 const listPHashEmbeddingsForRepository = `-- name: ListPHashEmbeddingsForRepository :many
-SELECT a.asset_id, a.owner_id, a.file_size, a.taken_time, a.upload_time, a.rating, e.vector
+;
+
+SELECT a.asset_id, a.owner_id, content.file_size, a.taken_time, a.upload_time, a.rating, e.vector
 FROM assets a
+JOIN content_objects content ON content.content_id = a.content_id
 JOIN embeddings e ON e.asset_id = a.asset_id
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
-  AND a.repository_id = ?1
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = a.asset_id
+      AND occurrence.repository_id = ?1
+  )
   AND e.embedding_type = 'phash'
   AND e.is_primary = true
 `
@@ -710,7 +656,7 @@ type ListPHashEmbeddingsForRepositoryRow struct {
 // Loads pHash embeddings for every non-deleted photo in a repository so the
 // service layer can build a similarity graph in-memory. owner_id is included
 // because duplicate edges never cross owners.
-func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID uuid.NullUUID) ([]ListPHashEmbeddingsForRepositoryRow, error) {
+func (q *Queries) ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID uuid.UUID) ([]ListPHashEmbeddingsForRepositoryRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPHashEmbeddingsForRepository, repositoryID)
 	if err != nil {
 		return nil, err

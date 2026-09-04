@@ -1,4 +1,47 @@
 export interface paths {
+    "/api/v1/admin/lumen/runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lumen runtime diagnostics
+         * @description Return bounded per-backend and per-node Lumen runtime diagnostics for administrators.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Lumen runtime diagnostics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.LumenRuntimeDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/river/queue-summary": {
         parameters: {
             query?: never;
@@ -130,7 +173,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -139,7 +182,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -148,7 +191,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -198,7 +241,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -207,7 +250,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -216,7 +259,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -269,7 +312,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -278,7 +321,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Missing or stale confirmation */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -287,7 +339,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/event-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -336,7 +388,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -345,7 +397,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -354,7 +406,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -402,7 +454,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -441,7 +493,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -450,7 +502,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Ref not found */
@@ -459,7 +511,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -508,7 +560,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -517,7 +569,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -555,7 +607,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -564,7 +616,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -607,7 +659,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -616,7 +668,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -625,7 +677,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -675,7 +727,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -684,7 +736,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -742,7 +794,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -751,7 +803,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -760,7 +812,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -769,7 +821,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Image Semantic Analysis unavailable */
@@ -778,7 +830,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -834,7 +886,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -843,7 +895,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Pin not found */
@@ -852,7 +904,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -861,7 +913,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -918,7 +970,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -927,7 +979,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -975,7 +1027,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Ref not found */
@@ -984,7 +1036,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1042,7 +1094,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Ref not found */
@@ -1051,7 +1103,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1152,7 +1204,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1161,7 +1213,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to retrieve albums */
@@ -1170,7 +1222,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1209,7 +1261,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1218,7 +1270,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to create album */
@@ -1227,7 +1279,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1283,7 +1335,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1292,7 +1344,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1333,7 +1385,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1342,7 +1394,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -1351,7 +1403,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1360,7 +1412,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to update album */
@@ -1369,7 +1421,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1410,7 +1462,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1419,7 +1471,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -1428,7 +1480,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1437,7 +1489,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to delete album */
@@ -1446,7 +1498,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1501,7 +1553,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1510,7 +1562,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to retrieve album assets */
@@ -1519,7 +1571,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1579,7 +1631,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1588,7 +1640,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to add asset to album */
@@ -1597,7 +1649,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1639,7 +1691,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to remove asset from album */
@@ -1648,7 +1700,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1704,7 +1756,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to update asset position */
@@ -1713,7 +1765,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1769,7 +1821,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -1778,7 +1830,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -1787,7 +1839,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Album not found */
@@ -1796,7 +1848,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description BioCLIP unavailable */
@@ -1805,7 +1857,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1859,7 +1911,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -1868,7 +1920,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1937,7 +1989,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -1946,7 +1998,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -1990,7 +2042,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -1999,7 +2051,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2043,7 +2095,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2052,7 +2104,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2104,7 +2156,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to retrieve asset albums */
@@ -2113,7 +2165,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2178,7 +2230,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2187,7 +2239,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2239,7 +2291,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found or not audio */
@@ -2248,7 +2300,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2257,7 +2309,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2314,7 +2366,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2323,7 +2375,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2332,7 +2384,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2389,7 +2441,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset or EXIF not found */
@@ -2398,7 +2450,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2463,10 +2515,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.ErrorResponse"];
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
-                        "image/png": components["schemas"]["api.ErrorResponse"];
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Authentication required */
@@ -2475,10 +2524,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.ErrorResponse"];
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
-                        "image/png": components["schemas"]["api.ErrorResponse"];
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -2487,10 +2533,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.ErrorResponse"];
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
-                        "image/png": components["schemas"]["api.ErrorResponse"];
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset or original file not found */
@@ -2499,10 +2542,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.ErrorResponse"];
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
-                        "image/png": components["schemas"]["api.ErrorResponse"];
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Source image could not be encoded */
@@ -2511,10 +2551,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.ErrorResponse"];
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
-                        "image/png": components["schemas"]["api.ErrorResponse"];
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2523,10 +2560,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/avif": components["schemas"]["api.ErrorResponse"];
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
-                        "image/png": components["schemas"]["api.ErrorResponse"];
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2583,7 +2617,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2592,7 +2626,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2601,7 +2635,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2651,7 +2685,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2705,7 +2739,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2714,7 +2748,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2723,7 +2757,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2780,7 +2814,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2789,7 +2823,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2798,7 +2832,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2854,7 +2888,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -2863,7 +2897,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -2872,7 +2906,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -2895,7 +2929,7 @@ export interface paths {
         put?: never;
         /**
          * Reprocess asset
-         * @description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
+         * @description Request catalog-owned analysis, derivative, transcode, and enrichment stages for an asset. Progress is reported from the receipt and desired/applied catalog state.
          */
         post: {
             parameters: {
@@ -2929,7 +2963,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -2938,7 +2972,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -2947,7 +2981,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3005,7 +3039,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3014,7 +3048,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3070,7 +3104,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -3079,7 +3113,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3088,7 +3122,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3132,7 +3166,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found */
@@ -3141,7 +3175,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3150,7 +3184,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3200,7 +3234,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3277,7 +3311,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3286,7 +3320,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3328,7 +3362,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3337,7 +3371,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3391,7 +3425,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3400,7 +3434,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3454,7 +3488,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset or thumbnail not found */
@@ -3463,7 +3497,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3472,7 +3506,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3526,7 +3560,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "video/mp4": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset not found or not a video */
@@ -3535,7 +3569,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "video/mp4": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3544,7 +3578,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "video/mp4": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3600,7 +3634,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3609,7 +3643,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3663,7 +3697,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/assets/batch/jobs": {
+    "/api/v1/assets/batch/operations": {
         parameters: {
             query?: never;
             header?: never;
@@ -3672,13 +3706,13 @@ export interface paths {
         };
         /**
          * Get upload materialization status
-         * @description Get backend ingest lifecycle state for upload task IDs owned by the current caller
+         * @description Get ingest receipt state owned by the current caller
          */
         get: {
             parameters: {
                 query: {
-                    /** @description Comma-separated upload task IDs */
-                    task_ids: string;
+                    /** @description Comma-separated catalog receipt IDs */
+                    receipt_ids: string;
                 };
                 header?: never;
                 path?: never;
@@ -3692,16 +3726,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.UploadJobStatusResponseDTO"];
+                        "application/json": components["schemas"]["dto.UploadOperationStatusResponseDTO"];
                     };
                 };
-                /** @description Invalid task IDs */
+                /** @description Invalid receipt IDs */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3714,7 +3748,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/assets/batch/jobs/stream": {
+    "/api/v1/assets/batch/operations/stream": {
         parameters: {
             query?: never;
             header?: never;
@@ -3725,8 +3759,8 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    /** @description Comma-separated upload task IDs */
-                    task_ids: string;
+                    /** @description Comma-separated catalog receipt IDs */
+                    receipt_ids: string;
                 };
                 header?: never;
                 path?: never;
@@ -3882,7 +3916,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Authentication required */
@@ -3891,7 +3925,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -3900,7 +3934,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Asset or original file not found */
@@ -3909,7 +3943,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3918,7 +3952,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -3979,7 +4013,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -3988,7 +4022,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4040,7 +4074,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4093,7 +4127,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4102,7 +4136,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4155,7 +4189,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4164,7 +4198,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4219,7 +4253,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4228,7 +4262,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4278,7 +4312,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4333,7 +4367,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4342,7 +4376,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4399,7 +4433,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4454,7 +4488,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4463,7 +4497,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Image Semantic Analysis unavailable */
@@ -4472,7 +4506,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4537,7 +4571,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4546,7 +4580,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4601,7 +4635,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -4610,7 +4644,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -4619,7 +4653,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4677,7 +4711,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4686,7 +4720,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4710,7 +4744,7 @@ export interface paths {
         put?: never;
         /**
          * Search assets
-         * @description Search assets with optional top results enhancement and filename fallback.
+         * @description Search assets with optional top results enhancement, filename fallback, or visual similarity to a catalog asset.
          */
         post: {
             parameters: {
@@ -4741,7 +4775,25 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Query asset not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Query asset has no Image Semantic Analysis embedding */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4750,7 +4802,88 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Image Semantic Analysis unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/search/by-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search assets by image
+         * @description Embed an uploaded image with Image Semantic Analysis and return visually similar catalog media. The original is reduced to an in-memory medium thumbnail, then discarded; it is not stored. RAW uses the same OpenPhoto path as ingest. Maximum upload size is 256 MiB.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Query image | JSON AssetFilterDTO | Page size | Page offset | KNN cap, maximum 200 | Viewer timezone */
+            requestBody?: {
+                content: {
+                    "application/x-www-form-urlencoded": Record<string, never> | string | number;
+                    "multipart/form-data": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Assets searched successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.SearchAssetsResponseDTO"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Image Semantic Analysis unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4803,7 +4936,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -4812,7 +4945,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4869,7 +5002,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -4878,7 +5011,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -4931,7 +5064,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5061,7 +5194,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5116,7 +5249,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Invalid credentials */
@@ -5125,7 +5258,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Too many authentication attempts */
@@ -5134,7 +5267,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.RateLimitedProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5143,7 +5276,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5196,7 +5329,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Too many authentication attempts */
@@ -5205,7 +5338,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.RateLimitedProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5214,7 +5347,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5262,7 +5395,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5271,7 +5404,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5321,7 +5454,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5330,7 +5463,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5382,7 +5515,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5391,7 +5524,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5443,7 +5576,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5452,7 +5585,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5504,7 +5637,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5513,7 +5646,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5550,9 +5683,10 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: {
+            /** @description Recent security verification token */
+            requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["dto.PasskeyDeleteRequestDTO"];
                 };
             };
             responses: {
@@ -5562,7 +5696,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
+                        "application/json": components["schemas"]["dto.PasskeyMutationResponseDTO"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5571,7 +5705,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Passkey not found */
@@ -5580,7 +5714,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5589,7 +5723,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5640,7 +5774,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5649,7 +5783,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5683,7 +5817,7 @@ export interface paths {
             /** @description Passkey enrollment verification payload */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["dto.PasskeyVerifyRequestDTO"];
+                    "application/json": components["schemas"]["dto.PasskeyEnrollmentVerifyRequestDTO"];
                 };
             };
             responses: {
@@ -5693,7 +5827,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.PasskeyCredentialSummaryDTO"];
+                        "application/json": components["schemas"]["dto.PasskeyEnrollmentResponseDTO"];
                     };
                 };
                 /** @description Invalid or expired challenge */
@@ -5702,7 +5836,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5711,7 +5845,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5720,7 +5854,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5773,7 +5907,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized or incorrect password */
@@ -5782,7 +5916,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5791,7 +5925,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5844,7 +5978,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized or incorrect password */
@@ -5853,7 +5987,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5862,7 +5996,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5915,7 +6049,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5924,7 +6058,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5933,7 +6067,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -5964,9 +6098,10 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
+            /** @description Security verification payload */
+            requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["dto.TOTPSetupRequestDTO"];
                 };
             };
             responses: {
@@ -5985,7 +6120,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -5994,7 +6129,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6047,7 +6182,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Invalid or expired MFA challenge */
@@ -6056,7 +6191,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Too many authentication attempts */
@@ -6065,7 +6200,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.RateLimitedProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6074,7 +6209,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6127,7 +6262,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Invalid credentials */
@@ -6136,7 +6271,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Too many authentication attempts */
@@ -6145,7 +6280,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.RateLimitedProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6154,7 +6289,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6207,7 +6342,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Invalid credentials */
@@ -6216,7 +6351,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Too many authentication attempts */
@@ -6225,7 +6360,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.RateLimitedProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6234,7 +6369,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6287,7 +6422,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Invalid or expired password change token */
@@ -6296,7 +6431,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6305,7 +6440,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6353,7 +6488,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Invalid CSRF token */
@@ -6362,7 +6497,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Too many authentication attempts */
@@ -6371,7 +6506,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.RateLimitedProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6380,7 +6515,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6433,7 +6568,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description User already exists */
@@ -6442,7 +6577,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6451,7 +6586,69 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/security/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify recent account security
+         * @description Create a one-time security proof for a TOTP, recovery-code, or passkey mutation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Security verification payload */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.SecurityVerificationRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Security proof created */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.SecurityVerificationResponseDTO"];
+                    };
+                };
+                /** @description Invalid request data */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Invalid security verification */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6547,7 +6744,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6556,7 +6753,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6565,7 +6762,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Classification unavailable */
@@ -6574,7 +6771,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6620,7 +6817,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6629,7 +6826,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6668,7 +6865,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6677,7 +6874,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Credential belongs to another user */
@@ -6686,7 +6883,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6695,7 +6892,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6747,7 +6944,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6756,7 +6953,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Credential belongs to another user */
@@ -6765,7 +6962,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6774,7 +6971,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6829,7 +7026,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6838,7 +7035,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Credential belongs to another user */
@@ -6847,7 +7044,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6856,7 +7053,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6907,7 +7104,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6916,7 +7113,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Credential belongs to another user */
@@ -6925,7 +7122,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -6934,7 +7131,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -6990,7 +7187,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6999,7 +7196,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Credential belongs to another user */
@@ -7008,7 +7205,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7017,7 +7214,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7066,7 +7263,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -7075,7 +7272,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Import run belongs to another user */
@@ -7084,7 +7281,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7093,7 +7290,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7219,7 +7416,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -7228,7 +7425,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7269,7 +7466,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7322,7 +7519,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -7331,7 +7528,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7390,7 +7587,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -7399,7 +7596,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7454,7 +7651,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7511,7 +7708,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -7520,7 +7717,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7576,7 +7773,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -7585,7 +7782,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -7594,7 +7791,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -7603,7 +7800,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -7656,7 +7853,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -7665,7 +7862,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8319,7 +8516,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -8328,7 +8525,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8374,7 +8571,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8409,7 +8606,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8461,7 +8658,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -8470,7 +8667,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8565,7 +8762,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8574,7 +8771,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8629,7 +8826,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8638,7 +8835,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8693,7 +8890,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8702,7 +8899,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8756,7 +8953,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -8765,7 +8962,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8774,7 +8971,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8820,7 +9017,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -8829,7 +9026,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8838,7 +9035,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8890,7 +9087,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -8899,7 +9096,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8908,7 +9105,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Image Semantic Analysis unavailable */
@@ -8917,7 +9114,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -8969,7 +9166,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8978,7 +9175,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person cover not found */
@@ -8987,7 +9184,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8996,7 +9193,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9037,7 +9234,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person or face not found */
@@ -9046,7 +9243,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9055,7 +9252,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9151,7 +9348,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -9160,7 +9357,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9169,7 +9366,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9225,7 +9422,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9234,7 +9431,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Face crop not found */
@@ -9243,7 +9440,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9252,7 +9449,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/webp": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9312,7 +9509,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person or face not found */
@@ -9321,7 +9518,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9330,7 +9527,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9383,7 +9580,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person or face not found */
@@ -9392,7 +9589,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9401,7 +9598,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9456,7 +9653,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -9465,7 +9662,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9474,7 +9671,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9531,7 +9728,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Person not found */
@@ -9540,7 +9737,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9549,7 +9746,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9642,7 +9839,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9651,7 +9848,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -9660,7 +9857,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9709,7 +9906,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9762,7 +9959,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not found */
@@ -9771,7 +9968,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9827,7 +10024,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9880,7 +10077,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "audio/mpeg": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9933,7 +10130,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "video/mp4": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -9991,7 +10188,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -10000,7 +10197,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10056,7 +10253,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not found */
@@ -10065,7 +10262,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/zip": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10141,7 +10338,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -10150,7 +10347,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -10159,7 +10356,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Repository identity conflict */
@@ -10168,7 +10365,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.RepositoryConflictDTO"];
+                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -10177,7 +10374,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10226,7 +10423,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10269,7 +10466,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Repository not found */
@@ -10278,7 +10475,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Primary or busy repository */
@@ -10287,7 +10484,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10335,7 +10532,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -10344,7 +10541,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -10353,7 +10550,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10411,7 +10608,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -10420,7 +10617,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -10429,7 +10626,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10525,7 +10722,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10583,7 +10780,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -10592,7 +10789,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10648,7 +10845,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -10657,7 +10854,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -10666,7 +10863,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -10724,6 +10921,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories/{id}/scans/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get repository scan operation
+         * @description Return one durable Repository scan operation by immutable operation ID.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan operation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/scans/{operation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel repository scan operation
+         * @description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan cancellation requested */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories/{id}/scans/latest": {
         parameters: {
             query?: never;
@@ -10762,7 +11065,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11014,7 +11317,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -11023,7 +11326,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.RepositoryConflictDTO"];
+                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
                     };
                 };
             };
@@ -11079,7 +11382,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -11088,7 +11391,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11179,7 +11482,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Default, non-empty, or busy Storage Location */
@@ -11188,7 +11491,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11236,7 +11539,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Restore operation not found */
@@ -11245,7 +11548,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Restore operation could not be read */
@@ -11254,7 +11557,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11302,7 +11605,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description No restore operation exists */
@@ -11311,7 +11614,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Restore operation could not be read */
@@ -11320,7 +11623,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11368,7 +11671,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -11377,7 +11680,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11411,7 +11714,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -11420,7 +11723,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11472,7 +11775,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -11481,7 +11784,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -11490,7 +11793,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11538,7 +11841,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -11547,7 +11850,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Backup not found */
@@ -11556,7 +11859,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/octet-stream": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11609,7 +11912,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -11618,7 +11921,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Another restore is already in progress */
@@ -11627,7 +11930,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Restore could not be staged */
@@ -11636,7 +11939,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11682,7 +11985,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11734,7 +12037,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -11743,7 +12046,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11786,7 +12089,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -11795,7 +12098,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -11804,7 +12107,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11853,7 +12156,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -11862,7 +12165,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11908,7 +12211,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11956,7 +12259,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -11995,7 +12298,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -12004,7 +12307,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Failed to create share link */
@@ -12013,7 +12316,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12062,7 +12365,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Share link not found */
@@ -12071,7 +12374,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12109,7 +12412,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -12118,7 +12421,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Share link not found */
@@ -12127,7 +12430,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12170,7 +12473,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -12179,7 +12482,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Share link not found */
@@ -12188,7 +12491,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12235,7 +12538,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Share link not found */
@@ -12244,7 +12547,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12310,7 +12613,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Species reference not found */
@@ -12319,7 +12622,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -12328,7 +12631,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12379,7 +12682,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -12388,7 +12691,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12441,7 +12744,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -12450,7 +12753,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12509,7 +12812,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -12518,7 +12821,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12569,7 +12872,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -12578,7 +12881,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12631,7 +12934,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -12640,7 +12943,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12697,7 +13000,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -12706,7 +13009,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -12715,7 +13018,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12777,7 +13080,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -12786,7 +13089,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -12795,7 +13098,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description User not found */
@@ -12804,7 +13107,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description User already exists */
@@ -12813,7 +13116,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -12822,7 +13125,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12873,7 +13176,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -12882,7 +13185,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Forbidden */
@@ -12891,7 +13194,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description User not found */
@@ -12900,7 +13203,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -12909,7 +13212,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -12966,7 +13269,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Current password is incorrect */
@@ -12975,7 +13278,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -12984,7 +13287,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -13037,7 +13340,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -13046,7 +13349,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -13055,7 +13358,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.ErrorResponse"];
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
             };
@@ -13066,13 +13369,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        "api.ErrorResponse": {
-            /** @example 400 */
-            code?: number;
-            /** @example validation failed */
-            error?: string;
-            /** @example Bad request */
-            message?: string;
+        "api.ProblemResponse": components["schemas"]["api.AboutBlankProblem"] | components["schemas"]["api.AgentOperationFailedProblem"] | components["schemas"]["api.AuthAuthenticationRequiredProblem"] | components["schemas"]["api.AuthInvalidCredentialsProblem"] | components["schemas"]["api.AuthMfaInvalidProblem"] | components["schemas"]["api.AuthPasskeyUnavailableProblem"] | components["schemas"]["api.AuthPermissionDeniedProblem"] | components["schemas"]["api.AuthRateLimitedProblem"] | components["schemas"]["api.AuthSessionExpiredProblem"] | components["schemas"]["api.AuthUntrustedOriginProblem"] | components["schemas"]["api.BackupRestoreFailedProblem"] | components["schemas"]["api.BootstrapAppNotInitializedProblem"] | components["schemas"]["api.CloudImportFailedProblem"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblem"] | components["schemas"]["api.MediaImageEmbeddingMissingProblem"] | components["schemas"]["api.MediaInvalidRequestProblem"] | components["schemas"]["api.RepositoryConflictProblem"] | components["schemas"]["api.RepositoryScanFailedProblem"] | components["schemas"]["api.RepositoryScanIncompleteProblem"] | components["schemas"]["api.RepositoryUnavailableProblem"] | components["schemas"]["api.ServiceUnavailableProblem"] | components["schemas"]["api.StorageConfirmationRequiredProblem"] | components["schemas"]["api.StorageHostActionExpiredProblem"] | components["schemas"]["api.StorageHostActionFailedProblem"] | components["schemas"]["api.UploadProcessingFailedProblem"];
+        "api.RepositoryConflictProblemResponse": {
+            actions?: string[];
+            conflict_type: string;
+            /** Format: uri */
+            instance: string;
+            repository_id?: string;
+            /** @constant */
+            status: 409;
+            /**
+             * Format: uri
+             * @constant
+             */
+            type: "https://lumilio.org/problems/repository/conflict";
         };
         "api.SuccessResponse": {
             /** @example Operation completed successfully */
@@ -13112,22 +13422,17 @@ export interface components {
             year?: number;
         };
         "dbtypes.PhotoSpecificMetadata": {
+            camera_make?: string;
             camera_model?: string;
-            capture_offset_minutes?: number;
             content_identifier?: string;
             description?: string;
-            dimensions?: string;
-            exposure?: number;
+            exposure_compensation?: number;
             exposure_time?: string;
             f_number?: number;
             focal_length?: number;
-            gps_latitude?: number;
-            gps_longitude?: number;
             is_raw?: boolean;
             iso_speed?: number;
             lens_model?: string;
-            resolution?: string;
-            taken_time?: string;
         };
         "dbtypes.SpeciesPredictionMeta": {
             /** @description 物种标签 */
@@ -13138,9 +13443,10 @@ export interface components {
         "dbtypes.VideoSpecificMetadata": {
             /** @example 1000000 */
             bitrate?: number;
+            /** @example Canon */
+            camera_make?: string;
             /** @example Canon EOS 5D Mark IV */
             camera_model?: string;
-            capture_offset_minutes?: number;
             /** @example H.264 */
             codec?: string;
             content_identifier?: string;
@@ -13148,12 +13454,6 @@ export interface components {
             description?: string;
             /** @example 30 */
             frame_rate?: number;
-            /** @example 37.7749 */
-            gps_latitude?: number;
-            /** @example -122.4194 */
-            gps_longitude?: number;
-            /** @example 2023-01-01T00:00:00Z */
-            recorded_time?: string;
         };
         "dto.AddAssetTagRequestDTO": {
             /** @example vacation */
@@ -13290,9 +13590,12 @@ export interface components {
             added_time?: string;
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             file_size?: number;
+            gps_latitude?: number;
+            gps_longitude?: number;
             hash?: string;
             height?: number;
             is_deleted?: boolean;
@@ -13302,12 +13605,10 @@ export interface components {
             owner_id?: number;
             position?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             taken_time?: string;
             type?: string;
             upload_time?: string;
@@ -13346,9 +13647,12 @@ export interface components {
         "dto.AssetDTO": {
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             file_size?: number;
+            gps_latitude?: number;
+            gps_longitude?: number;
             hash?: string;
             height?: number;
             is_deleted?: boolean;
@@ -13357,12 +13661,10 @@ export interface components {
             original_filename?: string;
             owner_id?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             taken_time?: string;
             type?: string;
             upload_time?: string;
@@ -13372,10 +13674,13 @@ export interface components {
             albums?: components["schemas"]["dto.AssetAlbumRefDTO"][];
             asset_id?: string;
             capture_offset_minutes?: number;
+            content_id?: string;
             deleted_at?: string;
             duration?: number;
             face_result?: components["schemas"]["dto.AssetFaceResultDTO"];
             file_size?: number;
+            gps_latitude?: number;
+            gps_longitude?: number;
             hash?: string;
             height?: number;
             is_deleted?: boolean;
@@ -13385,12 +13690,10 @@ export interface components {
             original_filename?: string;
             owner_id?: number;
             rating?: number;
-            repository_id?: string;
             species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
-            storage_path?: string;
             tags?: components["schemas"]["dto.AssetTagDTO"][];
             taken_time?: string;
             thumbnails?: components["schemas"]["dto.AssetThumbnailDTO"][];
@@ -13648,14 +13951,14 @@ export interface components {
         };
         "dto.BatchUploadResultDTO": {
             content_hash?: string;
-            error?: string;
             file_name?: string;
             message?: string;
+            problem?: components["schemas"]["api.ProblemReference"];
+            receipt_id?: string;
             session_id?: string;
             size?: number;
             status?: string;
             success?: boolean;
-            task_id?: number;
         };
         "dto.BindRepositoryCloudSourceRequest": {
             credential_id: string;
@@ -13780,7 +14083,6 @@ export interface components {
             credential_id?: string;
             /** @example 80 */
             downloaded_count?: number;
-            error?: string;
             /** @example 5 */
             failed_count?: number;
             finished_at?: string;
@@ -13790,6 +14092,7 @@ export interface components {
             imported_count?: number;
             /** @example 123 */
             owner_id?: number;
+            problem?: components["schemas"]["api.ProblemReference"];
             /** @example icloud */
             provider?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -14004,7 +14307,7 @@ export interface components {
             phash_groups?: number;
         };
         "dto.DisableTOTPRequestDTO": {
-            current_password: string;
+            security_token: string;
         };
         "dto.DownloadAssetsRequestDTO": {
             /**
@@ -14263,6 +14566,19 @@ export interface components {
             /** @example 18 */
             video_count?: number;
         };
+        "dto.GeocodingSettingsDTO": {
+            /** @example en */
+            language?: string;
+            /** @example https://nominatim.openstreetmap.org/reverse */
+            nominatim_endpoint?: string;
+            /**
+             * @example disabled
+             * @enum {string}
+             */
+            provider?: "disabled" | "nominatim";
+            /** @example Lumilio-Photos/1.0 */
+            user_agent?: string;
+        };
         "dto.GetAlbumResponseDTO": {
             album_id?: number;
             album_name?: string;
@@ -14295,10 +14611,6 @@ export interface components {
             actor?: string;
             completed_at?: string;
             created_at?: string;
-            /** @example expired */
-            error_code?: string;
-            /** @example Native host approval expired */
-            error_message?: string;
             expected_version?: number;
             expires_at?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -14307,6 +14619,7 @@ export interface components {
             kind?: string;
             /** @example External Archive */
             name?: string;
+            problem?: components["schemas"]["api.ProblemReference"];
             /** @example Open an existing photo repository */
             purpose?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -14347,6 +14660,8 @@ export interface components {
              * @example /Volumes/Media/Photos
              */
             path?: string;
+            /** @example low_space */
+            pause_reason?: string;
             /**
              * @description Reachability lets a selector keep an unreachable repository visible as a
              *     browse filter while refusing it as an upload target. Activity is separate
@@ -14376,6 +14691,12 @@ export interface components {
             /** @example openai */
             provider?: string;
         };
+        "dto.LLMProviderDescriptorDTO": {
+            api_key_required?: boolean;
+            base_url_required?: boolean;
+            /** @example openai */
+            id?: string;
+        };
         "dto.LLMSettingsDTO": {
             agent_enabled?: boolean;
             api_key_configured?: boolean;
@@ -14385,6 +14706,7 @@ export interface components {
             model_name?: string;
             /** @example openai */
             provider?: string;
+            supported_providers?: components["schemas"]["dto.LLMProviderDescriptorDTO"][];
         };
         "dto.LifecycleAuditEventDTO": {
             action?: string;
@@ -14521,6 +14843,56 @@ export interface components {
             password: string;
             username: string;
         };
+        "dto.LumenBackendStatusDTO": {
+            consecutive_failures?: number;
+            last_error_code?: string;
+            /** @enum {string} */
+            last_outcome?: "success" | "failed" | "timed_out" | "cancelled";
+            last_scan_completed_at?: string;
+            last_scan_started_at?: string;
+            last_scan_succeeded_at?: string;
+            matched_count?: number;
+            next_scan_at?: string;
+            rejected_count?: number;
+            source?: string;
+            /** @enum {string} */
+            state?: "disabled" | "starting" | "healthy" | "degraded";
+        };
+        "dto.LumenNodeRuntimeDTO": {
+            /** @enum {string} */
+            compatibility?: "pending" | "compatible" | "incompatible";
+            endpoint?: string;
+            error_code?: string;
+            id?: string;
+            last_observed_at?: string;
+            runtime?: string;
+            sources?: string[];
+            tasks?: components["schemas"]["dto.LumenNodeTaskDTO"][];
+            /** @enum {string} */
+            transport?: "connecting" | "ready" | "unavailable";
+            updated_at?: string;
+            version?: string;
+        };
+        "dto.LumenNodeTaskDTO": {
+            service?: string;
+            task?: string;
+        };
+        "dto.LumenRuntimeCountsDTO": {
+            active?: number;
+            connecting?: number;
+            discovered?: number;
+            incompatible?: number;
+            pending?: number;
+            unavailable?: number;
+        };
+        "dto.LumenRuntimeDTO": {
+            backends?: components["schemas"]["dto.LumenBackendStatusDTO"][];
+            captured_at?: string;
+            counts?: components["schemas"]["dto.LumenRuntimeCountsDTO"];
+            /** @enum {string} */
+            discovery_state?: "disabled" | "starting" | "healthy" | "degraded";
+            nodes?: components["schemas"]["dto.LumenNodeRuntimeDTO"][];
+        };
         "dto.LumilioSidecarSourceDTO": {
             /** @example 1048576 */
             file_size?: number;
@@ -14554,14 +14926,28 @@ export interface components {
             passkey_count?: number;
             recovery_codes_generated_at?: string;
             recovery_codes_remaining?: number;
+            session?: components["schemas"]["dto.AuthResponseDTO"];
             totp_enabled?: boolean;
         };
         "dto.MLCapabilitiesDTO": {
             /** @example 1 */
             active_node_count?: number;
+            /** @example 0 */
+            connecting_node_count?: number;
             /** @example 2 */
             discovered_node_count?: number;
+            /**
+             * @example healthy
+             * @enum {string}
+             */
+            discovery_state?: "disabled" | "starting" | "healthy" | "degraded";
+            /** @example 0 */
+            incompatible_node_count?: number;
+            /** @example 1 */
+            pending_node_count?: number;
             tasks?: components["schemas"]["dto.MLTaskSetDTO"];
+            /** @example 0 */
+            unavailable_node_count?: number;
         };
         "dto.MLSettingsDTO": {
             bioclip_enabled?: boolean;
@@ -14731,9 +15117,25 @@ export interface components {
             passkey_id?: number;
             transports?: string[];
         };
+        "dto.PasskeyDeleteRequestDTO": {
+            security_token: string;
+        };
+        "dto.PasskeyEnrollmentResponseDTO": {
+            credential?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"];
+            session?: components["schemas"]["dto.AuthResponseDTO"];
+        };
+        "dto.PasskeyEnrollmentVerifyRequestDTO": {
+            challenge_token: string;
+            credential: unknown;
+            security_token: string;
+        };
         "dto.PasskeyListResponseDTO": {
             credentials?: components["schemas"]["dto.PasskeyCredentialSummaryDTO"][];
             total?: number;
+        };
+        "dto.PasskeyMutationResponseDTO": {
+            session?: components["schemas"]["dto.AuthResponseDTO"];
+            status?: components["schemas"]["dto.MFAStatusDTO"];
         };
         "dto.PasskeyOptionsRequestDTO": {
             username?: string;
@@ -14865,9 +15267,10 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /**
-             * @description ResetSemantic wipes all semantic vectors and rebuilds from scratch. Use
-             *     after switching the embedding model (drop+refill) so no two models' vectors
-             *     are mixed. Honored only when the semantic task is included.
+             * @description ResetSemantic globally wipes all photo and video semantic vectors and
+             *     rebuilds both lanes from scratch. Use after switching the embedding model
+             *     (drop+refill) so no two models' vectors are mixed. Repository-scoped resets
+             *     are rejected; the semantic task must be included.
              * @example false
              */
             reset_semantic?: boolean;
@@ -14881,14 +15284,14 @@ export interface components {
         };
         "dto.RebuildAssetIndexesResponseDTO": {
             disabled_tasks?: string[];
-            /** @example 123 */
-            job_id?: number;
             /** @example 200 */
             limit?: number;
             /** @example Index rebuild job queued successfully */
             message?: string;
             /** @example true */
             missing_only?: boolean;
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             requested_tasks?: string[];
@@ -14900,10 +15303,10 @@ export interface components {
             repository_id?: string;
         };
         "dto.RebuildLocationClustersResponseDTO": {
-            /** @example 123 */
-            job_id?: number;
             /** @example Location cluster rebuild queued successfully */
             message?: string;
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example queued */
@@ -14917,10 +15320,11 @@ export interface components {
         "dto.RecoveryCodesResponseDTO": {
             generated_at?: string;
             recovery_codes?: string[];
+            session?: components["schemas"]["dto.AuthResponseDTO"];
             status?: components["schemas"]["dto.MFAStatusDTO"];
         };
         "dto.RegenerateRecoveryCodesRequestDTO": {
-            current_password: string;
+            security_token: string;
         };
         "dto.RegistrationStartRequestDTO": {
             password: string;
@@ -14985,27 +15389,6 @@ export interface components {
             /** @example icloud */
             provider?: string;
             sources?: components["schemas"]["dto.RepositoryCloudSourceDTO"][];
-        };
-        "dto.RepositoryConflictDTO": {
-            /**
-             * @example [
-             *       "relocate",
-             *       "copy"
-             *     ]
-             */
-            actions?: string[];
-            /** @example 409 */
-            code?: number;
-            /** @example repository_identity */
-            conflict_type?: string;
-            /** @example Repository identity is already registered */
-            message?: string;
-            /** @example /Volumes/OldDrive/Photos */
-            registered_path?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id?: string;
-            /** @example /Volumes/NewDrive/Photos */
-            requested_path?: string;
         };
         "dto.RepositoryDTO": {
             /** @example idle */
@@ -15097,10 +15480,14 @@ export interface components {
             writable?: boolean;
         };
         "dto.RepositoryScanQueuedDTO": {
-            /** @example 12345 */
-            job_id?: number;
+            /** @example false */
+            coalesced?: boolean;
+            /** @example true */
+            inserted?: boolean;
             /** @example manual */
             mode?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example queued */
@@ -15111,36 +15498,42 @@ export interface components {
             force?: boolean;
         };
         "dto.RepositoryScanRunDTO": {
-            /** @example 0 */
-            ambiguous_count?: number;
-            /** @example true */
-            authoritative?: boolean;
+            /** @example 8 */
+            authoritative_directories?: number;
+            /** @example 524288 */
+            bytes_hashed?: number;
+            /** @example 1048576 */
+            bytes_queued?: number;
+            /** @example false */
+            cancellation_requested?: boolean;
             /** @example 1 */
-            deferred_count?: number;
-            /** @example 1 */
-            deleted_count?: number;
+            coalesced_count?: number;
+            created_at?: string;
             /** @example 10 */
-            discovered_count?: number;
-            error?: string;
+            directories_observed?: number;
+            /** @example 1 */
+            error_directories?: number;
+            /** @example 120 */
+            files_observed?: number;
             finished_at?: string;
             /** @example manual */
             mode?: string;
-            /** @example 1 */
-            moved_count?: number;
-            partial_reason?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
+            /** @example 12 */
+            outbox_depth?: number;
+            /** @example true */
+            partial_coverage?: boolean;
+            problem?: components["schemas"]["api.ProblemReference"];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example edwin */
             requested_by?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            scan_id?: string;
-            /** @example 4 */
-            skipped_count?: number;
+            /** @example 2 */
+            requested_epoch?: number;
             started_at?: string;
             /** @example completed */
             status?: string;
-            /** @example 2 */
-            updated_count?: number;
         };
         "dto.RepositoryScanRunListDTO": {
             scans?: components["schemas"]["dto.RepositoryScanRunDTO"][];
@@ -15150,9 +15543,9 @@ export interface components {
             force_full_retry?: boolean;
             /**
              * @example [
-             *       "thumbnail_small",
-             *       "thumbnail_medium",
-             *       "transcode_1080p"
+             *       "analyze",
+             *       "derivatives",
+             *       "enrich"
              *     ]
              */
             tasks?: string[];
@@ -15160,22 +15553,10 @@ export interface components {
         "dto.ReprocessAssetResponseDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             asset_id?: string;
-            /**
-             * @example [
-             *       "thumbnail_small",
-             *       "transcode_1080p"
-             *     ]
-             */
-            failed_tasks?: string[];
-            /** @example Reprocessing job queued successfully */
+            /** @example Reprocessing request accepted */
             message?: string;
-            /**
-             * @example [
-             *       "thumbnail_small",
-             *       "transcode_1080p"
-             *     ]
-             */
-            retry_tasks?: string[];
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example queued */
             status?: string;
         };
@@ -15206,10 +15587,9 @@ export interface components {
             /** @example 20260711T020000.000000Z-library.sqlite3 */
             backup_name?: string;
             completed_at?: string;
-            error_code?: string;
             /** @example d62cbbf3-f564-458b-86ca-0f6d10fcd8d4 */
             id?: string;
-            message?: string;
+            problem?: components["schemas"]["api.ProblemReference"];
             requested_at?: string;
             restore_point?: string;
             /** @enum {string} */
@@ -15225,8 +15605,6 @@ export interface components {
             acme_last_managed_at?: string;
             /** @example production */
             environment?: string;
-            /** @example disabled */
-            geocoding_provider?: string;
             /** @example none */
             hardware_accel?: string;
             /** @example info */
@@ -15235,8 +15613,6 @@ export interface components {
             lumen_discovery_enabled?: boolean;
             /** @example true */
             passkey_enabled?: boolean;
-            /** @example true */
-            repository_scan_enabled?: boolean;
             /** @example 300 */
             repository_scan_interval_seconds?: number;
             /** @example 0.0.0.0:6680 */
@@ -15257,6 +15633,8 @@ export interface components {
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /** @example red bird on branch */
             query?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            similar_to_asset_id?: string;
             /**
              * @example date_captured
              * @enum {string}
@@ -15317,6 +15695,18 @@ export interface components {
              */
             source_types?: string[];
             sources?: components["schemas"]["dto.SearchSourceMetaDTO"][];
+        };
+        "dto.SecurityVerificationRequestDTO": {
+            code?: string;
+            current_password: string;
+            /** @enum {string} */
+            method?: "totp" | "recovery_code";
+            /** @enum {string} */
+            purpose: "totp_setup" | "totp_disable" | "recovery_regenerate" | "passkey_mutation";
+        };
+        "dto.SecurityVerificationResponseDTO": {
+            expires_at?: string;
+            security_token?: string;
         };
         "dto.SessionProgressDTO": {
             bytes_done?: number;
@@ -15473,6 +15863,11 @@ export interface components {
             effective_uid?: string;
             filesystem?: string;
             inode?: number;
+            /**
+             * @example default
+             * @enum {string}
+             */
+            kind?: "default" | "external";
             last_coordination?: string;
             lock_holder?: string;
             marker_uuid?: string;
@@ -15488,10 +15883,17 @@ export interface components {
             registered_mount_fingerprint?: string;
             removable_likely?: boolean;
             risk_warnings?: string[];
+            /**
+             * @example primary
+             * @enum {string}
+             */
+            role?: "primary" | "regular";
+            safety_margin_bytes?: number;
             target_id?: string;
             target_type?: string;
             total_bytes?: number;
             writable?: boolean;
+            writable_budget_bytes?: number;
         };
         "dto.StorageDiagnosticsResponseDTO": {
             generated_at?: string;
@@ -15708,13 +16110,18 @@ export interface components {
         };
         "dto.SystemSettingsDTO": {
             backup?: components["schemas"]["dto.BackupSettingsDTO"];
+            geocoding?: components["schemas"]["dto.GeocodingSettingsDTO"];
             llm?: components["schemas"]["dto.LLMSettingsDTO"];
             ml?: components["schemas"]["dto.MLSettingsDTO"];
             updated_at?: string;
             updated_by?: number;
         };
+        "dto.TOTPSetupRequestDTO": {
+            security_token: string;
+        };
         "dto.TOTPSetupResponseDTO": {
             account_name?: string;
+            expires_at?: string;
             issuer?: string;
             otpauth_uri?: string;
             secret?: string;
@@ -15775,13 +16182,19 @@ export interface components {
             /** @example A beautiful sunset photo */
             description?: string;
         };
+        "dto.UpdateGeocodingSettingsDTO": {
+            language?: string;
+            nominatim_endpoint?: string;
+            /** @enum {string} */
+            provider?: "disabled" | "nominatim";
+            user_agent?: string;
+        };
         "dto.UpdateLLMSettingsDTO": {
             agent_enabled?: boolean;
             api_key?: string;
             base_url?: string;
             model_name?: string;
-            /** @enum {string} */
-            provider?: "none" | "ark" | "openai" | "deepseek" | "ollama";
+            provider?: string;
         };
         "dto.UpdateLikeRequestDTO": {
             /** @example true */
@@ -15826,6 +16239,7 @@ export interface components {
         };
         "dto.UpdateSystemSettingsDTO": {
             backup?: components["schemas"]["dto.UpdateBackupSettingsDTO"];
+            geocoding?: components["schemas"]["dto.UpdateGeocodingSettingsDTO"];
             llm?: components["schemas"]["dto.UpdateLLMSettingsDTO"];
             ml?: components["schemas"]["dto.UpdateMLSettingsDTO"];
         };
@@ -15836,22 +16250,21 @@ export interface components {
             memory_buffer?: number;
             merge_concurrency?: number;
         };
-        "dto.UploadJobStatusDTO": {
-            /** @example failed to materialize asset */
-            error?: string;
+        "dto.UploadOperationStatusDTO": {
             /** @example photo.jpg */
             file_name?: string;
+            problem?: components["schemas"]["api.ProblemReference"];
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example completed */
             status?: string;
             /** @example true */
             success?: boolean;
-            /** @example 12345 */
-            task_id?: number;
             /** @example true */
             terminal?: boolean;
         };
-        "dto.UploadJobStatusResponseDTO": {
-            jobs?: components["schemas"]["dto.UploadJobStatusDTO"][];
+        "dto.UploadOperationStatusResponseDTO": {
+            operations?: components["schemas"]["dto.UploadOperationStatusDTO"][];
         };
         "dto.UploadPrecheckFileDTO": {
             /** @example blake3-size-first-last-1m-v1 */
@@ -15900,19 +16313,19 @@ export interface components {
             file_name?: string;
             /** @example File received and queued for processing */
             message?: string;
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
             /** @example 1048576 */
             size?: number;
             /** @example processing */
             status?: string;
-            /** @example 12345 */
-            task_id?: number;
         };
         "dto.UploadSessionResponseDTO": {
             bytes_received?: number;
+            receipt_id?: string;
             received_chunks?: number[];
             session_id?: string;
             status?: string;
-            task_id?: number;
             total_chunks?: number;
         };
         "dto.UserDTO": {
@@ -15933,11 +16346,8 @@ export interface components {
             base_url?: string;
             /** @example gpt-4.1-mini */
             model_name: string;
-            /**
-             * @example openai
-             * @enum {string}
-             */
-            provider: "ark" | "openai" | "deepseek" | "ollama";
+            /** @example openai */
+            provider: string;
             use_stored_api_key?: boolean;
         };
         "dto.ValidateLLMSettingsResponseDTO": {
@@ -16097,6 +16507,541 @@ export interface components {
             id?: string;
             label?: string;
             type?: string;
+        };
+        "api.AboutBlankProblem": {
+            /** Format: uri */
+            instance: string;
+            status: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "about:blank";
+        };
+        "api.AgentOperationFailedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/agent/operation-failed";
+        };
+        "api.AgentOperationFailedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/agent/operation-failed";
+        };
+        "api.AuthAuthenticationRequiredProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 401;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/authentication-required";
+        };
+        "api.AuthAuthenticationRequiredProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/authentication-required";
+        };
+        "api.AuthInvalidCredentialsProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 401;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/invalid-credentials";
+        };
+        "api.AuthInvalidCredentialsProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/invalid-credentials";
+        };
+        "api.AuthMfaInvalidProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 401;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/mfa-invalid";
+        };
+        "api.AuthMfaInvalidProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/mfa-invalid";
+        };
+        "api.AuthPasskeyUnavailableProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 400;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/passkey-unavailable";
+        };
+        "api.AuthPasskeyUnavailableProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/passkey-unavailable";
+        };
+        "api.AuthPermissionDeniedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 403;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/permission-denied";
+        };
+        "api.AuthPermissionDeniedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/permission-denied";
+        };
+        "api.AuthRateLimitedProblem": {
+            /** Format: uri */
+            instance: string;
+            retry_after_seconds: number;
+            /** @constant */
+            status: 429;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/rate-limited";
+        };
+        "api.AuthRateLimitedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retry_after_seconds: number;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/rate-limited";
+        };
+        "api.AuthSessionExpiredProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 401;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/session-expired";
+        };
+        "api.AuthSessionExpiredProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/session-expired";
+        };
+        "api.AuthUntrustedOriginProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 403;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/untrusted-origin";
+        };
+        "api.AuthUntrustedOriginProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/auth/untrusted-origin";
+        };
+        "api.BackupRestoreFailedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/backup/restore-failed";
+        };
+        "api.BackupRestoreFailedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/backup/restore-failed";
+        };
+        "api.BootstrapAppNotInitializedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/bootstrap/app-not-initialized";
+        };
+        "api.BootstrapAppNotInitializedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/bootstrap/app-not-initialized";
+        };
+        "api.CloudImportFailedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/cloud/import-failed";
+        };
+        "api.CloudImportFailedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/cloud/import-failed";
+        };
+        "api.LumenImageSemanticAnalysisUnavailableProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 503;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/lumen/image-semantic-analysis-unavailable";
+        };
+        "api.LumenImageSemanticAnalysisUnavailableProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/lumen/image-semantic-analysis-unavailable";
+        };
+        "api.MediaImageEmbeddingMissingProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/media/image-embedding-missing";
+        };
+        "api.MediaImageEmbeddingMissingProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/media/image-embedding-missing";
+        };
+        "api.MediaInvalidRequestProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 422;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/media/invalid-request";
+        };
+        "api.MediaInvalidRequestProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/media/invalid-request";
+        };
+        "api.RepositoryConflictProblem": {
+            actions?: string[];
+            conflict_type: string;
+            /** Format: uri */
+            instance: string;
+            repository_id?: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/conflict";
+        };
+        "api.RepositoryConflictProblemReference": {
+            actions?: string[];
+            conflict_type: string;
+            /** Format: uri */
+            instance: string;
+            repository_id?: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/conflict";
+        };
+        "api.RepositoryScanFailedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/scan-failed";
+        };
+        "api.RepositoryScanFailedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/scan-failed";
+        };
+        "api.RepositoryScanIncompleteProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/scan-incomplete";
+        };
+        "api.RepositoryScanIncompleteProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/scan-incomplete";
+        };
+        "api.RepositoryUnavailableProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 503;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/unavailable";
+        };
+        "api.RepositoryUnavailableProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/repository/unavailable";
+        };
+        "api.ServiceUnavailableProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 503;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/service/unavailable";
+        };
+        "api.ServiceUnavailableProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/service/unavailable";
+        };
+        "api.StorageConfirmationRequiredProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/confirmation-required";
+        };
+        "api.StorageConfirmationRequiredProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/confirmation-required";
+        };
+        "api.StorageHostActionExpiredProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/host-action-expired";
+        };
+        "api.StorageHostActionExpiredProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/host-action-expired";
+        };
+        "api.StorageHostActionFailedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/host-action-failed";
+        };
+        "api.StorageHostActionFailedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/storage/host-action-failed";
+        };
+        "api.UploadProcessingFailedProblem": {
+            /** Format: uri */
+            instance: string;
+            /** @constant */
+            status: 500;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/upload/processing-failed";
+        };
+        "api.UploadProcessingFailedProblemReference": {
+            /** Format: uri */
+            instance: string;
+            retryable?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "https://lumilio.org/problems/upload/processing-failed";
+        };
+        "api.ProblemReference": components["schemas"]["api.AgentOperationFailedProblemReference"] | components["schemas"]["api.AuthAuthenticationRequiredProblemReference"] | components["schemas"]["api.AuthInvalidCredentialsProblemReference"] | components["schemas"]["api.AuthMfaInvalidProblemReference"] | components["schemas"]["api.AuthPasskeyUnavailableProblemReference"] | components["schemas"]["api.AuthPermissionDeniedProblemReference"] | components["schemas"]["api.AuthRateLimitedProblemReference"] | components["schemas"]["api.AuthSessionExpiredProblemReference"] | components["schemas"]["api.AuthUntrustedOriginProblemReference"] | components["schemas"]["api.BackupRestoreFailedProblemReference"] | components["schemas"]["api.BootstrapAppNotInitializedProblemReference"] | components["schemas"]["api.CloudImportFailedProblemReference"] | components["schemas"]["api.LumenImageSemanticAnalysisUnavailableProblemReference"] | components["schemas"]["api.MediaImageEmbeddingMissingProblemReference"] | components["schemas"]["api.MediaInvalidRequestProblemReference"] | components["schemas"]["api.RepositoryConflictProblemReference"] | components["schemas"]["api.RepositoryScanFailedProblemReference"] | components["schemas"]["api.RepositoryScanIncompleteProblemReference"] | components["schemas"]["api.RepositoryUnavailableProblemReference"] | components["schemas"]["api.ServiceUnavailableProblemReference"] | components["schemas"]["api.StorageConfirmationRequiredProblemReference"] | components["schemas"]["api.StorageHostActionExpiredProblemReference"] | components["schemas"]["api.StorageHostActionFailedProblemReference"] | components["schemas"]["api.UploadProcessingFailedProblemReference"];
+        "api.RateLimitedProblemResponse": {
+            /** Format: uri */
+            instance: string;
+            retry_after_seconds: number;
+            /** @constant */
+            status: 429;
+            /**
+             * Format: uri
+             * @constant
+             */
+            type: "https://lumilio.org/problems/auth/rate-limited";
         };
     };
     responses: never;

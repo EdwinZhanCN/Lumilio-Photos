@@ -35,8 +35,6 @@ type RestoreOperation struct {
 	ID           string                 `json:"id"`
 	BackupName   string                 `json:"backup_name"`
 	Status       RestoreOperationStatus `json:"status"`
-	Message      string                 `json:"message"`
-	ErrorCode    string                 `json:"error_code,omitempty"`
 	RestorePoint string                 `json:"restore_point,omitempty"`
 	RequestedAt  time.Time              `json:"requested_at"`
 	UpdatedAt    time.Time              `json:"updated_at"`
@@ -64,7 +62,6 @@ func newRestoreOperation(backupName string, now time.Time) RestoreOperation {
 		ID:          uuid.NewString(),
 		BackupName:  filepath.Base(strings.TrimSpace(backupName)),
 		Status:      RestoreOperationStaged,
-		Message:     "Restore validated and staged.",
 		RequestedAt: now,
 		UpdatedAt:   now,
 	}
@@ -174,8 +171,6 @@ func updateRestoreOperation(marker PendingRestore, status RestoreOperationStatus
 	}
 	now := time.Now().UTC()
 	operation.Status = status
-	operation.ErrorCode = strings.TrimSpace(code)
-	operation.Message = strings.TrimSpace(message)
 	operation.RestorePoint = ""
 	if marker.RestorePoint != "" {
 		operation.RestorePoint = filepath.Base(marker.RestorePoint)
@@ -236,8 +231,6 @@ func FailRestoreOperationIfCurrent(activePath, operationID, code, message string
 	}
 	now := time.Now().UTC()
 	operation.Status = RestoreOperationFailed
-	operation.ErrorCode = strings.TrimSpace(code)
-	operation.Message = strings.TrimSpace(message)
 	operation.CompletedAt = &now
 	return writeRestoreOperation(activePath, operation)
 }

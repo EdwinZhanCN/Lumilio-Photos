@@ -20,7 +20,7 @@ const TONES: Record<RailCardTone, { gradient: string; text: string }> = {
 
 /**
  * The two card shapes used across Collections surfaces:
- * - `icon`: a tinted gradient tile with a centered glyph and label.
+ * - `icon`: a tinted gradient tile with a centered glyph and caption.
  * - `photo`: a square cover image with the caption overlaid at the bottom.
  */
 export type RailCardMedia =
@@ -30,7 +30,7 @@ export type RailCardMedia =
 export type RailCardProps = {
   media: RailCardMedia;
   title: string;
-  /** Overlay caption second line — photo cards only; icon cards have no caption. */
+  /** Caption second line. Photo cards render it in the overlay. */
   subtitle?: string;
   onClick?: () => void;
   /** Sizing (e.g. `w-48` in a rail, `w-full` in a grid). */
@@ -41,10 +41,12 @@ function IconBody({
   icon: Icon,
   tone = "primary",
   title,
+  subtitle,
 }: {
   icon: LucideIcon;
   tone?: RailCardTone;
   title: string;
+  subtitle?: string;
 }) {
   const toneStyle = TONES[tone];
   return (
@@ -59,6 +61,11 @@ function IconBody({
         >
           {title}
         </span>
+        {subtitle && (
+          <span className="max-w-full truncate text-xs text-base-content/55" title={subtitle}>
+            {subtitle}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -109,7 +116,7 @@ function RailCardBody({
   subtitle,
 }: Pick<RailCardProps, "media" | "title" | "subtitle">) {
   return media.kind === "icon" ? (
-    <IconBody icon={media.icon} tone={media.tone} title={title} />
+    <IconBody icon={media.icon} tone={media.tone} title={title} subtitle={subtitle} />
   ) : (
     <PhotoBody
       src={media.src}

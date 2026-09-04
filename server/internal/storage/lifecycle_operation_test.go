@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -461,21 +462,6 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if err := os.WriteFile(privatePath, []byte("private-state"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	assetID := uuid.New()
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO assets (
-			asset_id, type, original_filename, storage_path, mime_type,
-			file_size, content_hash, upload_time, repository_id, updated_at
-		) VALUES (?, 'PHOTO', 'kept.jpg', 'originals/kept.jpg', 'image/jpeg', ?, 'hash', 1, ?, 1)
-	`, assetID, len("original-media"), created.Repository.RepoID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO river_job (args, kind, state)
-		VALUES (jsonb(?), 'process_semantic', 'available')
-	`, `{"assetId":"`+assetID.String()+`"}`); err != nil {
-		t.Fatal(err)
-	}
 	owner, err := catalog.Queries.CreateUser(ctx, repo.CreateUserParams{
 		Username: "removal-impact-owner", Password: "test", DisplayName: "Owner", Role: "admin",
 		WebauthnUserHandle: []byte("removal-impact-owner-handle"),
@@ -483,6 +469,12 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assetID := uuid.New()
+	contentID := uuid.New()
+	seedRepositoryAssetOccurrence(
+		t, catalog, created.Repository.RepoID, assetID, contentID, owner.UserID,
+		"kept.jpg", int64(len("original-media")), true,
+	)
 	credentialID := uuid.New()
 	if _, err := catalog.SQL.ExecContext(ctx, `
 		INSERT INTO cloud_credentials (
@@ -510,28 +502,12 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	if impact.CloudImportCount != 1 {
 		t.Fatalf("cloud import receipt impact = %d, want 1", impact.CloudImportCount)
 	}
-	if impact.ActiveTaskCount != 1 {
-		t.Fatalf("asset-scoped task impact = %d, want 1", impact.ActiveTaskCount)
+	if impact.ActiveTaskCount != 0 {
+		t.Fatalf("catalog work impact = %d, want 0", impact.ActiveTaskCount)
 	}
 	if !impact.PrivateStateFound || impact.PrivateStateBytes < int64(len("private-state")) {
 		t.Fatalf("private-state impact = %+v", impact)
 	}
-	manager.beforeRepositoryJobCleanup = func() {
-		if _, updateErr := catalog.SQL.ExecContext(ctx, `UPDATE river_job SET state = 'running' WHERE json_extract(args, '$.assetId') = ?`, assetID.String()); updateErr != nil {
-			t.Errorf("transition available asset job to running: %v", updateErr)
-		}
-	}
-	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String()); !errors.Is(err, ErrRepositoryBusy) {
-		t.Fatalf("running asset-scoped removal error = %v, want ErrRepositoryBusy", err)
-	}
-	manager.beforeRepositoryJobCleanup = nil
-	if _, err := manager.queries.GetRepository(ctx, created.Repository.RepoID); err != nil {
-		t.Fatalf("running-job rejection removed repository: %v", err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `UPDATE river_job SET state = 'available' WHERE json_extract(args, '$.assetId') = ?`, assetID.String()); err != nil {
-		t.Fatal(err)
-	}
-
 	if err := manager.RemoveRepository(ctx, created.Repository.RepoID.String(), LifecycleRequest{
 		RequestID: "remove-regular", Actor: "test",
 	}); err != nil {
@@ -546,16 +522,6 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	}
 	if assets != 0 {
 		t.Fatalf("remaining catalog assets = %d, want 0", assets)
-	}
-	var remainingAssetJobs int
-	if err := catalog.SQL.QueryRowContext(ctx, `
-		SELECT count(*) FROM river_job
-		WHERE json_extract(args, '$.assetId') = ?
-	`, assetID.String()).Scan(&remainingAssetJobs); err != nil {
-		t.Fatal(err)
-	}
-	if remainingAssetJobs != 0 {
-		t.Fatalf("remaining asset-scoped jobs = %d, want 0", remainingAssetJobs)
 	}
 	var removalAudit int
 	if err := catalog.SQL.QueryRowContext(ctx, `
@@ -585,6 +551,202 @@ func TestRemoveRepositoryClearsCatalogAndPreservesFiles(t *testing.T) {
 	}
 	if err := manager.RemoveRepository(ctx, primary.RepoID.String()); !errors.Is(err, ErrPrimaryRepositoryNotRemovable) {
 		t.Fatalf("primary removal error = %v, want ErrPrimaryRepositoryNotRemovable", err)
+	}
+}
+
+func TestRemoveRepositoryPreservesAssetsWithLocationsElsewhere(t *testing.T) {
+	catalog, manager := newCatalogRepositoryManager(t)
+	ctx := context.Background()
+	initializeDefaultStorageForTest(t, manager, filepath.Join(t.TempDir(), "default"))
+	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	create := func(name, directory string) repo.Repository {
+		t.Helper()
+		result, createErr := manager.CreateRepository(ctx, CreateRepositorySpec{
+			RequestID: "create-" + directory, Actor: "test", Name: name,
+			DirectoryName: directory, Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		})
+		if createErr != nil {
+			t.Fatal(createErr)
+		}
+		return *result.Repository
+	}
+	target := create("Exact Copy A", "exact-copy-a")
+	survivor := create("Exact Copy B", "exact-copy-b")
+	owner, err := catalog.Queries.CreateUser(ctx, repo.CreateUserParams{
+		Username: "shared-removal-owner", Password: "test", DisplayName: "Shared Owner", Role: "admin",
+		WebauthnUserHandle: []byte("shared-removal-owner-handle"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetID := uuid.New()
+	contentID := uuid.New()
+	seedRepositoryAssetOccurrence(
+		t, catalog, target.RepoID, assetID, contentID, owner.UserID, "shared.jpg", 12, true,
+	)
+	seedRepositoryAssetOccurrence(
+		t, catalog, survivor.RepoID, assetID, contentID, owner.UserID, "copy.jpg", 12, false,
+	)
+
+	mediaItemID := uuid.New()
+	stackID := uuid.New()
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO media_items (
+			media_item_id, owner_id, repository_id, media_kind,
+			primary_asset_id, created_at, updated_at
+		) VALUES (?, ?, ?, 'photo', ?, 1, 1)
+	`, mediaItemID, owner.UserID, target.RepoID, assetID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO media_item_assets (asset_id, media_item_id, relation, created_at)
+		VALUES (?, ?, 'original', 1)
+	`, assetID, mediaItemID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO asset_stacks (
+			stack_id, owner_id, repository_id, stack_kind,
+			cover_media_item_id, created_at, updated_at
+		) VALUES (?, ?, ?, 'manual', ?, 1, 1)
+	`, stackID, owner.UserID, target.RepoID, mediaItemID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO asset_stack_members (media_item_id, stack_id, created_at)
+		VALUES (?, ?, 1)
+	`, mediaItemID, stackID); err != nil {
+		t.Fatal(err)
+	}
+	var albumID int64
+	if err := catalog.SQL.QueryRowContext(ctx, `
+		INSERT INTO albums (user_id, album_name, created_at, updated_at)
+		VALUES (?, 'Shared album', 1, 1)
+		RETURNING album_id
+	`, owner.UserID).Scan(&albumID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO album_assets (album_id, asset_id, added_time)
+		VALUES (?, ?, 1)
+	`, albumID, assetID); err != nil {
+		t.Fatal(err)
+	}
+	assetIDs := `["` + assetID.String() + `"]`
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO share_links (
+			share_id, owner_id, token_hash, title, source_kind, asset_ids,
+			asset_count, expires_at, created_at, updated_at
+		) VALUES (?, ?, ?, 'Shared link', 'asset_snapshot', ?, 1, 999999, 1, 1)
+	`, uuid.New(), owner.UserID, []byte("shared-removal-token"), assetIDs); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO agent_pins (pin_id, user_id, title, asset_ids, created_at, updated_at)
+		VALUES (?, ?, 'Shared pin', ?, 1, 1)
+	`, uuid.New(), owner.UserID, assetIDs); err != nil {
+		t.Fatal(err)
+	}
+
+	impact, err := manager.PreviewRepositoryRemoval(ctx, target.RepoID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if impact.AssetCount != 1 || impact.CatalogMediaBytes != 12 || impact.AlbumCount != 1 || impact.ActiveTaskCount != 0 {
+		t.Fatalf("shared-location removal impact = %+v", impact)
+	}
+	if err := manager.RemoveRepository(ctx, target.RepoID.String()); err != nil {
+		t.Fatal(err)
+	}
+
+	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM assets WHERE asset_id = ?`, 1, assetID)
+	assertStorageCount(t, catalog.SQL, `
+		SELECT count(*) FROM active_asset_occurrences
+		WHERE asset_id = ? AND repository_id = ?
+	`, 1, assetID, survivor.RepoID)
+	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM album_assets WHERE asset_id = ?`, 1, assetID)
+	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM share_links WHERE asset_ids = ?`, 1, assetIDs)
+	assertStorageCount(t, catalog.SQL, `SELECT count(*) FROM agent_pins WHERE asset_ids = ?`, 1, assetIDs)
+	assertStorageCount(t, catalog.SQL, `
+		SELECT count(*) FROM media_items
+		WHERE media_item_id = ? AND repository_id = ?
+	`, 1, mediaItemID, survivor.RepoID)
+	assertStorageCount(t, catalog.SQL, `
+		SELECT count(*) FROM asset_stacks
+		WHERE stack_id = ? AND repository_id = ?
+	`, 1, stackID, survivor.RepoID)
+}
+
+func seedRepositoryAssetOccurrence(
+	t *testing.T,
+	catalog *db.DB,
+	repositoryID uuid.UUID,
+	assetID uuid.UUID,
+	contentID uuid.UUID,
+	ownerID int32,
+	filename string,
+	fileSize int64,
+	createAsset bool,
+) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	if createAsset {
+		if _, err := catalog.SQL.ExecContext(ctx, `
+			INSERT INTO content_objects (
+				content_id, hash_algorithm, full_hash, file_size, created_at
+			) VALUES (?, 'blake3-v1', ?, ?, 1)
+		`, contentID, strings.Repeat("a", 64), fileSize); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := catalog.SQL.ExecContext(ctx, `
+			INSERT INTO assets (
+				asset_id, owner_id, content_id, type, original_filename,
+				mime_type, upload_time, updated_at
+			) VALUES (?, ?, ?, 'PHOTO', ?, 'image/jpeg', 1, 1)
+		`, assetID, ownerID, contentID, filename); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rootNodeID := uuid.New()
+	fileNodeID := uuid.New()
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO repository_nodes (
+			node_id, repository_id, parent_node_id, name, name_key, kind,
+			observation_revision, created_at, updated_at
+		) VALUES (?, ?, NULL, '', '', 'directory', 1, 1, 1)
+	`, rootNodeID, repositoryID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO repository_nodes (
+			node_id, repository_id, parent_node_id, name, name_key, kind,
+			observation_revision, file_size, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, 'file', 2, ?, 1, 1)
+	`, fileNodeID, repositoryID, rootNodeID, filename, filename, fileSize); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO asset_locations (
+			location_id, node_id, asset_id, bound_observation_revision,
+			created_at, updated_at
+		) VALUES (?, ?, ?, 2, 1, 1)
+	`, uuid.New(), fileNodeID, assetID); err != nil {
+		t.Fatal(err)
+	}
+	return fileNodeID
+}
+
+func assertStorageCount(t *testing.T, database *sql.DB, query string, want int, args ...any) {
+	t.Helper()
+	var got int
+	if err := database.QueryRow(query, args...).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("count for %q = %d, want %d", query, got, want)
 	}
 }
 

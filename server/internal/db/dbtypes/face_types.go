@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-// FaceResultMeta 用于在 PhotoSpecificMetadata 中缓存人脸识别统计信息
+// FaceResultMeta is a standalone face-processing summary; it is not stored in
+// PhotoSpecificMetadata.
 type FaceResultMeta struct {
 	HasFaces       bool      `json:"has_faces"`          // 是否检测到人脸
 	TotalFaces     int       `json:"total_faces"`        // 检测到的人脸总数

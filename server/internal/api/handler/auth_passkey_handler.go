@@ -8,6 +8,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -21,10 +22,10 @@ import (
 // @Produce json
 // @Param request body dto.PasskeyOptionsRequestDTO true "Username for passkey login"
 // @Success 200 {object} dto.PasskeyOptionsResponseDTO "Passkey login options created successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Invalid credentials"
-// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Invalid credentials"
+// @Failure 429 {object} api.ProblemResponse "Too many authentication attempts"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/options [post]
 func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 	origin, ok := requirePasskeyRequest(c)
@@ -37,11 +38,11 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 
 	var req dto.PasskeyOptionsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if strings.TrimSpace(req.Username) == "" {
-		api.GinBadRequest(c, errors.New("username is required"), "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(errors.New("username is required")))
 		return
 	}
 	if !h.allowAuthUsername(c, authRateScopePasskeyOptions, req.Username) {
@@ -53,9 +54,9 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 		switch {
 		case errors.Is(err, service.ErrPasskeyNotConfigured),
 			errors.Is(err, service.ErrUserNotFound):
-			api.GinUnauthorized(c, errors.New("Username or passkey is incorrect"), "Invalid credentials")
+			api.WriteProblem(c, api.KnownProblem(problem.InvalidCredentials, err))
 		default:
-			api.GinInternalError(c, err, "Failed to start passkey login")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -72,10 +73,10 @@ func (h *AuthHandler) BeginPasskeyLogin(c *gin.Context) {
 // @Produce json
 // @Param request body dto.PasskeyVerifyRequestDTO true "Passkey login verification payload"
 // @Success 200 {object} dto.AuthResponseDTO "Passkey login verified successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid request data"
-// @Failure 401 {object} api.ErrorResponse "Invalid credentials"
-// @Failure 429 {object} api.ErrorResponse "Too many authentication attempts"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 400 {object} api.ProblemResponse "Invalid request data"
+// @Failure 401 {object} api.ProblemResponse "Invalid credentials"
+// @Failure 429 {object} api.ProblemResponse "Too many authentication attempts"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/passkeys/login/verify [post]
 func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 	origin, ok := requirePasskeyRequest(c)
@@ -88,7 +89,7 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 
 	var req dto.PasskeyVerifyRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 	if !h.allowAuthOpaqueSubject(c, authRateScopePasskeyVerify, req.ChallengeToken) {
@@ -97,7 +98,7 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 
 	credentialJSON, err := json.Marshal(req.Credential)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid passkey credential payload")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
@@ -108,9 +109,9 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 			errors.Is(err, service.ErrExpiredPasskeyChallenge),
 			errors.Is(err, service.ErrPasskeyNotConfigured),
 			errors.Is(err, service.ErrUserNotFound):
-			api.GinUnauthorized(c, errors.New("Passkey verification failed"), "Invalid credentials")
+			api.WriteProblem(c, api.KnownProblem(problem.InvalidCredentials, err))
 		default:
-			api.GinInternalError(c, err, "Failed to verify passkey login")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -127,8 +128,8 @@ func (h *AuthHandler) VerifyPasskeyLogin(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.PasskeyListResponseDTO "Passkeys retrieved successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys [get]
 func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -138,7 +139,7 @@ func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 
 	response, err := h.authService.ListPasskeys(c.Request.Context(), user.UserID)
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to load passkeys")
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 
@@ -153,8 +154,8 @@ func (h *AuthHandler) ListPasskeys(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.PasskeyOptionsResponseDTO "Passkey enrollment options created successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/options [post]
 func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 	origin, ok := requirePasskeyRequest(c)
@@ -170,9 +171,9 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrTOTPRequiredForPasskey):
-			api.GinBadRequest(c, err, "Enable TOTP before adding a passkey")
+			api.WriteProblem(c, api.BadRequest(err))
 		default:
-			api.GinInternalError(c, err, "Failed to start passkey enrollment")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
@@ -187,11 +188,11 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param request body dto.PasskeyVerifyRequestDTO true "Passkey enrollment verification payload"
-// @Success 200 {object} dto.PasskeyCredentialSummaryDTO "Passkey enrolled successfully"
-// @Failure 400 {object} api.ErrorResponse "Invalid or expired challenge"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Param request body dto.PasskeyEnrollmentVerifyRequestDTO true "Passkey enrollment verification payload"
+// @Success 200 {object} dto.PasskeyEnrollmentResponseDTO "Passkey enrolled successfully"
+// @Failure 400 {object} api.ProblemResponse "Invalid or expired challenge"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/verify [post]
 func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 	origin, ok := requirePasskeyRequest(c)
@@ -203,33 +204,35 @@ func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 		return
 	}
 
-	var req dto.PasskeyVerifyRequestDTO
+	var req dto.PasskeyEnrollmentVerifyRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	credentialJSON, err := json.Marshal(req.Credential)
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid passkey credential payload")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
-	response, err := h.authService.VerifyPasskeyEnrollment(c.Request.Context(), user.UserID, req.ChallengeToken, credentialJSON, origin)
+	response, err := h.authService.VerifyPasskeyEnrollment(c.Request.Context(), user.UserID, req.ChallengeToken, credentialJSON, req.SecurityToken, origin)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidPasskeyChallenge),
 			errors.Is(err, service.ErrExpiredPasskeyChallenge):
-			api.GinBadRequest(c, err, "Invalid or expired passkey challenge")
+			api.WriteProblem(c, api.BadRequest(err))
 		case errors.Is(err, service.ErrTOTPRequiredForPasskey):
-			api.GinBadRequest(c, err, "Enable TOTP before adding a passkey")
+			api.WriteProblem(c, api.BadRequest(err))
+		case errors.Is(err, service.ErrInvalidSecurityProof):
+			api.WriteProblem(c, api.Unauthorized(err))
 		default:
-			api.GinInternalError(c, err, "Failed to enroll passkey")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
 
-	api.JSONOK(c, dto.ToPasskeyCredentialSummaryDTO(response))
+	h.writePasskeyEnrollmentResponse(c, response)
 }
 
 // DeletePasskey removes an enrolled passkey from the authenticated user.
@@ -240,10 +243,11 @@ func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Passkey ID"
-// @Success 200 {object} api.SuccessResponse "Passkey deleted successfully"
-// @Failure 401 {object} api.ErrorResponse "Unauthorized"
-// @Failure 404 {object} api.ErrorResponse "Passkey not found"
-// @Failure 500 {object} api.ErrorResponse "Internal server error"
+// @Param request body dto.PasskeyDeleteRequestDTO true "Recent security verification token"
+// @Success 200 {object} dto.PasskeyMutationResponseDTO "Passkey deleted successfully"
+// @Failure 401 {object} api.ProblemResponse "Unauthorized"
+// @Failure 404 {object} api.ProblemResponse "Passkey not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/auth/mfa/passkeys/{id} [delete]
 func (h *AuthHandler) DeletePasskey(c *gin.Context) {
 	user, ok := requireCurrentUser(c)
@@ -253,27 +257,36 @@ func (h *AuthHandler) DeletePasskey(c *gin.Context) {
 
 	passkeyID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		api.GinBadRequest(c, err, "Invalid passkey ID")
+		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
-	if err := h.authService.DeletePasskey(c.Request.Context(), user.UserID, passkeyID); err != nil {
+	var req dto.PasskeyDeleteRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+
+	response, err := h.authService.DeletePasskey(c.Request.Context(), user.UserID, passkeyID, req.SecurityToken)
+	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrPasskeyCredentialNotFound):
-			api.GinNotFound(c, err, "Passkey not found")
+			api.WriteProblem(c, api.NotFound(err))
+		case errors.Is(err, service.ErrInvalidSecurityProof):
+			api.WriteProblem(c, api.Unauthorized(err))
 		default:
-			api.GinInternalError(c, err, "Failed to delete passkey")
+			api.WriteProblem(c, api.Internal(err))
 		}
 		return
 	}
 
-	api.JSONOK(c, api.SuccessResponse{Message: "Passkey deleted successfully"})
+	h.writePasskeyMutationResponse(c, response)
 }
 
 func requirePasskeyRequest(c *gin.Context) (string, bool) {
 	resolved, ok := api.RequestOriginContext(c)
 	if !ok || !resolved.IsSecureForPasskey {
-		api.GinBadRequest(c, errors.New("passkey is unavailable for this browser origin"), "Passkey is unavailable for this browser origin")
+		api.WriteProblem(c, api.KnownProblem(problem.PasskeyUnavailable, errors.New("passkey is unavailable for this browser origin")))
 		return "", false
 	}
 	return resolved.BrowserOrigin, true

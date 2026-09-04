@@ -52,7 +52,13 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 		conditions = append(conditions, fmt.Sprintf("%s.owner_id = %s", a, builder.addArg(*filter.OwnerID)))
 	}
 	if filter.RepositoryID != nil {
-		conditions = append(conditions, fmt.Sprintf("%s.repository_id = %s", a, builder.addArg(*filter.RepositoryID)))
+		repositoryPlaceholder := builder.addArg(*filter.RepositoryID)
+		conditions = append(conditions, fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM active_asset_occurrences repository_occurrence
+			WHERE repository_occurrence.asset_id = %s.asset_id
+			  AND repository_occurrence.repository_id = %s
+		)`, a, repositoryPlaceholder))
 	}
 	if filter.PersonID != nil {
 		personPlaceholder := builder.addArg(*filter.PersonID)

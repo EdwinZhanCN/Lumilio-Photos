@@ -1,10 +1,10 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Check, Copy, HardDrive } from "lucide-react";
-import type { components } from "@/lib/http-commons/schema";
+import { useMessage } from "@/features/notifications";
+import { getStorageEntityDisplayName, type StorageDiagnostic } from "@/features/repositories";
+import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "@/lib/utils/formatters";
-
-type StorageDiagnostic = components["schemas"]["dto.StorageDiagnosticDTO"];
 
 export function StorageTargetDetail({
   item,
@@ -13,7 +13,7 @@ export function StorageTargetDetail({
   item: StorageDiagnostic;
   repositories: StorageDiagnostic[];
 }) {
-  if (item.target_type === "storage_location") {
+  if (item.entityType === "storage_location") {
     return <StorageLocationDetail item={item} repositories={repositories} />;
   }
 
@@ -40,6 +40,7 @@ function StorageInformationView({
 }) {
   const { t } = useI18n();
   const headingID = `storage-target-${item.target_id || "unknown"}`;
+  const displayName = getStorageEntityDisplayName(item, t);
 
   return (
     <section
@@ -51,7 +52,7 @@ function StorageInformationView({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h2 id={headingID} className="min-w-0 truncate text-base font-semibold">
-                {item.name || t("common.na")}
+                {displayName || t("common.na")}
               </h2>
               {titleMeta}
             </div>
@@ -79,15 +80,17 @@ function StorageLocationDetail({
   repositories: StorageDiagnostic[];
 }) {
   const { t } = useI18n();
+  const showMessage = useMessage();
   const [copiedRepositoryID, setCopiedRepositoryID] = useState<string | null>(null);
 
   const copyRepositoryPath = async (repository: StorageDiagnostic, repositoryKey: string) => {
-    if (!repository.path || !navigator.clipboard) return;
+    if (!repository.path) return;
     try {
-      await navigator.clipboard.writeText(repository.path);
+      await copyText(repository.path);
       setCopiedRepositoryID(repositoryKey);
     } catch {
       setCopiedRepositoryID(null);
+      showMessage("error", t("common.copyFailed", { defaultValue: "Copy failed." }));
     }
   };
 
@@ -121,15 +124,16 @@ function StorageLocationDetail({
               <li className="text-sm text-base-content/50">
                 {t(
                   "monitor.storage.noRepositories",
-                  "No repositories are registered in this location.",
+                  "No Repositories are registered in this Storage Location.",
                 )}
               </li>
             ) : (
               repositories.map((repository, index) => {
+                const repositoryName = getStorageEntityDisplayName(repository, t);
                 const repositoryKey =
                   repository.target_id ??
                   repository.path ??
-                  repository.name ??
+                  repository.rawName ??
                   `repository-${index}`;
                 const isCopied = copiedRepositoryID === repositoryKey;
 
@@ -137,9 +141,7 @@ function StorageLocationDetail({
                   <li key={repositoryKey} className="m-0 flex min-w-0 items-center gap-3 p-0">
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <div className="min-w-0 truncate text-sm font-medium">
-                          {repository.name}
-                        </div>
+                        <div className="min-w-0 truncate text-sm font-medium">{repositoryName}</div>
                         <StorageStatusDot item={repository} />
                       </div>
                       <div
@@ -153,7 +155,7 @@ function StorageLocationDetail({
                       type="button"
                       className="btn btn-square btn-ghost btn-sm shrink-0"
                       disabled={!repository.path}
-                      aria-label={`${t("common.copy")} ${repository.name || t("common.na")}`}
+                      aria-label={`${t("common.copy")} ${repositoryName || t("common.na")}`}
                       title={isCopied ? t("common.copied") : t("common.copy")}
                       onClick={() => void copyRepositoryPath(repository, repositoryKey)}
                     >
@@ -220,6 +222,8 @@ function CapacityDonut({ item }: { item: StorageDiagnostic }) {
 
   const usedPercent = Math.round(capacityUsedPercent(item));
   const usedBytes = Math.max(0, (item.total_bytes ?? 0) - (item.available_bytes ?? 0));
+  const safetyMargin = item.safety_margin_bytes ?? 0;
+  const writableBudget = item.writable_budget_bytes ?? 0;
   const ringTone =
     usedPercent >= 90 ? "text-error" : usedPercent >= 80 ? "text-warning" : "text-primary";
 
@@ -251,13 +255,29 @@ function CapacityDonut({ item }: { item: StorageDiagnostic }) {
         />
         <CapacityLegend
           color="bg-base-300"
-          label={t("monitor.storage.statAvailable", "Available")}
+          label={t("monitor.storage.statAvailable", "Currently writable")}
           value={formatBytes(item.available_bytes ?? 0)}
+        />
+        <CapacityLegend
+          color="bg-warning"
+          label={t("monitor.storage.safetyReserve", "Safety reserve")}
+          value={formatBytes(safetyMargin)}
+        />
+        <CapacityLegend
+          color="bg-success"
+          label={t("monitor.storage.uploadBudget", "Available for new writes")}
+          value={formatBytes(writableBudget)}
         />
         <p className="tabular-nums text-base-content/50">
           {t("monitor.storage.totalCapacity", "Total {{total}}", {
             total: formatBytes(item.total_bytes ?? 0),
           })}
+        </p>
+        <p className="max-w-sm text-base-content/50">
+          {t(
+            "monitor.storage.capacityExplanation",
+            "Writable space comes from the filesystem and may be lower than the space shown by macOS when purgeable APFS storage is included. Lumilio keeps the safety reserve free before accepting new writes.",
+          )}
         </p>
       </div>
     </div>

@@ -19,20 +19,20 @@ type AuthResponse = {
 type QueryResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
 
 type UploadResponse = {
-  task_id: number;
+  receipt_id: string;
   status: string;
 };
 
-type UploadJobStatus = {
-  task_id: number;
+type UploadOperationStatus = {
+  receipt_id: string;
   status: string;
   terminal: boolean;
   success: boolean;
   error?: string;
 };
 
-type UploadJobStatusResponse = {
-  jobs?: UploadJobStatus[];
+type UploadOperationStatusResponse = {
+  operations?: UploadOperationStatus[];
 };
 
 async function expectAuth(response: APIResponse): Promise<AuthResponse> {
@@ -102,7 +102,7 @@ async function uploadAsset(
   request: APIRequestContext,
   workspace: Workspace,
   filename: string,
-): Promise<number> {
+): Promise<string> {
   const source = readFileSync(workspace.authIsolationSource);
   const endOfImage = source.lastIndexOf(Buffer.from([0xff, 0xd9]));
   if (endOfImage < 0) throw new Error("auth isolation fixture is not a JPEG");
@@ -132,21 +132,21 @@ async function uploadAsset(
   expect(response.ok(), await response.text()).toBe(true);
   const upload = (await response.json()) as UploadResponse;
   expect(upload.status).toBe("processing");
-  expect(upload.task_id).toBeGreaterThan(0);
-  return upload.task_id;
+  expect(upload.receipt_id).toMatch(/^[0-9a-f-]{36}$/);
+  return upload.receipt_id;
 }
 
-async function uploadJobStatus(
+async function uploadOperationStatus(
   request: APIRequestContext,
   token: string,
-  taskId: number,
-): Promise<UploadJobStatus | undefined> {
-  const response = await request.get(`/api/v1/assets/batch/jobs?task_ids=${taskId}`, {
+  receiptId: string,
+): Promise<UploadOperationStatus | undefined> {
+  const response = await request.get(`/api/v1/assets/batch/operations?receipt_ids=${receiptId}`, {
     headers: { authorization: `Bearer ${token}` },
   });
   expect(response.ok(), await response.text()).toBe(true);
-  const result = (await response.json()) as UploadJobStatusResponse;
-  return result.jobs?.find((job) => job.task_id === taskId);
+  const result = (await response.json()) as UploadOperationStatusResponse;
+  return result.operations?.find((operation) => operation.receipt_id === receiptId);
 }
 
 async function userCanSeeAsset(
@@ -244,7 +244,10 @@ test("@auth-hardening browser logout clears local credentials and revokes its re
 }) => {
   await new LoginPage(page).signIn(workspace.username, workspace.password);
 
-  const accountButton = page.getByRole("button", { name: workspace.username });
+  const accountButton = page
+    .locator("button[aria-controls]")
+    .filter({ hasText: workspace.username });
+  await expect(accountButton).toHaveCount(1);
   await accountButton.click();
 
   const browserRefreshCookie = (await page.context().cookies()).find(
@@ -407,19 +410,19 @@ test("@auth-hardening exhausted session clears user A before user B data loads",
 }, testInfo) => {
   test.setTimeout(150_000);
   const privateFilename = `auth-isolation-${testInfo.parallelIndex}-${Date.now()}.jpg`;
-  const uploadTaskId = await uploadAsset(request, workspace, privateFilename);
+  const uploadReceiptId = await uploadAsset(request, workspace, privateFilename);
   await expect
     .poll(
       async () =>
-        (await uploadJobStatus(request, workspace.token, uploadTaskId))?.terminal ?? false,
+        (await uploadOperationStatus(request, workspace.token, uploadReceiptId))?.terminal ?? false,
       {
-        message: `${privateFilename} upload task should reach a terminal state for user A`,
+        message: `${privateFilename} upload operation should reach a terminal state for user A`,
         timeout: 120_000,
         intervals: [500, 1_000, 2_000],
       },
     )
     .toBe(true);
-  const completedUpload = await uploadJobStatus(request, workspace.token, uploadTaskId);
+  const completedUpload = await uploadOperationStatus(request, workspace.token, uploadReceiptId);
   expect(completedUpload?.success, completedUpload?.error ?? completedUpload?.status).toBe(true);
   expect(
     await userCanSeeAsset(request, workspace.token, privateFilename, workspace.repositoryId),

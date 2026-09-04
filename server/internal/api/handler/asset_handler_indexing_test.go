@@ -175,6 +175,7 @@ func TestAssetHandlerGetIndexingStats_RejectsInvalidRepositoryID(t *testing.T) {
 
 func TestAssetHandlerRebuildAssetIndexes_QueuesDefaultBatch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	receiptID := uuid.New()
 
 	handler := &AssetHandler{
 		indexingService: stubAssetIndexingService{
@@ -185,7 +186,7 @@ func TestAssetHandlerRebuildAssetIndexes_QueuesDefaultBatch(t *testing.T) {
 				require.True(t, input.MissingOnly)
 
 				return service.ReindexAssetsJobResult{
-					JobID:       42,
+					ReceiptID:   receiptID,
 					Requested:   []service.AssetIndexingTask{service.AssetIndexingTaskSemanticImage, service.AssetIndexingTaskOCR},
 					Limit:       input.Limit,
 					MissingOnly: input.MissingOnly,
@@ -206,13 +207,14 @@ func TestAssetHandlerRebuildAssetIndexes_QueuesDefaultBatch(t *testing.T) {
 	var response dto.RebuildAssetIndexesResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Equal(t, "queued", response.Status)
-	require.Equal(t, int64(42), response.JobID)
+	require.Equal(t, receiptID.String(), response.ReceiptID)
 	require.Equal(t, 200, response.Limit)
 	require.True(t, response.MissingOnly)
 	require.Equal(t, []string{"semantic", "ocr"}, response.RequestedTasks)
 }
 
 func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
+	receiptID := uuid.New()
 	gin.SetMode(gin.TestMode)
 
 	repositoryID := "550e8400-e29b-41d4-a716-446655440000"
@@ -237,7 +239,7 @@ func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
 				require.False(t, input.MissingOnly)
 
 				return service.ReindexAssetsJobResult{
-					JobID:        99,
+					ReceiptID:    receiptID,
 					Requested:    input.Tasks,
 					Limit:        input.Limit,
 					MissingOnly:  input.MissingOnly,
@@ -258,7 +260,7 @@ func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
 
 	var response dto.RebuildAssetIndexesResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-	require.Equal(t, int64(99), response.JobID)
+	require.Equal(t, receiptID.String(), response.ReceiptID)
 	require.Equal(t, 500, response.Limit)
 	require.False(t, response.MissingOnly)
 	require.Equal(t, repositoryID, *response.RepositoryID)
@@ -305,6 +307,34 @@ func TestAssetHandlerRebuildAssetIndexes_RejectsBioClipTask(t *testing.T) {
 			enqueueReindexAssets: func(ctx context.Context, input service.ReindexAssetsInput) (service.ReindexAssetsJobResult, error) {
 				t.Fatal("service should not be called for album-scoped BioCLIP tasks")
 				return service.ReindexAssetsJobResult{}, nil
+			},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/indexing/rebuild", bytes.NewReader(requestBody))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.RebuildAssetIndexes(ctx)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
+func TestAssetHandlerRebuildAssetIndexes_RejectsRepositoryScopedSemanticReset(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repositoryID := "550e8400-e29b-41d4-a716-446655440000"
+	requestBody, err := json.Marshal(dto.RebuildAssetIndexesRequestDTO{
+		RepositoryID:  repositoryID,
+		Tasks:         []string{"semantic"},
+		ResetSemantic: boolPtr(true),
+	})
+	require.NoError(t, err)
+
+	handler := &AssetHandler{
+		indexingService: stubAssetIndexingService{
+			enqueueReindexAssets: func(context.Context, service.ReindexAssetsInput) (service.ReindexAssetsJobResult, error) {
+				return service.ReindexAssetsJobResult{}, service.ErrSemanticResetRequiresGlobalScope
 			},
 		},
 	}

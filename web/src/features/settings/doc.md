@@ -15,8 +15,16 @@ Device-local preferences live in the lower shared
 Rich server-backed editors use [useDraftSettings](./hooks/useDraftSettings.ts): a local draft,
 dirty/reset/save state, and explicit commit through
 [SettingsSaveBar](./components/SettingsSaveBar.tsx). [useAISettingsDraft](./flows/ai/useAISettingsDraft.ts) adapts LLM credentials
-and semantic, video-semantic, BioCLIP, OCR, and face switches. Server facts
-remain Query data and are not copied into the preferences store.
+and semantic, video-semantic, BioCLIP, OCR, and face switches. Its provider
+dropdown and required-field checks consume the Server-advertised descriptor
+contract through [normalizeProviderDescriptors](./model/llmProviders.ts); the Web keeps only
+the exhaustive localized label boundary for known product IDs. Optional
+endpoints remain empty so the pinned provider adapter applies its
+deterministic default; the Web does not duplicate provider endpoint
+defaults. Server facts remain Query data and are not copied into the
+preferences store.
+[useGeocodingSettingsDraft](./flows/server/useGeocodingSettingsDraft.ts) gives the Server tab an explicit local
+draft for the provider, endpoint, language, and User-Agent aggregate.
 
 The active settings tab is the `tab` URL parameter. Repository browse and
 upload preferences are owned by Repositories; authentication reset clears
@@ -47,6 +55,9 @@ chrome.
 create, download, restore, and delete interaction. A successful restore
 reloads the application because the entire catalog and every cached server
 fact have changed.
+[GeocodingSection](./flows/server/GeocodingSection.tsx) owns the manual-save reverse-geocoding editor. It
+keeps privacy-sensitive endpoint and User-Agent edits local until the admin
+explicitly saves them.
 
 ## Data
 
@@ -57,7 +68,9 @@ command. [useRuntimeInfo](./api/useRuntimeInfo.ts) reports effective manifest-de
 configuration and is display-only.
 
 [useBackups](./api/useBackups.ts) owns the backup list and temporary post-create polling;
-[useRestoreBackup](./api/useBackups.ts) performs catalog replacement. Cloud tabs consume
+[useRestoreBackup](./api/useBackups.ts) performs catalog replacement. Restore polling keeps
+the durable Problem Reference and [BackupSection](./flows/server/BackupSection.tsx) localizes it only at
+presentation, allowing a language change during recovery. Cloud tabs consume
 the Cloud public entry, and user/account tabs consume Users/Auth public
 entries. The Settings root `index.ts` exposes only preference effects and
 the narrow preference hook required by application composition.

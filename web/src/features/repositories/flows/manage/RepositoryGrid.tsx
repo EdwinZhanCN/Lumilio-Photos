@@ -13,10 +13,10 @@ import {
   Wrench,
 } from "lucide-react";
 import { formatBytes } from "@/lib/utils/formatters";
-import type { components } from "@/lib/http-commons/schema";
 import { useI18n } from "@/lib/i18n";
-import type { RepositoryOption } from "../../types";
+import type { RepositoryOption, StorageLocationOption } from "../../types";
 import { useRepositoryRoots } from "../../api/useRepositoryRoots";
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
 import {
   type HostActionKind,
   useNativeHostCapability,
@@ -51,8 +51,6 @@ export interface RepositoryGridProps {
   onRebuildPeople: () => void;
 }
 
-type RepositoryRoot = components["schemas"]["dto.RepositoryRootDTO"];
-
 export default function RepositoryGrid({
   repositories,
   repositoryIds,
@@ -79,7 +77,7 @@ export default function RepositoryGrid({
   const navigate = useNavigate();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCandidateOpen, setIsCandidateOpen] = useState(false);
-  const [removeRootTarget, setRemoveRootTarget] = useState<RepositoryRoot | null>(null);
+  const [removeRootTarget, setRemoveRootTarget] = useState<StorageLocationOption | null>(null);
   const [collapsedRootIds, setCollapsedRootIds] = useState<ReadonlySet<string>>(new Set());
   const [hostAction, setHostAction] = useState<{
     kind: HostActionKind;
@@ -144,7 +142,7 @@ export default function RepositoryGrid({
       onCloudImport={onCloudImport}
       onLocate={
         nativeHostAvailable &&
-        !repository.isPrimary &&
+        repository.role !== "primary" &&
         rootById.get(repository.rootId)?.status === "active"
           ? () =>
               setHostAction({
@@ -189,7 +187,12 @@ export default function RepositoryGrid({
           <h2 className="text-base font-semibold">
             {t("manage.repositories.title", "Repositories")}
           </h2>
-          <p className="text-sm text-base-content/60">{t("manage.repositories.description")}</p>
+          <p className="text-sm text-base-content/60">
+            {t(
+              "manage.repositories.description",
+              "A Storage Location is an authorized parent location that can contain multiple Repositories. A Repository is a concrete media unit with its own identity.",
+            )}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <div className="join">
@@ -208,7 +211,7 @@ export default function RepositoryGrid({
                 className="btn btn-primary btn-sm join-item px-2"
                 aria-label={t(
                   "manage.repositories.moreCreateOptions",
-                  "More ways to add repositories",
+                  "More ways to add Repositories",
                 )}
               >
                 <ChevronDown size={16} />
@@ -320,6 +323,7 @@ export default function RepositoryGrid({
             const rootRepos = groups.reposByRoot.get(root.id ?? "") ?? [];
             const collapsed = collapsedRootIds.has(root.id ?? "");
             const removeBlockedLabel = storageRootRemovalBlockedLabel(root.removal_blocked_by, t);
+            const rootDisplayName = getStorageEntityDisplayName(root, t);
             return (
               <section key={root.id} className="card border border-base-300 bg-base-100 shadow-sm">
                 <header className="flex flex-wrap items-center gap-3 px-3 py-3">
@@ -331,7 +335,7 @@ export default function RepositoryGrid({
                     aria-label={t(
                       "manage.repositories.toggleLocationSection",
                       'Toggle the "{{name}}" section',
-                      { name: root.name ?? "" },
+                      { name: rootDisplayName },
                     )}
                   >
                     <ChevronDown
@@ -341,12 +345,7 @@ export default function RepositoryGrid({
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold">{root.name}</span>
-                      {root.kind === "default" ? (
-                        <span className="badge badge-primary badge-sm badge-soft">
-                          {t("manage.repositories.storageLocationDefault", "Default")}
-                        </span>
-                      ) : null}
+                      <span className="text-sm font-semibold">{rootDisplayName}</span>
                       {root.status !== "active" ? (
                         <span className="badge badge-warning badge-sm badge-soft">
                           {storageRootStatusLabel(root.status, t)}
@@ -375,7 +374,7 @@ export default function RepositoryGrid({
                           )}`}
                       {` · ${t(
                         "manage.repositories.storageLocationRepositoryCount",
-                        "{{count}} repositories",
+                        "{{count}} Repositories",
                         { count: root.repository_count ?? 0 },
                       )}`}
                     </div>
@@ -428,7 +427,7 @@ export default function RepositoryGrid({
                   <p className="border-t border-base-200 px-4 py-5 text-center text-xs text-base-content/50">
                     {t(
                       "manage.repositories.locationEmpty",
-                      "No repositories in this Storage Location yet.",
+                      "No Repositories in this Storage Location yet.",
                     )}
                   </p>
                 )}
@@ -557,7 +556,7 @@ function storageRootRemovalBlockedLabel(
     case "registered_repositories":
       return t(
         "manage.repositories.storageLocationRemoveBlockedRepositories",
-        "Remove its repositories from Lumilio first.",
+        "Remove its Repositories from Lumilio first.",
       );
     case "active_operation":
       return t(

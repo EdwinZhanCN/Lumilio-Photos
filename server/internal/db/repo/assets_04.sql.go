@@ -54,23 +54,28 @@ eligible AS (
       OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
     )
     AND (?8 IS NULL OR facts.owner_id = ?8)
-    AND (?9 IS NULL OR facts.repository_id = ?9)
+    AND (?9 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = pa.asset_id
+      AND occurrence.repository_id = ?9
+  ))
     AND (
       ?10 IS NULL
-      OR (
-        CASE
-          WHEN ?10 = '' THEN
-            CASE WHEN COALESCE(?11, true) THEN true
-              ELSE instr(pa.storage_path, '/') = 0
-            END
-          ELSE
-            CASE WHEN COALESCE(?11, true) THEN
-              pa.storage_path LIKE ?10 || '/%'
+      OR EXISTS (
+        SELECT 1 FROM active_asset_occurrence_paths occurrence_path
+        WHERE occurrence_path.asset_id = pa.asset_id
+          AND (?9 IS NULL OR occurrence_path.repository_id = ?9)
+          AND CASE
+            WHEN ?10 = '' THEN
+              COALESCE(?11, true)
+              OR instr(occurrence_path.relative_path, '/') = 0
             ELSE
-              pa.storage_path LIKE ?10 || '/%'
-              AND pa.storage_path NOT LIKE ?10 || '/%/%'
-            END
-        END
+              occurrence_path.relative_path LIKE ?10 || '/%'
+              AND (
+                COALESCE(?11, true)
+                OR instr(substr(occurrence_path.relative_path, length(?10) + 2), '/') = 0
+              )
+          END
       )
     )
     AND (
@@ -305,7 +310,7 @@ SELECT
   CAST(p.cover_has_live_motion AS INTEGER) AS cover_has_live_motion,
   p.member_items,
   p.matched_items,
-  cover_pa.asset_id, cover_pa.owner_id, cover_pa.type, cover_pa.original_filename, cover_pa.storage_path, cover_pa.mime_type, cover_pa.file_size, cover_pa.content_hash, cover_pa.quick_fingerprint, cover_pa.quick_fingerprint_version, cover_pa.width, cover_pa.height, cover_pa.duration, cover_pa.upload_time, cover_pa.taken_time, cover_pa.capture_offset_minutes, cover_pa.is_deleted, cover_pa.deleted_at, cover_pa.specific_metadata, cover_pa.rating, cover_pa.liked, cover_pa.repository_id, cover_pa.status, cover_pa.updated_at, cover_pa.gps_latitude, cover_pa.gps_longitude, cover_pa.gps_geohash_5, cover_pa.gps_geohash_7, cover_pa.exif_raw
+  cover_pa.asset_id, cover_pa.owner_id, cover_pa.content_id, cover_pa.type, cover_pa.original_filename, cover_pa.mime_type, cover_pa.width, cover_pa.height, cover_pa.duration, cover_pa.upload_time, cover_pa.taken_time, cover_pa.capture_offset_minutes, cover_pa.is_deleted, cover_pa.deleted_at, cover_pa.specific_metadata, cover_pa.rating, cover_pa.liked, cover_pa.status, cover_pa.updated_at, cover_pa.gps_latitude, cover_pa.gps_longitude, cover_pa.gps_geohash_5, cover_pa.gps_geohash_7, cover_pa.exif_raw
 FROM paged p
 JOIN assets cover_pa ON cover_pa.asset_id = p.cover_primary_asset_id
 ORDER BY p.sort_time DESC, p.cover_media_item_id DESC
@@ -423,14 +428,10 @@ func (q *Queries) GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCol
 			&i.MatchedItems,
 			&i.Asset.AssetID,
 			&i.Asset.OwnerID,
+			&i.Asset.ContentID,
 			&i.Asset.Type,
 			&i.Asset.OriginalFilename,
-			&i.Asset.StoragePath,
 			&i.Asset.MimeType,
-			&i.Asset.FileSize,
-			&i.Asset.ContentHash,
-			&i.Asset.QuickFingerprint,
-			&i.Asset.QuickFingerprintVersion,
 			&i.Asset.Width,
 			&i.Asset.Height,
 			&i.Asset.Duration,
@@ -442,7 +443,6 @@ func (q *Queries) GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCol
 			&i.Asset.SpecificMetadata,
 			&i.Asset.Rating,
 			&i.Asset.Liked,
-			&i.Asset.RepositoryID,
 			&i.Asset.Status,
 			&i.Asset.UpdatedAt,
 			&i.Asset.GpsLatitude,

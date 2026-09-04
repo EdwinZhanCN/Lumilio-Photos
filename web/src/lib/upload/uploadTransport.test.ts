@@ -11,22 +11,36 @@ describe("upload transport error mapping", () => {
     vi.unstubAllGlobals();
   });
 
-  it("rejects with the status and server message on a 503 upload response", async () => {
+  it("preserves a structured Problem and ignores injected server prose", async () => {
+    const problem = {
+      type: "https://lumilio.org/problems/repository/unavailable",
+      status: 503,
+      instance: "urn:lumilio:problem:0123456789abcdef0123456789abcdef",
+      message: "INJECTED MESSAGE",
+      error: "INJECTED ERROR",
+    };
     vi.stubGlobal(
       "fetch",
       async () =>
-        new Response(JSON.stringify({ message: "storage unavailable" }), {
+        new Response(JSON.stringify(problem), {
           status: 503,
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/problem+json" },
         }),
     );
 
-    await expect(uploadFile(new File(["photo"], "photo.jpg"), "smoke-hash")).rejects.toThrow(
-      "Upload failed with status 503: storage unavailable",
-    );
+    await expect(uploadFile(new File(["photo"], "photo.jpg"), "smoke-hash")).rejects.toEqual({
+      kind: "problem",
+      type: problem.type,
+      status: problem.status,
+      instance: problem.instance,
+      retryAfterSeconds: undefined,
+      conflictType: undefined,
+      repositoryID: undefined,
+      actions: undefined,
+    });
   });
 
-  it("keeps the status actionable when the error body is not JSON", async () => {
+  it("returns the shared malformed state when the error body is not a Problem", async () => {
     vi.stubGlobal(
       "fetch",
       async () =>
@@ -36,9 +50,9 @@ describe("upload transport error mapping", () => {
         }),
     );
 
-    await expect(precheckUploads([{ hash: "abcd", size: 5 }])).rejects.toThrow(
-      "Upload precheck failed with status 503",
-    );
+    await expect(precheckUploads([{ hash: "abcd", size: 5 }])).rejects.toEqual({
+      kind: "malformed",
+    });
   });
 });
 

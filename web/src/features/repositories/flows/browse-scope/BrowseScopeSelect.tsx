@@ -16,7 +16,7 @@ export default function BrowseScopeSelect({ className = "" }: { className?: stri
       title={t("assets.assetsPageHeader.scope.title", "Gallery scope")}
       aria-label={t("assets.assetsPageHeader.scope.title", "Gallery scope")}
     >
-      <option value="">{t("navbar.repository.all", "All repositories")}</option>
+      <option value="">{t("navbar.repository.all", "All Repositories")}</option>
       {repositories.map((repo) => (
         <option key={repo.id} value={repo.id}>
           {getRepositoryLabel(repo)}

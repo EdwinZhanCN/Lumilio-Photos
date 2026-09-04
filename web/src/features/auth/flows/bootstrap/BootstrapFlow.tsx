@@ -66,6 +66,8 @@ const BootstrapFlow: React.FC = () => {
     totpSetup,
     totpCode,
     setTotpCode,
+    passkeySecurityCode,
+    setPasskeySecurityCode,
     recoveryCodes,
     displayError,
     isBusy,
@@ -400,10 +402,33 @@ const BootstrapFlow: React.FC = () => {
                 />
                 <div className="mt-5 flex flex-col gap-4">
                   <PasskeyAffordance />
+                  <Field
+                    label={t("auth.register.passkeySecurityCode", {
+                      defaultValue: "Current authenticator code",
+                    })}
+                    hint={t("auth.register.passkeySecurityCodeHint", {
+                      defaultValue:
+                        "Enter a fresh code from your authenticator before adding this passkey.",
+                    })}
+                  >
+                    <TextInput
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      value={passkeySecurityCode}
+                      onChange={(event) =>
+                        setPasskeySecurityCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      required
+                    />
+                  </Field>
                   <Btn
                     variant="primary"
                     icon={Fingerprint}
                     loading={isBusy}
+                    disabled={passkeySecurityCode.length < 6}
                     onClick={() => void handleCreatePasskey()}
                   >
                     {t("auth.bootstrap.passkey.action", { defaultValue: "Create admin passkey" })}
@@ -454,11 +479,11 @@ const BootstrapFlow: React.FC = () => {
                 <CardHead
                   icon={HardDrive}
                   title={t("auth.bootstrap.repository.title", {
-                    defaultValue: "Set up primary storage",
+                    defaultValue: "Create Primary Repository",
                   })}
                   sub={t("auth.bootstrap.repository.subtitle", {
                     defaultValue:
-                      "Choose where Lumilio Photos stores media. This becomes the default for future repositories.",
+                      "The Primary Repository is the first concrete media unit inside the configured Default Storage Location.",
                   })}
                 />
 
@@ -473,7 +498,7 @@ const BootstrapFlow: React.FC = () => {
                     label={t("auth.primaryRepository.name", { defaultValue: "Name" })}
                     hint={t(
                       "auth.primaryRepository.nameHint",
-                      "This display name can be changed later. The primary directory remains <root>/primary.",
+                      "This display name can be changed later. The Primary Repository directory remains primary/.",
                     )}
                     error={
                       repoName.length > 0 && repoNameError
@@ -493,10 +518,12 @@ const BootstrapFlow: React.FC = () => {
                   </Field>
 
                   <Field
-                    label={t("auth.primaryRepository.root", { defaultValue: "Storage Location" })}
+                    label={t("auth.primaryRepository.root", {
+                      defaultValue: "Default Storage Location",
+                    })}
                     hint={t("auth.primaryRepository.rootHint", {
                       defaultValue:
-                        "Set by server configuration. The primary repository is created at <root>/primary.",
+                        "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
                     })}
                   >
                     <TextInput
@@ -532,7 +559,7 @@ const BootstrapFlow: React.FC = () => {
                     className="self-start px-6"
                   >
                     {t("auth.bootstrap.repository.submit", {
-                      defaultValue: "Create & open dashboard",
+                      defaultValue: "Create Primary Repository & open dashboard",
                     })}
                   </Btn>
                 </form>

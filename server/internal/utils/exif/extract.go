@@ -51,6 +51,7 @@ func NewExtractor(config *Config) *Extractor {
 // MetadataResult holds the result of metadata extraction
 type MetadataResult struct {
 	Metadata interface{}
+	Common   dbtypes.CommonMetadata
 	Error    error
 	Type     dbtypes.AssetType
 	Raw      json.RawMessage
@@ -90,7 +91,7 @@ func (e *Extractor) ExtractFromStream(ctx context.Context, req *StreamingExtract
 
 	// Extract metadata directly from stream without loading entire file into memory
 	result := &MetadataResult{Type: req.AssetType}
-	result.Metadata, result.Raw, result.Error = e.extractMetadataFromStream(ctx, req.Reader, req.AssetType)
+	result.Metadata, result.Common, result.Raw, result.Error = e.extractMetadataFromStream(ctx, req.Reader, req.AssetType)
 	if result.Error != nil {
 		return nil, fmt.Errorf("extract metadata from stream: %w", result.Error)
 	}
@@ -169,7 +170,7 @@ func (e *Extractor) validateRequest(req *StreamingExtractRequest) error {
 }
 
 // extractMetadataFromStream extracts metadata directly from stream without buffering entire file
-func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Reader, assetType dbtypes.AssetType) (interface{}, json.RawMessage, error) {
+func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Reader, assetType dbtypes.AssetType) (interface{}, dbtypes.CommonMetadata, json.RawMessage, error) {
 	var tags []string
 
 	switch assetType {
@@ -180,7 +181,7 @@ func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Rea
 	case dbtypes.AssetTypeAudio:
 		tags = e.tagConfig.AudioTags
 	default:
-		return nil, nil, fmt.Errorf("unsupported asset type: %s", assetType)
+		return nil, dbtypes.CommonMetadata{}, nil, fmt.Errorf("unsupported asset type: %s", assetType)
 	}
 
 	if e.config.IncludeRaw {
@@ -189,14 +190,15 @@ func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Rea
 
 	rawData, rawJSON, err := e.runExifToolFromStream(ctx, reader, tags)
 	if err != nil {
-		return nil, nil, err
+		return nil, dbtypes.CommonMetadata{}, nil, err
 	}
+	common := parseCommonMetadata(rawData, rawJSON, assetType)
 
 	if !e.config.IncludeRaw {
 		rawJSON = nil
 	}
 
-	return e.parseMetadata(rawData, assetType), rawJSON, nil
+	return e.parseMetadata(rawData, assetType), common, rawJSON, nil
 }
 
 // parseMetadata parses raw metadata based on asset type

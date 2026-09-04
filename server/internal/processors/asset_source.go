@@ -2,12 +2,13 @@ package processors
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/roe/locations"
 
 	"github.com/google/uuid"
 )
@@ -16,6 +17,7 @@ var ErrAssetSourceStale = errors.New("asset source observation is stale")
 
 type currentAssetSource struct {
 	asset       *repo.Asset
+	content     repo.ContentObject
 	repository  repo.Repository
 	files       *storage.RepositoryFS
 	path        storage.RepositoryPath
@@ -30,53 +32,91 @@ func (source *currentAssetSource) Close() error {
 	return source.files.Close()
 }
 
-func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID uuid.UUID, expectedToken, expectedHash string) (*currentAssetSource, error) {
-	asset, repository, err := ap.loadAssetAndRepo(ctx, assetID)
+// resolveCurrentAssetSource verifies immutable logical content identity, then
+// leases and opens one active Location immediately before native media access.
+// No queue fact or Asset row carries a path or repository context.
+func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID, expectedContentID uuid.UUID) (*currentAssetSource, error) {
+	if ap == nil || ap.locationResolver == nil {
+		return nil, locations.ErrAssetUnavailable
+	}
+	asset, err := ap.reader.GetAssetByID(ctx, assetID)
 	if err != nil {
-		return nil, err
-	}
-	if asset.IsDeleted || asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		return nil, ErrAssetSourceStale
-	}
-	repositoryPath, err := storage.ParseUserMediaPath(*asset.StoragePath)
-	if err != nil {
-		return nil, err
-	}
-	indexed, err := ap.queries.GetRepositoryFileIndexEntry(ctx, repo.GetRepositoryFileIndexEntryParams{
-		RepositoryID: repository.RepoID,
-		StoragePath:  repositoryPath.String(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("load current asset file index: %w", err)
-	}
-	if !indexed.AssetID.Valid || indexed.AssetID.UUID != assetID || indexed.State != "present" {
-		return nil, ErrAssetSourceStale
-	}
-	repositoryFS, err := ap.files.Open(repository)
-	if err != nil {
-		return nil, err
-	}
-	observation, err := repositoryFS.InspectMedia(ctx, repositoryPath, storage.HashNone)
-	if err != nil {
-		_ = repositoryFS.Close()
-		return nil, err
-	}
-	if observation.ObservationToken != indexed.ObservationToken {
-		_ = repositoryFS.Close()
-		return nil, ErrAssetSourceStale
-	}
-	if expectedToken != "" && expectedToken != observation.ObservationToken {
-		movedSameContent := expectedHash != "" && indexed.ContentHash != nil &&
-			strings.EqualFold(*indexed.ContentHash, expectedHash) && strings.EqualFold(asset.ContentHash, expectedHash)
-		if !movedSameContent {
-			_ = repositoryFS.Close()
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrAssetSourceStale
 		}
-	}
-	localPath, err := repositoryFS.LocalMediaPath(repositoryPath)
-	if err != nil {
-		_ = repositoryFS.Close()
 		return nil, err
 	}
-	return &currentAssetSource{asset: asset, repository: repository, files: repositoryFS, path: repositoryPath, localPath: localPath, observation: observation}, nil
+	if asset.IsDeleted || (expectedContentID != uuid.Nil && asset.ContentID != expectedContentID) {
+		return nil, ErrAssetSourceStale
+	}
+	content, err := ap.reader.GetContentObjectByID(ctx, asset.ContentID)
+	if err != nil {
+		return nil, err
+	}
+	if active, err := ap.hasActiveAssetOccurrence(ctx, assetID); err != nil {
+		return nil, err
+	} else if !active {
+		return nil, ErrAssetSourceStale
+	}
+	opened, localPath, err := ap.locationResolver.LocalAssetPath(ctx, assetID)
+	if err != nil {
+		// Repository removal can win the race after the asset fence was read but
+		// before the resolver opened its capability. A delivery for that old
+		// occurrence is stale and must be acknowledged, while a still-active but
+		// temporarily unavailable repository remains retryable.
+		if errors.Is(err, locations.ErrAssetUnavailable) {
+			active, checkErr := ap.hasActiveAssetOccurrence(ctx, assetID)
+			if checkErr != nil {
+				return nil, checkErr
+			}
+			if !active {
+				return nil, ErrAssetSourceStale
+			}
+		}
+		return nil, err
+	}
+	if opened.File != nil {
+		if err := opened.File.Close(); err != nil {
+			_ = opened.Close()
+			return nil, err
+		}
+		opened.File = nil
+	}
+	observation, err := opened.Repository.InspectMedia(ctx, opened.Path, storage.HashNone)
+	if err != nil {
+		_ = opened.Close()
+		return nil, err
+	}
+	if observation.Size != content.FileSize || opened.Node.StabilityToken == nil ||
+		observation.ObservationToken != *opened.Node.StabilityToken {
+		_ = opened.Close()
+		return nil, ErrAssetSourceStale
+	}
+	source := &currentAssetSource{
+		asset: &asset, content: content, repository: opened.Catalog,
+		files: opened.Repository, path: opened.Path, localPath: localPath,
+		observation: observation,
+	}
+	opened.Repository = nil
+	if err := opened.Close(); err != nil {
+		_ = source.Close()
+		return nil, fmt.Errorf("release source capability: %w", err)
+	}
+	return source, nil
+}
+
+func (ap *AssetProcessor) hasActiveAssetOccurrence(ctx context.Context, assetID uuid.UUID) (bool, error) {
+	if ap == nil || ap.readerDatabase == nil {
+		// Lightweight processor tests and non-catalog callers may not provide the
+		// diagnostic query handle. The resolver remains the authority in that case.
+		return true, nil
+	}
+	var active bool
+	if err := ap.readerDatabase.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM active_asset_occurrences WHERE asset_id = ?
+		)`, assetID).Scan(&active); err != nil {
+		return false, fmt.Errorf("check active asset occurrence: %w", err)
+	}
+	return active, nil
 }

@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import PageHeader from "@/components/ui/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
-import { useRepositoryOptions } from "@/features/repositories";
+import { getStorageEntityDisplayName, useRepositoryOptions } from "@/features/repositories";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
 import { LifecycleHistory } from "./LifecycleHistory";
 import { MLMonitor } from "./MLMonitor";
@@ -63,7 +63,7 @@ export default function MonitorOverview() {
                 ? t("monitor.subtitles.capabilities")
                 : t(
                     "monitor.subtitles.storage",
-                    "Storage Location, repository, capacity, mount, and lifecycle health.",
+                    "Storage Location, Repository, capacity, mount, and lifecycle health.",
                   )
         }
         icon={<Activity className="w-6 h-6 text-primary" />}
@@ -78,12 +78,12 @@ export default function MonitorOverview() {
             >
               <option value="">
                 {t("navbar.repository.all", {
-                  defaultValue: "All repositories",
+                  defaultValue: "All Repositories",
                 })}
               </option>
               {repositories.map((repo) => (
                 <option key={repo.id} value={repo.id}>
-                  {repo.name || repo.path}
+                  {getStorageEntityDisplayName(repo, t)}
                 </option>
               ))}
             </select>

@@ -29,3 +29,15 @@ func TestRecoveryCodeGenerationAndNormalization(t *testing.T) {
 	require.Len(t, normalizeRecoveryCode(first), recoveryCodeLength)
 	require.Equal(t, hashRecoveryCode(first), hashRecoveryCode(normalizeRecoveryCode(first)))
 }
+
+func TestNormalizeMFAMethodRejectsUnknownValues(t *testing.T) {
+	if got := normalizeMFAMethod("bogus"); got != "" {
+		t.Fatalf("normalizeMFAMethod(bogus) = %q, want empty", got)
+	}
+	if got := normalizeMFAMethod(MFAMethodTOTP); got != MFAMethodTOTP {
+		t.Fatalf("normalizeMFAMethod(totp) = %q, want %q", got, MFAMethodTOTP)
+	}
+	if got := normalizeMFAMethod(MFAMethodRecoveryCode); got != MFAMethodRecoveryCode {
+		t.Fatalf("normalizeMFAMethod(recovery_code) = %q, want %q", got, MFAMethodRecoveryCode)
+	}
+}

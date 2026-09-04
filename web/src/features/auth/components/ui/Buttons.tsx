@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Check, Copy, type LucideIcon } from "lucide-react";
+import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/lib/i18n.tsx";
 import { cx } from "./classNames.ts";
 
@@ -52,30 +53,46 @@ export const CopyButton: React.FC<{
   const resolvedLabel = label ?? t("common.copy", { defaultValue: "Copy" });
   const resolvedCopiedLabel = copiedLabel ?? t("common.copied", { defaultValue: "Copied" });
   const [done, setDone] = useState(false);
-  const copy = () => {
-    void navigator.clipboard?.writeText(text).catch(() => undefined);
-    setDone(true);
-    window.setTimeout(() => setDone(false), 1600);
+  const [failed, setFailed] = useState(false);
+  const copy = async () => {
+    try {
+      await copyText(text);
+      setDone(true);
+      setFailed(false);
+    } catch {
+      setDone(false);
+      setFailed(true);
+    }
+    window.setTimeout(() => {
+      setDone(false);
+      setFailed(false);
+    }, 1600);
   };
+  const statusLabel = failed
+    ? t("common.copyFailed", { defaultValue: "Copy failed." })
+    : done
+      ? resolvedCopiedLabel
+      : resolvedLabel;
   if (variant === "block") {
     return (
       <button
         type="button"
-        onClick={copy}
+        onClick={() => void copy()}
+        aria-live="polite"
         className="btn btn-outline h-11 min-h-11 w-full gap-2 rounded-xl border-base-300 font-medium normal-case text-base-content hover:bg-base-200"
       >
-        {done ? <Check size={16} /> : <Copy size={16} />}{" "}
-        {done ? resolvedCopiedLabel : resolvedLabel}
+        {done ? <Check size={16} /> : <Copy size={16} />} {statusLabel}
       </button>
     );
   }
   return (
     <button
       type="button"
-      onClick={copy}
+      onClick={() => void copy()}
+      aria-live="polite"
       className="btn btn-ghost btn-sm gap-1.5 rounded-lg text-base-content/60 hover:text-base-content"
     >
-      {done ? <Check size={14} /> : <Copy size={14} />} {done ? resolvedCopiedLabel : resolvedLabel}
+      {done ? <Check size={14} /> : <Copy size={14} />} {statusLabel}
     </button>
   );
 };

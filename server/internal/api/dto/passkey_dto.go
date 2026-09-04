@@ -25,6 +25,26 @@ type PasskeyVerifyRequestDTO struct {
 	Credential     any    `json:"credential" binding:"required"`
 }
 
+type PasskeyEnrollmentVerifyRequestDTO struct {
+	ChallengeToken string `json:"challenge_token" binding:"required"`
+	Credential     any    `json:"credential" binding:"required"`
+	SecurityToken  string `json:"security_token" binding:"required"`
+}
+
+type PasskeyDeleteRequestDTO struct {
+	SecurityToken string `json:"security_token" binding:"required"`
+}
+
+type PasskeyEnrollmentResponseDTO struct {
+	Credential PasskeyCredentialSummaryDTO `json:"credential"`
+	Session    *AuthResponseDTO            `json:"session,omitempty"`
+}
+
+type PasskeyMutationResponseDTO struct {
+	Status  MFAStatusDTO     `json:"status"`
+	Session *AuthResponseDTO `json:"session,omitempty"`
+}
+
 type PasskeyCredentialSummaryDTO struct {
 	PasskeyID  int        `json:"passkey_id"`
 	Label      string     `json:"label"`
@@ -53,6 +73,25 @@ func ToPasskeyCredentialSummaryDTO(summary service.PasskeyCredentialSummary) Pas
 		CreatedAt:  summary.CreatedAt,
 		LastUsedAt: summary.LastUsedAt,
 	}
+}
+
+func ToPasskeyEnrollmentResponseDTO(response service.PasskeyEnrollmentResponse) PasskeyEnrollmentResponseDTO {
+	var session *AuthResponseDTO
+	if response.Session != nil {
+		session = ToAuthResponseDTO(response.Session)
+	}
+	return PasskeyEnrollmentResponseDTO{
+		Credential: ToPasskeyCredentialSummaryDTO(response.Credential),
+		Session:    session,
+	}
+}
+
+func ToPasskeyMutationResponseDTO(response service.MFAStatusResponse) PasskeyMutationResponseDTO {
+	var session *AuthResponseDTO
+	if response.Session != nil {
+		session = ToAuthResponseDTO(response.Session)
+	}
+	return PasskeyMutationResponseDTO{Status: ToMFAStatusDTO(response.Status), Session: session}
 }
 
 func ToPasskeyListResponseDTO(response service.PasskeyListResponse) PasskeyListResponseDTO {

@@ -11,6 +11,7 @@ import {
 import { useMessage } from "@/features/notifications";
 import { formatBytes } from "@/lib/utils/formatters";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { useCreateRepository } from "../../api/useCreateRepository";
 import { useRepositoryCandidates } from "../../api/useRepositoryCandidates";
 import { useRepositoryRoots } from "../../api/useRepositoryRoots";
@@ -25,6 +26,7 @@ import {
   type RepositoryDirectoryNameError,
   type RepositoryNameError,
 } from "../../model/repositorySetup";
+import { getStorageEntityDisplayName } from "../../model/storageEntities";
 
 type CreateRepositoryStep = 0 | 1 | 2 | 3;
 
@@ -164,10 +166,7 @@ export default function AddRepositoryModal({
           onRecoveryRequired(conflictType);
           return;
         }
-        showMessage(
-          "error",
-          error instanceof Error ? error.message : t("manage.repositories.createFailed"),
-        );
+        showMessage("error", localizeAPIProblem(error, t, t("manage.repositories.createFailed")));
       }
     },
     [
@@ -244,7 +243,7 @@ export default function AddRepositoryModal({
               <section aria-labelledby="create-repository-details-step" className="space-y-5">
                 <div>
                   <h4 id="create-repository-details-step" className="text-sm font-semibold">
-                    {t("manage.repositories.createWizard.detailsTitle", "Name the repository")}
+                    {t("manage.repositories.createWizard.detailsTitle", "Name the Repository")}
                   </h4>
                   <p className="mt-1 max-w-xl text-sm text-base-content/60">
                     {t(
@@ -379,7 +378,7 @@ export default function AddRepositoryModal({
                   <p className="mt-1 max-w-xl text-sm text-base-content/60">
                     {t(
                       "manage.repositories.createWizard.locationDescription",
-                      "Lumilio creates the repository as a direct child of this authorized location.",
+                      "A Storage Location is an authorized parent location. Lumilio creates this Repository as its direct child.",
                     )}
                   </p>
                 </div>
@@ -414,10 +413,7 @@ export default function AddRepositoryModal({
                         value={root.id}
                         disabled={root.status !== "active" || root.writable === false}
                       >
-                        {root.name}
-                        {root.kind === "default"
-                          ? ` · ${t("manage.repositories.storageLocationDefault", "Default")}`
-                          : ""}
+                        {getStorageEntityDisplayName(root, t)}
                         {root.status !== "active"
                           ? ` · ${t("manage.repositories.storageLocationOffline", "Offline")}`
                           : ""}
@@ -438,7 +434,9 @@ export default function AddRepositoryModal({
                         <HardDrive size={18} />
                       </span>
                       <div className="min-w-0">
-                        <div className="font-medium">{selectedRoot.name}</div>
+                        <div className="font-medium">
+                          {getStorageEntityDisplayName(selectedRoot, t)}
+                        </div>
                         <div className="mt-0.5 break-all font-mono text-xs text-base-content/55">
                           {selectedRoot.path}
                         </div>
@@ -449,7 +447,7 @@ export default function AddRepositoryModal({
                           {selectedRoot.capacity_known
                             ? ` · ${t("manage.repositories.storageLocationCapacity", "{{available}} of {{total}} available", { available: formatBytes(selectedRoot.available_bytes ?? 0), total: formatBytes(selectedRoot.total_bytes ?? 0) })}`
                             : ` · ${t("manage.repositories.storageLocationCapacityUnknown", "Capacity unavailable")}`}
-                          {` · ${t("manage.repositories.storageLocationRepositoryCount", "{{count}} repositories", { count: selectedRoot.repository_count ?? 0 })}`}
+                          {` · ${t("manage.repositories.storageLocationRepositoryCount", "{{count}} Repositories", { count: selectedRoot.repository_count ?? 0 })}`}
                         </div>
                       </div>
                     </div>
@@ -458,7 +456,7 @@ export default function AddRepositoryModal({
                 <p className="text-xs leading-snug text-base-content/55">
                   {t(
                     "manage.repositories.storageLocationHint",
-                    "External locations are authorized in the Desktop Control Panel.",
+                    "A Storage Location can contain multiple Repositories. Authorize external Storage Locations in the Desktop Control Panel.",
                   )}
                 </p>
                 {!rootsQuery.isLoading && activeRoots.length === 0 && canRequestStorageLocation ? (
@@ -519,7 +517,7 @@ export default function AddRepositoryModal({
                   <p className="mt-1 max-w-xl text-sm text-base-content/60">
                     {t(
                       "manage.repositories.createWizard.reviewDescription",
-                      "Confirm the repository identity and its permanent storage layout before creating it.",
+                      "Confirm the Repository identity and its permanent storage layout before creating it.",
                     )}
                   </p>
                 </div>
@@ -532,7 +530,7 @@ export default function AddRepositoryModal({
                   />
                   <ReviewRow
                     label={t("manage.repositories.storageLocationLabel", "Storage Location")}
-                    value={selectedRoot?.name || "—"}
+                    value={selectedRoot ? getStorageEntityDisplayName(selectedRoot, t) : "—"}
                     detail={selectedRoot?.path}
                   />
                   <ReviewRow
@@ -683,7 +681,7 @@ function repositoryNameErrorMessage(
 ): string {
   switch (error) {
     case "required":
-      return t("manage.repositories.createNameRequired", "Enter a repository name.");
+      return t("manage.repositories.createNameRequired", "Enter a Repository name.");
     case "leadingOrTrailingSpace":
       return t(
         "manage.repositories.createNameEdgeSpace",

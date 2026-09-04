@@ -44,6 +44,7 @@ type EditorPanelProps = {
 
   depthStatus: DepthStatus;
   depthFeather: number;
+  depthUnavailableReason?: string;
   onGenerateDepth: () => void;
   onDepthFeatherChange: (value: number) => void;
 
@@ -108,6 +109,7 @@ export function EditorPanel({
   onResetCrop,
   depthStatus,
   depthFeather,
+  depthUnavailableReason,
   onGenerateDepth,
   onDepthFeatherChange,
   disabled = false,
@@ -225,6 +227,7 @@ export function EditorPanel({
               onLayersChange={onLayersChange}
               depthStatus={depthStatus}
               depthFeather={depthFeather}
+              depthUnavailableReason={depthUnavailableReason}
               onGenerateDepth={onGenerateDepth}
               onDepthFeatherChange={onDepthFeatherChange}
             />

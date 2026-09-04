@@ -20,9 +20,21 @@ export type {
   RepositoryActivity,
   RepositoryEffectiveState,
   RepositoryOption,
+  RepositoryRole,
   RepositoryReachability,
+  RepositoryRootsResponse,
+  StorageDiagnostic,
+  StorageDiagnosticsResponse,
+  StorageEntity,
+  StorageLocationEntity,
+  StorageLocationKind,
+  StorageLocationOption,
 } from "./types";
-export { getRepositoryDisplayName } from "./model/repositoryDisplayName";
+export {
+  getStorageEntityDisplayName,
+  normalizeRepositoryRootsResponse,
+  normalizeStorageDiagnosticsResponse,
+} from "./model/storageEntities";
 export { getRepositoryEffectiveState, isRepositoryUnavailable } from "./model/repositoryOptions";
 export {
   isDuplicateHandling,
@@ -32,4 +44,3 @@ export {
   type RepositoryDirectoryNameError,
   type RepositoryNameError,
 } from "./model/repositorySetup";
-export { waitForRepositoryScan } from "./api/waitForRepositoryScan";

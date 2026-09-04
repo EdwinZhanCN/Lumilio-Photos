@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
+import { t } from "@test/i18n";
 import { StorageMonitor } from "./StorageMonitor";
 
 describe("StorageMonitor", () => {
@@ -10,15 +11,24 @@ describe("StorageMonitor", () => {
         HttpResponse.json({
           generated_at: "2026-08-09T00:00:00Z",
           items: [
-            diagnostic("storage_location", "root-primary", "Primary Storage", "/storage"),
+            {
+              ...diagnostic("storage_location", "root-primary", "legacy default name", "/storage"),
+              kind: "default",
+            },
             diagnostic("storage_location", "root-archive", "Archive Disk", "/archive"),
             {
               ...diagnostic("repository", "repo-family", "Family Archive", "/archive/family"),
               parent_target_id: "root-archive",
             },
             {
-              ...diagnostic("repository", "repo-primary", "Primary", "/storage/primary"),
+              ...diagnostic(
+                "repository",
+                "repo-primary",
+                "legacy primary name",
+                "/storage/primary",
+              ),
               parent_target_id: "root-primary",
+              role: "primary",
             },
           ],
         }),
@@ -27,7 +37,9 @@ describe("StorageMonitor", () => {
 
     const screen = await renderWithProviders(<StorageMonitor />);
 
-    const primaryDetail = screen.getByRole("region", { name: "Primary Storage" });
+    const primaryDetail = screen.getByRole("region", {
+      name: t("productTerms.defaultStorageLocation"),
+    });
     await expect.element(primaryDetail).toHaveClass(/h-auto/);
     const capacityProgress = primaryDetail.getByRole("progressbar", { name: "Used capacity" });
     await expect.element(capacityProgress).toHaveAttribute("aria-valuenow", "40");
@@ -43,7 +55,12 @@ describe("StorageMonitor", () => {
       .element(primaryDetail.getByText("/storage/primary", { exact: true }))
       .toBeVisible();
     await expect
-      .element(primaryDetail.getByRole("button", { name: "Copy Primary", exact: true }))
+      .element(
+        primaryDetail.getByRole("button", {
+          name: `${t("common.copy")} ${t("productTerms.primaryRepository")}`,
+          exact: true,
+        }),
+      )
       .toBeVisible();
     expect(primaryDetail.element()?.scrollWidth).toBeLessThanOrEqual(
       primaryDetail.element()?.clientWidth ?? 0,
@@ -53,10 +70,17 @@ describe("StorageMonitor", () => {
     await expect
       .element(nav.getByRole("button", { name: "Family Archive", exact: true }))
       .toBeVisible();
-    await expect.element(nav.getByRole("button", { name: "Primary", exact: true })).toBeVisible();
+    await expect
+      .element(nav.getByRole("button", { name: t("productTerms.primaryRepository"), exact: true }))
+      .toBeVisible();
 
-    await nav.getByRole("button", { name: "Primary", exact: true }).click();
-    const repositoryDetail = screen.getByRole("region", { name: "Primary", exact: true });
+    await nav
+      .getByRole("button", { name: t("productTerms.primaryRepository"), exact: true })
+      .click();
+    const repositoryDetail = screen.getByRole("region", {
+      name: t("productTerms.primaryRepository"),
+      exact: true,
+    });
     await expect.element(repositoryDetail.getByRole("heading", { name: "Capacity" })).toBeVisible();
     await expect
       .element(repositoryDetail.getByRole("heading", { name: "Technical details" }))
@@ -78,10 +102,14 @@ describe("StorageMonitor", () => {
         HttpResponse.json({
           generated_at: "2026-08-09T00:00:00Z",
           items: [
-            diagnostic("storage_location", "root-primary", "Primary Storage", "/storage"),
+            {
+              ...diagnostic("storage_location", "root-primary", "Primary Storage", "/storage"),
+              kind: "default",
+            },
             {
               ...diagnostic("repository", "repo-primary", "Primary", "/storage/primary"),
               parent_target_id: "root-primary",
+              role: "primary",
             },
           ],
         }),
@@ -90,8 +118,14 @@ describe("StorageMonitor", () => {
 
     const screen = await renderWithProviders(<StorageMonitor />);
     const nav = screen.getByRole("navigation", { name: "Storage targets" });
-    const repoRow = nav.getByRole("button", { name: "Primary", exact: true });
-    const locationRow = nav.getByRole("button", { name: "Primary Storage", exact: true });
+    const repoRow = nav.getByRole("button", {
+      name: t("productTerms.primaryRepository"),
+      exact: true,
+    });
+    const locationRow = nav.getByRole("button", {
+      name: t("productTerms.defaultStorageLocation"),
+      exact: true,
+    });
     await expect.element(repoRow).toBeVisible();
     await expect.element(locationRow).toHaveAttribute("aria-expanded", "true");
 
@@ -103,7 +137,13 @@ describe("StorageMonitor", () => {
 
     // 点击行主体：只选中详情，不重新展开
     await locationRow.click();
-    await expect.element(screen.getByRole("region", { name: "Primary Storage" })).toBeVisible();
+    await expect
+      .element(
+        screen.getByRole("region", {
+          name: t("productTerms.defaultStorageLocation"),
+        }),
+      )
+      .toBeVisible();
     await expect.element(repoRow).not.toBeInTheDocument();
 
     // 再次点击 chevron 展开

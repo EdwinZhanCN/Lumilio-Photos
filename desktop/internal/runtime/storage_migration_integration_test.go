@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"server/config"
 
 	"desktop/internal/control/dto"
 	"desktop/internal/operation"
@@ -54,9 +55,12 @@ func newEmbeddedRuntimeHarness(t *testing.T) *embeddedRuntimeHarness {
 	oldPath := filepath.Join(t.TempDir(), "default-storage")
 	settings := draft.Settings
 	settings.NetworkMode = "custom"
-	settings.Listen = reserveLoopbackAddress(t)
+	// The manifest contract requires a non-zero port, but this storage-focused
+	// harness must not reserve and release a process-global port before startup.
+	// The test factory below replaces this persisted placeholder with :0 only
+	// for the embedded generation it starts.
+	settings.Listen = "127.0.0.1:1"
 	settings.StoragePath = oldPath
-	settings.RepositoryScanEnabled = false
 	settings.HardwareAcceleration = "none"
 	draft, err = configStore.PatchDraft(draft.TOML, settings)
 	if err != nil {
@@ -78,10 +82,17 @@ func newEmbeddedRuntimeHarness(t *testing.T) *embeddedRuntimeHarness {
 
 	snapshotStore := state.NewWithInstanceID("embedded-storage-migration")
 	operations := operation.New()
+	loadConfig := func() (config.AppConfig, error) {
+		cfg, loadErr := configStore.LoadCurrentConfig()
+		if loadErr == nil {
+			cfg.ServerConfig.Listen = "127.0.0.1:0"
+		}
+		return cfg, loadErr
+	}
 	controller := desktopruntime.NewController(desktopruntime.Options{
 		Store: snapshotStore, Operations: operations,
 		Desired:    desktopruntime.NewMemoryDesiredState(dto.DesiredStopped),
-		Factory:    desktopruntime.ServerFactory{Load: configStore.LoadCurrentConfig},
+		Factory:    desktopruntime.ServerFactory{Load: loadConfig},
 		Configured: true, OnReady: configStore.PromoteCurrentToLastKnownGood,
 		ReadyBudget: 20 * time.Second, StopBudget: 20 * time.Second,
 	})
@@ -299,19 +310,6 @@ func installMediaToolFixtures(t *testing.T) {
 		}
 	}
 	t.Setenv("LUMILIO_RESOURCES_DIR", resources)
-}
-
-func reserveLoopbackAddress(t *testing.T) string {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	address := listener.Addr().String()
-	if err := listener.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return address
 }
 
 func waitEmbeddedRuntime(t *testing.T, controller *desktopruntime.Controller, predicate func(dto.RuntimeSnapshot) bool) dto.RuntimeSnapshot {

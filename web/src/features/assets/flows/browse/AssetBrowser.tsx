@@ -19,6 +19,7 @@ import type { BrowseGroup } from "../../types";
 import type { AssetGalleryProps } from "./gallery/gallery.types";
 import { findBrowseItemIndexByAssetId } from "../../model/browseItems";
 import { countActiveAssetUserFilters, type AssetBrowseConstraint } from "../../model/filter";
+import { classifySearchError } from "../../model/visualSearch";
 import { useAssetBrowseRouteState } from "./useAssetBrowseRouteState";
 
 type PinNavigationOrigin = {
@@ -37,7 +38,7 @@ export type AssetBrowserProps = {
    * from the saved agent result (pin) instead of the normal browse view. */
   pinId?: string;
   /** Custom banner rendered between the header and the gallery (album info,
-   * person cover, trip map, etc.). Lets scoped collections reuse this page
+   * person cover, Event cover, etc.). Lets scoped collections reuse this page
    * instead of hand-rolling header + carousel + search. */
   hero?: ReactNode;
   /** Whether scoped search (FAB + search view) is available. Off for views
@@ -72,14 +73,41 @@ export function AssetBrowser({
 
   const {
     query: searchQuery,
+    similarAssetId: similarFromRoute,
     sort: sortBy,
     filter: userFilter,
     setQuery,
+    setSimilarAssetId,
     setSort,
     applyFilter,
   } = useAssetBrowseRouteState({ migrateLegacyState });
+  const similarAssetId = similarFromRoute ?? "";
+  const [fileQuery, setFileQuery] = useState<File | null>(null);
   const isCarouselOpen = Boolean(assetId);
-  const isSearchActive = searchEnabled && searchQuery.trim().length > 0;
+  const handleQueryChange = useCallback(
+    (next: string) => {
+      if (next.trim()) setFileQuery(null);
+      setQuery(next);
+    },
+    [setQuery],
+  );
+  const handleSimilarChange = useCallback(
+    (next: string | null) => {
+      setFileQuery(null);
+      setSimilarAssetId(next);
+    },
+    [setSimilarAssetId],
+  );
+  const handleFileQueryChange = useCallback(
+    (next: File | null) => {
+      if (next) setSimilarAssetId(null);
+      setFileQuery(next);
+    },
+    [setSimilarAssetId],
+  );
+  const isSearchActive =
+    searchEnabled &&
+    (searchQuery.trim().length > 0 || similarAssetId.length > 0 || fileQuery !== null);
   const hasActiveFilters = countActiveAssetUserFilters(userFilter) > 0;
   const isTrashView = constraint?.is_deleted === true;
   const handleViewerNavigate = useCallback(
@@ -134,6 +162,8 @@ export function AssetBrowser({
     constraint,
     userFilter,
     searchQuery: searchEnabled ? searchQuery : "",
+    similarAssetId: searchEnabled ? similarAssetId : "",
+    fileQuery: searchEnabled ? fileQuery : null,
     viewKey,
     disabled: isPinMode,
   });
@@ -156,6 +186,44 @@ export function AssetBrowser({
     error,
   } = activeView;
   const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(null);
+  const searchErrorKind = error ? classifySearchError(error) : null;
+  const searchEmptyState = useMemo(() => {
+    const visual = similarAssetId.length > 0 || fileQuery !== null;
+    if (visual && searchErrorKind === "embedding_missing") {
+      return {
+        title: t("assets.all.emptySimilarMissingTitle", "Not analyzed yet"),
+        description: t(
+          "assets.all.emptySimilarMissingDescription",
+          "This photo has no Image Semantic Analysis embedding yet.",
+        ),
+      };
+    }
+    if (visual && searchErrorKind === "unavailable") {
+      return {
+        title: t("assets.all.emptySimilarUnavailableTitle", "Image Semantic Analysis unavailable"),
+        description: t(
+          "assets.all.emptySimilarUnavailableDescription",
+          "Visual search is temporarily unavailable.",
+        ),
+      };
+    }
+    if (visual && searchErrorKind === "invalid_image") {
+      return {
+        title: t("assets.all.emptySimilarInvalidTitle", "Unsupported image"),
+        description: t(
+          "assets.all.emptySimilarInvalidDescription",
+          "That file could not be used as a search image.",
+        ),
+      };
+    }
+    if (visual) {
+      return {
+        title: t("assets.all.emptySimilarTitle", "No similar media"),
+        description: t("assets.all.emptySimilarDescription", "Nothing similar enough was found."),
+      };
+    }
+    return emptyState;
+  }, [emptyState, fileQuery, searchErrorKind, similarAssetId, t]);
 
   const hasFetchedOnce = isFetched;
 
@@ -235,13 +303,28 @@ export function AssetBrowser({
           </div>
         )}
 
-        {error && (
+        {Boolean(error) && (
           <div className="px-4">
             <div className="alert alert-warning">
               <span>
-                {t("search.error", {
-                  defaultValue: "Search is temporarily unavailable. Try again in a moment.",
-                })}
+                {searchErrorKind === "embedding_missing"
+                  ? t(
+                      "assets.all.emptySimilarMissingDescription",
+                      "This photo has no Image Semantic Analysis embedding yet.",
+                    )
+                  : searchErrorKind === "unavailable"
+                    ? t(
+                        "assets.all.emptySimilarUnavailableDescription",
+                        "Visual search is temporarily unavailable.",
+                      )
+                    : searchErrorKind === "invalid_image"
+                      ? t(
+                          "assets.all.emptySimilarInvalidDescription",
+                          "That file could not be used as a search image.",
+                        )
+                      : t("search.error", {
+                          defaultValue: "Search is temporarily unavailable. Try again in a moment.",
+                        })}
               </span>
             </div>
           </div>
@@ -269,8 +352,8 @@ export function AssetBrowser({
             isLoadingMore={isFetchingNextPage}
             isLoading={isFetching && activeSearchView.resultAssets.length === 0}
             columns={compactColumns}
-            emptyStateTitle={emptyState.title}
-            emptyStateDescription={emptyState.description}
+            emptyStateTitle={searchEmptyState.title}
+            emptyStateDescription={searchEmptyState.description}
           />
         )}
       </div>
@@ -478,7 +561,15 @@ export function AssetBrowser({
           </div>
         ))}
       {!isCarouselOpen && !dockExpanded && searchEnabled && (
-        <SearchFAB query={searchQuery} onQueryChange={setQuery} />
+        <SearchFAB
+          query={searchQuery}
+          similarAssetId={similarAssetId}
+          fileQuery={fileQuery}
+          searchError={isSearchActive ? error : null}
+          onQueryChange={handleQueryChange}
+          onSimilarChange={handleSimilarChange}
+          onFileQueryChange={handleFileQueryChange}
+        />
       )}
     </div>
   );

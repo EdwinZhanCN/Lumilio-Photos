@@ -23,6 +23,11 @@ INSERT INTO settings (
     backup_enabled,
     backup_interval_hours,
     backup_keep_last,
+    geocoding_provider,
+    geocoding_nominatim_endpoint,
+    geocoding_language,
+    geocoding_user_agent,
+    geocoding_revision,
     created_at,
     updated_at,
     updated_by
@@ -47,9 +52,14 @@ VALUES (
     ?16,
     ?17,
     ?18,
+    ?19,
+    ?20,
+    ?21,
+    ?22,
+    ?23,
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
-    ?19
+    ?24
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -70,6 +80,11 @@ ON CONFLICT (id) DO UPDATE SET
     backup_enabled = EXCLUDED.backup_enabled,
     backup_interval_hours = EXCLUDED.backup_interval_hours,
     backup_keep_last = EXCLUDED.backup_keep_last,
+    geocoding_provider = EXCLUDED.geocoding_provider,
+    geocoding_nominatim_endpoint = EXCLUDED.geocoding_nominatim_endpoint,
+    geocoding_language = EXCLUDED.geocoding_language,
+    geocoding_user_agent = EXCLUDED.geocoding_user_agent,
+    geocoding_revision = EXCLUDED.geocoding_revision,
     updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     updated_by = EXCLUDED.updated_by
 RETURNING *;

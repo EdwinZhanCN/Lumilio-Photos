@@ -49,23 +49,28 @@ eligible AS (
       OR pa.type IN (SELECT value FROM json_each((SELECT asset_types_json FROM filter_params)))
     )
     AND (?8 IS NULL OR facts.owner_id = ?8)
-    AND (?9 IS NULL OR facts.repository_id = ?9)
+    AND (?9 IS NULL OR EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = pa.asset_id
+      AND occurrence.repository_id = ?9
+  ))
     AND (
       ?10 IS NULL
-      OR (
-        CASE
-          WHEN ?10 = '' THEN
-            CASE WHEN COALESCE(?11, true) THEN true
-              ELSE instr(pa.storage_path, '/') = 0
-            END
-          ELSE
-            CASE WHEN COALESCE(?11, true) THEN
-              pa.storage_path LIKE ?10 || '/%'
+      OR EXISTS (
+        SELECT 1 FROM active_asset_occurrence_paths occurrence_path
+        WHERE occurrence_path.asset_id = pa.asset_id
+          AND (?9 IS NULL OR occurrence_path.repository_id = ?9)
+          AND CASE
+            WHEN ?10 = '' THEN
+              COALESCE(?11, true)
+              OR instr(occurrence_path.relative_path, '/') = 0
             ELSE
-              pa.storage_path LIKE ?10 || '/%'
-              AND pa.storage_path NOT LIKE ?10 || '/%/%'
-            END
-        END
+              occurrence_path.relative_path LIKE ?10 || '/%'
+              AND (
+                COALESCE(?11, true)
+                OR instr(substr(occurrence_path.relative_path, length(?10) + 2), '/') = 0
+              )
+          END
       )
     )
     AND (

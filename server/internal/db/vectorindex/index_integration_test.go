@@ -9,6 +9,7 @@ import (
 	"math"
 	"testing"
 
+	"server/internal/db/catalogtx"
 	"server/internal/db/vec1ext"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -77,7 +78,7 @@ func TestTrainANNInstallsQueryableModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := trainANN(ctx, database, 512); err != nil {
+	if err := trainANN(ctx, catalogtx.NewWriter(database, nil), database, 512); err != nil {
 		t.Fatal(err)
 	}
 	if mode, err := CurrentMode(ctx, database); err != nil || mode != ModeANN {

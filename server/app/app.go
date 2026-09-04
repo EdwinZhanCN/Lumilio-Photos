@@ -29,24 +29,29 @@ import (
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/api/handler"
+	"server/internal/artifact"
 	"server/internal/cloud"
+	"server/internal/commit"
 	"server/internal/db"
 	dbbackup "server/internal/db/backup"
+	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
+	"server/internal/execution"
 	"server/internal/httporigin"
 	"server/internal/logging"
 	"server/internal/processors"
 	"server/internal/queue"
-	"server/internal/queue/jobs"
 	"server/internal/search/bleveocr"
 	"server/internal/servertransport"
 	"server/internal/service"
 	"server/internal/settings"
 	"server/internal/sourcing"
 	"server/internal/storage"
-	"server/internal/storage/scanner"
+	roecontroller "server/internal/storage/roe/controller"
+	roelocations "server/internal/storage/roe/locations"
+	roematerializer "server/internal/storage/roe/materializer"
 	"server/internal/utils/imaging"
 	"server/internal/version"
 
@@ -228,7 +233,7 @@ func run(
 	repositoryLogger := logRuntime.Named("repository")
 	processorLogger := logRuntime.Named("processor")
 	indexingLogger := logRuntime.Named("indexing")
-	scannerLogger := logRuntime.Named("repository_scanner")
+	observationLogger := logRuntime.Named("repository_observation")
 	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"), appConfig.LoggingConfig.RepositoryAuditVerbose)
 	defer func() {
 		if err := repoAuditProvider.Close(); err != nil {
@@ -255,7 +260,8 @@ func run(
 		return fmt.Errorf("ensure storage layout: %w", err)
 	}
 
-	database, err := db.Open(ctx, dbConfig)
+	catalogScheduleWake := queue.NewSchedulerWake()
+	database, err := db.Open(ctx, dbConfig, db.WithTransactionObserver(catalogScheduleWake))
 	if err != nil {
 		return fmt.Errorf("open SQLite database: %w", err)
 	}
@@ -279,12 +285,36 @@ func run(
 		}
 	}()
 
-	if err := database.Migrate(ctx); err != nil {
+	// Schema generation 8 is intentionally fresh-only. Pre-production catalogs
+	// from earlier generations are rejected and recreated instead of translated.
+	if err := database.MigrateCatalog(ctx); err != nil {
 		appLogger.Error("failed to run migrations automatically",
 			zap.String("operation", "database.migrate"),
 			zap.Error(err),
 		)
 		return fmt.Errorf("run database migrations: %w", err)
+	}
+	queueDatabase, quarantinedQueuePath, err := db.OpenQueueWithRecovery(ctx, dbConfig)
+	if err != nil {
+		return fmt.Errorf("open SQLite queue database: %w", err)
+	}
+	if quarantinedQueuePath != "" {
+		appLogger.Warn("rebuilt corrupt SQLite queue database", zap.String("quarantined_path", quarantinedQueuePath))
+	}
+	queueDatabaseCloseAllowed := true
+	defer func() {
+		if !queueDatabaseCloseAllowed {
+			return
+		}
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer closeCancel()
+		if err := queueDatabase.Close(closeCtx); err != nil {
+			appLogger.Warn("SQLite queue close maintenance failed", zap.Error(err))
+			runErr = errors.Join(runErr, fmt.Errorf("close SQLite queue database: %w", err))
+		}
+	}()
+	if err := queueDatabase.Migrate(ctx); err != nil {
+		return fmt.Errorf("run SQLite queue migrations: %w", err)
 	}
 	sqlDB := database.SQL
 	queries := database.Queries
@@ -303,16 +333,51 @@ func run(
 			runErr = errors.Join(runErr, err)
 		}
 	}()
-	ocrIndexWriter := bleveocr.NewWriter(sqlDB, queries, ocrIndex)
+	ocrIndexWriter := bleveocr.NewWriter(sqlDB, database.Writer, queries, ocrIndex)
+	ocrIndexTrigger := bleveocr.NewOutboxTrigger()
 
-	settingsService := service.NewSettingsService(queries, settings.Default(appConfig.Environment), appConfig.Auth.SecretKeyFile)
+	// Execution budget, macro workers lane width, and process-global tool session
+	// derived strictly from the runtime manifest.
+	budget := execution.Budget{
+		CPU:          int64(appConfig.Execution.CPU),
+		DiskIO:       int64(appConfig.Execution.DiskIO),
+		ImageCodec:   int64(appConfig.Execution.ImageCodec),
+		VideoCodec:   int64(appConfig.Execution.VideoCodec),
+		Inference:    int64(appConfig.Execution.Inference),
+		MemoryBytes:  appConfig.Execution.MemoryMiB << 20,
+		MacroWorkers: appConfig.Execution.MacroWorkers,
+		MaxWaiting:   appConfig.Execution.MaxWaiting,
+		ToolSession: execution.ToolSession{
+			Threads:        appConfig.Execution.FFmpegThreads,
+			SoftwarePreset: appConfig.Execution.FFmpegSoftwarePreset,
+			HardwareAccel:  appConfig.Transcode.HardwareAccel,
+		},
+	}
+	resolvedAccel := processors.ResolveHardwareAccel(budget.ToolSession.HardwareAccel)
+	budget.ToolSession.HardwareAccel = resolvedAccel
+	appLogger.Info("resolved execution tool session", zap.String("hardware_accel", resolvedAccel), zap.Int("ffmpeg_threads", budget.ToolSession.Threads))
+
+	// Construct the closed River worker set and QueueDB adapter early. Catalog
+	// desired state remains recoverable while the domain services and commit
+	// capabilities are assembled below.
+	workers := river.NewWorkers()
+	queueClient, err := queue.New(queueDatabase.SQL, queueDatabase.ReaderSQL, workers, logRuntime.RiverLogger(), budget.DerivedMacroWorkers())
+	if err != nil {
+		return fmt.Errorf("initialize queue: %w", err)
+	}
+	settingsService := service.NewSettingsServiceWithRuntime(
+		queries,
+		settings.Default(appConfig.Environment),
+		appConfig.Auth.SecretKeyFile,
+		service.SettingsRuntime{DB: sqlDB, Writer: database.Writer},
+	)
 	if err := settingsService.EnsureInitialized(ctx); err != nil {
 		return fmt.Errorf("initialize system settings: %w", err)
 	}
 
 	// Single source of truth for first-run bootstrap progress. Reconcile at boot
 	// so the cached phase reflects the current gates.
-	bootstrapService := service.NewBootstrapService(queries)
+	bootstrapService := service.NewBootstrapServiceWithReader(queries, database.ReaderQueries)
 	if phase, err := bootstrapService.Reconcile(ctx); err != nil {
 		appLogger.Warn("failed to reconcile bootstrap phase", zap.Error(err))
 	} else {
@@ -337,7 +402,7 @@ func run(
 	// Initialize new repository-based storage system
 	repositoryAccess := storage.NewRepositoryAccessCoordinator()
 	repositoryFiles := storage.NewRepositoryFSFactory(repositoryAccess, queries)
-	repoManager, err := storage.NewRepositoryManager(sqlDB, queries, repositoryLogger, repoAuditProvider, repositoryFiles)
+	repoManager, err := storage.NewRepositoryManagerWithCatalog(sqlDB, database.Writer, database.ReaderSQL, queries, repositoryLogger, repoAuditProvider, repositoryFiles)
 	if err != nil {
 		return fmt.Errorf("initialize repository manager: %w", err)
 	}
@@ -386,24 +451,10 @@ func run(
 		appLogger.Warn("failed to reconcile repository capacity", zap.Error(err))
 	}
 	go monitorRepositoryCapacity(ctx, repoManager, appLogger.Named("storage_capacity"))
-	workers := river.NewWorkers()
-	queueClient, err := queue.New(sqlDB, workers, logRuntime.RiverLogger())
-	if err != nil {
-		return fmt.Errorf("initialize queue: %w", err)
-	}
-	eventService := event.NewService(sqlDB, queueClient)
-	river.AddWorker[queue.EventRebuildArgs](workers, &queue.EventRebuildWorker{
-		DB: sqlDB, Service: eventService,
-	})
-	river.AddWorker[queue.ScheduleEventRebuildsArgs](workers, &queue.ScheduleEventRebuildsWorker{
-		DB: sqlDB,
-	})
-	river.AddWorker[queue.ProcessOCROutboxArgs](workers, &queue.ProcessOCROutboxWorker{
-		Writer: ocrIndexWriter,
-	})
-	faceService := service.NewFaceService(queries, repositoryFiles, sqlDB)
+	eventService := event.NewServiceWithCatalog(database.Writer, database.Reader)
+	faceService := service.NewFaceService(queries, repositoryFiles, sqlDB, database.Writer)
 
-	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, queries, workers, appLogger, lumenLogger, settingsService, faceService, repositoryFiles)
+	lumenService, embeddingService, classifierService, err := initMLServices(ctx, appConfig, sqlDB, database.Writer, database.ReaderSQL, queries, appLogger, lumenLogger)
 	if err != nil {
 		return fmt.Errorf("initialize ML services: %w", err)
 	}
@@ -416,24 +467,35 @@ func run(
 		}
 	}()
 
-	assetService, err := service.NewAssetServiceWithQueue(
+	assetService, err := service.NewAssetServiceWithReader(
 		queries,
 		sqlDB,
+		database.Writer,
+		database.ReaderQueries,
+		database.ReaderSQL,
 		lumenService,
 		embeddingService,
 		ocrIndex,
-		queueClient,
+		ocrIndexTrigger,
 		appLogger.Named("asset_service"),
 	)
 	if err != nil {
 		return fmt.Errorf("initialize asset service: %w", err)
 	}
-	locationService := service.NewLocationService(queries, sqlDB, appConfig.Geocoding)
+	locationService := service.NewLocationServiceWithCatalog(queries, database.Writer, database.Reader)
 	speciesReferenceService := service.NewSpeciesReferenceService()
-	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, sqlDB, indexingLogger, repoAuditProvider, repositoryFiles)
-	stackService := service.NewStackServiceWithQueue(queries, sqlDB, appLogger.Named("stack"), repoAuditProvider, queueClient)
-	duplicateService := service.NewDuplicateService(queries, sqlDB, appLogger.Named("duplicate"), assetService)
-	authService, err := service.NewAuthService(queries, sqlDB, appConfig.Auth, appLogger.Named("auth"), securityLogger)
+	indexingService := service.NewAssetIndexingServiceWithReader(queries, settingsService, lumenService, database.Writer, database.ReaderSQL, indexingLogger, repoAuditProvider, repositoryFiles)
+	stackService := service.NewStackServiceWithReader(queries, sqlDB, database.Writer, database.ReaderSQL, appLogger.Named("stack"), repoAuditProvider)
+	duplicateService := service.NewDuplicateService(queries, sqlDB, database.Writer, appLogger.Named("duplicate"), assetService)
+	authService, err := service.NewAuthServiceWithReader(
+		queries,
+		database.ReaderQueries,
+		sqlDB,
+		database.Writer,
+		appConfig.Auth,
+		appLogger.Named("auth"),
+		securityLogger,
+	)
 	if err != nil {
 		return fmt.Errorf("initialize auth service: %w", err)
 	}
@@ -442,7 +504,7 @@ func run(
 		return fmt.Errorf("initialize auth rate limiter: %w", err)
 	}
 	albumService := service.NewAlbumService(queries)
-	userService := service.NewUserService(queries, sqlDB)
+	userService := service.NewUserServiceWithWriter(queries, sqlDB, database.Writer)
 
 	// Break-glass recovery is an explicit single-run host control, separate from
 	// immutable AppConfig.
@@ -451,7 +513,7 @@ func run(
 	// Initialize Agent Service. The ref store is shared between the agent
 	// tool chain and the hydration API handler; its janitor bounds memory
 	// for abandoned sessions.
-	authorizedLibraries := core.NewAuthorizedLibraryFactory(queries, assetService, sqlDB)
+	authorizedLibraries := core.NewAuthorizedLibraryFactory(queries, assetService, database.ReaderSQL)
 	refStore := ref.NewPersistentStore(
 		queries,
 		authorizedLibraries,
@@ -463,7 +525,7 @@ func run(
 	go refStore.RunJanitor(ctx, 10*time.Minute)
 	conversations := core.NewConversationStore(core.DefaultConversationTTL)
 	go conversations.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, sqlDB, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
+	agentService := core.NewAgentService(queries, sqlDB, database.Writer, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
 	agentPins := pins.NewService(queries, refStore, authorizedLibraries)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
@@ -476,19 +538,130 @@ func run(
 	tools.RegisterAll()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
-	sourceMaterializer := sourcing.NewSourceMaterializer(database, stagingManager, queueClient, processorLogger, repoAuditProvider, repositoryFiles)
-	sourceMaterializer.SetCapacityGuard(repoManager)
+	// Upload/cloud staging and filesystem observation converge at the same ROE
+	// content/Asset/Location commit boundary.
+	repositoryHashPreparer := roematerializer.NewHashPreparer(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
+	repositoryHashApplier := roematerializer.NewHashApplier()
+	artifactCleaner, err := artifact.NewCleaner(database, repositoryFiles, 24*time.Hour)
+	if err != nil {
+		return fmt.Errorf("initialize artifact cleaner: %w", err)
+	}
+	go artifactCleaner.Run(ctx, 6*time.Hour, func(err error) {
+		appLogger.Warn("artifact cleanup failed", zap.Error(err))
+	})
 
-	assetProcessor := processors.NewAssetProcessor(sqlDB, assetService, queries, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, appConfig.Transcode, appConfig.Tools, processorLogger, repoAuditProvider, repositoryFiles, repoManager)
-	repositoryScanner := scanner.NewScanner(database, queueClient, repositoryFiles, repoManager, appConfig.RepositoryScan, scannerLogger)
+	governor, err := budget.Governor()
+	if err != nil {
+		return fmt.Errorf("initialize execution governor: %w", err)
+	}
+	executionEngine := execution.NewEngine(governor)
+	repositoryObservationConfig := roecontroller.Config{
+		Settle: time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
+	}
+	commitCoordinator, err := commit.New(database.Writer, commit.Config{Capacity: 256, MaxBatch: 32, OldestWait: 10 * time.Millisecond}, commit.CatalogDependencies{
+		Face: faceService, Event: eventService, Location: locationService,
+		Indexing: indexingService, Materializer: repositoryHashApplier,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize commit coordinator: %w", err)
+	}
+	commitCoordinator.Start()
+	go monitorSQLiteWriter(
+		ctx,
+		database,
+		queueDatabase,
+		commitCoordinator,
+		governor,
+		appConfig.LoggingConfig.LogDir,
+		appLogger.Named("runtime_diagnostics"),
+	)
+	sourceMaterializer := sourcing.NewSourceMaterializer(
+		database.ReaderQueries,
+		sourcing.NewCoordinatorStagingJournal(commitCoordinator),
+		stagingManager,
+		processorLogger,
+		repoAuditProvider,
+		repositoryFiles,
+	)
+	sourceMaterializer.SetCapacityGuard(repoManager)
+	assetProcessor := processors.NewAssetProcessor(
+		database.ReaderQueries,
+		database.ReaderSQL,
+		sourceMaterializer,
+		settingsService,
+		lumenService,
+		appConfig.Transcode,
+		appConfig.Tools,
+		budget.ToolSession,
+		processorLogger,
+		repoAuditProvider,
+		repositoryFiles,
+	)
+	sourceMaterializer.SetActivation(func(ctx context.Context, fact roematerializer.KnownContent) (roematerializer.Result, error) {
+		_, err := commitCoordinator.ApplyRepositoryKnownContent(ctx, commit.RepositoryKnownContentApplied{Fact: fact})
+		if err != nil {
+			return roematerializer.Result{}, err
+		}
+		observation, err := database.ReaderQueries.GetRepositoryObservationBySourceEvent(ctx, repo.GetRepositoryObservationBySourceEventParams{RepositoryID: fact.RepositoryID, Source: fact.Source, SourceEventKey: &fact.SourceEventKey})
+		if err != nil || !observation.MappedNodeID.Valid {
+			return roematerializer.Result{}, fmt.Errorf("load committed source observation: %w", err)
+		}
+		location, err := database.ReaderQueries.GetActiveAssetLocationByNode(ctx, observation.MappedNodeID.UUID)
+		if err != nil {
+			return roematerializer.Result{}, fmt.Errorf("load committed source asset: %w", err)
+		}
+		asset, err := database.ReaderQueries.GetAssetByIDAny(ctx, location.AssetID)
+		if err != nil {
+			return roematerializer.Result{}, fmt.Errorf("load committed source content: %w", err)
+		}
+		return roematerializer.Result{Code: roematerializer.ResultBound, RepositoryID: fact.RepositoryID, NodeID: observation.MappedNodeID.UUID, AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: observation.Revision}, nil
+	})
+	defer func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := commitCoordinator.Stop(stopCtx); err != nil {
+			runErr = errors.Join(runErr, err)
+		}
+	}()
+	assetLocationResolver := roelocations.NewResolver(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
+	assetProcessor.SetLocationResolver(assetLocationResolver)
+	repositoryObserver := roecontroller.New(database.ReaderQueries, commitCoordinator, repositoryFiles, repositoryObservationConfig, observationLogger)
+	repositoryScanCommands := roecontroller.NewCommands(database, repositoryObservationConfig, observationLogger)
+	defer func() {
+		if err := repositoryObserver.Close(); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("close repository change feed: %w", err))
+		}
+	}()
+	if notifications := repositoryObserver.Notifications(); notifications != nil {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case repositoryID, ok := <-notifications:
+					if !ok {
+						return
+					}
+					if _, err := repositoryScanCommands.Request(ctx, repositoryID, "watcher", "native_change", false); err != nil && ctx.Err() == nil {
+						observationLogger.Warn("enqueue native repository observation",
+							zap.String("repository_id", repositoryID.String()), zap.Error(err))
+					}
+				}
+			}
+		}()
+	}
 	repoManager.SetInitialScanEnqueuer(func(ctx context.Context, repositoryID string) error {
-		_, err := repositoryScanner.EnqueueManualScan(ctx, repositoryID, "storage_lifecycle", true)
+		_, err := repositoryScanCommands.EnqueueManualScan(ctx, repositoryID, "storage_lifecycle", true)
 		return err
 	})
 	if err := repoManager.RetryPendingInitialRepositoryScans(ctx); err != nil {
 		return fmt.Errorf("resume pending initial repository scans: %w", err)
 	}
+	go func() {
+		ticker := time.NewTicker(time.Duration(appConfig.RepositoryScan.IntervalSeconds) * time.Second)
+		defer ticker.Stop()
+		runRepositoryVerifierLoop(ctx, ticker.C, repositoryScanCommands.EnqueueAllPeriodicScans, observationLogger)
+	}()
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
@@ -507,27 +680,21 @@ func run(
 		controls.RepositoryManagerReady(newRepositoryControl(repoManager))
 		defer controls.RepositoryManagerReady(nil)
 	}
-	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
-	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
-	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
-	river.AddWorker[queue.ThumbnailArgs](workers, &queue.ThumbnailWorker{Process: assetProcessor.ProcessThumbnailTask})
-	river.AddWorker[queue.TranscodeArgs](workers, &queue.TranscodeWorker{Process: assetProcessor.ProcessTranscodeTask})
-	river.AddWorker[queue.ProcessVideoFramesArgs](workers, &queue.ProcessVideoFramesWorker{Process: assetProcessor.ProcessVideoFramesTask})
-	river.AddWorker[queue.AssetRetryArgs](workers, &queue.AssetRetryWorker{ProcessRetry: assetProcessor.ProcessRetryTask})
-	river.AddWorker[queue.ReindexAssetsArgs](workers, &queue.ReindexAssetsWorker{IndexingService: indexingService})
-	river.AddWorker[queue.RebuildLocationClustersArgs](workers, &queue.RebuildLocationClustersWorker{LocationService: locationService})
-	river.AddWorker[queue.ScanRepositoryArgs](workers, &queue.ScanRepositoryWorker{ProcessScan: repositoryScanner.ProcessScanRepository})
-	river.AddWorker[queue.DetectStacksArgs](workers, &queue.DetectStacksWorker{StackService: stackService})
-	river.AddWorker[queue.LivePhotoMatchArgs](workers, &queue.LivePhotoMatchWorker{StackService: stackService})
-	river.AddWorker[queue.ProcessPHashArgs](workers, &queue.ProcessPHashWorker{
-		Queries:          queries,
-		EmbeddingService: embeddingService,
-		Files:            repositoryFiles,
-	})
-	river.AddWorker[queue.ScheduleRepositoryScansArgs](workers, &queue.ScheduleRepositoryScansWorker{
-		EnqueueAll: repositoryScanner.EnqueueAllPeriodicScans,
-	})
-
+	// River carries only closed macro commands. Catalog desired/applied state and
+	// the commit coordinator own product progress; each bounded runtime step
+	// declares its own process-wide execution resources.
+	macroRuntime := &pipelineRuntime{
+		engine: executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
+		repository: repositoryObserver, repositoryHasher: repositoryHashPreparer,
+		repositoryReader: database.ReaderQueries,
+		eventProjection:  eventService, locationProjection: locationService,
+		ocrProjection: ocrIndexWriter, reindexProjection: indexingService,
+		enrichmentReader: database.ReaderQueries, settings: settingsService,
+		lumen: lumenService, classifier: classifierService, files: repositoryFiles,
+	}
+	if err := macroRuntime.register(workers); err != nil {
+		return fmt.Errorf("register pipeline runtime: %w", err)
+	}
 	// Automatic database backups use their explicit private destination rather
 	// than following any removable repository root. Policy
 	// (enabled/interval/retention) is read from runtime settings on every tick,
@@ -548,14 +715,25 @@ func run(
 		MaxRiverMigration:       catalogInfo.RiverMigration,
 	}
 	backupScheduler := &dbbackup.Scheduler{
-		Source:   sqlDB,
+		// Online Backup holds one source connection while it copies the
+		// catalog page-by-page. In WAL mode that work belongs on the
+		// query-only reader pool; using the single writer connection here
+		// would stall every application and River write for the duration of
+		// a large backup.
+		Source:   database.ReaderSQL,
 		Dir:      appConfig.StorageConfig.BackupsDir(),
 		Metadata: snapshotMetadata,
 		Ready:    bootstrapService.IsReady,
 		Settings: settingsService.GetBackupConfig,
 		Logf:     func(format string, args ...any) { backupLogger.Infof(format, args...) },
 	}
-	river.AddWorker[queue.DatabaseBackupArgs](workers, &queue.DatabaseBackupWorker{Run: backupScheduler.Run})
+	backupRequestScheduler, err := queue.NewBackupScheduler(database.Writer, time.Hour)
+	if err != nil {
+		return fmt.Errorf("initialize catalog backup scheduler: %w", err)
+	}
+	if err := macroRuntime.registerBackup(workers, backupScheduler.Run); err != nil {
+		return fmt.Errorf("register backup pipeline runtime: %w", err)
+	}
 
 	// Admin backup surface (list/trigger/download/delete/restore). Restore only
 	// stages a validated snapshot here; the generation loop drains and closes
@@ -567,7 +745,7 @@ func run(
 		Compatibility:  snapshotCompatibility,
 		RequestRestart: requestRestart,
 		Logf:           backupScheduler.Logf,
-	}, queueClient)
+	}, database.Writer)
 
 	// River's Start runs the client in a background goroutine until Stop is
 	// called; it returns once startup completes. context.Background is used (not
@@ -576,12 +754,29 @@ func run(
 	if err := queueClient.Start(context.Background()); err != nil {
 		return fmt.Errorf("start queue client: %w", err)
 	}
+	catalogScheduler, err := queue.NewScheduler(database.Reader, database.Writer, queueClient, catalogScheduleWake.Signals(), 256, 30*time.Second)
+	if err != nil {
+		return fmt.Errorf("initialize catalog scheduler: %w", err)
+	}
+	if _, err := catalogScheduler.ScheduleOnce(ctx); err != nil {
+		return fmt.Errorf("schedule catalog desired work: %w", err)
+	}
+	go catalogScheduler.Run(ctx)
+	go func() {
+		if err := backupRequestScheduler.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			appLogger.Error("catalog backup scheduler stopped", zap.Error(err))
+		}
+	}()
 	queueStopped := false
 	defer func() {
 		if queueStopped {
 			return
 		}
 		if err := stopRiverQueue(queueClient, queueStopTimeout, queueKillTimeout); err != nil {
+			// A failed River drain leaves workers potentially using the queue
+			// database. Do not close that handle underneath them; preserving it
+			// is the same ownership safety rule used for the catalog database.
+			queueDatabaseCloseAllowed = false
 			databaseCloseAllowed = false
 			appLogger.Warn("queue client cleanup failed", zap.Error(err))
 			runErr = errors.Join(runErr, fmt.Errorf("stop River during cleanup: %w", err))
@@ -591,70 +786,23 @@ func run(
 		databaseCloseAllowed = true
 	}()
 	appLogger.Info("queues initialized successfully", zap.String("operation", "queue.init"))
-	backfillOwners, err := eventService.InitializeBackfill(ctx)
-	if err != nil {
+	if _, err := eventService.InitializeBackfill(ctx); err != nil {
 		return fmt.Errorf("initialize Event backfill: %w", err)
 	}
-	for _, ownerID := range backfillOwners {
-		args := jobs.EventRebuildArgs{OwnerID: ownerID}
-		opts := args.InsertOpts()
-		if _, err := queueClient.Insert(ctx, args, &opts); err != nil {
-			return fmt.Errorf("enqueue Event backfill for owner %d: %w", ownerID, err)
-		}
-	}
-
-	// --- Periodic Jobs (River PeriodicJobs) ---
-	// Must be registered after Start() — the periodic job enqueuer is
-	// initialized during Start.
-	if appConfig.RepositoryScan.Enabled {
-		queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
-			river.PeriodicInterval(time.Duration(appConfig.RepositoryScan.IntervalSeconds)*time.Second),
-			func() (river.JobArgs, *river.InsertOpts) {
-				return jobs.ScheduleRepositoryScansArgs{}, nil
-			},
-			&river.PeriodicJobOpts{ID: "repository_scan", RunOnStart: true},
-		))
-	}
-
-	// Hourly database-backup heartbeat. RunOnStart also gives a fresh install
-	// its first dump immediately; the worker's due-check (interval from
-	// runtime settings, storage reachability) turns superfluous ticks into
-	// silent no-ops.
-	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
-		river.PeriodicInterval(time.Hour),
-		func() (river.JobArgs, *river.InsertOpts) {
-			return jobs.DatabaseBackupArgs{}, nil
-		},
-		&river.PeriodicJobOpts{ID: "database_backup", RunOnStart: true},
-	))
-	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
-		river.PeriodicInterval(time.Minute),
-		func() (river.JobArgs, *river.InsertOpts) {
-			args := jobs.ScheduleEventRebuildsArgs{}
-			opts := args.InsertOpts()
-			return args, &opts
-		},
-		&river.PeriodicJobOpts{ID: "schedule_event_rebuilds", RunOnStart: true},
-	))
-	queueClient.PeriodicJobs().Add(river.NewPeriodicJob(
-		river.PeriodicInterval(time.Second),
-		func() (river.JobArgs, *river.InsertOpts) {
-			return jobs.ProcessOCROutboxArgs{}, nil
-		},
-		&river.PeriodicJobOpts{ID: "ocr_index_outbox", RunOnStart: true},
-	))
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, sqlDB, repoManager, stagingManager, queueClient, settingsService, lumenService, repositoryFiles)
+	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, sqlDB, database.Writer, repoManager, stagingManager, settingsService, lumenService, repositoryFiles)
+	assetController.SetReaderDatabase(database.ReaderSQL)
+	assetController.SetLocationResolver(assetLocationResolver)
 	assetController.StartCleanupTasks(ctx)
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
 	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
-	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
+	albumController := handler.NewAlbumHandler(&albumService, queries, database.Writer, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager, repositoryFiles)
-	locationController := handler.NewLocationHandler(locationService, queueClient)
+	locationController := handler.NewLocationHandler(locationService)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService, securityLogger)
-	queueController := handler.NewQueueHandler(sqlDB)
+	queueController := handler.NewQueueHandler(queueDatabase.ReaderSQL)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, authorizedLibraries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
@@ -667,17 +815,13 @@ func run(
 	if err := cloudSyncService.RecoverInterruptedRuns(ctx); err != nil {
 		appLogger.Warn("failed to recover interrupted cloud import runs", zap.Error(err))
 	}
-	// Reclaim scan runs left "running" by a previous crash/restart so the
-	// one-running-per-repository index does not permanently block scans.
-	if err := repositoryScanner.ReclaimInterruptedRuns(ctx); err != nil {
-		appLogger.Warn("failed to reclaim interrupted repository scan runs", zap.Error(err))
-	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanCommands, repoManager)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
-	eventController := handler.NewEventHandler(eventService, sqlDB, shareLinkService, queueClient)
+	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)
 	shareLinkController := handler.NewShareLinkHandler(shareLinkService, assetService, queries, repositoryFiles)
+	shareLinkController.SetLocationResolver(assetLocationResolver)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -753,7 +897,7 @@ func run(
 			)
 		}
 		var users int
-		if err := sqlDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
+		if err := database.ReaderSQL.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&users); err != nil {
 			return errors.Join(
 				fmt.Errorf("users table unreadable after SQLite restore: %w", err),
 				shutdownTransport(),
@@ -814,10 +958,12 @@ func run(
 	}
 	queueErr := stopRiverQueue(queueClient, queueStopTimeout, queueKillTimeout)
 	if queueErr != nil {
+		queueDatabaseCloseAllowed = false
 		databaseCloseAllowed = false
 		appLogger.Warn("queue client shutdown error", zap.String("operation", "queue.shutdown"), zap.Error(queueErr))
 	} else {
 		queueStopped = true
+		queueDatabaseCloseAllowed = true
 	}
 	if httpErr != nil || queueErr != nil {
 		return errors.Join(
@@ -883,6 +1029,227 @@ func monitorRepositoryCapacity(ctx context.Context, manager *storage.DefaultRepo
 			}
 		}
 	}
+}
+
+const (
+	sqliteCheckpointInterval  = 30 * time.Second
+	sqliteTelemetryInterval   = 5 * time.Second
+	sqliteCheckpointThreshold = int64(4 << 20)
+	sqliteCheckpointTimeout   = 10 * time.Second
+)
+
+// monitorSQLiteWriter keeps checkpoint work off arbitrary foreground commits
+// and reports database/sql queueing deltas for the process's single writer.
+// It does no SQLite work while the WAL is below the threshold.
+func monitorSQLiteWriter(
+	ctx context.Context,
+	database *db.DB,
+	queueDatabase *db.QueueDB,
+	commitCoordinator *commit.Coordinator,
+	governor *execution.Governor,
+	logDir string,
+	logger *zap.Logger,
+) {
+	telemetryTicker := time.NewTicker(sqliteTelemetryInterval)
+	defer telemetryTicker.Stop()
+	checkpointTicker := time.NewTicker(sqliteCheckpointInterval)
+	defer checkpointTicker.Stop()
+	previous := database.SQL.Stats()
+	var previousQueue sql.DBStats
+	if queueDatabase != nil && queueDatabase.SQL != nil {
+		previousQueue = queueDatabase.SQL.Stats()
+	}
+	var checkpointedWAL db.WALState
+	hasCheckpointedWAL := false
+	var checkpointedQueueWAL db.WALState
+	hasCheckpointedQueueWAL := false
+	var lastCheckpoint *sqliteCheckpointObservation
+	var lastQueueCheckpoint *sqliteCheckpointObservation
+	started := time.Now()
+	intervalStartedAt := started.UTC()
+
+	publish := func() {
+		intervalEndedAt := time.Now().UTC()
+		interval, intervalErr := database.TransactionIntervalReport()
+		diagnosticCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		catalogPipeline, catalogPipelineErr := readCatalogPipelineObservation(diagnosticCtx, database.ReaderSQL, intervalStartedAt, intervalEndedAt)
+		var macroQueue macroQueueObservation
+		var macroQueueErr error
+		if queueDatabase != nil {
+			macroQueue, macroQueueErr = readMacroQueueObservation(diagnosticCtx, queueDatabase.ReaderSQL, intervalStartedAt, intervalEndedAt)
+		}
+		cancel()
+		current := database.SQL.Stats()
+		waitCount := current.WaitCount - previous.WaitCount
+		waitDuration := current.WaitDuration - previous.WaitDuration
+		previous = current
+		walState, walErr := database.InspectWAL()
+		var queueStats sql.DBStats
+		var queueTelemetry db.QueueTelemetrySnapshot
+		var queueWAL db.WALState
+		var queueWALErr error
+		if queueDatabase != nil {
+			queueTelemetry = queueDatabase.TelemetrySnapshot()
+			if queueDatabase.SQL != nil {
+				queueStats = queueDatabase.SQL.Stats()
+			}
+			queueWAL, queueWALErr = queueDatabase.InspectWAL()
+		}
+		queueWaitCount := queueStats.WaitCount - previousQueue.WaitCount
+		queueWaitDuration := queueStats.WaitDuration - previousQueue.WaitDuration
+		previousQueue = queueStats
+		observation := sqliteRuntimeObservation{
+			ObservedAt:              intervalEndedAt,
+			RuntimeElapsed:          time.Since(started),
+			Telemetry:               database.TelemetrySnapshot(),
+			QueueTelemetry:          queueTelemetry,
+			TelemetryInterval:       interval,
+			IntervalStartedAt:       intervalStartedAt,
+			WAL:                     walState,
+			QueueWAL:                queueWAL,
+			WriterWaitCount:         waitCount,
+			WriterWaitDuration:      waitDuration,
+			QueueWriterWaitCount:    queueWaitCount,
+			QueueWriterWaitDuration: queueWaitDuration,
+			LastCheckpoint:          lastCheckpoint,
+			LastQueueCheckpoint:     lastQueueCheckpoint,
+			CatalogPipeline:         catalogPipeline,
+			MacroQueue:              macroQueue,
+		}
+		if commitCoordinator != nil {
+			observation.CommitCoordinator = commitCoordinator.Snapshot()
+		}
+		if governor != nil {
+			observation.ExecutionGovernor = governor.Snapshot()
+		}
+		if intervalErr == nil {
+			intervalStartedAt = intervalEndedAt
+		} else {
+			observation.IntervalError = boundedDiagnosticError(intervalErr)
+			logger.Warn("encode SQLite telemetry interval", zap.Error(intervalErr))
+		}
+		if walErr != nil {
+			observation.WALError = boundedDiagnosticError(walErr)
+		}
+		if queueWALErr != nil {
+			observation.QueueWALError = boundedDiagnosticError(queueWALErr)
+		}
+		if catalogPipelineErr != nil {
+			observation.CatalogPipelineError = boundedDiagnosticError(catalogPipelineErr)
+		}
+		if macroQueueErr != nil {
+			observation.MacroQueueError = boundedDiagnosticError(macroQueueErr)
+		}
+		if err := writeSQLiteRuntimeObservation(logDir, observation); err != nil {
+			logger.Warn("publish SQLite runtime diagnostics", zap.Error(err))
+		}
+		if waitCount > 0 {
+			logger.Warn("SQLite writer queueing observed",
+				zap.Int64("wait_count_delta", waitCount),
+				zap.Duration("wait_duration_delta", waitDuration),
+				zap.Int64("wal_bytes", walState.SizeBytes),
+			)
+		}
+		if queueWaitCount > 0 {
+			logger.Warn("SQLite queue writer queueing observed",
+				zap.Int64("wait_count_delta", queueWaitCount),
+				zap.Duration("wait_duration_delta", queueWaitDuration),
+				zap.Int64("wal_bytes", queueWAL.SizeBytes),
+			)
+		}
+	}
+	checkpointWAL := func(
+		name string,
+		inspect func() (db.WALState, error),
+		passiveCheckpoint func(context.Context) (db.CheckpointResult, error),
+		checkpointed *db.WALState,
+		hasCheckpointed *bool,
+		lastCheckpoint **sqliteCheckpointObservation,
+	) {
+		walState, err := inspect()
+		if err != nil {
+			logger.Warn("inspect SQLite writer runtime", zap.String("database", name), zap.Error(err))
+			return
+		}
+		if walState.SizeBytes < sqliteCheckpointThreshold ||
+			walStateAlreadyCheckpointed(walState, *checkpointed, *hasCheckpointed) {
+			return
+		}
+
+		checkpointStarted := time.Now()
+		checkpointCtx, cancel := context.WithTimeout(ctx, sqliteCheckpointTimeout)
+		result, checkpointErr := passiveCheckpoint(checkpointCtx)
+		cancel()
+		*lastCheckpoint = &sqliteCheckpointObservation{
+			ObservedAt: time.Now().UTC(),
+			WALBefore:  walState,
+			Result:     result,
+			Duration:   time.Since(checkpointStarted),
+		}
+		if checkpointErr != nil {
+			(*lastCheckpoint).Error = boundedDiagnosticError(checkpointErr)
+			if !errors.Is(checkpointErr, context.Canceled) {
+				logger.Warn("SQLite passive checkpoint failed",
+					zap.String("database", name),
+					zap.Int64("wal_bytes", walState.SizeBytes),
+					zap.Error(checkpointErr),
+				)
+			}
+			return
+		}
+		if result.Busy == 0 && result.Checkpointed == result.LogPages {
+			// Record the pre-checkpoint file version. A writer that committed
+			// before the checkpoint is included; one that commits afterwards
+			// changes the WAL version and re-arms maintenance.
+			*checkpointed = walState
+			*hasCheckpointed = true
+		}
+		logger.Info("SQLite passive checkpoint complete",
+			zap.String("database", name),
+			zap.Int64("wal_bytes_before", walState.SizeBytes),
+			zap.Int("busy", result.Busy),
+			zap.Int("log_pages", result.LogPages),
+			zap.Int("checkpointed_pages", result.Checkpointed),
+			zap.Duration("duration", result.Duration),
+		)
+	}
+	checkpoint := func() {
+		checkpointWAL("catalog", database.InspectWAL, database.PassiveCheckpoint, &checkpointedWAL, &hasCheckpointedWAL, &lastCheckpoint)
+		if queueDatabase != nil {
+			checkpointWAL("queue", queueDatabase.InspectWAL, queueDatabase.PassiveCheckpoint, &checkpointedQueueWAL, &hasCheckpointedQueueWAL, &lastQueueCheckpoint)
+		}
+	}
+	runSQLiteWriterMonitor(ctx, telemetryTicker.C, checkpointTicker.C, publish, checkpoint)
+}
+
+func runSQLiteWriterMonitor(
+	ctx context.Context,
+	telemetry <-chan time.Time,
+	checkpoints <-chan time.Time,
+	publish func(),
+	checkpoint func(),
+) {
+	publish()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-telemetry:
+			publish()
+		case <-checkpoints:
+			checkpoint()
+			// The runtime file is latest-only. Publishing here can land within
+			// milliseconds of the five-second telemetry turn and overwrite an
+			// entire interval before an external sampler observes it. Keep one
+			// publisher cadence; the next telemetry turn includes lastCheckpoint.
+		}
+	}
+}
+
+func walStateAlreadyCheckpointed(current, checkpointed db.WALState, hasCheckpointed bool) bool {
+	return hasCheckpointed &&
+		current.SizeBytes == checkpointed.SizeBytes &&
+		current.ModifiedAt.Equal(checkpointed.ModifiedAt)
 }
 
 func productURL(listen string) string {
@@ -1010,13 +1377,11 @@ func initMLServices(
 	ctx context.Context,
 	appConfig config.AppConfig,
 	sqlDB *sql.DB,
+	writer *catalogtx.Writer,
+	readerDB *sql.DB,
 	queries *repo.Queries,
-	workers *river.Workers,
 	appLogger *zap.Logger,
 	lumenLogger *zap.Logger,
-	settingsService service.SettingsService,
-	faceService service.FaceService,
-	repositoryFiles *storage.RepositoryFSFactory,
 ) (service.LumenService, service.EmbeddingService, service.ClassifierService, error) {
 	appLogger.Info("initializing ML services", zap.String("operation", "ml.init"))
 
@@ -1034,52 +1399,10 @@ func initMLServices(
 		zap.Bool("enabled", appConfig.Lumen.Enabled()),
 	)
 
-	embeddingService := service.NewEmbeddingService(queries, sqlDB)
-	speciesService := service.NewSpeciesService(queries)
-	ocrService := service.NewOCRService(queries, sqlDB)
-	imageLoader := queue.NewDBMLImageLoader(queries, repositoryFiles)
-
-	river.AddWorker[queue.ProcessSemanticArgs](workers, &queue.ProcessSemanticWorker{
-		LumenService:     lumenService,
-		EmbeddingService: embeddingService,
-		ConfigProvider:   settingsService,
-		ImageLoader:      imageLoader,
-	})
-	appLogger.Info("semantic service and worker registered", zap.String("operation", "ml.init"))
-
-	river.AddWorker[queue.ProcessBioClipArgs](workers, &queue.ProcessBioClipWorker{
-		LumenService:   lumenService,
-		SpeciesService: speciesService,
-		ConfigProvider: settingsService,
-		ImageLoader:    imageLoader,
-	})
-	appLogger.Info("BioCLIP service and worker registered", zap.String("operation", "ml.init"))
-
-	river.AddWorker[queue.ProcessOcrArgs](workers, &queue.ProcessOcrWorker{
-		OCRService:     ocrService,
-		LumenService:   lumenService,
-		ConfigProvider: settingsService,
-		ImageLoader:    imageLoader,
-	})
-	appLogger.Info("OCR service and worker registered", zap.String("operation", "ml.init"))
-
-	river.AddWorker[queue.ProcessFaceArgs](workers, &queue.ProcessFaceWorker{
-		FaceService:    faceService,
-		LumenService:   lumenService,
-		ConfigProvider: settingsService,
-		ImageLoader:    imageLoader,
-	})
-	appLogger.Info("face service and worker registered", zap.String("operation", "ml.init"))
-
+	embeddingService := service.NewEmbeddingServiceWithCatalog(queries, writer, readerDB)
 	aiTagService := service.NewAIGeneratedTagService(queries)
-	classifierService := service.NewClassifierService(sqlDB, lumenService, embeddingService, appLogger.Named("classifier"))
-	river.AddWorker[queue.ZeroshotClassifyArgs](workers, &queue.ZeroshotClassifyWorker{
-		EmbeddingService:  embeddingService,
-		ClassifierService: classifierService,
-		AITagService:      aiTagService,
-		ConfigProvider:    settingsService,
-	})
-	appLogger.Info("zero-shot classifier service and worker registered", zap.String("operation", "ml.init"))
+	classifierService := service.NewClassifierServiceWithCatalog(sqlDB, readerDB, writer, lumenService, embeddingService, appLogger.Named("classifier"))
+	_ = aiTagService
 
 	// Build classifier prototypes in the background once the semantic text-embed
 	// task is reachable, so startup never blocks on ML node availability. With

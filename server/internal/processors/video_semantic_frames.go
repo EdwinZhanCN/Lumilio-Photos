@@ -169,8 +169,9 @@ func (ap *AssetProcessor) extractFrameAt(ctx context.Context, webPath string, ts
 		"-q:v", "2",
 		"-f", "image2",
 		"-y",
-		outputPath,
 	}
+	args = append(args, ap.toolSession.FFmpegThreadsArg()...)
+	args = append(args, outputPath)
 	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), args...)
 	sysproc.HideConsole(cmd)
 	var stderr bytes.Buffer

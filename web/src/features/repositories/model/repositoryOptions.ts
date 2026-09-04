@@ -5,6 +5,7 @@ import type {
   RepositoryOption,
   RepositoryReachability,
 } from "../types";
+import { normalizeRepositoryRole } from "./storageEntities";
 
 type RepositoryListResponse = components["schemas"]["dto.IndexingRepositoryListResponseDTO"];
 
@@ -25,14 +26,15 @@ const REPOSITORY_ACTIVITIES: RepositoryActivity[] = [
 
 export function normalizeRepositoryOptions(data?: RepositoryListResponse): RepositoryOption[] {
   return (data?.repositories ?? []).map((repository) => ({
+    entityType: "repository",
     id: repository.id ?? "",
-    name: repository.name ?? "",
+    rawName: repository.name ?? "",
     path: repository.path ?? "",
-    role: repository.role ?? "regular",
+    role: normalizeRepositoryRole(repository.role, Boolean(repository.is_primary)),
     rootId: repository.root_id ?? "",
     reachability: normalizeRepositoryReachability(repository.reachability),
     activity: normalizeRepositoryActivity(repository.activity),
-    isPrimary: repository.role === "primary" || Boolean(repository.is_primary),
+    pauseReason: repository.pause_reason ?? "",
   }));
 }
 
@@ -49,7 +51,7 @@ function normalizeRepositoryActivity(activity?: string): RepositoryActivity {
 }
 
 export function isRepositoryUnavailable(repository: RepositoryOption): boolean {
-  return repository.reachability !== "active";
+  return repository.reachability !== "active" || repository.activity === "paused";
 }
 
 export function getRepositoryEffectiveState(

@@ -1,5 +1,7 @@
 import type { BatchUploadResult } from "@/lib/upload/types";
 
+export type UploadProcessResult = BatchUploadResult & { localError?: string };
+
 export interface FailedFile {
   name: string;
   error: string;
@@ -61,6 +63,6 @@ export interface UploadProgressCallbacks {
 }
 
 export interface UploadRunResult {
-  results: BatchUploadResult[];
-  resultSessions: Map<BatchUploadResult, FileUploadSession>;
+  results: UploadProcessResult[];
+  resultSessions: Map<UploadProcessResult, FileUploadSession>;
 }

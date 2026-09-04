@@ -16,6 +16,7 @@ import { Link } from "react-router-dom";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useAuth } from "@/features/auth";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeAPIProblem } from "@/lib/http-commons/problem";
 import { LumilioAvatar } from "@/components/assistant/LumilioAvatar";
 import { useLumilioChatStore } from "../../state/chatStore";
 import { useContextStore, useDockStore } from "@/lib/assistant";
@@ -89,6 +90,13 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
     setGenerating(isGenerating);
   }, [isGenerating, setGenerating]);
   const connectionError = useLumilioChatStore((s) => s.connectionError);
+  const connectionErrorCopy = connectionError
+    ? localizeAPIProblem(
+        connectionError,
+        t,
+        t("lumilio.chat.connectionFailed", "Lumilio Agent could not complete this request."),
+      )
+    : null;
   const usage = useLumilioChatStore((s) => s.usage);
   const sendMessage = useLumilioChatStore((s) => s.sendMessage);
   const newConversation = useLumilioChatStore((s) => s.newConversation);
@@ -158,9 +166,8 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
   useEffect(() => {
     if (!isDrawer || collapsed) return undefined;
 
-    restoreFocusRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    restoreFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => {
       const panel = drawerRef.current;
       const target = panel?.querySelector<HTMLElement>(
@@ -179,9 +186,11 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
       }
       if (event.key !== "Tab") return;
 
-      const focusable = [...panel.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )].filter((item) => item.getClientRects().length > 0);
+      const focusable = [
+        ...panel.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((item) => item.getClientRects().length > 0);
       if (focusable.length === 0) {
         event.preventDefault();
         panel.focus();
@@ -234,10 +243,7 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
     : t("lumilio.dock.collapse", "Collapse chat");
 
   const statusDot = (
-    <span
-      className={`h-3 w-3 shrink-0 rounded-full ${status.dot}`}
-      aria-label={status.label}
-    />
+    <span className={`h-3 w-3 shrink-0 rounded-full ${status.dot}`} aria-label={status.label} />
   );
 
   const header = (
@@ -333,9 +339,9 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           )}
         </div>
       )}
-      {connectionError && (
+      {connectionErrorCopy && (
         <div className="border-b border-base-300 bg-error/10 px-3 py-1.5 text-xs text-error">
-          {connectionError}
+          {connectionErrorCopy}
         </div>
       )}
       {messages.length === 0 ? (
@@ -465,7 +471,9 @@ export function ChatDock({ variant = "embedded" }: ChatDockProps) {
           {header}
           {!collapsed && (
             <>
-              <div data-lumilio-chat-scroll className="min-h-0 flex-1 overflow-y-auto">{bodyContent}</div>
+              <div data-lumilio-chat-scroll className="min-h-0 flex-1 overflow-y-auto">
+                {bodyContent}
+              </div>
               <div className="border-t border-base-300 p-2">{inputArea}</div>
             </>
           )}

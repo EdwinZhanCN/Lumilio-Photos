@@ -41,10 +41,8 @@ export const createResponsiveConfig = (containerWidth: number): LayoutConfig => 
 };
 
 export const assetToLayoutBox = (asset: Asset): LayoutBox => {
-  // Layout uses the asset's own width/height, which the backend already
-  // orientation-corrects. We intentionally do not fall back to
-  // specific_metadata.dimensions: it is not a reliable source of truth and
-  // reading it risked undefined-access errors. Missing dimensions default to 3:2.
+  // Layout uses the orientation-corrected top-level width/height. Missing
+  // dimensions default to 3:2.
   const { width, height } = asset;
 
   return {

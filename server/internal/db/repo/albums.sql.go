@@ -24,14 +24,18 @@ WHERE al.user_id = ?1
       JOIN assets a ON a.asset_id = aa.asset_id
       WHERE aa.album_id = al.album_id
         AND a.is_deleted = false
-        AND a.repository_id = ?2
+        AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a.asset_id
+            AND occurrence.repository_id = ?2)
     )
     OR EXISTS (
       SELECT 1
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
         AND a_cover.is_deleted = false
-        AND a_cover.repository_id = ?2
+        AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a_cover.asset_id
+            AND occurrence.repository_id = ?2)
     )
   )
 `
@@ -131,7 +135,9 @@ WHERE aa.album_id = ?1
   AND a.is_deleted = false
   AND (
     ?2 IS NULL
-    OR a.repository_id = ?2
+    OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = ?2)
   )
 `
 
@@ -148,7 +154,7 @@ func (q *Queries) GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAsse
 }
 
 const getAlbumAssets = `-- name: GetAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = ?1 AND a.is_deleted = false
@@ -156,37 +162,32 @@ ORDER BY aa.position ASC, aa.added_time ASC
 `
 
 type GetAlbumAssetsRow struct {
-	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
-	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
-	Type                    string                   `db:"type" json:"type"`
-	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
-	StoragePath             *string                  `db:"storage_path" json:"storage_path"`
-	MimeType                string                   `db:"mime_type" json:"mime_type"`
-	FileSize                int64                    `db:"file_size" json:"file_size"`
-	ContentHash             string                   `db:"content_hash" json:"content_hash"`
-	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int64                   `db:"width" json:"width"`
-	Height                  *int64                   `db:"height" json:"height"`
-	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
-	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int64                   `db:"rating" json:"rating"`
-	Liked                   bool                     `db:"liked" json:"liked"`
-	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
-	Status                  dbtypes.JSON             `db:"status" json:"status"`
-	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
-	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
-	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
-	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
-	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
-	Position                int64                    `db:"position" json:"position"`
-	AddedTime               dbtypes.Timestamp        `db:"added_time" json:"added_time"`
+	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	ContentID            uuid.UUID                `db:"content_id" json:"content_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	Width                *int64                   `db:"width" json:"width"`
+	Height               *int64                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int64                   `db:"rating" json:"rating"`
+	Liked                bool                     `db:"liked" json:"liked"`
+	Status               dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt            dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	Position             int64                    `db:"position" json:"position"`
+	AddedTime            dbtypes.Timestamp        `db:"added_time" json:"added_time"`
 }
 
 func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error) {
@@ -201,14 +202,10 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -220,7 +217,6 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -245,14 +241,16 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 }
 
 const getAlbumAssetsScoped = `-- name: GetAlbumAssetsScoped :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = ?1
   AND a.is_deleted = false
   AND (
     ?2 IS NULL
-    OR a.repository_id = ?2
+    OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+      WHERE occurrence.asset_id = a.asset_id
+        AND occurrence.repository_id = ?2)
   )
 ORDER BY aa.position ASC, aa.added_time ASC
 `
@@ -263,37 +261,32 @@ type GetAlbumAssetsScopedParams struct {
 }
 
 type GetAlbumAssetsScopedRow struct {
-	AssetID                 uuid.UUID                `db:"asset_id" json:"asset_id"`
-	OwnerID                 *int32                   `db:"owner_id" json:"owner_id"`
-	Type                    string                   `db:"type" json:"type"`
-	OriginalFilename        string                   `db:"original_filename" json:"original_filename"`
-	StoragePath             *string                  `db:"storage_path" json:"storage_path"`
-	MimeType                string                   `db:"mime_type" json:"mime_type"`
-	FileSize                int64                    `db:"file_size" json:"file_size"`
-	ContentHash             string                   `db:"content_hash" json:"content_hash"`
-	QuickFingerprint        *string                  `db:"quick_fingerprint" json:"quick_fingerprint"`
-	QuickFingerprintVersion *string                  `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
-	Width                   *int64                   `db:"width" json:"width"`
-	Height                  *int64                   `db:"height" json:"height"`
-	Duration                *float64                 `db:"duration" json:"duration"`
-	UploadTime              dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
-	TakenTime               dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes    *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted               bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt               dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata        dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating                  *int64                   `db:"rating" json:"rating"`
-	Liked                   bool                     `db:"liked" json:"liked"`
-	RepositoryID            uuid.NullUUID            `db:"repository_id" json:"repository_id"`
-	Status                  dbtypes.JSON             `db:"status" json:"status"`
-	UpdatedAt               dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
-	GpsLatitude             *float64                 `db:"gps_latitude" json:"gps_latitude"`
-	GpsLongitude            *float64                 `db:"gps_longitude" json:"gps_longitude"`
-	GpsGeohash5             *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
-	GpsGeohash7             *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
-	ExifRaw                 dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
-	Position                int64                    `db:"position" json:"position"`
-	AddedTime               dbtypes.Timestamp        `db:"added_time" json:"added_time"`
+	AssetID              uuid.UUID                `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	ContentID            uuid.UUID                `db:"content_id" json:"content_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	Width                *int64                   `db:"width" json:"width"`
+	Height               *int64                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
+	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int64                   `db:"rating" json:"rating"`
+	Liked                bool                     `db:"liked" json:"liked"`
+	Status               dbtypes.JSON             `db:"status" json:"status"`
+	UpdatedAt            dbtypes.Timestamp        `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              dbtypes.JSON             `db:"exif_raw" json:"exif_raw"`
+	Position             int64                    `db:"position" json:"position"`
+	AddedTime            dbtypes.Timestamp        `db:"added_time" json:"added_time"`
 }
 
 func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsScopedParams) ([]GetAlbumAssetsScopedRow, error) {
@@ -308,14 +301,10 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -327,7 +316,6 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,
@@ -389,7 +377,9 @@ SELECT
       AND a_count.is_deleted = false
       AND (
         ?1 IS NULL
-        OR a_count.repository_id = ?1
+        OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a_count.asset_id
+            AND occurrence.repository_id = ?1)
       )
   ) AS asset_count,
   COALESCE(
@@ -400,7 +390,9 @@ SELECT
         AND a_cover.is_deleted = false
         AND (
           ?1 IS NULL
-          OR a_cover.repository_id = ?1
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_cover.asset_id
+              AND occurrence.repository_id = ?1)
         )
       LIMIT 1
     ),
@@ -412,7 +404,9 @@ SELECT
         AND a_scope.is_deleted = false
         AND (
           ?1 IS NULL
-          OR a_scope.repository_id = ?1
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_scope.asset_id
+              AND occurrence.repository_id = ?1)
         )
       ORDER BY aa_cover.position IS NULL, aa_cover.position, aa_cover.added_time, aa_cover.asset_id
       LIMIT 1
@@ -518,14 +512,18 @@ WITH page_albums AS (
         JOIN assets a_exists ON a_exists.asset_id = aa_exists.asset_id
         WHERE aa_exists.album_id = al.album_id
           AND a_exists.is_deleted = false
-          AND a_exists.repository_id = ?1
+          AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_exists.asset_id
+              AND occurrence.repository_id = ?1)
       )
       OR EXISTS (
         SELECT 1
         FROM assets a_cover_exists
         WHERE a_cover_exists.asset_id = al.cover_asset_id
           AND a_cover_exists.is_deleted = false
-          AND a_cover_exists.repository_id = ?1
+          AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_cover_exists.asset_id
+              AND occurrence.repository_id = ?1)
       )
     )
   ORDER BY al.created_at DESC, al.album_id DESC
@@ -548,7 +546,9 @@ SELECT
       AND a_count.is_deleted = false
       AND (
         ?1 IS NULL
-        OR a_count.repository_id = ?1
+        OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+          WHERE occurrence.asset_id = a_count.asset_id
+            AND occurrence.repository_id = ?1)
       )
   ) AS asset_count,
   COALESCE(
@@ -559,7 +559,9 @@ SELECT
         AND a_cover.is_deleted = false
         AND (
           ?1 IS NULL
-          OR a_cover.repository_id = ?1
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_cover.asset_id
+              AND occurrence.repository_id = ?1)
         )
       LIMIT 1
     ),
@@ -571,7 +573,9 @@ SELECT
         AND a_scope.is_deleted = false
         AND (
           ?1 IS NULL
-          OR a_scope.repository_id = ?1
+          OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
+            WHERE occurrence.asset_id = a_scope.asset_id
+              AND occurrence.repository_id = ?1)
         )
       ORDER BY aa_cover.position IS NULL, aa_cover.position, aa_cover.added_time, aa_cover.asset_id
       LIMIT 1
@@ -697,7 +701,7 @@ func (q *Queries) GetAssetAlbums(ctx context.Context, assetID uuid.UUID) ([]GetA
 }
 
 const listBioAlbumAssetsMissingSpeciesPredictions = `-- name: ListBioAlbumAssetsMissingSpeciesPredictions :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.content_hash, a.quick_fingerprint, a.quick_fingerprint_version, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM album_assets aa
 JOIN albums al ON al.album_id = aa.album_id
 JOIN assets a ON a.asset_id = aa.asset_id
@@ -725,14 +729,10 @@ func (q *Queries) ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Contex
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
+			&i.ContentID,
 			&i.Type,
 			&i.OriginalFilename,
-			&i.StoragePath,
 			&i.MimeType,
-			&i.FileSize,
-			&i.ContentHash,
-			&i.QuickFingerprint,
-			&i.QuickFingerprintVersion,
 			&i.Width,
 			&i.Height,
 			&i.Duration,
@@ -744,7 +744,6 @@ func (q *Queries) ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Contex
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
-			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
 			&i.GpsLatitude,

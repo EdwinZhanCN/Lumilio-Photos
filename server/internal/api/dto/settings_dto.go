@@ -5,14 +5,16 @@ import (
 
 	"server/config"
 	"server/internal/service"
+	settingsdomain "server/internal/settings"
 )
 
 type SystemSettingsDTO struct {
-	LLM       LLMSettingsDTO    `json:"llm"`
-	ML        MLSettingsDTO     `json:"ml"`
-	Backup    BackupSettingsDTO `json:"backup"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	UpdatedBy *int32            `json:"updated_by,omitempty"`
+	LLM       LLMSettingsDTO       `json:"llm"`
+	ML        MLSettingsDTO        `json:"ml"`
+	Backup    BackupSettingsDTO    `json:"backup"`
+	Geocoding GeocodingSettingsDTO `json:"geocoding"`
+	UpdatedAt time.Time            `json:"updated_at"`
+	UpdatedBy *int32               `json:"updated_by,omitempty"`
 }
 
 type BackupSettingsDTO struct {
@@ -21,12 +23,26 @@ type BackupSettingsDTO struct {
 	KeepLast      int32 `json:"keep_last" example:"14"`
 }
 
+type GeocodingSettingsDTO struct {
+	Provider          string `json:"provider" example:"disabled" enums:"disabled,nominatim"`
+	NominatimEndpoint string `json:"nominatim_endpoint" example:"https://nominatim.openstreetmap.org/reverse"`
+	Language          string `json:"language" example:"en"`
+	UserAgent         string `json:"user_agent" example:"Lumilio-Photos/1.0"`
+}
+
 type LLMSettingsDTO struct {
-	AgentEnabled     bool   `json:"agent_enabled"`
-	Provider         string `json:"provider" example:"openai"`
-	ModelName        string `json:"model_name" example:"gpt-4.1-mini"`
-	BaseURL          string `json:"base_url,omitempty" example:"https://api.openai.com/v1"`
-	APIKeyConfigured bool   `json:"api_key_configured"`
+	AgentEnabled       bool                       `json:"agent_enabled"`
+	Provider           string                     `json:"provider" example:"openai"`
+	ModelName          string                     `json:"model_name" example:"gpt-4.1-mini"`
+	BaseURL            string                     `json:"base_url,omitempty" example:"https://api.openai.com/v1"`
+	APIKeyConfigured   bool                       `json:"api_key_configured"`
+	SupportedProviders []LLMProviderDescriptorDTO `json:"supported_providers"`
+}
+
+type LLMProviderDescriptorDTO struct {
+	ID              string `json:"id" example:"openai"`
+	APIKeyRequired  bool   `json:"api_key_required"`
+	BaseURLRequired bool   `json:"base_url_required"`
 }
 
 type MLSettingsDTO struct {
@@ -48,9 +64,10 @@ type RepositoryDefaultsDTO struct {
 }
 
 type UpdateSystemSettingsDTO struct {
-	LLM    *UpdateLLMSettingsDTO    `json:"llm,omitempty"`
-	ML     *UpdateMLSettingsDTO     `json:"ml,omitempty"`
-	Backup *UpdateBackupSettingsDTO `json:"backup,omitempty"`
+	LLM       *UpdateLLMSettingsDTO       `json:"llm,omitempty"`
+	ML        *UpdateMLSettingsDTO        `json:"ml,omitempty"`
+	Backup    *UpdateBackupSettingsDTO    `json:"backup,omitempty"`
+	Geocoding *UpdateGeocodingSettingsDTO `json:"geocoding,omitempty"`
 }
 
 type UpdateBackupSettingsDTO struct {
@@ -59,9 +76,16 @@ type UpdateBackupSettingsDTO struct {
 	KeepLast      *int32 `json:"keep_last,omitempty" binding:"omitempty,min=1,max=365"`
 }
 
+type UpdateGeocodingSettingsDTO struct {
+	Provider          *string `json:"provider,omitempty" enums:"disabled,nominatim"`
+	NominatimEndpoint *string `json:"nominatim_endpoint,omitempty"`
+	Language          *string `json:"language,omitempty"`
+	UserAgent         *string `json:"user_agent,omitempty"`
+}
+
 type UpdateLLMSettingsDTO struct {
 	AgentEnabled *bool   `json:"agent_enabled,omitempty"`
-	Provider     *string `json:"provider,omitempty" binding:"omitempty,oneof=none ark openai deepseek ollama"`
+	Provider     *string `json:"provider,omitempty"`
 	ModelName    *string `json:"model_name,omitempty"`
 	BaseURL      *string `json:"base_url,omitempty"`
 	APIKey       *string `json:"api_key,omitempty"`
@@ -79,7 +103,7 @@ type UpdateMLSettingsDTO struct {
 }
 
 type ValidateLLMSettingsRequestDTO struct {
-	Provider        string `json:"provider" binding:"required,oneof=ark openai deepseek ollama" example:"openai"`
+	Provider        string `json:"provider" binding:"required" example:"openai"`
 	ModelName       string `json:"model_name" binding:"required" example:"gpt-4.1-mini"`
 	BaseURL         string `json:"base_url,omitempty" example:"https://api.openai.com/v1"`
 	APIKey          string `json:"api_key,omitempty"`
@@ -104,21 +128,19 @@ func (dto ValidateLLMSettingsRequestDTO) ToServiceInput() service.ValidateLLMDra
 // (changed only by editing TOML and restarting). Shown in the Settings → Server
 // tab so operators can see effective boot configuration.
 type RuntimeInfoDTO struct {
-	Environment                  string     `json:"environment" example:"production"`
-	ServerListen                 string     `json:"server_listen" example:"0.0.0.0:6680"`
-	TLSMode                      string     `json:"tls_mode" example:"off"`
-	PasskeyEnabled               bool       `json:"passkey_enabled" example:"true"`
-	ACMECertificateHostname      string     `json:"acme_certificate_hostname,omitempty" example:"photos.example.com"`
-	ACMECertificateStatus        string     `json:"acme_certificate_status" example:"active"`
-	ACMECertificateExpiresAt     *time.Time `json:"acme_certificate_expires_at,omitempty"`
-	ACMELastManagedAt            *time.Time `json:"acme_last_managed_at,omitempty"`
-	LogLevel                     string     `json:"log_level" example:"info"`
-	StorageRoot                  string     `json:"storage_root" example:"/data/storage"`
-	HardwareAccel                string     `json:"hardware_accel" example:"none"`
-	GeocodingProvider            string     `json:"geocoding_provider" example:"disabled"`
-	RepositoryScanEnabled        bool       `json:"repository_scan_enabled" example:"true"`
-	RepositoryScanIntervalSecond int        `json:"repository_scan_interval_seconds" example:"300"`
-	LumenDiscoveryEnabled        bool       `json:"lumen_discovery_enabled" example:"true"`
+	Environment                   string     `json:"environment" example:"production"`
+	ServerListen                  string     `json:"server_listen" example:"0.0.0.0:6680"`
+	TLSMode                       string     `json:"tls_mode" example:"off"`
+	PasskeyEnabled                bool       `json:"passkey_enabled" example:"true"`
+	ACMECertificateHostname       string     `json:"acme_certificate_hostname,omitempty" example:"photos.example.com"`
+	ACMECertificateStatus         string     `json:"acme_certificate_status" example:"active"`
+	ACMECertificateExpiresAt      *time.Time `json:"acme_certificate_expires_at,omitempty"`
+	ACMELastManagedAt             *time.Time `json:"acme_last_managed_at,omitempty"`
+	LogLevel                      string     `json:"log_level" example:"info"`
+	StorageRoot                   string     `json:"storage_root" example:"/data/storage"`
+	HardwareAccel                 string     `json:"hardware_accel" example:"none"`
+	RepositoryScanIntervalSeconds int        `json:"repository_scan_interval_seconds" example:"300"`
+	LumenDiscoveryEnabled         bool       `json:"lumen_discovery_enabled" example:"true"`
 }
 
 type CertificateRuntimeInfo struct {
@@ -132,18 +154,16 @@ type CertificateRuntimeInfo struct {
 // application configuration.
 func NewRuntimeInfoDTO(cfg config.AppConfig) RuntimeInfoDTO {
 	return RuntimeInfoDTO{
-		Environment:                  cfg.Environment,
-		ServerListen:                 cfg.ServerConfig.Listen,
-		TLSMode:                      string(cfg.ServerConfig.TLS.Mode),
-		PasskeyEnabled:               cfg.Auth.Passkey.Enabled,
-		ACMECertificateStatus:        map[bool]string{true: "initializing", false: "not_applicable"}[cfg.ServerConfig.TLS.Mode == config.TLSModeACME],
-		LogLevel:                     cfg.LoggingConfig.Level,
-		StorageRoot:                  cfg.StorageConfig.Path,
-		HardwareAccel:                cfg.Transcode.HardwareAccel,
-		GeocodingProvider:            cfg.Geocoding.Provider,
-		RepositoryScanEnabled:        cfg.RepositoryScan.Enabled,
-		RepositoryScanIntervalSecond: cfg.RepositoryScan.IntervalSeconds,
-		LumenDiscoveryEnabled:        cfg.Lumen.DiscoveryEnabled,
+		Environment:                   cfg.Environment,
+		ServerListen:                  cfg.ServerConfig.Listen,
+		TLSMode:                       string(cfg.ServerConfig.TLS.Mode),
+		PasskeyEnabled:                cfg.Auth.Passkey.Enabled,
+		ACMECertificateStatus:         map[bool]string{true: "initializing", false: "not_applicable"}[cfg.ServerConfig.TLS.Mode == config.TLSModeACME],
+		LogLevel:                      cfg.LoggingConfig.Level,
+		StorageRoot:                   cfg.StorageConfig.Path,
+		HardwareAccel:                 cfg.Transcode.HardwareAccel,
+		RepositoryScanIntervalSeconds: cfg.RepositoryScan.IntervalSeconds,
+		LumenDiscoveryEnabled:         cfg.Lumen.DiscoveryEnabled,
 	}
 }
 
@@ -155,13 +175,24 @@ func (info *RuntimeInfoDTO) ApplyCertificateRuntime(certificate CertificateRunti
 }
 
 func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
+	providers := settingsdomain.SupportedLLMProviders()
+	providerDTOs := make([]LLMProviderDescriptorDTO, 0, len(providers))
+	for _, provider := range providers {
+		providerDTOs = append(providerDTOs, LLMProviderDescriptorDTO{
+			ID:              provider.ID,
+			APIKeyRequired:  provider.APIKeyRequired,
+			BaseURLRequired: provider.BaseURLRequired,
+		})
+	}
+
 	return SystemSettingsDTO{
 		LLM: LLMSettingsDTO{
-			AgentEnabled:     settings.LLM.AgentEnabled,
-			Provider:         settings.LLM.Provider,
-			ModelName:        settings.LLM.ModelName,
-			BaseURL:          settings.LLM.BaseURL,
-			APIKeyConfigured: settings.LLM.APIKeyConfigured,
+			AgentEnabled:       settings.LLM.AgentEnabled,
+			Provider:           settings.LLM.Provider,
+			ModelName:          settings.LLM.ModelName,
+			BaseURL:            settings.LLM.BaseURL,
+			APIKeyConfigured:   settings.LLM.APIKeyConfigured,
+			SupportedProviders: providerDTOs,
 		},
 		ML: MLSettingsDTO{
 			SemanticEnabled:           settings.ML.SemanticEnabled,
@@ -177,6 +208,12 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 			Enabled:       settings.Backup.Enabled,
 			IntervalHours: settings.Backup.IntervalHours,
 			KeepLast:      settings.Backup.KeepLast,
+		},
+		Geocoding: GeocodingSettingsDTO{
+			Provider:          settings.Geocoding.Provider,
+			NominatimEndpoint: settings.Geocoding.NominatimEndpoint,
+			Language:          settings.Geocoding.Language,
+			UserAgent:         settings.Geocoding.UserAgent,
 		},
 		UpdatedAt: settings.UpdatedAt,
 		UpdatedBy: settings.UpdatedBy,
@@ -216,6 +253,15 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 			Enabled:       dto.Backup.Enabled,
 			IntervalHours: dto.Backup.IntervalHours,
 			KeepLast:      dto.Backup.KeepLast,
+		}
+	}
+
+	if dto.Geocoding != nil {
+		input.Geocoding = &service.UpdateGeocodingSettingsInput{
+			Provider:          dto.Geocoding.Provider,
+			NominatimEndpoint: dto.Geocoding.NominatimEndpoint,
+			Language:          dto.Geocoding.Language,
+			UserAgent:         dto.Geocoding.UserAgent,
 		}
 	}
 

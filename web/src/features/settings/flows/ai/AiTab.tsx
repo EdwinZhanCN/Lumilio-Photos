@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { localizeProblem } from "@/lib/http-commons/problem";
 import { useAISettingsDraft, type AISettingsDraft } from "./useAISettingsDraft";
 import {
   BirdIcon,
@@ -17,20 +18,11 @@ import {
 import { SettingsGroup, SettingsRow, SettingsBlock } from "../../components/SettingsGroup";
 import { SettingsDropdown } from "../../components/SettingsDropdown";
 import { SettingsSaveBar } from "../../components/SettingsSaveBar";
+import { findProviderDescriptor, type LLMProvider } from "../../model/llmProviders";
 
 type AgentProvider = AISettingsDraft["llm"]["provider"];
 
 type FeedbackState = { tone: "success" | "error"; message: string } | null;
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const maybeApiError = error as { message?: string; error?: string };
-    if (maybeApiError.message) return maybeApiError.message;
-    if (maybeApiError.error) return maybeApiError.error;
-  }
-  return fallback;
-}
 
 const ML_META = {
   semanticEnabled: {
@@ -64,12 +56,23 @@ export default function AiTab() {
     saveError,
     justSaved,
     apiKeyConfigured,
+    supportedProviders,
     query: settingsQuery,
     isValidating,
     validateDraft,
   } = useAISettingsDraft();
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [showAPIKey, setShowAPIKey] = useState(false);
+  const providerLabels: Record<LLMProvider, string> = {
+    ark: t("settings.aiSettings.providerOptions.ark", "Ark"),
+    openai: t("settings.aiSettings.providerOptions.openai", "OpenAI"),
+    deepseek: t("settings.aiSettings.providerOptions.deepseek", "DeepSeek"),
+    ollama: t("settings.aiSettings.providerOptions.ollama", "Ollama"),
+    claude: t("settings.aiSettings.providerOptions.claude", "Claude"),
+    gemini: t("settings.aiSettings.providerOptions.gemini", "Gemini"),
+    qwen: t("settings.aiSettings.providerOptions.qwen", "Qwen"),
+    openrouter: t("settings.aiSettings.providerOptions.openrouter", "OpenRouter"),
+  };
 
   useEffect(() => {
     if (justSaved) {
@@ -81,7 +84,7 @@ export default function AiTab() {
     if (saveError) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(saveError, t("settings.aiSettings.saveError")),
+        message: localizeProblem(saveError, t, t("settings.aiSettings.saveError")),
       });
     }
   }, [saveError, t]);
@@ -128,7 +131,7 @@ export default function AiTab() {
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: getErrorMessage(error, t("settings.aiSettings.validationError")),
+        message: localizeProblem(error, t, t("settings.aiSettings.validationError")),
       });
     }
   };
@@ -149,8 +152,16 @@ export default function AiTab() {
     );
   }
 
+  const selectedProviderDescriptor = findProviderDescriptor(supportedProviders, draft.llm.provider);
+
   return (
-    <div className="w-full space-y-8 lg:space-y-10">
+    <form
+      className="w-full space-y-8 lg:space-y-10"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleValidate();
+      }}
+    >
       {feedback && (
         <div
           className={`rounded-xl px-4 py-3 text-sm ${
@@ -193,10 +204,10 @@ export default function AiTab() {
               value={draft.llm.provider}
               options={[
                 { value: "none", label: t("settings.aiSettings.providerOptions.unset") },
-                { value: "ark", label: t("settings.aiSettings.providerOptions.ark") },
-                { value: "openai", label: t("settings.aiSettings.providerOptions.openai") },
-                { value: "deepseek", label: t("settings.aiSettings.providerOptions.deepseek") },
-                { value: "ollama", label: t("settings.aiSettings.providerOptions.ollama") },
+                ...supportedProviders.map(({ id }) => ({
+                  value: id,
+                  label: providerLabels[id],
+                })),
               ]}
               onChange={(provider) => {
                 setFeedback(null);
@@ -246,6 +257,7 @@ export default function AiTab() {
             className="input input-bordered input-sm mt-2 w-full"
             autoComplete="off"
             spellCheck={false}
+            required={selectedProviderDescriptor?.baseURLRequired}
             value={draft.llm.baseURL}
             onChange={(event) => {
               setFeedback(null);
@@ -253,7 +265,12 @@ export default function AiTab() {
             }}
           />
           <p className="mt-1.5 text-xs text-base-content/55">
-            {t("settings.aiSettings.baseUrlDescription")}
+            {selectedProviderDescriptor?.baseURLRequired
+              ? t(
+                  "settings.aiSettings.baseUrlRequiredDescription",
+                  "Required for the selected provider.",
+                )
+              : t("settings.aiSettings.baseUrlDescription")}
           </p>
         </SettingsBlock>
         <SettingsBlock>
@@ -373,16 +390,11 @@ export default function AiTab() {
           reset();
         }}
         extraAction={
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={isBusy}
-            onClick={() => void handleValidate()}
-          >
+          <button type="submit" className="btn btn-ghost btn-sm" disabled={isBusy}>
             {isValidating ? t("common.loading") : t("settings.aiSettings.validate")}
           </button>
         }
       />
-    </div>
+    </form>
   );
 }
