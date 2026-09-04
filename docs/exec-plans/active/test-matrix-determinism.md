@@ -11,7 +11,11 @@ retries). Video passes (1/1, no retries) on the same retained stack. Agent
 runtime cross-invocation isolation passes (8/8, no retries). Global inference
 counter assertions have now been removed at the user's request; the modified
 video slice passes (1/1, no retries, 1.0 minute). The fixture metrics endpoint remains
-available for diagnostics, but is not consulted by this spec.
+available for diagnostics, but is not consulted by this spec. The Windows
+native gate later exposed one remaining wall-clock assumption in the commit
+coordinator pressure test: a 1 ms timeout could expire before the submission
+entered the full-queue wait. The test now observes `BlockedSubmitters` before
+canceling each submission.
 
 Goal: make every required CI result depend on repository behavior rather than
 goroutine scheduling, wall-clock guesses, retry residue, global E2E backlog, or
@@ -61,6 +65,8 @@ a green result, and concurrent code must have an explicit race-detection path.
 - [x] Wait for the cloud fake provider to enter `List` before cancellation.
 - [x] Replace RepositoryAccess and commit coordinator sleeps with observable
   waiting/queue state.
+- [x] Drive commit coordinator cancellation only after the blocked-submitter
+  metric proves that the operation entered the full-queue path.
 - [x] Remove close-then-rebind loopback-port allocation from Desktop and Server
   transport tests.
 - [x] Run the narrow Server/Desktop packages repeatedly and under the race
@@ -109,6 +115,9 @@ a green result, and concurrent code must have an explicit race-detection path.
 - Server concurrency target: four packages, race + shuffle + count=3 passed;
   focused readiness regressions also passed repeated runs.
 - Desktop focused migration regressions passed twice locally.
+- Commit coordinator pressure regression failed in Windows Actions run
+  `33833806184` when one 1 ms context expired before queue admission; the
+  barrier-based replacement passed focused repeat and Server gates.
 - Vitest integration: 37 files / 94 tests passed without retries. Browser:
   20 passed / 6 skipped tests, with the existing GPU skips preserved.
 - Smoke: 5 passed on a retained stack containing earlier failed attempts.
