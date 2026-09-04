@@ -5,8 +5,8 @@ page_id: "getting-started/install-docker"
 audience: "管理员"
 platform: "Linux Docker"
 baseline_commit: "86da6be7147fa9749c99b914cd79a5f677b92676"
-last_verified: "2026-08-06"
-verification_status: "verified-with-todo"
+last_verified: "2026-09-03"
+verification_status: "verified"
 ---
 
 <!--
@@ -33,11 +33,12 @@ code-evidence:
 
 ## 启动
 
-1. 复制仓库中的 `deploy/compose/compose.yml`，或从同一 baseline 获取它。
-2. 设置两个宿主机路径，并确认 Docker 可以写入。
-3. 启动 Compose。
-4. 观察健康检查通过后，访问宿主机的 `6680` 端口。
-5. 完成管理员和主资源库设置。
+1. 从同一个 GitHub Release 下载 Server bundle 与 `SHA256SUMS.txt`，验证归档校验和。
+2. 解压 bundle；其中 `.env` 已按 OCI digest 固定本次发布的 multi-architecture 镜像。
+3. 设置两个宿主机路径，并确认 Docker 可以写入。
+4. 运行 `docker compose up -d --wait`。
+5. 观察健康检查通过后，访问宿主机的 `6680` 端口。
+6. 完成管理员和主资源库设置。
 
 容器以 UID/GID `10001` 运行。入口会检查两个挂载是否可写，并尝试修正挂载顶层权限；如果宿主文件系统拒绝，它会停止并输出可操作的权限错误。不要通过让整个媒体树永久变为任意用户可写来规避权限问题。
 
@@ -45,4 +46,4 @@ code-evidence:
 默认 Compose 使用主机网络并提供 HTTP。当前代码在初始化后仍显示公开注册入口；因此不要把未加访问控制的默认实例直接暴露到不可信网络。完成首次验证后，应阅读[HTTPS 与访问边界](../admin/https.md)和[公开注册风险](../admin/registration-exposure.md)。
 :::
 
-<!-- TODO(release-reproducibility): 默认 Compose 镜像标签指向 latest。可选方向：文档要求固定版本标签，或由发布包生成带版本锁定的 Compose。当前页建议使用与目标 baseline 对应的发布标签，但代码仓库没有提供唯一自动替换值。 -->
+保留上一个 Server bundle、其中记录的 image digest，以及升级前数据库快照。数据库已经向前迁移时，回退必须把旧镜像与对应快照配对；不要用数据库回退覆盖媒体目录。

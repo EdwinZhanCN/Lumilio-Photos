@@ -46,12 +46,15 @@
 ### Docker Compose
 
 Docker 交付面向安装了 Docker Engine 与 Compose 2.23.1+ 的 Linux 主机。
-默认部署使用 host network，以保留局域网 Lumen 节点发现：
+请下载 GitHub Release 附带的 Server bundle；其中的 `.env` 已按 OCI digest
+固定对应的 multi-architecture 镜像：
 
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+VERSION=release-version
+tar -xzf "Lumilio-Photos-v${VERSION}-server.tar.gz"
+cd "Lumilio-Photos-v${VERSION}-server"
 mkdir -p ./lumilio/media ./lumilio/app-state
-docker compose up -d
+docker compose up -d --wait
 ```
 
 启动后打开 `http://Linux主机IP:6680`。不需要先购买域名、配置 HTTPS 或生成

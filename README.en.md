@@ -48,13 +48,15 @@ Desktop packages include the embedded SQLite catalog and required media tools. T
 ### Docker Compose
 
 The Docker delivery targets Linux with Docker Engine and Compose 2.23.1 or
-newer. The default host-network deployment requires no domain or generated
-configuration:
+newer. Download the Server bundle attached to a GitHub Release; its `.env`
+pins the multi-architecture image by OCI digest:
 
 ```bash
-curl -LO https://raw.githubusercontent.com/EdwinZhanCN/Lumilio-Photos/main/deploy/compose/compose.yml
+VERSION=release-version
+tar -xzf "Lumilio-Photos-v${VERSION}-server.tar.gz"
+cd "Lumilio-Photos-v${VERSION}-server"
 mkdir -p ./lumilio/media ./lumilio/app-state
-docker compose up -d
+docker compose up -d --wait
 ```
 
 Open `http://<Linux-host-IP>:6680`. Optional
