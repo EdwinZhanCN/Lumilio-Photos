@@ -128,7 +128,9 @@ func Run(ctx context.Context, appConfig config.AppConfig, controls OperatorContr
 	// govips owns process-global libvips state and cannot be restarted after a
 	// shutdown. Keep it alive across in-process SQLite restore generations and
 	// repeated embedded Run calls; process exit releases the native runtime.
-	imaging.StartVips()
+	if err := imaging.StartVips(); err != nil {
+		return fmt.Errorf("initialize libvips: %w", err)
+	}
 
 	forceOCRRebuild := false
 	for {

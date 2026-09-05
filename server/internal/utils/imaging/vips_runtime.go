@@ -17,11 +17,12 @@ import (
 //     Default internal threading oversubscribed this workload.
 var (
 	vipsStartOnce sync.Once
+	vipsStartErr  error
 )
 
 // StartVips initializes the libvips runtime exactly once. Safe to call multiple
-// times; subsequent calls are no-ops.
-func StartVips() {
+// times; subsequent calls return the original initialization result.
+func StartVips() error {
 	vipsStartOnce.Do(func() {
 		vips.LoggingSettings(func(domain string, level vips.LogLevel, msg string) {
 			switch level {
@@ -36,7 +37,7 @@ func StartVips() {
 
 		// MaxCache*: 0 — thumbnails use fresh buffers each time; operation cache
 		// never hits and only adds global lock contention.
-		vips.Startup(&vips.Config{
+		vipsStartErr = vips.Startup(&vips.Config{
 			ConcurrencyLevel: 1,
 			MaxCacheFiles:    0,
 			MaxCacheMem:      0,
@@ -44,4 +45,5 @@ func StartVips() {
 			CollectStats:     false,
 		})
 	})
+	return vipsStartErr
 }

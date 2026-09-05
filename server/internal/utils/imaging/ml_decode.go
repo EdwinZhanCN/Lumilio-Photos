@@ -31,6 +31,9 @@ func (k ResizeKernel) vipsKernel() vips.Kernel {
 // image processors with `do_center_crop=false` such as SigLIP, where the
 // model's training-time preprocessing is one direct resize.
 func DecodeRGBResizeExact(buf []byte, width, height int, kernel ResizeKernel) (*RGBImage, error) {
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("ML dimensions must be positive")
+	}
 	img, err := decodeForML(buf)
 	if err != nil {
 		return nil, err
@@ -48,9 +51,12 @@ func DecodeRGBResizeExact(buf []byte, width, height int, kernel ResizeKernel) (*
 }
 
 // DecodeRGBShortestEdgeCenterCrop decodes buf, resizes the shortest edge to
-// the crop target, then center-crops to width x height. This mirrors HF
+// the larger crop dimension, then center-crops to width x height. This mirrors HF
 // CLIP-style processors with `do_center_crop=true` such as BioCLIP.
 func DecodeRGBShortestEdgeCenterCrop(buf []byte, width, height int, kernel ResizeKernel) (*RGBImage, error) {
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("ML dimensions must be positive")
+	}
 	img, err := decodeForML(buf)
 	if err != nil {
 		return nil, err
@@ -65,7 +71,7 @@ func DecodeRGBShortestEdgeCenterCrop(buf []byte, width, height int, kernel Resiz
 		return nil, fmt.Errorf("ml crop: invalid source size %dx%d", img.Width(), img.Height())
 	}
 	target := width
-	if height < target {
+	if height > target {
 		target = height
 	}
 	if shortest != target {
@@ -92,6 +98,10 @@ func decodeForML(buf []byte) (*vips.ImageRef, error) {
 	img, err := vips.NewImageFromBuffer(buf)
 	if err != nil {
 		return nil, fmt.Errorf("decode image: %w", err)
+	}
+	if err := img.AutoRotate(); err != nil {
+		img.Close()
+		return nil, fmt.Errorf("orient ML image: %w", err)
 	}
 	if img.Interpretation() != vips.InterpretationSRGB {
 		if err := img.ToColorSpace(vips.InterpretationSRGB); err != nil {
