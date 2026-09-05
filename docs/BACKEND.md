@@ -572,3 +572,9 @@ The Taskfile target exports the local cgo flag allowlist needed by media
 dependencies on macOS. Reproduce the CI Server gate with `task server:test:ci`.
 Run `gofmt` on changed Go files. Map a diff to evidence with
 [lumilio-select-checks](../.agents/skills/lumilio-select-checks/SKILL.md).
+
+## Native image processing audit
+
+The [govips call audit](govips-audit.md) records loader/operation ownership,
+display orientation, preview validation and regression evidence, including
+the native-library differences observed in beta.1.

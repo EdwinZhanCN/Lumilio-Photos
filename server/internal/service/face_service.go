@@ -550,8 +550,43 @@ func isClusterCandidate(item repo.FaceItem) bool {
 }
 
 func (s *faceService) persistFaceCrop(repositoryFS *storage.RepositoryFS, assetID uuid.UUID, index int, imageData []byte, bbox *dbtypes.FaceBoundingBox) (*string, error) {
+	cropBytes, err := encodeFaceCrop(imageData, bbox)
+	if err != nil {
+		return nil, err
+	}
+
+	filename := fmt.Sprintf("%s_%d.webp", assetID, index)
+	privatePath, err := storage.ParsePrivateRepositoryPath(path.Join(storage.DefaultStructure.FacesDir, filename))
+	if err != nil {
+		return nil, err
+	}
+	directory, err := storage.ParsePrivateRepositoryPath(path.Dir(privatePath.String()))
+	if err != nil {
+		return nil, err
+	}
+	if err := repositoryFS.MkdirAllPrivate(directory, 0o755); err != nil {
+		return nil, fmt.Errorf("create face crop directory: %w", err)
+	}
+	if _, err := repositoryFS.WritePrivateFileAtomic(privatePath, bytes.NewReader(cropBytes), 0o644); err != nil {
+		return nil, fmt.Errorf("write face crop: %w", err)
+	}
+
+	normalized := privatePath.String()
+	return &normalized, nil
+}
+
+// encodeFaceCrop uses the same display orientation as the inference tensor.
+func encodeFaceCrop(imageData []byte, bbox *dbtypes.FaceBoundingBox) ([]byte, error) {
 	if bbox == nil {
 		return nil, fmt.Errorf("bounding box is required")
+	}
+	for _, coordinate := range []float32{bbox.X1, bbox.Y1, bbox.X2, bbox.Y2} {
+		if math.IsNaN(float64(coordinate)) || math.IsInf(float64(coordinate), 0) {
+			return nil, fmt.Errorf("face crop coordinates must be finite")
+		}
+	}
+	if bbox.X2 <= bbox.X1 || bbox.Y2 <= bbox.Y1 {
+		return nil, fmt.Errorf("face crop bounds must have positive area")
 	}
 	if len(imageData) == 0 {
 		return nil, fmt.Errorf("face crop source image is empty")
@@ -562,6 +597,9 @@ func (s *faceService) persistFaceCrop(repositoryFS *storage.RepositoryFS, assetI
 		return nil, fmt.Errorf("decode face crop source: %w", err)
 	}
 	defer img.Close()
+	if err := img.AutoRotate(); err != nil {
+		return nil, fmt.Errorf("orient face crop source: %w", err)
+	}
 
 	srcW := img.Width()
 	srcH := img.Height()
@@ -586,24 +624,7 @@ func (s *faceService) persistFaceCrop(repositoryFS *storage.RepositoryFS, assetI
 		return nil, fmt.Errorf("encode face crop: %w", err)
 	}
 
-	filename := fmt.Sprintf("%s_%d.webp", assetID, index)
-	privatePath, err := storage.ParsePrivateRepositoryPath(path.Join(storage.DefaultStructure.FacesDir, filename))
-	if err != nil {
-		return nil, err
-	}
-	directory, err := storage.ParsePrivateRepositoryPath(path.Dir(privatePath.String()))
-	if err != nil {
-		return nil, err
-	}
-	if err := repositoryFS.MkdirAllPrivate(directory, 0o755); err != nil {
-		return nil, fmt.Errorf("create face crop directory: %w", err)
-	}
-	if _, err := repositoryFS.WritePrivateFileAtomic(privatePath, bytes.NewReader(cropBytes), 0o644); err != nil {
-		return nil, fmt.Errorf("write face crop: %w", err)
-	}
-
-	normalized := privatePath.String()
-	return &normalized, nil
+	return cropBytes, nil
 }
 
 func clampFaceCropBounds(bbox *dbtypes.FaceBoundingBox, imageWidth, imageHeight int) (left int, top int, width int, height int) {

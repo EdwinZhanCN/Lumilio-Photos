@@ -691,7 +691,7 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 	}
 
 	contentRows, err := h.queries.ListAssetFullHashPrecheckMatches(ctx, repo.ListAssetFullHashPrecheckMatchesParams{
-		FullHashes:   valueOrEmpty(dbtypes.StringsJSONParam(contentHashes)),
+		FullHashes:   precheckJSONHashes(contentHashes),
 		RepositoryID: repository.RepoID,
 	})
 	if err != nil {
@@ -721,7 +721,7 @@ func (h *AssetHandler) PrecheckUpload(c *gin.Context) {
 		}
 	}
 	quickRows, err := h.queries.ListAssetQuickFingerprintPrecheckMatches(ctx, repo.ListAssetQuickFingerprintPrecheckMatchesParams{
-		QuickFingerprints: valueOrEmpty(dbtypes.StringsJSONParam(quickFingerprints)),
+		QuickFingerprints: precheckJSONHashes(quickFingerprints),
 		RepositoryID:      repository.RepoID,
 	})
 	if err != nil {
@@ -3989,6 +3989,15 @@ func (h *AssetHandler) handleUploadFailureFile(repository repo.Repository, stagi
 // stringPtr returns a pointer to a string
 func stringPtr(s string) *string {
 	return &s
+}
+
+// Precheck collections are required membership sets, not optional filters.
+func precheckJSONHashes(values []string) string {
+	encoded := dbtypes.StringsJSONParam(values)
+	if encoded == nil {
+		return "[]"
+	}
+	return *encoded
 }
 
 func valueOrEmpty(value *string) string {

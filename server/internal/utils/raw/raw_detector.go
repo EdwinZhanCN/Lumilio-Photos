@@ -353,20 +353,8 @@ func (d *Detector) IsPreviewAcceptable(previewData []byte, minWidth, minHeight i
 		return false, fmt.Errorf("invalid JPEG data")
 	}
 
-	// Check for EOI marker (FF D9) to detect truncation
-	// Use LastIndex to find the end of the image.
-	lastEOI := bytes.LastIndex(previewData, []byte{0xFF, 0xD9})
-	if lastEOI == -1 {
-		return false, nil
-	}
-
-	// If the EOI is too far from the end, it might be an embedded thumbnail's EOI
-	// while the main image is truncated.
-	// We allow some padding (e.g. 4KB), but if it's huge, it's suspicious.
-	if len(previewData)-lastEOI > 4096 {
-		return false, nil
-	}
-
+	// Marker position does not prove validity: JPEGs may contain trailing data,
+	// while a truncated pixel stream can still have a readable header.
 	// Check dimensions using libvips
 	img, err := vips.NewImageFromBuffer(previewData)
 	if err != nil {
@@ -375,6 +363,11 @@ func (d *Detector) IsPreviewAcceptable(previewData []byte, minWidth, minHeight i
 	defer img.Close()
 
 	if img.Width() < minWidth || img.Height() < minHeight {
+		return false, nil
+	}
+
+	// libvips is lazy: force pixel decoding before accepting the preview.
+	if _, err := img.ToGoImage(); err != nil {
 		return false, nil
 	}
 
