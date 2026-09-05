@@ -372,10 +372,6 @@ func (p *Processor) rawDisplayRotation(fullPath string) vips.Angle {
 // in sensor orientation with no EXIF orientation of its own, so the rotation
 // (derived from the RAW container via libraw) must be applied explicitly here.
 func (p *Processor) normalizeEmbeddedPreview(previewData []byte, rotate vips.Angle) ([]byte, error) {
-	if rotate == vips.Angle0 && p.options.Quality >= 100 && p.options.OutputFormat == 0 {
-		return previewData, nil
-	}
-
 	processed, err := imaging.ProcessImageBytes(previewData, imaging.ProcessOptions{
 		Format:        p.options.OutputFormat,
 		Quality:       p.options.Quality,
@@ -459,6 +455,9 @@ func (p *Processor) GenerateThumbnails(previewData []byte, sizes map[string][2]i
 
 	for sizeName, dimensions := range sizes {
 		width, height := dimensions[0], dimensions[1]
+		if width <= 0 || height <= 0 {
+			return nil, fmt.Errorf("[%s] thumbnail dimensions must be positive", sizeName)
+		}
 
 		thumbnail, err := imaging.ProcessImageBytes(previewData, imaging.ProcessOptions{
 			Width:         width,
@@ -470,8 +469,7 @@ func (p *Processor) GenerateThumbnails(previewData []byte, sizes map[string][2]i
 			StripMetadata: true,
 		})
 		if err != nil {
-			log.Printf("Failed to generate %s thumbnail: %v", sizeName, err)
-			continue
+			return nil, fmt.Errorf("generate %s thumbnail: %w", sizeName, err)
 		}
 
 		thumbnails[sizeName] = thumbnail

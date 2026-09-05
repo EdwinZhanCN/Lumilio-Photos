@@ -188,6 +188,7 @@ jobs:
                           - 'web/src/lib/http-commons/**'
                           - 'web/src/locales/**'
                       desktop:
+                          - '.github/workflows/release.yml'
                           - 'desktop/**'
                           - 'server/**'
                           - 'taskfile.yml'

@@ -82,13 +82,13 @@ func buildMacOS(ctx context.Context, root string, args []string) error {
 	if err := copyFile(icon, filepath.Join(res, "AppIcon.icns")); err != nil {
 		return err
 	}
-	// Mirror the Wails3 template's create:app:bundle: Assets.car (window
-	// appearance assets) is copied when present; it is optional on dev runs.
+	// Icon Composer is the macOS source of truth; never ship a PNG fallback.
 	car := filepath.Join(desktop, "build", "darwin", "Assets.car")
-	if isFile(car) {
-		if err := copyFile(car, filepath.Join(res, "Assets.car")); err != nil {
-			return err
-		}
+	if !isFile(car) {
+		return fmt.Errorf("missing %s — generate appicon.icon with Xcode 26 or later", car)
+	}
+	if err := copyFile(car, filepath.Join(res, "Assets.car")); err != nil {
+		return err
 	}
 	fmt.Println("==> Staging bundled runtime resources")
 	stage := func(src, dst string) error {
