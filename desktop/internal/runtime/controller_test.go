@@ -244,7 +244,9 @@ func TestControllerStopTimeoutRetainsOwnershipUntilRetryCleanup(t *testing.T) {
 	}
 	blocked := waitForRuntime(t, controller, func(snapshot dto.RuntimeSnapshot) bool {
 		item, ok := controller.operations.Get(blockedReceipt.OperationID)
-		return ok && item.State == string(operation.Failed)
+		// The operation result is published before the matching runtime
+		// snapshot. Wait for both before using its version for cleanup.
+		return ok && item.State == string(operation.Failed) && snapshot.Version > failed.Version
 	})
 	if code := controller.operationsErrorCode(blockedReceipt.OperationID); code != dto.ErrorRuntimeNotReady {
 		t.Fatalf("blocked start error code = %q, want %q", code, dto.ErrorRuntimeNotReady)
