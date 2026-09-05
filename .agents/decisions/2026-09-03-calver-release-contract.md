@@ -73,3 +73,14 @@ Rejected because a production-test artifact must identify a reviewed release
 commit and have a durable rollback target. `dev` remains the integration
 branch, `main` remains the release branch, and manual workflow runs provide
 disposable edge builds when a tag is unnecessary.
+
+## macOS icon packaging
+
+The macOS icon source is `desktop/build/appicon.icon`. Release builders require
+macOS 26+ and Xcode 26+ because the pinned Wails Icon Composer generator checks
+both. The generator receives an explicitly empty PNG input, so unsupported
+toolchains fail instead of falling back to `appicon.png`. Both `Assets.car` and
+the compatibility ICNS generated from the same Composer source are bundled.
+Missing `Assets.car` fails packaging. Windows continues using its PNG source.
+The beta.1 build used macOS 15 and silently took Wails' PNG fallback; successful
+compilation alone therefore did not establish the intended icon source.
