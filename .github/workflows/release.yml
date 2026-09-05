@@ -229,9 +229,14 @@ jobs:
             matrix:
                 include:
                     - arch: arm64
-                      runner: macos-15
+                      runner: macos-26
         steps:
             - uses: actions/checkout@v7
+
+            - name: Select Xcode with Icon Composer support
+              uses: maxim-lobanov/setup-xcode@v1
+              with:
+                  xcode-version: latest-stable
 
             - name: Install Task
               uses: go-task/setup-task@v2

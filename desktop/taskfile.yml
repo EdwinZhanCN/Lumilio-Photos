@@ -128,8 +128,8 @@ tasks:
         desktop/internal/lumen/controlv1/control.proto
 
   generate:icons:
-    summary: Regenerates platform icons from build/appicon.png
-    desc: Regenerates platform icons from build/appicon.png
+    summary: Regenerates macOS icons from appicon.icon and Windows icons from appicon.png
+    desc: Regenerates macOS icons from appicon.icon and Windows icons from appicon.png
     cmds:
       - task: common:generate:icons
 
