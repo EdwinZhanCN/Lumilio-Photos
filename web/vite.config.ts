@@ -276,6 +276,7 @@ export default defineConfig({
       "swiper/modules",
       "swiper/react",
       "vite-plus/test",
+      "vite-plus/test/browser",
       "vitest-browser-react",
       "zustand",
       "zustand/middleware",

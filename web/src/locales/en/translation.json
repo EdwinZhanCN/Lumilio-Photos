@@ -230,20 +230,7 @@
       "something_went_wrong": "Something went wrong"
     },
     "export": {
-      "allFailed": "No images could be exported.",
-      "cancelled": "Export cancelled.",
-      "conversionUnavailable": "Export conversion is unavailable for video and audio assets.",
-      "downloadCancelled": "Download cancelled.",
-      "downloaded": "Image downloaded.",
-      "downloadFailed": "Download failed.",
-      "downloadingOriginal": "Downloading original…",
-      "exported": "Image exported.",
-      "failed": "Export failed.",
-      "multipleCompleted_one": "Exported {{count}} of {{total}} images.",
-      "multipleCompleted_other": "Exported {{count}} of {{total}} images.",
-      "noDownload": "No image is available for download.",
-      "noExport": "No image is available for export.",
-      "noneSelected": "No images are selected for export."
+      "downloadFailed": "Download failed."
     },
     "filterTool": {
       "cameraMakeSection": {
@@ -1164,21 +1151,11 @@
       "ml": "Machine Learning"
     },
     "downloadOriginal": "Download Original",
-    "export": "Export",
-    "exportFormat": "Export Format",
-    "exporting": "Exporting...",
     "exportUnavailable": "Export conversion is unavailable for video and audio assets. You can still download the original file.",
     "forceFullRetry": "Force full retry",
     "forceFullRetryHint": "Re-run all processing tasks regardless of previous status",
-    "format": {
-      "avif": "AVIF",
-      "jpeg": "JPEG (80%)",
-      "png": "PNG",
-      "webp": "WebP (80%)"
-    },
     "noAsset": "No asset selected. Actions are disabled.",
     "noRetryTasks": "No retry tasks are available for this asset type.",
-    "optional": "Optional",
     "retryProcessing": "Retry Processing",
     "retrySubmitFailed": "Failed to submit the processing retry.",
     "retrySubmitted": "Processing retry submitted.",
@@ -2005,6 +1982,32 @@
     },
     "unnamed": "Unnamed"
   },
+  "photoExport": {
+    "actions": "Photo actions",
+    "assetSource": "Exports this photo without Studio edits.",
+    "completed": "Photo download started.",
+    "confirm": "Export",
+    "downscaled": "Export was reduced to {{width}} × {{height}} to fit available resources.",
+    "exporting": "Exporting…",
+    "failed": "Export failed. Your settings are kept; try again.",
+    "filename": "File name",
+    "format": "Format",
+    "longEdge": "Long edge",
+    "longEdgePx": "Long edge (px)",
+    "maximum": "Maximum available",
+    "metadataUnavailable": "The photo was exported, but its metadata could not be preserved.",
+    "output": "Estimated output",
+    "percent": "Percent",
+    "pngMetadata": "Studio PNG exports do not include source metadata.",
+    "quality": "Quality",
+    "scale": "Scale (%)",
+    "serverMetadata": "Compatible metadata and color profiles are preserved when available in the source.",
+    "size": "Size",
+    "sourceSize": "Source dimensions",
+    "studioMetadata": "Compatible camera, date and GPS metadata is preserved when available. Orientation and dimensions follow the edited image.",
+    "studioSource": "Exports your current edits at the available working resolution.",
+    "title": "Export photo"
+  },
   "productTerms": {
     "defaultStorageLocation": "Default Storage Location",
     "primaryRepository": "Primary Repository"
@@ -2632,22 +2635,6 @@
       "fieldsCount_other": "{{count}} fields",
       "properties": "Image Properties",
       "title": "EXIF Metadata"
-    },
-    "export": {
-      "cancel": "Cancel",
-      "confirm": "Export",
-      "downscaledToast": "Export was scaled to {{w}}×{{h}} to stay within limits.",
-      "estimate": "Approx. output",
-      "failed": "Failed to export the image.",
-      "format": "Format",
-      "longEdge": "Long edge",
-      "longEdgePx": "Long edge (px)",
-      "original": "Original",
-      "percent": "Percent",
-      "quality": "Quality",
-      "scale": "Scale",
-      "size": "Size",
-      "title": "Export"
     },
     "frame": {
       "blur": "Blur",

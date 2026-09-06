@@ -53,7 +53,13 @@ slot as a repository [PhotoPicker](./picker/PhotoPicker.tsx) primary button and 
 control. The text input uses the same height as the FAB close control so the
 image-mode toggle does not shift it.
 
-[AssetExportDialog](./flows/export/AssetExportDialog.tsx) owns export and reprocess interaction.
+[AssetActionsDialog](./flows/viewer/AssetActionsDialog.tsx) owns viewer actions and reprocessing; it opens
+[AssetExportDialog](./flows/export/AssetExportDialog.tsx) for photo export. The shared PhotoExportDialog owns
+format, quality, size, naming and the download lifecycle, defaulting to JPEG
+at 92% and maximum available dimensions. Assets transcodes the unedited source
+through the server, preserving compatible metadata and color profiles where
+available. Original download bypasses conversion. Failed exports keep their
+settings open for retry; only a successful browser download handoff closes them.
 [PhotoPicker](./picker/PhotoPicker.tsx) is the isolated single-selection entry used by other
 features, while [AssetPreviewGrid](./flows/browse/AssetPreviewGrid.tsx) is the finite dashboard-preview
 entry. Neither exposes gallery implementation details.
