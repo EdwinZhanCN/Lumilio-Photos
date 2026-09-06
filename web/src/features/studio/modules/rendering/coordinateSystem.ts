@@ -182,57 +182,6 @@ export function mapRectSourceToDisplayed(
   return rectFromCorners(a.x, a.y, b.x, b.y);
 }
 
-/** How the user chose the export resolution (the Pixelmator Quick Export subset). */
-export type ExportSizeMode =
-  | { kind: "original" }
-  | { kind: "percent"; percent: number }
-  | { kind: "longEdge"; longEdge: number };
-
-export type ExportSizePlan = {
-  /** Longest-edge budget to pass to {@link deriveRenderSize} for the export render. */
-  maxSize: number;
-  /** The full-resolution long edge the source can supply (after any source guardrail). */
-  nativeLongEdge: number;
-  /** True when the guardrail (or an unupscalable request) reduced the ask. */
-  downscaled: boolean;
-};
-
-/**
- * Resolve the export render budget, applying the guardrail.
- *
- * `sourceWidth`/`sourceHeight` are the *effective* source (already clamped to
- * what the GPU could upload); `maxDimension` is the hard ceiling (GPU texture
- * limit). The result never upscales past the native long edge and never exceeds
- * the ceiling — `downscaled` says whether either bound bit, so the UI can tell
- * the user their full-resolution ask was reduced.
- */
-export function resolveExportSize(
-  sourceWidth: number,
-  sourceHeight: number,
-  crop: SourceRect | null,
-  mode: ExportSizeMode,
-  maxDimension: number,
-): ExportSizePlan {
-  const cropW = crop ? crop.width : sourceWidth;
-  const cropH = crop ? crop.height : sourceHeight;
-  const nativeLongEdge = Math.max(1, Math.round(Math.max(cropW, cropH)));
-
-  let requested: number;
-  if (mode.kind === "percent") {
-    const percent = Math.min(100, Math.max(1, mode.percent));
-    requested = (nativeLongEdge * percent) / 100;
-  } else if (mode.kind === "longEdge") {
-    requested = mode.longEdge;
-  } else {
-    requested = nativeLongEdge;
-  }
-  requested = Math.max(1, Math.round(requested));
-
-  const ceiling = Math.max(1, Math.min(Math.round(maxDimension), nativeLongEdge));
-  const maxSize = Math.min(requested, ceiling);
-  return { maxSize, nativeLongEdge, downscaled: maxSize < requested };
-}
-
 /**
  * Fit a source into a texture the GPU can actually upload.
  *

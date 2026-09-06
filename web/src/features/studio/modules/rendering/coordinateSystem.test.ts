@@ -6,7 +6,6 @@ import {
   fitScale,
   mapRectDisplayedToSource,
   mapRectSourceToDisplayed,
-  resolveExportSize,
   type SourceRect,
 } from "./coordinateSystem";
 
@@ -57,44 +56,6 @@ describe("deriveRenderSize", () => {
     expect(size.developHeight).toBe(2400);
     expect(size.outWidth).toBe(1800); // only the crop is presented
     expect(size.outHeight).toBe(1200);
-  });
-});
-
-describe("resolveExportSize", () => {
-  it("exports at native long edge when 'original' fits the ceiling", () => {
-    const plan = resolveExportSize(6000, 4000, null, { kind: "original" }, 8192);
-    expect(plan.nativeLongEdge).toBe(6000);
-    expect(plan.maxSize).toBe(6000);
-    expect(plan.downscaled).toBe(false);
-  });
-
-  it("guardrails 'original' down to the ceiling and flags it", () => {
-    const plan = resolveExportSize(12000, 8000, null, { kind: "original" }, 8192);
-    expect(plan.maxSize).toBe(8192);
-    expect(plan.downscaled).toBe(true);
-  });
-
-  it("scales by percent of the native long edge", () => {
-    const plan = resolveExportSize(6000, 4000, null, { kind: "percent", percent: 50 }, 8192);
-    expect(plan.maxSize).toBe(3000);
-    expect(plan.downscaled).toBe(false);
-  });
-
-  it("honors an explicit long edge but never upscales past native", () => {
-    const within = resolveExportSize(6000, 4000, null, { kind: "longEdge", longEdge: 2000 }, 8192);
-    expect(within.maxSize).toBe(2000);
-    expect(within.downscaled).toBe(false);
-
-    const beyond = resolveExportSize(6000, 4000, null, { kind: "longEdge", longEdge: 9000 }, 8192);
-    expect(beyond.maxSize).toBe(6000); // capped to native, not upscaled
-    expect(beyond.downscaled).toBe(true);
-  });
-
-  it("uses the crop's long edge as native when cropped", () => {
-    const crop: SourceRect = { x: 0, y: 0, width: 3000, height: 2000 };
-    const plan = resolveExportSize(6000, 4000, crop, { kind: "original" }, 8192);
-    expect(plan.nativeLongEdge).toBe(3000);
-    expect(plan.maxSize).toBe(3000);
   });
 });
 

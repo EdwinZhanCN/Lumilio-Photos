@@ -54,7 +54,13 @@
  * control. The text input uses the same height as the FAB close control so the
  * image-mode toggle does not shift it.
  *
- * {@link AssetExportDialog} owns export and reprocess interaction.
+ * {@link AssetActionsDialog} owns viewer actions and reprocessing; it opens
+ * {@link AssetExportDialog} for photo export. The shared PhotoExportDialog owns
+ * format, quality, size, naming and the download lifecycle, defaulting to JPEG
+ * at 92% and maximum available dimensions. Assets transcodes the unedited source
+ * through the server, preserving compatible metadata and color profiles where
+ * available. Original download bypasses conversion. Failed exports keep their
+ * settings open for retry; only a successful browser download handoff closes them.
  * {@link PhotoPicker} is the isolated single-selection entry used by other
  * features, while {@link AssetPreviewGrid} is the finite dashboard-preview
  * entry. Neither exposes gallery implementation details.
@@ -112,6 +118,7 @@ import type { createAssetSelectionStore } from "./flows/browse/selection/selecti
 import type { SearchFAB } from "./flows/browse/SearchFAB.tsx";
 import type { useAssetBrowser } from "./flows/browse/useAssetBrowser.ts";
 import type { useAssetBrowseRouteState } from "./flows/browse/useAssetBrowseRouteState.ts";
+import type { AssetActionsDialog } from "./flows/viewer/AssetActionsDialog.tsx";
 import type { AssetExportDialog } from "./flows/export/AssetExportDialog.tsx";
 import type Assets from "./flows/library/AssetsFlow.tsx";
 import type AssetsTrash from "./flows/trash/AssetsTrashFlow.tsx";

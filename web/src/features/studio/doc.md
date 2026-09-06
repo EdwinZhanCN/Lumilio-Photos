@@ -36,7 +36,7 @@ flowchart LR
     DEVELOP --> GEOMETRY["applyGeometry"]
     GEOMETRY --> COMPOSE["composeStudioImage"]
     EDITOR --> SIDECAR["LumilioSidecarV1"]
-    EDITOR --> EXPORT["ExportPanel"]
+    EDITOR --> EXPORT["PhotoExportDialog"]
 ```
 
 Preview rendering transfers the visible canvas and source blob to a worker.
@@ -45,10 +45,14 @@ Preview rendering transfers the visible canvas and source blob to a worker.
 [composeStudioImage](./modules/rendering/composeStudioImage.ts) draws the canvas treatment and layers in 2D.
 Slider previews stay on the GPU; only export encodes a blob.
 
-[ExportPanel](./flows/editor/export/ExportPanel.tsx) selects format, quality, and output size.
-[resolveExportSize](./modules/rendering/coordinateSystem.ts) prevents upscaling and respects GPU limits, then
+[PhotoExportDialog](../../components/PhotoExportDialog/PhotoExportDialog.tsx) shares format, quality, size, naming and download lifecycle
+with Fullscreen. Defaults are JPEG at 92% and maximum available dimensions.
+Export snapshots the current edits without saving them; failures keep settings
+open for retry. Size choices apply to the final cropped, rotated, framed image.
+[studioExportSize](./modules/rendering/exportSize.ts) prevents upscaling and respects GPU limits, then
 [preserveExif](./modules/export/exif.ts) copies compatible EXIF to the rendered output with an
-upright orientation.
+upright orientation and corrected dimensions. Metadata preservation is best-effort;
+failures warn after download. Studio PNG does not copy source metadata.
 
 ## Data
 

@@ -28,12 +28,14 @@ import { AssetPanel, type AssetExifRow } from "./AssetPanel";
 import { Viewport } from "./Viewport";
 import { EditorPanel, type EditorTab } from "./EditorPanel";
 import { useComposition } from "./useComposition";
+import { PhotoExportDialog } from "@/components/PhotoExportDialog/PhotoExportDialog";
 import {
-  ExportPanel,
-  DEFAULT_EXPORT_SETTINGS,
-  type ExportFormat,
-  type ExportSettings,
-} from "./export/ExportPanel";
+  defaultPhotoExportSettings,
+  PHOTO_EXPORT_MIME,
+  type PhotoExportArtifact,
+  type PhotoExportSettings,
+} from "@/lib/photo-export/model";
+import { composedExportDimensions } from "../../modules/rendering/exportSize";
 import { preserveExif } from "../../modules/export/exif";
 import { CropOverlay } from "./crop/CropOverlay";
 import { TextOverlay } from "./text/TextOverlay";
@@ -69,12 +71,6 @@ type ExportResult = {
   height: number;
   downscaled?: boolean;
   nativeLongEdge?: number;
-};
-
-const EXPORT_EXTENSION: Record<ExportFormat, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
 };
 
 export type StudioEditorActivity = {
@@ -250,15 +246,6 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(value < 10 && unit > 0 ? 1 : 0)} ${units[unit]}`;
 }
 
-function triggerDownload(url: string, fileName: string): void {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
-
 // ===========================================================================
 // StudioEditor
 // ===========================================================================
@@ -307,9 +294,11 @@ export function StudioEditor({
   const [isRendering, setIsRendering] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
+  const exportBusyRef = useRef(false);
+  const [exportSettings, setExportSettings] = useState<PhotoExportSettings>(() =>
+    defaultPhotoExportSettings(),
+  );
   const [renderEngine, setRenderEngine] = useState<RenderEngineName | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   // Bumped when marks reach the worker, to re-render a composition whose logos
@@ -600,6 +589,7 @@ export function StudioEditor({
 
         const originalWidth = getAssetDimension(loadedAsset.width, loaded.originalWidth);
         const originalHeight = getAssetDimension(loadedAsset.height, loaded.originalHeight);
+        setExportSettings(defaultPhotoExportSettings(loadedAsset.original_filename));
         setImageSize({ width: originalWidth, height: originalHeight });
         setCropSpace({ width: loaded.sourceWidth, height: loaded.sourceHeight });
 
@@ -820,100 +810,96 @@ export function StudioEditor({
     }
   }, [adjustments, depthFeather, callWorker, depthUnavailableReason, showMessage, t]);
 
-  const getExifSource = useCallback(async (id: string): Promise<Blob | null> => {
-    if (exifSourceRef.current?.assetId === id) return exifSourceRef.current.blob;
-    try {
-      const response = await fetch(assetUrls.getOriginalFileUrl(id));
-      if (!response.ok) return null;
-      const blob = await response.blob();
-      exifSourceRef.current = { assetId: id, blob };
-      return blob;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const handleExport = useCallback(async () => {
-    if (!asset) return;
-    const worker = workerRef.current;
-    if (!worker) return;
-    const baseName = (asset.original_filename ?? "lumilio-edit").replace(/\.[^.]+$/, "");
-
-    setIsExporting(true);
-    try {
-      const result = await callWorker<ExportResult>(
-        worker,
-        "EXPORT_IMAGE",
-        {
-          adjustments,
-          composition: currentComposition,
-          format: exportSettings.format,
-          quality: exportSettings.quality,
-          sizeMode: exportSettings.sizeMode,
-        },
-        "EXPORT_COMPLETE",
-      );
-
-      // Copy the original's EXIF onto the re-encoded export (best-effort; PNG and
-      // any failure fall through to the raw export).
-      let outBlob = result.blob;
-      if (exportSettings.format !== "image/png" && asset.asset_id) {
-        const originalBlob = await getExifSource(asset.asset_id);
-        if (originalBlob) {
-          outBlob = await preserveExif(result.blob, originalBlob, {
-            format: exportSettings.format,
-            width: result.width,
-            height: result.height,
-          });
-        }
+  const getExifSource = useCallback(
+    async (id: string, signal: AbortSignal): Promise<Blob | null> => {
+      if (exifSourceRef.current?.assetId === id) return exifSourceRef.current.blob;
+      try {
+        const response = await fetch(assetUrls.getOriginalFileUrl(id), {
+          signal,
+          credentials: "include",
+        });
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        exifSourceRef.current = { assetId: id, blob };
+        return blob;
+      } catch {
+        return null;
       }
+    },
+    [],
+  );
 
-      const url = URL.createObjectURL(outBlob);
-      triggerDownload(url, `${baseName}-lumilio.${EXPORT_EXTENSION[exportSettings.format]}`);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setExportOpen(false);
-
-      if (result.downscaled) {
-        showMessage(
-          "info",
-          t("studio.export.downscaledToast", {
-            defaultValue: "Export was scaled to {{w}}×{{h}} to stay within limits.",
-            w: result.width,
-            h: result.height,
-          }),
+  const handleExport = useCallback(
+    async (settings: PhotoExportSettings, signal: AbortSignal): Promise<PhotoExportArtifact> => {
+      const worker = workerRef.current;
+      if (!asset || !worker || exportBusyRef.current || settings.format === "avif")
+        throw new Error("Export unavailable");
+      exportBusyRef.current = true;
+      const warnings: string[] = [];
+      try {
+        const snapshot = structuredClone({ adjustments, composition: currentComposition });
+        const result = await callWorker<ExportResult>(
+          worker,
+          "EXPORT_IMAGE",
+          {
+            ...snapshot,
+            format: PHOTO_EXPORT_MIME[settings.format],
+            quality: settings.quality,
+            sizeMode: settings.sizeMode,
+          },
+          "EXPORT_COMPLETE",
         );
+        signal.throwIfAborted();
+        if (result.blob.type !== PHOTO_EXPORT_MIME[settings.format])
+          throw new Error("Unexpected export format");
+        let blob = result.blob;
+        if (settings.format !== "png" && asset.asset_id) {
+          const original = await getExifSource(asset.asset_id, signal);
+          signal.throwIfAborted();
+          const unavailable = () =>
+            warnings.push(
+              t(
+                "photoExport.metadataUnavailable",
+                "The photo was exported, but its metadata could not be preserved.",
+              ),
+            );
+          if (original)
+            blob = await preserveExif(blob, original, {
+              format: PHOTO_EXPORT_MIME[settings.format],
+              width: result.width,
+              height: result.height,
+              onUnavailable: unavailable,
+            });
+          else unavailable();
+        }
+        if (result.downscaled)
+          warnings.push(
+            t(
+              "photoExport.downscaled",
+              "Export was reduced to {{width}} × {{height}} to fit available resources.",
+              { width: result.width, height: result.height },
+            ),
+          );
+        return { blob, warnings };
+      } finally {
+        exportBusyRef.current = false;
       }
-    } catch (exportError) {
-      const message = localizeAPIProblem(
-        exportError,
-        t,
-        t("studio.export.failed", "Failed to export the image."),
-      );
-      setError(message);
-      showMessage("error", message);
-    } finally {
-      setIsExporting(false);
-    }
-  }, [
-    adjustments,
-    asset,
-    currentComposition,
-    exportSettings,
-    callWorker,
-    getExifSource,
-    showMessage,
-    t,
-  ]);
+    },
+    [adjustments, asset, currentComposition, callWorker, getExifSource, t],
+  );
 
   const fileName =
     asset?.original_filename ?? t("studio.editor.loading", { defaultValue: "Loading…" });
 
-  // What the export can actually reach: the smaller of the true source long edge
-  // and the working-source cap. The worker may guardrail further on weak GPUs.
-  const exportSourceLongEdge = useMemo(() => {
-    const longEdge = imageSize ? Math.max(imageSize.width, imageSize.height) : WORKING_SOURCE_MAX;
-    return Math.min(WORKING_SOURCE_MAX, longEdge);
-  }, [imageSize]);
+  const exportSource = useMemo(() => {
+    if (!cropSpace) return { width: 0, height: 0 };
+    return composedExportDimensions(
+      cropSpace.width,
+      cropSpace.height,
+      adjustments,
+      currentComposition.canvas,
+    );
+  }, [cropSpace, adjustments, currentComposition.canvas]);
 
   // Aspect presets are picked in the DISPLAYED orientation, so "original" and
   // the fit math resolve against the rotated frame.
@@ -953,7 +939,7 @@ export function StudioEditor({
         canUndo={history.length > 0}
         beforeActive={showOriginal}
         isSaving={isSaving}
-        isExporting={isExporting}
+        exportDisabled={!ready || isLoadingAsset || exportOpen}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
         onBack={onBack}
@@ -1032,15 +1018,27 @@ export function StudioEditor({
 
       <StatusBar dirty={isDirty} justSaved={justSaved} engine={renderEngine} />
 
-      <ExportPanel
+      <PhotoExportDialog
         open={exportOpen}
         settings={exportSettings}
         onChange={setExportSettings}
-        sourceLongEdge={exportSourceLongEdge}
-        sourceWidth={imageSize?.width ?? 0}
-        sourceHeight={imageSize?.height ?? 0}
-        isExporting={isExporting}
-        onExport={() => void handleExport()}
+        sourceWidth={exportSource.width}
+        sourceHeight={exportSource.height}
+        formats={["jpeg", "png", "webp"]}
+        sourceLabel={t(
+          "photoExport.studioSource",
+          "Exports your current edits at the available working resolution.",
+        )}
+        metadataNote={
+          exportSettings.format === "png"
+            ? t("photoExport.pngMetadata", "Studio PNG exports do not include source metadata.")
+            : t(
+                "photoExport.studioMetadata",
+                "Compatible camera, date and GPS metadata is preserved when available. Orientation and dimensions follow the edited image.",
+              )
+        }
+        onExport={handleExport}
+        onNotice={(message) => showMessage("info", message)}
         onClose={() => setExportOpen(false)}
       />
     </div>

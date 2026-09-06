@@ -1,3 +1,4 @@
+import type { PhotoExportSize } from "@/lib/photo-export/model";
 /**
  * The Studio render worker.
  *
@@ -18,7 +19,8 @@ import {
   type StudioEditAdjustments,
 } from "../../model/editTypes";
 import { composeStudioImage, type Composition } from "./composeStudioImage";
-import { deriveRenderSize, resolveExportSize, type ExportSizeMode } from "./coordinateSystem";
+import { deriveRenderSize } from "./coordinateSystem";
+import { studioExportSize } from "./exportSize";
 import { DevelopEngine } from "./developEngine";
 import { ensureStudioFontsLoaded } from "./fonts/loadStudioFonts";
 import { applyGeometry } from "./geometry";
@@ -77,7 +79,7 @@ type ExportImageMessage = {
     composition?: Composition;
     format: "image/jpeg" | "image/png" | "image/webp";
     quality: number;
-    sizeMode: ExportSizeMode;
+    sizeMode: PhotoExportSize;
   };
 };
 
@@ -295,23 +297,34 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       const adjustments = normalizeStudioAdjustments(message.payload.adjustments);
       await ensureFontsForComposition(message.payload.composition);
 
-      const plan = resolveExportSize(
+      const plan = studioExportSize(
         active.sourceWidth,
         active.sourceHeight,
-        adjustments.crop,
+        adjustments,
+        message.payload.composition?.canvas ?? null,
         message.payload.sizeMode,
         active.maxTextureSize,
       );
 
       // Render at the planned size; if a browser rejects the resulting canvas as
       // too large, back off by halves and report the export as downscaled.
-      let maxSize = plan.maxSize;
+      let maxSize = plan.renderLongEdge;
       let downscaled = plan.downscaled;
       let composed: OffscreenCanvas | null = null;
       let blob: Blob | null = null;
       for (;;) {
         try {
           composed = renderComposed(adjustments, message.payload.composition, maxSize, false);
+          // Frame rounding can add a pixel; the final image still obeys the requested long edge.
+          if (Math.max(composed.width, composed.height) > plan.outputLongEdge) {
+            const scale = plan.outputLongEdge / Math.max(composed.width, composed.height);
+            const bounded = new OffscreenCanvas(
+              Math.max(1, Math.round(composed.width * scale)),
+              Math.max(1, Math.round(composed.height * scale)),
+            );
+            context2d(bounded).drawImage(composed, 0, 0, bounded.width, bounded.height);
+            composed = bounded;
+          }
           blob = await composed.convertToBlob({
             type: message.payload.format,
             quality: message.payload.quality,

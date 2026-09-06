@@ -229,19 +229,7 @@
       "something_went_wrong": "出了些问题"
     },
     "export": {
-      "allFailed": "无法导出任何图像。",
-      "cancelled": "已取消导出。",
-      "conversionUnavailable": "视频和音频资源不支持转换导出。",
-      "downloadCancelled": "已取消下载。",
-      "downloaded": "图像已下载。",
-      "downloadFailed": "下载失败。",
-      "downloadingOriginal": "正在下载原始文件…",
-      "exported": "图像已导出。",
-      "failed": "导出失败。",
-      "multipleCompleted_other": "已导出 {{count}} / {{total}} 张图像。",
-      "noDownload": "没有可供下载的图像。",
-      "noExport": "没有可供导出的图像。",
-      "noneSelected": "尚未选择要导出的图像。"
+      "downloadFailed": "下载失败。"
     },
     "filterTool": {
       "cameraMakeSection": {
@@ -1150,21 +1138,11 @@
       "ml": "机器学习"
     },
     "downloadOriginal": "下载原文件",
-    "export": "导出",
-    "exportFormat": "导出格式",
-    "exporting": "导出中...",
     "exportUnavailable": "视频和音频资源不支持格式转换，但仍可下载原文件。",
     "forceFullRetry": "强制全部重试",
     "forceFullRetryHint": "忽略之前的状态，重新执行所有处理任务",
-    "format": {
-      "avif": "AVIF",
-      "jpeg": "JPEG（80%）",
-      "png": "PNG",
-      "webp": "WebP（80%）"
-    },
     "noAsset": "未选中资源，操作已禁用。",
     "noRetryTasks": "此资源类型没有可重试的任务。",
-    "optional": "可选",
     "retryProcessing": "重试处理",
     "retrySubmitFailed": "提交重新处理任务失败。",
     "retrySubmitted": "已提交重新处理任务。",
@@ -1980,6 +1958,32 @@
     },
     "unnamed": "未命名"
   },
+  "photoExport": {
+    "actions": "照片操作",
+    "assetSource": "导出此照片，不包含 Studio 编辑。",
+    "completed": "已开始下载照片。",
+    "confirm": "导出",
+    "downscaled": "受可用资源限制，导出尺寸已降至 {{width}} × {{height}}。",
+    "exporting": "正在导出…",
+    "failed": "导出失败。设置已保留，请重试。",
+    "filename": "文件名",
+    "format": "格式",
+    "longEdge": "长边",
+    "longEdgePx": "长边（像素）",
+    "maximum": "最大可用",
+    "metadataUnavailable": "照片已导出，但未能保留元数据。",
+    "output": "预计输出",
+    "percent": "百分比",
+    "pngMetadata": "Studio 导出的 PNG 不包含源文件元数据。",
+    "quality": "质量",
+    "scale": "缩放（%）",
+    "serverMetadata": "源文件中的兼容元数据和色彩配置会尽可能保留。",
+    "size": "尺寸",
+    "sourceSize": "源图像尺寸",
+    "studioMetadata": "尽可能保留兼容的相机、日期和 GPS 元数据；方向和尺寸按编辑后的图像更新。",
+    "studioSource": "以可用的工作分辨率导出当前编辑结果。",
+    "title": "导出照片"
+  },
   "productTerms": {
     "defaultStorageLocation": "默认存储位置",
     "primaryRepository": "主资源库"
@@ -2605,22 +2609,6 @@
       "fieldsCount_other": "{{count}} 个字段",
       "properties": "图像属性",
       "title": "EXIF 元数据"
-    },
-    "export": {
-      "cancel": "取消",
-      "confirm": "导出",
-      "downscaledToast": "导出已缩放至 {{w}}×{{h}} 以符合限制。",
-      "estimate": "预计输出",
-      "failed": "导出图像失败。",
-      "format": "格式",
-      "longEdge": "长边",
-      "longEdgePx": "长边（像素）",
-      "original": "原始",
-      "percent": "百分比",
-      "quality": "质量",
-      "scale": "缩放",
-      "size": "尺寸",
-      "title": "导出"
     },
     "frame": {
       "blur": "模糊",

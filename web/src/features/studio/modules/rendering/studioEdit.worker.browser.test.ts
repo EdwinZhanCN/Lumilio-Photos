@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vite-plus/test";
+import { DEFAULT_CANVAS } from "../../model/canvasSpec";
 import { DEFAULT_STUDIO_ADJUSTMENTS } from "../../model/editTypes";
 
 // Real Chromium, real Worker, real WebGL2 + OffscreenCanvas. This is the whole
@@ -90,7 +91,12 @@ describe.skipIf(!webgl2Available())("studioEdit worker", () => {
       const exported = await call<{ blob: Blob; width: number; height: number }>(
         worker,
         "EXPORT_IMAGE",
-        { adjustments: DEFAULT_STUDIO_ADJUSTMENTS, format: "image/png", quality: 1, sizeMode: { kind: "original" } },
+        {
+          adjustments: DEFAULT_STUDIO_ADJUSTMENTS,
+          format: "image/png",
+          quality: 1,
+          sizeMode: { kind: "original" },
+        },
         "EXPORT_COMPLETE",
       );
       expect([exported.width, exported.height]).toEqual([64, 64]);
@@ -143,6 +149,48 @@ describe.skipIf(!webgl2Available())("studioEdit worker", () => {
       expect(right[0]).toBeGreaterThan(right[2]); // right side reddish
       expect(left[2]).toBeGreaterThan(left[0]); // left side bluish
       bitmap.close();
+    } finally {
+      worker.terminate();
+    }
+  });
+  it("exports the cropped, rotated frame within the selected long edge", async () => {
+    const worker = createWorker();
+    try {
+      const off = new OffscreenCanvas(8, 8);
+      await call(worker, "INIT_CANVAS", { canvas: off }, "CANVAS_READY", [off]);
+      const loaded = await call<{ snapshot: ImageBitmap }>(
+        worker,
+        "LOAD_IMAGE",
+        { blob: await sourceBlob() },
+        "IMAGE_LOADED",
+      );
+      loaded.snapshot.close();
+      const result = await call<{ blob: Blob }>(
+        worker,
+        "EXPORT_IMAGE",
+        {
+          adjustments: {
+            ...DEFAULT_STUDIO_ADJUSTMENTS,
+            rotation: 90,
+            crop: { x: 0, y: 0, width: 48, height: 32 },
+          },
+          composition: {
+            canvas: {
+              ...DEFAULT_CANVAS,
+              pad: { top: 0.25, right: 0.25, bottom: 0.25, left: 0.25 },
+            },
+            layers: [],
+          },
+          format: "image/png",
+          quality: 1,
+          sizeMode: { kind: "longEdge", longEdge: 32 },
+        },
+        "EXPORT_COMPLETE",
+      );
+      expect(result.blob.type).toBe("image/png");
+      const image = await createImageBitmap(result.blob);
+      expect([image.width, image.height]).toEqual([24, 32]);
+      image.close();
     } finally {
       worker.terminate();
     }
