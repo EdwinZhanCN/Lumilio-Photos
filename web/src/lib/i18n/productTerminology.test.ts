@@ -10,7 +10,12 @@ function translationValues(value: unknown): string[] {
 
 describe("canonical product terminology", () => {
   it("does not expose Library as a Repository synonym", () => {
-    const violations = translationValues(en).filter((value) => /\blibrar(?:y|ies)\b/i.test(value));
+    const { browse, ...music } = en.music;
+    expect(browse).toEqual({ title: "Library" });
+    // The listening navigation label is not a Repository/storage identity.
+    const violations = translationValues({ ...en, music }).filter((value) =>
+      /\blibrar(?:y|ies)\b/i.test(value),
+    );
     expect(violations).toEqual([]);
   });
 
@@ -48,6 +53,22 @@ describe("canonical product terminology", () => {
     expect(englishViolations).toEqual([]);
     expect(englishCaseViolations).toEqual([]);
     expect(chineseViolations).toEqual([]);
+  });
+
+  it("keeps Music vocabulary separate from storage and mixed-media Albums", () => {
+    expect(en.music.title).toBe("Music");
+    expect(zh.music.title).toBe("音乐");
+    expect(en.music.album.label).toBe("Music Album");
+    expect(zh.music.album.label).toBe("音乐专辑");
+    expect(en.music.fields.artist).toBe("Track artist");
+    expect(zh.music.fields.artist).toBe("曲目艺人");
+    expect(en.music.playlists.create).toBe("Create playlist");
+    expect(zh.music.playlists.create).toBe("创建歌单");
+
+    const storageSynonymViolations = translationValues(en).filter((value) =>
+      /\bmusic library\b/i.test(value),
+    );
+    expect(storageSynonymViolations).toEqual([]);
   });
 
   it("keeps all four Lumen capability labels canonical", () => {

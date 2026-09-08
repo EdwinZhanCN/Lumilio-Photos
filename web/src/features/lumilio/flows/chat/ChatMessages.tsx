@@ -72,9 +72,7 @@ function TurnScope({ request }: { request: AgentTurnSnapshot }) {
         <span
           key={`${mention.type}:${mention.id}`}
           className={`badge badge-sm gap-1 ${
-            mention.status === "dropped"
-              ? "border-error/30 bg-error/10 text-error"
-              : "badge-ghost"
+            mention.status === "dropped" ? "border-error/30 bg-error/10 text-error" : "badge-ghost"
           }`}
           title={
             mention.status === "dropped"
@@ -104,7 +102,8 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
     const scrollContainer = endRef.current?.closest<HTMLElement>("[data-lumilio-chat-scroll]");
     if (!scrollContainer) return undefined;
     const updateFollow = () => {
-      const distance = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
+      const distance =
+        scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
       followLatestRef.current = distance < 96;
     };
     updateFollow();
@@ -123,7 +122,11 @@ export function ChatMessages({ messages, isGenerating }: ChatMessagesProps) {
   const showSpinner = isGenerating && last?.role === "assistant" && last.blocks.length === 0;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-4 py-6" aria-live="polite" aria-relevant="additions text">
+    <div
+      className="mx-auto max-w-3xl space-y-8 px-4 py-6"
+      aria-live="polite"
+      aria-relevant="additions text"
+    >
       {messages.map((message, messageIndex) => {
         if (message.role === "user") {
           const text = message.blocks

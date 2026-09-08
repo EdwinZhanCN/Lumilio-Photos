@@ -89,6 +89,7 @@ const (
 	OperationAssetReprocess
 	OperationAssetReindexRequest
 	OperationAssetUserStateMutate
+	OperationMusicMutation
 	OperationEventInitializeBackfill
 	OperationEventRebuildSnapshot
 	OperationEventPublishOwnerSnapshot
@@ -331,6 +332,11 @@ var operationCatalog = [operationCount]OperationDescriptor{
 	OperationAssetUserStateMutate: {
 		Operation: OperationAssetUserStateMutate,
 		Name:      "asset.user_state.mutate",
+		Role:      RoleWriter,
+	},
+	OperationMusicMutation: {
+		Operation: OperationMusicMutation,
+		Name:      "music.mutation",
 		Role:      RoleWriter,
 	},
 	OperationEventInitializeBackfill: {

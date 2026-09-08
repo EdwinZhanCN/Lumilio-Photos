@@ -1075,6 +1075,15 @@ func userFacingTerminologyViolation(relative, line string) bool {
 func allowedRepositoryTermContext(relative, line string) bool {
 	lower := strings.ToLower(line)
 	trimmed := strings.TrimSpace(line)
+	// The Music browse label is scoped to the listening domain. The Web
+	// terminology test additionally verifies its exact translation key.
+	if strings.HasPrefix(relative, "web/src/features/music/") && strings.Contains(line, `t("music.browse.title", "Library")`) {
+		return true
+	}
+	if relative == "web/src/locales/en/translation.json" && strings.TrimSuffix(trimmed, ",") == `"title": "Library"` {
+		return true
+	}
+
 	if (strings.HasSuffix(relative, ".go") || strings.HasSuffix(relative, ".ts") || strings.HasSuffix(relative, ".tsx")) &&
 		(strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*")) &&
 		!strings.HasPrefix(trimmed, "// @") && !strings.Contains(relative, "schema.d.ts") &&

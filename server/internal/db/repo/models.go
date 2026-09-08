@@ -648,6 +648,142 @@ type MediaItemBrowseFact struct {
 	StackKind      *string     `db:"stack_kind" json:"stack_kind"`
 }
 
+type MusicAlbum struct {
+	AlbumID           uuid.UUID         `db:"album_id" json:"album_id"`
+	OwnerID           int32             `db:"owner_id" json:"owner_id"`
+	Title             string            `db:"title" json:"title"`
+	ReleaseDate       *string           `db:"release_date" json:"release_date"`
+	ReleasePrecision  string            `db:"release_precision" json:"release_precision"`
+	Edition           string            `db:"edition" json:"edition"`
+	ReleaseIdentifier string            `db:"release_identifier" json:"release_identifier"`
+	SourceGroup       string            `db:"source_group" json:"source_group"`
+	ArtistSource      string            `db:"artist_source" json:"artist_source"`
+	CoverAssetID      uuid.NullUUID     `db:"cover_asset_id" json:"cover_asset_id"`
+	Revision          int64             `db:"revision" json:"revision"`
+	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	Favorite          int64             `db:"favorite" json:"favorite"`
+}
+
+type MusicAlbumArtist struct {
+	AlbumID  uuid.UUID `db:"album_id" json:"album_id"`
+	ArtistID uuid.UUID `db:"artist_id" json:"artist_id"`
+	Position int64     `db:"position" json:"position"`
+	Role     string    `db:"role" json:"role"`
+}
+
+type MusicArtist struct {
+	ArtistID       uuid.UUID         `db:"artist_id" json:"artist_id"`
+	OwnerID        int32             `db:"owner_id" json:"owner_id"`
+	DisplayName    string            `db:"display_name" json:"display_name"`
+	NormalizedName string            `db:"normalized_name" json:"normalized_name"`
+	ExternalID     string            `db:"external_id" json:"external_id"`
+	Revision       int64             `db:"revision" json:"revision"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	Favorite       int64             `db:"favorite" json:"favorite"`
+}
+
+type MusicPlaybackEntry struct {
+	EntryID       string        `db:"entry_id" json:"entry_id"`
+	SessionID     uuid.UUID     `db:"session_id" json:"session_id"`
+	Sequence      int64         `db:"sequence" json:"sequence"`
+	TrackID       uuid.NullUUID `db:"track_id" json:"track_id"`
+	SourceEntryID *string       `db:"source_entry_id" json:"source_entry_id"`
+	SavedTitle    string        `db:"saved_title" json:"saved_title"`
+}
+
+type MusicPlaybackSession struct {
+	SessionID      uuid.UUID         `db:"session_id" json:"session_id"`
+	OwnerID        int32             `db:"owner_id" json:"owner_id"`
+	SourceKind     string            `db:"source_kind" json:"source_kind"`
+	SourceID       string            `db:"source_id" json:"source_id"`
+	SourceRevision int64             `db:"source_revision" json:"source_revision"`
+	Status         string            `db:"status" json:"status"`
+	ExpiresAt      dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicPlaylist struct {
+	PlaylistID  uuid.UUID         `db:"playlist_id" json:"playlist_id"`
+	OwnerID     int32             `db:"owner_id" json:"owner_id"`
+	Title       string            `db:"title" json:"title"`
+	Description string            `db:"description" json:"description"`
+	Revision    int64             `db:"revision" json:"revision"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt   dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicPlaylistEntry struct {
+	EntryID        string            `db:"entry_id" json:"entry_id"`
+	PlaylistID     uuid.UUID         `db:"playlist_id" json:"playlist_id"`
+	TrackID        uuid.NullUUID     `db:"track_id" json:"track_id"`
+	SavedTitle     string            `db:"saved_title" json:"saved_title"`
+	Position       int64             `db:"position" json:"position"`
+	IdempotencyKey *string           `db:"idempotency_key" json:"idempotency_key"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicSearchFt struct {
+	TrackID  string `db:"track_id" json:"track_id"`
+	Title    string `db:"title" json:"title"`
+	Artist   string `db:"artist" json:"artist"`
+	Album    string `db:"album" json:"album"`
+	Filename string `db:"filename" json:"filename"`
+}
+
+type MusicTrack struct {
+	TrackID                 uuid.UUID         `db:"track_id" json:"track_id"`
+	OwnerID                 int32             `db:"owner_id" json:"owner_id"`
+	Designation             string            `db:"designation" json:"designation"`
+	AlbumID                 uuid.NullUUID     `db:"album_id" json:"album_id"`
+	Title                   string            `db:"title" json:"title"`
+	AlbumTitle              string            `db:"album_title" json:"album_title"`
+	ArtistName              string            `db:"artist_name" json:"artist_name"`
+	AlbumArtistName         string            `db:"album_artist_name" json:"album_artist_name"`
+	Genre                   string            `db:"genre" json:"genre"`
+	ReleaseDate             *string           `db:"release_date" json:"release_date"`
+	ReleasePrecision        string            `db:"release_precision" json:"release_precision"`
+	Edition                 string            `db:"edition" json:"edition"`
+	ReleaseIdentifier       string            `db:"release_identifier" json:"release_identifier"`
+	DiscNumber              *int64            `db:"disc_number" json:"disc_number"`
+	DiscTotal               *int64            `db:"disc_total" json:"disc_total"`
+	TrackNumber             *int64            `db:"track_number" json:"track_number"`
+	TrackTotal              *int64            `db:"track_total" json:"track_total"`
+	IsCompilation           int64             `db:"is_compilation" json:"is_compilation"`
+	ExtractedArtists        string            `db:"extracted_artists" json:"extracted_artists"`
+	ExtractedAlbumArtists   string            `db:"extracted_album_artists" json:"extracted_album_artists"`
+	ExtractedArtistIds      string            `db:"extracted_artist_ids" json:"extracted_artist_ids"`
+	ExtractedAlbumArtistIds string            `db:"extracted_album_artist_ids" json:"extracted_album_artist_ids"`
+	ExtractedSourceRevision int64             `db:"extracted_source_revision" json:"extracted_source_revision"`
+	Revision                int64             `db:"revision" json:"revision"`
+	CreatedAt               dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt               dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicTrackArtist struct {
+	TrackID  uuid.UUID `db:"track_id" json:"track_id"`
+	ArtistID uuid.UUID `db:"artist_id" json:"artist_id"`
+	Position int64     `db:"position" json:"position"`
+	Role     string    `db:"role" json:"role"`
+}
+
+type MusicTrackLyric struct {
+	TrackID  string `db:"track_id" json:"track_id"`
+	Content  string `db:"content" json:"content"`
+	Revision int64  `db:"revision" json:"revision"`
+}
+
+type MusicTrackOverride struct {
+	TrackID   string            `db:"track_id" json:"track_id"`
+	Field     string            `db:"field" json:"field"`
+	Value     *string           `db:"value" json:"value"`
+	IsPresent int64             `db:"is_present" json:"is_present"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type OcrIndexMetadatum struct {
 	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
 	Revision  int64             `db:"revision" json:"revision"`

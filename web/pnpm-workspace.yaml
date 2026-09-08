@@ -18,20 +18,20 @@ minimumReleaseAgeExclude:
 
 # Route transitive Vite/Vitest consumers through the Vite+ alpha packages.
 overrides:
-  vite: 'catalog:'
-  vitest: 'catalog:'
+  vite: "catalog:"
+  vitest: "catalog:"
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.2.5
   vitest: 4.1.10
   vite-plus: 0.2.5
-  '@vitest/browser-playwright': 4.1.10
-  '@vitest/coverage-istanbul': 4.1.10
-  '@vitest/coverage-v8': 4.1.10
-  '@vitest/ui': 4.1.10
+  "@vitest/browser-playwright": 4.1.10
+  "@vitest/coverage-istanbul": 4.1.10
+  "@vitest/coverage-v8": 4.1.10
+  "@vitest/ui": 4.1.10
 peerDependencyRules:
   allowAny:
     - vite
     - vitest
   allowedVersions:
-    vite: '*'
-    vitest: '*'
+    vite: "*"
+    vitest: "*"

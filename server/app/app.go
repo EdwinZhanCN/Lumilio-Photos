@@ -506,6 +506,12 @@ func run(
 		return fmt.Errorf("initialize auth rate limiter: %w", err)
 	}
 	albumService := service.NewAlbumService(queries)
+	musicService := service.NewMusicService(queries, database.ReaderQueries, database.Writer)
+	go func() {
+		if err := musicService.BackfillAll(ctx, 500); err != nil {
+			appLogger.Warn("music catalog backfill failed", zap.String("operation", "music.backfill"), zap.Error(err))
+		}
+	}()
 	userService := service.NewUserServiceWithWriter(queries, sqlDB, database.Writer)
 
 	// Break-glass recovery is an explicit single-run host control, separate from
@@ -800,6 +806,7 @@ func run(
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
 	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, database.Writer, settingsService, lumenService)
+	musicController := handler.NewMusicHandler(musicService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager, repositoryFiles)
 	locationController := handler.NewLocationHandler(locationService)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
@@ -858,6 +865,7 @@ func run(
 		handler.RequireAppInitialized(bootstrapService),
 		originPolicy,
 		appLogger.Named("http"),
+		musicController,
 	)
 
 	// Add Swagger documentation endpoint

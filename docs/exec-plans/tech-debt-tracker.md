@@ -27,3 +27,10 @@ Last aligned with the codebase: 2026-08-30.
   `AssetFaceResultDTO` currently unmarshals them directly into `time.Time`.
   Mirror the internal aggregate conversion now used by OCR and add a focused
   relation test before relying on `include_faces=true` in a user-facing flow.
+
+- **Music embedded covers are not materialized as thumbnails.** Owner:
+  `server/internal/processors/audio_helpers.go` and
+  `web/src/features/music/components/MusicArtwork.tsx`. Bandcamp audio retains
+  embedded artwork, but the audio pipeline does not generate image thumbnails;
+  assigning an audio asset as album cover produces a 404. Demo albums use the
+  placeholder until cover extraction and thumbnail generation are implemented.

@@ -8,7 +8,11 @@ type RoleRouteProps = {
 };
 
 /** Enforces route metadata even when a user opens a privileged URL directly. */
-export default function RoleRoute({ children, requiredRole, fallback = null }: RoleRouteProps): ReactNode {
+export default function RoleRoute({
+  children,
+  requiredRole,
+  fallback = null,
+}: RoleRouteProps): ReactNode {
   const { user } = useAuth();
 
   if (requiredRole && user?.role !== requiredRole) {

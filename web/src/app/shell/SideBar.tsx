@@ -8,6 +8,7 @@ import {
   Image,
   LibraryBig,
   LogOut,
+  Music2,
   Moon,
   Paintbrush,
   Palette,
@@ -113,6 +114,16 @@ function SideBar() {
           >
             <LibraryBig className="size-5" />
             {t("sidebar.collections")}
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/music"
+            onClick={closeMobileDrawer}
+            className={location.pathname.startsWith("/music") ? "active" : ""}
+          >
+            <Music2 className="size-5" />
+            {t("sidebar.music", { defaultValue: "Music" })}
           </Link>
         </li>
         <li>

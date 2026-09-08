@@ -45,6 +45,11 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS.
 - `server/internal/api/handler`: HTTP request/response layer.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
+- The Music domain is a first-class owner-scoped projection in
+  `server/internal/service/music_service.go` and `server/migrations/000015_music_library.up.sql`.
+  It uses Asset identity and media delivery, but owns track/release/artist
+  meaning, field-level corrections, playlists, and bounded playback snapshots
+  without changing legacy mixed-media Albums.
 - `server/internal/processors`: read/compute stages for ingest, metadata,
   derivatives, transcode, and enrichment. Background results are committed by
   the shared coordinator rather than by processors themselves.
@@ -114,6 +119,11 @@ useful; implementation plans belong in `exec-plans/`.
 
 - `web/ARCHITECTURE.md`: authoritative and boundary-enforced frontend ownership, feature vocabulary, dependency direction, and state-placement rules.
 - `web/src/features/*`: domain features. User journeys live in named `flows/`; reusable server access in `api/`; React-free rules and codecs in `model/`; cross-flow state or persistence in `state/`; isolated technical capabilities in `modules/`.
+- `web/src/features/music`: the authenticated local listening domain. Its
+  TanStack Query adapters own server facts, `MusicPlayerProvider` owns one
+  persistent audio engine and transient queue, and the shell mounts the dock
+  once above route changes. Asset media viewers coordinate through the neutral
+  `web/src/lib/media` capability rather than importing Music.
 - Feature route files are thin entries. Runtime imports between features go through the target feature's narrow `index.ts`, except the reviewed `assets/map` and `assets/picker` entries.
 - `web/src/lib/http-commons`: generated OpenAPI types and typed API client.
 - `web/src/contexts`: cross-cutting runtime capabilities and provider boundaries.

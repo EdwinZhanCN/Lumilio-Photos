@@ -159,10 +159,10 @@ test("@agent-trust Lumilio Agent exposes scope and waits for an effect receipt",
   await page.getByRole("button", { name: t("lumilio.input.send"), exact: true }).click();
 
   await expect.poll(() => chatRequest?.mode).toBe("organize");
-  expect(chatRequest?.mentions).toEqual([
-    { type: "album", id: "42", label: "Trust Review" },
-  ]);
-  await expect(page.getByText(t("lumilio.quickActions.organize.label"), { exact: true })).toBeVisible();
+  expect(chatRequest?.mentions).toEqual([{ type: "album", id: "42", label: "Trust Review" }]);
+  await expect(
+    page.getByText(t("lumilio.quickActions.organize.label"), { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Trust Review", { exact: true })).toBeVisible();
   await expect(page.getByText(t("lumilio.chat.confirmation.title"), { exact: true })).toBeVisible();
 

@@ -378,6 +378,7 @@
     },
     "mediaViewer": {
       "asset_alt_text": "资源",
+      "audio_title": "音频",
       "componentJpeg": "JPEG",
       "componentRaw": "RAW",
       "componentTabs": "媒体组件",
@@ -1870,6 +1871,178 @@
     },
     "title": "系统状态"
   },
+  "music": {
+    "actions": {
+      "back": "返回音乐",
+      "editAlbum": "编辑专辑",
+      "editArtist": "编辑艺人",
+      "favorite": "加入收藏",
+      "like": "喜欢",
+      "more": "更多操作",
+      "play": "播放",
+      "playAlbum": "播放专辑",
+      "playAll": "播放全部",
+      "playLiked": "播放喜欢的曲目",
+      "reset": "重置",
+      "save": "保存更改",
+      "unfavorite": "取消收藏",
+      "unlike": "取消喜欢"
+    },
+    "album": {
+      "emptyTracks": "此发行版本中没有可用曲目。",
+      "label": "音乐专辑",
+      "noDate": "发行日期未知",
+      "trackList": "曲目列表",
+      "untitled": "未命名专辑"
+    },
+    "albums": {
+      "emptyDescription": "导入的标签包含发行信息后，专辑会显示在这里。",
+      "emptyTitle": "还没有音乐专辑",
+      "viewAll": "查看全部专辑"
+    },
+    "artist": {
+      "albums": "张专辑",
+      "emptyTracks": "没有找到该艺人的曲目。",
+      "tracksHeading": "该艺人的曲目"
+    },
+    "artists": {
+      "emptyDescription": "艺人信息会从本地音频元数据中收集。",
+      "emptyTitle": "还没有艺人"
+    },
+    "browse": {
+      "title": "音乐库"
+    },
+    "designation": {
+      "music": "音乐",
+      "other": "其他音频"
+    },
+    "detail": {
+      "error": "无法加载此音乐内容。"
+    },
+    "favorites": {
+      "label": "收藏"
+    },
+    "feedback": {
+      "error": "无法保存更改，请重新加载后重试。",
+      "success": "更改已保存。"
+    },
+    "fields": {
+      "album": "专辑",
+      "albumArtist": "专辑艺人",
+      "artist": "曲目艺人",
+      "description": "描述",
+      "designation": "显示在",
+      "genre": "流派",
+      "playlistTitle": "歌单标题",
+      "releaseDate": "发行日期",
+      "title": "标题"
+    },
+    "filter": {
+      "all": "全部",
+      "favorites": "收藏",
+      "label": "音乐库筛选"
+    },
+    "filters": {
+      "all": "全部",
+      "label": "音乐筛选"
+    },
+    "likeError": "保存失败，请重试。",
+    "loadError": "无法加载音乐。",
+    "lyrics": {
+      "empty": "暂无本地歌词，可在曲目详情中添加。",
+      "hint": "粘贴歌词并保存在本地，不会修改原始音频文件。",
+      "title": "歌词"
+    },
+    "navigation": "音乐分区",
+    "pagination": {
+      "label": "音乐分页"
+    },
+    "player": {
+      "close": "关闭播放器",
+      "empty": "当前没有播放内容",
+      "label": "音乐播放器",
+      "loading": "正在准备播放队列…",
+      "mute": "静音",
+      "next": "下一首",
+      "pause": "暂停",
+      "play": "播放",
+      "previous": "上一首",
+      "repeat": "循环",
+      "seek": "播放进度",
+      "shuffle": "随机播放",
+      "unmute": "取消静音",
+      "volume": "音量"
+    },
+    "playlist": {
+      "confirmDelete": "删除这个歌单？音频文件会保留。",
+      "delete": "删除歌单",
+      "edit": "编辑歌单",
+      "empty": "此歌单还没有条目。",
+      "entryHeading": "歌单顺序",
+      "moveDown": "下移",
+      "moveUp": "上移",
+      "remove": "移除条目",
+      "unavailable": "音频不可用"
+    },
+    "playlists": {
+      "add": "添加曲目",
+      "addLabel": "添加到歌单",
+      "chooseTrack": "选择曲目",
+      "create": "创建歌单",
+      "emptyDescription": "创建歌单，保存独立于播放队列的播放顺序。",
+      "emptyTitle": "还没有歌单",
+      "untitled": "未命名歌单"
+    },
+    "queue": {
+      "add": "加入播放队列",
+      "remove": "从队列移除",
+      "title": "播放队列",
+      "unavailable": "不可用"
+    },
+    "quickStart": {
+      "liked": "喜欢的曲目"
+    },
+    "search": {
+      "label": "搜索音乐"
+    },
+    "searchTracks": "搜索曲目",
+    "title": "音乐",
+    "track": {
+      "artworkQueued": "封面生成任务已排队。处理完成后请刷新。",
+      "confirmReset": "将所有修正恢复为原始文件的元数据？",
+      "designation": "归类",
+      "details": "曲目详情",
+      "duration": "时长",
+      "editHint": "更改会作为覆盖值保存，不会写入原始文件。",
+      "editTitle": "修正元数据",
+      "file": "文件",
+      "format": "格式",
+      "regenerateArtwork": "重新生成封面"
+    },
+    "tracks": {
+      "count": "首曲目",
+      "emptyDescription": "尝试其他搜索词，或清除“喜欢”筛选。",
+      "emptyTitle": "没有匹配的曲目",
+      "heading": "全部音频",
+      "likedOnly": "已喜欢",
+      "sort": {
+        "album": "专辑",
+        "artist": "艺人",
+        "recent": "最近添加",
+        "title": "标题",
+        "track": "曲目编号"
+      },
+      "sortLabel": "排序曲目"
+    },
+    "unknownArtist": "未知艺人",
+    "views": {
+      "albums": "专辑",
+      "artists": "艺人",
+      "overview": "概览",
+      "playlists": "歌单",
+      "tracks": "曲目"
+    }
+  },
   "nav": {
     "home": "首页"
   },
@@ -2509,6 +2682,7 @@
     "collections": "合集",
     "home": "首页",
     "manage": "管理",
+    "music": "音乐",
     "openMenu": "打开菜单",
     "settings": "设置",
     "status": {

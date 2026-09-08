@@ -324,6 +324,39 @@ type ShareLinkControllerInterface interface {
 	DownloadPublicShare(c *gin.Context)     // POST /public/shares/:token/download
 }
 
+// MusicControllerInterface defines owner-scoped music library and playback
+// endpoints. The variadic router argument keeps lightweight router tests and
+// integrations that do not construct the optional feature source-compatible.
+type MusicControllerInterface interface {
+	GetLyrics(c *gin.Context)
+	UpdateLyrics(c *gin.Context)
+	ListTracks(c *gin.Context)
+	GetTrack(c *gin.Context)
+	UpdateTrack(c *gin.Context)
+	ResetTrackOverrides(c *gin.Context)
+	SetTrackDesignation(c *gin.Context)
+	ListAlbums(c *gin.Context)
+	GetAlbum(c *gin.Context)
+	CreateAlbum(c *gin.Context)
+	UpdateAlbum(c *gin.Context)
+	AssignTrackAlbum(c *gin.Context)
+	ListArtists(c *gin.Context)
+	GetArtist(c *gin.Context)
+	UpdateArtist(c *gin.Context)
+	ListPlaylists(c *gin.Context)
+	GetPlaylist(c *gin.Context)
+	CreatePlaylist(c *gin.Context)
+	UpdatePlaylist(c *gin.Context)
+	DeletePlaylist(c *gin.Context)
+	ListPlaylistEntries(c *gin.Context)
+	AddPlaylistEntry(c *gin.Context)
+	RemovePlaylistEntry(c *gin.Context)
+	ReorderPlaylist(c *gin.Context)
+	CreatePlaybackSession(c *gin.Context)
+	ListPlaybackEntries(c *gin.Context)
+	ExpirePlaybackSession(c *gin.Context)
+}
+
 func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
@@ -349,6 +382,7 @@ func NewRouter(
 	appInitializedMiddleware gin.HandlerFunc,
 	originPolicy *httporigin.Policy,
 	logger *zap.Logger,
+	musicControllers ...MusicControllerInterface,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(requestErrorLogger(logger))
@@ -603,6 +637,49 @@ func NewRouter(
 			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
 			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
 			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
+		}
+
+		if len(musicControllers) > 0 && musicControllers[0] != nil {
+			music := v1.Group("/music")
+			music.Use(authController.AuthMiddleware(), appInitializedMiddleware)
+			{
+				tracks := music.Group("/tracks")
+				tracks.GET("", musicControllers[0].ListTracks)
+				tracks.GET("/:id", musicControllers[0].GetTrack)
+				tracks.GET("/:id/lyrics", musicControllers[0].GetLyrics)
+				tracks.PUT("/:id/lyrics", musicControllers[0].UpdateLyrics)
+				tracks.PATCH("/:id", musicControllers[0].UpdateTrack)
+				tracks.POST("/:id/reset-overrides", musicControllers[0].ResetTrackOverrides)
+				tracks.PUT("/:id/designation", musicControllers[0].SetTrackDesignation)
+				tracks.PUT("/:id/album", musicControllers[0].AssignTrackAlbum)
+
+				albums := music.Group("/albums")
+				albums.GET("", musicControllers[0].ListAlbums)
+				albums.POST("", musicControllers[0].CreateAlbum)
+				albums.GET("/:id", musicControllers[0].GetAlbum)
+				albums.PATCH("/:id", musicControllers[0].UpdateAlbum)
+
+				artists := music.Group("/artists")
+				artists.GET("", musicControllers[0].ListArtists)
+				artists.GET("/:id", musicControllers[0].GetArtist)
+				artists.PATCH("/:id", musicControllers[0].UpdateArtist)
+
+				playlists := music.Group("/playlists")
+				playlists.GET("", musicControllers[0].ListPlaylists)
+				playlists.POST("", musicControllers[0].CreatePlaylist)
+				playlists.GET("/:id", musicControllers[0].GetPlaylist)
+				playlists.PATCH("/:id", musicControllers[0].UpdatePlaylist)
+				playlists.DELETE("/:id", musicControllers[0].DeletePlaylist)
+				playlists.GET("/:id/entries", musicControllers[0].ListPlaylistEntries)
+				playlists.POST("/:id/entries", musicControllers[0].AddPlaylistEntry)
+				playlists.PUT("/:id/entries/reorder", musicControllers[0].ReorderPlaylist)
+				playlists.DELETE("/:id/entries/:entryId", musicControllers[0].RemovePlaylistEntry)
+
+				sessions := music.Group("/playback-sessions")
+				sessions.POST("", musicControllers[0].CreatePlaybackSession)
+				sessions.GET("/:id/entries", musicControllers[0].ListPlaybackEntries)
+				sessions.DELETE("/:id", musicControllers[0].ExpirePlaybackSession)
+			}
 		}
 
 		people := v1.Group("/people")

@@ -49,7 +49,9 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
       {block.state === "committed" && (
         <div className="mt-2 flex items-start gap-2 text-xs text-success" role="status">
           <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
-          <span>{block.receipt?.message ?? t("lumilio.chat.confirmation.committed", "Applied")}</span>
+          <span>
+            {block.receipt?.message ?? t("lumilio.chat.confirmation.committed", "Applied")}
+          </span>
         </div>
       )}
       {block.state === "rejected" && (
@@ -74,7 +76,10 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
         </div>
       )}
       {block.state === "failed" && (
-        <div className="mt-2 flex items-start gap-2 rounded-lg bg-error/10 p-2 text-xs text-error" role="alert">
+        <div
+          className="mt-2 flex items-start gap-2 rounded-lg bg-error/10 p-2 text-xs text-error"
+          role="alert"
+        >
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>
             {block.error ??

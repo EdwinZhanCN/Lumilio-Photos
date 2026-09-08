@@ -198,18 +198,18 @@ func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Rea
 		rawJSON = nil
 	}
 
-	return e.parseMetadata(rawData, assetType), common, rawJSON, nil
+	return e.parseMetadata(rawData, rawJSON, assetType), common, rawJSON, nil
 }
 
 // parseMetadata parses raw metadata based on asset type
-func (e *Extractor) parseMetadata(rawData map[string]string, assetType dbtypes.AssetType) interface{} {
+func (e *Extractor) parseMetadata(rawData map[string]string, rawJSON json.RawMessage, assetType dbtypes.AssetType) interface{} {
 	switch assetType {
 	case dbtypes.AssetTypePhoto:
 		return parsePhotoMetadata(rawData)
 	case dbtypes.AssetTypeVideo:
 		return parseVideoMetadata(rawData)
 	case dbtypes.AssetTypeAudio:
-		return parseAudioMetadata(rawData)
+		return parseAudioMetadataWithRaw(rawData, rawJSON)
 	default:
 		return nil
 	}

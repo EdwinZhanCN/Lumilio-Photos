@@ -1319,7 +1319,7 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 // @Tags assets
 // @Produce image/jpeg
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Param size query string false "Thumbnail size" default(medium) Enums(small,medium,large)
+// @Param size query string false "Thumbnail size" default(medium) Enums(small,medium,large,waveform)
 // @Success 200 {file} string "Thumbnail image file"
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID or size parameter"
 // @Failure 404 {object} api.ProblemResponse "Asset or thumbnail not found"
@@ -1338,7 +1338,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	size := c.DefaultQuery("size", "medium")
 
 	// Validate size parameter
-	if size != "small" && size != "medium" && size != "large" {
+	if size != "small" && size != "medium" && size != "large" && size != "waveform" {
 		api.WriteProblem(c, api.BadRequest(errors.New("invalid size parameter")))
 		return
 	}
@@ -1392,6 +1392,9 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 
 	// Production-ready cache headers
 	c.Header("ETag", etag)
+	if thumbnail.MimeType != "" {
+		c.Header("Content-Type", thumbnail.MimeType)
+	}
 	c.Header("Cache-Control", "public, max-age=86400, must-revalidate") // 24h cache with validation
 	c.Header("Vary", "Accept-Encoding")
 
@@ -1713,7 +1716,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 		return
 	}
 
-	repositoryFS, file, err := openWebOrOriginal(ctx, h.locationResolver, asset, "audios", "_web.mp3")
+	repositoryFS, file, optimized, err := openWebOrOriginalWithFallback(ctx, h.locationResolver, asset, "audios", "_web.mp3")
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -1725,7 +1728,11 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 
 	// Set appropriate headers for audio streaming
 	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
-	c.Header("Content-Type", "audio/mpeg")
+	if optimized {
+		c.Header("Content-Type", "audio/mpeg")
+	} else {
+		c.Header("Content-Type", assetAudioContentType(asset))
+	}
 	c.Header("Vary", "Accept-Encoding")
 	c.Header("Accept-Ranges", "bytes") // Enable range requests for audio seeking
 

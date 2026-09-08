@@ -380,6 +380,7 @@
     },
     "mediaViewer": {
       "asset_alt_text": "Asset",
+      "audio_title": "Audio",
       "componentJpeg": "JPEG",
       "componentRaw": "RAW",
       "componentTabs": "Media components",
@@ -1890,6 +1891,178 @@
     },
     "title": "System Status"
   },
+  "music": {
+    "actions": {
+      "back": "Back to music",
+      "editAlbum": "Edit album",
+      "editArtist": "Edit artist",
+      "favorite": "Add to favorites",
+      "like": "Like",
+      "more": "More options",
+      "play": "Play",
+      "playAlbum": "Play album",
+      "playAll": "Play all",
+      "playLiked": "Play liked tracks",
+      "reset": "Reset",
+      "save": "Save changes",
+      "unfavorite": "Remove from favorites",
+      "unlike": "Unlike"
+    },
+    "album": {
+      "emptyTracks": "No available tracks in this release.",
+      "label": "Music Album",
+      "noDate": "Release date unknown",
+      "trackList": "Track list",
+      "untitled": "Untitled album"
+    },
+    "albums": {
+      "emptyDescription": "Albums appear when imported tags provide release information.",
+      "emptyTitle": "No music albums yet",
+      "viewAll": "View all albums"
+    },
+    "artist": {
+      "albums": "albums",
+      "emptyTracks": "No tracks found for this artist.",
+      "tracksHeading": "Tracks credited to this artist"
+    },
+    "artists": {
+      "emptyDescription": "Artist credits will be collected from your local audio metadata.",
+      "emptyTitle": "No artists yet"
+    },
+    "browse": {
+      "title": "Library"
+    },
+    "designation": {
+      "music": "Music",
+      "other": "Other audio"
+    },
+    "detail": {
+      "error": "This music item could not be loaded."
+    },
+    "favorites": {
+      "label": "Favorites"
+    },
+    "feedback": {
+      "error": "Could not save changes. Reload the item and try again.",
+      "success": "Changes saved."
+    },
+    "fields": {
+      "album": "Album",
+      "albumArtist": "Album artist",
+      "artist": "Track artist",
+      "description": "Description",
+      "designation": "Show in",
+      "genre": "Genre",
+      "playlistTitle": "Playlist title",
+      "releaseDate": "Release date",
+      "title": "Title"
+    },
+    "filter": {
+      "all": "All",
+      "favorites": "Favorites",
+      "label": "Filter music"
+    },
+    "filters": {
+      "all": "All",
+      "label": "Music filters"
+    },
+    "likeError": "Could not save. Try again.",
+    "loadError": "Music could not be loaded.",
+    "lyrics": {
+      "empty": "No local lyrics. Add them in track details.",
+      "hint": "Paste lyrics to keep them locally. Original audio files are unchanged.",
+      "title": "Lyrics"
+    },
+    "navigation": "Music sections",
+    "pagination": {
+      "label": "Music pages"
+    },
+    "player": {
+      "close": "Close player",
+      "empty": "Nothing is playing",
+      "label": "Music player",
+      "loading": "Preparing queue…",
+      "mute": "Mute",
+      "next": "Next track",
+      "pause": "Pause",
+      "play": "Play",
+      "previous": "Previous track",
+      "repeat": "Repeat",
+      "seek": "Seek",
+      "shuffle": "Shuffle",
+      "unmute": "Unmute",
+      "volume": "Volume"
+    },
+    "playlist": {
+      "confirmDelete": "Delete this playlist? The audio files will be kept.",
+      "delete": "Delete playlist",
+      "edit": "Edit playlist",
+      "empty": "This playlist has no entries yet.",
+      "entryHeading": "Playlist order",
+      "moveDown": "Move down",
+      "moveUp": "Move up",
+      "remove": "Remove entry",
+      "unavailable": "Unavailable audio"
+    },
+    "playlists": {
+      "add": "Add track",
+      "addLabel": "Add to playlist",
+      "chooseTrack": "Choose a track",
+      "create": "Create playlist",
+      "emptyDescription": "Create a playlist to keep a listening order independent from your queue.",
+      "emptyTitle": "No playlists yet",
+      "untitled": "Untitled playlist"
+    },
+    "queue": {
+      "add": "Add to queue",
+      "remove": "Remove from queue",
+      "title": "Play queue",
+      "unavailable": "Unavailable"
+    },
+    "quickStart": {
+      "liked": "Liked tracks"
+    },
+    "search": {
+      "label": "Search music"
+    },
+    "searchTracks": "Search tracks",
+    "title": "Music",
+    "track": {
+      "artworkQueued": "Artwork regeneration queued. Refresh after processing finishes.",
+      "confirmReset": "Reset all corrections to the original file metadata?",
+      "designation": "Designation",
+      "details": "Track details",
+      "duration": "Duration",
+      "editHint": "Changes are stored as overrides and never write to the original file.",
+      "editTitle": "Correct metadata",
+      "file": "File",
+      "format": "Format",
+      "regenerateArtwork": "Regenerate artwork"
+    },
+    "tracks": {
+      "count": "tracks",
+      "emptyDescription": "Try another search or clear the liked filter.",
+      "emptyTitle": "No tracks match",
+      "heading": "All audio",
+      "likedOnly": "Liked",
+      "sort": {
+        "album": "Album",
+        "artist": "Artist",
+        "recent": "Recently added",
+        "title": "Title",
+        "track": "Track number"
+      },
+      "sortLabel": "Sort tracks"
+    },
+    "unknownArtist": "Unknown artist",
+    "views": {
+      "albums": "Albums",
+      "artists": "Artists",
+      "overview": "Overview",
+      "playlists": "Playlists",
+      "tracks": "Tracks"
+    }
+  },
   "nav": {
     "home": "Home"
   },
@@ -2536,6 +2709,7 @@
     "collections": "Collections",
     "home": "Home",
     "manage": "Manage",
+    "music": "Music",
     "openMenu": "Open menu",
     "settings": "Settings",
     "status": {

@@ -346,7 +346,7 @@ func (runtime *pipelineRuntime) derivatives(ctx context.Context, qos workqos.Cla
 	}); err != nil {
 		return err
 	}
-	if mType == execution.MediaVideo {
+	if mType == execution.MediaVideo || mType == execution.MediaAudio {
 		if err := runtime.engine.Run(ctx, class, runtime.demand.Demand(execution.StepDerivativesComputeScale, mType), func(stepCtx context.Context) error {
 			return runtime.processor.ComputeThumbnailScale(stepCtx, work)
 		}); err != nil {

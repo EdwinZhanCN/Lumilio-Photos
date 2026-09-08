@@ -1557,9 +1557,42 @@ const docTemplate = `{
                         "example": "Album Title",
                         "type": "string"
                     },
+                    "album_artist": {
+                        "example": "John Doe",
+                        "type": "string"
+                    },
+                    "album_artist_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "album_artists": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "artist": {
                         "example": "John Doe",
                         "type": "string"
+                    },
+                    "artist_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "artists": {
+                        "description": "Ordered credits and identifiers are kept as extracted evidence. They are\ndeliberately not inferred by splitting punctuation in a display name.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     },
                     "bitrate": {
                         "example": 128000,
@@ -1573,12 +1606,33 @@ const docTemplate = `{
                         "example": "AAC",
                         "type": "string"
                     },
+                    "compilation": {
+                        "type": "boolean"
+                    },
                     "description": {
                         "example": "Song Description",
                         "type": "string"
                     },
+                    "disc_number": {
+                        "type": "integer"
+                    },
+                    "disc_total": {
+                        "type": "integer"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
                     "genre": {
                         "example": "Pop",
+                        "type": "string"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "release_precision": {
                         "type": "string"
                     },
                     "sample_rate": {
@@ -1588,6 +1642,12 @@ const docTemplate = `{
                     "title": {
                         "example": "Song Title",
                         "type": "string"
+                    },
+                    "track_number": {
+                        "type": "integer"
+                    },
+                    "track_total": {
+                        "type": "integer"
                     },
                     "year": {
                         "example": 2023,
@@ -6003,6 +6063,796 @@ const docTemplate = `{
                 "required": [
                     "target_person_id"
                 ],
+                "type": "object"
+            },
+            "dto.MusicAlbumAssignmentRequestDTO": {
+                "properties": {
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicAlbumCreateRequestDTO": {
+                "properties": {
+                    "artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "cover_asset_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.MusicAlbumDTO": {
+                "properties": {
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "artists": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicCreditDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "cover_asset_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_identifier": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "enum": [
+                            "unknown",
+                            "year",
+                            "month",
+                            "day"
+                        ],
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "track_count": {
+                        "type": "integer"
+                    },
+                    "tracks": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicAlbumPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicAlbumPatchRequestDTO": {
+                "properties": {
+                    "artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "cover_asset_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicArtistDTO": {
+                "properties": {
+                    "album_count": {
+                        "type": "integer"
+                    },
+                    "artist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "track_count": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicArtistPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicArtistDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicArtistPatchRequestDTO": {
+                "properties": {
+                    "display_name": {
+                        "minLength": 1,
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicCreditDTO": {
+                "properties": {
+                    "artist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "role": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicDesignationRequestDTO": {
+                "properties": {
+                    "designation": {
+                        "enum": [
+                            "music",
+                            "other"
+                        ],
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "designation"
+                ],
+                "type": "object"
+            },
+            "dto.MusicLyricsDTO": {
+                "properties": {
+                    "content": {
+                        "maxLength": 65536,
+                        "type": "string"
+                    },
+                    "revision": {
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicOverrideDTO": {
+                "properties": {
+                    "field": {
+                        "type": "string"
+                    },
+                    "present": {
+                        "type": "boolean"
+                    },
+                    "value": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackEntryDTO": {
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "saved_title": {
+                        "type": "string"
+                    },
+                    "sequence": {
+                        "type": "integer"
+                    },
+                    "source_entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "track_album": {
+                        "type": "string"
+                    },
+                    "track_artist": {
+                        "type": "string"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "track_title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaybackEntryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackSessionDTO": {
+                "properties": {
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "session_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "source_id": {
+                        "type": "string"
+                    },
+                    "source_kind": {
+                        "type": "string"
+                    },
+                    "source_revision": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "total_entries": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackSourceRequestDTO": {
+                "properties": {
+                    "artist_id": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "enum": [
+                            "query",
+                            "album",
+                            "playlist",
+                            "liked"
+                        ],
+                        "type": "string"
+                    },
+                    "liked_only": {
+                        "type": "boolean"
+                    },
+                    "query": {
+                        "type": "string"
+                    },
+                    "sort": {
+                        "enum": [
+                            "title",
+                            "artist",
+                            "album",
+                            "track"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "kind"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistCreateRequestDTO": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistDTO": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "entry_count": {
+                        "type": "integer"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "playlist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntriesResponseDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaylistEntryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntryCreateRequestDTO": {
+                "properties": {
+                    "idempotency_key": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "saved_title": {
+                        "type": "string"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "track_id"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntryDTO": {
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "idempotency_key": {
+                        "type": "string"
+                    },
+                    "playlist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "saved_title": {
+                        "type": "string"
+                    },
+                    "track": {
+                        "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntryPositionDTO": {
+                "properties": {
+                    "entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "entry_id"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistPatchRequestDTO": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistReorderRequestDTO": {
+                "properties": {
+                    "entries": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaylistEntryPositionDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "entries"
+                ],
+                "type": "object"
+            },
+            "dto.MusicTrackDTO": {
+                "properties": {
+                    "album_artist_name": {
+                        "type": "string"
+                    },
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "album_title": {
+                        "type": "string"
+                    },
+                    "artist_name": {
+                        "type": "string"
+                    },
+                    "artists": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicCreditDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "compilation": {
+                        "type": "boolean"
+                    },
+                    "designation": {
+                        "enum": [
+                            "music",
+                            "other"
+                        ],
+                        "type": "string"
+                    },
+                    "disc_number": {
+                        "type": "integer"
+                    },
+                    "disc_total": {
+                        "type": "integer"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "extracted_source_revision": {
+                        "type": "integer"
+                    },
+                    "genre": {
+                        "type": "string"
+                    },
+                    "is_deleted": {
+                        "type": "boolean"
+                    },
+                    "liked": {
+                        "type": "boolean"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "original_filename": {
+                        "type": "string"
+                    },
+                    "overrides": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicOverrideDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_identifier": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "enum": [
+                            "unknown",
+                            "year",
+                            "month",
+                            "day"
+                        ],
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "taken_at": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "track_number": {
+                        "type": "integer"
+                    },
+                    "track_total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicTrackPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicTrackPatchRequestDTO": {
+                "properties": {
+                    "album_artist_name": {
+                        "type": "string"
+                    },
+                    "album_artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "album_title": {
+                        "type": "string"
+                    },
+                    "artist_name": {
+                        "type": "string"
+                    },
+                    "artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "compilation": {
+                        "type": "boolean"
+                    },
+                    "designation": {
+                        "type": "string"
+                    },
+                    "disc_number": {
+                        "type": "integer"
+                    },
+                    "disc_total": {
+                        "type": "integer"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "genre": {
+                        "type": "string"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "track_number": {
+                        "type": "integer"
+                    },
+                    "track_total": {
+                        "type": "integer"
+                    }
+                },
                 "type": "object"
             },
             "dto.NativeHostCapabilityDTO": {
@@ -14981,7 +15831,8 @@ const docTemplate = `{
                             "enum": [
                                 "small",
                                 "medium",
-                                "large"
+                                "large",
+                                "waveform"
                             ],
                             "type": "string"
                         }
@@ -18834,6 +19685,1337 @@ const docTemplate = `{
                 "summary": "Queue location cluster rebuild",
                 "tags": [
                     "locations"
+                ]
+            }
+        },
+        "/api/v1/music/albums": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Search album title",
+                        "in": "query",
+                        "name": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Only favorite albums",
+                        "in": "query",
+                        "name": "favorites_only",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music albums",
+                "tags": [
+                    "music"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicAlbumCreateRequestDTO",
+                                        "description": "Album data",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create music album",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/albums/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Album UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music album",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Album UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicAlbumPatchRequestDTO",
+                                        "description": "Album changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music album",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/artists": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Only favorite artists",
+                        "in": "query",
+                        "name": "favorites_only",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Search artist name",
+                        "in": "query",
+                        "name": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicArtistPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music artists",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/artists/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Artist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicArtistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music artist",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Artist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicArtistPatchRequestDTO",
+                                        "description": "Artist changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Artist changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicArtistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music artist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playback-sessions": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaybackSourceRequestDTO",
+                                        "description": "Playback source",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Playback source",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaybackSessionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "413": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Request Entity Too Large"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create music playback session",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playback-sessions/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Session UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Expire playback session",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playback-sessions/{id}/entries": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Session UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaybackPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "410": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Gone"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List playback entries",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music playlists",
+                "tags": [
+                    "music"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistCreateRequestDTO",
+                                        "description": "Playlist data",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Playlist data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create music playlist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete music playlist",
+                "tags": [
+                    "music"
+                ]
+            },
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music playlist",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistPatchRequestDTO",
+                                        "description": "Playlist changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Playlist changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music playlist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}/entries": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistEntriesResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music playlist entries",
+                "tags": [
+                    "music"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistEntryCreateRequestDTO",
+                                        "description": "Entry data",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Entry data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistEntryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Add music playlist entry",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}/entries/reorder": {
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistReorderRequestDTO",
+                                        "description": "Entry positions",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Entry positions",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Reorder music playlist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}/entries/{entryId}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Entry UUID",
+                        "in": "path",
+                        "name": "entryId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Expected playlist revision",
+                        "in": "query",
+                        "name": "revision",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Remove music playlist entry",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Search title, artist, album, or filename",
+                        "in": "query",
+                        "name": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Sort by title, artist, album, or track",
+                        "in": "query",
+                        "name": "sort",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Only liked tracks",
+                        "in": "query",
+                        "name": "liked_only",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Filter by artist identity",
+                        "in": "query",
+                        "name": "artist_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music tracks",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music track",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicTrackPatchRequestDTO",
+                                        "description": "Track changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Track changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music track",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/album": {
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicAlbumAssignmentRequestDTO",
+                                        "description": "Album assignment",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album assignment",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Assign music album to track",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/designation": {
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicDesignationRequestDTO",
+                                        "description": "Designation change",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Designation change",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Set music track designation",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/lyrics": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicLyricsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get local track lyrics",
+                "tags": [
+                    "music"
+                ]
+            },
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicLyricsDTO",
+                                        "description": "Local lyrics and expected revision",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Local lyrics and expected revision",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicLyricsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Save local track lyrics",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/reset-overrides": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Reset music track overrides",
+                "tags": [
+                    "music"
                 ]
             }
         },

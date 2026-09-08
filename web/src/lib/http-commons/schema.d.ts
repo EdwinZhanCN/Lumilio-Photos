@@ -3459,7 +3459,7 @@ export interface paths {
             parameters: {
                 query?: {
                     /** @description Thumbnail size */
-                    size?: "small" | "medium" | "large";
+                    size?: "small" | "medium" | "large" | "waveform";
                 };
                 header?: never;
                 path: {
@@ -8846,6 +8846,1062 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/music/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music albums */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Search album title */
+                    query?: string;
+                    /** @description Only favorite albums */
+                    favorites_only?: boolean;
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create music album */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Album data */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicAlbumCreateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/albums/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music album */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Album UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update music album */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Album UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Album changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicAlbumPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music artists */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only favorite artists */
+                    favorites_only?: boolean;
+                    /** @description Search artist name */
+                    query?: string;
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicArtistPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/artists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music artist */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Artist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicArtistDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update music artist */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Artist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Artist changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicArtistPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicArtistDTO"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/playback-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create music playback session */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Playback source */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaybackSourceRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaybackSessionDTO"];
+                    };
+                };
+                /** @description Request Entity Too Large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playback-sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Expire playback session */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Session UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playback-sessions/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List playback entries */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Session UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaybackPageDTO"];
+                    };
+                };
+                /** @description Gone */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music playlists */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create music playlist */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Playlist data */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistCreateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music playlist */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete music playlist */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update music playlist */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Playlist changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistDTO"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music playlist entries */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistEntriesResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add music playlist entry */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Entry data */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistEntryCreateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistEntryDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}/entries/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove music playlist entry */
+        delete: {
+            parameters: {
+                query?: {
+                    /** @description Expected playlist revision */
+                    revision?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                    /** @description Entry UUID */
+                    entryId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}/entries/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder music playlist */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Entry positions */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistReorderRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music tracks */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Search title, artist, album, or filename */
+                    query?: string;
+                    /** @description Sort by title, artist, album, or track */
+                    sort?: string;
+                    /** @description Only liked tracks */
+                    liked_only?: boolean;
+                    /** @description Filter by artist identity */
+                    artist_id?: string;
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackPageDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music track */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update music track */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Track changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicTrackPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/album": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign music album to track */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Album assignment */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicAlbumAssignmentRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/designation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set music track designation */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Designation change */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicDesignationRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/lyrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get local track lyrics */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicLyricsDTO"];
+                    };
+                };
+            };
+        };
+        /** Save local track lyrics */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Local lyrics and expected revision */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicLyricsDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicLyricsDTO"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/reset-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset music track overrides */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/people": {
         parameters: {
             query?: never;
@@ -13403,21 +14459,40 @@ export interface components {
             /** @example Album Title */
             album?: string;
             /** @example John Doe */
+            album_artist?: string;
+            album_artist_ids?: string[];
+            album_artists?: string[];
+            /** @example John Doe */
             artist?: string;
+            artist_ids?: string[];
+            /**
+             * @description Ordered credits and identifiers are kept as extracted evidence. They are
+             *     deliberately not inferred by splitting punctuation in a display name.
+             */
+            artists?: string[];
             /** @example 128000 */
             bitrate?: number;
             /** @example 2 */
             channels?: number;
             /** @example AAC */
             codec?: string;
+            compilation?: boolean;
             /** @example Song Description */
             description?: string;
+            disc_number?: number;
+            disc_total?: number;
+            edition?: string;
             /** @example Pop */
             genre?: string;
+            release_date?: string;
+            release_id?: string;
+            release_precision?: string;
             /** @example 44100 */
             sample_rate?: number;
             /** @example Song Title */
             title?: string;
+            track_number?: number;
+            track_total?: number;
             /** @example 2023 */
             year?: number;
         };
@@ -15080,6 +16155,259 @@ export interface components {
         };
         "dto.MoveFaceRequestDTO": {
             target_person_id: number;
+        };
+        "dto.MusicAlbumAssignmentRequestDTO": {
+            /** Format: uuid */
+            album_id?: string;
+            revision?: number;
+        };
+        "dto.MusicAlbumCreateRequestDTO": {
+            artist_names?: string[];
+            /** Format: uuid */
+            cover_asset_id?: string;
+            edition?: string;
+            release_date?: string;
+            release_precision?: string;
+            title: string;
+        };
+        "dto.MusicAlbumDTO": {
+            /** Format: uuid */
+            album_id?: string;
+            artists?: components["schemas"]["dto.MusicCreditDTO"][];
+            /** Format: uuid */
+            cover_asset_id?: string;
+            edition?: string;
+            favorite?: boolean;
+            owner_id?: number;
+            release_date?: string;
+            release_identifier?: string;
+            /** @enum {string} */
+            release_precision?: "unknown" | "year" | "month" | "day";
+            revision?: number;
+            title?: string;
+            track_count?: number;
+            tracks?: components["schemas"]["dto.MusicTrackDTO"][];
+        };
+        "dto.MusicAlbumPageDTO": {
+            items?: components["schemas"]["dto.MusicAlbumDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicAlbumPatchRequestDTO": {
+            artist_names?: string[];
+            /** Format: uuid */
+            cover_asset_id?: string;
+            edition?: string;
+            favorite?: boolean;
+            release_date?: string;
+            release_precision?: string;
+            revision?: number;
+            title?: string;
+        };
+        "dto.MusicArtistDTO": {
+            album_count?: number;
+            /** Format: uuid */
+            artist_id?: string;
+            display_name?: string;
+            favorite?: boolean;
+            owner_id?: number;
+            revision?: number;
+            track_count?: number;
+        };
+        "dto.MusicArtistPageDTO": {
+            items?: components["schemas"]["dto.MusicArtistDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicArtistPatchRequestDTO": {
+            display_name?: string;
+            favorite?: boolean;
+            revision?: number;
+        };
+        "dto.MusicCreditDTO": {
+            /** Format: uuid */
+            artist_id?: string;
+            display_name?: string;
+            position?: number;
+            role?: string;
+        };
+        "dto.MusicDesignationRequestDTO": {
+            /** @enum {string} */
+            designation: "music" | "other";
+            revision?: number;
+        };
+        "dto.MusicLyricsDTO": {
+            content?: string;
+            revision?: number;
+        };
+        "dto.MusicOverrideDTO": {
+            field?: string;
+            present?: boolean;
+            value?: string;
+        };
+        "dto.MusicPlaybackEntryDTO": {
+            available?: boolean;
+            duration?: number;
+            /** Format: uuid */
+            entry_id?: string;
+            mime_type?: string;
+            saved_title?: string;
+            sequence?: number;
+            /** Format: uuid */
+            source_entry_id?: string;
+            track_album?: string;
+            track_artist?: string;
+            /** Format: uuid */
+            track_id?: string;
+            track_title?: string;
+        };
+        "dto.MusicPlaybackPageDTO": {
+            items?: components["schemas"]["dto.MusicPlaybackEntryDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicPlaybackSessionDTO": {
+            expires_at?: string;
+            owner_id?: number;
+            /** Format: uuid */
+            session_id?: string;
+            source_id?: string;
+            source_kind?: string;
+            source_revision?: number;
+            status?: string;
+            total_entries?: number;
+        };
+        "dto.MusicPlaybackSourceRequestDTO": {
+            artist_id?: string;
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            kind: "query" | "album" | "playlist" | "liked";
+            liked_only?: boolean;
+            query?: string;
+            /** @enum {string} */
+            sort?: "title" | "artist" | "album" | "track";
+        };
+        "dto.MusicPlaylistCreateRequestDTO": {
+            description?: string;
+            title: string;
+        };
+        "dto.MusicPlaylistDTO": {
+            description?: string;
+            entry_count?: number;
+            owner_id?: number;
+            /** Format: uuid */
+            playlist_id?: string;
+            revision?: number;
+            title?: string;
+        };
+        "dto.MusicPlaylistEntriesResponseDTO": {
+            items?: components["schemas"]["dto.MusicPlaylistEntryDTO"][];
+            revision?: number;
+        };
+        "dto.MusicPlaylistEntryCreateRequestDTO": {
+            idempotency_key?: string;
+            revision?: number;
+            saved_title?: string;
+            /** Format: uuid */
+            track_id: string;
+        };
+        "dto.MusicPlaylistEntryDTO": {
+            available?: boolean;
+            /** Format: uuid */
+            entry_id?: string;
+            idempotency_key?: string;
+            /** Format: uuid */
+            playlist_id?: string;
+            position?: number;
+            saved_title?: string;
+            track?: components["schemas"]["dto.MusicTrackDTO"];
+            /** Format: uuid */
+            track_id?: string;
+        };
+        "dto.MusicPlaylistEntryPositionDTO": {
+            /** Format: uuid */
+            entry_id: string;
+            position?: number;
+        };
+        "dto.MusicPlaylistPageDTO": {
+            items?: components["schemas"]["dto.MusicPlaylistDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicPlaylistPatchRequestDTO": {
+            description?: string;
+            revision?: number;
+            title: string;
+        };
+        "dto.MusicPlaylistReorderRequestDTO": {
+            entries: components["schemas"]["dto.MusicPlaylistEntryPositionDTO"][];
+            revision?: number;
+        };
+        "dto.MusicTrackDTO": {
+            album_artist_name?: string;
+            /** Format: uuid */
+            album_id?: string;
+            album_title?: string;
+            artist_name?: string;
+            artists?: components["schemas"]["dto.MusicCreditDTO"][];
+            compilation?: boolean;
+            /** @enum {string} */
+            designation?: "music" | "other";
+            disc_number?: number;
+            disc_total?: number;
+            duration?: number;
+            edition?: string;
+            extracted_source_revision?: number;
+            genre?: string;
+            is_deleted?: boolean;
+            liked?: boolean;
+            mime_type?: string;
+            original_filename?: string;
+            overrides?: components["schemas"]["dto.MusicOverrideDTO"][];
+            owner_id?: number;
+            release_date?: string;
+            release_identifier?: string;
+            /** @enum {string} */
+            release_precision?: "unknown" | "year" | "month" | "day";
+            revision?: number;
+            taken_at?: string;
+            title?: string;
+            /** Format: uuid */
+            track_id?: string;
+            track_number?: number;
+            track_total?: number;
+        };
+        "dto.MusicTrackPageDTO": {
+            items?: components["schemas"]["dto.MusicTrackDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicTrackPatchRequestDTO": {
+            album_artist_name?: string;
+            album_artist_names?: string[];
+            /** Format: uuid */
+            album_id?: string;
+            album_title?: string;
+            artist_name?: string;
+            artist_names?: string[];
+            compilation?: boolean;
+            designation?: string;
+            disc_number?: number;
+            disc_total?: number;
+            edition?: string;
+            genre?: string;
+            release_date?: string;
+            release_precision?: string;
+            revision?: number;
+            title?: string;
+            track_number?: number;
+            track_total?: number;
         };
         "dto.NativeHostCapabilityDTO": {
             available?: boolean;

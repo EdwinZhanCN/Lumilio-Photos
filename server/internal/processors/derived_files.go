@@ -15,11 +15,17 @@ import (
 // derivatives: every result is addressed by source fence, stage, and pipeline
 // version before the coordinator activates its catalog reference.
 func (ap *AssetProcessor) saveThumbnail(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, pipelineVersion, size string) (DerivedArtifact, error) {
-	published, err := publishDerived(ctx, files, reader, asset, "derivatives", pipelineVersion, size+".webp")
+	extension := "webp"
+	mimeType := "image/webp"
+	if size == "waveform" {
+		extension = "png"
+		mimeType = "image/png"
+	}
+	published, err := publishDerived(ctx, files, reader, asset, "derivatives", pipelineVersion, size+"."+extension)
 	if err != nil {
 		return DerivedArtifact{}, err
 	}
-	return DerivedArtifact{AssetID: asset.AssetID, SourceFence: asset.ContentID, RepositoryID: files.RepositoryID(), Size: size, StoragePath: published.Path, MimeType: "image/webp"}, nil
+	return DerivedArtifact{AssetID: asset.AssetID, SourceFence: asset.ContentID, RepositoryID: files.RepositoryID(), Size: size, StoragePath: published.Path, MimeType: mimeType}, nil
 }
 
 func saveVideoVersion(ctx context.Context, files *storage.RepositoryFS, reader io.Reader, asset *repo.Asset, pipelineVersion, version string) error {

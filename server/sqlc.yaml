@@ -10,6 +10,8 @@ sql:
           - "migrations/000011_repository_observation_engine.up.sql"
           - "migrations/000012_repository_observation_cutover.up.sql"
           - "migrations/000013_location_projection_convergence.up.sql"
+          - "migrations/000015_music_library.up.sql"
+          - "migrations/000016_music_local_preferences.up.sql"
       gen:
           go:
               package: "repo"
@@ -27,6 +29,16 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "albums.cover_asset_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "music_albums.cover_asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "music_tracks.album_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "music_playlist_entries.track_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "music_playback_entries.track_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "music_track_overrides.track_id"
+                    go_type: { type: string }
                   - column: "repository_observation_state.active_run_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_nodes.parent_node_id"
@@ -135,6 +147,30 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.active_run_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_tracks.track_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_artists.artist_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_albums.album_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_album_artists.album_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_album_artists.artist_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_track_artists.track_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_track_artists.artist_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_playlists.playlist_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_playlist_entries.playlist_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_playback_sessions.session_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_playback_entries.session_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "music_playback_entries.entry_id"
+                    go_type: { type: string }
                   - column: "*.node_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.observation_id"
