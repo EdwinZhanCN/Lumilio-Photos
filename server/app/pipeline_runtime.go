@@ -16,12 +16,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 
 	"server/internal/commit"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/event"
 	"server/internal/execution"
+	"server/internal/pipeline"
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/queue/jobs"
@@ -210,6 +212,8 @@ type ocrProjectionPreparer interface {
 // object and manages lifecycle only; River workers validate delivery payloads
 // while every bounded compute/commit step declares its own resource vector.
 type pipelineRuntime struct {
+	logger             *zap.Logger
+	pipelineReader     pipeline.Queryer
 	engine             *execution.Engine
 	demand             execution.DemandCatalog
 	commits            *commit.Coordinator
@@ -232,14 +236,14 @@ func (runtime *pipelineRuntime) register(workers *river.Workers) error {
 	if runtime == nil || workers == nil || runtime.engine == nil || runtime.commits == nil || runtime.processor == nil ||
 		runtime.repository == nil || runtime.repositoryHasher == nil || runtime.repositoryReader == nil ||
 		runtime.eventProjection == nil || runtime.locationProjection == nil || runtime.ocrProjection == nil ||
-		runtime.reindexProjection == nil || runtime.enrichmentReader == nil || runtime.files == nil {
+		runtime.pipelineReader == nil || runtime.reindexProjection == nil || runtime.enrichmentReader == nil || runtime.files == nil {
 		return errors.New("pipeline runtime is not configured")
 	}
 	river.AddWorker[jobs.IngestAssetArgs](workers, &queue.IngestMacroWorker{Execute: runtime.ingest})
-	river.AddWorker[jobs.AnalyzeAssetArgs](workers, queue.NewAnalyzeAssetWorker(runtime.analyze))
-	river.AddWorker[jobs.GenerateAssetDerivativesArgs](workers, queue.NewGenerateAssetDerivativesWorker(runtime.derivatives))
-	river.AddWorker[jobs.TranscodeMediaArgs](workers, queue.NewTranscodeMediaWorker(runtime.transcode))
-	river.AddWorker[jobs.EnrichAssetArgs](workers, &queue.EnrichAssetWorker{Execute: runtime.enrich})
+	river.AddWorker[jobs.AnalyzeAssetArgs](workers, queue.NewAnalyzeAssetWorker(guardAssetExecution(runtime, runtime.analyze)))
+	river.AddWorker[jobs.GenerateAssetDerivativesArgs](workers, queue.NewGenerateAssetDerivativesWorker(guardAssetExecution(runtime, runtime.derivatives)))
+	river.AddWorker[jobs.TranscodeMediaArgs](workers, queue.NewTranscodeMediaWorker(guardAssetExecution(runtime, runtime.transcode)))
+	river.AddWorker[jobs.EnrichAssetArgs](workers, &queue.EnrichAssetWorker{Execute: guardAssetExecution(runtime, runtime.enrich)})
 	river.AddWorker[jobs.ScanRepositoryBatchArgs](workers, &queue.ScanRepositoryBatchWorker{Execute: runtime.scanRepository})
 	river.AddWorker[jobs.RebuildProjectionBatchArgs](workers, &queue.RebuildProjectionBatchWorker{Execute: runtime.rebuildProjection})
 	return nil

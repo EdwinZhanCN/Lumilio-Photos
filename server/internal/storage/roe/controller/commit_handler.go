@@ -270,7 +270,8 @@ func (applier *commitApplier) startRun(ctx context.Context, queries *repo.Querie
 	if _, err := queries.StartRepositoryScanRun(ctx, repo.StartRepositoryScanRunParams{
 		RunID: payload.RunID, Status: payload.InitialStatus, UpdatedAt: payload.Now,
 		CursorStart: payload.StartCheckpoint.Cursor, CursorTarget: payload.TargetCursor,
-		VolumeIdentity: optionalString(checkpoint.VolumeIdentity),
+		FullVerificationPerformed: boolInt(payload.FullVerification),
+		VolumeIdentity:            optionalString(checkpoint.VolumeIdentity),
 	}); err != nil {
 		return fmt.Errorf("start repository observation run: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"server/internal/pipeline"
 
 	"github.com/google/uuid"
 
@@ -99,7 +100,7 @@ func (ap *AssetProcessor) ComputeThumbnailCodec(ctx context.Context, work *Prepa
 		work.frame, err = ap.extractAudioArtwork(ctx, source.localPath)
 		return err
 	default:
-		return fmt.Errorf("unsupported asset type for thumbnails: %s", work.assetType)
+		return fmt.Errorf("%w for thumbnails: %s", pipeline.ErrUnsupportedMedia, work.assetType)
 	}
 }
 

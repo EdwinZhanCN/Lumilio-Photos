@@ -46,6 +46,7 @@ export interface EffectReceipt {
   status: "committed" | "rejected" | "cancelled" | "failed";
   count: number;
   album_id?: number;
+  playlist_id?: string;
   message: string;
   already_committed?: boolean;
 }
@@ -98,6 +99,8 @@ export interface InterruptContext {
 }
 
 export interface ConfirmationInfo {
+  playlist_id?: string;
+  skip_existing?: boolean;
   effect_id?: string;
   EffectID?: string;
   action?: string;

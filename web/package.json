@@ -40,6 +40,9 @@
   },
   "dependencies": {
     "@colorhythm/exiftool-wasm": "^1.0.4",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@fontsource/caveat": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/noto-sans-sc": "^5.3.0",

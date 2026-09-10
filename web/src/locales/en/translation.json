@@ -1702,6 +1702,14 @@
       "transport": "Transport",
       "validatedNodes": "Validated nodes"
     },
+    "delivery": {
+      "active": "Active deliveries",
+      "cancelled": "Cancelled deliveries",
+      "completed": "Completed deliveries",
+      "description": "One file or scan can produce many deliveries. These records do not measure completed files or current file failures.",
+      "discarded": "Discarded deliveries",
+      "title": "Queue delivery records"
+    },
     "ml": {
       "allIndexed": "All indexed",
       "bioAlbumCoverage": "Bio album species coverage",
@@ -1728,6 +1736,20 @@
         "title": "Reindex — {{task}}"
       },
       "remainingAssets": "Remaining"
+    },
+    "processing": {
+      "failedAssets": "Files needing attention",
+      "failedProjections_one": "Projections needing attention: {{count}}",
+      "failedProjections_other": "Projections needing attention: {{count}}",
+      "failedRepositories_one": "Scans needing attention: {{count}}",
+      "failedRepositories_other": "Scans needing attention: {{count}}",
+      "operations": "Import, reindex and backup operations: {{pending}} pending · {{failed}} needing attention",
+      "pendingAssets": "Files awaiting processing",
+      "pendingProjections": "Pending projection work",
+      "pendingRepositories": "Repositories awaiting scan",
+      "retryHint": "Retry these files after resolving the cause.",
+      "retryWaiting_one": "Stages waiting to retry: {{count}}",
+      "retryWaiting_other": "Stages waiting to retry: {{count}}"
     },
     "queueSummary": {
       "copied": "Copied",
@@ -1803,30 +1825,11 @@
       "updated": "Updated {{time}}"
     },
     "stats": {
-      "activeJobs": "Work waiting",
-      "allHealthy": "All healthy",
-      "availableCount_one": "{{count}} waiting",
-      "availableCount_other": "{{count}} waiting",
-      "cancelledCount_one": "{{count}} stopped",
-      "cancelledCount_other": "{{count}} stopped",
-      "completed": "Processed",
-      "discardedCount_one": "{{count}} stopped",
-      "discardedCount_other": "{{count}} stopped",
-      "fetchError": "Failed to fetch queue stats",
-      "issues": "Needs attention",
-      "noData": "No data",
-      "noProcessedJobs": "No jobs processed yet",
-      "retryableCount_one": "{{count}} will retry",
-      "retryableCount_other": "{{count}} will retry",
-      "runningCount_one": "{{count}} in progress",
-      "runningCount_other": "{{count}} in progress",
-      "scheduledCount_one": "{{count}} planned",
-      "scheduledCount_other": "{{count}} planned",
-      "successRate": "{{rate}}% success rate"
+      "fetchError": "Failed to fetch queue stats"
     },
     "storage": {
       "allHealthy": "All storage targets are healthy",
-      "attentionNeeded_one": "{{count}} targets need attention",
+      "attentionNeeded_one": "{{count}} target needs attention",
       "attentionNeeded_other": "{{count}} targets need attention",
       "auditAction": "Action",
       "auditActor": "Actor",
@@ -1908,11 +1911,32 @@
       "unfavorite": "Remove from favorites",
       "unlike": "Unlike"
     },
+    "agent": {
+      "audition": "Audition selection",
+      "bounded": "This is a bounded selection; refine it to explore more tracks.",
+      "confirmAppend_one": "Append {{count}} tracks to “{{title}}”?",
+      "confirmAppend_other": "Append {{count}} tracks to “{{title}}”?",
+      "confirmCreate_one": "Create “{{title}}” with {{count}} tracks?",
+      "confirmCreate_other": "Create “{{title}}” with {{count}} tracks?",
+      "loading": "Loading music selection…",
+      "moveDown": "Move {{title}} down",
+      "moveUp": "Move {{title}} up",
+      "openPlaylist": "Open playlist",
+      "playlistTitle": "Playlist title",
+      "refine": "Refine selection",
+      "save": "Save playlist…",
+      "savePrompt": "Create a music playlist named “{{title}}” from exactly the attached selection, preserving its order. Ask me to confirm before saving.",
+      "selected_one": "{{count}} tracks selected, in the order shown",
+      "selected_other": "{{count}} tracks selected, in the order shown",
+      "selection": "Music selection",
+      "selectTrack": "Select {{title}}",
+      "skipExisting": "Tracks already in the playlist will be skipped.",
+      "unavailable": "This music selection is no longer available."
+    },
     "album": {
       "emptyTracks": "No available tracks in this release.",
       "label": "Music Album",
       "noDate": "Release date unknown",
-      "trackList": "Track list",
       "untitled": "Untitled album"
     },
     "albums": {
@@ -1922,15 +1946,11 @@
     },
     "artist": {
       "albums": "albums",
-      "emptyTracks": "No tracks found for this artist.",
-      "tracksHeading": "Tracks credited to this artist"
+      "emptyTracks": "No tracks found for this artist."
     },
     "artists": {
       "emptyDescription": "Artist credits will be collected from your local audio metadata.",
       "emptyTitle": "No artists yet"
-    },
-    "browse": {
-      "title": "Library"
     },
     "designation": {
       "music": "Music",
@@ -1938,9 +1958,6 @@
     },
     "detail": {
       "error": "This music item could not be loaded."
-    },
-    "favorites": {
-      "label": "Favorites"
     },
     "feedback": {
       "error": "Could not save changes. Reload the item and try again.",
@@ -1962,15 +1979,11 @@
       "favorites": "Favorites",
       "label": "Filter music"
     },
-    "filters": {
-      "all": "All",
-      "label": "Music filters"
-    },
     "likeError": "Could not save. Try again.",
     "loadError": "Music could not be loaded.",
     "lyrics": {
       "empty": "No local lyrics. Add them in track details.",
-      "hint": "Paste lyrics to keep them locally. Original audio files are unchanged.",
+      "hint": "Paste plain text or LRC lyrics. Timed lyrics follow playback.",
       "title": "Lyrics"
     },
     "navigation": "Music sections",
@@ -1996,18 +2009,14 @@
     "playlist": {
       "confirmDelete": "Delete this playlist? The audio files will be kept.",
       "delete": "Delete playlist",
+      "dragReorder": "Drag to reorder",
       "edit": "Edit playlist",
       "empty": "This playlist has no entries yet.",
       "entryHeading": "Playlist order",
-      "moveDown": "Move down",
-      "moveUp": "Move up",
-      "remove": "Remove entry",
-      "unavailable": "Unavailable audio"
+      "remove": "Remove entry"
     },
     "playlists": {
-      "add": "Add track",
       "addLabel": "Add to playlist",
-      "chooseTrack": "Choose a track",
       "create": "Create playlist",
       "emptyDescription": "Create a playlist to keep a listening order independent from your queue.",
       "emptyTitle": "No playlists yet",
@@ -2022,7 +2031,15 @@
     "quickStart": {
       "liked": "Liked tracks"
     },
+    "rating": {
+      "clear": "Clear rating",
+      "stars_one": "Rate {{count}} stars",
+      "stars_other": "Rate {{count}} stars",
+      "title": "Rating"
+    },
     "search": {
+      "clear": "Clear search",
+      "empty": "No matching tracks",
       "label": "Search music"
     },
     "searchTracks": "Search tracks",
@@ -2044,7 +2061,6 @@
       "emptyDescription": "Try another search or clear the liked filter.",
       "emptyTitle": "No tracks match",
       "heading": "All audio",
-      "likedOnly": "Liked",
       "sort": {
         "album": "Album",
         "artist": "Artist",
@@ -2052,7 +2068,7 @@
         "title": "Title",
         "track": "Track number"
       },
-      "sortLabel": "Sort tracks"
+      "sortBy": "Sort by {{sort}}"
     },
     "unknownArtist": "Unknown artist",
     "views": {
@@ -2061,6 +2077,10 @@
       "overview": "Overview",
       "playlists": "Playlists",
       "tracks": "Tracks"
+    },
+    "waveform": {
+      "title": "Waveform",
+      "unavailable": "Waveform unavailable. You can still seek."
     }
   },
   "nav": {

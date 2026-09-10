@@ -17,6 +17,7 @@ type MusicOverrideDTO struct {
 }
 
 type MusicTrackDTO struct {
+	Rating                  *int64             `json:"rating,omitempty"`
 	TrackID                 string             `json:"track_id" format:"uuid"`
 	OwnerID                 int32              `json:"owner_id"`
 	Designation             string             `json:"designation" enums:"music,other"`
@@ -152,12 +153,13 @@ type MusicArtistPatchRequestDTO struct {
 }
 
 type MusicPlaylistDTO struct {
-	PlaylistID  string `json:"playlist_id" format:"uuid"`
-	OwnerID     int32  `json:"owner_id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Revision    int64  `json:"revision"`
-	EntryCount  int64  `json:"entry_count"`
+	CoverAssetID string `json:"cover_asset_id,omitempty"`
+	PlaylistID   string `json:"playlist_id" format:"uuid"`
+	OwnerID      int32  `json:"owner_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Revision     int64  `json:"revision"`
+	EntryCount   int64  `json:"entry_count"`
 }
 
 type MusicPlaylistPageDTO struct {
@@ -255,4 +257,11 @@ type MusicPlaybackPageDTO struct {
 type MusicLyricsDTO struct {
 	Content  string `json:"content" binding:"max=65536"`
 	Revision int64  `json:"revision" binding:"min=0"`
+}
+
+// AgentMusicRefDTO hydrates a bounded selection in its immutable ref order.
+type AgentMusicRefDTO struct {
+	Tracks    []MusicTrackDTO `json:"tracks"`
+	Total     int             `json:"total"`
+	Truncated bool            `json:"truncated"`
 }

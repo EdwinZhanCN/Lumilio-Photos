@@ -19,7 +19,13 @@ import (
 
 const effectReceiptRetention = 30 * 24 * time.Hour
 
+// MusicPlaylistWriter uses the effect transaction so mutations and receipts commit together.
+type MusicPlaylistWriter interface {
+	ApplyAgentPlaylistTx(context.Context, *sql.Tx, int32, uuid.UUID, []uuid.UUID, string, uuid.UUID, int64, bool) (uuid.UUID, int, error)
+}
+
 type EffectRuntime struct {
+	music    MusicPlaylistWriter
 	pool     *sql.DB
 	writer   *catalogtx.Writer
 	queries  *repo.Queries
@@ -35,13 +41,18 @@ type EffectReceipt struct {
 	ToolName         string `json:"tool_name"`
 	Status           string `json:"status"`
 	Count            int    `json:"count"`
+	PlaylistID       string `json:"playlist_id,omitempty"`
 	AlbumID          int    `json:"album_id,omitempty"`
 	Message          string `json:"message"`
 	AlreadyCommitted bool   `json:"already_committed,omitempty"`
 }
 
-func NewEffectRuntime(pool *sql.DB, writer *catalogtx.Writer, queries *repo.Queries, registry *ToolRegistry) *EffectRuntime {
-	return &EffectRuntime{pool: pool, writer: writer, queries: queries, registry: registry}
+func NewEffectRuntime(pool *sql.DB, writer *catalogtx.Writer, queries *repo.Queries, registry *ToolRegistry, music ...MusicPlaylistWriter) *EffectRuntime {
+	r := &EffectRuntime{pool: pool, writer: writer, queries: queries, registry: registry}
+	if len(music) > 0 {
+		r.music = music[0]
+	}
+	return r
 }
 
 func nullableEffectUUID(id uuid.UUID) uuid.NullUUID {
@@ -213,6 +224,30 @@ func (r *EffectRuntime) Commit(ctx context.Context, userID int32, threadID strin
 			return EffectReceipt{}, err
 		}
 		receipt.Message = fmt.Sprintf("Applied tag change to %d assets", receipt.Count)
+	case "save_music_playlist":
+		var payload struct {
+			Title        string `json:"title"`
+			SkipExisting bool   `json:"skip_existing"`
+		}
+		var target struct {
+			PlaylistID uuid.UUID `json:"playlist_id"`
+			Revision   int64     `json:"revision"`
+		}
+		if err := json.Unmarshal(effect.Payload, &payload); err != nil {
+			return EffectReceipt{}, err
+		}
+		if err := json.Unmarshal(effect.Target, &target); err != nil {
+			return EffectReceipt{}, err
+		}
+		if r.music == nil {
+			return EffectReceipt{}, errors.New("music writer unavailable")
+		}
+		id, count, err := r.music.ApplyAgentPlaylistTx(ctx, tx.Raw(), userID, effectID, []uuid.UUID(effect.MembershipSnapshot), payload.Title, target.PlaylistID, target.Revision, payload.SkipExisting)
+		if err != nil {
+			return EffectReceipt{}, err
+		}
+		receipt.PlaylistID, receipt.Count = id.String(), count
+		receipt.Message = fmt.Sprintf("Saved %d tracks to playlist", count)
 	case "create_album":
 		var payload struct {
 			Title string `json:"title"`

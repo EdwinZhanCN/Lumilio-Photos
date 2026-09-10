@@ -53,6 +53,7 @@ type MusicPlayerContextValue = {
   shuffle: boolean;
   isLoading: boolean;
   error?: string;
+  playTracks: (tracks: MusicTrack[], selectedIndex?: number) => void;
   playTrack: (track: MusicTrack, source?: MusicPlaybackSource, entryId?: string) => Promise<void>;
   playSource: (
     source: MusicPlaybackSource,
@@ -257,6 +258,27 @@ export function MusicPlayerProvider({
     [replaceCurrentWithSelectedTrack],
   );
 
+  const playTracks = useCallback((tracks: MusicTrack[], selectedIndex = 0) => {
+    if (!tracks.length || tracks.length > 100 || tracks.some((track) => !trackId(track))) return;
+    const index = Math.max(0, Math.min(selectedIndex, tracks.length - 1));
+    restoreTimeRef.current = 0;
+    requestRef.current += 1;
+    shouldPlayRef.current = true;
+    setState((previous) => ({
+      ...previous,
+      queue: tracks.map((track) => ({ track, available: true })),
+      currentIndex: index,
+      sessionId: undefined,
+      totalEntries: tracks.length,
+      isPlaying: true,
+      isLoading: false,
+      currentTime: 0,
+      duration: tracks[index].duration ?? 0,
+      shuffle: false,
+      error: undefined,
+    }));
+  }, []);
+
   const playTrack = useCallback(
     async (track: MusicTrack, source?: MusicPlaybackSource, entryId?: string) => {
       if (!trackId(track)) return;
@@ -433,6 +455,7 @@ export function MusicPlayerProvider({
       isLoading: state.isLoading,
       error: state.error,
       playTrack,
+      playTracks,
       playSource,
       toggle,
       next: () => move(1),
@@ -474,7 +497,19 @@ export function MusicPlayerProvider({
         }));
       },
     }),
-    [clear, current, cycleRepeat, move, playSource, playTrack, seek, setVolume, state, toggle],
+    [
+      clear,
+      current,
+      cycleRepeat,
+      move,
+      playSource,
+      playTrack,
+      playTracks,
+      seek,
+      setVolume,
+      state,
+      toggle,
+    ],
   );
 
   return (

@@ -74,6 +74,38 @@ func (commands *Commands) Request(
 		}); err != nil {
 			return fmt.Errorf("ensure repository observation state: %w", err)
 		}
+		// A timer is a recurring verification policy, not a newer change fact.
+		// An active full verification satisfies this tick. An incremental run
+		// must still accept one overdue full request so a busy watcher cannot
+		// indefinitely postpone the mandatory verifier.
+		if mode == "periodic" {
+			active, err := queries.GetActiveRepositoryScanRun(ctx, repositoryID)
+			if err == nil {
+				state, stateErr := queries.GetRepositoryObservationState(ctx, repositoryID)
+				if stateErr != nil {
+					return stateErr
+				}
+				if active.FullVerificationPerformed != 0 || active.ForceFullVerification != 0 || state.FullVerificationRequired != 0 {
+					receipt.OperationID, receipt.RequestedEpoch = active.RunID, active.RequestedEpoch
+					receipt.Mode, receipt.Status, receipt.Coalesced = active.Mode, active.Status, true
+					return nil
+				}
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if commands.cfg.VerificationInterval > 0 {
+				latest, err := queries.GetLatestFullRepositoryVerificationRun(ctx, repositoryID)
+				if err != nil && !errors.Is(err, sql.ErrNoRows) {
+					return err
+				}
+				if err == nil && !latest.FinishedAt.Time.IsZero() && commands.now().Before(latest.FinishedAt.Time.Add(commands.cfg.VerificationInterval)) {
+					receipt.OperationID, receipt.RequestedEpoch = latest.RunID, latest.RequestedEpoch
+					receipt.Mode, receipt.Status, receipt.Coalesced = latest.Mode, latest.Status, true
+					return nil
+				}
+			}
+		}
+
 		state, err := queries.RequestRepositoryObservationEpoch(ctx, repo.RequestRepositoryObservationEpochParams{
 			RepositoryID:             repositoryID,
 			FullVerificationRequired: boolInt(forceFullVerification), UpdatedAt: now,

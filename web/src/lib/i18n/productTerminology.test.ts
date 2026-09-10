@@ -10,12 +10,7 @@ function translationValues(value: unknown): string[] {
 
 describe("canonical product terminology", () => {
   it("does not expose Library as a Repository synonym", () => {
-    const { browse, ...music } = en.music;
-    expect(browse).toEqual({ title: "Library" });
-    // The listening navigation label is not a Repository/storage identity.
-    const violations = translationValues({ ...en, music }).filter((value) =>
-      /\blibrar(?:y|ies)\b/i.test(value),
-    );
+    const violations = translationValues(en).filter((value) => /\blibrar(?:y|ies)\b/i.test(value));
     expect(violations).toEqual([]);
   });
 

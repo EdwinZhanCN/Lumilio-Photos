@@ -202,3 +202,38 @@ menu parity still require completion; do not claim full 1:1 parity yet.
   in the current local artist DTO; playlist covers lack cover metadata; queue
   is a full-page overlay rather than a URL route; advanced reference online
   categories, intelligence playback and public/private controls are excluded.
+
+## Music feature review on 2026-09-09
+
+- Preserve the current shared-shell and unified track-list direction.
+- Fixed duplicate playlist entry keys, hidden unresolved entries without a remove
+  action, pagination after removing the last page, and the forced-open mobile sidebar.
+- Added Asset-owned 0–5 ratings to the Music DTO and detail/fullscreen controls.
+- Playlist covers derive from the first live owner-scoped entry with medium artwork;
+  queries resolve this without loading every playlist's entries into the browser.
+- Fullscreen playback displays the existing waveform derivative with seeking.
+- Local LRC timestamps support repeated stamps, offsets, highlighting and seek.
+  Plain text remains supported. Editing retains the original revision and draft
+  across background refetches instead of silently replacing unsaved lyrics.
+- Custom uploaded playlist artwork, LRC file import, rating filters, playback
+  history and smart playlists remain potential future extensions.
+- Validation pending in this review session; earlier verification is historical.
+
+### Review validation and remaining boundaries
+
+- `task server:test`: passed, including ratings and derived-playlist-cover checks.
+- `task web:test`: 103 files passed, 2 skipped; 423 tests passed, 6 skipped.
+- Added Chromium regressions cover rating save/clear/error, timed lyric seeking,
+  and draft/revision retention across a background refetch.
+- Artist detail sorting now requests the global server order before paging and
+  carries the same search/sort into playback. Its browser regression failed
+  against the original page-only sorting and passed after the fix.
+- Positive LRC offsets advance lyrics; the offset tests failed with addition
+  and pass with subtraction. Reference: https://github.com/Clarkkkk/paroles .
+- Fixed the pre-existing architecture-gate violation in embedded-artwork
+  extraction by using the configured ToolSession thread arguments. Architecture
+  and the processors package pass after this change.
+- Shared detail toolbars and ratings wrap on narrow screens; unavailable
+  playlist entries remain removable and use the current search filter.
+- The old localhost:6657 preview was not running. Live full-stack browser E2E
+  was not executed in this session; Chromium component/flow tests use MSW.

@@ -17,14 +17,14 @@ UPDATE repository_observation_state
 SET applied_epoch = ?2,
     active_run_id = NULL,
     full_verification_required = CASE
-        WHEN desired_epoch > ?2 THEN full_verification_required
+        WHEN full_verification_requested_epoch > ?2 THEN full_verification_required
         ELSE ?3
     END,
     updated_at = ?4
 WHERE repository_id = ?1
   AND applied_epoch < ?2
   AND desired_epoch >= ?2
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
 `
 
 type AdvanceRepositoryObservationEpochParams struct {
@@ -59,6 +59,7 @@ func (q *Queries) AdvanceRepositoryObservationEpoch(ctx context.Context, arg Adv
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
 }
@@ -150,7 +151,7 @@ SET cursor_target = ?2,
 WHERE run_id = ?1
   AND status = 'catching_up'
   AND length(cursor_target) = 0
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type CaptureRepositoryScanRunCursorTargetParams struct {
@@ -190,6 +191,7 @@ func (q *Queries) CaptureRepositoryScanRunCursorTarget(ctx context.Context, arg 
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -263,7 +265,7 @@ WHERE repository_id = ?1
       OR controller_lease_id = ?2
       OR controller_lease_expires_at < ?4
   )
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
 `
 
 type ClaimRepositoryObservationControllerParams struct {
@@ -298,6 +300,7 @@ func (q *Queries) ClaimRepositoryObservationController(ctx context.Context, arg 
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
 }
@@ -411,7 +414,7 @@ SET coalesced_count = coalesced_count + 1,
     updated_at = ?4
 WHERE run_id = ?1
   AND status IN ('queued', 'crawling', 'catching_up', 'finalizing')
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type CoalesceRepositoryScanRunParams struct {
@@ -457,6 +460,7 @@ func (q *Queries) CoalesceRepositoryScanRun(ctx context.Context, arg CoalesceRep
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -804,7 +808,7 @@ INSERT INTO repository_scan_runs (
     created_at,
     updated_at
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'queued', ?7, ?7)
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type CreateRepositoryScanRunParams struct {
@@ -856,6 +860,7 @@ func (q *Queries) CreateRepositoryScanRun(ctx context.Context, arg CreateReposit
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -967,7 +972,7 @@ INSERT INTO repository_observation_state (
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
 ON CONFLICT (repository_id) DO UPDATE SET
     updated_at = repository_observation_state.updated_at
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
 `
 
 type EnsureRepositoryObservationStateParams struct {
@@ -1012,6 +1017,7 @@ func (q *Queries) EnsureRepositoryObservationState(ctx context.Context, arg Ensu
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
 }
@@ -1079,7 +1085,7 @@ func (q *Queries) GetActiveRepositoryChildByName(ctx context.Context, arg GetAct
 }
 
 const getActiveRepositoryScanRun = `-- name: GetActiveRepositoryScanRun :one
-SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at FROM repository_scan_runs
+SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed FROM repository_scan_runs
 WHERE repository_id = ?1
   AND status IN ('queued', 'crawling', 'catching_up', 'finalizing')
 ORDER BY created_at, run_id
@@ -1117,6 +1123,7 @@ func (q *Queries) GetActiveRepositoryScanRun(ctx context.Context, repositoryID u
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -1162,8 +1169,51 @@ func (q *Queries) GetContentObjectByID(ctx context.Context, contentID uuid.UUID)
 	return i, err
 }
 
+const getLatestFullRepositoryVerificationRun = `-- name: GetLatestFullRepositoryVerificationRun :one
+SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed FROM repository_scan_runs
+WHERE repository_id = ?1 AND status = 'completed' AND full_verification_performed = 1
+ORDER BY finished_at DESC, run_id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestFullRepositoryVerificationRun(ctx context.Context, repositoryID uuid.UUID) (RepositoryScanRun, error) {
+	row := q.db.QueryRowContext(ctx, getLatestFullRepositoryVerificationRun, repositoryID)
+	var i RepositoryScanRun
+	err := row.Scan(
+		&i.RunID,
+		&i.RepositoryID,
+		&i.RequestedEpoch,
+		&i.Mode,
+		&i.RequestedBy,
+		&i.CoalescedCount,
+		&i.Status,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CursorStart,
+		&i.CursorEnd,
+		&i.CursorTarget,
+		&i.VolumeIdentity,
+		&i.DirectoriesObserved,
+		&i.FilesObserved,
+		&i.BytesQueued,
+		&i.BytesHashed,
+		&i.AuthoritativeDirectories,
+		&i.ErrorDirectories,
+		&i.OutboxDepth,
+		&i.PartialCoverage,
+		&i.CancellationRequested,
+		&i.ForceFullVerification,
+		&i.FailureCode,
+		&i.FailureProblemType,
+		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
+	)
+	return i, err
+}
+
 const getLatestRepositoryScanRun = `-- name: GetLatestRepositoryScanRun :one
-SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at FROM repository_scan_runs
+SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed FROM repository_scan_runs
 WHERE repository_id = ?1
 ORDER BY created_at DESC, run_id DESC
 LIMIT 1
@@ -1200,6 +1250,7 @@ func (q *Queries) GetLatestRepositoryScanRun(ctx context.Context, repositoryID u
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -1434,7 +1485,7 @@ func (q *Queries) GetRepositoryObservationForNodeRevision(ctx context.Context, a
 }
 
 const getRepositoryObservationState = `-- name: GetRepositoryObservationState :one
-SELECT repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at FROM repository_observation_state
+SELECT repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch FROM repository_observation_state
 WHERE repository_id = ?1
 `
 
@@ -1458,6 +1509,7 @@ func (q *Queries) GetRepositoryObservationState(ctx context.Context, repositoryI
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
 }
@@ -1498,7 +1550,7 @@ func (q *Queries) GetRepositoryRootNode(ctx context.Context, repositoryID uuid.U
 }
 
 const getRepositoryScanRun = `-- name: GetRepositoryScanRun :one
-SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at FROM repository_scan_runs
+SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed FROM repository_scan_runs
 WHERE repository_id = ?1 AND run_id = ?2
 `
 
@@ -1538,6 +1590,7 @@ func (q *Queries) GetRepositoryScanRun(ctx context.Context, arg GetRepositorySca
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -2222,7 +2275,7 @@ func (q *Queries) ListRepositoryNodeChildrenPage(ctx context.Context, arg ListRe
 }
 
 const listRepositoryScanRuns = `-- name: ListRepositoryScanRuns :many
-SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at FROM repository_scan_runs
+SELECT run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed FROM repository_scan_runs
 WHERE repository_id = ?1
 ORDER BY created_at DESC, run_id DESC
 LIMIT ?2 OFFSET ?3
@@ -2271,6 +2324,7 @@ func (q *Queries) ListRepositoryScanRuns(ctx context.Context, arg ListRepository
 			&i.FailureCode,
 			&i.FailureProblemType,
 			&i.UpdatedAt,
+			&i.FullVerificationPerformed,
 		); err != nil {
 			return nil, err
 		}
@@ -2494,10 +2548,11 @@ const requestRepositoryObservationEpoch = `-- name: RequestRepositoryObservation
 UPDATE repository_observation_state
 SET desired_epoch = desired_epoch + 1,
     full_verification_required = CASE WHEN ?2 THEN 1 ELSE full_verification_required END,
+    full_verification_requested_epoch = CASE WHEN ?2 THEN desired_epoch + 1 ELSE full_verification_requested_epoch END,
     terminal_error = NULL,
     updated_at = ?3
 WHERE repository_id = ?1
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
 `
 
 type RequestRepositoryObservationEpochParams struct {
@@ -2526,6 +2581,7 @@ func (q *Queries) RequestRepositoryObservationEpoch(ctx context.Context, arg Req
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
 }
@@ -2535,7 +2591,7 @@ UPDATE repository_scan_runs
 SET cancellation_requested = 1, updated_at = ?2
 WHERE run_id = ?1
   AND status IN ('queued', 'crawling', 'catching_up', 'finalizing')
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type RequestRepositoryScanRunCancellationParams struct {
@@ -2574,6 +2630,7 @@ func (q *Queries) RequestRepositoryScanRunCancellation(ctx context.Context, arg 
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -2668,7 +2725,7 @@ SET active_run_id = ?2,
     updated_at = ?3
 WHERE repository_id = ?1
   AND (active_run_id IS NULL OR active_run_id = ?2)
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
 `
 
 type SetActiveRepositoryObservationRunParams struct {
@@ -2697,6 +2754,7 @@ func (q *Queries) SetActiveRepositoryObservationRun(ctx context.Context, arg Set
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
 }
@@ -2704,6 +2762,7 @@ func (q *Queries) SetActiveRepositoryObservationRun(ctx context.Context, arg Set
 const startRepositoryScanRun = `-- name: StartRepositoryScanRun :one
 UPDATE repository_scan_runs
 SET status = ?2,
+    full_verification_performed = ?7,
     started_at = COALESCE(started_at, ?3),
     cursor_start = ?4,
     cursor_end = ?4,
@@ -2712,16 +2771,17 @@ SET status = ?2,
     updated_at = ?3
 WHERE run_id = ?1
   AND status = 'queued'
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type StartRepositoryScanRunParams struct {
-	RunID          uuid.UUID         `db:"run_id" json:"run_id"`
-	Status         string            `db:"status" json:"status"`
-	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-	CursorStart    []byte            `db:"cursor_start" json:"cursor_start"`
-	CursorTarget   []byte            `db:"cursor_target" json:"cursor_target"`
-	VolumeIdentity *string           `db:"volume_identity" json:"volume_identity"`
+	RunID                     uuid.UUID         `db:"run_id" json:"run_id"`
+	Status                    string            `db:"status" json:"status"`
+	UpdatedAt                 dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	CursorStart               []byte            `db:"cursor_start" json:"cursor_start"`
+	CursorTarget              []byte            `db:"cursor_target" json:"cursor_target"`
+	VolumeIdentity            *string           `db:"volume_identity" json:"volume_identity"`
+	FullVerificationPerformed int64             `db:"full_verification_performed" json:"full_verification_performed"`
 }
 
 func (q *Queries) StartRepositoryScanRun(ctx context.Context, arg StartRepositoryScanRunParams) (RepositoryScanRun, error) {
@@ -2732,6 +2792,7 @@ func (q *Queries) StartRepositoryScanRun(ctx context.Context, arg StartRepositor
 		arg.CursorStart,
 		arg.CursorTarget,
 		arg.VolumeIdentity,
+		arg.FullVerificationPerformed,
 	)
 	var i RepositoryScanRun
 	err := row.Scan(
@@ -2762,6 +2823,7 @@ func (q *Queries) StartRepositoryScanRun(ctx context.Context, arg StartRepositor
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -2830,7 +2892,7 @@ SET status = ?2,
     updated_at = ?3
 WHERE run_id = ?1
   AND status = ?7
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type TransitionRepositoryScanRunParams struct {
@@ -2882,6 +2944,7 @@ func (q *Queries) TransitionRepositoryScanRun(ctx context.Context, arg Transitio
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -2948,7 +3011,7 @@ SET adapter_kind = ?2,
     full_verification_required = CASE WHEN ?7 THEN 1 ELSE full_verification_required END,
     updated_at = ?8
 WHERE repository_id = ?1
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
 `
 
 type UpdateRepositoryObservationAdapterParams struct {
@@ -2991,6 +3054,7 @@ func (q *Queries) UpdateRepositoryObservationAdapter(ctx context.Context, arg Up
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
 }
@@ -3002,7 +3066,7 @@ SET cursor_end = ?2,
     updated_at = ?4
 WHERE run_id = ?1
   AND status = 'catching_up'
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type UpdateRepositoryScanRunCursorParams struct {
@@ -3048,6 +3112,7 @@ func (q *Queries) UpdateRepositoryScanRunCursor(ctx context.Context, arg UpdateR
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }
@@ -3063,7 +3128,7 @@ SET directories_observed = directories_observed + ?2,
     outbox_depth = ?8,
     updated_at = ?9
 WHERE run_id = ?1
-RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at
+RETURNING run_id, repository_id, requested_epoch, mode, requested_by, coalesced_count, status, created_at, started_at, finished_at, cursor_start, cursor_end, cursor_target, volume_identity, directories_observed, files_observed, bytes_queued, bytes_hashed, authoritative_directories, error_directories, outbox_depth, partial_coverage, cancellation_requested, force_full_verification, failure_code, failure_problem_type, updated_at, full_verification_performed
 `
 
 type UpdateRepositoryScanRunProgressParams struct {
@@ -3119,6 +3184,7 @@ func (q *Queries) UpdateRepositoryScanRunProgress(ctx context.Context, arg Updat
 		&i.FailureCode,
 		&i.FailureProblemType,
 		&i.UpdatedAt,
+		&i.FullVerificationPerformed,
 	)
 	return i, err
 }

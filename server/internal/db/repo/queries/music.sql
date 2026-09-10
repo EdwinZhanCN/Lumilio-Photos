@@ -14,7 +14,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked
+    a.is_deleted, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 CROSS JOIN sort_params
@@ -75,7 +75,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked
+    a.is_deleted, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.track_id = sqlc.arg('track_id')
@@ -283,7 +283,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked
+    a.is_deleted, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.album_id = sqlc.arg('album_id') AND mt.owner_id = sqlc.arg('owner_id')
@@ -397,7 +397,14 @@ ORDER BY pe.position, pe.entry_id;
 
 -- name: ListMusicPlaylists :many
 SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
-       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count
+       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
+       CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
+         JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+           AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
+         WHERE ce.playlist_id = p.playlist_id AND EXISTS (
+           SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
+         ) ORDER BY ce.position, ce.entry_id LIMIT 1), '') AS TEXT) AS cover_asset_id
 FROM music_playlists p
 LEFT JOIN music_playlist_entries pe ON pe.playlist_id = p.playlist_id
 WHERE p.owner_id = sqlc.arg('owner_id')
@@ -410,7 +417,14 @@ SELECT COUNT(*) FROM music_playlists WHERE owner_id = sqlc.arg('owner_id');
 
 -- name: GetMusicPlaylist :one
 SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
-       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count
+       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
+       CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
+         JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+           AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
+         WHERE ce.playlist_id = p.playlist_id AND EXISTS (
+           SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
+         ) ORDER BY ce.position, ce.entry_id LIMIT 1), '') AS TEXT) AS cover_asset_id
 FROM music_playlists p
 LEFT JOIN music_playlist_entries pe ON pe.playlist_id = p.playlist_id
 WHERE p.playlist_id = sqlc.arg('playlist_id') AND p.owner_id = sqlc.arg('owner_id')
@@ -562,3 +576,28 @@ WHERE mt.track_id = sqlc.arg('track_id') AND mt.owner_id = sqlc.arg('owner_id');
 INSERT INTO music_track_lyrics (track_id, content, revision)
 VALUES (sqlc.arg('track_id'), sqlc.arg('content'), 1)
 ON CONFLICT(track_id) DO UPDATE SET content = excluded.content, revision = music_track_lyrics.revision + 1;
+
+-- name: SearchAgentMusic :many
+WITH scope_params AS (SELECT CAST(sqlc.narg('asset_ids') AS TEXT) AS ids)
+SELECT mt.track_id, mt.title, mt.artist_name, mt.album_title, mt.genre,
+       a.duration, a.rating, a.liked, a.original_filename, a.mime_type
+FROM music_tracks mt JOIN assets a ON a.asset_id = mt.track_id
+WHERE mt.owner_id = sqlc.arg('owner_id') AND a.owner_id = sqlc.arg('owner_id')
+ AND a.type = 'AUDIO' AND a.is_deleted = 0
+ AND (sqlc.arg('query') = '' OR mt.title LIKE '%' || sqlc.arg('query') || '%'
+      OR mt.artist_name LIKE '%' || sqlc.arg('query') || '%' OR mt.album_title LIKE '%' || sqlc.arg('query') || '%')
+ AND (sqlc.arg('artist') = '' OR mt.artist_name LIKE '%' || sqlc.arg('artist') || '%')
+ AND (sqlc.arg('exclude_artist') = '' OR mt.artist_name NOT LIKE '%' || sqlc.arg('exclude_artist') || '%')
+ AND (sqlc.arg('genre') = '' OR mt.genre LIKE '%' || sqlc.arg('genre') || '%')
+ AND (sqlc.arg('liked_only') = 0 OR a.liked = 1)
+ AND (sqlc.arg('min_rating') = 0 OR a.rating >= sqlc.arg('min_rating'))
+ AND (sqlc.arg('missing_cover') = 0 OR NOT EXISTS (SELECT 1 FROM thumbnails t WHERE t.asset_id = mt.track_id AND t.size = 'medium'))
+ AND (sqlc.arg('missing_lyrics') = 0 OR NOT EXISTS (SELECT 1 FROM music_track_lyrics l WHERE l.track_id = mt.track_id AND trim(l.content) <> ''))
+ AND (sqlc.arg('scoped') = 0 OR mt.track_id IN (SELECT CAST(value AS TEXT) FROM json_each((SELECT ids FROM scope_params))))
+ORDER BY lower(mt.title), mt.track_id
+LIMIT 2001;
+
+-- name: LookupAgentMusicPlaylists :many
+SELECT playlist_id, title, revision FROM music_playlists
+WHERE owner_id = sqlc.arg('owner_id') AND title LIKE '%' || sqlc.arg('query') || '%'
+ORDER BY lower(title), playlist_id LIMIT 20;

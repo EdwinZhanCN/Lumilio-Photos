@@ -1,3 +1,4 @@
+import MusicRating from "../../components/MusicRating";
 import MusicLyrics from "../../components/MusicLyrics";
 import { $api } from "@/lib/http-commons/queryClient";
 import MusicPlaylistAction from "../../components/MusicPlaylistAction";
@@ -8,6 +9,7 @@ import { ArrowLeft, Play, RotateCcw, Save } from "lucide-react";
 import { useParams } from "react-router-dom";
 import PageHeader from "@/components/ui/PageHeader";
 import { useI18n } from "@/lib/i18n";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMusicMutations, useMusicTrack } from "../../api/useMusic";
 import MusicArtwork from "../../components/MusicArtwork";
 import { formatMusicDuration, trackArtist, trackTitle } from "../../model/music";
@@ -33,6 +35,12 @@ export default function MusicTrackDetailsFlow() {
   });
 
   const track = trackQuery.data;
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("music.title"), to: "/music" },
+    { label: t("music.views.tracks", "Tracks"), to: "/music?view=tracks" },
+    { label: track?.title || t("music.views.tracks", "Tracks") },
+  ]);
   useEffect(() => {
     if (!track) return;
     setDraft({
@@ -261,8 +269,9 @@ export default function MusicTrackDetailsFlow() {
                 </button>
               </div>
             </form>
+            <MusicRating track={track} />
             <MusicPlaylistAction trackId={track.track_id} />
-            <MusicLyrics trackId={track.track_id} editable />
+            <MusicLyrics key={track.track_id} trackId={track.track_id} editable />
           </div>
         </div>
       </div>

@@ -3,4 +3,4 @@ export { MusicPlayerProvider, useMusicPlayer } from "./state/MusicPlayerProvider
 export { default as Music } from "./routes/Music";
 export { formatMusicDuration, trackAlbum, trackArtist, trackTitle } from "./model/music";
 
-export { default as MusicNavigation } from "./components/MusicNavigation";
+export { MusicAgentResult } from "./components/MusicAgentResult";

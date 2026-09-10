@@ -1529,6 +1529,9 @@ const docTemplate = `{
                     "message": {
                         "type": "string"
                     },
+                    "playlist_id": {
+                        "type": "string"
+                    },
                     "status": {
                         "type": "string"
                     },
@@ -1808,6 +1811,24 @@ const docTemplate = `{
                     "count": {
                         "example": 12,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AgentMusicRefDTO": {
+                "properties": {
+                    "total": {
+                        "type": "integer"
+                    },
+                    "tracks": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "truncated": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -6496,6 +6517,9 @@ const docTemplate = `{
             },
             "dto.MusicPlaylistDTO": {
                 "properties": {
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
                     "description": {
                         "type": "string"
                     },
@@ -6727,6 +6751,9 @@ const docTemplate = `{
                         "uniqueItems": false
                     },
                     "owner_id": {
+                        "type": "integer"
+                    },
+                    "rating": {
                         "type": "integer"
                     },
                     "release_date": {
@@ -10341,6 +10368,9 @@ const docTemplate = `{
                     "discarded": {
                         "type": "integer"
                     },
+                    "processing": {
+                        "$ref": "#/components/schemas/handler.ProcessingStatsResponse"
+                    },
                     "retryable": {
                         "type": "integer"
                     },
@@ -10348,6 +10378,38 @@ const docTemplate = `{
                         "type": "integer"
                     },
                     "scheduled": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "handler.ProcessingStatsResponse": {
+                "properties": {
+                    "failed_assets": {
+                        "type": "integer"
+                    },
+                    "failed_operations": {
+                        "type": "integer"
+                    },
+                    "failed_projections": {
+                        "type": "integer"
+                    },
+                    "failed_repositories": {
+                        "type": "integer"
+                    },
+                    "pending_assets": {
+                        "type": "integer"
+                    },
+                    "pending_operations": {
+                        "type": "integer"
+                    },
+                    "pending_projections": {
+                        "type": "integer"
+                    },
+                    "pending_repositories": {
+                        "type": "integer"
+                    },
+                    "retry_waiting_stages": {
                         "type": "integer"
                     }
                 },
@@ -10627,7 +10689,7 @@ const docTemplate = `{
         },
         "/api/v1/admin/river/stats": {
             "get": {
-                "description": "Get aggregated statistics about jobs by state",
+                "description": "Get current Catalog processing state and operational River delivery counts",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -11688,6 +11750,56 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Get Agent Ref Assets",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/api/v1/agent/refs/{id}/music": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Ref ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Thread ID",
+                        "in": "query",
+                        "name": "thread_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AgentMusicRefDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "summary": "Hydrate music selection",
                 "tags": [
                     "agent"
                 ]

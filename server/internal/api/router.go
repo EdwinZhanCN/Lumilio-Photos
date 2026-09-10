@@ -179,6 +179,7 @@ type AgentControllerInterface interface {
 	GetEffectStatus(c *gin.Context) // GET /agent/effects/:id - Reconcile one durable effect receipt
 	GetTools(c *gin.Context)        // GET /agent/tools - Get available tools
 	GetRef(c *gin.Context)          // GET /agent/refs/:id - Get ref metadata with facets
+	GetRefMusic(c *gin.Context)
 	GetRefAssets(c *gin.Context)    // GET /agent/refs/:id/assets - Hydrate a ref page in snapshot order
 	CreatePin(c *gin.Context)       // POST /agent/pins - Pin a ref as a durable board widget
 	ListPins(c *gin.Context)        // GET /agent/pins - List board widgets
@@ -791,6 +792,7 @@ func NewRouter(
 			agent.GET("/tools", agentController.GetTools)
 			agent.GET("/refs/:id", agentController.GetRef)
 			agent.GET("/refs/:id/assets", agentController.GetRefAssets)
+			agent.GET("/refs/:id/music", agentController.GetRefMusic)
 			agent.POST("/pins", agentController.CreatePin)
 			agent.GET("/pins", agentController.ListPins)
 			agent.GET("/pins/:id", agentController.GetPin)

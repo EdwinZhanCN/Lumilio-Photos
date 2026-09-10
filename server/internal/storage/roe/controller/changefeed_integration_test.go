@@ -834,3 +834,125 @@ func TestRemovableVolumeAbsenceSettlesAcrossAuthoritativeRuns(t *testing.T) {
 	}
 	assertActiveLocationCount(t, fixture, 0)
 }
+
+func TestPeriodicTickDuringFullScanSettlesWithoutAnotherRun(t *testing.T) {
+	fixture := newControllerFixtureWithFeed(t, 1, &deterministicFeed{})
+	fixture.writeMedia(t, "photo.jpg", []byte("original"))
+	first, err := fixture.commands.EnqueuePeriodicScan(fixture.ctx, fixture.repository.RepoID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.controller.RunTurn(fixture.ctx, fixture.repository.RepoID, first.OperationID); err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		tick, err := fixture.commands.EnqueuePeriodicScan(fixture.ctx, fixture.repository.RepoID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tick.OperationID != first.OperationID || !tick.Coalesced {
+			t.Fatalf("tick did not coalesce: %+v", tick)
+		}
+	}
+	fixture.runToTerminal(t, first.OperationID)
+	state, err := fixture.database.ReaderQueries.GetRepositoryObservationState(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.DesiredEpoch != state.AppliedEpoch || state.ActiveRunID.Valid || state.FullVerificationRequired != 0 {
+		t.Fatalf("timer kept scan pending: %+v", state)
+	}
+}
+
+func TestPeriodicVerificationIntervalStartsAtCompletion(t *testing.T) {
+	fixture := newControllerFixtureWithFeed(t, 1, &deterministicFeed{})
+	fixture.commands.cfg.VerificationInterval = 5 * time.Minute
+	first, err := fixture.commands.EnqueuePeriodicScan(fixture.ctx, fixture.repository.RepoID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished := fixture.runToTerminal(t, first.OperationID)
+	fixture.commands.now = func() time.Time { return finished.FinishedAt.Time.Add(4 * time.Minute) }
+	early, err := fixture.commands.EnqueuePeriodicScan(fixture.ctx, fixture.repository.RepoID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if early.Inserted || early.OperationID != first.OperationID {
+		t.Fatalf("verification requested too soon: %+v", early)
+	}
+	fixture.commands.now = func() time.Time { return finished.FinishedAt.Time.Add(5 * time.Minute) }
+	due, err := fixture.commands.EnqueuePeriodicScan(fixture.ctx, fixture.repository.RepoID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !due.Inserted || due.OperationID == first.OperationID {
+		t.Fatalf("due verification not requested: %+v", due)
+	}
+}
+
+func TestFullScanFollowUpOnlyRepeatsCrawlForNewForce(t *testing.T) {
+	for _, force := range []bool{false, true} {
+		t.Run(fmt.Sprint(force), func(t *testing.T) {
+			fixture := newControllerFixtureWithFeed(t, 1, &deterministicFeed{})
+			first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := fixture.controller.RunTurn(fixture.ctx, fixture.repository.RepoID, first.OperationID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", force); err != nil {
+				t.Fatal(err)
+			}
+			fixture.runToTerminal(t, first.OperationID)
+			followUp, err := fixture.database.ReaderQueries.GetActiveRepositoryScanRun(fixture.ctx, fixture.repository.RepoID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (followUp.ForceFullVerification != 0) != force {
+				t.Fatalf("follow-up force = %d, want %v", followUp.ForceFullVerification, force)
+			}
+			finished := fixture.runToTerminal(t, followUp.RunID)
+			if (finished.FullVerificationPerformed != 0) != force {
+				t.Fatalf("follow-up crawl = %d, want %v", finished.FullVerificationPerformed, force)
+			}
+		})
+	}
+}
+
+func TestPeriodicVerificationDoesNotStarveBehindIncrementalWork(t *testing.T) {
+	fixture := newControllerFixtureWithFeed(t, 1, &deterministicFeed{})
+	first, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "manual", "test", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.runToTerminal(t, first.OperationID)
+	incremental, err := fixture.commands.Request(fixture.ctx, fixture.repository.RepoID, "watcher", "test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.controller.RunTurn(fixture.ctx, fixture.repository.RepoID, incremental.OperationID); err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		if _, err := fixture.commands.EnqueuePeriodicScan(fixture.ctx, fixture.repository.RepoID.String()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fixture.runToTerminal(t, incremental.OperationID)
+	followUp, err := fixture.database.ReaderQueries.GetActiveRepositoryScanRun(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if followUp.RequestedEpoch != incremental.RequestedEpoch+1 || followUp.ForceFullVerification != 1 {
+		t.Fatalf("overdue full verifier was lost or repeated: %+v", followUp)
+	}
+	fixture.runToTerminal(t, followUp.RunID)
+	state, err := fixture.database.ReaderQueries.GetRepositoryObservationState(fixture.ctx, fixture.repository.RepoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.DesiredEpoch != state.AppliedEpoch || state.ActiveRunID.Valid {
+		t.Fatalf("verifier did not settle: %+v", state)
+	}
+}

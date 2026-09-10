@@ -405,6 +405,7 @@ type Querier interface {
 	// primary exists, the first account is the initial administrator and therefore
 	// the Host Owner.
 	GetHostOwnerID(ctx context.Context) (int32, error)
+	GetLatestFullRepositoryVerificationRun(ctx context.Context, repositoryID uuid.UUID) (RepositoryScanRun, error)
 	GetLatestRepositoryScanRun(ctx context.Context, repositoryID uuid.UUID) (RepositoryScanRun, error)
 	GetLifecycleOperation(ctx context.Context, operationID string) (LifecycleOperation, error)
 	GetLifecycleOperationByRequestID(ctx context.Context, requestID string) (LifecycleOperation, error)
@@ -639,6 +640,7 @@ type Querier interface {
 	ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg ListVideoAssetsMissingSemanticFramesParams) ([]Asset, error)
 	LocationProjectionWorkPending(ctx context.Context) (int64, error)
 	LockAuthorizedAssetIDs(ctx context.Context, arg LockAuthorizedAssetIDsParams) ([]uuid.UUID, error)
+	LookupAgentMusicPlaylists(ctx context.Context, arg LookupAgentMusicPlaylistsParams) ([]LookupAgentMusicPlaylistsRow, error)
 	MarkCloudImportRunStarted(ctx context.Context, runID uuid.UUID) (CloudImportRun, error)
 	MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFileParams) error
 	MarkDuplicateGroupDismissed(ctx context.Context, groupID uuid.UUID) error
@@ -709,6 +711,7 @@ type Querier interface {
 	RevokeShareLink(ctx context.Context, arg RevokeShareLinkParams) (ShareLink, error)
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
 	RewriteRedirectTargets(ctx context.Context, arg RewriteRedirectTargetsParams) error
+	SearchAgentMusic(ctx context.Context, arg SearchAgentMusicParams) ([]SearchAgentMusicRow, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)

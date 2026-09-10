@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"server/internal/pipeline"
 	"strings"
 
 	"github.com/google/uuid"
@@ -60,7 +61,7 @@ func (ap *AssetProcessor) LoadTranscodeTask(ctx context.Context, args TranscodeA
 	case dbtypes.AssetTypePhoto:
 		return work, nil
 	default:
-		err = fmt.Errorf("unsupported asset type for transcode: %s", work.assetType)
+		err = fmt.Errorf("%w for transcode: %s", pipeline.ErrUnsupportedMedia, work.assetType)
 	}
 	if err != nil {
 		return nil, err
@@ -114,7 +115,7 @@ func (ap *AssetProcessor) ComputeTranscodeTask(ctx context.Context, work *Prepar
 		work.outputPath = path
 		return err
 	default:
-		return fmt.Errorf("unsupported asset type for transcode: %s", work.assetType)
+		return fmt.Errorf("%w for transcode: %s", pipeline.ErrUnsupportedMedia, work.assetType)
 	}
 }
 

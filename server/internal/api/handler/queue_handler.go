@@ -14,25 +14,28 @@ import (
 
 // QueueHandler handles River queue monitoring endpoints (read-only)
 type QueueHandler struct {
-	dbpool *sql.DB
+	dbpool  *sql.DB
+	catalog *sql.DB
 }
 
 // NewQueueHandler creates a new queue handler
-func NewQueueHandler(dbpool *sql.DB) *QueueHandler {
+func NewQueueHandler(dbpool, catalog *sql.DB) *QueueHandler {
 	return &QueueHandler{
-		dbpool: dbpool,
+		dbpool:  dbpool,
+		catalog: catalog,
 	}
 }
 
 // JobStatsResponse represents overall job statistics
 type JobStatsResponse struct {
-	Available int64 `json:"available"`
-	Scheduled int64 `json:"scheduled"`
-	Running   int64 `json:"running"`
-	Retryable int64 `json:"retryable"`
-	Completed int64 `json:"completed"`
-	Cancelled int64 `json:"cancelled"`
-	Discarded int64 `json:"discarded"`
+	Processing ProcessingStatsResponse `json:"processing"`
+	Available  int64                   `json:"available"`
+	Scheduled  int64                   `json:"scheduled"`
+	Running    int64                   `json:"running"`
+	Retryable  int64                   `json:"retryable"`
+	Completed  int64                   `json:"completed"`
+	Cancelled  int64                   `json:"cancelled"`
+	Discarded  int64                   `json:"discarded"`
 }
 
 // QueueSummaryResponse represents aggregated queue activity.
@@ -105,7 +108,7 @@ func (h *QueueHandler) GetQueueSummary(c *gin.Context) {
 
 // GetJobStats godoc
 // @Summary Get job statistics
-// @Description Get aggregated statistics about jobs by state
+// @Description Get current Catalog processing state and operational River delivery counts
 // @Tags Queue
 // @Accept json
 // @Produce json
@@ -138,6 +141,12 @@ func (h *QueueHandler) GetJobStats(c *gin.Context) {
 		}
 	}
 
+	processing, err := h.loadProcessingStats(ctx)
+	if err != nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
+		return
+	}
+	stats.Processing = processing
 	api.JSONOK(c, stats)
 }
 

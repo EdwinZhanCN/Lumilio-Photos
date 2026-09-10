@@ -266,11 +266,13 @@ func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
 // extractAudioArtwork reads only local embedded artwork. A file without an
 // image stream still publishes its waveform and remains fully playable.
 func (ap *AssetProcessor) extractAudioArtwork(ctx context.Context, audioPath string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(),
-		"-v", "error", "-nostdin", "-threads", "1", "-i", audioPath,
+	args := append([]string{"-v", "error", "-nostdin"}, ap.toolSession.FFmpegThreadsArg()...)
+	args = append(args, "-i", audioPath,
 		"-map", "0:v:0?", "-an", "-frames:v", "1",
-		"-vf", "scale=1024:1024:force_original_aspect_ratio=decrease",
-		"-threads", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1")
+		"-vf", "scale=1024:1024:force_original_aspect_ratio=decrease")
+	args = append(args, ap.toolSession.FFmpegThreadsArg()...)
+	args = append(args, "-f", "image2pipe", "-c:v", "png", "pipe:1")
+	cmd := exec.CommandContext(ctx, ap.toolsConfig.FFmpegCommand(), args...)
 	sysproc.HideConsole(cmd)
 	output, err := cmd.Output()
 	if ctx.Err() != nil {

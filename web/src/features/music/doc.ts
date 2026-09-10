@@ -39,22 +39,38 @@
  *   Detail --> Player
  * ```
  *
+ * ## Agent integration
+ *
+ * {@link MusicAgentResult} hydrates owner/thread-scoped refs inside Lumilio chat.
+ * Explicit audition uses the same player with a bounded ordered preview queue.
+ * Selection edits attach the exact chosen order to the next Agent turn. Metadata
+ * search does not infer acoustic mood. Playlist creation and append use the
+ * existing confirmed effect journal: revision/ownership rechecks, entry writes
+ * and the durable receipt share one transaction. Existing playlist occurrences
+ * retain their identities, and retries return the original receipt.
+ *
  * ## Data
  *
  * {@link MusicPlayerDock} is composed once by the application shell beside
  * the outlet. A 64px dock opens the queue surface and native fullscreen lyrics
- * dialog without replacing the audio engine. Music routes use their own
+ * dialog without replacing the audio engine. Music routes use the shared
  * navigation chrome while the shared shell preserves playback. The engine collects playback-session pages before publishing an
  * editable queue, keeps duplicate
  * playlist occurrences distinct, and coordinates with the neutral media
  * playback event used by Assets. Original audio files are never rewritten by
  * metadata corrections. Album/artist favorites are owner-scoped catalog
- * preferences. Local plain-text lyrics use optimistic revisions and never
+ * preferences. Asset ratings (0–5) are exposed by the Music projection and
+ * edited through the Asset rating endpoint. Playlist artwork is derived from
+ * the first live owner-scoped entry with an available medium thumbnail.
+ * Local plain-text and LRC lyrics use optimistic revisions and never
  * require an online provider. Embedded artwork is generated through the
- * existing fenced Asset derivative pipeline alongside the waveform.
+ * existing fenced Asset derivative pipeline alongside the waveform. The fullscreen
+ * player displays the waveform with an accessible seek control and synchronizes
+ * LRC timestamps; clicking a timed line seeks the existing audio engine.
  *
  * @module
  */
+import type { MusicAgentResult } from "./components/MusicAgentResult.tsx";
 import type MusicPlayerDock from "./components/MusicPlayerDock.tsx";
 import type MusicTrackRow from "./components/MusicTrackRow.tsx";
 import type {

@@ -36,6 +36,29 @@ export function trackAlbum(track: MusicTrack): string {
   return track.album_title?.trim() || "Unknown album";
 }
 
+export function sortMusicTracks(
+  tracks: MusicTrack[],
+  sort: "" | "title" | "artist" | "album" | "track",
+): MusicTrack[] {
+  // "" = keep the source order (recently added).
+  if (sort === "") return tracks;
+  if (sort === "track") {
+    return [...tracks].sort((a, b) => {
+      const discA = a.disc_number ?? 0;
+      const discB = b.disc_number ?? 0;
+      if (discA !== discB) return discA - discB;
+      return (a.track_number ?? 0) - (b.track_number ?? 0);
+    });
+  }
+  const key = (track: MusicTrack) =>
+    sort === "title"
+      ? trackTitle(track)
+      : sort === "artist"
+        ? trackArtist(track)
+        : trackAlbum(track);
+  return [...tracks].sort((a, b) => key(a).localeCompare(key(b)));
+}
+
 export function formatMusicDuration(seconds?: number): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "—";
   const minutes = Math.floor(seconds / 60);

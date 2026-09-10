@@ -29,7 +29,7 @@ const migrationTable = "lumilio_schema_migrations"
 const (
 	schemaGeneration                 = 8
 	currentGenerationBaselineVersion = 9
-	currentApplicationMigration      = 16
+	currentApplicationMigration      = 17
 )
 
 type embeddedMigration struct {

@@ -1,3 +1,4 @@
+import { MusicAgentResult } from "@/features/music";
 import { useEffect, useRef } from "react";
 import { AlertTriangle, AtSign, Images, WandSparkles } from "lucide-react";
 import { Markdown } from "./markdown/Markdown";
@@ -33,8 +34,34 @@ function BlockView({ block, isAnimating = false }: { block: Block; isAnimating?:
 }
 
 function WidgetBlockView({ block }: { block: WidgetBlock }) {
+  const { t } = useI18n();
   const threadId = useLumilioChatStore((state) => state.threadId);
+  const sendMessage = useLumilioChatStore((state) => state.sendMessage);
+  const disabled = useLumilioChatStore((state) => state.isGenerating || state.awaitingConfirmation);
   if (!threadId) return null;
+  if (block.widget === "music_tracks")
+    return (
+      <MusicAgentResult
+        key={`${threadId}:${block.refId}`}
+        refId={block.refId}
+        threadId={threadId}
+        title={block.title}
+        disabled={disabled}
+        onSend={(prompt, assetIds) =>
+          void sendMessage(prompt, {
+            mode: "curate",
+            context: [
+              {
+                id: `music:${block.refId}`,
+                type: "selection",
+                label: block.title || t("music.title"),
+                assetIds,
+              },
+            ],
+          })
+        }
+      />
+    );
   return (
     <InlineWidgetCard
       refId={block.refId}

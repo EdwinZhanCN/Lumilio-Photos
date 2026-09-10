@@ -533,7 +533,7 @@ func run(
 	go refStore.RunJanitor(ctx, 10*time.Minute)
 	conversations := core.NewConversationStore(core.DefaultConversationTTL)
 	go conversations.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, sqlDB, database.Writer, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
+	agentService := core.NewAgentService(queries, sqlDB, database.Writer, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath, musicService)
 	agentPins := pins.NewService(queries, refStore, authorizedLibraries)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
@@ -564,7 +564,8 @@ func run(
 	}
 	executionEngine := execution.NewEngine(governor)
 	repositoryObservationConfig := roecontroller.Config{
-		Settle: time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
+		VerificationInterval: time.Duration(appConfig.RepositoryScan.IntervalSeconds) * time.Second,
+		Settle:               time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
 	}
 	commitCoordinator, err := commit.New(database.Writer, commit.Config{Capacity: 256, MaxBatch: 32, OldestWait: 10 * time.Millisecond}, commit.CatalogDependencies{
 		Face: faceService, Event: eventService, Location: locationService,
@@ -692,7 +693,9 @@ func run(
 	// the commit coordinator own product progress; each bounded runtime step
 	// declares its own process-wide execution resources.
 	macroRuntime := &pipelineRuntime{
-		engine: executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
+		logger:         appLogger.Named("pipeline"),
+		pipelineReader: database.ReaderSQL,
+		engine:         executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
 		repository: repositoryObserver, repositoryHasher: repositoryHashPreparer,
 		repositoryReader: database.ReaderQueries,
 		eventProjection:  eventService, locationProjection: locationService,
@@ -811,7 +814,7 @@ func run(
 	locationController := handler.NewLocationHandler(locationService)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService, securityLogger)
-	queueController := handler.NewQueueHandler(queueDatabase.ReaderSQL)
+	queueController := handler.NewQueueHandler(queueDatabase.ReaderSQL, database.ReaderSQL)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, authorizedLibraries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)

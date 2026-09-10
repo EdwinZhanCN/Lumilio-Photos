@@ -2,13 +2,13 @@ import MusicLyricExcerpt from "../../components/MusicLyricExcerpt";
 import MusicCoverCard from "../../components/MusicCoverCard";
 import MusicPlaylistAction from "../../components/MusicPlaylistAction";
 import Link from "../../components/MusicLink";
-import { useRef, type ReactNode } from "react";
-import { Disc3, ListMusic, Mic2, Music2, Play } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Disc3, ListMusic, Mic2, Music2, Play, Search } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import EmptyState from "@/components/ui/EmptyState";
 import "../../components/MusicLibrary.css";
-import UserAvatar from "@/components/ui/UserAvatar";
-import { useAuth } from "@/features/auth";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
+import PageHeader from "@/components/ui/PageHeader";
 import { useI18n } from "@/lib/i18n";
 import {
   useMusicAlbums,
@@ -18,7 +18,8 @@ import {
 } from "../../api/useMusic";
 import MusicArtwork from "../../components/MusicArtwork";
 import MusicTrackRow from "../../components/MusicTrackRow";
-import MusicFilterBar from "./MusicFilterBar";
+import MusicTrackList from "../../components/MusicTrackList";
+import MusicSortDropdown from "../../components/MusicSortDropdown";
 import type {
   MusicAlbum,
   MusicArtist,
@@ -50,7 +51,7 @@ function sourceFor(
 
 export default function MusicLibraryFlow() {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { playSource } = useMusicPlayer();
   const view = readView(searchParams.get("view"));
@@ -62,6 +63,38 @@ export default function MusicLibraryFlow() {
   const offset = Number.isSafeInteger(offsetValue) && offsetValue >= 0 ? offsetValue : 0;
   const showHighlights = !likedOnly;
   const scroll = useRef<HTMLDivElement>(null);
+  const stickOnViewChange = useRef(false);
+  const [search, setSearch] = useState(query);
+  useEffect(() => setSearch(query), [query]);
+  useBreadcrumbs([{ label: t("sidebar.home", "Home"), to: "/" }, { label: t("music.title") }]);
+
+  // After a tab-driven view change, wait until the new pane has been
+  // committed/laid out (double rAF), then scroll the sticky tab bar to the
+  // container top (clamped to the scrollable range). Only runs for tab clicks
+  // (see onClick). Measuring after render avoids the jitter/clamp that happens
+  // when the target is computed against the pre-switch layout.
+  useEffect(() => {
+    if (!stickOnViewChange.current) return;
+    stickOnViewChange.current = false;
+    let raf2 = 0;
+    const measure = () => {
+      const container = scroll.current;
+      const bar = container?.querySelector<HTMLElement>(".sticky");
+      if (!container || !bar) return;
+      const target =
+        container.scrollTop +
+        Math.round(bar.getBoundingClientRect().top - container.getBoundingClientRect().top);
+      const max = Math.max(0, container.scrollHeight - container.clientHeight);
+      container.scrollTo({ top: Math.max(0, Math.min(target, max)), behavior: "smooth" });
+    };
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(measure);
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [view]);
 
   const tracksQuery = useMusicTracks({
     query,
@@ -126,175 +159,217 @@ export default function MusicLibraryFlow() {
           ? playlistsQuery
           : albumsQuery;
   const total = activeQuery.data?.total ?? 0;
-  const title = likedOnly
-    ? t("music.quickStart.liked", "Liked tracks")
-    : t("music.browse.title", "Library");
+  const title = likedOnly ? t("music.quickStart.liked", "Liked tracks") : t("music.title");
 
   return (
-    <div ref={scroll} className="music-browse music-scroll">
-      <div className="music-browse-content">
-        <h1 className="music-browse-title">
-          <UserAvatar
-            name={user?.display_name || user?.username || title}
-            assetId={user?.avatar_asset_id}
-            size="size-11"
-            textSize="text-base"
-          />
-          {title}
-        </h1>
-        {showHighlights && (
-          <section className="music-highlights">
-            <div className="music-likes">
-              <Link
-                to="/music?view=tracks&liked=1"
-                className="music-likes-fill"
-                aria-label={t("music.quickStart.liked", "Liked tracks")}
-              >
-                <MusicLyricExcerpt trackId={highlightQuery.data?.items?.[0]?.track_id} />
-              </Link>
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <Link
-                    to="/music?view=tracks&liked=1"
-                    className="text-2xl font-bold tracking-tight hover:underline"
+    <div className="flex h-full min-h-0 flex-col">
+      <PageHeader title={title} icon={<Music2 className="h-6 w-6 text-primary" />} />
+      <div
+        ref={scroll}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-8 sm:px-4"
+      >
+        <div className="music-browse-content">
+          {showHighlights && (
+            <section className="music-highlights">
+              <div className="music-likes">
+                <Link
+                  to="/music?view=tracks&liked=1"
+                  className="music-likes-fill"
+                  aria-label={t("music.quickStart.liked", "Liked tracks")}
+                >
+                  <MusicLyricExcerpt trackId={highlightQuery.data?.items?.[0]?.track_id} />
+                </Link>
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <Link
+                      to="/music?view=tracks&liked=1"
+                      className="text-2xl font-bold tracking-tight hover:underline"
+                    >
+                      {t("music.quickStart.liked", "Liked tracks")}
+                    </Link>
+                    <p className="mt-1 text-sm opacity-70">
+                      {likedQuery.data?.total ?? 0} {t("music.tracks.count", "tracks")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="music-likes-play"
+                    disabled={!likedQuery.data?.total}
+                    onClick={() => void playSource({ kind: "liked" })}
+                    aria-label={t("music.actions.playLiked", "Play liked tracks")}
                   >
-                    {t("music.quickStart.liked", "Liked tracks")}
-                  </Link>
-                  <p className="mt-1 text-sm opacity-70">
-                    {likedQuery.data?.total ?? 0} {t("music.tracks.count", "tracks")}
-                  </p>
+                    <Play className="size-5" fill="currentColor" />
+                  </button>
                 </div>
+              </div>
+              <div className="min-w-0">
+                <div className="music-highlight-tracks">
+                  {highlightQuery.isPending && <LoadingState />}
+                  {highlightQuery.data?.items?.map((track) => (
+                    <MusicTrackRow
+                      key={track.track_id}
+                      track={track}
+                      compact
+                      source={{ kind: "liked" }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          <div className="music-browse-main">
+            <div className="sticky top-0 z-sticky bg-base-100">
+              <div className="music-tabbar" hidden={likedOnly}>
+                <div
+                  role="tablist"
+                  aria-label={t("music.navigation", "Music sections")}
+                  className="tabs tabs-box"
+                >
+                  {views.map(({ id }) => (
+                    <Link
+                      key={id}
+                      to={id === "overview" ? "/music" : `/music?view=${id}`}
+                      role="tab"
+                      aria-selected={view === id}
+                      onClick={() => {
+                        stickOnViewChange.current = true;
+                      }}
+                      className={`tab ${view === id ? "tab-active" : ""}`}
+                    >
+                      {viewLabels[id]}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="music-toolbar">
+                <form
+                  role="search"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void navigate(
+                      `/music?view=tracks${search.trim() ? `&q=${encodeURIComponent(search.trim())}` : ""}`,
+                    );
+                  }}
+                >
+                  <label className="input input-bordered input-sm flex w-48 items-center gap-2">
+                    <Search className="size-4 text-base-content/50" />
+                    <input
+                      type="text"
+                      className="grow"
+                      placeholder={t("music.search.label", "Search music")}
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      aria-label={t("music.search.label", "Search music")}
+                    />
+                  </label>
+                </form>
+
+                {view === "tracks" && (
+                  <>
+                    <MusicSortDropdown
+                      sort={sort}
+                      onSortChange={(value) => updateParams({ sort: value || undefined })}
+                    />
+                    <MusicFavoriteFilter
+                      active={likedOnly}
+                      onChange={(value) => updateParams({ liked: value ? "1" : undefined })}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm gap-1.5 btn-primary"
+                      onClick={playAll}
+                      disabled={tracks.length === 0}
+                    >
+                      <Play className="size-4" />
+                      {t("music.actions.playAll", "Play all")}
+                    </button>
+                  </>
+                )}
+
+                {(view === "albums" || view === "artists") && (
+                  <MusicFavoriteFilter
+                    active={favoritesOnly}
+                    onChange={(value) => updateParams({ favorites: value ? "1" : undefined })}
+                  />
+                )}
+
+                {view === "playlists" && <MusicPlaylistAction variant="primary" />}
+              </div>
+            </div>
+
+            <MusicPanel active={view === "tracks"}>
+              {tracksQuery.isError ? (
+                <MusicLoadError onRetry={() => void tracksQuery.refetch()} />
+              ) : (
+                <TracksView
+                  tracks={tracks}
+                  total={tracksQuery.data?.total ?? 0}
+                  query={query}
+                  likedOnly={likedOnly}
+                  sort={sort}
+                  isLoading={tracksQuery.isPending}
+                />
+              )}
+            </MusicPanel>
+
+            <MusicPanel active={view === "albums"}>
+              {albumsQuery.isError ? (
+                <MusicLoadError onRetry={() => void albumsQuery.refetch()} />
+              ) : (
+                <AlbumsView albums={albums} isLoading={albumsQuery.isPending} />
+              )}
+            </MusicPanel>
+
+            <MusicPanel active={view === "artists"}>
+              {artistsQuery.isError ? (
+                <MusicLoadError onRetry={() => void artistsQuery.refetch()} />
+              ) : (
+                <ArtistsView artists={artists} isLoading={artistsQuery.isPending} />
+              )}
+            </MusicPanel>
+
+            <MusicPanel active={view === "playlists"}>
+              {playlistsQuery.isError ? (
+                <MusicLoadError onRetry={() => void playlistsQuery.refetch()} />
+              ) : (
+                <PlaylistsView playlists={playlists} isLoading={playlistsQuery.isPending} />
+              )}
+            </MusicPanel>
+            {view === "overview" && total > albums.length && (
+              <Link className="btn btn-ghost" to="/music?view=albums">
+                {t("music.albums.viewAll", "View all albums")}
+              </Link>
+            )}
+            {view !== "overview" && total > 50 && (
+              <nav
+                className="flex items-center justify-between gap-3"
+                aria-label={t("music.pagination.label", "Music pages")}
+              >
                 <button
                   type="button"
-                  className="music-likes-play"
-                  disabled={!likedQuery.data?.total}
-                  onClick={() => void playSource({ kind: "liked" })}
-                  aria-label={t("music.actions.playLiked", "Play liked tracks")}
+                  className="btn btn-sm"
+                  disabled={offset === 0 || activeQuery.isFetching}
+                  onClick={() => updateParams({ offset: String(Math.max(0, offset - 50)) })}
                 >
-                  <Play className="size-5" fill="currentColor" />
+                  {t("common.previous", "Previous")}
                 </button>
-              </div>
-            </div>
-            <div className="min-w-0">
-              <div className="music-highlight-tracks">
-                {highlightQuery.isPending && <LoadingState />}
-                {highlightQuery.data?.items?.map((track) => (
-                  <MusicTrackRow
-                    key={track.track_id}
-                    track={track}
-                    compact
-                    source={{ kind: "liked" }}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-        <div className="music-categories" hidden={likedOnly}>
-          <nav className="music-tabs" aria-label={t("music.navigation", "Music sections")}>
-            {views.map(({ id }) => (
-              <Link
-                key={id}
-                to={id === "overview" ? "/music" : `/music?view=${id}`}
-                aria-current={view === id ? "page" : undefined}
-                onClick={() => scroll.current?.scrollTo({ top: 375, behavior: "smooth" })}
-                className={`music-tab ${view === id ? "is-active" : ""}`}
-              >
-                {viewLabels[id]}
-              </Link>
-            ))}
-          </nav>
-          <div className="music-category-actions">
-            {(view === "albums" || view === "artists") && (
-              <select
-                className="music-filter"
-                aria-label={t("music.filter.label", "Filter music")}
-                value={favoritesOnly ? "favorites" : "all"}
-                onChange={(event) =>
-                  updateParams({ favorites: event.target.value === "favorites" ? "1" : undefined })
-                }
-              >
-                <option value="all">{t("music.filter.all", "All")}</option>
-                <option value="favorites">{t("music.filter.favorites", "Favorites")}</option>
-              </select>
+                <span className="text-sm text-base-content/60">
+                  {offset + 1}–{Math.min(offset + 50, total)} / {total}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={offset + 50 >= total || activeQuery.isFetching}
+                  onClick={() => updateParams({ offset: String(offset + 50) })}
+                >
+                  {t("common.next", "Next")}
+                </button>
+              </nav>
             )}
-
-            {view === "playlists" && <MusicPlaylistAction />}
           </div>
         </div>
-
-        <MusicPanel active={view === "tracks"}>
-          {tracksQuery.isError ? (
-            <MusicLoadError onRetry={() => void tracksQuery.refetch()} />
-          ) : (
-            <TracksView
-              tracks={tracks}
-              total={tracksQuery.data?.total ?? 0}
-              query={query}
-              likedOnly={likedOnly}
-              sort={sort}
-              isLoading={tracksQuery.isPending}
-              onPlayAll={playAll}
-              onSortChange={(value) => updateParams({ sort: value || undefined })}
-              onLikedChange={(value) => updateParams({ liked: value ? "1" : undefined })}
-            />
-          )}
-        </MusicPanel>
-
-        <MusicPanel active={view === "albums"}>
-          {albumsQuery.isError ? (
-            <MusicLoadError onRetry={() => void albumsQuery.refetch()} />
-          ) : (
-            <AlbumsView albums={albums} isLoading={albumsQuery.isPending} />
-          )}
-        </MusicPanel>
-
-        <MusicPanel active={view === "artists"}>
-          {artistsQuery.isError ? (
-            <MusicLoadError onRetry={() => void artistsQuery.refetch()} />
-          ) : (
-            <ArtistsView artists={artists} isLoading={artistsQuery.isPending} />
-          )}
-        </MusicPanel>
-
-        <MusicPanel active={view === "playlists"}>
-          {playlistsQuery.isError ? (
-            <MusicLoadError onRetry={() => void playlistsQuery.refetch()} />
-          ) : (
-            <PlaylistsView playlists={playlists} isLoading={playlistsQuery.isPending} />
-          )}
-        </MusicPanel>
-        {view === "overview" && total > albums.length && (
-          <Link className="btn btn-ghost" to="/music?view=albums">
-            {t("music.albums.viewAll", "View all albums")}
-          </Link>
-        )}
-        {view !== "overview" && total > 50 && (
-          <nav
-            className="flex items-center justify-between gap-3"
-            aria-label={t("music.pagination.label", "Music pages")}
-          >
-            <button
-              type="button"
-              className="btn btn-sm"
-              disabled={offset === 0 || activeQuery.isFetching}
-              onClick={() => updateParams({ offset: String(Math.max(0, offset - 50)) })}
-            >
-              {t("common.previous", "Previous")}
-            </button>
-            <span className="text-sm text-base-content/60">
-              {offset + 1}–{Math.min(offset + 50, total)} / {total}
-            </span>
-            <button
-              type="button"
-              className="btn btn-sm"
-              disabled={offset + 50 >= total || activeQuery.isFetching}
-              onClick={() => updateParams({ offset: String(offset + 50) })}
-            >
-              {t("common.next", "Next")}
-            </button>
-          </nav>
-        )}
       </div>
     </div>
   );
@@ -307,9 +382,6 @@ function TracksView({
   likedOnly,
   sort,
   isLoading,
-  onPlayAll,
-  onSortChange,
-  onLikedChange,
 }: {
   tracks: MusicTrack[];
   total: number;
@@ -317,52 +389,20 @@ function TracksView({
   likedOnly: boolean;
   sort: "" | "title" | "artist" | "album" | "track";
   isLoading: boolean;
-  onPlayAll: () => void;
-  onSortChange: (value: "" | "title" | "artist" | "album" | "track") => void;
-  onLikedChange: (value: boolean) => void;
 }) {
   const { t } = useI18n();
   if (isLoading) return <LoadingState />;
   return (
     <section className="py-2">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">
-            {likedOnly
-              ? t("music.quickStart.liked", "Liked tracks")
-              : t("music.tracks.heading", "All audio")}
-          </h2>
-          <p className="text-sm text-base-content/60">
-            {total} {t("music.tracks.count", "tracks")}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="select select-sm h-9">
-            <span className="sr-only">{t("music.tracks.sortLabel", "Sort tracks")}</span>
-            <select
-              value={sort}
-              onChange={(event) =>
-                onSortChange(event.target.value as "" | "title" | "artist" | "album" | "track")
-              }
-            >
-              <option value="">{t("music.tracks.sort.recent", "Recently added")}</option>
-              <option value="title">{t("music.tracks.sort.title", "Title")}</option>
-              <option value="artist">{t("music.tracks.sort.artist", "Artist")}</option>
-              <option value="album">{t("music.tracks.sort.album", "Album")}</option>
-              <option value="track">{t("music.tracks.sort.track", "Track number")}</option>
-            </select>
-          </label>
-          <MusicFilterBar scope="tracks" active={likedOnly} onChange={onLikedChange} />
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            onClick={onPlayAll}
-            disabled={tracks.length === 0}
-          >
-            <Play className="size-4" />
-            {t("music.actions.playAll", "Play all")}
-          </button>
-        </div>
+      <div className="mb-3">
+        <h2 className="text-lg font-semibold">
+          {likedOnly
+            ? t("music.quickStart.liked", "Liked tracks")
+            : t("music.tracks.heading", "All audio")}
+        </h2>
+        <p className="text-sm text-base-content/60">
+          {total} {t("music.tracks.count", "tracks")}
+        </p>
       </div>
       {tracks.length === 0 ? (
         <EmptyState
@@ -373,16 +413,7 @@ function TracksView({
           )}
         />
       ) : (
-        <div className="divide-y divide-base-200">
-          {tracks.map((track, index) => (
-            <MusicTrackRow
-              key={track.track_id ?? index}
-              track={track}
-              index={index}
-              source={sourceFor(query, likedOnly, sort || undefined)}
-            />
-          ))}
-        </div>
+        <MusicTrackList tracks={tracks} source={sourceFor(query, likedOnly, sort || undefined)} />
       )}
     </section>
   );
@@ -488,13 +519,52 @@ function PlaylistsView({
               source={{ kind: "playlist", id: playlist.playlist_id }}
               subtitle={`${playlist.entry_count ?? 0} ${t("music.tracks.count", "tracks")}`}
             >
-              <div className="flex aspect-square items-center justify-center rounded-xl bg-base-200 text-base-content/40">
-                <ListMusic className="size-14" strokeWidth={1.3} />
-              </div>
+              <MusicArtwork
+                assetId={playlist.cover_asset_id}
+                alt={playlist.title ?? ""}
+                size="cover"
+              />
             </MusicCoverCard>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function MusicFavoriteFilter({
+  active,
+  onChange,
+}: {
+  active: boolean;
+  onChange: (active: boolean) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="dropdown dropdown-end">
+      <div
+        tabIndex={0}
+        role="button"
+        aria-label={t("music.filter.label", "Filter music")}
+        className="btn btn-sm btn-soft btn-info gap-2"
+      >
+        {active ? t("music.filter.favorites", "Favorites") : t("music.filter.all", "All")}
+      </div>
+      <ul
+        tabIndex={0}
+        className="dropdown-content menu bg-base-200 rounded-box z-dropdown w-36 p-2 shadow-xl"
+      >
+        <li>
+          <button onClick={() => onChange(false)} className={!active ? "active" : ""}>
+            {t("music.filter.all", "All")}
+          </button>
+        </li>
+        <li>
+          <button onClick={() => onChange(true)} className={active ? "active" : ""}>
+            {t("music.filter.favorites", "Favorites")}
+          </button>
+        </li>
+      </ul>
     </div>
   );
 }

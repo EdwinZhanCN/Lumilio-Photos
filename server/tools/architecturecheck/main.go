@@ -219,7 +219,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		{name: "idle WAL checkpoint suppression", snippet: "walStateAlreadyCheckpointed(walState"},
 		{name: "independent queue WAL checkpoint", snippet: `checkpointWAL("queue"`},
 		{name: "backup source reader", snippet: "Source:   database.ReaderSQL"},
-		{name: "queue status reader", snippet: "handler.NewQueueHandler(queueDatabase.ReaderSQL)"},
+		{name: "queue status reader", snippet: "handler.NewQueueHandler(queueDatabase.ReaderSQL, database.ReaderSQL)"},
 		{name: "event planning reader", snippet: "event.NewServiceWithCatalog(database.Writer, database.Reader"},
 		{name: "event HTTP catalog capabilities", snippet: "handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL"},
 		{name: "agent library reader", snippet: "core.NewAuthorizedLibraryFactory(queries, assetService, database.ReaderSQL)"},
@@ -239,7 +239,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		pattern *regexp.Regexp
 	}{
 		{name: "raw production read on the writer", pattern: regexp.MustCompile(`\b(?:sqlDB|database\.SQL)\.(?:Query|QueryRow|Prepare)(?:Context)?\(`)},
-		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*\)`)},
+		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*[,)]`)},
 		{name: "backup copy bound to the writer", pattern: regexp.MustCompile(`Source:\s+sqlDB\b`)},
 		{name: "agent library bound to the writer", pattern: regexp.MustCompile(`NewAuthorizedLibraryFactory\(queries, assetService, sqlDB\)`)},
 	} {

@@ -10,9 +10,11 @@ import { useMusicFeedback } from "../state/useMusicFeedback";
 export default function MusicPlaylistAction({
   trackId,
   showLabel = false,
+  variant = "ghost",
 }: {
   trackId?: string;
   showLabel?: boolean;
+  variant?: "ghost" | "primary";
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -47,7 +49,7 @@ export default function MusicPlaylistAction({
     <>
       <button
         type="button"
-        className="btn btn-ghost btn-sm"
+        className={variant === "primary" ? "btn btn-sm btn-primary gap-2" : "btn btn-ghost btn-sm"}
         aria-label={label}
         onClick={() => {
           createdPlaylist.current = undefined;
@@ -57,7 +59,7 @@ export default function MusicPlaylistAction({
           setOpen(true);
         }}
       >
-        <ListMusic className="size-4" />
+        {variant === "primary" ? <Plus className="size-4" /> : <ListMusic className="size-4" />}
         {(!trackId || showLabel) && label}
       </button>
       {createPortal(
@@ -72,7 +74,7 @@ export default function MusicPlaylistAction({
             if (pending) event.preventDefault();
           }}
         >
-          <div className="modal-box max-w-md">
+          <div className="modal-box max-w-md p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold">
                 {creating ? t("music.playlists.create", "Create playlist") : label}

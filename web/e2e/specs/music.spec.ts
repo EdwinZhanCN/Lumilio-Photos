@@ -125,7 +125,10 @@ test("@smoke music imports tags, separates editions, and preserves album playbac
   const source = await audio.getAttribute("src");
   const position = await audio.evaluate((element: HTMLAudioElement) => element.currentTime);
   // Follow the real SPA link: a full page load would mask a provider remount.
-  await page.getByRole("link", { name: t("music.browse.title"), exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: t("music.title"), exact: true })
+    .click();
   await expect(page).toHaveURL(/\/music$/);
   await expect(audio).toHaveAttribute("src", source!);
   await expect

@@ -13,14 +13,31 @@ import (
 )
 
 func (c *Coordinator) submitOutcome(ctx context.Context, kind OperationKind, apply func(context.Context, *sql.Tx) (Outcome, error)) (Result, error) {
-	return c.SubmitOperation(ctx, Operation{
+	result, err := c.SubmitOperation(ctx, Operation{
 		Kind: kind,
 		Apply: func(ctx context.Context, tx *sql.Tx) (Result, error) {
 			outcome, err := apply(ctx, tx)
 			return Result{Outcome: outcome}, err
 		},
 	})
+	if err != nil {
+		return result, &unacknowledgedError{cause: err}
+	}
+	return result, nil
 }
+
+// IsUnacknowledged distinguishes a failed Catalog publication from a domain
+// execution failure. Delivery must retry publication without spending a media
+// processing failure budget or reporting success.
+func IsUnacknowledged(err error) bool {
+	var failure *unacknowledgedError
+	return errors.As(err, &failure)
+}
+
+type unacknowledgedError struct{ cause error }
+
+func (e *unacknowledgedError) Error() string { return e.cause.Error() }
+func (e *unacknowledgedError) Unwrap() error { return e.cause }
 
 func (c *Coordinator) ApplyAssetStage(ctx context.Context, payload AssetStageApplied) (Result, error) {
 	if err := validateAssetStage(payload); err != nil {

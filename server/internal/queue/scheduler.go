@@ -159,7 +159,10 @@ func (s *Scheduler) derive(ctx context.Context) ([]derivedWork, error) {
 		return work, nil
 	}
 
-	assetRows, err := db.QueryContext(ctx, `SELECT asset_id,source_content_id,stage,pipeline_version,desired_version,priority FROM asset_pipeline_state WHERE desired_version>applied_version AND terminal_error IS NULL ORDER BY updated_at,asset_id,stage LIMIT ?`, s.batchSize-len(work))
+	assetRows, err := db.QueryContext(ctx, `SELECT asset_id,source_content_id,stage,pipeline_version,desired_version,priority FROM asset_pipeline_state s WHERE desired_version>applied_version AND terminal_error IS NULL
+ AND EXISTS(SELECT 1 FROM assets a WHERE a.asset_id=s.asset_id AND a.content_id=s.source_content_id AND a.is_deleted=0)
+ AND NOT EXISTS(SELECT 1 FROM asset_pipeline_failures f WHERE f.asset_id=s.asset_id AND f.stage=s.stage AND f.source_content_id=s.source_content_id AND f.pipeline_version=s.pipeline_version AND f.desired_version=s.desired_version AND f.retry_after>?)
+ ORDER BY updated_at,asset_id,stage LIMIT ?`, time.Now().UTC().UnixMicro(), s.batchSize-len(work))
 	if err != nil {
 		return nil, err
 	}

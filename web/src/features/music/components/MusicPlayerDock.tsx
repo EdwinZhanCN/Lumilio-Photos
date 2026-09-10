@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { useMusicTrack } from "../api/useMusic";
+import MusicWaveform from "./MusicWaveform";
+import MusicRating from "./MusicRating";
 import MusicLyrics from "./MusicLyrics";
 import MusicQueue from "./MusicQueue";
 import MusicLikeButton from "./MusicLikeButton";
@@ -221,9 +223,21 @@ export default function MusicPlayerDock() {
             <h2 className="mt-8 text-2xl font-bold">{displayTrack && trackTitle(displayTrack)}</h2>
             <p className="mt-2 opacity-50">{displayTrack && trackArtist(displayTrack)}</p>
             <div className="mt-8">{transport}</div>
+            <MusicWaveform
+              trackId={current?.track.track_id}
+              currentTime={progress}
+              duration={max}
+              onSeek={seek}
+            />
+            {displayTrack && <MusicRating track={displayTrack} />}
           </div>
           <div className="music-lyrics-content">
-            <MusicLyrics trackId={current?.track.track_id} />
+            <MusicLyrics
+              key={current?.track.track_id}
+              trackId={current?.track.track_id}
+              currentTime={currentTime}
+              onSeek={seek}
+            />
           </div>
         </div>
       </dialog>

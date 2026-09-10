@@ -74,6 +74,7 @@ type MusicTrack struct {
 	Duration                *float64        `json:"duration,omitempty"`
 	TakenAt                 *time.Time      `json:"taken_at,omitempty"`
 	IsDeleted               bool            `json:"is_deleted"`
+	Rating                  *int64          `json:"rating,omitempty"`
 	Liked                   bool            `json:"liked"`
 	Artists                 []MusicCredit   `json:"artists,omitempty"`
 	Overrides               []MusicOverride `json:"overrides,omitempty"`
@@ -128,12 +129,13 @@ type MusicArtistPage struct {
 }
 
 type MusicPlaylist struct {
-	PlaylistID  uuid.UUID `json:"playlist_id"`
-	OwnerID     int32     `json:"owner_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Revision    int64     `json:"revision"`
-	EntryCount  int64     `json:"entry_count"`
+	CoverAssetID string    `json:"cover_asset_id,omitempty"`
+	PlaylistID   uuid.UUID `json:"playlist_id"`
+	OwnerID      int32     `json:"owner_id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	Revision     int64     `json:"revision"`
+	EntryCount   int64     `json:"entry_count"`
 }
 
 type MusicPlaylistPage struct {
@@ -241,6 +243,7 @@ type MusicLyrics struct {
 }
 
 type MusicService interface {
+	ApplyAgentPlaylistTx(context.Context, *sql.Tx, int32, uuid.UUID, []uuid.UUID, string, uuid.UUID, int64, bool) (uuid.UUID, int, error)
 	GetLyrics(context.Context, int32, uuid.UUID) (MusicLyrics, error)
 	UpdateLyrics(context.Context, int32, uuid.UUID, string, int64) (MusicLyrics, error)
 	ListTracks(context.Context, int32, string, string, string, bool, int, int) (MusicTrackPage, error)
@@ -343,7 +346,7 @@ func trackFromListRow(row repo.ListMusicTracksRow) MusicTrack {
 		TrackNumber: row.TrackNumber, TrackTotal: row.TrackTotal, Compilation: row.IsCompilation != 0,
 		ExtractedSourceRevision: row.ExtractedSourceRevision, Revision: row.Revision,
 		OriginalFilename: row.OriginalFilename, MimeType: row.MimeType, Duration: row.Duration,
-		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked,
+		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked, Rating: row.Rating,
 	}
 }
 
@@ -357,7 +360,7 @@ func trackFromDetailRow(row repo.GetMusicTrackRow) MusicTrack {
 		TrackNumber: row.TrackNumber, TrackTotal: row.TrackTotal, Compilation: row.IsCompilation != 0,
 		ExtractedSourceRevision: row.ExtractedSourceRevision, Revision: row.Revision,
 		OriginalFilename: row.OriginalFilename, MimeType: row.MimeType, Duration: row.Duration,
-		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked,
+		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked, Rating: row.Rating,
 	}
 }
 
@@ -1158,7 +1161,7 @@ func trackFromAlbumTrackRow(row repo.ListMusicAlbumTracksRow) MusicTrack {
 		TrackNumber: row.TrackNumber, TrackTotal: row.TrackTotal, Compilation: row.IsCompilation != 0,
 		ExtractedSourceRevision: row.ExtractedSourceRevision, Revision: row.Revision,
 		OriginalFilename: row.OriginalFilename, MimeType: row.MimeType, Duration: row.Duration,
-		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked,
+		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked, Rating: row.Rating,
 	}
 }
 
@@ -1430,14 +1433,14 @@ func (s *musicService) UpdateArtist(ctx context.Context, ownerID int32, artistID
 func playlistFromListRow(row repo.ListMusicPlaylistsRow) MusicPlaylist {
 	return MusicPlaylist{
 		PlaylistID: row.PlaylistID, OwnerID: row.OwnerID, Title: row.Title,
-		Description: row.Description, Revision: row.Revision, EntryCount: row.EntryCount,
+		Description: row.Description, Revision: row.Revision, EntryCount: row.EntryCount, CoverAssetID: row.CoverAssetID,
 	}
 }
 
 func playlistFromDetailRow(row repo.GetMusicPlaylistRow) MusicPlaylist {
 	return MusicPlaylist{
 		PlaylistID: row.PlaylistID, OwnerID: row.OwnerID, Title: row.Title,
-		Description: row.Description, Revision: row.Revision, EntryCount: row.EntryCount,
+		Description: row.Description, Revision: row.Revision, EntryCount: row.EntryCount, CoverAssetID: row.CoverAssetID,
 	}
 }
 
@@ -2047,4 +2050,77 @@ func (s *musicService) UpdateLyrics(ctx context.Context, ownerID int32, trackID 
 		return MusicLyrics{}, err
 	}
 	return s.GetLyrics(ctx, ownerID, trackID)
+}
+
+// ApplyAgentPlaylistTx is called only inside the confirmed effect transaction.
+// Existing entry identities and duplicate occurrences are never rewritten.
+func (s *musicService) ApplyAgentPlaylistTx(ctx context.Context, tx *sql.Tx, ownerID int32, effectID uuid.UUID, ids []uuid.UUID, title string, target uuid.UUID, revision int64, skipExisting bool) (uuid.UUID, int, error) {
+	if len(ids) == 0 || len(ids) > 100 {
+		return uuid.Nil, 0, errors.New("playlist selection must contain 1–100 tracks")
+	}
+	q := s.queries.WithTx(tx)
+	seen := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			return uuid.Nil, 0, errors.New("duplicate selection")
+		}
+		seen[id] = true
+		track, err := q.GetMusicTrack(ctx, repo.GetMusicTrackParams{TrackID: id, OwnerID: ownerID})
+		if err != nil || track.IsDeleted {
+			return uuid.Nil, 0, sql.ErrNoRows
+		}
+	}
+	if target == uuid.Nil {
+		title = strings.TrimSpace(title)
+		if title == "" || len(title) > 300 {
+			return uuid.Nil, 0, errors.New("invalid playlist title")
+		}
+		target = uuid.NewSHA1(effectID, []byte("music-playlist"))
+		_, err := q.CreateMusicPlaylist(ctx, repo.CreateMusicPlaylistParams{PlaylistID: target, OwnerID: ownerID, Title: title, Description: ""})
+		if err != nil {
+			return uuid.Nil, 0, err
+		}
+		revision = 1
+	} else {
+		p, err := q.GetMusicPlaylist(ctx, repo.GetMusicPlaylistParams{PlaylistID: target, OwnerID: ownerID})
+		if err != nil {
+			return uuid.Nil, 0, err
+		}
+		if revision <= 0 || p.Revision != revision {
+			return uuid.Nil, 0, ErrMusicConflict
+		}
+	}
+	// One set-based insertion preserves the supplied selection order and bounds writer work.
+	type entry struct {
+		ID    string `json:"id"`
+		Track string `json:"track"`
+	}
+	entries := make([]entry, len(ids))
+	for i, id := range ids {
+		entries[i] = entry{uuid.NewSHA1(effectID, []byte(fmt.Sprintf("entry:%d", i))).String(), id.String()}
+	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return uuid.Nil, 0, err
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO music_playlist_entries (entry_id,playlist_id,track_id,saved_title,position,idempotency_key,created_at,updated_at)
+ SELECT json_extract(e.value,'$.id'), ?, mt.track_id, mt.title,
+ (SELECT COALESCE(MAX(position),-1)+1 FROM music_playlist_entries WHERE playlist_id=?) + CAST(e.key AS INTEGER), json_extract(e.value,'$.id'),
+ CAST(unixepoch('subsec')*1000000 AS INTEGER), CAST(unixepoch('subsec')*1000000 AS INTEGER)
+ FROM json_each(?) e JOIN music_tracks mt ON mt.track_id=json_extract(e.value,'$.track')
+ JOIN assets a ON a.asset_id=mt.track_id AND a.owner_id=? AND a.is_deleted=0 AND a.type='AUDIO'
+ WHERE mt.owner_id=? AND (?=0 OR NOT EXISTS (SELECT 1 FROM music_playlist_entries pe WHERE pe.playlist_id=? AND pe.track_id=mt.track_id))`, target, target, data, ownerID, ownerID, skipExisting, target)
+	if err != nil {
+		return uuid.Nil, 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return uuid.Nil, 0, err
+	}
+	if count > 0 {
+		if err := bumpMusicPlaylistRevisionTx(ctx, q, target, ownerID, revision); err != nil {
+			return uuid.Nil, 0, err
+		}
+	}
+	return target, int(count), nil
 }

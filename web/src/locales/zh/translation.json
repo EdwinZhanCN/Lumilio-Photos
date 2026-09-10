@@ -1628,6 +1628,7 @@
     "capabilities": {
       "capabilityPending": "正在交换能力信息",
       "compatibility": "兼容性",
+      "consecutiveFailures_one": "连续失败 {{count}} 次",
       "consecutiveFailures_other": "连续失败 {{count}} 次",
       "diagnostic": "诊断信息",
       "discovery": {
@@ -1683,6 +1684,14 @@
       "transport": "传输状态",
       "validatedNodes": "已验证节点"
     },
+    "delivery": {
+      "active": "活跃投递",
+      "cancelled": "已取消投递",
+      "completed": "已完成投递",
+      "description": "一个文件或一次扫描可能产生多次投递。这些记录不代表已完成的文件数或当前文件失败数。",
+      "discarded": "已丢弃投递",
+      "title": "队列投递记录"
+    },
     "ml": {
       "allIndexed": "全部已索引",
       "bioAlbumCoverage": "生物图鉴相册覆盖率",
@@ -1709,6 +1718,17 @@
         "title": "重建索引 — {{task}}"
       },
       "remainingAssets": "剩余"
+    },
+    "processing": {
+      "failedAssets": "需要处理的文件",
+      "failedProjections_other": "需要处理的投影：{{count}}",
+      "failedRepositories_other": "需要处理的扫描：{{count}}",
+      "operations": "导入、重新索引和备份操作：{{pending}} 项待执行 · {{failed}} 项需要处理",
+      "pendingAssets": "待处理文件",
+      "pendingProjections": "待执行投影工作",
+      "pendingRepositories": "待扫描资源库",
+      "retryHint": "解决原因后，可重新处理这些文件。",
+      "retryWaiting_other": "等待重试的阶段：{{count}}"
     },
     "queueSummary": {
       "copied": "已复制",
@@ -1784,29 +1804,11 @@
       "updated": "{{time}} 更新"
     },
     "stats": {
-      "activeJobs": "待处理",
-      "allHealthy": "状态正常",
-      "availableCount_one": "{{count}} 个等待处理",
-      "availableCount_other": "{{count}} 个等待处理",
-      "cancelledCount_one": "{{count}} 个已停止",
-      "cancelledCount_other": "{{count}} 个已停止",
-      "completed": "已处理",
-      "discardedCount_one": "{{count}} 个已停止",
-      "discardedCount_other": "{{count}} 个已停止",
-      "fetchError": "获取队列统计失败",
-      "issues": "需关注",
-      "noData": "暂无数据",
-      "noProcessedJobs": "暂无已处理任务",
-      "retryableCount_one": "{{count}} 个将重试",
-      "retryableCount_other": "{{count}} 个将重试",
-      "runningCount_one": "{{count}} 个处理中",
-      "runningCount_other": "{{count}} 个处理中",
-      "scheduledCount_one": "{{count}} 个稍后处理",
-      "scheduledCount_other": "{{count}} 个稍后处理",
-      "successRate": "成功率 {{rate}}%"
+      "fetchError": "获取队列统计失败"
     },
     "storage": {
       "allHealthy": "所有存储目标均正常",
+      "attentionNeeded_one": "{{count}} 个目标需要关注",
       "attentionNeeded_other": "{{count}} 个目标需要关注",
       "auditAction": "操作",
       "auditActor": "操作者",
@@ -1888,11 +1890,29 @@
       "unfavorite": "取消收藏",
       "unlike": "取消喜欢"
     },
+    "agent": {
+      "audition": "试听选曲",
+      "bounded": "当前展示的是限定范围的选曲；可继续筛选以探索更多曲目。",
+      "confirmAppend_other": "将 {{count}} 首曲目追加到“{{title}}”？",
+      "confirmCreate_other": "使用 {{count}} 首曲目创建“{{title}}”？",
+      "loading": "正在加载音乐选曲…",
+      "moveDown": "下移 {{title}}",
+      "moveUp": "上移 {{title}}",
+      "openPlaylist": "打开歌单",
+      "playlistTitle": "歌单名称",
+      "refine": "继续筛选",
+      "save": "保存歌单…",
+      "savePrompt": "请将附带的选曲按当前顺序创建为名为“{{title}}”的音乐歌单，保存前请让我确认。",
+      "selected_other": "已选择 {{count}} 首曲目，顺序如上",
+      "selection": "音乐选曲",
+      "selectTrack": "选择 {{title}}",
+      "skipExisting": "歌单中已有的曲目将被跳过。",
+      "unavailable": "这组选曲已不可用。"
+    },
     "album": {
       "emptyTracks": "此发行版本中没有可用曲目。",
       "label": "音乐专辑",
       "noDate": "发行日期未知",
-      "trackList": "曲目列表",
       "untitled": "未命名专辑"
     },
     "albums": {
@@ -1902,15 +1922,11 @@
     },
     "artist": {
       "albums": "张专辑",
-      "emptyTracks": "没有找到该艺人的曲目。",
-      "tracksHeading": "该艺人的曲目"
+      "emptyTracks": "没有找到该艺人的曲目。"
     },
     "artists": {
       "emptyDescription": "艺人信息会从本地音频元数据中收集。",
       "emptyTitle": "还没有艺人"
-    },
-    "browse": {
-      "title": "音乐库"
     },
     "designation": {
       "music": "音乐",
@@ -1918,9 +1934,6 @@
     },
     "detail": {
       "error": "无法加载此音乐内容。"
-    },
-    "favorites": {
-      "label": "收藏"
     },
     "feedback": {
       "error": "无法保存更改，请重新加载后重试。",
@@ -1942,15 +1955,11 @@
       "favorites": "收藏",
       "label": "音乐库筛选"
     },
-    "filters": {
-      "all": "全部",
-      "label": "音乐筛选"
-    },
     "likeError": "保存失败，请重试。",
     "loadError": "无法加载音乐。",
     "lyrics": {
       "empty": "暂无本地歌词，可在曲目详情中添加。",
-      "hint": "粘贴歌词并保存在本地，不会修改原始音频文件。",
+      "hint": "粘贴纯文本或 LRC 歌词。带时间戳的歌词会随播放同步。",
       "title": "歌词"
     },
     "navigation": "音乐分区",
@@ -1976,18 +1985,14 @@
     "playlist": {
       "confirmDelete": "删除这个歌单？音频文件会保留。",
       "delete": "删除歌单",
+      "dragReorder": "拖动排序",
       "edit": "编辑歌单",
       "empty": "此歌单还没有条目。",
       "entryHeading": "歌单顺序",
-      "moveDown": "下移",
-      "moveUp": "上移",
-      "remove": "移除条目",
-      "unavailable": "音频不可用"
+      "remove": "移除条目"
     },
     "playlists": {
-      "add": "添加曲目",
       "addLabel": "添加到歌单",
-      "chooseTrack": "选择曲目",
       "create": "创建歌单",
       "emptyDescription": "创建歌单，保存独立于播放队列的播放顺序。",
       "emptyTitle": "还没有歌单",
@@ -2002,7 +2007,14 @@
     "quickStart": {
       "liked": "喜欢的曲目"
     },
+    "rating": {
+      "clear": "清除评分",
+      "stars_other": "评为 {{count}} 星",
+      "title": "评分"
+    },
     "search": {
+      "clear": "清除搜索",
+      "empty": "没有匹配的曲目",
       "label": "搜索音乐"
     },
     "searchTracks": "搜索曲目",
@@ -2024,7 +2036,6 @@
       "emptyDescription": "尝试其他搜索词，或清除“喜欢”筛选。",
       "emptyTitle": "没有匹配的曲目",
       "heading": "全部音频",
-      "likedOnly": "已喜欢",
       "sort": {
         "album": "专辑",
         "artist": "艺人",
@@ -2032,7 +2043,7 @@
         "title": "标题",
         "track": "曲目编号"
       },
-      "sortLabel": "排序曲目"
+      "sortBy": "按 {{sort}} 排序"
     },
     "unknownArtist": "未知艺人",
     "views": {
@@ -2041,6 +2052,10 @@
       "overview": "概览",
       "playlists": "歌单",
       "tracks": "曲目"
+    },
+    "waveform": {
+      "title": "音频波形",
+      "unavailable": "波形暂不可用，仍可拖动定位。"
     }
   },
   "nav": {

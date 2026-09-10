@@ -43,7 +43,12 @@ whose tree and detail column scroll independently.
 
 ## Data
 
-Queue stats and summary endpoints poll every five seconds. Queue summaries
+Queue stats and summary endpoints poll every five seconds. StatMonitor reads
+current Catalog file, Repository, projection, and operation work from the
+stats response. File counts deduplicate stages; a terminal stage puts the file
+in the attention count. Retry waits survive QueueDB replacement. River counts
+are separately labeled delivery records and never stand in for file progress.
+Queue summaries
 include bounded error samples suitable for copied diagnostics.
 [useCapabilities](../../lib/capabilities/useCapabilities.ts) and [useLumenRuntime](./api/useLumenRuntime.ts) poll every five seconds.
 The public capability snapshot supplies de-sensitized task availability;

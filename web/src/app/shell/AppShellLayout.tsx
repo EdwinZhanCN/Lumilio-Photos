@@ -3,12 +3,7 @@ import type { ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { BreadcrumbProvider } from "@/components/breadcrumbs";
 import { ChatDock } from "@/features/lumilio";
-import {
-  MusicNavigation,
-  MusicPlayerDock,
-  MusicPlayerProvider,
-  useMusicPlayer,
-} from "@/features/music";
+import { MusicPlayerDock, MusicPlayerProvider, useMusicPlayer } from "@/features/music";
 import { useI18n } from "@/lib/i18n.tsx";
 import NavBar from "@/app/shell/NavBar";
 import SideBar from "@/app/shell/SideBar";
@@ -31,15 +26,14 @@ function AppShellContent(): ReactNode {
   const { current, isLoading, error } = useMusicPlayer();
   // The /lumilio board embeds its own dock; everywhere else gets the global
   // agent drawer (launched from the NavBar button, see AgentDockLauncher).
-  const isMusic = location.pathname === "/music" || location.pathname.startsWith("/music/");
-  const showAgentDock = location.pathname !== "/lumilio" && !isMusic;
+  const showAgentDock = location.pathname !== "/lumilio";
   const hasPlayer = Boolean(current || isLoading || error);
 
   return (
-    <div className={`${isMusic ? "" : "drawer lg:drawer-open"} h-screen`}>
+    <div className="drawer lg:drawer-open h-screen">
       <input id="app-drawer" type="checkbox" className="drawer-toggle" />
       <div className="drawer-content flex h-screen min-h-0 flex-col overflow-hidden">
-        {isMusic ? <MusicNavigation /> : <NavBar />}
+        <NavBar />
         <div
           id="app-scroll-container"
           className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hasPlayer ? "pb-16" : ""}`}
@@ -51,18 +45,20 @@ function AppShellContent(): ReactNode {
         <MusicPlayerDock />
         {showAgentDock && <ChatDock variant="fab" />}
       </div>
-      {!isMusic && (
-        <div className="drawer-side z-overlay lg:z-auto">
-          <label
-            htmlFor="app-drawer"
-            aria-label={t("sidebar.closeMenu", { defaultValue: "Close menu" })}
-            className="drawer-overlay"
-          />
-          <div className="flex h-full w-64 flex-col overflow-hidden bg-base-200 shadow-lg lg:w-56">
-            <SideBar />
-          </div>
+      <div className="drawer-side z-overlay lg:z-auto">
+        <label
+          htmlFor="app-drawer"
+          aria-label={t("sidebar.closeMenu", { defaultValue: "Close menu" })}
+          className="drawer-overlay"
+        />
+        <div
+          className={`flex h-full w-64 flex-col overflow-hidden bg-base-200 shadow-lg lg:w-56 ${
+            hasPlayer ? "pb-16" : ""
+          }`}
+        >
+          <SideBar />
         </div>
-      )}
+      </div>
     </div>
   );
 }

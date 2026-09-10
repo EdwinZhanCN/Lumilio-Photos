@@ -12,6 +12,7 @@ sql:
           - "migrations/000013_location_projection_convergence.up.sql"
           - "migrations/000015_music_library.up.sql"
           - "migrations/000016_music_local_preferences.up.sql"
+          - "migrations/000017_processing_convergence.up.sql"
       gen:
           go:
               package: "repo"

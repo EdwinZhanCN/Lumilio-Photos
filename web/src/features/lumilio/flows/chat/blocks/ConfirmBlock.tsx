@@ -1,3 +1,7 @@
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { MusicAgentResult } from "@/features/music";
 import { AlertTriangle, CheckCircle2, LoaderCircle, ShieldQuestion, XCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useLumilioChatStore } from "../../../state/chatStore";
@@ -18,6 +22,19 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
   const { t } = useI18n();
   const confirmInterrupt = useLumilioChatStore((state) => state.confirmInterrupt);
 
+  const threadId = useLumilioChatStore((state) => state.threadId);
+  const queryClient = useQueryClient();
+  const playlistId = block.receipt?.playlist_id;
+  useEffect(() => {
+    if (block.state !== "committed" || !playlistId) return;
+    for (const path of [
+      "/api/v1/music/playlists",
+      "/api/v1/music/playlists/{id}",
+      "/api/v1/music/playlists/{id}/entries",
+    ])
+      void queryClient.invalidateQueries({ queryKey: ["get", path] });
+  }, [block.state, playlistId, queryClient]);
+
   const rootCause = block.interrupt.InterruptContexts.find((context) => context.IsRootCause);
   if (!rootCause) return null;
 
@@ -26,13 +43,23 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
   const count = getCount(info);
   const title = getTitle(info);
   const message =
-    action === "create_album" && title && typeof count === "number"
-      ? t("lumilio.chat.confirmation.createAlbum", { count, title })
-      : action === "add_to_album" && typeof count === "number"
-        ? t("lumilio.chat.confirmation.addToAlbum", "Add {{count}} photos to this album?", {
+    action === "save_music_playlist" && title && typeof count === "number"
+      ? info?.playlist_id
+        ? t("music.agent.confirmAppend", "Append {{count}} tracks to “{{title}}”?", {
             count,
+            title,
           })
-        : getLegacyMessage(info);
+        : t("music.agent.confirmCreate", "Create “{{title}}” with {{count}} tracks?", {
+            count,
+            title,
+          })
+      : action === "create_album" && title && typeof count === "number"
+        ? t("lumilio.chat.confirmation.createAlbum", { count, title })
+        : action === "add_to_album" && typeof count === "number"
+          ? t("lumilio.chat.confirmation.addToAlbum", "Add {{count}} photos to this album?", {
+              count,
+            })
+          : getLegacyMessage(info);
 
   const submitting =
     block.state === "submitting_approval" || block.state === "submitting_rejection";
@@ -46,6 +73,22 @@ export function ConfirmBlock({ block }: ConfirmBlockProps) {
       </div>
       {message && <p className="my-2 text-sm text-base-content/80">{message}</p>}
 
+      {action === "save_music_playlist" && info?.skip_existing && (
+        <p className="text-xs">
+          {t("music.agent.skipExisting", "Tracks already in the playlist will be skipped.")}
+        </p>
+      )}
+      {action === "save_music_playlist" &&
+        info?.ref_id &&
+        threadId &&
+        (block.state === "pending" || block.state === "failed") && (
+          <MusicAgentResult refId={info.ref_id} threadId={threadId} />
+        )}
+      {block.state === "committed" && playlistId && (
+        <Link className="link text-sm" to={`/music/playlists/${playlistId}`}>
+          {t("music.agent.openPlaylist", "Open playlist")}
+        </Link>
+      )}
       {block.state === "committed" && (
         <div className="mt-2 flex items-start gap-2 text-xs text-success" role="status">
           <CheckCircle2 size={15} className="mt-0.5 shrink-0" />

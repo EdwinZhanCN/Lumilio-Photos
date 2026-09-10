@@ -1,15 +1,18 @@
-import MusicMoreMenu from "../../components/MusicMoreMenu";
-import MusicFavoriteButton from "../../components/MusicFavoriteButton";
-
 import { useMusicFeedback } from "../../state/useMusicFeedback";
 import { FormEvent, useEffect, useState } from "react";
-import { Disc3, Play, Save } from "lucide-react";
+import { Disc3, Play, Save, Shuffle } from "lucide-react";
 import { useParams } from "react-router-dom";
 
 import { useI18n } from "@/lib/i18n";
+import Modal from "@/components/ui/Modal";
+import { useBreadcrumbs } from "@/components/breadcrumbs";
 import { useMusicAlbum, useMusicMutations } from "../../api/useMusic";
 import MusicArtwork from "../../components/MusicArtwork";
-import MusicTrackRow from "../../components/MusicTrackRow";
+import MusicTrackList from "../../components/MusicTrackList";
+import MusicPagination from "../../components/MusicPagination";
+import MusicDetailToolbar from "../../components/MusicDetailToolbar";
+import type { MusicSortValue } from "../../components/MusicSortDropdown";
+import { sortMusicTracks, trackAlbum, trackArtist, trackTitle } from "../../model/music";
 import { useMusicPlayer } from "../../state/MusicPlayerProvider";
 
 export default function MusicAlbumDetailsFlow() {
@@ -17,15 +20,34 @@ export default function MusicAlbumDetailsFlow() {
   const { run, feedback } = useMusicFeedback();
   const { albumId } = useParams<{ albumId: string }>();
   const albumQuery = useMusicAlbum(albumId);
-  const { playSource } = useMusicPlayer();
+  const { playSource, shuffle, toggleShuffle } = useMusicPlayer();
   const { updateAlbum, invalidateMusic } = useMusicMutations();
   const [editing, setEditing] = useState(false);
+  const [sort, setSort] = useState<MusicSortValue>("");
+  const [search, setSearch] = useState("");
+  const [offset, setOffset] = useState(0);
   const [title, setTitle] = useState("");
   const album = albumQuery.data;
+  useBreadcrumbs([
+    { label: t("sidebar.home", "Home"), to: "/" },
+    { label: t("music.title"), to: "/music" },
+    { label: t("music.views.albums", "Albums"), to: "/music?view=albums" },
+    { label: album?.title || t("music.views.albums", "Albums") },
+  ]);
+  const allTracks = album?.tracks ?? [];
+  const filteredTracks = allTracks.filter((track) => {
+    if (!search) return true;
+    const text = [trackTitle(track), trackArtist(track), trackAlbum(track)].join(" ").toLowerCase();
+    return text.includes(search.toLowerCase());
+  });
+  const sortedTracks = sortMusicTracks(filteredTracks, sort);
+  const pageTracks = sortedTracks.slice(offset, offset + 50);
+  const totalTracks = sortedTracks.length;
 
   useEffect(() => {
     if (album) setTitle(album.title ?? "");
   }, [album]);
+  useEffect(() => setOffset(0), [album?.album_id, sort, search]);
 
   if (albumQuery.isPending)
     return (
@@ -55,6 +77,24 @@ export default function MusicAlbumDetailsFlow() {
   return (
     <div className="music-browse music-scroll">
       {feedback}
+      <MusicDetailToolbar
+        editLabel={t("music.actions.editAlbum", "Edit album")}
+        onEdit={() => setEditing(!editing)}
+        sort={sort}
+        onSortChange={setSort}
+        favorite={{
+          kind: "album",
+          id: album.album_id,
+          favorite: album.favorite,
+          revision: album.revision,
+        }}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: t("music.searchTracks", "Search tracks"),
+          ariaLabel: t("music.searchTracks", "Search tracks"),
+        }}
+      />
       <div className="w-full">
         <div className="w-full space-y-8">
           <div className="music-detail-hero">
@@ -86,73 +126,97 @@ export default function MusicAlbumDetailsFlow() {
               <div className="music-detail-actions">
                 <button
                   type="button"
+                  className="btn btn-ghost btn-circle"
+                  aria-label={t("music.player.shuffle", "Shuffle")}
+                  aria-pressed={shuffle}
+                  onClick={() => {
+                    if (!shuffle) toggleShuffle();
+                    void playSource({ kind: "album", id: album.album_id ?? "" });
+                  }}
+                >
+                  <Shuffle className="size-4" />
+                </button>
+                <button
+                  type="button"
                   className="btn btn-sm btn-primary"
                   onClick={() => void playSource({ kind: "album", id: album.album_id ?? "" })}
                 >
                   <Play className="size-4" fill="currentColor" />
                   {t("music.actions.playAlbum", "Play album")}
                 </button>
-                <MusicFavoriteButton
-                  kind="album"
-                  id={album.album_id}
-                  favorite={album.favorite}
-                  revision={album.revision}
-                />
-                <MusicMoreMenu
-                  actions={[
-                    {
-                      label: t("music.actions.editAlbum", "Edit album"),
-                      onSelect: () => setEditing(!editing),
-                    },
-                  ]}
-                />
               </div>
-              {editing && (
+              <Modal
+                open={editing}
+                onClose={() => setEditing(false)}
+                title={t("music.actions.editAlbum", "Edit album")}
+                icon={<Disc3 className="size-5" />}
+                size="sm"
+                footer={
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setEditing(false)}
+                    >
+                      {t("common.cancel", "Cancel")}
+                    </button>
+                    <button
+                      type="submit"
+                      form="edit-album-form"
+                      className="btn btn-primary"
+                      disabled={updateAlbum.isPending}
+                    >
+                      <Save className="size-4" />
+                      {t("music.actions.save", "Save changes")}
+                    </button>
+                  </>
+                }
+              >
                 <form
+                  id="edit-album-form"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void run(() => save(event));
                   }}
-                  className="flex flex-col gap-2 sm:flex-row"
+                  className="grid gap-4 p-4 sm:p-6"
                 >
-                  <input
-                    className="input input-bordered input-sm flex-1"
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    aria-label={t("music.fields.album", "Album")}
-                  />
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    type="submit"
-                    disabled={updateAlbum.isPending}
-                  >
-                    <Save className="size-4" />
-                    {t("music.actions.save", "Save changes")}
-                  </button>
+                  <label className="grid gap-2">
+                    <span className="text-sm font-medium text-base-content/70">
+                      {t("music.fields.album", "Album")}
+                    </span>
+                    <input
+                      className="input input-bordered w-full"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      required
+                    />
+                  </label>
                 </form>
-              )}
+              </Modal>
             </div>
           </div>
           <section className="py-2">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{t("music.album.trackList", "Track list")}</h2>
-              <span className="text-xs text-base-content/50">{album.tracks?.length ?? 0}</span>
-            </div>
-            {(album.tracks ?? []).length === 0 ? (
+            {totalTracks === 0 ? (
               <p className="p-5 text-sm text-base-content/60">
                 {t("music.album.emptyTracks", "No available tracks in this release.")}
               </p>
             ) : (
-              <div className="space-y-1">
-                {(album.tracks ?? []).map((track, index) => (
-                  <MusicTrackRow
-                    key={track.track_id ?? index}
-                    track={track}
-                    index={index}
-                    source={{ kind: "album", id: album.album_id ?? "" }}
+              <>
+                <MusicTrackList
+                  tracks={pageTracks}
+                  source={{ kind: "album", id: album.album_id ?? "" }}
+                  showAlbumColumn={false}
+                />
+                {totalTracks > 50 && (
+                  <MusicPagination
+                    offset={offset}
+                    pageSize={50}
+                    total={totalTracks}
+                    onPrevious={() => setOffset(Math.max(0, offset - 50))}
+                    onNext={() => setOffset(offset + 50)}
                   />
-                ))}
-              </div>
+                )}
+              </>
             )}
           </section>
         </div>

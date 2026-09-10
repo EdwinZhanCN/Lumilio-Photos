@@ -814,7 +814,14 @@ func (q *Queries) GetMusicPlaybackSession(ctx context.Context, arg GetMusicPlayb
 
 const getMusicPlaylist = `-- name: GetMusicPlaylist :one
 SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
-       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count
+       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
+       CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
+         JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+           AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
+         WHERE ce.playlist_id = p.playlist_id AND EXISTS (
+           SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
+         ) ORDER BY ce.position, ce.entry_id LIMIT 1), '') AS TEXT) AS cover_asset_id
 FROM music_playlists p
 LEFT JOIN music_playlist_entries pe ON pe.playlist_id = p.playlist_id
 WHERE p.playlist_id = ?1 AND p.owner_id = ?2
@@ -827,14 +834,15 @@ type GetMusicPlaylistParams struct {
 }
 
 type GetMusicPlaylistRow struct {
-	PlaylistID  uuid.UUID         `db:"playlist_id" json:"playlist_id"`
-	OwnerID     int32             `db:"owner_id" json:"owner_id"`
-	Title       string            `db:"title" json:"title"`
-	Description string            `db:"description" json:"description"`
-	Revision    int64             `db:"revision" json:"revision"`
-	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	UpdatedAt   dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-	EntryCount  int64             `db:"entry_count" json:"entry_count"`
+	PlaylistID   uuid.UUID         `db:"playlist_id" json:"playlist_id"`
+	OwnerID      int32             `db:"owner_id" json:"owner_id"`
+	Title        string            `db:"title" json:"title"`
+	Description  string            `db:"description" json:"description"`
+	Revision     int64             `db:"revision" json:"revision"`
+	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EntryCount   int64             `db:"entry_count" json:"entry_count"`
+	CoverAssetID string            `db:"cover_asset_id" json:"cover_asset_id"`
 }
 
 func (q *Queries) GetMusicPlaylist(ctx context.Context, arg GetMusicPlaylistParams) (GetMusicPlaylistRow, error) {
@@ -849,6 +857,7 @@ func (q *Queries) GetMusicPlaylist(ctx context.Context, arg GetMusicPlaylistPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EntryCount,
+		&i.CoverAssetID,
 	)
 	return i, err
 }
@@ -892,7 +901,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked
+    a.is_deleted, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.track_id = ?1
@@ -934,6 +943,7 @@ type GetMusicTrackRow struct {
 	TakenTime               dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
 	IsDeleted               bool              `db:"is_deleted" json:"is_deleted"`
 	Liked                   bool              `db:"liked" json:"liked"`
+	Rating                  *int64            `db:"rating" json:"rating"`
 }
 
 func (q *Queries) GetMusicTrack(ctx context.Context, arg GetMusicTrackParams) (GetMusicTrackRow, error) {
@@ -968,6 +978,7 @@ func (q *Queries) GetMusicTrack(ctx context.Context, arg GetMusicTrackParams) (G
 		&i.TakenTime,
 		&i.IsDeleted,
 		&i.Liked,
+		&i.Rating,
 	)
 	return i, err
 }
@@ -1106,7 +1117,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked
+    a.is_deleted, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.album_id = ?1 AND mt.owner_id = ?2
@@ -1149,6 +1160,7 @@ type ListMusicAlbumTracksRow struct {
 	TakenTime               dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
 	IsDeleted               bool              `db:"is_deleted" json:"is_deleted"`
 	Liked                   bool              `db:"liked" json:"liked"`
+	Rating                  *int64            `db:"rating" json:"rating"`
 }
 
 func (q *Queries) ListMusicAlbumTracks(ctx context.Context, arg ListMusicAlbumTracksParams) ([]ListMusicAlbumTracksRow, error) {
@@ -1189,6 +1201,7 @@ func (q *Queries) ListMusicAlbumTracks(ctx context.Context, arg ListMusicAlbumTr
 			&i.TakenTime,
 			&i.IsDeleted,
 			&i.Liked,
+			&i.Rating,
 		); err != nil {
 			return nil, err
 		}
@@ -1550,7 +1563,14 @@ func (q *Queries) ListMusicPlaylistEntries(ctx context.Context, arg ListMusicPla
 
 const listMusicPlaylists = `-- name: ListMusicPlaylists :many
 SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
-       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count
+       p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
+       CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
+         JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+           AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
+         WHERE ce.playlist_id = p.playlist_id AND EXISTS (
+           SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
+         ) ORDER BY ce.position, ce.entry_id LIMIT 1), '') AS TEXT) AS cover_asset_id
 FROM music_playlists p
 LEFT JOIN music_playlist_entries pe ON pe.playlist_id = p.playlist_id
 WHERE p.owner_id = ?1
@@ -1566,14 +1586,15 @@ type ListMusicPlaylistsParams struct {
 }
 
 type ListMusicPlaylistsRow struct {
-	PlaylistID  uuid.UUID         `db:"playlist_id" json:"playlist_id"`
-	OwnerID     int32             `db:"owner_id" json:"owner_id"`
-	Title       string            `db:"title" json:"title"`
-	Description string            `db:"description" json:"description"`
-	Revision    int64             `db:"revision" json:"revision"`
-	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	UpdatedAt   dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-	EntryCount  int64             `db:"entry_count" json:"entry_count"`
+	PlaylistID   uuid.UUID         `db:"playlist_id" json:"playlist_id"`
+	OwnerID      int32             `db:"owner_id" json:"owner_id"`
+	Title        string            `db:"title" json:"title"`
+	Description  string            `db:"description" json:"description"`
+	Revision     int64             `db:"revision" json:"revision"`
+	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EntryCount   int64             `db:"entry_count" json:"entry_count"`
+	CoverAssetID string            `db:"cover_asset_id" json:"cover_asset_id"`
 }
 
 func (q *Queries) ListMusicPlaylists(ctx context.Context, arg ListMusicPlaylistsParams) ([]ListMusicPlaylistsRow, error) {
@@ -1594,6 +1615,7 @@ func (q *Queries) ListMusicPlaylists(ctx context.Context, arg ListMusicPlaylists
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.EntryCount,
+			&i.CoverAssetID,
 		); err != nil {
 			return nil, err
 		}
@@ -1712,7 +1734,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked
+    a.is_deleted, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 CROSS JOIN sort_params
@@ -1783,6 +1805,7 @@ type ListMusicTracksRow struct {
 	TakenTime               dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
 	IsDeleted               bool              `db:"is_deleted" json:"is_deleted"`
 	Liked                   bool              `db:"liked" json:"liked"`
+	Rating                  *int64            `db:"rating" json:"rating"`
 }
 
 // Music is always owner-scoped at the query boundary. The caller never gets
@@ -1834,6 +1857,7 @@ func (q *Queries) ListMusicTracks(ctx context.Context, arg ListMusicTracksParams
 			&i.TakenTime,
 			&i.IsDeleted,
 			&i.Liked,
+			&i.Rating,
 		); err != nil {
 			return nil, err
 		}
@@ -1896,6 +1920,140 @@ func (q *Queries) ListUncatalogedAudioAssets(ctx context.Context, arg ListUncata
 			&i.GpsGeohash5,
 			&i.GpsGeohash7,
 			&i.ExifRaw,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lookupAgentMusicPlaylists = `-- name: LookupAgentMusicPlaylists :many
+SELECT playlist_id, title, revision FROM music_playlists
+WHERE owner_id = ?1 AND title LIKE '%' || ?2 || '%'
+ORDER BY lower(title), playlist_id LIMIT 20
+`
+
+type LookupAgentMusicPlaylistsParams struct {
+	OwnerID int32   `db:"owner_id" json:"owner_id"`
+	Query   *string `db:"query" json:"query"`
+}
+
+type LookupAgentMusicPlaylistsRow struct {
+	PlaylistID uuid.UUID `db:"playlist_id" json:"playlist_id"`
+	Title      string    `db:"title" json:"title"`
+	Revision   int64     `db:"revision" json:"revision"`
+}
+
+func (q *Queries) LookupAgentMusicPlaylists(ctx context.Context, arg LookupAgentMusicPlaylistsParams) ([]LookupAgentMusicPlaylistsRow, error) {
+	rows, err := q.db.QueryContext(ctx, lookupAgentMusicPlaylists, arg.OwnerID, arg.Query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LookupAgentMusicPlaylistsRow
+	for rows.Next() {
+		var i LookupAgentMusicPlaylistsRow
+		if err := rows.Scan(&i.PlaylistID, &i.Title, &i.Revision); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchAgentMusic = `-- name: SearchAgentMusic :many
+WITH scope_params AS (SELECT CAST(?11 AS TEXT) AS ids)
+SELECT mt.track_id, mt.title, mt.artist_name, mt.album_title, mt.genre,
+       a.duration, a.rating, a.liked, a.original_filename, a.mime_type
+FROM music_tracks mt JOIN assets a ON a.asset_id = mt.track_id
+WHERE mt.owner_id = ?1 AND a.owner_id = ?1
+ AND a.type = 'AUDIO' AND a.is_deleted = 0
+ AND (?2 = '' OR mt.title LIKE '%' || ?2 || '%'
+      OR mt.artist_name LIKE '%' || ?2 || '%' OR mt.album_title LIKE '%' || ?2 || '%')
+ AND (?3 = '' OR mt.artist_name LIKE '%' || ?3 || '%')
+ AND (?4 = '' OR mt.artist_name NOT LIKE '%' || ?4 || '%')
+ AND (?5 = '' OR mt.genre LIKE '%' || ?5 || '%')
+ AND (?6 = 0 OR a.liked = 1)
+ AND (?7 = 0 OR a.rating >= ?7)
+ AND (?8 = 0 OR NOT EXISTS (SELECT 1 FROM thumbnails t WHERE t.asset_id = mt.track_id AND t.size = 'medium'))
+ AND (?9 = 0 OR NOT EXISTS (SELECT 1 FROM music_track_lyrics l WHERE l.track_id = mt.track_id AND trim(l.content) <> ''))
+ AND (?10 = 0 OR mt.track_id IN (SELECT CAST(value AS TEXT) FROM json_each((SELECT ids FROM scope_params))))
+ORDER BY lower(mt.title), mt.track_id
+LIMIT 2001
+`
+
+type SearchAgentMusicParams struct {
+	OwnerID       int32       `db:"owner_id" json:"owner_id"`
+	Query         interface{} `db:"query" json:"query"`
+	Artist        interface{} `db:"artist" json:"artist"`
+	ExcludeArtist interface{} `db:"exclude_artist" json:"exclude_artist"`
+	Genre         interface{} `db:"genre" json:"genre"`
+	LikedOnly     interface{} `db:"liked_only" json:"liked_only"`
+	MinRating     interface{} `db:"min_rating" json:"min_rating"`
+	MissingCover  interface{} `db:"missing_cover" json:"missing_cover"`
+	MissingLyrics interface{} `db:"missing_lyrics" json:"missing_lyrics"`
+	Scoped        interface{} `db:"scoped" json:"scoped"`
+	AssetIds      *string     `db:"asset_ids" json:"asset_ids"`
+}
+
+type SearchAgentMusicRow struct {
+	TrackID          uuid.UUID `db:"track_id" json:"track_id"`
+	Title            string    `db:"title" json:"title"`
+	ArtistName       string    `db:"artist_name" json:"artist_name"`
+	AlbumTitle       string    `db:"album_title" json:"album_title"`
+	Genre            string    `db:"genre" json:"genre"`
+	Duration         *float64  `db:"duration" json:"duration"`
+	Rating           *int64    `db:"rating" json:"rating"`
+	Liked            bool      `db:"liked" json:"liked"`
+	OriginalFilename string    `db:"original_filename" json:"original_filename"`
+	MimeType         string    `db:"mime_type" json:"mime_type"`
+}
+
+func (q *Queries) SearchAgentMusic(ctx context.Context, arg SearchAgentMusicParams) ([]SearchAgentMusicRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchAgentMusic,
+		arg.OwnerID,
+		arg.Query,
+		arg.Artist,
+		arg.ExcludeArtist,
+		arg.Genre,
+		arg.LikedOnly,
+		arg.MinRating,
+		arg.MissingCover,
+		arg.MissingLyrics,
+		arg.Scoped,
+		arg.AssetIds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchAgentMusicRow
+	for rows.Next() {
+		var i SearchAgentMusicRow
+		if err := rows.Scan(
+			&i.TrackID,
+			&i.Title,
+			&i.ArtistName,
+			&i.AlbumTitle,
+			&i.Genre,
+			&i.Duration,
+			&i.Rating,
+			&i.Liked,
+			&i.OriginalFilename,
+			&i.MimeType,
 		); err != nil {
 			return nil, err
 		}

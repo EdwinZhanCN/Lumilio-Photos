@@ -97,7 +97,7 @@ export interface paths {
         };
         /**
          * Get job statistics
-         * @description Get aggregated statistics about jobs by state
+         * @description Get current Catalog processing state and operational River delivery counts
          */
         get: {
             parameters: {
@@ -1098,6 +1098,57 @@ export interface paths {
                     };
                 };
                 /** @description Ref not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/refs/{id}/music": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hydrate music selection */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Thread ID */
+                    thread_id: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Ref ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AgentMusicRefDTO"];
+                    };
+                };
+                /** @description Not Found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -14450,6 +14501,7 @@ export interface components {
             count?: number;
             effect_id?: string;
             message?: string;
+            playlist_id?: string;
             status?: string;
             tool_name?: string;
         };
@@ -14561,6 +14613,11 @@ export interface components {
             bucket?: string;
             /** @example 12 */
             count?: number;
+        };
+        "dto.AgentMusicRefDTO": {
+            total?: number;
+            tracks?: components["schemas"]["dto.MusicTrackDTO"][];
+            truncated?: boolean;
         };
         "dto.AgentNameCountDTO": {
             /** @example 42 */
@@ -16296,6 +16353,7 @@ export interface components {
             title: string;
         };
         "dto.MusicPlaylistDTO": {
+            cover_asset_id?: string;
             description?: string;
             entry_count?: number;
             owner_id?: number;
@@ -16370,6 +16428,7 @@ export interface components {
             original_filename?: string;
             overrides?: components["schemas"]["dto.MusicOverrideDTO"][];
             owner_id?: number;
+            rating?: number;
             release_date?: string;
             release_identifier?: string;
             /** @enum {string} */
@@ -17777,9 +17836,21 @@ export interface components {
             cancelled?: number;
             completed?: number;
             discarded?: number;
+            processing?: components["schemas"]["handler.ProcessingStatsResponse"];
             retryable?: number;
             running?: number;
             scheduled?: number;
+        };
+        "handler.ProcessingStatsResponse": {
+            failed_assets?: number;
+            failed_operations?: number;
+            failed_projections?: number;
+            failed_repositories?: number;
+            pending_assets?: number;
+            pending_operations?: number;
+            pending_projections?: number;
+            pending_repositories?: number;
+            retry_waiting_stages?: number;
         };
         "handler.QueueErrorSampleDTO": {
             attempt?: number;

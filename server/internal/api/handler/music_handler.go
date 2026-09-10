@@ -114,7 +114,7 @@ func toMusicTrackDTO(track service.MusicTrack) dto.MusicTrackDTO {
 		DiscNumber: track.DiscNumber, DiscTotal: track.DiscTotal, TrackNumber: track.TrackNumber,
 		TrackTotal: track.TrackTotal, Compilation: track.Compilation, ExtractedSourceRevision: track.ExtractedSourceRevision,
 		Revision: track.Revision, OriginalFilename: track.OriginalFilename, MimeType: track.MimeType,
-		Duration: track.Duration, TakenAt: track.TakenAt, IsDeleted: track.IsDeleted, Liked: track.Liked,
+		Duration: track.Duration, TakenAt: track.TakenAt, IsDeleted: track.IsDeleted, Liked: track.Liked, Rating: track.Rating,
 	}
 	if track.AlbumID != nil {
 		value := track.AlbumID.String()
@@ -183,7 +183,7 @@ func toMusicArtistPageDTO(page service.MusicArtistPage) dto.MusicArtistPageDTO {
 }
 
 func toMusicPlaylistDTO(playlist service.MusicPlaylist) dto.MusicPlaylistDTO {
-	return dto.MusicPlaylistDTO{PlaylistID: playlist.PlaylistID.String(), OwnerID: playlist.OwnerID, Title: playlist.Title, Description: playlist.Description, Revision: playlist.Revision, EntryCount: playlist.EntryCount}
+	return dto.MusicPlaylistDTO{PlaylistID: playlist.PlaylistID.String(), OwnerID: playlist.OwnerID, Title: playlist.Title, Description: playlist.Description, Revision: playlist.Revision, EntryCount: playlist.EntryCount, CoverAssetID: playlist.CoverAssetID}
 }
 
 func toMusicPlaylistPageDTO(page service.MusicPlaylistPage) dto.MusicPlaylistPageDTO {
