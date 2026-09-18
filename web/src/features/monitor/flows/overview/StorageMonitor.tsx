@@ -4,11 +4,11 @@ import {
   BookImage,
   ChevronDown,
   ChevronRight,
+  CircleAlert,
   Download,
   Folder,
   FolderOpen,
   HardDrive,
-  RefreshCw,
   X,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -18,7 +18,9 @@ import {
   useStorageDiagnostics,
   useStorageSupportBundle,
 } from "@/features/repositories";
-import { StorageStatusDot, StorageTargetDetail, storageItemSeverity } from "./StorageTargetDetail";
+import { StorageStatusDot, StorageTargetDetail } from "./StorageTargetDetail";
+import { storageItemSeverity } from "../../model/storageSeverity";
+import { MonitorFrame } from "./MonitorFrame";
 
 export function StorageMonitor() {
   const { t } = useI18n();
@@ -42,20 +44,14 @@ export function StorageMonitor() {
       repositoriesByLocation.set(parentID, repositories);
     }
 
-    const repositoryCount =
-      unlinkedRepositories.length +
-      locations.reduce(
-        (count, location) =>
-          count + (repositoriesByLocation.get(location.target_id ?? "")?.length ?? 0),
-        0,
-      );
+    // The tree is the enumeration of every target, so the tab no longer derives
+    // a second "N Storage Locations · M Repositories" tally for the heading.
     const attentionCount = items.filter((item) => storageItemSeverity(item) !== "healthy").length;
 
     return {
       locations,
       repositoriesByLocation,
       unlinkedRepositories,
-      repositoryCount,
       attentionCount,
     };
   }, [diagnostics.data?.items]);
@@ -93,51 +89,43 @@ export function StorageMonitor() {
   };
 
   return (
-    <div className="flex h-auto w-full min-w-0 max-w-full flex-col gap-4">
-      {diagnostics.isLoading ? (
-        <StorageSkeleton />
-      ) : diagnostics.isError ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
-          <StorageToolbar isFetching={diagnostics.isFetching} onRefresh={diagnostics.refetch} />
-          <div role="alert" className="alert alert-error alert-soft">
-            <AlertTriangle size={18} />
-            <span>
-              {t("monitor.storage.loadFailed", "Storage diagnostics could not be loaded.")}
-            </span>
-            <button type="button" className="btn btn-sm" onClick={() => void diagnostics.refetch()}>
-              {t("common.retry", "Retry")}
-            </button>
-          </div>
-        </div>
-      ) : hierarchy.locations.length === 0 && hierarchy.unlinkedRepositories.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
-          <StorageToolbar isFetching={diagnostics.isFetching} onRefresh={diagnostics.refetch} />
-          <div className="rounded-lg bg-base-100 p-6 text-center shadow-sm">
-            <HardDrive className="mx-auto size-8 text-base-content/30" />
-            <h3 className="mt-3 text-sm font-semibold">
-              {t("monitor.storage.emptyTitle", "No storage diagnostics")}
-            </h3>
-            <p className="mt-1 text-sm text-base-content/55">
-              {t(
-                "monitor.storage.emptyDescription",
-                "No registered storage targets are available.",
-              )}
-            </p>
-          </div>
+    <MonitorFrame
+      hasData={!!diagnostics.data}
+      isLoading={diagnostics.isLoading}
+      isFetching={diagnostics.isFetching}
+      onRefresh={() => void diagnostics.refetch()}
+      updatedAt={diagnostics.data?.generated_at}
+      error={
+        diagnostics.isError
+          ? t("monitor.storage.loadFailed", "Storage diagnostics could not be loaded.")
+          : undefined
+      }
+      actions={<SupportBundleButton />}
+    >
+      {hierarchy.locations.length === 0 && hierarchy.unlinkedRepositories.length === 0 ? (
+        <div className="min-h-80 py-16 text-center">
+          <HardDrive className="mx-auto size-8 text-base-content/30" />
+          <h3 className="mt-3 text-sm font-semibold">
+            {t("monitor.storage.emptyTitle", "No storage diagnostics")}
+          </h3>
+          <p className="mt-1 text-sm text-base-content/55">
+            {t("monitor.storage.emptyDescription", "No registered storage targets are available.")}
+          </p>
         </div>
       ) : (
-        <>
-          <StorageToolbar
-            isFetching={diagnostics.isFetching}
-            onRefresh={diagnostics.refetch}
-            generatedAt={diagnostics.data?.generated_at}
-            locationCount={hierarchy.locations.length}
-            repositoryCount={hierarchy.repositoryCount}
-            attentionCount={hierarchy.attentionCount}
-          />
-
+        <div className="space-y-3">
+          {/* 关注计数属于整个 Tab 而非某一列，所以提到主从区之上；健康时不作声，
+              陈旧快照也不得断言当前状态。 */}
+          {!diagnostics.isError && hierarchy.attentionCount > 0 && (
+            <p className="flex items-center gap-1.5 text-sm text-warning">
+              <CircleAlert className="size-4 shrink-0" aria-hidden />
+              {t("monitor.storage.attentionNeeded", "{{count}} targets need attention", {
+                count: hierarchy.attentionCount,
+              })}
+            </p>
+          )}
           {/* 主从区：左树独立滚动，右侧详情按内容自然展开 */}
-          <div className="relative grid h-auto w-full min-w-0 max-w-full grid-cols-1 items-stretch gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
+          <div className="relative grid h-auto w-full min-w-0 max-w-full grid-cols-1 items-stretch gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
             {/* 移动端：当前目标选择器 */}
             <div className="lg:hidden">
               <button
@@ -167,7 +155,7 @@ export function StorageMonitor() {
 
             {/* 移动端：Bottom Sheet 文件树 */}
             {mobileTreeOpen ? (
-              <div className="fixed inset-0 z-50 lg:hidden">
+              <div className="fixed inset-0 z-modal lg:hidden">
                 <button
                   type="button"
                   className="absolute inset-0 bg-base-content/20 backdrop-blur-[1px]"
@@ -235,34 +223,18 @@ export function StorageMonitor() {
               ) : null}
             </section>
           </div>
-        </>
+        </div>
       )}
-    </div>
+    </MonitorFrame>
   );
 }
 
-function StorageToolbar({
-  isFetching,
-  onRefresh,
-  generatedAt,
-  locationCount,
-  repositoryCount,
-  attentionCount,
-}: {
-  isFetching: boolean;
-  onRefresh: () => void;
-  generatedAt?: string;
-  locationCount?: number;
-  repositoryCount?: number;
-  attentionCount?: number;
-}) {
+function SupportBundleButton() {
   const { t } = useI18n();
   const supportBundle = useStorageSupportBundle();
-  const hasData = locationCount !== undefined;
-
   const downloadSupportBundle = async () => {
     const result = await supportBundle.refetch();
-    if (!result.data) return;
+    if (result.isError || !result.data) return;
     const blob = new Blob([JSON.stringify(result.data, null, 2)], {
       type: "application/json",
     });
@@ -275,69 +247,21 @@ function StorageToolbar({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-base-300 bg-base-100 px-4 py-3 shadow-sm">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        {hasData ? (
-          attentionCount === 0 ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
-              <span className="size-2 rounded-full bg-success" aria-hidden="true" />
-              {t("monitor.storage.allHealthy", "All storage targets are healthy")}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning">
-              <AlertTriangle className="size-4" />
-              {t("monitor.storage.attentionNeeded", "{{count}} targets need attention", {
-                count: attentionCount,
-              })}
-            </span>
-          )
-        ) : null}
-        <span className="text-xs text-base-content/50 tabular-nums">
-          {hasData
-            ? t(
-                "monitor.storage.summaryMeta",
-                "{{locations}} Storage Locations · {{repositories}} Repositories",
-                {
-                  locations: locationCount,
-                  repositories: repositoryCount,
-                },
-              )
-            : null}
-          {generatedAt
-            ? ` · ${t("monitor.storage.updated", "Checked {{time}}", {
-                time: formatTime(generatedAt, t("common.na")),
-              })}`
-            : null}
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm gap-2"
-          disabled={isFetching}
-          onClick={() => onRefresh()}
-        >
-          {isFetching ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <RefreshCw size={15} />
-          )}
-          {t("monitor.storage.refresh", "Refresh")}
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm gap-2"
-          disabled={supportBundle.isFetching}
-          onClick={() => void downloadSupportBundle()}
-        >
-          {supportBundle.isFetching ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <Download size={15} />
-          )}
-          {t("monitor.storage.download", "Download support bundle")}
-        </button>
-      </div>
+    <div>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        disabled={supportBundle.isFetching}
+        onClick={() => void downloadSupportBundle()}
+      >
+        <Download className="size-4" aria-hidden />
+        {t("monitor.storage.download", "Download support bundle")}
+      </button>
+      {supportBundle.isError && (
+        <p role="alert" className="text-xs text-error">
+          {t("monitor.storage.bundleFailed", "Support bundle could not be downloaded.")}
+        </p>
+      )}
     </div>
   );
 }
@@ -489,40 +413,4 @@ function TargetNav({
       </ul>
     </nav>
   );
-}
-
-function StorageSkeleton() {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4" aria-hidden="true">
-      <div className="flex items-center justify-between rounded-lg border border-base-300 bg-base-100 px-4 py-3 shadow-sm">
-        <div className="space-y-1.5">
-          <div className="skeleton h-3.5 w-44" />
-          <div className="skeleton h-3 w-32" />
-        </div>
-        <div className="flex gap-2">
-          <div className="skeleton h-7 w-20 rounded-field" />
-          <div className="skeleton h-7 w-36 rounded-field" />
-        </div>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
-        <div className="hidden w-80 shrink-0 space-y-2 rounded-box bg-base-200 p-3 shadow-sm lg:block">
-          {[0, 1, 2].map((item) => (
-            <div key={item} className="skeleton h-7 w-full rounded-field" />
-          ))}
-        </div>
-        <div className="min-h-0 flex-1 space-y-3 rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
-          <div className="skeleton h-5 w-40" />
-          <div className="skeleton h-3 w-2/3" />
-          <div className="skeleton mt-4 h-2 w-full max-w-md" />
-          <div className="skeleton mt-4 h-16 w-full" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatTime(value: string | undefined, emptyValue: string): string {
-  if (!value) return emptyValue;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }

@@ -1626,22 +1626,17 @@
     "adminOnlyDescription": "处理活动与运行时诊断仅对管理员开放。",
     "adminOnlyTitle": "需要管理员权限",
     "capabilities": {
-      "capabilityPending": "正在交换能力信息",
+      "capabilityPending": "正在检查支持的能力",
       "compatibility": "兼容性",
       "consecutiveFailures_one": "连续失败 {{count}} 次",
       "consecutiveFailures_other": "连续失败 {{count}} 次",
-      "diagnostic": "诊断信息",
       "discovery": {
         "degraded": "Lumen 发现服务状态异常",
-        "degradedDetail": "后端自动重试期间会保留此前发现的节点。",
         "disabled": "Lumen 发现服务已禁用",
-        "disabledDetail": "媒体管理仍可使用，但外部 ML 任务无法运行。",
-        "healthy": "Lumen 发现服务运行正常",
-        "healthyDetail": "定时发现任务独立运行，不依赖此页面。",
-        "starting": "Lumen 发现服务正在启动",
-        "startingDetail": "首次限时发现扫描尚未完成。"
+        "starting": "Lumen 发现服务正在启动"
       },
       "discoveryBackends": "发现后端",
+      "endpoint": "地址",
       "errors": {
         "capabilityUnimplemented": "节点未实现能力交换接口",
         "incompatible": "节点不兼容",
@@ -1658,14 +1653,18 @@
       },
       "lastObserved": "最近发现时间",
       "lastSuccess": "最近成功扫描",
-      "noCurrentNodes": "当前未发现已验证的 Lumen Hub",
-      "node": "节点",
-      "noNodes": "当前没有已广播且通过验证的 Lumen Hub",
-      "noNodesDetail": "稍后启动的 Hub 会被自动发现并验证，无需重启 Photos 或打开监控页面。",
-      "refreshStatus": "刷新状态",
+      "nextScan": "下次扫描",
+      "noAdvertisedTasks": "未报告支持的能力",
+      "nodeDetails": "连接详情",
+      "nodePages": "节点分页",
+      "noNodes": "未发现 Lumen 节点",
+      "orbitLabel": "Lumilio Photos 与 Lumen 节点",
+      "runtime": "运行时",
+      "scanCancelled": "上次扫描已取消",
+      "scanFailed": "上次扫描失败",
       "scanResults": "匹配 / 拒绝",
+      "scanTimedOut": "上次扫描超时",
       "source": "来源",
-      "state": "状态",
       "states": {
         "active": "活跃",
         "compatible": "兼容",
@@ -1680,30 +1679,30 @@
         "unavailable": "不可用",
         "unknown": "未知"
       },
-      "tasks": "已通告任务",
       "transport": "传输状态",
-      "validatedNodes": "已验证节点"
+      "version": "版本"
     },
     "delivery": {
       "active": "活跃投递",
       "cancelled": "已取消投递",
       "completed": "已完成投递",
       "description": "一个文件或一次扫描可能产生多次投递。这些记录不代表已完成的文件数或当前文件失败数。",
-      "discarded": "已丢弃投递",
-      "title": "队列投递记录"
+      "details": "统计详情",
+      "discarded": "已丢弃投递"
     },
     "ml": {
-      "allIndexed": "全部已索引",
+      "aboutCoverage": "关于覆盖率",
       "bioAlbumCoverage": "生物图鉴相册覆盖率",
       "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
-      "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
-      "existingPhotos": "现有照片",
-      "indexedAssets": "已索引",
+      "cellMeaning": "每格约为 1% 覆盖率，并非一个文件；不同任务的总数不同。",
+      "covered": "已覆盖",
+      "globalActivity": "全局活动",
       "loadError": "加载 ML 索引统计失败。",
-      "queuedJobs": "队列中",
-      "queuedMlJobs": "待处理 ML 任务",
+      "noApplicable": "暂无适用内容",
+      "pendingMedia": "待分析媒体",
+      "pendingRebuilds": "重建请求",
+      "rebuildFailed": "无法启动索引重建，请重试。",
       "reindex": "重建索引",
-      "reindexJobs": "待处理重建任务",
       "reindexModal": {
         "cancel": "取消",
         "confirm": "开始重建",
@@ -1717,23 +1716,21 @@
         "reindexAllCheckbox": "全量重建（而非仅补缺）",
         "title": "重建索引 — {{task}}"
       },
-      "remainingAssets": "剩余"
+      "uncovered": "未覆盖"
     },
     "processing": {
-      "failedAssets": "需要处理的文件",
-      "failedProjections_other": "需要处理的投影：{{count}}",
-      "failedRepositories_other": "需要处理的扫描：{{count}}",
-      "operations": "导入、重新索引和备份操作：{{pending}} 项待执行 · {{failed}} 项需要处理",
+      "attentionCount_other": "{{count}} 项需要关注",
+      "noData": "暂无数据",
       "pendingAssets": "待处理文件",
+      "pendingOperations": "待处理操作",
       "pendingProjections": "待执行投影工作",
       "pendingRepositories": "待扫描资源库",
-      "retryHint": "解决原因后，可重新处理这些文件。",
       "retryWaiting_other": "等待重试的阶段：{{count}}"
     },
     "queueSummary": {
       "copied": "已复制",
       "copyError": "复制错误",
-      "emptyDescription": "资源库有后台处理任务时，会显示在这里。",
+      "details": "详情",
       "emptyTitle": "当前没有需要关注的处理项",
       "errorAttempt": "尝试 {{current}} / {{max}}",
       "errorFallback": "没有记录错误信息。",
@@ -1743,7 +1740,6 @@
         "retryable": "将重试",
         "unknown": "需要关注"
       },
-      "fetchError": "加载处理活动失败。",
       "kinds": {
         "analyze_asset": "读取媒体信息",
         "backup_catalog": "创建目录备份",
@@ -1755,7 +1751,6 @@
         "transcode_media": "准备可播放媒体",
         "unknown": "其他后台任务 · {{name}}"
       },
-      "loading": "正在加载处理活动...",
       "metrics": {
         "attention": "需关注",
         "averageLatency": "平均总耗时",
@@ -1773,9 +1768,6 @@
           "description": "在共享资源限制下运行有界目录处理阶段。",
           "name": "目录处理"
         },
-        "default": {
-          "description": "资源库的后台处理。"
-        },
         "unknown": {
           "name": "其他处理 · {{name}}"
         }
@@ -1789,7 +1781,6 @@
         "settled": "安静",
         "working": "处理中"
       },
-      "subtitle": "按资源库后台处理模块聚合。",
       "time": {
         "daysAgo_one": "{{count}} 天前",
         "daysAgo_other": "{{count}} 天前",
@@ -1800,14 +1791,19 @@
         "minutesAgo_other": "{{count}} 分钟前",
         "never": "从未"
       },
-      "title": "处理活动",
-      "updated": "{{time}} 更新"
+      "title": "处理活动"
+    },
+    "snapshot": {
+      "diagnostics": "诊断详情",
+      "missing": "暂无可用快照。",
+      "selection": "所选详情",
+      "stale": "刷新失败。当前显示上次成功快照，最新状态未知。",
+      "updated": "上次成功：{{time}}"
     },
     "stats": {
       "fetchError": "获取队列统计失败"
     },
     "storage": {
-      "allHealthy": "所有存储目标均正常",
       "attentionNeeded_one": "{{count}} 个目标需要关注",
       "attentionNeeded_other": "{{count}} 个目标需要关注",
       "auditAction": "操作",
@@ -1819,10 +1815,11 @@
       "auditTarget": "目标",
       "auditTime": "时间",
       "auditTitle": "生命周期历史",
-      "capacityExplanation": "可写空间来自文件系统；当 macOS 将可清理的 APFS 空间计入可用空间时，这个数字可能更低。Lumilio 会保留安全预留空间，再接受新的写入。",
+      "budgetMeaning": "此写入预算由 Server 在保留安全预留空间后报告。",
+      "bundleFailed": "无法下载支持包。",
       "capacityHeading": "容量",
+      "capacityNote": "当 macOS 将可清理的 APFS 空间计入可用空间时，文件系统报告的可写空间可能低于 macOS 显示的数值。",
       "capacityUnknown": "容量不可用",
-      "capacityUsed": "已用容量",
       "caseBehavior": "大小写行为",
       "caseInsensitive": "不区分大小写",
       "caseSensitive": "区分大小写",
@@ -1833,18 +1830,19 @@
       "filesystem": "文件系统",
       "loadFailed": "无法加载存储诊断。",
       "lockHolder": "锁持有者",
+      "mapLegend": "容量图例",
       "marker": "标记身份",
       "mount": "挂载",
       "navLabel": "存储目标",
       "noRepositories": "此存储位置中没有已注册的资源库。",
       "readOnly": "只读",
-      "refresh": "刷新",
+      "reserveTarget": "预留目标为 {{target}}；图中仅显示当前实际保留的空间。",
       "riskCloudSync": "云同步目录",
       "riskMountChanged": "挂载身份已变化",
       "riskNetwork": "网络文件系统",
       "riskRemovable": "可移动存储",
       "safetyReserve": "安全预留",
-      "statAvailable": "当前可写",
+      "statAvailable": "文件系统可写",
       "statusActive": "可用",
       "statUsed": "已用",
       "statusIdentityError": "身份不匹配",
@@ -1852,18 +1850,11 @@
       "statusOffline": "离线",
       "statusRecoveryRequired": "需要恢复",
       "statusUnknown": "未知",
-      "summaryMeta": "{{locations}} 个存储位置 · {{repositories}} 个资源库",
       "technicalDetails": "技术详情",
       "totalCapacity": "共 {{total}}",
       "unlinkedTitle": "所属位置未知的资源库",
-      "updated": "检查于 {{time}}",
-      "uploadBudget": "可用于新写入"
-    },
-    "subtitles": {
-      "capabilities": "ML 服务发现与 LLM Agent 运行状态",
-      "ml": "ML 索引覆盖率与回填进度",
-      "queue": "集中查看资源库导入、预览图、AI 索引和后台整理进度",
-      "storage": "存储位置、资源库、容量、挂载和生命周期状态"
+      "uploadBudget": "可用于新写入",
+      "usedMeaning": "总容量减去文件系统报告的可写空间，不严格等于物理占用量。"
     },
     "tabs": {
       "capabilities": "能力",
@@ -2479,9 +2470,6 @@
     },
     "server": "服务器",
     "serverSettings": {
-      "activeNodes": "活跃节点",
-      "agentEnabled": "Agent 已启用",
-      "available": "可用",
       "backup": {
         "confirmDelete": "确定删除此备份吗？",
         "confirmNo": "取消",
@@ -2514,10 +2502,6 @@
         "true": "是"
       },
       "capabilitiesError": "加载能力状态失败。",
-      "configured": "已配置",
-      "disabled": "禁用",
-      "discoveredNodes": "已发现节点",
-      "enabled": "启用",
       "geocoding": {
         "description": "启用提供方后，照片坐标会发送到配置的端点；禁用时坐标保留在本地。",
         "endpointDescription": "请输入绝对 HTTP(S) URL。允许回环地址和私有网络地址。",
@@ -2537,21 +2521,15 @@
       },
       "healthCheckDescription": "控制应用程序检测服务器健康状态的频率。较低的数值会更频繁地更新，但可能增加网络使用量。",
       "healthCheckInterval": "健康检查间隔",
-      "llmTitle": "LLM Agent",
-      "mlTitle": "ML 服务",
-      "model": "模型",
       "presets": "预设值：",
-      "provider": "提供方",
       "refresh": "刷新",
       "reset": "重置",
       "runtimeInfoDescription": "当前生效的服务器配置。请在 TOML 中修改这些值并重启服务器。",
       "runtimeInfoLoadError": "运行时配置暂时不可用。",
       "runtimeInfoTitle": "运行时配置",
-      "taskAvailability": "任务可用性",
       "taskNames": {
         "bioClipClassify": "BioCLIP物种识别"
       },
-      "unavailable": "不可用",
       "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持资源库过滤时都会默认使用这个范围。",
       "workingRepositoryUnavailable": "资源库选项暂时不可用。"
     },

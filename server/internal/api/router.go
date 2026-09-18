@@ -158,8 +158,7 @@ type SpeciesControllerInterface interface {
 
 // QueueControllerInterface defines the interface for queue monitoring controllers
 type QueueControllerInterface interface {
-	GetQueueSummary(c *gin.Context)
-	GetJobStats(c *gin.Context)
+	GetProcessingMonitor(c *gin.Context)
 }
 
 // StatsControllerInterface defines the interface for statistics controllers
@@ -762,11 +761,7 @@ func NewRouter(
 			{
 				lumen.GET("/runtime", capabilitiesController.GetLumenRuntime)
 			}
-			river := admin.Group("/river")
-			{
-				river.GET("/queue-summary", queueController.GetQueueSummary)
-				river.GET("/stats", queueController.GetJobStats)
-			}
+			admin.GET("/monitor/processing", queueController.GetProcessingMonitor)
 		}
 
 		// Stats routes - with optional authentication

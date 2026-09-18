@@ -1,11 +1,22 @@
+import "@/styles/App.css";
 import { describe, expect, it } from "vite-plus/test";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
+import { t } from "@test/i18n";
 import type { components } from "@/lib/http-commons/schema";
 import type { LumenRuntime } from "../../api/useLumenRuntime";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
 
 type CapabilitiesResponse = components["schemas"]["dto.CapabilitiesResponseDTO"];
+
+/**
+ * Build a substring matcher from app copy without embedding the copy itself.
+ * Diagnostic cells combine a typed label with a failure count, so the locator
+ * must stay a partial match while remaining key-resolved.
+ */
+function copyPattern(value: string): RegExp {
+  return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+}
 
 const publicCapabilities: CapabilitiesResponse = {
   ml: {
@@ -82,20 +93,20 @@ describe("CapabilitiesMonitor", () => {
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
 
     try {
-      await expect.element(screen.getByText("Loading...", { exact: true })).toBeVisible();
+      await expect.element(screen.getByText(t("common.loading"), { exact: true })).toBeVisible();
     } finally {
       releaseSnapshots();
     }
-    await expect.element(screen.getByText("Lumen discovery is healthy")).toBeVisible();
+    await expect.element(screen.getByText(t("monitor.capabilities.noNodes"))).toBeVisible();
   });
 
   it("distinguishes a healthy zero-node scan from discovery failure", async () => {
     serve();
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
 
-    await expect.element(screen.getByText("Lumen discovery is healthy")).toBeVisible();
+    await expect.element(screen.getByText(t("monitor.capabilities.noNodes"))).toBeVisible();
     await expect
-      .element(screen.getByRole("heading", { name: "No validated Lumen Hubs are advertised" }))
+      .element(screen.getByText(t("monitor.capabilities.noNodes"), { exact: true }))
       .toBeVisible();
     await expect.element(screen.getByText("mdns", { exact: true })).toBeVisible();
   });
@@ -119,9 +130,17 @@ describe("CapabilitiesMonitor", () => {
     });
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
 
-    await expect.element(screen.getByText("Lumen discovery is degraded")).toBeVisible();
-    await expect.element(screen.getByText(/Discovery scan timed out/)).toBeVisible();
-    await expect.element(screen.getByText(/2 consecutive failures/)).toBeVisible();
+    await expect
+      .element(screen.getByText(t("monitor.capabilities.discovery.degraded")))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(copyPattern(t("monitor.capabilities.errors.queryTimedOut"))))
+      .toBeVisible();
+    await expect
+      .element(
+        screen.getByText(copyPattern(t("monitor.capabilities.consecutiveFailures", { count: 2 }))),
+      )
+      .toBeVisible();
   });
 
   it("shows a discovered node as capability-pending before routing", async () => {
@@ -141,11 +160,40 @@ describe("CapabilitiesMonitor", () => {
       ],
     });
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
+    await expect
+      .element(screen.getByRole("region", { name: t("monitor.snapshot.selection") }))
+      .not.toBeInTheDocument();
+    await screen.getByRole("group", { name: t("monitor.capabilities.orbitLabel") }).hover();
+    await screen
+      .getByRole("group", { name: t("monitor.capabilities.orbitLabel") })
+      .getByRole("button", { name: "lab-node-1", exact: false })
+      .click();
+    await screen.getByText(t("monitor.capabilities.nodeDetails"), { exact: true }).click();
 
-    await expect.element(screen.getByText("lab-node-1", { exact: true })).toBeVisible();
-    await expect.element(screen.getByText("Capability exchange pending")).toBeVisible();
-    await expect.element(screen.getByText("pending", { exact: true }).first()).toBeVisible();
-    await expect.element(screen.getByText("ready", { exact: true })).toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("group", { name: t("monitor.capabilities.orbitLabel") })
+          .getByText("lab-node-1", { exact: true }),
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: t("monitor.snapshot.selection") })
+          .getByText(t("monitor.capabilities.capabilityPending")),
+      )
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(t("monitor.capabilities.states.pending"), { exact: true }).first())
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: t("monitor.snapshot.selection") })
+          .getByText(t("monitor.capabilities.states.ready"), { exact: true }),
+      )
+      .toBeVisible();
   });
 
   it("shows incompatible nodes without presenting their tasks as available", async () => {
@@ -165,9 +213,28 @@ describe("CapabilitiesMonitor", () => {
       ],
     });
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
+    await expect
+      .element(screen.getByRole("region", { name: t("monitor.snapshot.selection") }))
+      .not.toBeInTheDocument();
+    await screen.getByRole("group", { name: t("monitor.capabilities.orbitLabel") }).hover();
+    await screen
+      .getByRole("group", { name: t("monitor.capabilities.orbitLabel") })
+      .getByRole("button", { name: "legacy-node", exact: false })
+      .click();
+    await screen.getByText(t("monitor.capabilities.nodeDetails"), { exact: true }).click();
 
-    await expect.element(screen.getByText("incompatible", { exact: true }).first()).toBeVisible();
-    await expect.element(screen.getByText("Protocol version is incompatible")).toBeVisible();
+    await expect
+      .element(
+        screen.getByText(t("monitor.capabilities.states.incompatible"), { exact: true }).first(),
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: t("monitor.snapshot.selection") })
+          .getByText(t("monitor.capabilities.errors.protocolIncompatible")),
+      )
+      .toBeVisible();
   });
 
   it("shows a compatible transport as active with canonical capability labels", async () => {
@@ -206,13 +273,36 @@ describe("CapabilitiesMonitor", () => {
       },
     );
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
-
-    await expect.element(screen.getByText("active", { exact: true })).toBeVisible();
     await expect
-      .element(screen.getByText("Image Semantic Analysis", { exact: true }))
+      .element(screen.getByRole("region", { name: t("monitor.snapshot.selection") }))
+      .not.toBeInTheDocument();
+    await screen.getByRole("group", { name: t("monitor.capabilities.orbitLabel") }).hover();
+    await screen
+      .getByRole("group", { name: t("monitor.capabilities.orbitLabel") })
+      .getByRole("button", { name: "active-node", exact: false })
+      .click();
+    await screen.getByText(t("monitor.capabilities.nodeDetails"), { exact: true }).click();
+
+    await expect
+      .element(
+        screen
+          .getByRole("group", { name: t("monitor.capabilities.orbitLabel") })
+          .getByText(t("monitor.capabilities.states.active"), { exact: true }),
+      )
       .toBeVisible();
-    await expect.element(screen.getByText("Person Recognition", { exact: true })).toBeVisible();
-    await expect.element(screen.getByText("siglip / semantic_image_embed")).toBeVisible();
+    await expect
+      .element(screen.getByText(t("settings.aiSettings.taskNames.semantic"), { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(t("settings.aiSettings.taskNames.face"), { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("region", { name: t("monitor.snapshot.selection") })
+          .getByText("siglip / semantic_image_embed", { exact: false }),
+      )
+      .toBeVisible();
   });
 
   it("refreshes an expired empty snapshot into a recovered active node", async () => {
@@ -242,12 +332,62 @@ describe("CapabilitiesMonitor", () => {
     );
     const screen = await renderWithProviders(<CapabilitiesMonitor />);
     await expect
-      .element(screen.getByRole("heading", { name: "No validated Lumen Hubs are advertised" }))
+      .element(screen.getByText(t("monitor.capabilities.noNodes"), { exact: true }))
       .toBeVisible();
 
     recovered = true;
-    await screen.getByRole("button", { name: "Refresh status" }).click();
-    await expect.element(screen.getByText("recovered-node", { exact: true })).toBeVisible();
-    await expect.element(screen.getByText("active", { exact: true })).toBeVisible();
+    await screen.getByRole("button", { name: t("settings.serverSettings.refresh") }).click();
+    await expect
+      .element(
+        screen
+          .getByRole("group", { name: t("monitor.capabilities.orbitLabel") })
+          .getByText("recovered-node", { exact: true }),
+      )
+      .toBeVisible();
+    await expect
+      .element(
+        screen
+          .getByRole("group", { name: t("monitor.capabilities.orbitLabel") })
+          .getByText(t("monitor.capabilities.states.active"), { exact: true }),
+      )
+      .toBeVisible();
   });
+});
+
+it.each(["disabled", "starting"] as const)(
+  "keeps %s discovery explicit with no nodes",
+  async (state) => {
+    serve({ ...healthyRuntime, discovery_state: state });
+    const screen = await renderWithProviders(<CapabilitiesMonitor />);
+    await expect
+      .element(screen.getByText(t(`monitor.capabilities.discovery.${state}`), { exact: true }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByText(t("monitor.capabilities.noNodes"), { exact: true }))
+      .toBeVisible();
+  },
+);
+
+it("marks a failed runtime refresh stale while retaining prior endpoint diagnostics", async () => {
+  let failed = false;
+  worker.use(
+    http.get("*/api/v1/capabilities", () => HttpResponse.json(publicCapabilities)),
+    http.get("*/api/v1/admin/lumen/runtime", () =>
+      failed
+        ? HttpResponse.json({ title: "Fixture failure" }, { status: 500 })
+        : HttpResponse.json(healthyRuntime),
+    ),
+  );
+  const screen = await renderWithProviders(<CapabilitiesMonitor />);
+  await expect
+    .element(screen.getByText(t("monitor.capabilities.noNodes"), { exact: true }))
+    .toBeVisible();
+  failed = true;
+  await screen
+    .getByRole("button", { name: t("settings.serverSettings.refresh"), exact: true })
+    .click();
+  await expect.element(screen.getByRole("alert")).toHaveTextContent(t("monitor.snapshot.stale"));
+  await expect
+    .element(screen.getByText(t("monitor.capabilities.noNodes"), { exact: true }))
+    .toBeVisible();
 });

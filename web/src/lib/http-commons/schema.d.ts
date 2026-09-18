@@ -42,7 +42,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/river/queue-summary": {
+    "/api/v1/admin/monitor/processing": {
         parameters: {
             query?: never;
             header?: never;
@@ -50,8 +50,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get queue summaries
-         * @description Get aggregated processing activity per queue, including recent error samples
+         * Get processing monitor snapshot
+         * @description Catalog pending work and disposable queue delivery diagnostics. Global scope; reads across Catalog and QueueDB are not an atomic transaction.
          */
         get: {
             parameters: {
@@ -63,11 +63,7 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
+            requestBody?: never;
             responses: {
                 /** @description OK */
                 200: {
@@ -75,50 +71,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["handler.QueueSummaryResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/river/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get job statistics
-         * @description Get current Catalog processing state and operational River delivery counts
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["handler.JobStatsResponse"];
+                        "application/json": components["schemas"]["handler.ProcessingMonitorResponse"];
                     };
                 };
             };
@@ -17812,6 +17765,16 @@ export interface components {
             data?: components["schemas"]["handler.CameraLensCombination"][];
             total?: number;
         };
+        "handler.DeliveryStatsDTO": {
+            available?: number;
+            cancelled?: number;
+            completed?: number;
+            discarded?: number;
+            queues?: components["schemas"]["handler.QueueSummaryDTO"][];
+            retryable?: number;
+            running?: number;
+            scheduled?: number;
+        };
         "handler.FocalLengthBucket": {
             count?: number;
             focal_length?: number;
@@ -17831,15 +17794,10 @@ export interface components {
             count?: number;
             date?: string;
         };
-        "handler.JobStatsResponse": {
-            available?: number;
-            cancelled?: number;
-            completed?: number;
-            discarded?: number;
+        "handler.ProcessingMonitorResponse": {
+            deliveries?: components["schemas"]["handler.DeliveryStatsDTO"];
+            generated_at?: string;
             processing?: components["schemas"]["handler.ProcessingStatsResponse"];
-            retryable?: number;
-            running?: number;
-            scheduled?: number;
         };
         "handler.ProcessingStatsResponse": {
             failed_assets?: number;
@@ -17876,10 +17834,6 @@ export interface components {
             remaining_jobs?: number;
             running_jobs?: number;
             total_jobs?: number;
-        };
-        "handler.QueueSummaryResponse": {
-            generated_at?: string;
-            queues?: components["schemas"]["handler.QueueSummaryDTO"][];
         };
         "handler.TimeBucket": {
             count?: number;

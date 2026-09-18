@@ -1,0 +1,190 @@
+.monitor-frame {
+  min-width: 0;
+  container-type: inline-size;
+}
+.monitor-frame button:focus-visible,
+.monitor-frame summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+.monitor-weave {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 1.5rem;
+}
+@container (min-width: 560px) {
+  .monitor-weave {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container (min-width: 960px) {
+  .monitor-weave {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.monitor-weave-field {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+  aspect-ratio: 1;
+  margin: 0.8rem 0;
+}
+.monitor-weave-field span {
+  background: var(--color-base-300);
+  border-radius: 1px;
+}
+.monitor-weave-field span[data-covered="true"] {
+  background: var(--color-primary);
+}
+.monitor-capacity-map {
+  height: 16rem;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-base-200);
+}
+.monitor-capacity-area {
+  position: absolute;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  container-type: size;
+}
+.monitor-capacity-area[data-selected="true"] {
+  box-shadow: inset 0 0 0 2px var(--color-base-content);
+}
+.monitor-capacity-label {
+  display: none;
+  height: 100%;
+  padding: 1rem;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+@container (min-width: 150px) and (min-height: 90px) {
+  .monitor-capacity-label {
+    display: flex;
+  }
+}
+.monitor-reserve {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-warning) 45%, var(--color-base-100)) 0 2px,
+    var(--color-base-200) 2px 8px
+  );
+}
+.monitor-orbit-workspace {
+  container-type: inline-size;
+}
+.monitor-orbit-stage {
+  overflow: hidden;
+}
+.monitor-orbit {
+  position: relative;
+  height: 440px;
+  container-type: size;
+}
+.monitor-orbit-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+.monitor-orbit-arm {
+  --radius: min(30cqw, 155px);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--radius) * 2);
+  height: calc(var(--radius) * 2);
+  margin: calc(-1 * var(--radius));
+  animation: monitor-orbit-spin 54s linear var(--orbit-delay) infinite;
+  pointer-events: none;
+  transform: rotate(var(--orbit-angle));
+}
+.monitor-orbit-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed color-mix(in srgb, var(--node-color) 28%, transparent);
+  border-radius: 50%;
+}
+.monitor-orbit-rider {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 0;
+  animation: monitor-orbit-upright 54s linear var(--orbit-delay) infinite;
+  transform: rotate(calc(-1 * var(--orbit-angle)));
+}
+.monitor-node {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: clamp(128px, 32cqw, 168px);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  border-color: color-mix(in srgb, var(--node-color) 55%, var(--color-base-300));
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+}
+.monitor-node[aria-pressed="true"] {
+  outline: 2px solid var(--node-color);
+  outline-offset: 4px;
+}
+.monitor-orbit:hover .monitor-orbit-arm,
+.monitor-orbit:hover .monitor-orbit-rider,
+.monitor-orbit:focus-within .monitor-orbit-arm,
+.monitor-orbit:focus-within .monitor-orbit-rider,
+.monitor-orbit[data-paused="true"] .monitor-orbit-arm,
+.monitor-orbit[data-paused="true"] .monitor-orbit-rider {
+  animation-play-state: paused;
+}
+.monitor-orbit-panel {
+  width: 100%;
+}
+@container (min-width: 760px) {
+  .monitor-orbit-stage {
+    margin-right: 18rem;
+    min-height: 500px;
+  }
+  .monitor-orbit {
+    height: 500px;
+  }
+  .monitor-orbit-panel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 17rem;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+}
+@keyframes monitor-orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes monitor-orbit-upright {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .monitor-frame *,
+  .monitor-frame *::before,
+  .monitor-frame *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

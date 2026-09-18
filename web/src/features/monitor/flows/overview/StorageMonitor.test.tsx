@@ -4,6 +4,14 @@ import { renderWithProviders } from "@test/render";
 import { t } from "@test/i18n";
 import { StorageMonitor } from "./StorageMonitor";
 
+/**
+ * Spec-owned fixture value. Legacy server names stay literal on purpose: this
+ * assertion proves that semantic identity wins over a raw `name`, so it must
+ * never be resolved through i18n. Every other literal in this file is either a
+ * fixture value or a filesystem path.
+ */
+const LEGACY_REPOSITORY_NAME = "Primary";
+
 describe("StorageMonitor", () => {
   it("groups repositories beneath their owning Storage Locations", async () => {
     worker.use(
@@ -24,7 +32,7 @@ describe("StorageMonitor", () => {
               ...diagnostic(
                 "repository",
                 "repo-primary",
-                "legacy primary name",
+                LEGACY_REPOSITORY_NAME,
                 "/storage/primary",
               ),
               parent_target_id: "root-primary",
@@ -37,20 +45,43 @@ describe("StorageMonitor", () => {
 
     const screen = await renderWithProviders(<StorageMonitor />);
 
+    // 标题不重复：Tab 名由路由表头承担，快照头只剩上次成功时间与操作
+    await expect
+      .element(screen.getByRole("heading", { name: t("monitor.tabs.storage"), exact: true }))
+      .not.toBeInTheDocument();
+    // 全部健康时不作声：既没有关注计数，也没有报平安的句子
+    await expect
+      .element(
+        screen.getByText(t("monitor.storage.attentionNeeded", { count: 1 }), { exact: true }),
+      )
+      .not.toBeInTheDocument();
+
     const primaryDetail = screen.getByRole("region", {
       name: t("productTerms.defaultStorageLocation"),
     });
     await expect.element(primaryDetail).toHaveClass(/h-auto/);
-    const capacityProgress = primaryDetail.getByRole("progressbar", { name: "Used capacity" });
-    await expect.element(capacityProgress).toHaveAttribute("aria-valuenow", "40");
+    const map = primaryDetail.getByRole("group", { name: t("monitor.storage.capacityHeading") });
+    await expect
+      .element(map.getByRole("button", { name: t("monitor.storage.statUsed"), exact: false }))
+      .toHaveAttribute("aria-pressed", "true");
     const repositoryList = primaryDetail.getByRole("list");
     await expect.element(repositoryList).toHaveClass(/h-auto/);
     await expect.element(repositoryList).toHaveClass(/overflow-y-auto/);
     await expect.element(repositoryList).toHaveClass(/border-0/);
     await expect
-      .element(primaryDetail.getByRole("heading", { name: "Technical details" }))
+      .element(primaryDetail.getByText(t("monitor.storage.technicalDetails"), { exact: true }))
       .toBeVisible();
-    await expect.element(primaryDetail.getByText("Total 976.56 KB", { exact: true })).toBeVisible();
+    // 容量告警留在默认收起的诊断里，不占首屏篇幅
+    await expect
+      .element(primaryDetail.getByText(t("monitor.storage.capacityNote"), { exact: true }))
+      .not.toBeVisible();
+    await expect
+      .element(
+        primaryDetail.getByText(t("monitor.storage.totalCapacity", { total: "976.56 KB" }), {
+          exact: false,
+        }),
+      )
+      .toBeVisible();
     await expect
       .element(primaryDetail.getByText("/storage/primary", { exact: true }))
       .toBeVisible();
@@ -66,7 +97,7 @@ describe("StorageMonitor", () => {
       primaryDetail.element()?.clientWidth ?? 0,
     );
 
-    const nav = screen.getByRole("navigation", { name: "Storage targets" });
+    const nav = screen.getByRole("navigation", { name: t("monitor.storage.navLabel") });
     await expect
       .element(nav.getByRole("button", { name: "Family Archive", exact: true }))
       .toBeVisible();
@@ -81,9 +112,13 @@ describe("StorageMonitor", () => {
       name: t("productTerms.primaryRepository"),
       exact: true,
     });
-    await expect.element(repositoryDetail.getByRole("heading", { name: "Capacity" })).toBeVisible();
     await expect
-      .element(repositoryDetail.getByRole("heading", { name: "Technical details" }))
+      .element(
+        repositoryDetail.getByRole("heading", { name: t("monitor.storage.capacityHeading") }),
+      )
+      .toBeVisible();
+    await expect
+      .element(repositoryDetail.getByText(t("monitor.storage.technicalDetails"), { exact: true }))
       .toBeVisible();
     await expect.element(repositoryDetail.getByRole("list")).not.toBeInTheDocument();
 
@@ -91,8 +126,9 @@ describe("StorageMonitor", () => {
     await nav.getByRole("button", { name: "Archive Disk", exact: true }).click();
     const archiveDetail = screen.getByRole("region", { name: "Archive Disk" });
     await expect.element(archiveDetail.getByText("Family Archive", { exact: true })).toBeVisible();
+    // 语义身份优先于服务器原始名称：rawName 不得作为显示名出现
     await expect
-      .element(archiveDetail.getByText("Primary", { exact: true }))
+      .element(archiveDetail.getByText(LEGACY_REPOSITORY_NAME, { exact: true }))
       .not.toBeInTheDocument();
   });
 
@@ -107,7 +143,12 @@ describe("StorageMonitor", () => {
               kind: "default",
             },
             {
-              ...diagnostic("repository", "repo-primary", "Primary", "/storage/primary"),
+              ...diagnostic(
+                "repository",
+                "repo-primary",
+                LEGACY_REPOSITORY_NAME,
+                "/storage/primary",
+              ),
               parent_target_id: "root-primary",
               role: "primary",
             },
@@ -117,7 +158,7 @@ describe("StorageMonitor", () => {
     );
 
     const screen = await renderWithProviders(<StorageMonitor />);
-    const nav = screen.getByRole("navigation", { name: "Storage targets" });
+    const nav = screen.getByRole("navigation", { name: t("monitor.storage.navLabel") });
     const repoRow = nav.getByRole("button", {
       name: t("productTerms.primaryRepository"),
       exact: true,
@@ -165,7 +206,11 @@ describe("StorageMonitor", () => {
     const screen = await renderWithProviders(<StorageMonitor />);
 
     await expect
-      .element(screen.getByText("Repositories without a known location", { exact: true }))
+      .element(
+        screen.getByText(t("monitor.storage.unlinkedTitle"), {
+          exact: true,
+        }),
+      )
       .toBeVisible();
     await expect.element(screen.getByRole("heading", { name: "Detached Archive" })).toBeVisible();
   });
@@ -187,3 +232,43 @@ function diagnostic(targetType: string, targetID: string, name: string, path: st
     risk_warnings: [],
   };
 }
+
+it("keeps read-only and mount risks visible, with stale data on a failed manual refresh", async () => {
+  let failed = false;
+  worker.use(
+    http.get("*/api/v1/repositories/storage-diagnostics", () =>
+      failed
+        ? HttpResponse.json({ title: "Fixture failure" }, { status: 500 })
+        : HttpResponse.json({
+            items: [
+              {
+                ...diagnostic("storage_location", "fixture-root", "Fixture disk", "/fixture"),
+                writable: false,
+                mount_fingerprint_changed: true,
+                risk_warnings: ["mount_fingerprint_changed"],
+              },
+            ],
+          }),
+    ),
+  );
+  const screen = await renderWithProviders(<StorageMonitor />);
+  await expect
+    .element(screen.getByText(t("monitor.storage.readOnly"), { exact: true }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByText(t("monitor.storage.riskMountChanged"), { exact: true }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByText(t("monitor.storage.attentionNeeded", { count: 1 }), { exact: true }))
+    .toBeVisible();
+  failed = true;
+  await screen
+    .getByRole("button", { name: t("settings.serverSettings.refresh"), exact: true })
+    .click();
+  await expect.element(screen.getByRole("alert")).toHaveTextContent(t("monitor.snapshot.stale"));
+  await expect.element(screen.getByRole("heading", { name: "Fixture disk" })).toBeVisible();
+  // 陈旧快照不得断言当前的关注状态
+  await expect
+    .element(screen.getByText(t("monitor.storage.attentionNeeded", { count: 1 }), { exact: true }))
+    .not.toBeInTheDocument();
+});

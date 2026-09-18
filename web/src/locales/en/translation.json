@@ -1644,22 +1644,17 @@
     "adminOnlyDescription": "Processing activity and runtime diagnostics are only available to administrators.",
     "adminOnlyTitle": "Admin access required",
     "capabilities": {
-      "capabilityPending": "Capability exchange pending",
+      "capabilityPending": "Checking supported capabilities",
       "compatibility": "Compatibility",
       "consecutiveFailures_one": "{{count}} consecutive failures",
       "consecutiveFailures_other": "{{count}} consecutive failures",
-      "diagnostic": "Diagnostic",
       "discovery": {
         "degraded": "Lumen discovery is degraded",
-        "degradedDetail": "Previous observations are preserved while the backend retries automatically.",
         "disabled": "Lumen discovery is disabled",
-        "disabledDetail": "Media management remains available, but external ML tasks cannot run.",
-        "healthy": "Lumen discovery is healthy",
-        "healthyDetail": "Scheduled discovery is running independently of this page.",
-        "starting": "Lumen discovery is starting",
-        "startingDetail": "The first bounded discovery scan has not completed yet."
+        "starting": "Lumen discovery is starting"
       },
       "discoveryBackends": "Discovery backends",
+      "endpoint": "Address",
       "errors": {
         "capabilityUnimplemented": "Capability exchange is not implemented",
         "incompatible": "Node is incompatible",
@@ -1676,14 +1671,18 @@
       },
       "lastObserved": "Last observed",
       "lastSuccess": "Last successful scan",
-      "noCurrentNodes": "No validated Lumen Hubs are currently visible",
-      "node": "Node",
-      "noNodes": "No validated Lumen Hubs are advertised",
-      "noNodesDetail": "A Hub that appears later will be discovered and validated without restarting Photos or opening Monitor.",
-      "refreshStatus": "Refresh status",
+      "nextScan": "Next scan",
+      "noAdvertisedTasks": "No supported capabilities reported",
+      "nodeDetails": "Connection details",
+      "nodePages": "Node pages",
+      "noNodes": "No Lumen nodes found",
+      "orbitLabel": "Lumilio Photos and Lumen nodes",
+      "runtime": "Runtime",
+      "scanCancelled": "Last scan cancelled",
+      "scanFailed": "Last scan failed",
       "scanResults": "Matched / rejected",
+      "scanTimedOut": "Last scan timed out",
       "source": "Source",
-      "state": "State",
       "states": {
         "active": "active",
         "compatible": "compatible",
@@ -1698,30 +1697,30 @@
         "unavailable": "unavailable",
         "unknown": "unknown"
       },
-      "tasks": "Advertised tasks",
       "transport": "Transport",
-      "validatedNodes": "Validated nodes"
+      "version": "Version"
     },
     "delivery": {
       "active": "Active deliveries",
       "cancelled": "Cancelled deliveries",
       "completed": "Completed deliveries",
       "description": "One file or scan can produce many deliveries. These records do not measure completed files or current file failures.",
-      "discarded": "Discarded deliveries",
-      "title": "Queue delivery records"
+      "details": "Statistics",
+      "discarded": "Discarded deliveries"
     },
     "ml": {
-      "allIndexed": "All indexed",
+      "aboutCoverage": "About coverage",
       "bioAlbumCoverage": "Bio album species coverage",
       "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
-      "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
-      "existingPhotos": "Existing photos",
-      "indexedAssets": "Indexed",
+      "cellMeaning": "Each cell ≈ 1% coverage, not one file. Task totals differ.",
+      "covered": "Covered",
+      "globalActivity": "Global activity",
       "loadError": "Failed to load ML indexing stats.",
-      "queuedJobs": "Queued",
-      "queuedMlJobs": "Queued ML jobs",
+      "noApplicable": "No applicable content",
+      "pendingMedia": "Media awaiting analysis",
+      "pendingRebuilds": "Reindex requests",
+      "rebuildFailed": "Rebuild could not be started. Try again.",
       "reindex": "Reindex",
-      "reindexJobs": "Queued reindex jobs",
       "reindexModal": {
         "cancel": "Cancel",
         "confirm": "Start reindex",
@@ -1735,26 +1734,23 @@
         "reindexAllCheckbox": "Reindex all (not just missing)",
         "title": "Reindex — {{task}}"
       },
-      "remainingAssets": "Remaining"
+      "uncovered": "Uncovered"
     },
     "processing": {
-      "failedAssets": "Files needing attention",
-      "failedProjections_one": "Projections needing attention: {{count}}",
-      "failedProjections_other": "Projections needing attention: {{count}}",
-      "failedRepositories_one": "Scans needing attention: {{count}}",
-      "failedRepositories_other": "Scans needing attention: {{count}}",
-      "operations": "Import, reindex and backup operations: {{pending}} pending · {{failed}} needing attention",
+      "attentionCount_one": "{{count}} needing attention",
+      "attentionCount_other": "{{count}} needing attention",
+      "noData": "No data",
       "pendingAssets": "Files awaiting processing",
+      "pendingOperations": "Pending operations",
       "pendingProjections": "Pending projection work",
       "pendingRepositories": "Repositories awaiting scan",
-      "retryHint": "Retry these files after resolving the cause.",
       "retryWaiting_one": "Stages waiting to retry: {{count}}",
       "retryWaiting_other": "Stages waiting to retry: {{count}}"
     },
     "queueSummary": {
       "copied": "Copied",
       "copyError": "Copy error",
-      "emptyDescription": "Background processing will appear here when Repositories have work to do.",
+      "details": "Details",
       "emptyTitle": "Nothing needs attention",
       "errorAttempt": "Attempt {{current}} / {{max}}",
       "errorFallback": "No error message was recorded.",
@@ -1764,7 +1760,6 @@
         "retryable": "Will retry",
         "unknown": "Needs attention"
       },
-      "fetchError": "Failed to load processing activity.",
       "kinds": {
         "analyze_asset": "Read media information",
         "backup_catalog": "Create catalog backup",
@@ -1776,7 +1771,6 @@
         "transcode_media": "Prepare playable media",
         "unknown": "Other background task · {{name}}"
       },
-      "loading": "Loading processing activity...",
       "metrics": {
         "attention": "Needs attention",
         "averageLatency": "Avg total time",
@@ -1794,9 +1788,6 @@
           "description": "Runs bounded catalog pipeline stages with shared resource limits.",
           "name": "Catalog processing"
         },
-        "default": {
-          "description": "Background work for the media collection."
-        },
         "unknown": {
           "name": "Other processing · {{name}}"
         }
@@ -1810,7 +1801,6 @@
         "settled": "Quiet",
         "working": "Working"
       },
-      "subtitle": "Grouped by the part of the media pipeline doing the work.",
       "time": {
         "daysAgo_one": "{{count}} day ago",
         "daysAgo_other": "{{count}} days ago",
@@ -1821,14 +1811,19 @@
         "minutesAgo_other": "{{count}} minutes ago",
         "never": "never"
       },
-      "title": "Processing activity",
-      "updated": "Updated {{time}}"
+      "title": "Processing activity"
+    },
+    "snapshot": {
+      "diagnostics": "Diagnostics",
+      "missing": "No snapshot is available.",
+      "selection": "Selected detail",
+      "stale": "Refresh failed. Showing the last successful snapshot; current state is unknown.",
+      "updated": "Last success {{time}}"
     },
     "stats": {
       "fetchError": "Failed to fetch queue stats"
     },
     "storage": {
-      "allHealthy": "All storage targets are healthy",
       "attentionNeeded_one": "{{count}} target needs attention",
       "attentionNeeded_other": "{{count}} targets need attention",
       "auditAction": "Action",
@@ -1840,10 +1835,11 @@
       "auditTarget": "Target",
       "auditTime": "Time",
       "auditTitle": "Lifecycle history",
-      "capacityExplanation": "Writable space comes from the filesystem and may be lower than the space shown by macOS when purgeable APFS storage is included. Lumilio keeps the safety reserve free before accepting new writes.",
+      "budgetMeaning": "The Server reports this write budget after keeping its safety reserve.",
+      "bundleFailed": "Support bundle could not be downloaded.",
       "capacityHeading": "Capacity",
+      "capacityNote": "The filesystem can report less writable space than macOS shows when purgeable APFS storage is included.",
       "capacityUnknown": "Capacity unavailable",
-      "capacityUsed": "Used capacity",
       "caseBehavior": "Case behavior",
       "caseInsensitive": "Case-insensitive",
       "caseSensitive": "Case-sensitive",
@@ -1854,18 +1850,19 @@
       "filesystem": "Filesystem",
       "loadFailed": "Storage diagnostics could not be loaded.",
       "lockHolder": "Lock holder",
+      "mapLegend": "Capacity legend",
       "marker": "Marker identity",
       "mount": "Mount",
       "navLabel": "Storage targets",
       "noRepositories": "No Repositories are registered in this Storage Location.",
       "readOnly": "Read-only",
-      "refresh": "Refresh",
+      "reserveTarget": "Reserve target {{target}}; the map shows only space currently retained.",
       "riskCloudSync": "Cloud-sync directory",
       "riskMountChanged": "Mount identity changed",
       "riskNetwork": "Network filesystem",
       "riskRemovable": "Removable storage",
       "safetyReserve": "Safety reserve",
-      "statAvailable": "Currently writable",
+      "statAvailable": "Filesystem writable",
       "statusActive": "Available",
       "statUsed": "Used",
       "statusIdentityError": "Identity mismatch",
@@ -1873,18 +1870,11 @@
       "statusOffline": "Offline",
       "statusRecoveryRequired": "Recovery required",
       "statusUnknown": "Unknown",
-      "summaryMeta": "{{locations}} Storage Locations · {{repositories}} Repositories",
       "technicalDetails": "Technical details",
       "totalCapacity": "Total {{total}}",
       "unlinkedTitle": "Repositories without a known location",
-      "updated": "Checked {{time}}",
-      "uploadBudget": "Available for new writes"
-    },
-    "subtitles": {
-      "capabilities": "Runtime ML discovery and LLM agent status",
-      "ml": "ML indexing coverage and reindex progress",
-      "queue": "Repository imports, previews, AI indexing, and background cleanup at a glance",
-      "storage": "Storage Location, Repository, capacity, mount, and lifecycle health."
+      "uploadBudget": "Available for new writes",
+      "usedMeaning": "Total minus filesystem-writable space; this is not strictly physical occupancy."
     },
     "tabs": {
       "capabilities": "Capabilities",
@@ -2509,9 +2499,6 @@
     },
     "server": "Server",
     "serverSettings": {
-      "activeNodes": "Active nodes",
-      "agentEnabled": "Agent enabled",
-      "available": "Available",
       "backup": {
         "confirmDelete": "Delete this backup?",
         "confirmNo": "Cancel",
@@ -2544,10 +2531,6 @@
         "true": "Yes"
       },
       "capabilitiesError": "Failed to load capabilities.",
-      "configured": "Configured",
-      "disabled": "Disabled",
-      "discoveredNodes": "Discovered nodes",
-      "enabled": "Enabled",
       "geocoding": {
         "description": "Enabling a provider sends photo coordinates to the configured endpoint; Disabled keeps them local.",
         "endpointDescription": "Use an absolute HTTP(S) URL. Loopback and private-network endpoints are allowed.",
@@ -2567,21 +2550,15 @@
       },
       "healthCheckDescription": "Control how often the app pings the server for health status. Lower values update more frequently but may increase network usage.",
       "healthCheckInterval": "Health check interval",
-      "llmTitle": "LLM Agent",
-      "mlTitle": "ML Services",
-      "model": "Model",
       "presets": "Presets:",
-      "provider": "Provider",
       "refresh": "Refresh",
       "reset": "Reset",
       "runtimeInfoDescription": "Effective server configuration. Change these values in TOML and restart the server.",
       "runtimeInfoLoadError": "Runtime configuration is temporarily unavailable.",
       "runtimeInfoTitle": "Runtime configuration",
-      "taskAvailability": "Task availability",
       "taskNames": {
         "bioClipClassify": "BioCLIP Species Recognition"
       },
-      "unavailable": "Unavailable",
       "workingRepositoryHint": "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support Repository filtering.",
       "workingRepositoryUnavailable": "Repository options are temporarily unavailable."
     },

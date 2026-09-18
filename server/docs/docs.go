@@ -10296,6 +10296,39 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "handler.DeliveryStatsDTO": {
+                "properties": {
+                    "available": {
+                        "type": "integer"
+                    },
+                    "cancelled": {
+                        "type": "integer"
+                    },
+                    "completed": {
+                        "type": "integer"
+                    },
+                    "discarded": {
+                        "type": "integer"
+                    },
+                    "queues": {
+                        "items": {
+                            "$ref": "#/components/schemas/handler.QueueSummaryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "retryable": {
+                        "type": "integer"
+                    },
+                    "running": {
+                        "type": "integer"
+                    },
+                    "scheduled": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "handler.FocalLengthBucket": {
                 "properties": {
                     "count": {
@@ -10354,31 +10387,16 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "handler.JobStatsResponse": {
+            "handler.ProcessingMonitorResponse": {
                 "properties": {
-                    "available": {
-                        "type": "integer"
+                    "deliveries": {
+                        "$ref": "#/components/schemas/handler.DeliveryStatsDTO"
                     },
-                    "cancelled": {
-                        "type": "integer"
-                    },
-                    "completed": {
-                        "type": "integer"
-                    },
-                    "discarded": {
-                        "type": "integer"
+                    "generated_at": {
+                        "type": "string"
                     },
                     "processing": {
                         "$ref": "#/components/schemas/handler.ProcessingStatsResponse"
-                    },
-                    "retryable": {
-                        "type": "integer"
-                    },
-                    "running": {
-                        "type": "integer"
-                    },
-                    "scheduled": {
-                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -10488,21 +10506,6 @@ const docTemplate = `{
                     },
                     "total_jobs": {
                         "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "handler.QueueSummaryResponse": {
-                "properties": {
-                    "generated_at": {
-                        "type": "string"
-                    },
-                    "queues": {
-                        "items": {
-                            "$ref": "#/components/schemas/handler.QueueSummaryDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -10647,9 +10650,9 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/admin/river/queue-summary": {
+        "/api/v1/admin/monitor/processing": {
             "get": {
-                "description": "Get aggregated processing activity per queue, including recent error samples",
+                "description": "Catalog pending work and disposable queue delivery diagnostics. Global scope; reads across Catalog and QueueDB are not an atomic transaction.",
                 "parameters": [
                     {
                         "description": "Recent error samples per queue (default: 5, max: 20)",
@@ -10660,58 +10663,19 @@ const docTemplate = `{
                         }
                     }
                 ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "200": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/handler.QueueSummaryResponse"
+                                    "$ref": "#/components/schemas/handler.ProcessingMonitorResponse"
                                 }
                             }
                         },
                         "description": "OK"
                     }
                 },
-                "summary": "Get queue summaries",
-                "tags": [
-                    "Queue"
-                ]
-            }
-        },
-        "/api/v1/admin/river/stats": {
-            "get": {
-                "description": "Get current Catalog processing state and operational River delivery counts",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/handler.JobStatsResponse"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "summary": "Get job statistics",
+                "summary": "Get processing monitor snapshot",
                 "tags": [
                     "Queue"
                 ]

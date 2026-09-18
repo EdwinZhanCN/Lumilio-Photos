@@ -1,6 +1,7 @@
 import { AlertTriangle, ChevronDown, History } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useLifecycleAudit } from "@/features/repositories";
+import { formatDiagnosticTime } from "../../model/time";
 
 /**
  * LifecycleHistory renders the durable administrative storage audit trail as a
@@ -62,7 +63,7 @@ export function LifecycleHistory() {
                 {(audit.data?.events ?? []).map((event) => (
                   <tr key={event.event_id} className="hover:bg-base-200/30">
                     <td className="whitespace-nowrap text-xs">
-                      {formatTime(event.occurred_at, t("common.na"))}
+                      {formatDiagnosticTime(event.occurred_at, t("common.na"))}
                     </td>
                     <td className="font-mono text-xs">{event.action || t("common.na")}</td>
                     <td className="text-xs">
@@ -104,10 +105,4 @@ function ResultBadge({ result }: { result?: string }) {
   return (
     <span className={`badge badge-sm badge-soft ${resultClass}`}>{result || t("common.na")}</span>
   );
-}
-
-function formatTime(value: string | undefined, emptyValue: string): string {
-  if (!value) return emptyValue;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }

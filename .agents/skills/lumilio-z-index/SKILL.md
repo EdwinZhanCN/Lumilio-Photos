@@ -35,6 +35,7 @@ Use the theme tokens defined in `web/src/styles/App.css` `@theme inline`:
 | `z-overlay` | 300 | FABs, application drawers, floating docks, drag overlays |
 | `z-modal` | 400 | Modals and modal bottom-sheets |
 | `z-lightbox` | 500 | Fullscreen viewers (AssetViewer, PublicShareLightbox) |
+| `z-agent` | 550 | Lumilio ChatDock expanded body, above viewers but below tooltips |
 | `z-tooltip` | 600 | Portaled tooltips/popovers that escape a lightbox |
 | `z-toast` | 700 | App-wide notifications above other document-layer floating UI |
 

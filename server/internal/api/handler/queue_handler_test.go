@@ -3,8 +3,11 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"server/internal/db/catalogtx"
@@ -35,6 +38,25 @@ func TestQueueHandlerLoadQueueSummariesRunsAgainstMigratedSQLiteSchema(t *testin
 	summaries, err := NewQueueHandler(database.SQL, database.ReaderSQL).loadQueueSummaries(ctx)
 	require.NoError(t, err)
 	require.Empty(t, summaries)
+
+	// The combined HTTP contract includes both data domains, including empty queues.
+	recorder := httptest.NewRecorder()
+	requestContext, _ := gin.CreateTestContext(recorder)
+	requestContext.Request = httptest.NewRequest("GET", "/api/v1/admin/monitor/processing?error_limit=0", nil)
+	NewQueueHandler(database.SQL, database.ReaderSQL).GetProcessingMonitor(requestContext)
+	require.Equal(t, 200, recorder.Code, recorder.Body.String())
+	var response ProcessingMonitorResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.False(t, response.GeneratedAt.IsZero())
+	require.NotNil(t, response.Deliveries.Queues)
+	require.Zero(t, response.Deliveries.Completed)
+	require.Zero(t, response.Processing.PendingAssets)
+	var shape map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &shape))
+	require.Contains(t, shape, "processing")
+	require.Contains(t, shape, "deliveries")
+	require.NotContains(t, shape, "completed")
+
 }
 
 func TestProcessingStatsCountCurrentFilesInsteadOfStagesOrDeliveryHistory(t *testing.T) {

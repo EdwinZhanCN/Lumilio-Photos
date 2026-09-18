@@ -1,10 +1,17 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, Copy, HardDrive } from "lucide-react";
 import { useMessage } from "@/features/notifications";
 import { getStorageEntityDisplayName, type StorageDiagnostic } from "@/features/repositories";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/lib/i18n";
-import { formatBytes } from "@/lib/utils/formatters";
+import { CapacityMap } from "./CapacityMap";
+import { MonitorDiagnostics } from "./MonitorFrame";
+import {
+  reachabilityLabel,
+  riskLabel,
+  storageItemSeverity,
+  storageRiskKeys,
+} from "../../model/storageSeverity";
 
 export function StorageTargetDetail({
   item,
@@ -18,9 +25,10 @@ export function StorageTargetDetail({
   }
 
   return (
-    <StorageInformationView item={item}>
+    <StorageInformationView item={item} titleMeta={<StorageTitleMeta item={item} />}>
       <div className="grid w-full min-w-0 content-start gap-3">
         <CapacityPanel item={item} />
+        <StorageRiskPanels item={item} />
         <TechnicalDetailsPanel item={item} />
       </div>
     </StorageInformationView>
@@ -43,11 +51,8 @@ function StorageInformationView({
   const displayName = getStorageEntityDisplayName(item, t);
 
   return (
-    <section
-      aria-labelledby={headingID}
-      className="card h-auto w-full min-w-0 max-w-full rounded-box border border-base-300 bg-base-100 shadow-sm"
-    >
-      <div className="card-body h-auto w-full min-w-0 max-w-full gap-3 p-4 sm:p-5">
+    <section aria-labelledby={headingID} className="h-auto w-full min-w-0 max-w-full bg-base-100">
+      <div className="h-auto w-full min-w-0 max-w-full space-y-4">
         <header className="flex w-full min-w-0 items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -97,16 +102,7 @@ function StorageLocationDetail({
   return (
     <StorageInformationView
       item={item}
-      titleMeta={
-        <>
-          <StorageStatusBadge item={item} />
-          {item.writable === false ? (
-            <span className="badge badge-ghost badge-sm">
-              {t("monitor.storage.readOnly", "Read-only")}
-            </span>
-          ) : null}
-        </>
-      }
+      titleMeta={<StorageTitleMeta item={item} />}
       headerAside={
         <div className="shrink-0 text-right">
           <p className="text-base font-semibold tabular-nums">{repositories.length}</p>
@@ -116,7 +112,9 @@ function StorageLocationDetail({
         </div>
       }
     >
-      <div className="grid w-full min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)] lg:items-stretch">
+      <CapacityPanel item={item} />
+      <StorageRiskPanels item={item} />
+      <div className="grid w-full min-w-0 items-start gap-4">
         <section className="flex h-auto min-h-28 min-w-0 max-h-[60dvh] w-full max-w-full flex-col rounded-box border border-base-300 bg-base-100 p-3 lg:h-full lg:min-h-0 lg:max-h-none">
           <SectionLabel>{t("manage.repositories.title", "Repositories")}</SectionLabel>
           <ul className="m-0 mt-2 flex h-auto min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain border-0 bg-transparent p-0">
@@ -173,7 +171,6 @@ function StorageLocationDetail({
         </section>
 
         <div className="grid w-full min-w-0 max-w-full content-start gap-3 self-start">
-          <CapacityPanel item={item} />
           <TechnicalDetailsPanel item={item} />
         </div>
       </div>
@@ -189,12 +186,27 @@ function SectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
+/** Reachability and writability, owned once for both detail bodies. */
+function StorageTitleMeta({ item }: { item: StorageDiagnostic }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <StorageStatusBadge item={item} />
+      {item.writable === false && (
+        <span className="badge badge-ghost badge-sm">
+          {t("monitor.storage.readOnly", "Read-only")}
+        </span>
+      )}
+    </>
+  );
+}
+
 function CapacityPanel({ item }: { item: StorageDiagnostic }) {
   const { t } = useI18n();
   return (
-    <section className="h-auto w-full min-w-0 max-w-full rounded-box border border-base-300 bg-base-100 p-3">
+    <section className="h-auto w-full min-w-0 max-w-full space-y-3">
       <SectionLabel>{t("monitor.storage.capacityHeading", "Capacity")}</SectionLabel>
-      <CapacityDonut item={item} />
+      <CapacityMap key={item.target_id} item={item} />
     </section>
   );
 }
@@ -202,96 +214,16 @@ function CapacityPanel({ item }: { item: StorageDiagnostic }) {
 function TechnicalDetailsPanel({ item }: { item: StorageDiagnostic }) {
   const { t } = useI18n();
   return (
-    <section className="h-auto w-full min-w-0 max-w-full rounded-box border border-base-300 bg-base-100 p-4">
-      <SectionLabel>{t("monitor.storage.technicalDetails", "Technical details")}</SectionLabel>
+    <MonitorDiagnostics title={t("monitor.storage.technicalDetails", "Technical details")}>
       <TechnicalDetails item={item} />
-      <StorageRiskPanels item={item} />
-    </section>
-  );
-}
-
-function CapacityDonut({ item }: { item: StorageDiagnostic }) {
-  const { t } = useI18n();
-  if (!item.capacity_known) {
-    return (
-      <p className="mt-2 text-center text-sm text-base-content/50">
-        {t("monitor.storage.capacityUnknown", "Capacity unavailable")}
+      {/* 容量读数的告警：唯一无法从其他位置读出的容量事实，留在可展开的诊断里 */}
+      <p className="text-xs text-base-content/60">
+        {t(
+          "monitor.storage.capacityNote",
+          "The filesystem can report less writable space than macOS shows when purgeable APFS storage is included.",
+        )}
       </p>
-    );
-  }
-
-  const usedPercent = Math.round(capacityUsedPercent(item));
-  const usedBytes = Math.max(0, (item.total_bytes ?? 0) - (item.available_bytes ?? 0));
-  const safetyMargin = item.safety_margin_bytes ?? 0;
-  const writableBudget = item.writable_budget_bytes ?? 0;
-  const ringTone =
-    usedPercent >= 90 ? "text-error" : usedPercent >= 80 ? "text-warning" : "text-primary";
-
-  return (
-    <div className="mx-auto mt-2 flex w-full min-w-0 max-w-xl flex-wrap items-center justify-center gap-4">
-      <div
-        role="progressbar"
-        aria-label={t("monitor.storage.capacityUsed", "Used capacity")}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={usedPercent}
-        className={`radial-progress shrink-0 text-sm font-semibold tabular-nums ${ringTone}`}
-        style={
-          {
-            "--value": usedPercent,
-            "--size": "5.5rem",
-            "--thickness": "0.55rem",
-          } as CSSProperties
-        }
-      >
-        {usedPercent}%
-      </div>
-
-      <div className="min-w-0 space-y-2 text-xs">
-        <CapacityLegend
-          color="bg-primary"
-          label={t("monitor.storage.statUsed", "Used")}
-          value={formatBytes(usedBytes)}
-        />
-        <CapacityLegend
-          color="bg-base-300"
-          label={t("monitor.storage.statAvailable", "Currently writable")}
-          value={formatBytes(item.available_bytes ?? 0)}
-        />
-        <CapacityLegend
-          color="bg-warning"
-          label={t("monitor.storage.safetyReserve", "Safety reserve")}
-          value={formatBytes(safetyMargin)}
-        />
-        <CapacityLegend
-          color="bg-success"
-          label={t("monitor.storage.uploadBudget", "Available for new writes")}
-          value={formatBytes(writableBudget)}
-        />
-        <p className="tabular-nums text-base-content/50">
-          {t("monitor.storage.totalCapacity", "Total {{total}}", {
-            total: formatBytes(item.total_bytes ?? 0),
-          })}
-        </p>
-        <p className="max-w-sm text-base-content/50">
-          {t(
-            "monitor.storage.capacityExplanation",
-            "Writable space comes from the filesystem and may be lower than the space shown by macOS when purgeable APFS storage is included. Lumilio keeps the safety reserve free before accepting new writes.",
-          )}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function CapacityLegend({ color, label, value }: { color: string; label: string; value: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-1.5 text-base-content/65">
-      <span className={`size-2.5 shrink-0 rounded-full ${color}`} aria-hidden="true" />
-      <span className="truncate">
-        {label} <span className="tabular-nums">{value}</span>
-      </span>
-    </div>
+    </MonitorDiagnostics>
   );
 }
 
@@ -358,23 +290,19 @@ function TechnicalDetails({ item }: { item: StorageDiagnostic }) {
 
 function StorageRiskPanels({ item }: { item: StorageDiagnostic }) {
   const { t } = useI18n();
-  const risks = new Set(item.risk_warnings ?? []);
-  if (item.removable_likely) risks.add("removable_storage");
-  if (item.network_filesystem) risks.add("network_filesystem");
-  if (item.cloud_sync_provider) risks.add("cloud_sync_directory");
-  if (item.mount_fingerprint_changed) risks.add("mount_fingerprint_changed");
+  const risks = storageRiskKeys(item);
 
-  if (risks.size === 0) return null;
+  if (risks.length === 0) return null;
 
   return (
     <div className="mt-2 space-y-1.5">
-      {[...risks].map((risk) => (
+      {risks.map((risk) => (
         <div
           key={risk}
           className="flex min-w-0 items-center gap-2 rounded-field bg-base-200/60 px-3 py-2 text-xs font-medium text-primary"
         >
           <HardDrive className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          <span className="min-w-0">{riskLabel(risk, t)}</span>
+          <span className="min-w-0">{riskLabel(t, risk)}</span>
         </div>
       ))}
     </div>
@@ -407,58 +335,7 @@ function StorageStatusBadge({ item }: { item: StorageDiagnostic }) {
         : "badge-error";
   return (
     <span className={`badge badge-sm badge-soft ${tone} shrink-0`}>
-      {reachabilityLabel(item.reachability, t)}
+      {reachabilityLabel(t, item.reachability)}
     </span>
   );
-}
-
-export function storageItemSeverity(item: StorageDiagnostic): "healthy" | "warning" | "error" {
-  if (
-    item.reachability === "offline" ||
-    item.reachability === "identity_error" ||
-    item.reachability === "recovery_required"
-  ) {
-    return "error";
-  }
-  if (!isStorageHealthy(item) || (item.risk_warnings ?? []).length > 0) {
-    return "warning";
-  }
-  return "healthy";
-}
-
-function isStorageHealthy(item: StorageDiagnostic): boolean {
-  return item.reachability === "active" && item.writable !== false;
-}
-
-function capacityUsedPercent(item: StorageDiagnostic): number {
-  if (!item.capacity_known || !item.total_bytes || item.total_bytes <= 0) return 0;
-  const available = Math.max(0, item.available_bytes ?? 0);
-  return Math.min(100, Math.max(0, ((item.total_bytes - available) / item.total_bytes) * 100));
-}
-
-function reachabilityLabel(value: string | undefined, t: ReturnType<typeof useI18n>["t"]): string {
-  switch (value) {
-    case "active":
-      return t("monitor.storage.statusActive", "Available");
-    case "maintenance":
-      return t("monitor.storage.statusMaintenance", "Maintenance");
-    case "offline":
-      return t("monitor.storage.statusOffline", "Offline");
-    case "identity_error":
-      return t("monitor.storage.statusIdentityError", "Identity mismatch");
-    case "recovery_required":
-      return t("monitor.storage.statusRecoveryRequired", "Recovery required");
-    default:
-      return value || t("monitor.storage.statusUnknown", "Unknown");
-  }
-}
-
-function riskLabel(risk: string, t: ReturnType<typeof useI18n>["t"]): string {
-  const labels: Record<string, string> = {
-    removable_storage: t("monitor.storage.riskRemovable", "Removable storage"),
-    network_filesystem: t("monitor.storage.riskNetwork", "Network filesystem"),
-    cloud_sync_directory: t("monitor.storage.riskCloudSync", "Cloud-sync directory"),
-    mount_fingerprint_changed: t("monitor.storage.riskMountChanged", "Mount identity changed"),
-  };
-  return labels[risk] ?? risk;
 }
