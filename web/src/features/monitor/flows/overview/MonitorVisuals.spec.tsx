@@ -6,7 +6,6 @@ import { t } from "@test/i18n";
 import type { components } from "@/lib/http-commons/schema";
 import { MLMonitor } from "./MLMonitor";
 import { StatMonitor } from "./StatMonitor";
-import { StorageMonitor } from "./StorageMonitor";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
 import "@/styles/App.css";
 
@@ -88,7 +87,7 @@ function serve() {
         },
       }),
     ),
-    http.get("*/api/v1/repositories/storage-diagnostics", () =>
+    http.get("*/api/v1/storage/diagnostics", () =>
       HttpResponse.json({
         generated_at: "2026-09-12T06:00:00Z",
         items: [
@@ -200,9 +199,6 @@ for (const theme of ["light", "dark"])
       }
       await capture("processing");
       await screen.unmount();
-      screen = await renderWithProviders(wrap(<StorageMonitor />));
-      await expect.element(screen.getByRole("heading", { name: "Archive Disk" })).toBeVisible();
-      await capture("storage");
       await screen.unmount();
       screen = await renderWithProviders(wrap(<CapabilitiesMonitor />));
       const orbit = screen.getByRole("group", { name: t("monitor.capabilities.orbitLabel") });

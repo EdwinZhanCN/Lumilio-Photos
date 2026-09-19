@@ -57,29 +57,6 @@ type RebuildAssetIndexesResponseDTO struct {
 	RepositoryID   *string  `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
-type IndexingRepositoryOptionDTO struct {
-	ID   string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name string `json:"name" example:"Family Repository"`
-	// Path is only populated for admin callers; repository filesystem
-	// locations are never exposed to regular users.
-	Path string `json:"path,omitempty" example:"/Volumes/Media/Photos"`
-	Role string `json:"role" example:"regular"`
-	// RootID identifies the parent Storage Location so clients can derive an
-	// effective state with parent reachability taking priority.
-	RootID string `json:"root_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	// Reachability lets a selector keep an unreachable repository visible as a
-	// browse filter while refusing it as an upload target. Activity is separate
-	// so scanning never masks storage availability.
-	Reachability string `json:"reachability" example:"active"`
-	Activity     string `json:"activity" example:"idle"`
-	PauseReason  string `json:"pause_reason,omitempty" example:"low_space"`
-	IsPrimary    bool   `json:"is_primary" example:"false"`
-}
-
-type IndexingRepositoryListResponseDTO struct {
-	Repositories []IndexingRepositoryOptionDTO `json:"repositories"`
-}
-
 type AssetIndexingTaskStatsDTO struct {
 	IndexedCount int `json:"indexed_count" example:"1200"`
 	QueuedJobs   int `json:"queued_jobs" example:"12"`

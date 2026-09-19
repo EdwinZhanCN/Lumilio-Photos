@@ -1,6 +1,6 @@
 # Cloud
 
-Cloud is an API capability shared by Settings, Repositories, and Manage. It
+Cloud is an API capability shared by Settings and admin Storage. It
 owns provider descriptors, authenticated cloud credentials, repository
 bindings, explicit import runs, and the repository source-management flow.
 
@@ -24,10 +24,10 @@ flowchart TD
     IMPORT --> API
 ```
 
-Settings composes provider and credential setup. After repository creation,
-[CloudSourcesModal](./flows/repository-sources/CloudSourcesModal.tsx) binds one or more connected accounts (including a
-provider-specific remote scope), renders their durable receipts, and starts,
-cancels, or resumes repository-scoped imports.
+Settings composes provider and credential setup. Admin Storage opens
+[CloudSourcesModal](./flows/repository-sources/CloudSourcesModal.tsx) to bind one or more connected accounts (including a
+provider-specific remote scope), render their durable receipts, and start,
+cancel, or resume repository-scoped imports.
 
 ## Data
 

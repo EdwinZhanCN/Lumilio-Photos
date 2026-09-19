@@ -188,12 +188,45 @@ type AssetPipelineFailure struct {
 	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type AssetPipelineReceiptStage struct {
+	ReceiptID      string    `db:"receipt_id" json:"receipt_id"`
+	AssetID        uuid.UUID `db:"asset_id" json:"asset_id"`
+	Stage          string    `db:"stage" json:"stage"`
+	DesiredVersion int64     `db:"desired_version" json:"desired_version"`
+}
+
+type AssetPipelineState struct {
+	AssetID         uuid.UUID         `db:"asset_id" json:"asset_id"`
+	SourceContentID string            `db:"source_content_id" json:"source_content_id"`
+	Stage           string            `db:"stage" json:"stage"`
+	PipelineVersion string            `db:"pipeline_version" json:"pipeline_version"`
+	DesiredVersion  int64             `db:"desired_version" json:"desired_version"`
+	AppliedVersion  int64             `db:"applied_version" json:"applied_version"`
+	Priority        int64             `db:"priority" json:"priority"`
+	TerminalError   *string           `db:"terminal_error" json:"terminal_error"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type AssetQualityScore struct {
 	AssetID      uuid.UUID         `db:"asset_id" json:"asset_id"`
 	Score        float64           `db:"score" json:"score"`
 	ModelVersion string            `db:"model_version" json:"model_version"`
 	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type AssetReindexRequest struct {
+	ReceiptID         string            `db:"receipt_id" json:"receipt_id"`
+	RepositoryID      uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Tasks             string            `db:"tasks" json:"tasks"`
+	PageLimit         int64             `db:"page_limit" json:"page_limit"`
+	Cursor            *string           `db:"cursor" json:"cursor"`
+	MissingOnly       int64             `db:"missing_only" json:"missing_only"`
+	ResetSemantic     int64             `db:"reset_semantic" json:"reset_semantic"`
+	Priority          int64             `db:"priority" json:"priority"`
+	RequestedRevision int64             `db:"requested_revision" json:"requested_revision"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type AssetSearchFt struct {
@@ -234,6 +267,24 @@ type AuthSecurityVerification struct {
 	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	ExpiresAt      dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 	ConsumedAt     *int64            `db:"consumed_at" json:"consumed_at"`
+}
+
+type CatalogBackupRequest struct {
+	ReceiptID string `db:"receipt_id" json:"receipt_id"`
+	Force     int64  `db:"force" json:"force"`
+	Priority  int64  `db:"priority" json:"priority"`
+}
+
+type CatalogOperationReceipt struct {
+	ReceiptID      string            `db:"receipt_id" json:"receipt_id"`
+	Kind           string            `db:"kind" json:"kind"`
+	SubjectID      string            `db:"subject_id" json:"subject_id"`
+	DesiredVersion int64             `db:"desired_version" json:"desired_version"`
+	AppliedVersion int64             `db:"applied_version" json:"applied_version"`
+	State          string            `db:"state" json:"state"`
+	TerminalError  *string           `db:"terminal_error" json:"terminal_error"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type ClassifierDefinition struct {
@@ -440,6 +491,17 @@ type EventOwnerState struct {
 	RebuildLeaseExpiresAt  *int64            `db:"rebuild_lease_expires_at" json:"rebuild_lease_expires_at"`
 }
 
+type EventProjectionPipelineState struct {
+	OwnerID           int32             `db:"owner_id" json:"owner_id"`
+	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
+	ProjectionVersion int64             `db:"projection_version" json:"projection_version"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	Priority          int64             `db:"priority" json:"priority"`
+	Cursor            *string           `db:"cursor" json:"cursor"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type EventRebuildRun struct {
 	RunID             uuid.UUID         `db:"run_id" json:"run_id"`
 	OwnerID           int32             `db:"owner_id" json:"owner_id"`
@@ -609,11 +671,28 @@ type LocationClusterAsset struct {
 	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
+type LocationProjectionReceiptScope struct {
+	ReceiptID       string    `db:"receipt_id" json:"receipt_id"`
+	RepositoryID    uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID         int32     `db:"owner_id" json:"owner_id"`
+	DesiredRevision int64     `db:"desired_revision" json:"desired_revision"`
+}
+
 type LocationProjectionState struct {
 	RepositoryID      uuid.UUID         `db:"repository_id" json:"repository_id"`
 	OwnerID           int32             `db:"owner_id" json:"owner_id"`
 	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
 	PublishedRevision int64             `db:"published_revision" json:"published_revision"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
+}
+
+type LocationResolutionPipelineState struct {
+	Scope             string            `db:"scope" json:"scope"`
+	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
+	ProjectionVersion int64             `db:"projection_version" json:"projection_version"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
 	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
@@ -808,6 +887,16 @@ type OcrIndexOutbox struct {
 	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type OcrProjectionPipelineState struct {
+	Scope             string            `db:"scope" json:"scope"`
+	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
+	ProjectionVersion int64             `db:"projection_version" json:"projection_version"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	Cursor            *string           `db:"cursor" json:"cursor"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type OcrResult struct {
 	AssetID          uuid.UUID         `db:"asset_id" json:"asset_id"`
 	ModelID          string            `db:"model_id" json:"model_id"`
@@ -850,19 +939,19 @@ type RefreshToken struct {
 }
 
 type Repository struct {
-	RepoID         uuid.UUID                      `db:"repo_id" json:"repo_id"`
-	Name           string                         `db:"name" json:"name"`
-	Path           string                         `db:"path" json:"path"`
-	Config         repocfg.RepositoryConfig       `db:"config" json:"config"`
-	Reachability   dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
-	Activity       dbtypes.RepositoryActivity     `db:"activity" json:"activity"`
-	PauseReason    string                         `db:"pause_reason" json:"pause_reason"`
-	LastSync       dbtypes.Timestamp              `db:"last_sync" json:"last_sync"`
-	CreatedAt      dbtypes.Timestamp              `db:"created_at" json:"created_at"`
-	UpdatedAt      dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
-	DefaultOwnerID *int32                         `db:"default_owner_id" json:"default_owner_id"`
-	Role           dbtypes.RepoRole               `db:"role" json:"role"`
-	RootID         uuid.UUID                      `db:"root_id" json:"root_id"`
+	RepoID            uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Name              string                         `db:"name" json:"name"`
+	Path              string                         `db:"path" json:"path"`
+	Config            repocfg.RepositoryConfig       `db:"config" json:"config"`
+	Reachability      dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	Activity          dbtypes.RepositoryActivity     `db:"activity" json:"activity"`
+	PauseReason       string                         `db:"pause_reason" json:"pause_reason"`
+	LastSync          dbtypes.Timestamp              `db:"last_sync" json:"last_sync"`
+	CreatedAt         dbtypes.Timestamp              `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
+	DefaultOwnerID    *int32                         `db:"default_owner_id" json:"default_owner_id"`
+	Role              dbtypes.RepoRole               `db:"role" json:"role"`
+	StorageLocationID uuid.UUID                      `db:"storage_location_id" json:"storage_location_id"`
 }
 
 type RepositoryChangeCursor struct {
@@ -966,18 +1055,8 @@ type RepositoryObservationState struct {
 	CursorHealth                   string            `db:"cursor_health" json:"cursor_health"`
 	FullVerificationRequired       int64             `db:"full_verification_required" json:"full_verification_required"`
 	UpdatedAt                      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	TerminalError                  *string           `db:"terminal_error" json:"terminal_error"`
 	FullVerificationRequestedEpoch int64             `db:"full_verification_requested_epoch" json:"full_verification_requested_epoch"`
-}
-
-type RepositoryRoot struct {
-	RootID           uuid.UUID                    `db:"root_id" json:"root_id"`
-	Name             string                       `db:"name" json:"name"`
-	Path             string                       `db:"path" json:"path"`
-	Kind             dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
-	Status           dbtypes.RepositoryRootStatus `db:"status" json:"status"`
-	MountFingerprint string                       `db:"mount_fingerprint" json:"mount_fingerprint"`
-	CreatedAt        dbtypes.Timestamp            `db:"created_at" json:"created_at"`
-	UpdatedAt        dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryScanFrontier struct {
@@ -1150,6 +1229,17 @@ type SpeciesPrediction struct {
 
 type SpeciesSearchFt struct {
 	Label string `db:"label" json:"label"`
+}
+
+type StorageLocation struct {
+	StorageLocationID uuid.UUID                     `db:"storage_location_id" json:"storage_location_id"`
+	Name              string                        `db:"name" json:"name"`
+	Path              string                        `db:"path" json:"path"`
+	Kind              dbtypes.StorageLocationKind   `db:"kind" json:"kind"`
+	Status            dbtypes.StorageLocationStatus `db:"status" json:"status"`
+	MountFingerprint  string                        `db:"mount_fingerprint" json:"mount_fingerprint"`
+	CreatedAt         dbtypes.Timestamp             `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp             `db:"updated_at" json:"updated_at"`
 }
 
 type SystemState struct {

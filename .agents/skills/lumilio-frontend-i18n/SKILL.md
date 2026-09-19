@@ -49,26 +49,33 @@ and a Repository into one concept.
 
 ## Technical identifier mapping
 
-Keep stable technical identifiers unchanged and interpret them through this
-map. They are implementation vocabulary, not additional product concepts.
+Catalog, HTTP, and Go identifiers use `StorageLocation`, `storage_location`,
+or `StorageLocations`. The only retained exception is the on-disk marker
+filename `.lumilioroot` (and its lock file `.lumilioroot.lock`). Do not
+introduce `StorageRoot`, `RepositoryRoot`, `root_id`, or `roots` as Storage
+Location identifiers.
 
-| Product concept | Retained technical identifiers | Interpretation |
+| Product concept | Technical identifiers | Interpretation |
 | --- | --- | --- |
-| Storage Location | `.lumilioroot`, root UUID | Portable on-disk Storage Location identity; the marker name is a format, not a user-facing label. |
-| Storage Location | `repository_roots`, `repositories.root_id`, `root_id` | Catalog row and foreign-key association for a Storage Location. |
-| Storage Location | `repo.RepositoryRoot`, `RepositoryRoot*`, `RootID`, `ErrRepositoryRoot*` | Existing SQLC and Go symbols for Storage Location state, identity, lifecycle, and errors. |
-| Storage Location | `/api/v1/repository-roots`, `root_id`, `roots`, `RepositoryRootDTO` | Existing HTTP/OpenAPI wire contract for Storage Location resources. |
-| Storage Location | `useRepositoryRoots`, `repositoryRoot`, Repository Root query keys | Frontend adapters over that retained HTTP contract; UI text still says Storage Location / 存储位置. |
-| Default Storage Location | `storage.path`, `repository_roots.kind = 'default'`, `GetDefaultRepositoryRoot` | The single non-removable Default Storage Location. |
+| Storage Location | `.lumilioroot` | Portable on-disk Storage Location identity; the marker name is a format, not a user-facing label. |
+| Storage Location | `storage_locations`, `repositories.storage_location_id`, `storage_location_id`, `storage_location` | Catalog row, foreign key, and JSON fields for a Storage Location. |
+| Storage Location | `repo.StorageLocation`, `StorageLocation*`, `StorageLocationID`, `ErrStorageLocation*` | SQLC and Go symbols for Storage Location state, identity, lifecycle, and errors. |
+| Storage Location | `/api/v1/storage/view`, `StorageViewResponseDTO`, `storage_locations` | Admin HTTP read model for Storage Location registration. |
+| Storage Location | `/api/v1/storage/locations/{id}/detach-impact`, `/api/v1/storage/locations/{id}/detach` | Location registration lifecycle commands (already namespaced under `/storage/`). |
+| Storage Location | `useStorageView`, `storageViewQueryKey`, `useStorageLocations` | Frontend adapters over `/api/v1/storage/view`. |
+| Repository (selectors) | `/api/v1/storage/targets`, `StorageTargetDTO`, `StorageTargetsResponseDTO` | Non-admin browse/upload selector contract (replaces `IndexingRepositoryOptionDTO` and `GET /assets/indexing/repositories`). |
+| Primary Repository (setup) | `POST /api/v1/setup/primary-repository` | Authenticated initial Primary Repository creation outside completed-setup gates. |
+| Default Storage Location | `storage.path`, `storage_locations.kind = 'default'`, `GetDefaultStorageLocation` | The single non-removable Default Storage Location. |
 | Repository | `.lumiliorepo`, `repositories`, `repo_id`, `repository_id`, `Repository*` | Repository identity, catalog rows, and domain symbols. |
 | Primary Repository | `repositories.role = 'primary'`, `<storage.path>/primary` | The unique Primary Repository role and fixed directory. |
 
-Do not rename an on-disk, database, durable-payload, or HTTP identifier solely
-to match product copy. Do not add cosmetic aliases such as a second Go type for
-`repo.RepositoryRoot`; translate terminology at human-facing boundaries. When
-extending an existing technical contract, follow its mapped identifiers rather
-than creating parallel spellings. Comments, API descriptions, logs intended for
-operators, and UI text name the mapped product concept.
+Do not add cosmetic aliases such as a second Go type for `repo.StorageLocation`.
+When extending an existing technical contract, follow Storage Location
+identifiers rather than creating parallel spellings. Comments, API
+descriptions, logs intended for operators, and UI text name the mapped product
+concept. ROE content Locations (`asset_locations.location_id`) and geo
+`/locations/*` routes are a different Location concept and stay unchanged.
+The git project tree may still be called a repository root.
 
 The Chinese exception `打开项目仓库` refers to the source-code repository and
 is not a Repository synonym.

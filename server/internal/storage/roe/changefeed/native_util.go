@@ -26,7 +26,7 @@ func repositoryVolume(repository repo.Repository) (identity, kind string) {
 
 func relativeUserPath(repository repo.Repository, nativePath string) (string, error) {
 	cleanedNativePath := filepath.Clean(nativePath)
-	roots := nativeRepositoryRoots(repository.Path)
+	roots := nativeRepositoryPathVariants(repository.Path)
 	for _, root := range roots {
 		relative, err := filepath.Rel(root, cleanedNativePath)
 		if err != nil {
@@ -47,7 +47,7 @@ func relativeUserPath(repository repo.Repository, nativePath string) (string, er
 	return "", fmt.Errorf("native event path %q is outside repository", nativePath)
 }
 
-func nativeRepositoryRoots(repositoryPath string) []string {
+func nativeRepositoryPathVariants(repositoryPath string) []string {
 	roots := make([]string, 0, 3)
 	appendRoot := func(candidate string) {
 		candidate = filepath.Clean(candidate)

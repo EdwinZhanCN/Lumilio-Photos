@@ -256,7 +256,7 @@ func run(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Ensure the default media root and explicitly separate private cloud/backup
+	// Ensure the default media storageLocation and explicitly separate private cloud/backup
 	// directories exist before any service reads them.
 	if err := storage.EnsureRootLayout(appConfig.StorageConfig); err != nil {
 		return fmt.Errorf("ensure storage layout: %w", err)
@@ -421,18 +421,18 @@ func run(
 	if err := repoManager.RecoverHostActions(ctx); err != nil {
 		return fmt.Errorf("recover native host actions: %w", err)
 	}
-	defaultRoot, degradedStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
+	defaultStorageLocation, degradedStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
 	if err != nil {
 		return err
 	}
 	if degradedStorage {
 		appLogger.Warn("default Storage Location requires recovery; continuing in degraded mode",
-			zap.String("operation", "repository_root.recovery_required"),
+			zap.String("operation", "storage_location.recovery_required"),
 			zap.String("path", appConfig.StorageConfig.Path))
 	} else {
 		appLogger.Info("default storage location initialized",
-			zap.String("operation", "repository_root.init"),
-			zap.String("path", defaultRoot.Path),
+			zap.String("operation", "storage_location.init"),
+			zap.String("path", defaultStorageLocation.Path),
 		)
 	}
 	stagingManager := storage.NewStagingManager(repositoryFiles)
@@ -442,7 +442,7 @@ func run(
 	// Re-check every repository's recorded path before anything schedules work
 	// against it. Unreachable repositories become offline rather than failing
 	// mid-scan.
-	if err := repoManager.ReconcileRepositoryRoots(ctx); err != nil {
+	if err := repoManager.ReconcileStorageLocations(ctx); err != nil {
 		appLogger.Warn("failed to reconcile Storage Locations", zap.Error(err))
 	}
 	if err := repoManager.ReconcileAll(ctx); err != nil {
@@ -707,7 +707,7 @@ func run(
 		return fmt.Errorf("register pipeline runtime: %w", err)
 	}
 	// Automatic database backups use their explicit private destination rather
-	// than following any removable repository root. Policy
+	// than following any removable Storage Location. Policy
 	// (enabled/interval/retention) is read from runtime settings on every tick,
 	// so the periodic job below can stay a fixed hourly heartbeat.
 	backupLogger := appLogger.Named("db_backup").Sugar()
@@ -720,10 +720,10 @@ func run(
 		ConfigSchemaVersion: appConfig.SchemaVersion,
 	}
 	snapshotCompatibility := dbbackup.Compatibility{
-		LibraryID:               catalogInfo.LibraryID,
-		ConfigSchemaVersion:     appConfig.SchemaVersion,
-		MaxApplicationMigration: catalogInfo.ApplicationMigration,
-		MaxRiverMigration:       catalogInfo.RiverMigration,
+		LibraryID:           catalogInfo.LibraryID,
+		ConfigSchemaVersion: appConfig.SchemaVersion,
+		SchemaVersion:       catalogInfo.SchemaVersion,
+		MaxRiverMigration:   catalogInfo.RiverMigration,
 	}
 	backupScheduler := &dbbackup.Scheduler{
 		// Online Backup holds one source connection while it copies the
@@ -829,6 +829,8 @@ func run(
 	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanCommands, repoManager)
+	repositoryScanController.SetBootstrapService(bootstrapService)
+	storageController := handler.NewStorageHandler(repoManager, queries, repositoryScanCommands)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)
@@ -858,6 +860,7 @@ func run(
 		settingsController,
 		classifierController,
 		userController,
+		storageController,
 		repositoryScanController,
 		hostActionController,
 		duplicateController,
@@ -989,41 +992,41 @@ func run(
 }
 
 type defaultStorageRuntimeManager interface {
-	EnsureDefaultRepositoryRoot(context.Context, string, ...storage.LifecycleRequest) (*repo.RepositoryRoot, error)
-	ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error)
+	EnsureDefaultStorageLocation(context.Context, string, ...storage.LifecycleRequest) (*repo.StorageLocation, error)
+	ListStorageLocations(context.Context) ([]repo.StorageLocation, error)
 }
 
 // ensureDefaultStorageForRuntime distinguishes a first-run initialization
 // failure from a previously registered portable identity that needs recovery.
 // The latter must not prevent the HTTP runtime and unrelated repositories from
 // starting in degraded mode.
-func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (*repo.RepositoryRoot, bool, error) {
+func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (*repo.StorageLocation, bool, error) {
 	hostInstanceID, _ := os.Hostname()
-	root, err := manager.EnsureDefaultRepositoryRoot(ctx, path, storage.LifecycleRequest{
+	storageLocation, err := manager.EnsureDefaultStorageLocation(ctx, path, storage.LifecycleRequest{
 		Actor: "server:config", HostInstanceID: hostInstanceID, ConfirmationType: "portable_identity_match",
 	})
 	if err == nil {
-		return root, false, nil
+		return storageLocation, false, nil
 	}
-	if !errors.Is(err, storage.ErrRepositoryRootOffline) && !errors.Is(err, storage.ErrRepositoryRootInvalid) {
+	if !errors.Is(err, storage.ErrStorageLocationOffline) && !errors.Is(err, storage.ErrStorageLocationInvalid) {
 		return nil, false, fmt.Errorf("initialize default storage location: %w", err)
 	}
-	roots, listErr := manager.ListRepositoryRoots(ctx)
+	storageLocations, listErr := manager.ListStorageLocations(ctx)
 	if listErr != nil {
 		return nil, false, fmt.Errorf("verify degraded default Storage Location: %w", listErr)
 	}
-	for i := range roots {
-		if roots[i].Kind == dbtypes.RepositoryRootKindDefault {
+	for i := range storageLocations {
+		if storageLocations[i].Kind == dbtypes.StorageLocationKindDefault {
 			// A registered default failing at its unchanged configured path is a
 			// recoverable offline/missing-marker condition. A different configured
 			// path is a migration attempt; failure to prove its portable identity
 			// must fail startup so Desktop rolls the runtime intent back.
-			registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(roots[i].Path)
+			registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(storageLocations[i].Path)
 			configuredPath, configuredPathErr := storage.CanonicalizeRepositoryPath(path)
 			if registeredPathErr != nil || configuredPathErr != nil || registeredPath != configuredPath {
 				return nil, false, fmt.Errorf("validate default storage location migration: %w", err)
 			}
-			return &roots[i], true, nil
+			return &storageLocations[i], true, nil
 		}
 	}
 	return nil, false, fmt.Errorf("initialize default storage location: %w", err)

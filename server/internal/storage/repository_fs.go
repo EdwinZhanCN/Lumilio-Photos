@@ -18,7 +18,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
-	"server/internal/storage/rootcfg"
 	fileutil "server/internal/utils/file"
 	hashutil "server/internal/utils/hash"
 
@@ -137,34 +136,10 @@ func (f *RepositoryFSFactory) AccessCoordinator() *RepositoryAccessCoordinator {
 	return f.access
 }
 
-// ValidateRepositoryParent is the common pre-I/O identity gate. Repository
-// reachability never overrides its parent Storage Location: an offline,
-// maintenance, missing, or replaced root fails before any repository handle or
-// staging writer is opened.
-func (f *RepositoryFSFactory) ValidateRepositoryParent(ctx context.Context, repository repo.Repository) error {
-	if f == nil || f.queries == nil {
-		return nil
-	}
-	root, err := f.queries.GetRepositoryRoot(ctx, repository.RootID)
-	if err != nil {
-		return fmt.Errorf("%w: load parent Storage Location: %v", ErrRepositoryUnavailable, err)
-	}
-	if root.Status != dbtypes.RepositoryRootStatusActive {
-		return fmt.Errorf("%w: parent Storage Location status=%s", ErrRepositoryUnavailable, root.Status)
-	}
-	marker, err := rootcfg.Load(root.Path)
-	if err != nil || marker.ID != root.RootID.String() {
-		_, _ = f.queries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
-			RootID: root.RootID, Name: root.Name, Status: dbtypes.RepositoryRootStatusError,
-			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
-		})
-		return fmt.Errorf("%w: parent Storage Location identity changed", ErrRepositoryUnavailable)
-	}
-	return nil
-}
-
 // Open verifies catalog reachability and the portable repository marker before
-// returning any media capability.
+// returning any media capability. A Storage Location is an authorization scope,
+// not an I/O health gate: the opened repository's own path and marker decide
+// access, and parent registration state never participates.
 func (f *RepositoryFSFactory) Open(repository repo.Repository) (*RepositoryFS, error) {
 	return f.OpenContext(context.Background(), repository)
 }
@@ -197,15 +172,11 @@ func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.R
 			release()
 			return nil, fmt.Errorf("%w: reachability=%s", ErrRepositoryUnavailable, repository.Reachability)
 		}
-		if err := f.ValidateRepositoryParent(ctx, repository); err != nil {
-			release()
-			return nil, err
-		}
 	}
 	root, err := os.OpenRoot(repository.Path)
 	if err != nil {
 		release()
-		return nil, classifyRepositoryRootError(repository.Path, err)
+		return nil, classifyStorageLocationError(repository.Path, err)
 	}
 	fail := func(err error) (*RepositoryFS, error) {
 		_ = root.Close()
@@ -217,7 +188,7 @@ func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.R
 		if errors.Is(err, fs.ErrNotExist) {
 			return fail(fmt.Errorf("%w: .lumiliorepo is missing", ErrRepositoryOffline))
 		}
-		return fail(classifyRepositoryRootError(".lumiliorepo", err))
+		return fail(classifyStorageLocationError(".lumiliorepo", err))
 	}
 	config, err := repocfg.ParseConfig(marker)
 	if err != nil {
@@ -237,7 +208,7 @@ func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.R
 	}, nil
 }
 
-func classifyRepositoryRootError(name string, err error) error {
+func classifyStorageLocationError(name string, err error) error {
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return fmt.Errorf("%w: %s: %v", ErrRepositoryOffline, name, err)
@@ -308,7 +279,7 @@ func (r *RepositoryFS) VerifyIdentity() error {
 	defer done()
 	marker, err := root.ReadFile(".lumiliorepo")
 	if err != nil {
-		return classifyRepositoryRootError(".lumiliorepo", err)
+		return classifyStorageLocationError(".lumiliorepo", err)
 	}
 	config, err := repocfg.ParseConfig(marker)
 	if err != nil {

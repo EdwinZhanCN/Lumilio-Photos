@@ -2,17 +2,10 @@ version: "2"
 sql:
     - engine: "sqlite"
       queries: "internal/db/repo/queries"
-      # sqlc parses the complete baseline used by the current development
-      # catalog; migration files are runtime assets, not query inputs.
+      # sqlc parses the single standalone catalog baseline. The baseline is a
+      # runtime asset, edited in place; there is no migration sequence.
       schema:
-          - "migrations/000009_auth_security_baseline.up.sql"
-          - "migrations/000010_agent_resume_preparation.up.sql"
-          - "migrations/000011_repository_observation_engine.up.sql"
-          - "migrations/000012_repository_observation_cutover.up.sql"
-          - "migrations/000013_location_projection_convergence.up.sql"
-          - "migrations/000015_music_library.up.sql"
-          - "migrations/000016_music_local_preferences.up.sql"
-          - "migrations/000017_processing_convergence.up.sql"
+          - "migrations/000001_storage_baseline.up.sql"
       gen:
           go:
               package: "repo"
@@ -106,7 +99,7 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.repository_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
-                  - column: "*.root_id"
+                  - column: "*.storage_location_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "*.scan_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
@@ -320,10 +313,10 @@ sql:
                     go_type: { import: "server/internal/db/dbtypes", type: "RepositoryActivity" }
                   - column: "repositories.role"
                     go_type: { import: "server/internal/db/dbtypes", type: "RepoRole" }
-                  - column: "repository_roots.kind"
-                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryRootKind" }
-                  - column: "repository_roots.status"
-                    go_type: { import: "server/internal/db/dbtypes", type: "RepositoryRootStatus" }
+                  - column: "storage_locations.kind"
+                    go_type: { import: "server/internal/db/dbtypes", type: "StorageLocationKind" }
+                  - column: "storage_locations.status"
+                    go_type: { import: "server/internal/db/dbtypes", type: "StorageLocationStatus" }
                   - column: "*.user_id"
                     go_type: "int32"
                   - column: "*.owner_id"

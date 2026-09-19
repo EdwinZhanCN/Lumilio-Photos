@@ -24,7 +24,7 @@ SET applied_epoch = ?2,
 WHERE repository_id = ?1
   AND applied_epoch < ?2
   AND desired_epoch >= ?2
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, terminal_error, full_verification_requested_epoch
 `
 
 type AdvanceRepositoryObservationEpochParams struct {
@@ -59,6 +59,7 @@ func (q *Queries) AdvanceRepositoryObservationEpoch(ctx context.Context, arg Adv
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.TerminalError,
 		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
@@ -265,7 +266,7 @@ WHERE repository_id = ?1
       OR controller_lease_id = ?2
       OR controller_lease_expires_at < ?4
   )
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, terminal_error, full_verification_requested_epoch
 `
 
 type ClaimRepositoryObservationControllerParams struct {
@@ -300,6 +301,7 @@ func (q *Queries) ClaimRepositoryObservationController(ctx context.Context, arg 
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.TerminalError,
 		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
@@ -972,7 +974,7 @@ INSERT INTO repository_observation_state (
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
 ON CONFLICT (repository_id) DO UPDATE SET
     updated_at = repository_observation_state.updated_at
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, terminal_error, full_verification_requested_epoch
 `
 
 type EnsureRepositoryObservationStateParams struct {
@@ -1017,6 +1019,7 @@ func (q *Queries) EnsureRepositoryObservationState(ctx context.Context, arg Ensu
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.TerminalError,
 		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
@@ -1485,7 +1488,7 @@ func (q *Queries) GetRepositoryObservationForNodeRevision(ctx context.Context, a
 }
 
 const getRepositoryObservationState = `-- name: GetRepositoryObservationState :one
-SELECT repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch FROM repository_observation_state
+SELECT repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, terminal_error, full_verification_requested_epoch FROM repository_observation_state
 WHERE repository_id = ?1
 `
 
@@ -1509,42 +1512,8 @@ func (q *Queries) GetRepositoryObservationState(ctx context.Context, repositoryI
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.TerminalError,
 		&i.FullVerificationRequestedEpoch,
-	)
-	return i, err
-}
-
-const getRepositoryRootNode = `-- name: GetRepositoryRootNode :one
-SELECT node_id, repository_id, parent_node_id, name, name_key, kind, lifecycle, native_identity_kind, native_identity_value, volume_identity, observation_revision, stability_token, file_size, modified_at_ns, changed_at_ns, last_seen_run_id, last_authoritative_coverage_revision, absence_first_observed_at, created_at, updated_at FROM repository_nodes
-WHERE repository_id = ?1
-  AND parent_node_id IS NULL
-  AND lifecycle = 'active'
-`
-
-func (q *Queries) GetRepositoryRootNode(ctx context.Context, repositoryID uuid.UUID) (RepositoryNode, error) {
-	row := q.db.QueryRowContext(ctx, getRepositoryRootNode, repositoryID)
-	var i RepositoryNode
-	err := row.Scan(
-		&i.NodeID,
-		&i.RepositoryID,
-		&i.ParentNodeID,
-		&i.Name,
-		&i.NameKey,
-		&i.Kind,
-		&i.Lifecycle,
-		&i.NativeIdentityKind,
-		&i.NativeIdentityValue,
-		&i.VolumeIdentity,
-		&i.ObservationRevision,
-		&i.StabilityToken,
-		&i.FileSize,
-		&i.ModifiedAtNs,
-		&i.ChangedAtNs,
-		&i.LastSeenRunID,
-		&i.LastAuthoritativeCoverageRevision,
-		&i.AbsenceFirstObservedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -1591,6 +1560,41 @@ func (q *Queries) GetRepositoryScanRun(ctx context.Context, arg GetRepositorySca
 		&i.FailureProblemType,
 		&i.UpdatedAt,
 		&i.FullVerificationPerformed,
+	)
+	return i, err
+}
+
+const getRepositoryTreeRootNode = `-- name: GetRepositoryTreeRootNode :one
+SELECT node_id, repository_id, parent_node_id, name, name_key, kind, lifecycle, native_identity_kind, native_identity_value, volume_identity, observation_revision, stability_token, file_size, modified_at_ns, changed_at_ns, last_seen_run_id, last_authoritative_coverage_revision, absence_first_observed_at, created_at, updated_at FROM repository_nodes
+WHERE repository_id = ?1
+  AND parent_node_id IS NULL
+  AND lifecycle = 'active'
+`
+
+func (q *Queries) GetRepositoryTreeRootNode(ctx context.Context, repositoryID uuid.UUID) (RepositoryNode, error) {
+	row := q.db.QueryRowContext(ctx, getRepositoryTreeRootNode, repositoryID)
+	var i RepositoryNode
+	err := row.Scan(
+		&i.NodeID,
+		&i.RepositoryID,
+		&i.ParentNodeID,
+		&i.Name,
+		&i.NameKey,
+		&i.Kind,
+		&i.Lifecycle,
+		&i.NativeIdentityKind,
+		&i.NativeIdentityValue,
+		&i.VolumeIdentity,
+		&i.ObservationRevision,
+		&i.StabilityToken,
+		&i.FileSize,
+		&i.ModifiedAtNs,
+		&i.ChangedAtNs,
+		&i.LastSeenRunID,
+		&i.LastAuthoritativeCoverageRevision,
+		&i.AbsenceFirstObservedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -1809,7 +1813,7 @@ func (q *Queries) InsertRepositoryObservation(ctx context.Context, arg InsertRep
 	return i, err
 }
 
-const insertRepositoryRootNode = `-- name: InsertRepositoryRootNode :one
+const insertRepositoryTreeRootNode = `-- name: InsertRepositoryTreeRootNode :one
 INSERT INTO repository_nodes (
     node_id, repository_id, parent_node_id, name, name_key, kind,
     lifecycle, observation_revision, stability_token, created_at, updated_at
@@ -1817,7 +1821,7 @@ INSERT INTO repository_nodes (
 RETURNING node_id, repository_id, parent_node_id, name, name_key, kind, lifecycle, native_identity_kind, native_identity_value, volume_identity, observation_revision, stability_token, file_size, modified_at_ns, changed_at_ns, last_seen_run_id, last_authoritative_coverage_revision, absence_first_observed_at, created_at, updated_at
 `
 
-type InsertRepositoryRootNodeParams struct {
+type InsertRepositoryTreeRootNodeParams struct {
 	NodeID              uuid.UUID         `db:"node_id" json:"node_id"`
 	RepositoryID        uuid.UUID         `db:"repository_id" json:"repository_id"`
 	ObservationRevision int64             `db:"observation_revision" json:"observation_revision"`
@@ -1825,8 +1829,8 @@ type InsertRepositoryRootNodeParams struct {
 	CreatedAt           dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
-func (q *Queries) InsertRepositoryRootNode(ctx context.Context, arg InsertRepositoryRootNodeParams) (RepositoryNode, error) {
-	row := q.db.QueryRowContext(ctx, insertRepositoryRootNode,
+func (q *Queries) InsertRepositoryTreeRootNode(ctx context.Context, arg InsertRepositoryTreeRootNodeParams) (RepositoryNode, error) {
+	row := q.db.QueryRowContext(ctx, insertRepositoryTreeRootNode,
 		arg.NodeID,
 		arg.RepositoryID,
 		arg.ObservationRevision,
@@ -2552,7 +2556,7 @@ SET desired_epoch = desired_epoch + 1,
     terminal_error = NULL,
     updated_at = ?3
 WHERE repository_id = ?1
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, terminal_error, full_verification_requested_epoch
 `
 
 type RequestRepositoryObservationEpochParams struct {
@@ -2581,6 +2585,7 @@ func (q *Queries) RequestRepositoryObservationEpoch(ctx context.Context, arg Req
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.TerminalError,
 		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
@@ -2725,7 +2730,7 @@ SET active_run_id = ?2,
     updated_at = ?3
 WHERE repository_id = ?1
   AND (active_run_id IS NULL OR active_run_id = ?2)
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, terminal_error, full_verification_requested_epoch
 `
 
 type SetActiveRepositoryObservationRunParams struct {
@@ -2754,6 +2759,7 @@ func (q *Queries) SetActiveRepositoryObservationRun(ctx context.Context, arg Set
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.TerminalError,
 		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err
@@ -3011,7 +3017,7 @@ SET adapter_kind = ?2,
     full_verification_required = CASE WHEN ?7 THEN 1 ELSE full_verification_required END,
     updated_at = ?8
 WHERE repository_id = ?1
-RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, full_verification_requested_epoch
+RETURNING repository_id, desired_epoch, applied_epoch, next_revision, active_run_id, controller_lease_id, controller_lease_expires_at, adapter_kind, adapter_identity, volume_identity, volume_kind, path_case_mode, path_normalization, cursor_health, full_verification_required, updated_at, terminal_error, full_verification_requested_epoch
 `
 
 type UpdateRepositoryObservationAdapterParams struct {
@@ -3054,6 +3060,7 @@ func (q *Queries) UpdateRepositoryObservationAdapter(ctx context.Context, arg Up
 		&i.CursorHealth,
 		&i.FullVerificationRequired,
 		&i.UpdatedAt,
+		&i.TerminalError,
 		&i.FullVerificationRequestedEpoch,
 	)
 	return i, err

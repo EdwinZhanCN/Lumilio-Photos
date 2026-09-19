@@ -76,7 +76,7 @@ type lifecycleBeginInput struct {
 type createRepositoryOperationPayload struct {
 	Name              string           `json:"name"`
 	Path              string           `json:"path"`
-	RootID            string           `json:"root_id"`
+	StorageLocationID string           `json:"storage_location_id"`
 	Role              dbtypes.RepoRole `json:"role"`
 	OwnerID           *int32           `json:"owner_id,omitempty"`
 	StorageStrategy   string           `json:"storage_strategy"`
@@ -94,9 +94,9 @@ type createRepositoryOperationResult struct {
 }
 
 type createStorageLocationOperationPayload struct {
-	Path string                     `json:"path"`
-	Name string                     `json:"name"`
-	Kind dbtypes.RepositoryRootKind `json:"kind"`
+	Path string                      `json:"path"`
+	Name string                      `json:"name"`
+	Kind dbtypes.StorageLocationKind `json:"kind"`
 }
 
 type createStorageLocationRollbackData struct {
@@ -105,15 +105,15 @@ type createStorageLocationRollbackData struct {
 }
 
 type createStorageLocationOperationResult struct {
-	RootID string `json:"root_id"`
+	StorageLocationID string `json:"storage_location_id"`
 }
 
 type registerRepositoryCopyOperationPayload struct {
-	Path             string           `json:"path"`
-	RootID           string           `json:"root_id"`
-	OwnerID          *int32           `json:"owner_id,omitempty"`
-	Role             dbtypes.RepoRole `json:"role"`
-	RiskConfirmation bool             `json:"risk_confirmation"`
+	Path              string           `json:"path"`
+	StorageLocationID string           `json:"storage_location_id"`
+	OwnerID           *int32           `json:"owner_id,omitempty"`
+	Role              dbtypes.RepoRole `json:"role"`
+	RiskConfirmation  bool             `json:"risk_confirmation"`
 }
 
 type registerRepositoryCopyRollbackData struct {
@@ -129,11 +129,11 @@ type registerRepositoryCopyOperationResult struct {
 }
 
 type openRepositoryOperationPayload struct {
-	Path             string           `json:"path"`
-	RootID           string           `json:"root_id"`
-	OwnerID          *int32           `json:"owner_id,omitempty"`
-	Role             dbtypes.RepoRole `json:"role"`
-	RiskConfirmation bool             `json:"risk_confirmation"`
+	Path              string           `json:"path"`
+	StorageLocationID string           `json:"storage_location_id"`
+	OwnerID           *int32           `json:"owner_id,omitempty"`
+	Role              dbtypes.RepoRole `json:"role"`
+	RiskConfirmation  bool             `json:"risk_confirmation"`
 }
 
 type openRepositoryOperationResult struct {
@@ -217,17 +217,17 @@ func (rm *DefaultRepositoryManager) RetryPendingInitialRepositoryScans(ctx conte
 }
 
 type switchDefaultStorageOperationPayload struct {
-	RootID           string `json:"root_id"`
-	OldPath          string `json:"old_path"`
-	NewPath          string `json:"new_path"`
-	ConfirmationType string `json:"confirmation_type"`
-	RepositoryCount  int64  `json:"repository_count"`
+	StorageLocationID string `json:"storage_location_id"`
+	OldPath           string `json:"old_path"`
+	NewPath           string `json:"new_path"`
+	ConfirmationType  string `json:"confirmation_type"`
+	RepositoryCount   int64  `json:"repository_count"`
 }
 
 type switchDefaultStorageOperationResult struct {
-	RootID          string `json:"root_id"`
-	RepositoryCount int64  `json:"repository_count"`
-	FilesPreserved  bool   `json:"files_preserved"`
+	StorageLocationID string `json:"storage_location_id"`
+	RepositoryCount   int64  `json:"repository_count"`
+	FilesPreserved    bool   `json:"files_preserved"`
 }
 
 func (rm *DefaultRepositoryManager) beginLifecycleOperation(ctx context.Context, input lifecycleBeginInput) (repo.LifecycleOperation, bool, error) {
@@ -551,9 +551,9 @@ func (rm *DefaultRepositoryManager) claimLifecycleRecoveryTargets(ctx context.Co
 	kind := "repository"
 	switch operation.Kind {
 	case lifecycleKindCreateStorageLocation:
-		kind = "root"
+		kind = "storage_location"
 	case lifecycleKindSwitchDefaultStorage, lifecycleKindRelocateStorage:
-		kind = "root"
+		kind = "storage_location"
 		path = strings.TrimSpace(target.NewPath)
 	case lifecycleKindCreateRepository, lifecycleKindOpenRepository,
 		lifecycleKindRegisterRepositoryCopy, lifecycleKindRenameRepository:
@@ -584,9 +584,6 @@ func (rm *DefaultRepositoryManager) recoverRenameRepositoryOperation(ctx context
 	diskConfig, diskErr := repocfg.LoadConfigFromFile(payload.Path)
 	if databaseErr != nil || diskErr != nil || diskConfig.ID != repositoryID.String() {
 		return fmt.Errorf("%w: rename target identity is unavailable", ErrLifecycleRecoveryRequired)
-	}
-	if err := rm.files.ValidateRepositoryParent(ctx, databaseRepository); err != nil {
-		return fmt.Errorf("%w: validate rename parent: %v", ErrLifecycleRecoveryRequired, err)
 	}
 
 	// The requested new name is the deterministic roll-forward state. Either
@@ -655,25 +652,25 @@ func (rm *DefaultRepositoryManager) recoverSwitchDefaultStorageOperation(ctx con
 	if err := json.Unmarshal(operation.Payload, &payload); err != nil {
 		return fmt.Errorf("%w: decode default Storage Location switch payload: %v", ErrLifecycleRecoveryRequired, err)
 	}
-	rootID, err := uuid.Parse(payload.RootID)
+	storageLocationID, err := uuid.Parse(payload.StorageLocationID)
 	if err != nil {
 		return fmt.Errorf("%w: invalid default Storage Location switch identity", ErrLifecycleRecoveryRequired)
 	}
-	root, err := rm.queries.GetRepositoryRoot(ctx, rootID)
+	storageLocation, err := rm.queries.GetStorageLocation(ctx, storageLocationID)
 	if err != nil {
 		return fmt.Errorf("recover default Storage Location switch: %w", err)
 	}
 	marker, markerErr := rootcfg.Load(payload.NewPath)
-	if markerErr != nil || marker.ID != rootID.String() {
+	if markerErr != nil || marker.ID != storageLocationID.String() {
 		return fmt.Errorf("%w: configured default Storage Location marker is invalid", ErrLifecycleRecoveryRequired)
 	}
-	if root.Path == payload.OldPath {
+	if storageLocation.Path == payload.OldPath {
 		// A process crash may have persisted the maintenance barrier before the
 		// atomic path transaction. Release that orphaned barrier under the
 		// lifecycle journal, then replay the fully validating relocation.
-		if root.Status == dbtypes.RepositoryRootStatusMaintenance {
-			_, _ = rm.queries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
-				RootID: rootID, Name: root.Name, Status: dbtypes.RepositoryRootStatusActive,
+		if storageLocation.Status == dbtypes.StorageLocationStatusMaintenance {
+			_, _ = rm.queries.UpdateStorageLocationFromDisk(ctx, repo.UpdateStorageLocationFromDiskParams{
+				StorageLocationID: storageLocationID, Name: storageLocation.Name, Status: dbtypes.StorageLocationStatusActive,
 				UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 			})
 			repositories, listErr := rm.queries.ListRepositories(ctx)
@@ -681,7 +678,7 @@ func (rm *DefaultRepositoryManager) recoverSwitchDefaultStorageOperation(ctx con
 				return listErr
 			}
 			for _, repository := range repositories {
-				if repository.RootID == rootID && repository.Reachability == dbtypes.RepositoryReachabilityMaintenance {
+				if repository.StorageLocationID == storageLocationID && repository.Reachability == dbtypes.RepositoryReachabilityMaintenance {
 					_, _ = rm.queries.EndRepositoryMaintenance(ctx, repo.EndRepositoryMaintenanceParams{
 						RepoID: repository.RepoID, Reachability: dbtypes.RepositoryReachabilityActive,
 						Activity: dbtypes.RepositoryActivityIdle, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
@@ -689,14 +686,14 @@ func (rm *DefaultRepositoryManager) recoverSwitchDefaultStorageOperation(ctx con
 				}
 			}
 		}
-		if _, err := rm.relocateRepositoryRoot(ctx, rootID.String(), payload.NewPath, operation.Kind == lifecycleKindSwitchDefaultStorage); err != nil {
+		if _, err := rm.relocateStorageLocation(ctx, storageLocationID.String(), payload.NewPath, operation.Kind == lifecycleKindSwitchDefaultStorage); err != nil {
 			return fmt.Errorf("%w: roll forward default Storage Location switch: %v", ErrLifecycleRecoveryRequired, err)
 		}
-	} else if root.Path != payload.NewPath {
+	} else if storageLocation.Path != payload.NewPath {
 		return fmt.Errorf("%w: default Storage Location path changed outside the operation", ErrLifecycleRecoveryRequired)
 	}
 	return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID,
-		createStorageLocationOperationResult{RootID: rootID.String()})
+		createStorageLocationOperationResult{StorageLocationID: storageLocationID.String()})
 }
 
 func (rm *DefaultRepositoryManager) recoverRegisterRepositoryCopyOperation(ctx context.Context, operation repo.LifecycleOperation) error {
@@ -755,14 +752,14 @@ func (rm *DefaultRepositoryManager) recoverCreateStorageLocationOperation(ctx co
 	if operation.TargetID == nil {
 		return fmt.Errorf("%w: Storage Location target ID is missing", ErrLifecycleRecoveryRequired)
 	}
-	rootID, err := uuid.Parse(*operation.TargetID)
+	storageLocationID, err := uuid.Parse(*operation.TargetID)
 	if err != nil {
 		return fmt.Errorf("%w: invalid Storage Location target ID", ErrLifecycleRecoveryRequired)
 	}
-	databaseRoot, databaseErr := rm.queries.GetRepositoryRoot(ctx, rootID)
+	databaseRoot, databaseErr := rm.queries.GetStorageLocation(ctx, storageLocationID)
 	diskConfig, diskErr := rootcfg.Load(payload.Path)
-	if databaseErr == nil && diskErr == nil && diskConfig.ID == rootID.String() && databaseRoot.Path == payload.Path {
-		return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID, createStorageLocationOperationResult{RootID: rootID.String()})
+	if databaseErr == nil && diskErr == nil && diskConfig.ID == storageLocationID.String() && databaseRoot.Path == payload.Path {
+		return rm.completeRecoveredLifecycleOperation(ctx, operation.OperationID, createStorageLocationOperationResult{StorageLocationID: storageLocationID.String()})
 	}
 	if databaseErr != nil && !errors.Is(databaseErr, sql.ErrNoRows) {
 		return fmt.Errorf("recover Storage Location catalog lookup: %w", databaseErr)
@@ -777,7 +774,7 @@ func (rm *DefaultRepositoryManager) recoverCreateStorageLocationOperation(ctx co
 			return fmt.Errorf("%w: decode Storage Location rollback data: %v", ErrLifecycleRecoveryRequired, err)
 		}
 	}
-	if diskErr == nil && diskConfig.ID != rootID.String() {
+	if diskErr == nil && diskConfig.ID != storageLocationID.String() {
 		return fmt.Errorf("%w: Storage Location path now carries a different identity", ErrLifecycleRecoveryRequired)
 	}
 	if rollback.MarkerCreated {

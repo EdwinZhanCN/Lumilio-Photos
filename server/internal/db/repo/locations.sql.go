@@ -172,7 +172,7 @@ func (q *Queries) DisableUnresolvedLocationClusters(ctx context.Context) error {
 }
 
 const getLocationProjectionState = `-- name: GetLocationProjectionState :one
-SELECT repository_id, owner_id, source_revision, published_revision, updated_at
+SELECT repository_id, owner_id, source_revision, published_revision, updated_at, terminal_error
 FROM location_projection_state
 WHERE repository_id = ?1
   AND owner_id = ?2
@@ -192,6 +192,7 @@ func (q *Queries) GetLocationProjectionState(ctx context.Context, arg GetLocatio
 		&i.SourceRevision,
 		&i.PublishedRevision,
 		&i.UpdatedAt,
+		&i.TerminalError,
 	)
 	return i, err
 }

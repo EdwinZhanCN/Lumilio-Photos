@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"os"
@@ -45,10 +46,10 @@ func compatibilityFor(t *testing.T, catalog *db.DB, schemaVersion int) Compatibi
 		t.Fatalf("db.InspectCatalog: %v", err)
 	}
 	return Compatibility{
-		LibraryID:               info.LibraryID,
-		ConfigSchemaVersion:     schemaVersion,
-		MaxApplicationMigration: info.ApplicationMigration,
-		MaxRiverMigration:       info.RiverMigration,
+		LibraryID:           info.LibraryID,
+		ConfigSchemaVersion: schemaVersion,
+		SchemaVersion:       info.SchemaVersion,
+		MaxRiverMigration:   info.RiverMigration,
 	}
 }
 
@@ -617,5 +618,128 @@ func TestSchedulerPolicyAndForcedSnapshot(t *testing.T) {
 	}
 	if _, ok := LatestRoutine(dir); !ok {
 		t.Fatal("forced run did not create a snapshot")
+	}
+}
+
+func TestInspectCatalogUsesUserVersionWithoutMigrationLedger(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	appState := filepath.Join(root, "app-state")
+	if err := os.MkdirAll(appState, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	catalog := openTestCatalog(t, filepath.Join(appState, "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+
+	var ledgerTables int
+	if err := catalog.SQL.QueryRowContext(ctx, `
+		SELECT count(*) FROM sqlite_schema
+		WHERE type = 'table' AND name = 'lumilio_schema_migrations'
+	`).Scan(&ledgerTables); err != nil {
+		t.Fatal(err)
+	}
+	if ledgerTables != 0 {
+		t.Fatal("migration ledger table must not exist on a generation-9 catalog")
+	}
+
+	info, err := db.InspectCatalog(ctx, catalog.Path)
+	if err != nil {
+		t.Fatalf("InspectCatalog: %v", err)
+	}
+	if info.SchemaVersion != db.SchemaVersion {
+		t.Fatalf("SchemaVersion = %d, want PRAGMA user_version %d (not absent-ledger zero)", info.SchemaVersion, db.SchemaVersion)
+	}
+
+	backupDir := filepath.Join(root, "backups")
+	if err := os.MkdirAll(backupDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := CreateSnapshot(ctx, catalog.SQL, backupDir, "", SnapshotMetadata{
+		AppVersion: "test", ConfigSchemaVersion: 2,
+	}, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missingVersion := Compatibility{LibraryID: info.LibraryID, SchemaVersion: 0}
+	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, missingVersion); err == nil || !strings.Contains(err.Error(), "missing the runtime schema version") {
+		t.Fatalf("ValidateSnapshot with SchemaVersion=0 error = %v", err)
+	}
+	staleRuntime := Compatibility{LibraryID: info.LibraryID, SchemaVersion: db.SchemaVersion - 1}
+	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, staleRuntime); err == nil || !strings.Contains(err.Error(), "incompatible with runtime schema version") {
+		t.Fatalf("ValidateSnapshot with stale runtime schema error = %v", err)
+	}
+}
+
+// TestManifestSchemaProvenanceReplacesMigrationLedger proves the manifest
+// contract itself changed: it carries schema_version and no longer carries the
+// retired application_migration_version field.
+func TestManifestSchemaProvenanceReplacesMigrationLedger(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+
+	snapshot, err := CreateSnapshot(ctx, catalog.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+		AppVersion: "test", ConfigSchemaVersion: 2,
+	}, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Manifest.FormatVersion != manifestFormatVersion {
+		t.Fatalf("manifest format = %d, want %d", snapshot.Manifest.FormatVersion, manifestFormatVersion)
+	}
+	if snapshot.Manifest.SchemaVersion != db.SchemaVersion {
+		t.Fatalf("manifest schema version = %d, want %d", snapshot.Manifest.SchemaVersion, db.SchemaVersion)
+	}
+	rawManifest, err := os.ReadFile(ManifestPath(snapshot.Path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(rawManifest), `"schema_version": 9`) {
+		t.Fatalf("manifest lacks schema_version: %s", rawManifest)
+	}
+	if strings.Contains(string(rawManifest), "application_migration_version") {
+		t.Fatalf("manifest still carries retired provenance: %s", rawManifest)
+	}
+}
+
+// TestValidateSnapshotRejectsSupersededManifestFormat proves an older manifest
+// fails loudly instead of being read as an absent/matching version.
+func TestValidateSnapshotRejectsSupersededManifestFormat(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+
+	snapshot, err := CreateSnapshot(ctx, catalog.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+		AppVersion: "test", ConfigSchemaVersion: 2,
+	}, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := ManifestPath(snapshot.Path)
+	rawManifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rawManifest, &payload); err != nil {
+		t.Fatal(err)
+	}
+	payload["format_version"] = 2
+	delete(payload, "schema_version")
+	payload["application_migration_version"] = 17
+	encoded, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded = append(encoded, '\n')
+	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	compatibility := compatibilityFor(t, catalog, 2)
+	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, compatibility); err == nil || !strings.Contains(err.Error(), "manifest format 2 is unsupported") {
+		t.Fatalf("superseded manifest format error = %v", err)
 	}
 }

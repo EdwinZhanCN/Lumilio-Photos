@@ -24,7 +24,35 @@ func inspectPathPlatform(path string) pathPlatformInfo {
 		result.Device = fmt.Sprintf("%d", stat.Dev)
 		result.Inode = stat.Ino
 	}
+	// statfs reports the mount point of the volume backing the path, which is
+	// how macOS names storage to people: "/" for the boot volume and
+	// "/Volumes/<name>" for anything else.
+	var fsstat syscall.Statfs_t
+	if err := syscall.Statfs(path, &fsstat); err == nil {
+		result.MountPath = int8CString(fsstat.Mntonname[:])
+	}
 	return result
+}
+
+// capacityGroupKeyForPath proves shared backing capacity from statfs. The
+// filesystem ID is per mounted volume; the macOS mount point name is never
+// used because the same volume can be reached through firmlinks and several
+// mount points.
+func capacityGroupKeyForPath(path string, filesystem string) string {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return ""
+	}
+	return capacityGroupKeyFromStatfsID(capacityGroupKindDarwinStatfs, darwinStatfsFilesystemID(stat.Fsid.Val), filesystem)
+}
+
+// darwinStatfsFilesystemID encodes the two-word statfs filesystem ID. A zero
+// ID cannot prove a shared pool, so it stays empty (unknown).
+func darwinStatfsFilesystemID(fsid [2]int32) string {
+	if fsid[0] == 0 && fsid[1] == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%08x%08x", uint32(fsid[0]), uint32(fsid[1]))
 }
 
 func platformPlaceholderUnavailable(path string) (bool, error) {

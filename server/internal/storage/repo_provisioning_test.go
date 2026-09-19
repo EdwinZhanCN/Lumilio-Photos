@@ -17,7 +17,7 @@ func TestCreateRepositoryClassifiesAllExistingMarkerConflictsFromDisk(t *testing
 	ctx := context.Background()
 	rootPath := filepath.Join(t.TempDir(), "default")
 	initializeDefaultStorageForTest(t, manager, rootPath)
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestCreateRepositoryClassifiesAllExistingMarkerConflictsFromDisk(t *testing
 	}
 	_, err = manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-valid-existing", Actor: "test", Name: "Existing",
-		DirectoryName: "valid-existing", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "valid-existing", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	var existing *ExistingRepositoryFoundError
 	if !errors.As(err, &existing) || existing.RepositoryID != validMarker.ID {
@@ -48,7 +48,7 @@ func TestCreateRepositoryClassifiesAllExistingMarkerConflictsFromDisk(t *testing
 	}
 	_, err = manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-invalid-existing", Actor: "test", Name: "Invalid",
-		DirectoryName: "invalid-existing", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "invalid-existing", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	var invalid *RepositoryMarkerInvalidError
 	if !errors.As(err, &invalid) {
@@ -57,7 +57,7 @@ func TestCreateRepositoryClassifiesAllExistingMarkerConflictsFromDisk(t *testing
 
 	registered, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-conflict-source", Actor: "test", Name: "Source",
-		DirectoryName: "conflict-source", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "conflict-source", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestCreateRepositoryClassifiesAllExistingMarkerConflictsFromDisk(t *testing
 	}
 	_, err = manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "create-registered-copy", Actor: "test", Name: "Copy",
-		DirectoryName: "registered-copy", Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		DirectoryName: "registered-copy", Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	var conflict *RepositoryConflictError
 	if !errors.As(err, &conflict) || len(conflict.Actions) != 1 || conflict.Actions[0] != "copy" {
@@ -80,28 +80,28 @@ func TestCreateRepositoryClassifiesAllExistingMarkerConflictsFromDisk(t *testing
 }
 
 func TestResolveRepositoryCreatePathUsesExplicitStorageFolder(t *testing.T) {
-	root := canonicalTempDir(t)
+	storageLocation := canonicalTempDir(t)
 
-	got, err := resolveRepositoryCreatePath(root, "family-media", dbtypes.RepoRoleRegular)
+	got, err := resolveRepositoryCreatePath(storageLocation, "family-media", dbtypes.RepoRoleRegular)
 	if err != nil {
 		t.Fatalf("resolveRepositoryCreatePath returned error: %v", err)
 	}
 
-	want := filepath.Join(root, "family-media")
+	want := filepath.Join(storageLocation, "family-media")
 	if got != want {
 		t.Fatalf("resolveRepositoryCreatePath = %q, want %q", got, want)
 	}
 }
 
 func TestResolveRepositoryCreatePathUsesPrimaryFolderForPrimaryRole(t *testing.T) {
-	root := canonicalTempDir(t)
+	storageLocation := canonicalTempDir(t)
 
-	got, err := resolveRepositoryCreatePath(root, "Library", dbtypes.RepoRolePrimary)
+	got, err := resolveRepositoryCreatePath(storageLocation, "Library", dbtypes.RepoRolePrimary)
 	if err != nil {
 		t.Fatalf("resolveRepositoryCreatePath returned error: %v", err)
 	}
 
-	want := filepath.Join(root, "primary")
+	want := filepath.Join(storageLocation, "primary")
 	if got != want {
 		t.Fatalf("resolveRepositoryCreatePath = %q, want %q", got, want)
 	}
@@ -178,12 +178,12 @@ func TestValidateRepositoryDirectoryName(t *testing.T) {
 }
 
 func TestResolveRepositoryCreatePathRejectsCaseInsensitiveSiblingConflict(t *testing.T) {
-	root := canonicalTempDir(t)
-	if err := os.Mkdir(filepath.Join(root, "Family Media"), 0o755); err != nil {
+	storageLocation := canonicalTempDir(t)
+	if err := os.Mkdir(filepath.Join(storageLocation, "Family Media"), 0o755); err != nil {
 		t.Fatalf("create sibling directory: %v", err)
 	}
 
-	_, err := resolveRepositoryCreatePath(root, "family media", dbtypes.RepoRoleRegular)
+	_, err := resolveRepositoryCreatePath(storageLocation, "family media", dbtypes.RepoRoleRegular)
 	if !errors.Is(err, ErrRepositoryDirectoryConflict) {
 		t.Fatalf("resolveRepositoryCreatePath error = %v, want ErrRepositoryDirectoryConflict", err)
 	}

@@ -6,12 +6,10 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { getStorageEntityDisplayName, useRepositoryOptions } from "@/features/repositories";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
-import { LifecycleHistory } from "./LifecycleHistory";
 import { MLMonitor } from "./MLMonitor";
 import { StatMonitor } from "./StatMonitor";
-import { StorageMonitor } from "./StorageMonitor";
 
-type MonitorView = "queue" | "ml" | "capabilities" | "storage";
+type MonitorView = "queue" | "ml" | "capabilities";
 
 export default function MonitorOverview() {
   const { t } = useI18n();
@@ -19,9 +17,7 @@ export default function MonitorOverview() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedView = searchParams.get("tab");
   const view: MonitorView =
-    requestedView === "capabilities" || requestedView === "ml" || requestedView === "storage"
-      ? requestedView
-      : "queue";
+    requestedView === "capabilities" || requestedView === "ml" ? requestedView : "queue";
 
   const [localRepoId, setLocalRepoId] = useState<string | undefined>(undefined);
   const { repositories } = useRepositoryOptions();
@@ -104,15 +100,6 @@ export default function MonitorOverview() {
             >
               {t("monitor.tabs.capabilities")}
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "storage"}
-              className={`tab ${view === "storage" ? "tab-active" : ""}`}
-              onClick={() => setView("storage")}
-            >
-              {t("monitor.tabs.storage", "Storage")}
-            </button>
           </div>
         </div>
       </PageHeader>
@@ -121,12 +108,7 @@ export default function MonitorOverview() {
         className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${view === "queue" ? "bg-base-200/40" : ""}`}
       >
         <div className="mx-auto w-full max-w-7xl space-y-5 p-4 pb-8 sm:p-6">
-          {view === "storage" ? (
-            <>
-              <StorageMonitor />
-              <LifecycleHistory />
-            </>
-          ) : view === "queue" ? (
+          {view === "queue" ? (
             <StatMonitor />
           ) : view === "ml" ? (
             <MLMonitor localRepoId={localRepoId} />

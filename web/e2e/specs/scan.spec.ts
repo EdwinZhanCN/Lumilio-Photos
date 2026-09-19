@@ -4,7 +4,7 @@ import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
-type RepositoryOptions = components["schemas"]["dto.IndexingRepositoryListResponseDTO"];
+type StorageView = components["schemas"]["dto.StorageViewResponseDTO"];
 type ScanAccepted = components["schemas"]["dto.RepositoryScanQueuedDTO"];
 type AssetList = components["schemas"]["dto.QueryAssetsResponseDTO"];
 
@@ -14,18 +14,19 @@ test("@smoke administrator scans a real repository file and sees it", async ({
 }) => {
   test.setTimeout(120_000);
   await expect(async () => {
-    const options = await api<RepositoryOptions>("/api/v1/assets/indexing/repositories", {
-      token: workspace.token,
-    });
-    const repository = options.repositories?.find(({ id }) => id === workspace.repositoryId);
+    const view = await api<StorageView>("/api/v1/storage/view", { token: workspace.token });
+    const repository = view.repositories?.find(({ id }) => id === workspace.repositoryId);
     expect(repository?.activity).toBe("idle");
   }).toPass({ timeout: 90_000 });
 
-  const queued = await api<ScanAccepted>(`/api/v1/repositories/${workspace.repositoryId}/scan`, {
-    method: "POST",
-    token: workspace.token,
-    body: JSON.stringify({ force: false }),
-  });
+  const queued = await api<ScanAccepted>(
+    `/api/v1/storage/repositories/${workspace.repositoryId}/verifications`,
+    {
+      method: "POST",
+      token: workspace.token,
+      body: JSON.stringify({ force: false }),
+    },
+  );
   expect(queued.operation_id).toBeTruthy();
   await expect(async () => {
     const assets = await api<AssetList>("/api/v1/assets/list", {

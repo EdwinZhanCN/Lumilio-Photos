@@ -274,12 +274,12 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		return errors.New("storage runtime status performs reconciliation; GET/setup status must read the cached projection without acquiring SQLite's writer")
 	}
 
-	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/repository_roots.go"))
+	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/storage_locations.go"))
 	if err != nil {
 		return fmt.Errorf("read Storage Location list boundary: %w", err)
 	}
-	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error) {\n\tif err := rm.ReconcileRepositoryRoots(ctx)") {
-		return errors.New("ListRepositoryRoots reconciles on a foreground read; background storage reconciliation owns projection writes")
+	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListStorageLocations(ctx context.Context) ([]repo.StorageLocation, error) {\n\tif err := rm.ReconcileStorageLocations(ctx)") {
+		return errors.New("ListStorageLocations reconciles on a foreground read; background storage reconciliation owns projection writes")
 	}
 
 	hostActionSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/host_action.go"))
@@ -298,7 +298,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		if strings.HasSuffix(relative, "_test.go") {
 			return false
 		}
-		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileRepositoryRoots(")
+		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileStorageLocations(")
 	})
 	if err != nil {
 		return err

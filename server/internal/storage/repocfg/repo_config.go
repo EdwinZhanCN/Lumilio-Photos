@@ -204,8 +204,8 @@ func (rc *RepositoryConfig) Validate() error {
 	return nil
 }
 
-// IsRepositoryRoot checks if a directory contains a .lumiliorepo file
-func IsRepositoryRoot(path string) bool {
+// IsStorageLocation checks if a directory contains a .lumiliorepo file
+func IsStorageLocation(path string) bool {
 	configPath := filepath.Join(path, ".lumiliorepo")
 	_, err := os.Stat(configPath)
 	return err == nil

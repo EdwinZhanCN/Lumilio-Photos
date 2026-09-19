@@ -23,22 +23,20 @@ The route checks the authenticated user before monitor queries render.
 ```mermaid
 flowchart TD
     ROUTE["/server-monitor"] --> ADMIN["admin gate"]
-    ADMIN --> TABS["queue / ML / capabilities / storage"]
+    ADMIN --> TABS["queue / ML / capabilities"]
     TABS --> QUEUE["StatMonitor + QueueSummaryList"]
     TABS --> ML["MLMonitor"]
     TABS --> CAP["CapabilitiesMonitor"]
-    TABS --> STORAGE["StorageMonitor"]
-    STORAGE --> HISTORY["LifecycleHistory"]
     ML --> REPOSITORY["optional repository scope"]
     ML --> REBUILD["task rebuild"]
 ```
 
-[MonitorFrame](./flows/overview/MonitorFrame.tsx) gives all four tabs one compact snapshot heading: the
+[MonitorFrame](./flows/overview/MonitorFrame.tsx) gives every tab one compact snapshot heading: the
 successful-read timestamp, that tab's actions, and refresh. The route header
 already names the tab and the primary visual already enumerates its subjects,
 so the heading never repeats a title or tallies targets. A failed background
-read retains cached facts with an explicit stale warning. Storage is a manual
-snapshot; the other tabs retain their polling intervals.
+read retains cached facts with an explicit stale warning. Each tab retains
+its own polling interval.
 
 [StatMonitor](./flows/overview/StatMonitor.tsx) contains four independently selected work trays and keeps
 [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) inside delivery diagnostics. The authored file tray
@@ -59,19 +57,13 @@ Advertisements filter nodes but do not override public capability composition.
 Agent configuration, backend and full node diagnostics remain expandable.
 [MLMonitor](./flows/overview/MLMonitor.tsx) combines coverage, repository options, and one confirmed
 rebuild command. [CapabilitiesMonitor](./flows/overview/CapabilitiesMonitor.tsx) is display-only; durable ML and
-agent settings stay in Settings. [StorageMonitor](./flows/overview/StorageMonitor.tsx) groups repositories
-below their owning Storage Locations and exposes filesystem-writable capacity,
-the server-owned safety reserve and resulting write budget, mount, risk, and
-redacted support-bundle diagnostics. The tree is the only enumeration of
-targets, so a count of targets needing attention sits above it and appears
-only when one exists — never for a healthy snapshot, and never while the
-shown snapshot is stale. [CapacityMap](./flows/overview/CapacityMap.tsx) partitions total capacity into
-used, Server-reported write budget, and actual retained space, with no
-area-distorting gaps. A small area moves its label to the legend, and the
-selected area's meaning is stated once instead of beside a repeated value.
-The tree expresses ownership only; the selected detail grows with its
-content, and measurement caveats stay inside its diagnostics disclosure.
-[LifecycleHistory](./flows/overview/LifecycleHistory.tsx) renders the durable lifecycle audit below the pane.
+agent settings stay in Settings.
+
+Storage administration is not a Monitor tab. Storage Locations,
+Repositories, capacity, verification, and the lifecycle audit belong to the
+admin Storage route owned by `features/repositories`; Monitor reports
+processing health only. Keeping storage out of Monitor leaves exactly one
+authority for a storage fact.
 
 ## Data
 

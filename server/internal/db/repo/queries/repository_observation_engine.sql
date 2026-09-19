@@ -221,14 +221,14 @@ WHERE run_id = ?1
   AND status IN ('queued', 'crawling', 'catching_up', 'finalizing')
 RETURNING *;
 
--- name: InsertRepositoryRootNode :one
+-- name: InsertRepositoryTreeRootNode :one
 INSERT INTO repository_nodes (
     node_id, repository_id, parent_node_id, name, name_key, kind,
     lifecycle, observation_revision, stability_token, created_at, updated_at
 ) VALUES (?1, ?2, NULL, '', '', 'directory', 'active', ?3, ?4, ?5, ?5)
 RETURNING *;
 
--- name: GetRepositoryRootNode :one
+-- name: GetRepositoryTreeRootNode :one
 SELECT * FROM repository_nodes
 WHERE repository_id = ?1
   AND parent_node_id IS NULL

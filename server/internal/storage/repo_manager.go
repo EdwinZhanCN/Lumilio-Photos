@@ -44,10 +44,10 @@ type RepositoryRemovalImpact struct {
 	PrivateStateFound bool
 }
 
-type RepositoryRootRemovalImpact struct {
-	RootID               string
-	RootName             string
-	Kind                 dbtypes.RepositoryRootKind
+type StorageLocationRemovalImpact struct {
+	StorageLocationID    string
+	StorageLocationName  string
+	Kind                 dbtypes.StorageLocationKind
 	RepositoryCount      int64
 	ActiveOperationCount int64
 	CanRemove            bool
@@ -83,14 +83,14 @@ type RepositoryManager interface {
 	// directory structure, writes the .lumiliorepo config, and inserts the
 	// database record. It fails if a repository already exists at path or path
 	// is nested inside one, and removes any partially created files on failure.
-	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, storageLocationID ...uuid.UUID) (*repo.Repository, error)
 
 	// AddRepository registers an already-initialized on-disk repository (one
 	// that has a valid .lumiliorepo). It fails if the path is not a valid
 	// repository or is already registered. If the repository's ID is registered
 	// at a different path it returns a *RepositoryConflictError, which the caller
 	// resolves with RelocateRepository or RegisterRepositoryCopy.
-	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error)
+	AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, storageLocationID ...uuid.UUID) (*repo.Repository, error)
 
 	// OpenRepository is the durable user-facing attach workflow. It isolates
 	// repository-private state left by a previous registration before inserting
@@ -103,14 +103,14 @@ type RepositoryManager interface {
 	// Storage Locations are host-authorized repository containers. The default
 	// location comes from immutable config; external locations come only from a
 	// native Desktop grant, never an arbitrary shared-API path.
-	EnsureDefaultRepositoryRoot(ctx context.Context, path string, request ...LifecycleRequest) (*repo.RepositoryRoot, error)
-	AddRepositoryRoot(ctx context.Context, path, name string, request ...LifecycleRequest) (*repo.RepositoryRoot, error)
-	RelocateRepositoryRoot(ctx context.Context, id, path string, request ...LifecycleRequest) (*repo.RepositoryRoot, error)
-	ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error)
-	GetRepositoryRoot(ctx context.Context, id string) (*repo.RepositoryRoot, error)
-	PreviewRepositoryRootRemoval(ctx context.Context, id string) (RepositoryRootRemovalImpact, error)
-	DeleteRepositoryRoot(ctx context.Context, id string, request ...LifecycleRequest) error
-	ReconcileRepositoryRoots(ctx context.Context) error
+	EnsureDefaultStorageLocation(ctx context.Context, path string, request ...LifecycleRequest) (*repo.StorageLocation, error)
+	AddStorageLocation(ctx context.Context, path, name string, request ...LifecycleRequest) (*repo.StorageLocation, error)
+	RelocateStorageLocation(ctx context.Context, id, path string, request ...LifecycleRequest) (*repo.StorageLocation, error)
+	ListStorageLocations(ctx context.Context) ([]repo.StorageLocation, error)
+	GetStorageLocation(ctx context.Context, id string) (*repo.StorageLocation, error)
+	PreviewStorageLocationRemoval(ctx context.Context, id string) (StorageLocationRemovalImpact, error)
+	DeleteStorageLocation(ctx context.Context, id string, request ...LifecycleRequest) error
+	ReconcileStorageLocations(ctx context.Context) error
 
 	// RelocateRepository points an existing repository at a new on-disk
 	// location. Assets and Locations are untouched because repository node paths
@@ -295,11 +295,11 @@ func (rm *DefaultRepositoryManager) HostOwnerID(ctx context.Context) (*int32, er
 }
 
 // AddRepository registers an existing repository with the system
-func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error) {
-	return rm.addRepository(context.Background(), path, defaultOwnerID, role, false, rootID...)
+func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32, role dbtypes.RepoRole, storageLocationID ...uuid.UUID) (*repo.Repository, error) {
+	return rm.addRepository(context.Background(), path, defaultOwnerID, role, false, storageLocationID...)
 }
 
-func (rm *DefaultRepositoryManager) addRepository(ctx context.Context, path string, defaultOwnerID *int32, role dbtypes.RepoRole, locksHeld bool, rootID ...uuid.UUID) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) addRepository(ctx context.Context, path string, defaultOwnerID *int32, role dbtypes.RepoRole, locksHeld bool, storageLocationID ...uuid.UUID) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := CanonicalizeRepositoryPath(path)
 	if err != nil {
@@ -350,39 +350,39 @@ func (rm *DefaultRepositoryManager) addRepository(ctx context.Context, path stri
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
-	associatedRootID, err := rm.resolveRepositoryAssociation(ctx, cleanPath, rootID)
+	associatedStorageLocationID, err := rm.resolveRepositoryAssociation(ctx, cleanPath, storageLocationID)
 	if err != nil {
 		return nil, err
 	}
-	associatedRoot, err := rm.queries.GetRepositoryRoot(ctx, associatedRootID)
+	associatedStorageLocation, err := rm.queries.GetStorageLocation(ctx, associatedStorageLocationID)
 	if err != nil {
 		return nil, fmt.Errorf("load repository Storage Location: %w", err)
 	}
-	if err := rm.claimRuntimeStoragePath(ctx, "root", associatedRoot.Path); err != nil {
+	if err := rm.claimRuntimeStoragePath(ctx, "storage_location", associatedStorageLocation.Path); err != nil {
 		return nil, err
 	}
-	releaseRoot := func() {}
+	releaseStorageLocation := func() {}
 	releaseMutation := func() {}
 	if !locksHeld {
-		releaseRoot = rm.acquireRepositoryRootRead(associatedRootID)
+		releaseStorageLocation = rm.acquireStorageLocationRead(associatedStorageLocationID)
 		releaseMutation = rm.acquireRepositoryMutation(repoUUID)
 	}
-	defer releaseRoot()
+	defer releaseStorageLocation()
 	defer releaseMutation()
 
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(ctx, repo.CreateRepositoryParams{
-		RepoID:         repoUUID,
-		Name:           config.Name,
-		Path:           cleanPath,
-		Config:         *config,
-		Role:           normalizeRepoRole(role),
-		Reachability:   dbtypes.RepositoryReachabilityActive,
-		Activity:       dbtypes.RepositoryActivityIdle,
-		DefaultOwnerID: defaultOwnerID,
-		CreatedAt:      dbtypes.NewTimestamp(config.CreatedAt),
-		UpdatedAt:      dbtypes.NewTimestamp(now),
-		RootID:         associatedRootID,
+		RepoID:            repoUUID,
+		Name:              config.Name,
+		Path:              cleanPath,
+		Config:            *config,
+		Role:              normalizeRepoRole(role),
+		Reachability:      dbtypes.RepositoryReachabilityActive,
+		Activity:          dbtypes.RepositoryActivityIdle,
+		DefaultOwnerID:    defaultOwnerID,
+		CreatedAt:         dbtypes.NewTimestamp(config.CreatedAt),
+		UpdatedAt:         dbtypes.NewTimestamp(now),
+		StorageLocationID: associatedStorageLocationID,
 	})
 	if err != nil {
 		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_id", config.ID))
@@ -556,8 +556,8 @@ func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error
 }
 
 // InitializeRepository creates a new repository with full directory structure
-func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, rootID ...uuid.UUID) (*repo.Repository, error) {
-	return rm.initializeRepository(context.Background(), path, config, defaultOwnerID, role, nil, rootID...)
+func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32, role dbtypes.RepoRole, storageLocationID ...uuid.UUID) (*repo.Repository, error) {
+	return rm.initializeRepository(context.Background(), path, config, defaultOwnerID, role, nil, storageLocationID...)
 }
 
 func (rm *DefaultRepositoryManager) initializeRepository(
@@ -567,7 +567,7 @@ func (rm *DefaultRepositoryManager) initializeRepository(
 	defaultOwnerID *int32,
 	role dbtypes.RepoRole,
 	operation *repo.LifecycleOperation,
-	rootID ...uuid.UUID,
+	storageLocationID ...uuid.UUID,
 ) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := CanonicalizeRepositoryPath(path)
@@ -577,7 +577,7 @@ func (rm *DefaultRepositoryManager) initializeRepository(
 	}
 
 	// Check if repository already exists
-	if repocfg.IsRepositoryRoot(cleanPath) {
+	if repocfg.IsStorageLocation(cleanPath) {
 		return nil, fmt.Errorf("repository already exists at %s", cleanPath)
 	}
 
@@ -598,19 +598,19 @@ func (rm *DefaultRepositoryManager) initializeRepository(
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
-	associatedRootID, err := rm.resolveRepositoryAssociation(ctx, cleanPath, rootID)
+	associatedStorageLocationID, err := rm.resolveRepositoryAssociation(ctx, cleanPath, storageLocationID)
 	if err != nil {
 		return nil, err
 	}
-	associatedRoot, err := rm.queries.GetRepositoryRoot(ctx, associatedRootID)
+	associatedStorageLocation, err := rm.queries.GetStorageLocation(ctx, associatedStorageLocationID)
 	if err != nil {
 		return nil, fmt.Errorf("load repository Storage Location: %w", err)
 	}
-	if err := rm.claimRuntimeStoragePath(ctx, "root", associatedRoot.Path); err != nil {
+	if err := rm.claimRuntimeStoragePath(ctx, "storage_location", associatedStorageLocation.Path); err != nil {
 		return nil, err
 	}
-	releaseRoot := rm.acquireRepositoryRootRead(associatedRootID)
-	defer releaseRoot()
+	releaseStorageLocation := rm.acquireStorageLocationRead(associatedStorageLocationID)
+	defer releaseStorageLocation()
 	releaseMutation := rm.acquireRepositoryMutation(repoUUID)
 	defer releaseMutation()
 
@@ -664,17 +664,17 @@ func (rm *DefaultRepositoryManager) initializeRepository(
 
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(ctx, repo.CreateRepositoryParams{
-		RepoID:         repoUUID,
-		Name:           config.Name,
-		Path:           cleanPath,
-		Config:         config,
-		Role:           normalizeRepoRole(role),
-		Reachability:   dbtypes.RepositoryReachabilityActive,
-		Activity:       dbtypes.RepositoryActivityIdle,
-		DefaultOwnerID: defaultOwnerID,
-		CreatedAt:      dbtypes.NewTimestamp(config.CreatedAt),
-		UpdatedAt:      dbtypes.NewTimestamp(now),
-		RootID:         associatedRootID,
+		RepoID:            repoUUID,
+		Name:              config.Name,
+		Path:              cleanPath,
+		Config:            config,
+		Role:              normalizeRepoRole(role),
+		Reachability:      dbtypes.RepositoryReachabilityActive,
+		Activity:          dbtypes.RepositoryActivityIdle,
+		DefaultOwnerID:    defaultOwnerID,
+		CreatedAt:         dbtypes.NewTimestamp(config.CreatedAt),
+		UpdatedAt:         dbtypes.NewTimestamp(now),
+		StorageLocationID: associatedStorageLocationID,
 	})
 	if err != nil {
 		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_id", config.ID), zap.String("repository_name", config.Name))
@@ -855,13 +855,14 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 	}
 	privatePath := filepath.Join(existing.Path, DefaultStructure.SystemDir)
 	if info, statErr := os.Stat(privatePath); statErr == nil && info.IsDir() {
-		impact.PrivateStateFound = true
-		impact.PrivateStateBytes, err = directoryTreeSize(privatePath)
-		if err != nil {
-			return RepositoryRemovalImpact{}, fmt.Errorf("measure repository private state: %w", err)
+		size, measureErr := directoryTreeSize(privatePath)
+		if measureErr != nil {
+			impact.PrivateStateFound = false
+			impact.PrivateStateBytes = 0
+		} else {
+			impact.PrivateStateFound = true
+			impact.PrivateStateBytes = size
 		}
-	} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
-		return RepositoryRemovalImpact{}, fmt.Errorf("inspect repository private state: %w", statErr)
 	}
 	return impact, nil
 }
@@ -878,15 +879,11 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 	if existing.Role == dbtypes.RepoRolePrimary {
 		return ErrPrimaryRepositoryNotRemovable
 	}
-	if existing.Activity != dbtypes.RepositoryActivityIdle {
+	if existing.Activity != dbtypes.RepositoryActivityIdle &&
+		!repositoryReachabilityAllowsStaleActivityDetach(existing.Reachability) {
 		return fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, existing.Activity)
 	}
 	coordinator := rm.files.AccessCoordinator()
-	releaseRoot, err := coordinator.AcquireRootReadContext(ctx, existing.RootID)
-	if err != nil {
-		return fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
-	}
-	defer releaseRoot()
 	releaseMutation, err := coordinator.AcquireMutationsContext(ctx, []uuid.UUID{repoUUID})
 	if err != nil {
 		return fmt.Errorf("%w: repository is busy: %v", ErrRepositoryBusy, err)
@@ -906,6 +903,23 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 	}
 	if runningOperations != 0 {
 		return fmt.Errorf("%w: repository has an active lifecycle operation", ErrRepositoryBusy)
+	}
+	if existing.Activity != dbtypes.RepositoryActivityIdle {
+		if !repositoryReachabilityAllowsStaleActivityDetach(existing.Reachability) {
+			return fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, existing.Activity)
+		}
+		if _, err := rm.queries.FinishRepositoryActivity(ctx, repo.FinishRepositoryActivityParams{
+			RepoID: repoUUID, Activity: existing.Activity, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		}); err != nil {
+			return fmt.Errorf("clear offline repository activity before detach: %w", err)
+		}
+		existing, err = rm.queries.GetRepository(ctx, repoUUID)
+		if err != nil {
+			return err
+		}
+		if existing.Activity != dbtypes.RepositoryActivityIdle {
+			return fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, existing.Activity)
+		}
 	}
 	if _, err := rm.queries.BeginRepositoryMaintenance(ctx, repo.BeginRepositoryMaintenanceParams{
 		RepoID: repoUUID, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
@@ -1076,6 +1090,11 @@ func firstLifecycleRequest(requests []LifecycleRequest) LifecycleRequest {
 	return requests[0]
 }
 
+func repositoryReachabilityAllowsStaleActivityDetach(reachability dbtypes.RepositoryReachability) bool {
+	return reachability == dbtypes.RepositoryReachabilityOffline ||
+		reachability == dbtypes.RepositoryReachabilityIdentityError
+}
+
 func directoryTreeSize(root string) (int64, error) {
 	var total int64
 	err := filepath.WalkDir(root, func(_ string, entry os.DirEntry, err error) error {
@@ -1095,13 +1114,15 @@ func directoryTreeSize(root string) (int64, error) {
 	return total, err
 }
 
-// BeginRepositoryWork establishes the parent identity lease and persistent
-// activity gate used by lifecycle maintenance. Its callers publish only
-// catalog/queue intent, so they deliberately do not take the repository's
-// filesystem mutation lease: waiting for active media readers would put an
-// unbounded filesystem operation on a synchronous request path. The activity
-// compare-and-swap serializes enqueue with repository removal, and the worker
-// resolves the current Location again before execution.
+// BeginRepositoryWork establishes the repository's own persistent activity gate
+// used by lifecycle maintenance. Its callers publish only catalog/queue intent, so
+// they deliberately do not take the repository's filesystem mutation lease:
+// waiting for active media readers would put an unbounded filesystem operation
+// on a synchronous request path. The activity compare-and-swap admits work only
+// while the child itself is reachable and idle, and serializes enqueue with
+// repository removal; the worker resolves the current Location again before
+// execution. Parent Storage Location health, status, marker, and lifecycle
+// leases never participate in admission.
 //
 // Callers must invoke the returned release function after their catalog write
 // or queue-enqueue section.
@@ -1110,34 +1131,14 @@ func (rm *DefaultRepositoryManager) BeginRepositoryWork(ctx context.Context, id 
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
-	repository, err := rm.queries.GetRepository(ctx, repositoryID)
-	if err != nil {
-		return nil, nil, err
-	}
-	coordinator := rm.files.AccessCoordinator()
-	releaseRoot, err := coordinator.AcquireRootReadContext(ctx, repository.RootID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
-	}
-	fail := func(cause error) (*repo.Repository, func() error, error) {
-		releaseRoot()
-		return nil, nil, cause
-	}
-	repository, err = rm.queries.GetRepository(ctx, repositoryID)
-	if err != nil {
-		return fail(err)
-	}
-	if err := rm.files.ValidateRepositoryParent(ctx, repository); err != nil {
-		return fail(err)
-	}
 	started, err := rm.queries.BeginRepositoryActivity(ctx, repo.BeginRepositoryActivityParams{
 		RepoID: repositoryID, Activity: activity, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return fail(fmt.Errorf("%w: repository is unavailable or has active work", ErrRepositoryBusy))
+			return nil, nil, fmt.Errorf("%w: repository is unavailable or has active work", ErrRepositoryBusy)
 		}
-		return fail(fmt.Errorf("begin repository work: %w", err))
+		return nil, nil, fmt.Errorf("begin repository work: %w", err)
 	}
 	released := false
 	release := func() error {
@@ -1148,7 +1149,6 @@ func (rm *DefaultRepositoryManager) BeginRepositoryWork(ctx context.Context, id 
 		_, finishErr := rm.queries.FinishRepositoryActivity(context.Background(), repo.FinishRepositoryActivityParams{
 			RepoID: repositoryID, Activity: activity, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 		})
-		releaseRoot()
 		return finishErr
 	}
 	return &started, release, nil
@@ -1226,7 +1226,8 @@ func (rm *DefaultRepositoryManager) ReadRepositorySidecar(ctx context.Context, r
 // RenameRepository changes only the mutable display name. Storage strategy,
 // duplicate handling, identity, ownership, role, root and path are copied from
 // the authoritative existing marker/catalog record and cannot be supplied by
-// the caller.
+// the caller. The repository's own marker and path decide the write; parent
+// Storage Location status and marker are not consulted.
 func (rm *DefaultRepositoryManager) RenameRepository(ctx context.Context, id, name string, requests ...LifecycleRequest) (*repo.Repository, error) {
 	if err := ValidateRepositoryName(name); err != nil {
 		return nil, err
@@ -1243,19 +1244,11 @@ func (rm *DefaultRepositoryManager) RenameRepository(ctx context.Context, id, na
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryOffline, repository.Path)
 	}
 	coordinator := rm.files.AccessCoordinator()
-	releaseRoot, err := coordinator.AcquireRootReadContext(ctx, repository.RootID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
-	}
-	defer releaseRoot()
 	releaseRepository, err := coordinator.AcquireMutationsContext(ctx, []uuid.UUID{repositoryID})
 	if err != nil {
 		return nil, fmt.Errorf("%w: repository is busy: %v", ErrRepositoryBusy, err)
 	}
 	defer releaseRepository()
-	if err := rm.files.ValidateRepositoryParent(ctx, repository); err != nil {
-		return nil, fmt.Errorf("validate repository parent before rename: %w", err)
-	}
 
 	previousConfig := repository.Config
 	updatedConfig := previousConfig
@@ -1331,11 +1324,11 @@ func (rm *DefaultRepositoryManager) acquireRepositoryMutation(repositoryID uuid.
 	return rm.files.AccessCoordinator().AcquireMutation(repositoryID)
 }
 
-func (rm *DefaultRepositoryManager) acquireRepositoryRootRead(rootID uuid.UUID) func() {
+func (rm *DefaultRepositoryManager) acquireStorageLocationRead(storageLocationID uuid.UUID) func() {
 	if rm == nil || rm.files == nil || rm.files.AccessCoordinator() == nil {
 		return func() {}
 	}
-	return rm.files.AccessCoordinator().AcquireRootRead(rootID)
+	return rm.files.AccessCoordinator().AcquireRootRead(storageLocationID)
 }
 
 func normalizeRepoRole(role dbtypes.RepoRole) dbtypes.RepoRole {

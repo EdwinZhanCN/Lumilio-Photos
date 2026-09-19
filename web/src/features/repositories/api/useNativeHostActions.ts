@@ -9,7 +9,7 @@ export type HostActionResolution =
 export function useNativeHostCapability() {
   return $api.useQuery(
     "get",
-    "/api/v1/host-actions/native-capability",
+    "/api/v1/storage/native-capability",
     {},
     { staleTime: 30_000, refetchOnWindowFocus: true },
   );
@@ -18,24 +18,29 @@ export function useNativeHostCapability() {
 export function useNativeHostAction(actionID: string, enabled: boolean) {
   return $api.useQuery(
     "get",
-    "/api/v1/host-actions/{id}",
+    "/api/v1/storage/native-tasks/{id}",
     { params: { path: { id: actionID } } },
     { enabled: enabled && actionID.length > 0, refetchInterval: 1500 },
   );
 }
 
 export function useUnfinishedNativeHostActions(enabled: boolean) {
-  return $api.useQuery("get", "/api/v1/host-actions", {}, { enabled, refetchOnWindowFocus: true });
+  return $api.useQuery(
+    "get",
+    "/api/v1/storage/native-tasks",
+    {},
+    { enabled, refetchOnWindowFocus: true },
+  );
 }
 
 export function useCreateNativeHostAction() {
-  return $api.useMutation("post", "/api/v1/host-actions");
+  return $api.useMutation("post", "/api/v1/storage/native-tasks");
 }
 
 export function useResolveNativeHostAction() {
-  return $api.useMutation("post", "/api/v1/host-actions/{id}/resolve");
+  return $api.useMutation("post", "/api/v1/storage/native-tasks/{id}/resolve");
 }
 
 export function useCancelNativeHostAction() {
-  return $api.useMutation("delete", "/api/v1/host-actions/{id}");
+  return $api.useMutation("post", "/api/v1/storage/native-tasks/{id}/cancel");
 }

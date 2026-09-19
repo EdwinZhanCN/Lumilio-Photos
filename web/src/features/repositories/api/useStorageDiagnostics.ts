@@ -4,7 +4,7 @@ import { normalizeStorageDiagnosticsResponse } from "../model/storageEntities";
 export function useStorageDiagnostics(enabled: boolean) {
   return $api.useQuery(
     "get",
-    "/api/v1/repositories/storage-diagnostics",
+    "/api/v1/storage/diagnostics",
     {},
     { enabled, staleTime: 15_000, select: normalizeStorageDiagnosticsResponse },
   );
@@ -13,7 +13,7 @@ export function useStorageDiagnostics(enabled: boolean) {
 export function useLifecycleAudit(enabled: boolean) {
   return $api.useQuery(
     "get",
-    "/api/v1/repositories/lifecycle-audit",
+    "/api/v1/storage/audit",
     { params: { query: { limit: 100, offset: 0 } } },
     { enabled, staleTime: 10_000 },
   );
@@ -22,7 +22,7 @@ export function useLifecycleAudit(enabled: boolean) {
 export function useStorageSupportBundle() {
   return $api.useQuery(
     "get",
-    "/api/v1/repositories/storage-support-bundle",
+    "/api/v1/storage/support-bundle",
     {},
     { enabled: false, staleTime: 0 },
   );

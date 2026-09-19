@@ -110,17 +110,17 @@ INSERT INTO users (
 
 func insertRetrieverRepositories(t *testing.T, database *db.DB, repositoryA, repositoryB uuid.UUID) {
 	t.Helper()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err := database.SQL.Exec(`
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
 ) VALUES
     (?, 'repo-a', '/media/a', 1, 1, 1, ?),
     (?, 'repo-b', '/media/b', 1, 1, 1, ?);
-`, rootID, repositoryA, rootID, repositoryB, rootID)
+`, storageLocationID, repositoryA, storageLocationID, repositoryB, storageLocationID)
 	require.NoError(t, err)
 }
 

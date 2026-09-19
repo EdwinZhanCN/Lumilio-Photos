@@ -65,7 +65,7 @@ func openAuthorizedLibraryOCRTestCatalog(t *testing.T) (*db.DB, authorizedLibrar
 	require.NoError(t, catalog.Migrate(ctx))
 	t.Cleanup(func() { require.NoError(t, catalog.Close(context.Background())) })
 
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	repositoryID := uuid.New()
 	ids := authorizedLibraryOCRIDs{
 		ownerPhoto:      uuid.New(),
@@ -79,13 +79,13 @@ INSERT INTO users (
 ) VALUES
     (1, 'ocr-owner', 'hash', 1, 1, x'01'),
     (2, 'other-owner', 'hash', 1, 1, x'02');
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
 ) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-`, rootID, repositoryID, rootID)
+`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	for _, fixture := range []struct {
 		id, filename, assetType, mime string

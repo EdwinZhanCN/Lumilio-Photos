@@ -215,7 +215,7 @@ type Querier interface {
 	DeleteEventMemberships(ctx context.Context, arg DeleteEventMembershipsParams) error
 	DeleteExpiredAgentRefs(ctx context.Context, now dbtypes.Timestamp) error
 	DeleteExpiredAuthSecurityVerifications(ctx context.Context) error
-	DeleteExternalRepositoryRoot(ctx context.Context, rootID uuid.UUID) (int64, error)
+	DeleteExternalStorageLocation(ctx context.Context, storageLocationID uuid.UUID) (int64, error)
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
 	DeleteFaceClusterMembersByCluster(ctx context.Context, clusterID int32) error
@@ -357,7 +357,7 @@ type Querier interface {
 	GetContentObjectByID(ctx context.Context, contentID uuid.UUID) (ContentObject, error)
 	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)
 	GetDefaultEmbeddingSpaceByType(ctx context.Context, embeddingType string) (EmbeddingSpace, error)
-	GetDefaultRepositoryRoot(ctx context.Context) (RepositoryRoot, error)
+	GetDefaultStorageLocation(ctx context.Context) (StorageLocation, error)
 	GetDistinctCameraModels(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
 	GetDuplicateGroupAssets(ctx context.Context, groupID uuid.UUID) ([]DuplicateGroupAsset, error)
@@ -482,11 +482,9 @@ type Querier interface {
 	GetRepositoryObservationBySourceEvent(ctx context.Context, arg GetRepositoryObservationBySourceEventParams) (RepositoryObservation, error)
 	GetRepositoryObservationForNodeRevision(ctx context.Context, arg GetRepositoryObservationForNodeRevisionParams) (RepositoryObservation, error)
 	GetRepositoryObservationState(ctx context.Context, repositoryID uuid.UUID) (RepositoryObservationState, error)
-	GetRepositoryRoot(ctx context.Context, rootID uuid.UUID) (RepositoryRoot, error)
-	GetRepositoryRootByPath(ctx context.Context, path string) (RepositoryRoot, error)
-	GetRepositoryRootNode(ctx context.Context, repositoryID uuid.UUID) (RepositoryNode, error)
 	GetRepositoryScanRun(ctx context.Context, arg GetRepositoryScanRunParams) (RepositoryScanRun, error)
 	GetRepositoryStagingCommit(ctx context.Context, commitID uuid.UUID) (RepositoryStagingCommit, error)
+	GetRepositoryTreeRootNode(ctx context.Context, repositoryID uuid.UUID) (RepositoryNode, error)
 	GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	// Visual similarity query vector: photo primary (frame_ts_ms IS NULL) first,
 	// otherwise the earliest video frame.
@@ -517,6 +515,8 @@ type Querier interface {
 	GetStackNormalizationState(ctx context.Context, stackID uuid.UUID) ([]GetStackNormalizationStateRow, error)
 	GetStackScope(ctx context.Context, stackID uuid.UUID) (GetStackScopeRow, error)
 	GetStacksByAssetIDs(ctx context.Context, assetIds []uuid.UUID) ([]GetStacksByAssetIDsRow, error)
+	GetStorageLocation(ctx context.Context, storageLocationID uuid.UUID) (StorageLocation, error)
+	GetStorageLocationByPath(ctx context.Context, path string) (StorageLocation, error)
 	GetSystemState(ctx context.Context) (SystemState, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
@@ -557,7 +557,7 @@ type Querier interface {
 	InsertLocationClusterAsset(ctx context.Context, arg InsertLocationClusterAssetParams) (int64, error)
 	InsertOwnerContentAsset(ctx context.Context, arg InsertOwnerContentAssetParams) (Asset, error)
 	InsertRepositoryObservation(ctx context.Context, arg InsertRepositoryObservationParams) (RepositoryObservation, error)
-	InsertRepositoryRootNode(ctx context.Context, arg InsertRepositoryRootNodeParams) (RepositoryNode, error)
+	InsertRepositoryTreeRootNode(ctx context.Context, arg InsertRepositoryTreeRootNodeParams) (RepositoryNode, error)
 	// Dedicated fixed-dimension authoritative semantic search vectors.
 	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 	InsertSearchEmbedding(ctx context.Context, arg InsertSearchEmbeddingParams) error
@@ -624,9 +624,9 @@ type Querier interface {
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID uuid.UUID) ([]RepositoryCloudBinding, error)
 	ListRepositoryMaterializationCandidates(ctx context.Context, arg ListRepositoryMaterializationCandidatesParams) ([]ListRepositoryMaterializationCandidatesRow, error)
 	ListRepositoryNodeChildrenPage(ctx context.Context, arg ListRepositoryNodeChildrenPageParams) ([]RepositoryNode, error)
-	ListRepositoryRoots(ctx context.Context) ([]RepositoryRoot, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
 	ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error)
+	ListStorageLocations(ctx context.Context) ([]StorageLocation, error)
 	ListStoredLocationClusterAssetsForScope(ctx context.Context, arg ListStoredLocationClusterAssetsForScopeParams) ([]ListStoredLocationClusterAssetsForScopeRow, error)
 	ListStoredLocationClustersForScope(ctx context.Context, arg ListStoredLocationClustersForScopeParams) ([]LocationCluster, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
@@ -785,13 +785,13 @@ type Querier interface {
 	UpdateRepositoryObservationAdapter(ctx context.Context, arg UpdateRepositoryObservationAdapterParams) (RepositoryObservationState, error)
 	UpdateRepositoryPath(ctx context.Context, arg UpdateRepositoryPathParams) (Repository, error)
 	UpdateRepositoryReachability(ctx context.Context, arg UpdateRepositoryReachabilityParams) (Repository, error)
-	UpdateRepositoryRootFromDisk(ctx context.Context, arg UpdateRepositoryRootFromDiskParams) (RepositoryRoot, error)
-	UpdateRepositoryRootMountFingerprint(ctx context.Context, arg UpdateRepositoryRootMountFingerprintParams) (RepositoryRoot, error)
 	UpdateRepositoryScanRunCursor(ctx context.Context, arg UpdateRepositoryScanRunCursorParams) (RepositoryScanRun, error)
 	UpdateRepositoryScanRunProgress(ctx context.Context, arg UpdateRepositoryScanRunProgressParams) (RepositoryScanRun, error)
 	UpdateShareLinkSettings(ctx context.Context, arg UpdateShareLinkSettingsParams) (ShareLink, error)
 	UpdateStackCover(ctx context.Context, arg UpdateStackCoverParams) error
 	UpdateStackMemberPosition(ctx context.Context, arg UpdateStackMemberPositionParams) error
+	UpdateStorageLocationFromDisk(ctx context.Context, arg UpdateStorageLocationFromDiskParams) (StorageLocation, error)
+	UpdateStorageLocationMountFingerprint(ctx context.Context, arg UpdateStorageLocationMountFingerprintParams) (StorageLocation, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error
@@ -817,9 +817,9 @@ type Querier interface {
 	UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	UpsertRepositoryDefaults(ctx context.Context, arg UpsertRepositoryDefaultsParams) (RepositoryDefault, error)
 	UpsertRepositoryNodeObservation(ctx context.Context, arg UpsertRepositoryNodeObservationParams) (RepositoryNode, error)
-	UpsertRepositoryRoot(ctx context.Context, arg UpsertRepositoryRootParams) (RepositoryRoot, error)
 	UpsertReverseGeocodeCache(ctx context.Context, arg UpsertReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
+	UpsertStorageLocation(ctx context.Context, arg UpsertStorageLocationParams) (StorageLocation, error)
 	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)
 	UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int64, error)
 	UseTOTPCode(ctx context.Context, arg UseTOTPCodeParams) (int64, error)

@@ -24,22 +24,20 @@
  * ```mermaid
  * flowchart TD
  *     ROUTE["/server-monitor"] --> ADMIN["admin gate"]
- *     ADMIN --> TABS["queue / ML / capabilities / storage"]
+ *     ADMIN --> TABS["queue / ML / capabilities"]
  *     TABS --> QUEUE["StatMonitor + QueueSummaryList"]
  *     TABS --> ML["MLMonitor"]
  *     TABS --> CAP["CapabilitiesMonitor"]
- *     TABS --> STORAGE["StorageMonitor"]
- *     STORAGE --> HISTORY["LifecycleHistory"]
  *     ML --> REPOSITORY["optional repository scope"]
  *     ML --> REBUILD["task rebuild"]
  * ```
  *
- * {@link MonitorFrame} gives all four tabs one compact snapshot heading: the
+ * {@link MonitorFrame} gives every tab one compact snapshot heading: the
  * successful-read timestamp, that tab's actions, and refresh. The route header
  * already names the tab and the primary visual already enumerates its subjects,
  * so the heading never repeats a title or tallies targets. A failed background
- * read retains cached facts with an explicit stale warning. Storage is a manual
- * snapshot; the other tabs retain their polling intervals.
+ * read retains cached facts with an explicit stale warning. Each tab retains
+ * its own polling interval.
  *
  * {@link StatMonitor} contains four independently selected work trays and keeps
  * {@link QueueSummaryList} inside delivery diagnostics. The authored file tray
@@ -60,19 +58,13 @@
  * Agent configuration, backend and full node diagnostics remain expandable.
  * {@link MLMonitor} combines coverage, repository options, and one confirmed
  * rebuild command. {@link CapabilitiesMonitor} is display-only; durable ML and
- * agent settings stay in Settings. {@link StorageMonitor} groups repositories
- * below their owning Storage Locations and exposes filesystem-writable capacity,
- * the server-owned safety reserve and resulting write budget, mount, risk, and
- * redacted support-bundle diagnostics. The tree is the only enumeration of
- * targets, so a count of targets needing attention sits above it and appears
- * only when one exists — never for a healthy snapshot, and never while the
- * shown snapshot is stale. {@link CapacityMap} partitions total capacity into
- * used, Server-reported write budget, and actual retained space, with no
- * area-distorting gaps. A small area moves its label to the legend, and the
- * selected area's meaning is stated once instead of beside a repeated value.
- * The tree expresses ownership only; the selected detail grows with its
- * content, and measurement caveats stay inside its diagnostics disclosure.
- * {@link LifecycleHistory} renders the durable lifecycle audit below the pane.
+ * agent settings stay in Settings.
+ *
+ * Storage administration is not a Monitor tab. Storage Locations,
+ * Repositories, capacity, verification, and the lifecycle audit belong to the
+ * admin Storage route owned by `features/repositories`; Monitor reports
+ * processing health only. Keeping storage out of Monitor leaves exactly one
+ * authority for a storage fact.
  *
  * ## Data
  *
@@ -108,16 +100,13 @@ import type {
   useRebuildAssetIndexes,
 } from "./api/useAssetIndexing.ts";
 import type { CapabilitiesMonitor } from "./flows/overview/CapabilitiesMonitor.tsx";
-import type { LifecycleHistory } from "./flows/overview/LifecycleHistory.tsx";
 import type { MonitorFrame } from "./flows/overview/MonitorFrame.tsx";
-import type { CapacityMap } from "./flows/overview/CapacityMap.tsx";
 import type { CapabilityOrbit } from "./flows/overview/CapabilityOrbit.tsx";
 import type { ProcessingTray } from "./modules/rive/ProcessingTray.tsx";
 import type { MLMonitor } from "./flows/overview/MLMonitor.tsx";
 import type MonitorOverview from "./flows/overview/MonitorOverview.tsx";
 import type { QueueSummaryList } from "./flows/overview/QueueSummaryList.tsx";
 import type { StatMonitor } from "./flows/overview/StatMonitor.tsx";
-import type { StorageMonitor } from "./flows/overview/StorageMonitor.tsx";
 import type { useCapabilities } from "../../lib/capabilities/useCapabilities.ts";
 import type { useProcessingMonitor } from "./api/useProcessingMonitor.ts";
 import type { useLumenRuntime } from "./api/useLumenRuntime.ts";

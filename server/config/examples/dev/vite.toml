@@ -93,7 +93,7 @@ file_format = "json"
 repository_audit_verbose = false
 
 [storage]
-# Portable media root holding the .lumilioroot marker and repository
+# Portable Default Storage Location holding the .lumilioroot marker and repository
 # directories. This is the mount users back up and migrate.
 path = "../storage"
 

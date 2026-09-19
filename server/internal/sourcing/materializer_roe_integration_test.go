@@ -124,9 +124,9 @@ func newSourceMaterializerFixture(t *testing.T) *sourceMaterializerFixture {
 	if err := os.Mkdir(repositoryPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	rootConfig := rootcfg.New("source root")
-	rootConfig.ID = rootID.String()
+	rootConfig.ID = storageLocationID.String()
 	if err := rootConfig.Save(rootPath); err != nil {
 		t.Fatal(err)
 	}
@@ -141,9 +141,9 @@ func newSourceMaterializerFixture(t *testing.T) *sourceMaterializerFixture {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	if _, err := database.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID: rootID, Name: "source root", Path: rootPath,
-		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+	if _, err := database.Queries.UpsertStorageLocation(ctx, repo.UpsertStorageLocationParams{
+		StorageLocationID: storageLocationID, Name: "source root", Path: rootPath,
+		Kind: dbtypes.StorageLocationKindExternal, Status: dbtypes.StorageLocationStatusActive,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -153,7 +153,7 @@ func newSourceMaterializerFixture(t *testing.T) *sourceMaterializerFixture {
 		Config: *repositoryConfig, Role: dbtypes.RepoRoleRegular,
 		Reachability: dbtypes.RepositoryReachabilityActive,
 		Activity:     dbtypes.RepositoryActivityIdle, DefaultOwnerID: &owner.UserID,
-		CreatedAt: now, UpdatedAt: now, RootID: rootID,
+		CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID,
 	})
 	if err != nil {
 		t.Fatal(err)

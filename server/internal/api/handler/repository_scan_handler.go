@@ -35,7 +35,7 @@ import (
 // @Param limit query int false "Maximum events (1-200)"
 // @Param offset query int false "Pagination offset"
 // @Success 200 {object} dto.ListLifecycleAuditEventsResponseDTO
-// @Router /api/v1/repositories/lifecycle-audit [get]
+// @Router /api/v1/storage/audit [get]
 func (h *RepositoryScanHandler) ListLifecycleAudit(c *gin.Context) {
 	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "100"), 10, 64)
 	offset, _ := strconv.ParseInt(c.DefaultQuery("offset", "0"), 10, 64)
@@ -55,7 +55,7 @@ func (h *RepositoryScanHandler) ListLifecycleAudit(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.StorageDiagnosticsResponseDTO
-// @Router /api/v1/repositories/storage-diagnostics [get]
+// @Router /api/v1/storage/diagnostics [get]
 func (h *RepositoryScanHandler) GetStorageDiagnostics(c *gin.Context) {
 	items, err := h.storageDiagnostics(c.Request.Context(), false)
 	if err != nil {
@@ -71,7 +71,7 @@ func (h *RepositoryScanHandler) GetStorageDiagnostics(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.StorageSupportBundleDTO
-// @Router /api/v1/repositories/storage-support-bundle [get]
+// @Router /api/v1/storage/support-bundle [get]
 func (h *RepositoryScanHandler) DownloadStorageSupportBundle(c *gin.Context) {
 	items, err := h.storageDiagnostics(c.Request.Context(), true)
 	if err != nil {
@@ -91,7 +91,7 @@ func (h *RepositoryScanHandler) DownloadStorageSupportBundle(c *gin.Context) {
 }
 
 func (h *RepositoryScanHandler) storageDiagnostics(ctx context.Context, redact bool) ([]dto.StorageDiagnosticDTO, error) {
-	roots, err := h.repoManager.ListRepositoryRoots(ctx)
+	storageLocations, err := h.repoManager.ListStorageLocations(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +99,13 @@ func (h *RepositoryScanHandler) storageDiagnostics(ctx context.Context, redact b
 	if err != nil {
 		return nil, err
 	}
-	items := make([]dto.StorageDiagnosticDTO, 0, len(roots)+len(repositories))
-	for _, root := range roots {
-		info := storage.InspectStoragePath(root.Path)
-		item := storageDiagnosticDTO("storage_location", root.RootID.String(), "", root.Name, root.Path, string(root.Status), root.RootID.String(), info, redact)
-		item.Kind = string(root.Kind)
-		item.RegisteredMountFingerprint = root.MountFingerprint
-		item.MountFingerprintChanged = root.MountFingerprint != "" && info.MountFingerprint != "" && root.MountFingerprint != info.MountFingerprint
+	items := make([]dto.StorageDiagnosticDTO, 0, len(storageLocations)+len(repositories))
+	for _, storageLocation := range storageLocations {
+		info := storage.InspectStoragePath(storageLocation.Path)
+		item := storageDiagnosticDTO("storage_location", storageLocation.StorageLocationID.String(), "", storageLocation.Name, storageLocation.Path, string(storageLocation.Status), storageLocation.StorageLocationID.String(), info, redact)
+		item.Kind = string(storageLocation.Kind)
+		item.RegisteredMountFingerprint = storageLocation.MountFingerprint
+		item.MountFingerprintChanged = storageLocation.MountFingerprint != "" && info.MountFingerprint != "" && storageLocation.MountFingerprint != info.MountFingerprint
 		if item.MountFingerprintChanged {
 			item.RiskWarnings = append(item.RiskWarnings, "mount_fingerprint_changed")
 		}
@@ -113,7 +113,7 @@ func (h *RepositoryScanHandler) storageDiagnostics(ctx context.Context, redact b
 	}
 	for _, repository := range repositories {
 		info := storage.InspectStoragePath(repository.Path)
-		item := storageDiagnosticDTO("repository", repository.RepoID.String(), repository.RootID.String(), repository.Name, repository.Path, string(repository.Reachability), repository.RepoID.String(), info, redact)
+		item := storageDiagnosticDTO("repository", repository.RepoID.String(), repository.StorageLocationID.String(), repository.Name, repository.Path, string(repository.Reachability), repository.RepoID.String(), info, redact)
 		item.Role = string(repository.Role)
 		items = append(items, item)
 	}
@@ -251,8 +251,13 @@ type RepositoryScanService interface {
 }
 
 type RepositoryScanHandler struct {
-	scanService RepositoryScanService
-	repoManager storage.RepositoryManager
+	scanService      RepositoryScanService
+	repoManager      storage.RepositoryManager
+	bootstrapService bootstrapPhaseReader
+}
+
+type bootstrapPhaseReader interface {
+	IsReady(ctx context.Context) (bool, error)
 }
 
 func NewRepositoryScanHandler(scanService RepositoryScanService, repoManager storage.RepositoryManager) *RepositoryScanHandler {
@@ -262,9 +267,15 @@ func NewRepositoryScanHandler(scanService RepositoryScanService, repoManager sto
 	}
 }
 
+func (h *RepositoryScanHandler) SetBootstrapService(bootstrap bootstrapPhaseReader) {
+	if h != nil {
+		h.bootstrapService = bootstrap
+	}
+}
+
 // CreateRepository creates a repository below an authorized Storage Location.
 // @Summary Create repository
-// @Description Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty root_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.
+// @Description Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty storage_location_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.
 // @Tags repositories
 // @Accept json
 // @Produce json
@@ -276,7 +287,7 @@ func NewRepositoryScanHandler(scanService RepositoryScanService, repoManager sto
 // @Failure 403 {object} api.ProblemResponse "Forbidden"
 // @Failure 409 {object} api.RepositoryConflictProblemResponse "Repository identity conflict"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
-// @Router /api/v1/repositories [post]
+// @Router /api/v1/storage/repositories [post]
 func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	if h == nil || h.repoManager == nil {
 		api.WriteProblem(c, api.Internal(errors.New("repository manager unavailable")))
@@ -296,6 +307,10 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	}
 
 	role := repositoryRoleFromRequest(req.Role)
+	if role == dbtypes.RepoRolePrimary {
+		api.WriteProblem(c, api.StatusProblem(http.StatusBadRequest, errors.New("primary repository must be created through setup")))
+		return
+	}
 	directoryName := req.DirectoryName
 	if role != dbtypes.RepoRolePrimary {
 		if err := storage.ValidateRepositoryDirectoryName(directoryName); err != nil {
@@ -325,17 +340,17 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		actor = fmt.Sprintf("web:user:%d", *actorOwnerID)
 	}
 	result, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
-		RequestID:        requestID,
-		Actor:            actor,
-		ActorUserID:      actorOwnerID,
-		HostInstanceID:   lifecycleHostInstanceID(),
-		Name:             name,
-		DirectoryName:    directoryName,
-		Role:             role,
-		RootID:           strings.TrimSpace(req.RootID),
-		OwnerID:          hostOwnerID,
-		StorageStrategy:  req.StorageStrategy,
-		RiskConfirmation: req.RiskConfirmation,
+		RequestID:         requestID,
+		Actor:             actor,
+		ActorUserID:       actorOwnerID,
+		HostInstanceID:    lifecycleHostInstanceID(),
+		Name:              name,
+		DirectoryName:     directoryName,
+		Role:              role,
+		StorageLocationID: strings.TrimSpace(req.StorageLocationID),
+		OwnerID:           hostOwnerID,
+		StorageStrategy:   req.StorageStrategy,
+		RiskConfirmation:  req.RiskConfirmation,
 	})
 	if err != nil {
 		var conflict *storage.RepositoryConflictError
@@ -346,9 +361,9 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 			writeRepositoryConflict(c, err, "primary_exists")
 		case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
 			writeRepositoryConflict(c, err, "primary_required")
-		case errors.Is(err, storage.ErrRepositoryRootOffline):
+		case errors.Is(err, storage.ErrStorageLocationOffline):
 			writeRepositoryConflict(c, err, "storage_location_offline")
-		case errors.Is(err, storage.ErrRepositoryRootInvalid):
+		case errors.Is(err, storage.ErrStorageLocationInvalid):
 			writeRepositoryConflict(c, err, "storage_location_invalid")
 		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
 			api.WriteProblem(c, api.BadRequest(err))
@@ -387,6 +402,113 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	})
 }
 
+// CreatePrimaryRepository registers the initial primary repository during authenticated setup.
+// @Summary Create primary repository during setup
+// @Description Create the single primary repository when first-run setup has not completed. Returns 409 once setup is complete.
+// @Tags setup
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.SetupPrimaryRepositoryRequestDTO true "Primary repository"
+// @Success 200 {object} dto.CreateRepositoryResponseDTO
+// @Failure 409 {object} api.ProblemResponse "Setup already completed"
+// @Router /api/v1/setup/primary-repository [post]
+func (h *RepositoryScanHandler) CreatePrimaryRepository(c *gin.Context) {
+	if h == nil || h.repoManager == nil {
+		api.WriteProblem(c, api.Internal(errors.New("repository manager unavailable")))
+		return
+	}
+	if h.bootstrapService != nil {
+		ready, err := h.bootstrapService.IsReady(c.Request.Context())
+		if err != nil {
+			api.WriteProblem(c, api.Internal(err))
+			return
+		}
+		if ready {
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, storage.ErrPrimaryRepositoryExists))
+			return
+		}
+	}
+	var req dto.SetupPrimaryRepositoryRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	if err := storage.ValidateRepositoryName(req.Name); err != nil {
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	actorOwnerID := adminIDFromContext(c)
+	hostOwnerID, err := h.repoManager.HostOwnerID(c.Request.Context())
+	if err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if hostOwnerID == nil {
+		hostOwnerID = actorOwnerID
+	}
+	requestID := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	c.Header("Idempotency-Key", requestID)
+	actor := "web:setup"
+	if actorOwnerID != nil {
+		actor = fmt.Sprintf("web:user:%d", *actorOwnerID)
+	}
+	result, err := h.repoManager.CreateRepository(c.Request.Context(), storage.CreateRepositorySpec{
+		RequestID:        requestID,
+		Actor:            actor,
+		ActorUserID:      actorOwnerID,
+		HostInstanceID:   lifecycleHostInstanceID(),
+		Name:             req.Name,
+		Role:             dbtypes.RepoRolePrimary,
+		OwnerID:          hostOwnerID,
+		StorageStrategy:  req.StorageStrategy,
+		RiskConfirmation: req.RiskConfirmation,
+	})
+	if err != nil {
+		if errors.Is(err, storage.ErrPrimaryRepositoryExists) {
+			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+			return
+		}
+		var conflict *storage.RepositoryConflictError
+		var existing *storage.ExistingRepositoryFoundError
+		var invalidMarker *storage.RepositoryMarkerInvalidError
+		switch {
+		case errors.Is(err, storage.ErrPrimaryRepositoryRequired):
+			writeRepositoryConflict(c, err, "primary_required")
+		case errors.Is(err, storage.ErrStorageLocationOffline):
+			writeRepositoryConflict(c, err, "storage_location_offline")
+		case errors.Is(err, storage.ErrStorageLocationInvalid):
+			writeRepositoryConflict(c, err, "storage_location_invalid")
+		case errors.Is(err, storage.ErrRepositoryExistsAtPath):
+			api.WriteProblem(c, api.BadRequest(err))
+		case errors.Is(err, storage.ErrInvalidRepositoryName):
+			api.WriteProblem(c, api.BadRequest(err))
+		case errors.Is(err, storage.ErrRepositoryStorageNotWritable):
+			api.WriteProblem(c, api.BadRequest(err))
+		case errors.Is(err, storage.ErrPathNotAllowed):
+			api.WriteProblem(c, api.BadRequest(err))
+		case errors.Is(err, storage.ErrRepositoryRiskConfirmationRequired):
+			api.WriteProblem(c, api.KnownProblem(problem.StorageConfirmationRequired, err))
+		case errors.As(err, &conflict):
+			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_identity", conflict.RepositoryID, conflict.Actions))
+		case errors.As(err, &existing):
+			api.WriteProblem(c, problem.NewRepositoryConflict(err, "existing_repository_found", existing.RepositoryID, []string{"open"}))
+		case errors.As(err, &invalidMarker):
+			api.WriteProblem(c, problem.NewRepositoryConflict(err, "repository_marker_invalid", "", []string{"diagnose"}))
+		default:
+			api.WriteProblem(c, api.BadRequest(err))
+		}
+		return
+	}
+	api.JSONOK(c, dto.CreateRepositoryResponseDTO{
+		Repository: toRepositoryDTO(result.Repository),
+		Warnings:   result.Warnings,
+	})
+}
+
 // ListRepositoryCandidates classifies direct children of the configured default Storage Location.
 // @Summary List repository candidates
 // @Description Returns bounded direct-child facts for standalone and Docker workflows without accepting arbitrary filesystem paths.
@@ -394,7 +516,7 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.ListRepositoryCandidatesResponseDTO
-// @Router /api/v1/repository-candidates [get]
+// @Router /api/v1/storage/candidates [get]
 func (h *RepositoryScanHandler) ListRepositoryCandidates(c *gin.Context) {
 	candidates, err := h.repoManager.ListDefaultRepositoryCandidates(c.Request.Context())
 	if err != nil {
@@ -429,7 +551,7 @@ func (h *RepositoryScanHandler) ListRepositoryCandidates(c *gin.Context) {
 // @Success 200 {object} dto.RepositoryDTO
 // @Failure 400 {object} api.ProblemResponse
 // @Failure 409 {object} api.ProblemResponse
-// @Router /api/v1/repository-candidates/resolve [post]
+// @Router /api/v1/storage/candidates/resolve [post]
 func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 	var req dto.ResolveRepositoryCandidateRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -481,7 +603,7 @@ func (h *RepositoryScanHandler) ResolveRepositoryCandidate(c *gin.Context) {
 // @Success 200 {object} dto.RepositoryDTO
 // @Failure 400 {object} api.ProblemResponse
 // @Failure 409 {object} api.RepositoryConflictProblemResponse
-// @Router /api/v1/repository-candidates/open [post]
+// @Router /api/v1/storage/candidates/open [post]
 func (h *RepositoryScanHandler) OpenRepositoryCandidate(c *gin.Context) {
 	var req dto.OpenRepositoryCandidateRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -543,7 +665,7 @@ func writeRepositoryConflict(c *gin.Context, cause error, conflictType string) {
 // @Failure 400 {object} api.ProblemResponse "Invalid request"
 // @Failure 401 {object} api.ProblemResponse "Unauthorized"
 // @Failure 403 {object} api.ProblemResponse "Forbidden"
-// @Router /api/v1/repositories/{id}/scan [post]
+// @Router /api/v1/storage/repositories/{id}/verifications [post]
 func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 	if h == nil || h.scanService == nil {
 		api.WriteProblem(c, api.Internal(errors.New("repository scan service unavailable")))
@@ -593,7 +715,7 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 // @Param operation_id path string true "Scan operation UUID"
 // @Success 200 {object} dto.RepositoryScanRunDTO "Repository scan operation retrieved successfully"
 // @Failure 404 {object} api.ProblemResponse "Scan operation not found"
-// @Router /api/v1/repositories/{id}/scans/{operation_id} [get]
+// @Router /api/v1/storage/repositories/{id}/verifications/{operation_id} [get]
 func (h *RepositoryScanHandler) GetRepositoryScan(c *gin.Context) {
 	scanRun, err := h.scanService.GetScanRun(
 		c.Request.Context(),
@@ -621,7 +743,7 @@ func (h *RepositoryScanHandler) GetRepositoryScan(c *gin.Context) {
 // @Param operation_id path string true "Scan operation UUID"
 // @Success 200 {object} dto.RepositoryScanRunDTO "Repository scan cancellation requested"
 // @Failure 404 {object} api.ProblemResponse "Scan operation not found"
-// @Router /api/v1/repositories/{id}/scans/{operation_id}/cancel [post]
+// @Router /api/v1/storage/repositories/{id}/verifications/{operation_id}/cancel [post]
 func (h *RepositoryScanHandler) CancelRepositoryScan(c *gin.Context) {
 	scanRun, err := h.scanService.CancelScanRun(
 		c.Request.Context(),
@@ -648,7 +770,7 @@ func (h *RepositoryScanHandler) CancelRepositoryScan(c *gin.Context) {
 // @Param id path string true "Repository UUID"
 // @Success 200 {object} dto.RepositoryScanRunDTO "Latest repository scan retrieved successfully"
 // @Failure 404 {object} api.ProblemResponse "No scan run found"
-// @Router /api/v1/repositories/{id}/scans/latest [get]
+// @Router /api/v1/storage/repositories/{id}/verifications/latest [get]
 func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 	scanRun, err := h.scanService.GetLatestScanRun(c.Request.Context(), strings.TrimSpace(c.Param("id")))
 	if err != nil {
@@ -672,7 +794,7 @@ func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 // @Param limit query int false "Limit" default(20)
 // @Param offset query int false "Offset" default(0)
 // @Success 200 {object} dto.RepositoryScanRunListDTO "Repository scan runs retrieved successfully"
-// @Router /api/v1/repositories/{id}/scans [get]
+// @Router /api/v1/storage/repositories/{id}/verifications [get]
 func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 	limit := parseInt32Query(c, "limit", 20)
 	offset := parseInt32Query(c, "offset", 0)
@@ -688,84 +810,53 @@ func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 	api.JSONOK(c, dto.RepositoryScanRunListDTO{Scans: items})
 }
 
-// ListRepositories returns all registered repositories.
-// @Summary List repositories
-// @Description Return all registered repositories.
-// @Tags repositories
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} dto.ListRepositoriesResponseDTO "Repositories retrieved successfully"
-// @Router /api/v1/repositories [get]
-func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
-	repos, err := h.repoManager.ListRepositories()
-	if err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-
-	items := make([]dto.RepositoryDTO, 0, len(repos))
-	for _, r := range repos {
-		items = append(items, toRepositoryDTO(r))
-	}
-	api.JSONOK(c, dto.ListRepositoriesResponseDTO{Repositories: items})
-}
-
-// ListRepositoryRoots returns the Storage Locations authorized by the host.
-// @Summary List Storage Locations
-// @Description Return registered repository roots with their current reachability. Filesystem paths are admin-only through this route.
-// @Tags repositories
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} dto.ListRepositoryRootsResponseDTO "Storage Locations retrieved successfully"
-// @Router /api/v1/repository-roots [get]
-func (h *RepositoryScanHandler) ListRepositoryRoots(c *gin.Context) {
-	roots, err := h.repoManager.ListRepositoryRoots(c.Request.Context())
-	if err != nil {
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-	items := make([]dto.RepositoryRootDTO, 0, len(roots))
-	for _, root := range roots {
-		pathInfo := storage.InspectStoragePath(root.Path)
-		fingerprintChanged := root.MountFingerprint != "" && pathInfo.MountFingerprint != "" && root.MountFingerprint != pathInfo.MountFingerprint
-		risks := append([]string{}, pathInfo.RiskWarnings...)
-		if fingerprintChanged {
-			risks = append(risks, "mount_fingerprint_changed")
-		}
-		impact, impactErr := h.repoManager.PreviewRepositoryRootRemoval(c.Request.Context(), root.RootID.String())
-		if impactErr != nil {
-			api.WriteProblem(c, api.Internal(impactErr))
-			return
-		}
-		items = append(items, dto.RepositoryRootDTO{
-			ID: root.RootID.String(), Name: root.Name, Path: root.Path,
-			Kind: string(root.Kind), Status: string(root.Status), Writable: pathInfo.Writable,
-			CapacityKnown: pathInfo.CapacityKnown, TotalBytes: pathInfo.TotalBytes,
-			AvailableBytes: pathInfo.AvailableBytes, Filesystem: pathInfo.Filesystem,
-			RepositoryCount: impact.RepositoryCount, ActiveOperationCount: impact.ActiveOperationCount,
-			CanRemove: impact.CanRemove, RemovalBlockedBy: impact.BlockingReason,
-			FilesPreserved: impact.FilesPreserved,
-			RiskWarnings:   risks, MountFingerprint: pathInfo.MountFingerprint,
-			RegisteredMountFingerprint: root.MountFingerprint, MountFingerprintChanged: fingerprintChanged,
-		})
-	}
-	api.JSONOK(c, dto.ListRepositoryRootsResponseDTO{Roots: items})
-}
-
-// DeleteRepositoryRoot removes an eligible external Storage Location registration.
-// @Summary Remove Storage Location registration
-// @Description Remove an empty, idle external Storage Location from Lumilio. The directory, .lumilioroot marker, and every disk file are preserved.
-// @Tags repositories
+// PostLocationDetachImpact previews catalog impact of detaching a Storage Location registration.
+// @Summary Preview Storage Location detach impact
+// @Tags storage
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Storage Location UUID"
-// @Success 200 {object} api.SuccessResponse "Storage Location registration removed successfully"
-// @Failure 404 {object} api.ProblemResponse "Storage Location not found"
-// @Failure 409 {object} api.ProblemResponse "Default, non-empty, or busy Storage Location"
-// @Router /api/v1/repository-roots/{id} [delete]
-func (h *RepositoryScanHandler) DeleteRepositoryRoot(c *gin.Context) {
+// @Success 200 {object} dto.StorageLocationRemovalImpactDTO
+// @Router /api/v1/storage/locations/{id}/detach-impact [post]
+func (h *RepositoryScanHandler) PostLocationDetachImpact(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
-	if _, err := h.repoManager.GetRepositoryRoot(c.Request.Context(), id); err != nil {
+	impact, err := h.repoManager.PreviewStorageLocationRemoval(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			api.WriteProblem(c, api.NotFound(err))
+			return
+		}
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	api.JSONOK(c, dto.StorageLocationRemovalImpactDTO{
+		StorageLocationID:    impact.StorageLocationID,
+		StorageLocationName:  impact.StorageLocationName,
+		Kind:                 string(impact.Kind),
+		RepositoryCount:      impact.RepositoryCount,
+		ActiveOperationCount: impact.ActiveOperationCount,
+		CanRemove:            impact.CanRemove,
+		BlockingReason:       impact.BlockingReason,
+		FilesPreserved:       impact.FilesPreserved,
+	})
+}
+
+// DetachLocation removes an eligible Storage Location registration.
+// @Summary Detach Storage Location registration
+// @Description Remove an empty, idle external Storage Location from Lumilio. Original files are preserved.
+// @Tags storage
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Storage Location UUID"
+// @Success 200 {object} api.SuccessResponse
+// @Router /api/v1/storage/locations/{id}/detach [post]
+func (h *RepositoryScanHandler) DetachLocation(c *gin.Context) {
+	h.deleteStorageLocation(c)
+}
+
+func (h *RepositoryScanHandler) deleteStorageLocation(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	if _, err := h.repoManager.GetStorageLocation(c.Request.Context(), id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			api.WriteProblem(c, api.NotFound(err))
 		} else {
@@ -774,9 +865,9 @@ func (h *RepositoryScanHandler) DeleteRepositoryRoot(c *gin.Context) {
 		return
 	}
 	requestID, actor := lifecycleRequestFromWeb(c)
-	if err := h.repoManager.DeleteRepositoryRoot(c.Request.Context(), id, storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID()}); err != nil {
-		if errors.Is(err, storage.ErrRepositoryRootNotRemovable) ||
-			errors.Is(err, storage.ErrRepositoryRootInUse) || errors.Is(err, storage.ErrRepositoryBusy) {
+	if err := h.repoManager.DeleteStorageLocation(c.Request.Context(), id, storage.LifecycleRequest{RequestID: requestID, Actor: actor, ActorUserID: adminIDFromContext(c), HostInstanceID: lifecycleHostInstanceID()}); err != nil {
+		if errors.Is(err, storage.ErrStorageLocationNotRemovable) ||
+			errors.Is(err, storage.ErrStorageLocationInUse) || errors.Is(err, storage.ErrRepositoryBusy) {
 			api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
 			return
 		}
@@ -786,37 +877,19 @@ func (h *RepositoryScanHandler) DeleteRepositoryRoot(c *gin.Context) {
 	api.JSONOK(c, api.SuccessResponse{Message: "Storage Location registration removed; files were preserved"})
 }
 
-// GetRepository returns a single repository by ID.
-// @Summary Get repository
-// @Description Return a single repository.
-// @Tags repositories
+// PostRepositoryDetachImpact previews catalog data removed by repository detach.
+// @Summary Preview repository detach impact
+// @Tags storage
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
-// @Success 200 {object} dto.RepositoryDTO "Repository retrieved successfully"
-// @Failure 404 {object} api.ProblemResponse "Repository not found"
-// @Router /api/v1/repositories/{id} [get]
-func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
-	repo, err := h.repoManager.GetRepository(strings.TrimSpace(c.Param("id")))
-	if err != nil {
-		api.WriteProblem(c, api.NotFound(err))
-		return
-	}
-	api.JSONOK(c, toRepositoryDTO(repo))
+// @Success 200 {object} dto.RepositoryRemovalImpactDTO
+// @Router /api/v1/storage/repositories/{id}/detach-impact [post]
+func (h *RepositoryScanHandler) PostRepositoryDetachImpact(c *gin.Context) {
+	h.getRepositoryRemovalImpact(c)
 }
 
-// GetRepositoryRemovalImpact previews catalog data that will be removed while
-// confirming that repository files remain untouched.
-// @Summary Preview repository removal
-// @Description Return the catalog, album, queued-work, and private-state impact of removing a non-primary repository registration. Files on disk are always preserved.
-// @Tags repositories
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Repository UUID"
-// @Success 200 {object} dto.RepositoryRemovalImpactDTO "Repository removal impact"
-// @Failure 404 {object} api.ProblemResponse "Repository not found"
-// @Router /api/v1/repositories/{id}/removal-impact [get]
-func (h *RepositoryScanHandler) GetRepositoryRemovalImpact(c *gin.Context) {
+func (h *RepositoryScanHandler) getRepositoryRemovalImpact(c *gin.Context) {
 	impact, err := h.repoManager.PreviewRepositoryRemoval(c.Request.Context(), strings.TrimSpace(c.Param("id")))
 	if err != nil {
 		api.WriteProblem(c, api.NotFound(err))
@@ -844,7 +917,7 @@ func (h *RepositoryScanHandler) GetRepositoryRemovalImpact(c *gin.Context) {
 // @Success 200 {object} dto.RepositoryDTO
 // @Failure 400 {object} api.ProblemResponse
 // @Failure 404 {object} api.ProblemResponse
-// @Router /api/v1/repositories/{id}/rename [post]
+// @Router /api/v1/storage/repositories/{id}/rename [post]
 func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var request dto.RenameRepositoryRequestDTO
@@ -867,21 +940,22 @@ func (h *RepositoryScanHandler) RenameRepository(c *gin.Context) {
 	api.JSONOK(c, toRepositoryDTO(updated))
 }
 
-// DeleteRepository removes a non-primary repository registration.
-// @Summary Remove repository registration
-// @Description Remove a non-primary repository and its catalog/index/task state after an exact repository-name confirmation. Original media, marker, and private files remain on disk.
-// @Tags repositories
+// DetachRepository removes a non-primary repository registration.
+// @Summary Detach repository registration
+// @Description Remove a non-primary repository registration after an exact repository-name confirmation. Original media remains on disk.
+// @Tags storage
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
 // @Param request body dto.RemoveRepositoryRequestDTO true "Exact repository-name confirmation"
-// @Success 200 {object} api.SuccessResponse "Repository registration removed successfully"
-// @Failure 400 {object} api.ProblemResponse "Invalid confirmation"
-// @Failure 409 {object} api.ProblemResponse "Primary or busy repository"
-// @Failure 404 {object} api.ProblemResponse "Repository not found"
-// @Router /api/v1/repositories/{id} [delete]
-func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
+// @Success 200 {object} api.SuccessResponse
+// @Router /api/v1/storage/repositories/{id}/detach [post]
+func (h *RepositoryScanHandler) DetachRepository(c *gin.Context) {
+	h.detachRepository(c)
+}
+
+func (h *RepositoryScanHandler) detachRepository(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 
 	existing, err := h.repoManager.GetRepository(id)
@@ -961,16 +1035,16 @@ func toRepositoryDTO(repository *repo.Repository) dto.RepositoryDTO {
 	}
 
 	return dto.RepositoryDTO{
-		ID:              repository.RepoID.String(),
-		Name:            repository.Name,
-		Path:            repository.Path,
-		Role:            string(repository.Role),
-		IsPrimary:       repository.Role == dbtypes.RepoRolePrimary,
-		RootID:          repository.RootID.String(),
-		Reachability:    string(repository.Reachability),
-		Activity:        string(repository.Activity),
-		DefaultOwnerID:  repository.DefaultOwnerID,
-		StorageStrategy: repository.Config.StorageStrategy,
+		ID:                repository.RepoID.String(),
+		Name:              repository.Name,
+		Path:              repository.Path,
+		Role:              string(repository.Role),
+		IsPrimary:         repository.Role == dbtypes.RepoRolePrimary,
+		StorageLocationID: repository.StorageLocationID.String(),
+		Reachability:      string(repository.Reachability),
+		Activity:          string(repository.Activity),
+		DefaultOwnerID:    repository.DefaultOwnerID,
+		StorageStrategy:   repository.Config.StorageStrategy,
 		LocalSettings: dto.RepositoryLocalSettings{
 			HandleDuplicateFilenames: repository.Config.LocalSettings.HandleDuplicateFilenames,
 		},

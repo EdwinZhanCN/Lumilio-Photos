@@ -56,15 +56,15 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	rootConfig := rootcfg.New("processor root")
-	rootConfig.ID = rootID.String()
+	rootConfig.ID = storageLocationID.String()
 	if err := rootConfig.Save(filepath.Dir(repositoryPath)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID: rootID, Name: "processor root", Path: filepath.Dir(repositoryPath),
-		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+	if _, err := catalog.Queries.UpsertStorageLocation(ctx, repo.UpsertStorageLocationParams{
+		StorageLocationID: storageLocationID, Name: "processor root", Path: filepath.Dir(repositoryPath),
+		Kind: dbtypes.StorageLocationKindExternal, Status: dbtypes.StorageLocationStatusActive,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 	repository, err := catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: repositoryID, Name: "moved job", Path: repositoryPath, Config: *repositoryConfig,
 		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive, Activity: dbtypes.RepositoryActivityIdle,
-		CreatedAt: now, UpdatedAt: now, RootID: rootID, DefaultOwnerID: &owner.UserID,
+		CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID, DefaultOwnerID: &owner.UserID,
 	})
 	if err != nil {
 		t.Fatal(err)

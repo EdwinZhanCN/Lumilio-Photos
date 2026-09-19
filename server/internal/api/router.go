@@ -46,15 +46,14 @@ type AssetControllerInterface interface {
 	GetAssetThumbnail(c *gin.Context)
 
 	// New filtering and search operations
-	QueryAssets(c *gin.Context)              // POST /assets/list - Unified asset listing, filtering, and search
-	SearchAssets(c *gin.Context)             // POST /assets/search - Sectioned search with top results and fallback results
-	SearchAssetsByImage(c *gin.Context)      // POST /assets/search/by-image - Visual search from an uploaded image
-	ListIndexingRepositories(c *gin.Context) // GET /assets/indexing/repositories - List repositories for indexing filters
-	GetIndexingStats(c *gin.Context)         // GET /assets/indexing/stats - Index coverage and queue status
-	RebuildAssetIndexes(c *gin.Context)      // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
-	GetFilterOptions(c *gin.Context)         // GET /assets/filter-options - Get available filter options
-	GetFeaturedAssets(c *gin.Context)        // GET /assets/featured - Curated featured photos for home/gallery
-	GetPhotoMapPoints(c *gin.Context)        // GET /assets/map-points - Lightweight photo map points with GPS
+	QueryAssets(c *gin.Context)         // POST /assets/list - Unified asset listing, filtering, and search
+	SearchAssets(c *gin.Context)        // POST /assets/search - Sectioned search with top results and fallback results
+	SearchAssetsByImage(c *gin.Context) // POST /assets/search/by-image - Visual search from an uploaded image
+	GetIndexingStats(c *gin.Context)    // GET /assets/indexing/stats - Index coverage and queue status
+	RebuildAssetIndexes(c *gin.Context) // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
+	GetFilterOptions(c *gin.Context)    // GET /assets/filter-options - Get available filter options
+	GetFeaturedAssets(c *gin.Context)   // GET /assets/featured - Curated featured photos for home/gallery
+	GetPhotoMapPoints(c *gin.Context)   // GET /assets/map-points - Lightweight photo map points with GPS
 
 	// Rating management operations
 	UpdateAssetRating(c *gin.Context)        // PUT /assets/:id/rating - Update asset rating
@@ -223,21 +222,25 @@ type UserControllerInterface interface {
 	ResetUserAccess(c *gin.Context)
 }
 
+type StorageControllerInterface interface {
+	GetStorageTargets(c *gin.Context) // GET /storage/targets - Authenticated storage selectors
+	GetStorageView(c *gin.Context)    // GET /storage/view - Admin storage read model
+}
+
 type RepositoryScanControllerInterface interface {
+	CreatePrimaryRepository(c *gin.Context) // POST /setup/primary-repository - Initial primary during setup
 	CreateRepository(c *gin.Context)
 	ListRepositoryCandidates(c *gin.Context)
 	OpenRepositoryCandidate(c *gin.Context)
 	ResolveRepositoryCandidate(c *gin.Context)
-	ListRepositoryRoots(c *gin.Context)
 	ListLifecycleAudit(c *gin.Context)
 	GetStorageDiagnostics(c *gin.Context)
 	DownloadStorageSupportBundle(c *gin.Context)
-	DeleteRepositoryRoot(c *gin.Context)
-	ListRepositories(c *gin.Context)
-	GetRepository(c *gin.Context)
-	GetRepositoryRemovalImpact(c *gin.Context)
+	PostLocationDetachImpact(c *gin.Context)
+	DetachLocation(c *gin.Context)
+	PostRepositoryDetachImpact(c *gin.Context)
 	RenameRepository(c *gin.Context)
-	DeleteRepository(c *gin.Context)
+	DetachRepository(c *gin.Context)
 	QueueRepositoryScan(c *gin.Context)
 	GetRepositoryScan(c *gin.Context)
 	GetLatestRepositoryScan(c *gin.Context)
@@ -372,6 +375,7 @@ func NewRouter(
 	settingsController SettingsControllerInterface,
 	classifierController ClassifierControllerInterface,
 	userController UserControllerInterface,
+	storageController StorageControllerInterface,
 	repositoryScanController RepositoryScanControllerInterface,
 	hostActionController HostActionControllerInterface,
 	duplicateController DuplicateControllerInterface,
@@ -425,6 +429,7 @@ func NewRouter(
 		setup := v1.Group("/setup")
 		{
 			setup.GET("/status", setupController.GetSetupStatus)
+			setup.POST("/primary-repository", authController.AuthMiddleware(), repositoryScanController.CreatePrimaryRepository)
 		}
 
 		settings := v1.Group("/settings")
@@ -487,54 +492,48 @@ func NewRouter(
 			users.POST("/:id/reset-access", authController.RequireAdmin(), userController.ResetUserAccess)
 		}
 
+		storageRoutes := v1.Group("/storage")
+		storageRoutes.Use(authController.AuthMiddleware())
+		{
+			storageRoutes.GET("/targets", appInitializedMiddleware, storageController.GetStorageTargets)
+
+			storageAdmin := storageRoutes.Group("")
+			storageAdmin.Use(authController.RequireAdmin())
+			{
+				storageAdmin.GET("/view", appInitializedMiddleware, storageController.GetStorageView)
+				storageAdmin.POST("/repositories", repositoryScanController.CreateRepository)
+				storageAdmin.POST("/repositories/:id/rename", appInitializedMiddleware, repositoryScanController.RenameRepository)
+				storageAdmin.POST("/repositories/:id/detach-impact", appInitializedMiddleware, repositoryScanController.PostRepositoryDetachImpact)
+				storageAdmin.POST("/repositories/:id/detach", appInitializedMiddleware, repositoryScanController.DetachRepository)
+				storageAdmin.POST("/repositories/:id/verifications", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)
+				storageAdmin.GET("/repositories/:id/verifications/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
+				storageAdmin.GET("/repositories/:id/verifications/:operation_id", appInitializedMiddleware, repositoryScanController.GetRepositoryScan)
+				storageAdmin.POST("/repositories/:id/verifications/:operation_id/cancel", appInitializedMiddleware, repositoryScanController.CancelRepositoryScan)
+				storageAdmin.GET("/repositories/:id/verifications", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
+				storageAdmin.POST("/locations/:id/detach-impact", appInitializedMiddleware, repositoryScanController.PostLocationDetachImpact)
+				storageAdmin.POST("/locations/:id/detach", appInitializedMiddleware, repositoryScanController.DetachLocation)
+				storageAdmin.GET("/candidates", appInitializedMiddleware, repositoryScanController.ListRepositoryCandidates)
+				storageAdmin.POST("/candidates/open", appInitializedMiddleware, repositoryScanController.OpenRepositoryCandidate)
+				storageAdmin.POST("/candidates/resolve", appInitializedMiddleware, repositoryScanController.ResolveRepositoryCandidate)
+				storageAdmin.GET("/native-capability", appInitializedMiddleware, hostActionController.GetNativeHostCapability)
+				storageAdmin.GET("/native-tasks", appInitializedMiddleware, hostActionController.ListHostActions)
+				storageAdmin.POST("/native-tasks", appInitializedMiddleware, hostActionController.CreateHostAction)
+				storageAdmin.GET("/native-tasks/:id", appInitializedMiddleware, hostActionController.GetHostAction)
+				storageAdmin.POST("/native-tasks/:id/resolve", appInitializedMiddleware, hostActionController.ResolveHostAction)
+				storageAdmin.POST("/native-tasks/:id/cancel", appInitializedMiddleware, hostActionController.CancelHostAction)
+				storageAdmin.GET("/diagnostics", appInitializedMiddleware, repositoryScanController.GetStorageDiagnostics)
+				storageAdmin.GET("/support-bundle", appInitializedMiddleware, repositoryScanController.DownloadStorageSupportBundle)
+				storageAdmin.GET("/audit", appInitializedMiddleware, repositoryScanController.ListLifecycleAudit)
+			}
+		}
+
 		repositories := v1.Group("/repositories")
-		repositories.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		repositories.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
 		{
-			repositories.GET("", appInitializedMiddleware, repositoryScanController.ListRepositories)
-			repositories.GET("/lifecycle-audit", appInitializedMiddleware, repositoryScanController.ListLifecycleAudit)
-			repositories.GET("/storage-diagnostics", appInitializedMiddleware, repositoryScanController.GetStorageDiagnostics)
-			repositories.GET("/storage-support-bundle", appInitializedMiddleware, repositoryScanController.DownloadStorageSupportBundle)
-			repositories.POST("", repositoryScanController.CreateRepository)
-			repositories.GET("/:id", appInitializedMiddleware, repositoryScanController.GetRepository)
-			repositories.GET("/:id/removal-impact", appInitializedMiddleware, repositoryScanController.GetRepositoryRemovalImpact)
-			repositories.POST("/:id/rename", appInitializedMiddleware, repositoryScanController.RenameRepository)
-			repositories.DELETE("/:id", appInitializedMiddleware, repositoryScanController.DeleteRepository)
-			// Rename remains disabled until its marker/config transaction is journaled.
-			repositories.GET("/:id/cloud", appInitializedMiddleware, cloudController.GetRepositoryCloudStatus)
-			repositories.POST("/:id/cloud/sources", appInitializedMiddleware, cloudController.BindRepositoryCloudSource)
-			repositories.POST("/:id/cloud/import", appInitializedMiddleware, cloudController.StartRepositoryImport)
-			repositories.POST("/:id/scan", appInitializedMiddleware, repositoryScanController.QueueRepositoryScan)
-			repositories.GET("/:id/scans/latest", appInitializedMiddleware, repositoryScanController.GetLatestRepositoryScan)
-			repositories.GET("/:id/scans/:operation_id", appInitializedMiddleware, repositoryScanController.GetRepositoryScan)
-			repositories.POST("/:id/scans/:operation_id/cancel", appInitializedMiddleware, repositoryScanController.CancelRepositoryScan)
-			repositories.GET("/:id/scans", appInitializedMiddleware, repositoryScanController.ListRepositoryScans)
-			repositories.POST("/:id/stacks/detect", appInitializedMiddleware, assetController.AutoDetectStacks)
-		}
-
-		repositoryRoots := v1.Group("/repository-roots")
-		repositoryRoots.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
-		{
-			repositoryRoots.GET("", repositoryScanController.ListRepositoryRoots)
-			repositoryRoots.DELETE("/:id", repositoryScanController.DeleteRepositoryRoot)
-		}
-
-		repositoryCandidates := v1.Group("/repository-candidates")
-		repositoryCandidates.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
-		{
-			repositoryCandidates.GET("", repositoryScanController.ListRepositoryCandidates)
-			repositoryCandidates.POST("/open", repositoryScanController.OpenRepositoryCandidate)
-			repositoryCandidates.POST("/resolve", repositoryScanController.ResolveRepositoryCandidate)
-		}
-
-		hostActions := v1.Group("/host-actions")
-		hostActions.Use(authController.AuthMiddleware(), authController.RequireAdmin(), appInitializedMiddleware)
-		{
-			hostActions.GET("/native-capability", hostActionController.GetNativeHostCapability)
-			hostActions.GET("", hostActionController.ListHostActions)
-			hostActions.POST("", hostActionController.CreateHostAction)
-			hostActions.GET("/:id", hostActionController.GetHostAction)
-			hostActions.POST("/:id/resolve", hostActionController.ResolveHostAction)
-			hostActions.DELETE("/:id", hostActionController.CancelHostAction)
+			repositories.GET("/:id/cloud", cloudController.GetRepositoryCloudStatus)
+			repositories.POST("/:id/cloud/sources", cloudController.BindRepositoryCloudSource)
+			repositories.POST("/:id/cloud/import", cloudController.StartRepositoryImport)
+			repositories.POST("/:id/stacks/detect", assetController.AutoDetectStacks)
 		}
 
 		locations := v1.Group("/locations")
@@ -559,10 +558,6 @@ func NewRouter(
 			assets.GET("/filter-options", assetController.GetFilterOptions)
 			assets.GET("/featured", assetController.GetFeaturedAssets)
 			assets.GET("/map-points", assetController.GetPhotoMapPoints)
-			// Repository registry read: open to all authenticated users so
-			// browse-scope and upload selectors work for non-admins; the
-			// handler strips filesystem paths for them.
-			assets.GET("/indexing/repositories", authController.AuthMiddleware(), assetController.ListIndexingRepositories)
 			assets.GET("/indexing/stats", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.GetIndexingStats)
 			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.RebuildAssetIndexes)
 			assets.POST("/list", assetController.QueryAssets)

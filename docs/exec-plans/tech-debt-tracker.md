@@ -4,9 +4,16 @@ Keep this list short. Each item must describe current behavior, name a concrete
 owner path, and explain the user or release impact. Completed history belongs in
 the relevant exec plan, not in this file.
 
-Last aligned with the codebase: 2026-08-30.
+Last aligned with the codebase: 2026-09-19.
 
 ## Product paths
+
+- **Linux bind-mount capacity grouping is unexecuted without mount privileges.**
+  Owner: `server/internal/storage/storage_path_info_linux_test.go`
+  `TestInspectStoragePathProvesSharedCapacityGroupAcrossBindMount`. The test
+  creates a real `MS_BIND` mount and asserts one statfs-derived capacity group;
+  it skips without `CAP_SYS_ADMIN`. Darwin/Windows CI never compile it, and
+  Docker Desktop virtiofs/osxfs bind topologies are not this fixture.
 
 - **AgentBoard has no mobile column reflow.** Owner:
   `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one

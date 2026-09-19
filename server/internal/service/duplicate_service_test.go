@@ -29,7 +29,7 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
@@ -38,17 +38,17 @@ func TestDuplicateDetectionBulkReplacesCompleteGraph(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1)
-	`, rootID)
+	`, storageLocationID)
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
+			default_owner_id, role, storage_location_id
 		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?)
-	`, repositoryID, rootID)
+	`, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO embedding_spaces (

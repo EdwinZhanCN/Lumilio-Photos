@@ -137,7 +137,7 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 		if err != nil {
 			return repo.Repository{}, errNoRepository
 		}
-		if err := rejectOfflineRepository(repository); err != nil {
+		if err := storage.CheckUploadAdmission(repository, storage.WriteFacts{}); err != nil {
 			return repo.Repository{}, err
 		}
 		return repository, nil
@@ -151,7 +151,7 @@ func (h *AssetHandler) resolveUploadRepository(ctx context.Context, repositoryID
 	if err != nil {
 		return repo.Repository{}, errRepositoryNotFound
 	}
-	if err := rejectOfflineRepository(repository); err != nil {
+	if err := storage.CheckUploadAdmission(repository, storage.WriteFacts{}); err != nil {
 		return repo.Repository{}, err
 	}
 	return repository, nil
@@ -211,19 +211,6 @@ func (h *AssetHandler) enqueueStagingCommit(
 	return receiptID, nil
 }
 
-// rejectOfflineRepository refuses ingest into a repository whose location is not
-// currently reachable. Staging a file for a repository that cannot be written is
-// a guaranteed failure later, with a worse error attached.
-func rejectOfflineRepository(repository repo.Repository) error {
-	if repository.Reachability != dbtypes.RepositoryReachabilityActive {
-		return fmt.Errorf("%w: %s", storage.ErrRepositoryOffline, repository.Name)
-	}
-	if repository.Activity == dbtypes.RepositoryActivityPaused {
-		return fmt.Errorf("%w: %s is paused", storage.ErrRepositoryBusy, repository.Name)
-	}
-	return nil
-}
-
 // respondRepositoryError maps a resolveUploadRepository failure onto its HTTP response.
 func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 	switch {
@@ -231,10 +218,7 @@ func (h *AssetHandler) respondRepositoryError(c *gin.Context, err error) {
 		api.WriteProblem(c, api.BadRequest(err))
 	case errors.Is(err, errRepositoryNotFound):
 		api.WriteProblem(c, api.NotFound(err))
-	case errors.Is(err, storage.ErrRepositoryOffline):
-		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
-	case errors.Is(err, storage.ErrRepositoryBusy):
-		api.WriteProblem(c, api.StatusProblem(http.StatusConflict, err))
+	case writeUploadAdmissionError(c, err):
 	default:
 		api.WriteProblem(c, api.BadRequest(err))
 	}
@@ -290,8 +274,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		h.respondRepositoryError(c, err)
 		return
 	}
-	if _, err := h.repoManager.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), uint64(max(header.Size, 0))); err != nil {
-		h.respondCapacityError(c, err)
+	if !h.guardUploadWriteCapacity(c, repository, uint64(max(header.Size, 0))) {
 		return
 	}
 
@@ -821,8 +804,7 @@ func (h *AssetHandler) CreateUploadSession(c *gin.Context) {
 		h.respondRepositoryError(c, err)
 		return
 	}
-	if _, err := h.repoManager.CheckRepositoryWriteCapacity(c.Request.Context(), repository.RepoID.String(), uint64(req.TotalSize)); err != nil {
-		h.respondCapacityError(c, err)
+	if !h.guardUploadWriteCapacity(c, repository, uint64(req.TotalSize)) {
 		return
 	}
 	userID := "anonymous"
@@ -2055,33 +2037,6 @@ func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndex
 	}
 }
 
-func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository, includePath bool) dto.IndexingRepositoryListResponseDTO {
-	items := make([]dto.IndexingRepositoryOptionDTO, 0, len(repositories))
-	for _, repository := range repositories {
-		if repository == nil {
-			continue
-		}
-		item := dto.IndexingRepositoryOptionDTO{
-			ID:           repository.RepoID.String(),
-			Name:         repository.Name,
-			Role:         string(repository.Role),
-			RootID:       repository.RootID.String(),
-			Reachability: string(repository.Reachability),
-			Activity:     string(repository.Activity),
-			PauseReason:  repository.PauseReason,
-			IsPrimary:    repository.Role == dbtypes.RepoRolePrimary,
-		}
-		if includePath {
-			item.Path = repository.Path
-		}
-		items = append(items, item)
-	}
-
-	return dto.IndexingRepositoryListResponseDTO{
-		Repositories: items,
-	}
-}
-
 func normalizeAssetQuerySortBy(sortBy string) string {
 	switch strings.ToLower(strings.TrimSpace(sortBy)) {
 	case "recently_added":
@@ -2800,29 +2755,6 @@ func formIntDefault(raw string, fallback int) int {
 		return fallback
 	}
 	return value
-}
-
-// ListIndexingRepositories returns repository options for scope selectors
-// (browse scope, upload target) and indexing filters. All authenticated users
-// may read the shared registry; filesystem paths are admin-only.
-// @Summary List repositories for scope selection
-// @Description Return the shared repository registry for browse-scope/upload selectors and indexing filters. Paths are only included for admins.
-// @Tags assets
-// @Accept json
-// @Produce json
-// @Success 200 {object} dto.IndexingRepositoryListResponseDTO "Repository options retrieved successfully"
-// @Failure 500 {object} api.ProblemResponse "Internal server error"
-// @Router /api/v1/assets/indexing/repositories [get]
-func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
-	repositories, err := h.repoManager.ListRepositories()
-	if err != nil {
-		log.Printf("Failed to list repositories for indexing: %v", err)
-		api.WriteProblem(c, api.Internal(err))
-		return
-	}
-
-	isAdmin := ownerScopeID(c) == nil
-	api.JSONOK(c, toIndexingRepositoryListResponseDTO(repositories, isAdmin))
 }
 
 // GetIndexingStats returns indexing coverage and queue status for photo AI tasks.

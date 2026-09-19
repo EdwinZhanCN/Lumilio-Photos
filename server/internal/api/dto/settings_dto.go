@@ -57,7 +57,7 @@ type MLSettingsDTO struct {
 }
 
 type RepositoryDefaultsDTO struct {
-	DefaultRoot       string   `json:"default_root" example:"/data/storage"`
+	StorageLocation   string   `json:"storage_location" example:"/data/storage"`
 	Strategy          string   `json:"strategy" example:"date"`
 	DuplicateHandling string   `json:"duplicate_handling" example:"rename"`
 	RiskWarnings      []string `json:"risk_warnings,omitempty"`
@@ -137,7 +137,7 @@ type RuntimeInfoDTO struct {
 	ACMECertificateExpiresAt      *time.Time `json:"acme_certificate_expires_at,omitempty"`
 	ACMELastManagedAt             *time.Time `json:"acme_last_managed_at,omitempty"`
 	LogLevel                      string     `json:"log_level" example:"info"`
-	StorageRoot                   string     `json:"storage_root" example:"/data/storage"`
+	StorageLocation               string     `json:"storage_location" example:"/data/storage"`
 	HardwareAccel                 string     `json:"hardware_accel" example:"none"`
 	RepositoryScanIntervalSeconds int        `json:"repository_scan_interval_seconds" example:"300"`
 	LumenDiscoveryEnabled         bool       `json:"lumen_discovery_enabled" example:"true"`
@@ -160,7 +160,7 @@ func NewRuntimeInfoDTO(cfg config.AppConfig) RuntimeInfoDTO {
 		PasskeyEnabled:                cfg.Auth.Passkey.Enabled,
 		ACMECertificateStatus:         map[bool]string{true: "initializing", false: "not_applicable"}[cfg.ServerConfig.TLS.Mode == config.TLSModeACME],
 		LogLevel:                      cfg.LoggingConfig.Level,
-		StorageRoot:                   cfg.StorageConfig.Path,
+		StorageLocation:               cfg.StorageConfig.Path,
 		HardwareAccel:                 cfg.Transcode.HardwareAccel,
 		RepositoryScanIntervalSeconds: cfg.RepositoryScan.IntervalSeconds,
 		LumenDiscoveryEnabled:         cfg.Lumen.DiscoveryEnabled,

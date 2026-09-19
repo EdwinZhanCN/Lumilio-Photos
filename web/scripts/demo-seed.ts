@@ -31,10 +31,9 @@ type ApiOptions = {
   form?: FormData;
 };
 
-type Repository = {
-  id: string;
-  name: string;
-};
+type Repository = components["schemas"]["dto.RepositoryDTO"];
+type StorageTargets = components["schemas"]["dto.StorageTargetsResponseDTO"];
+type CreateRepositoryResponse = components["schemas"]["dto.CreateRepositoryResponseDTO"];
 
 type CatalogAsset = {
   id: string;
@@ -109,54 +108,58 @@ async function ensureAdmin(): Promise<{ token: string }> {
 }
 
 /**
- * Demo media lands in its own named repository so it never mixes with a
- * developer's real library. An existing repository is reused, never recreated.
+ * Demo media lands in its own named Repository so it never mixes with a
+ * developer's existing Repositories. An existing Repository is reused, never
+ * recreated.
  *
- * A fresh instance is not "app initialized" until a primary repository exists,
- * and `GET /repositories` is gated behind that readiness — so on first run we
- * must create the primary repository through the ungated `POST /repositories`
- * before any gated call. On a fresh instance the demo repository itself becomes
- * the primary; when a primary already exists (e.g. a developer's real library),
- * the demo lands in a separate regular repository.
+ * A fresh instance needs its first primary through `POST /setup/primary-repository`.
+ * When a primary already exists (e.g. a developer's existing Primary Repository),
+ * the demo lands in a separate regular Repository discovered via `GET /storage/targets`.
  */
 async function ensureRepository(token: string): Promise<Repository> {
   const status = await api<{ primary_repository_initialized: boolean }>("/api/v1/setup/status");
 
   if (!status.primary_repository_initialized) {
     try {
-      const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
-        method: "POST",
-        token,
-        body: JSON.stringify({
-          name: repositoryName,
-          role: "primary",
-          storage_strategy: "date",
-        }),
-      });
+      const { repository } = await api<CreateRepositoryResponse>(
+        "/api/v1/setup/primary-repository",
+        {
+          method: "POST",
+          token,
+          body: JSON.stringify({
+            name: repositoryName,
+            storage_strategy: "date",
+          }),
+        },
+      );
+      if (!repository?.id) throw new Error("primary repository creation returned no repository");
       return repository;
     } catch (error) {
       // A primary created concurrently or by a prior partial run is fine; fall
       // through to discover and reuse it below.
-      if (!String(error).includes("primary_exists")) throw error;
+      if (
+        !String(error).includes("primary repository already exists") &&
+        !String(error).includes("primary_exists")
+      ) {
+        throw error;
+      }
     }
   }
 
-  const { repositories } = await api<{ repositories: Repository[] }>("/api/v1/repositories", {
-    token,
-  });
-  const existing = repositories?.find((candidate: Repository) => candidate.name === repositoryName);
-  if (existing) return existing;
+  const { targets } = await api<StorageTargets>("/api/v1/storage/targets", { token });
+  const existing = targets?.find((candidate) => candidate.name === repositoryName);
+  if (existing?.id) return { id: existing.id, name: existing.name };
 
-  const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
+  const { repository } = await api<CreateRepositoryResponse>("/api/v1/storage/repositories", {
     method: "POST",
     token,
     body: JSON.stringify({
       name: repositoryName,
-      role: "regular",
       storage_strategy: "date",
       directory_name: repositoryName,
     }),
   });
+  if (!repository?.id) throw new Error("repository creation returned no repository");
   return repository;
 }
 
@@ -320,6 +323,7 @@ async function main() {
   const { token } = await ensureAdmin();
   const repository = await ensureRepository(token);
   console.log(`Uploading ${assets.length} assets at concurrency ${options.concurrency}`);
+  if (!repository.id) throw new Error("demo repository has no id");
   const { failures, receipts } = await uploadAll(assets, token, repository.id, options.concurrency);
   if (failures.length > 0) {
     throw new Error(`${failures.length} uploads failed:\n  ${failures.slice(0, 5).join("\n  ")}`);
@@ -327,7 +331,7 @@ async function main() {
 
   await waitForIngestion(token, receipts, options.timeoutMs);
   await prepareMusic(assets, token, options.timeoutMs);
-  console.log(`Demo library ready: ${assets.length} verified imports in ${repository.name}`);
+  console.log(`Demo Repository ready: ${assets.length} verified imports in ${repository.name}`);
   console.log(`Sign in as ${username} at ${baseURL}`);
 }
 

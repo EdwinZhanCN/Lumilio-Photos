@@ -33,8 +33,8 @@ func TestNewAuthService_RejectsRawSecretText(t *testing.T) {
 }
 
 func TestNewAuthService_UsesConfiguredDerivedSecretPath(t *testing.T) {
-	storageRoot := filepath.Join(t.TempDir(), "storage-root")
-	keyFile := filepath.Join(storageRoot, ".secrets", "lumilio_secret_key")
+	storageLocation := filepath.Join(t.TempDir(), "storage-root")
+	keyFile := filepath.Join(storageLocation, ".secrets", "lumilio_secret_key")
 
 	svc, err := NewAuthService(nil, nil, config.AuthConfig{SecretKeyFile: keyFile})
 	require.NoError(t, err)

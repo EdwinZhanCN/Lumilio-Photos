@@ -46,8 +46,8 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/api/handler`: HTTP request/response layer.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
 - The Music domain is a first-class owner-scoped projection in
-  `server/internal/service/music_service.go` and `server/migrations/000015_music_library.up.sql`.
-  It uses Asset identity and media delivery, but owns track/release/artist
+  `server/internal/service/music_service.go` with tables in the generation-9
+  catalog baseline. It uses Asset identity and media delivery, but owns track/release/artist
   meaning, field-level corrections, playlists, and bounded playback snapshots
   without changing legacy mixed-media Albums.
 - `server/internal/processors`: read/compute stages for ingest, metadata,
@@ -70,9 +70,10 @@ useful; implementation plans belong in `exec-plans/`.
   observations and Locations, and exact content identity. Its
   `C0 → crawl → fixed C1 → dirty verification → finalize` protocol never
   treats a watcher hint as absence authority.
-- Catalog migrations establish the current desired/applied pipeline state and
-  typed execution ledgers. QueueDB migrations are independent and may be
-  recreated without a catalog cutover or compatibility journal.
+- The catalog schema is one standalone baseline (`000001_storage_baseline.up.sql`,
+  `PRAGMA user_version = 9`) that establishes desired/applied pipeline state and
+  typed execution ledgers. QueueDB River migrations are independent and may be
+  recreated without touching the catalog.
 - `server/internal/sourcing`: recoverable staged materialization for upload and
   cloud flows. A committed source publishes the same node/content/Location
   facts as repository observation.
@@ -91,18 +92,19 @@ useful; implementation plans belong in `exec-plans/`.
   revision-fenced turns. Automatic WAL checkpoints are disabled; one runtime
   monitor observes writer wait/WAL growth and requests explicit passive
   checkpoints through each database's sole writer. This boundary owns catalog
-  migrations and verified snapshots; QueueDB owns River migrations. The catalog
+  baseline initialization and verified snapshots; QueueDB owns River migrations. The catalog
   still owns FTS5 and the statically linked SQLite Vec1 semantic index.
 - `server/internal/db/catalogtx`: the closed, compile-time named transaction
   and observed-connector boundary. It measures writer/reader admission,
   bounded transaction/statement/cursor lifetimes, outcomes, cancellations,
   and `DBStats` reconciliation. An AST inventory prevents raw transaction or
   standalone writer escape hatches from reappearing in production code.
-- Foreground bootstrap/setup/status and repository-list requests are strictly
+- Foreground bootstrap/setup/status and storage read models are strictly
   read-only. Incomplete bootstrap gates are derived through query-only readers;
-  repository reachability is a cached projection refreshed at boot and by the
-  portable background reconciler. HTTP reads never trigger reconciliation or
-  expiry writes merely to render current state.
+  Repository reachability and Storage Location summaries are catalog projections
+  refreshed at boot and by the periodic reconciler, which does not gate child
+  Repository I/O. HTTP reads never trigger reconciliation or expiry writes
+  merely to render current state.
 - The bounded Catalog scheduler derives outstanding work only from catalog
   desired/applied state. It never inspects River state to decide whether
   product work exists. River uniqueness covers active delivery states only, so
@@ -149,7 +151,8 @@ useful; implementation plans belong in `exec-plans/`.
   `internal/update` use schema-versioned metadata, atomic files, fingerprints,
   signatures, and explicit journals. `internal/storage` exposes only the typed
   repository handoff and a discardable shortcut cache; no private HTTP bridge
-  exists.
+  exists. Tray shortcuts open a Storage Location directory from a readable path;
+  catalog Location status does not gate `CanOpen` or folder reveal.
 - Desktop onboarding materialises a complete candidate from the explicit
   `desktop-local` profile, substitutes OS-owned paths, and runs the same strict
   loader before exposing a small structured projection to React. Draft reads
@@ -165,8 +168,16 @@ useful; implementation plans belong in `exec-plans/`.
 - Do not hand-edit generated OpenAPI artifacts.
 - `storage.path` is registered at startup as the non-removable default Storage
   Location, identified by `.lumilioroot`; startup does not create repositories.
-  Web creation selects a registered `root_id`, while the Desktop Control Panel
-  alone can authorize host paths or attach `.lumiliorepo` directories.
+  Authenticated setup creates the primary through `POST /api/v1/setup/primary-repository`.
+  Ordinary users choose upload targets from `GET /api/v1/storage/targets` on
+  `/manage`; administrators manage storage from `/storage` via
+  `GET /api/v1/storage/view` and admin-only `/api/v1/storage/*` commands
+  (create/open, verify, detach, native tasks, diagnostics). Repository cloud
+  bindings and stack detection remain on `/api/v1/repositories/{id}/cloud*` and
+  `/api/v1/repositories/{id}/stacks/detect`. Admin creation selects a registered
+  Storage Location by `storage_location_id`; the Desktop control plane authorizes host
+  paths, while standalone/Docker attach existing `.lumiliorepo` directories
+  through `/api/v1/storage/candidates`.
 - The SQLite catalog, cloud sessions, secrets, logs, and database backups are app-private state and
   must be configured outside `storage.path`. Repository staging remains inside
   its repository under `.lumilio/staging`.

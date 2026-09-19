@@ -300,15 +300,15 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 
 	stale := createRepositoryFSTestRoot(t)
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	rootMarker := rootcfg.New("test root")
-	rootMarker.ID = rootID.String()
+	rootMarker.ID = storageLocationID.String()
 	if err := rootMarker.Save(filepath.Dir(stale.Path)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := catalog.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID: rootID, Name: "test root", Path: filepath.Dir(stale.Path),
-		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+	if _, err := catalog.Queries.UpsertStorageLocation(ctx, repo.UpsertStorageLocationParams{
+		StorageLocationID: storageLocationID, Name: "test root", Path: filepath.Dir(stale.Path),
+		Kind: dbtypes.StorageLocationKindExternal, Status: dbtypes.StorageLocationStatusActive,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -316,7 +316,7 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	stale, err = catalog.Queries.CreateRepository(ctx, repo.CreateRepositoryParams{
 		RepoID: stale.RepoID, Name: "relocated", Path: stale.Path, Config: stale.Config,
 		Role: dbtypes.RepoRoleRegular, Reachability: dbtypes.RepositoryReachabilityActive,
-		Activity: dbtypes.RepositoryActivityIdle, CreatedAt: now, UpdatedAt: now, RootID: rootID,
+		Activity: dbtypes.RepositoryActivityIdle, CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -330,7 +330,7 @@ func TestRepositoryFSRefreshesCatalogPathAfterLifecycleMutation(t *testing.T) {
 	coordinator := NewRepositoryAccessCoordinator()
 	release := coordinator.AcquireMutation(stale.RepoID)
 	if _, err := catalog.Queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-		RepoID: stale.RepoID, Path: newPath, RootID: rootID,
+		RepoID: stale.RepoID, Path: newPath, StorageLocationID: storageLocationID,
 		Reachability: dbtypes.RepositoryReachabilityActive, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}); err != nil {
 		release()

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"server/internal/db/dbtypes"
+
 	"go.uber.org/zap"
 )
 
@@ -27,8 +29,8 @@ func TestRepositoryOSLockHelperProcess(t *testing.T) {
 		release func()
 		err     error
 	)
-	if os.Getenv(repositoryLockHelperKindEnv) == "root" {
-		release, err = acquireRootPathLock(context.Background(), helperPath, true)
+	if os.Getenv(repositoryLockHelperKindEnv) == "storage_location" {
+		release, err = acquireStorageLocationPathLock(context.Background(), helperPath, true)
 	} else {
 		release, err = acquireRepositoryPathLock(context.Background(), helperPath, true)
 	}
@@ -140,7 +142,7 @@ func TestRepositoryOSLockCoordinatesProcessAndReleasesAfterCrash(t *testing.T) {
 	release()
 }
 
-func TestRuntimeStorageOwnershipRejectsSecondManager(t *testing.T) {
+func TestRuntimeStorageOwnershipKeepsUnavailableRepositoryRegistered(t *testing.T) {
 	catalog, first := newCatalogRepositoryManager(t)
 	initializeDefaultStorageForTest(t, first, filepath.Join(t.TempDir(), "default"))
 	second, err := NewRepositoryManager(catalog.SQL, catalog.Queries, zap.NewNop(), nil, NewRepositoryFSFactory(nil, catalog.Queries))
@@ -154,8 +156,21 @@ func TestRuntimeStorageOwnershipRejectsSecondManager(t *testing.T) {
 	defer release()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	if _, err := second.AcquireRuntimeStorageOwnership(ctx); !errors.Is(err, ErrRepositoryLockUnavailable) {
-		t.Fatalf("second runtime ownership error = %v, want ErrRepositoryLockUnavailable", err)
+	secondRelease, err := second.AcquireRuntimeStorageOwnership(ctx)
+	if err != nil {
+		t.Fatalf("an occupied Repository prevented runtime initialization: %v", err)
+	}
+	defer secondRelease()
+	primary, err := catalog.Queries.GetPrimaryRepositoryRecord(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if primary.Reachability != dbtypes.RepositoryReachabilityOffline {
+		t.Fatalf("unclaimed Repository reachability = %q", primary.Reachability)
+	}
+	if files, err := second.files.Open(primary); err == nil {
+		_ = files.Close()
+		t.Fatal("unclaimed Repository admitted I/O")
 	}
 }
 
