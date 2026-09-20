@@ -39,8 +39,8 @@ func inspectPathPlatform(path string) pathPlatformInfo {
 	// GetVolumePathName resolves the volume that contains path to its mount
 	// point: `C:\` for a drive letter, or the folder when a volume is mounted
 	// into an NTFS directory.
-	if root, err := windowsVolumeRootPointer(path); err == nil {
-		result.MountPath = windows.UTF16ToString(root)
+	if mountPath, err := windowsVolumeRootPath(path); err == nil {
+		result.MountPath = mountPath
 	}
 	return result
 }
@@ -67,18 +67,26 @@ func capacityGroupKeyForPath(path string, filesystem string) string {
 	return windowsCapacityGroupKey(filesystem, volumeName, serial, driveType)
 }
 
-// windowsVolumeRootPointer returns the volume mount point that contains path,
+// windowsVolumeRootPath returns the volume mount point that contains path,
 // for example C:\ or C:\Data\ for a folder-mounted volume.
-func windowsVolumeRootPointer(path string) (*uint16, error) {
+func windowsVolumeRootPath(path string) (string, error) {
 	pathPointer, err := windows.UTF16PtrFromString(path)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	buffer := make([]uint16, windows.MAX_PATH+1)
 	if err := windows.GetVolumePathName(pathPointer, &buffer[0], uint32(len(buffer))); err != nil {
+		return "", err
+	}
+	return windows.UTF16ToString(buffer), nil
+}
+
+func windowsVolumeRootPointer(path string) (*uint16, error) {
+	mountPath, err := windowsVolumeRootPath(path)
+	if err != nil {
 		return nil, err
 	}
-	return windows.UTF16PtrFromString(windows.UTF16ToString(buffer))
+	return windows.UTF16PtrFromString(mountPath)
 }
 
 func windowsVolumeGUIDPath(root *uint16) (string, error) {
