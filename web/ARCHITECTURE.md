@@ -48,7 +48,10 @@ src/features/<feature>/
 - A small feature omits unused directories. Uniformity means identical directory semantics, not identical directory counts.
 - The Assets feature expresses its main journeys as `flows/browse`, `flows/viewer`, and `flows/export`; pure filtering and browse-item rules live in `model`. It keeps `map/` and `picker/` as reviewed public sub-entry exceptions whose entry files remain narrow.
 - The Events feature owns its cursor-backed index, Event detail orchestration,
-  mutations, and presentation fallbacks. Event detail composes
+  mutations, and presentation fallbacks. List and detail apply Repository
+  Browse Scope as a read projection after owner authorization; counts, cover,
+  and gallery come from that same resolved set. Rebuild status is polled only
+  while a source revision is pending. Event detail composes
   `@/features/assets`; neutral bulk-action selection contracts remain in
   `src/lib/assets` so Assets does not depend on Events.
 - The only handwritten documentation sources under `web/` are this file and
@@ -66,7 +69,7 @@ e2e -> public browser UI -> real API / database / storage / queues
 ```
 
 - Lower layers (`components`, `config`, `contexts`, `hooks`, `lib`, `types`, and shared worker code) never import features.
-- Nothing imports `app` except `main.tsx` and modules already inside `app`. `app` is the composition root and may import route implementations directly; this does not make those paths public to other features. Playwright E2E tests exercise public browser UI against isolated real services and do not import production feature internals.
+- Nothing imports `app` except `main.tsx` and modules already inside `app`. `app` is the composition root and may import route implementations directly; this does not make those paths public to other features. Playwright E2E tests exercise public browser UI against isolated real services and do not import production feature internals. Attempts own distinct users and repositories through the shared workspace fixture; a global queue reaching zero is not completion for one test.
 - Inside one feature, use relative imports. Do not import `@/features/<same-feature>/...` and do not route internal code through the feature's root public barrel. A cohesive submodule may use its own local `index.ts` through a relative path. Use the `@/...` alias when an import leaves the feature.
 - Between features, import `@/features/<feature>` unless an approved narrow entry applies. The target feature's `index.ts` is its explicit public contract.
 - Keep `index.ts` narrow. Export only symbols with real cross-feature consumers; do not expose internals merely to shorten a path.

@@ -135,6 +135,7 @@ the Settings WebView never calls the Server HTTP API.
 - `internal/event`: owner-scoped Event candidates, deterministic `events-v1`
   segmentation/reconciliation, correction transactions, resolution, and direct
   typed relations. Event membership atoms are always `media_item` rows.
+  `MarkEventFactsChangedTx` is the single factual invalidation boundary.
 - `internal/utils`: media, hashing, raw, exif, upload, imaging, and support utilities.
 
 ## Asset Metadata Projection
@@ -291,12 +292,19 @@ without holding a filesystem operation inside a database transaction.
   owner-wide source/published revision pair, renewable rebuild leases, persisted
   rebuild runs, and the terminal `retired` state. Event and other derived
   projections are delivered through the closed `rebuild_projection_batch`
-  macro; River is not the lifecycle authority.
+  macro; River is not the lifecycle authority. `source_revision > published_revision`
+  is pending rebuild work. `event_dirty_ranges` is a recovery ledger, not an
+  incremental computation window. `POST /api/v1/events/rebuild` enqueues work
+  and returns `202 Accepted`. Publish replaces the complete owner membership
+  set in delete-before-insert order inside one revision-checked transaction.
+  Manual corrections are exact logical-media assignments; `command → rebuild →
+  rebuild` is a fixed point.
 - Event reads, browse filters, shares, relations, and Agent refs resolve through
   the same owner-aware Event resolver. Repository filtering is a read-only
   Browse Scope projection over canonical logical-media membership. Event shares
   and Agent refs materialize immutable displayable-asset snapshots; automatic
-  membership uses no ML/AI signal.
+  membership uses no ML/AI signal. The topology contract is
+  [the Event owner-topology decision](../.agents/decisions/2026-08-10-event-owner-topology.md).
 - A running catalog must never be opened or copied through a host/container
   mount with another SQLite process. Host and container VFS locking is not a
   supported coordination boundary; use the application Online Backup flow, or
