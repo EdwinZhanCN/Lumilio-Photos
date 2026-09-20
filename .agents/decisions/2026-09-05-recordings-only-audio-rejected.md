@@ -12,11 +12,14 @@ only. That restriction conflicts with the user's clarified product goal.
 
 ## Decision
 
-The recordings-only restriction is rejected. The old execution plan is removed;
-the active [Music Library plan](../../docs/exec-plans/active/music-library.md)
-owns the proposed replacement. Music implementation is not yet shipped.
-YesPlayMusic supplies layout reference only; DaisyUI and existing Lumilio
-components govern the UI. Transcription and Agent work are not prerequisites.
+The recordings-only restriction is rejected. The old execution plan is removed.
+The replacement is the implemented
+[Music projection](2026-09-06-music-library.md).
+YesPlayMusic supplies layout reference only; it is not a 1:1 completion
+contract
+([parity rejected](2026-09-19-yesplaymusic-library-parity-rejected.md)).
+DaisyUI and existing Lumilio components govern the UI. Transcription and Agent
+work are not prerequisites.
 
 ## Alternatives considered
 

@@ -150,6 +150,12 @@ Metadata retries replace `specific_metadata` using the current type schema.
 They preserve an existing `description` key and never overwrite rating or
 embedded keyword relationships after the first successful raw extraction.
 
+Metadata subprocess success is the conjunction of valid output, process exit,
+and I/O provenance. An expected stdin EPIPE must not mask valid output.
+Genuine source read failures, invalid output, nonzero exit, and cancellation
+remain failures. Every started process is waited. The contract is
+[the processing-convergence decision](../.agents/decisions/2026-09-18-processing-convergence.md).
+
 ## Storage Model
 
 `storage.path` is the non-removable default Storage Location. Startup creates
@@ -230,7 +236,11 @@ authoritatively covered child sets. Cursor gaps, watcher overflow, volume
 replacement, offline repositories, cancellation, and access errors fail closed:
 positive observations may publish, but unproven absence never closes a valid
 Location. Native USN/ReadDirectoryChangesW, FSEvents, and inotify adapters are
-hints backed by periodic authoritative verification.
+hints backed by periodic authoritative verification. Periodic full-verification
+timer requests coalesce onto an active run. `full_verification_requested_epoch`
+is distinct from the sticky requirement; `full_verification_performed` records
+completion so the next interval starts after the scan finishes. A newer
+explicit force request or cursor gap is not lost.
 
 Independent ROE directory frontiers are enumerated in bounded deterministic
 batches. Catalog desired/applied rows are authoritative for asset, repository,
@@ -297,6 +307,9 @@ without holding a filesystem operation inside a database transaction.
   reading River state to infer product work. Discarded delivery rows do not
   retain uniqueness, so a still-runnable Catalog generation starts a fresh
   bounded delivery cycle.
+  `asset_pipeline_failures` is Catalog product state, fenced by
+  `source_content_id`, `pipeline_version`, and `desired_version`. River
+  delivery attempts never determine retry or terminal outcomes.
 - WAL auto-checkpointing is disabled on every connection so an arbitrary
   foreground commit is not charged an automatic checkpoint. Runtime monitoring
   samples writer pool wait count/duration and WAL size; once the WAL exceeds
