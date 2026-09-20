@@ -11,7 +11,15 @@ Specs live in `web/e2e/specs/*.spec.ts` and run against the isolated Compose
 stack ([lumilio-e2e-environment](../lumilio-e2e-environment/SKILL.md)). They
 run under `locale: "en-US"` (set in `playwright.config.ts`), which is what
 i18next detects from `navigator`. Layer assignment:
-[lumilio-write-a-test](../lumilio-write-a-test/SKILL.md).
+[lumilio-write-a-test](../lumilio-write-a-test/SKILL.md). Attempt isolation and
+scoped completion:
+[the test-matrix decision](../../decisions/2026-09-03-test-matrix-determinism.md).
+
+Use the shared workspace fixture in `e2e/fixtures/test.ts`. Identity includes
+the test, `repeatEachIndex`, and `retry`; do not key mutable users,
+repositories, or filenames on `parallelIndex` alone. Assert
+repository- or operation-scoped facts. A global queue reaching zero, or a
+global inference counter, is not completion for one test.
 
 ## Locator order
 

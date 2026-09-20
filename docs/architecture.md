@@ -59,7 +59,8 @@ useful; implementation plans belong in `exec-plans/`.
 - Event topology is owner-wide and derived from logical `media_item` facts.
   `source_revision`/`published_revision` and the shared Event resolver are the
   lifecycle authority; repository Browse Scope is applied only as a read
-  projection.
+  projection. Contract:
+  [Event owner-topology](../.agents/decisions/2026-08-10-event-owner-topology.md).
 - Owner scope is explicit at topology boundaries: a generic administrator
   asset browse may omit `OwnerID` to view the whole library, but an
   owner-scoped topology such as Event must always carry its resolved owner into

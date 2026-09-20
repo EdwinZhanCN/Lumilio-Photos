@@ -243,7 +243,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Authenticate GitHub Packages
               run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
@@ -312,7 +318,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             # @edwinzhancn/docts lives on GitHub Packages, which requires a
             # token even for public packages (web/.npmrc maps the scope).
@@ -442,7 +454,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             # CGO deps: both the complete Server suite and the Desktop module
             # compile govips/libraw. SQLite, FTS5, and Vec1 are linked into the
@@ -500,7 +518,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Build control panel
               run: task ci:desktop:panel
@@ -551,7 +575,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Install and build docs site
               run: task ci:site

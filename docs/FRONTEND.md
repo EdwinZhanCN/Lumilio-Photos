@@ -119,8 +119,12 @@ loading/error state, pagination and refetch behavior.
 Events follow this boundary directly: the index uses opaque server cursors,
 detail and mutation state remain in TanStack Query, and the detail gallery
 composes the public Assets entry with an immutable `event_id` constraint.
-Assets exposes feature-neutral logical selection values to Event correction
-actions; Events never imports Assets selection internals.
+List and detail apply Repository Browse Scope as a read projection after
+owner and Event authorization; header count, cover, and gallery come from that
+same resolved set. Rebuild status is polled only while a source revision is
+pending. Event picker search is server-side. Assets exposes feature-neutral
+logical selection values to Event correction actions; Events never imports
+Assets selection internals.
 
 Use Context for cross-cutting runtime capabilities: auth session, global
 runtime/notification coordination, worker dependencies.
@@ -238,6 +242,12 @@ accidental browser dependency fails instead of hiding; `integration` and
 `browser` run real Chromium via the Playwright provider. Core-browsing UI is
 assigned to Playwright by the
 [test-layer assignment decision](../.agents/decisions/2026-08-14-frontend-test-layer-assignment.md).
+Playwright attempts own distinct mutable state through the shared workspace
+fixture (`test`, `repeatEachIndex`, and `retry`). E2E assertions use
+repository- or operation-scoped facts; a global queue reaching zero is not
+completion for one test. A retry-only pass is a CI failure until the cause is
+removed. Determinism contract:
+[the test-matrix decision](../.agents/decisions/2026-09-03-test-matrix-determinism.md).
 
 Flow specs: [lumilio-integration-spec](../.agents/skills/lumilio-integration-spec/SKILL.md).
 Playwright specs: [lumilio-e2e-spec](../.agents/skills/lumilio-e2e-spec/SKILL.md).
