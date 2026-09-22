@@ -5,6 +5,11 @@ export const ASSETS_STATE_STORAGE_KEY = "lumilio.settings.assets_state";
 export const ASSETS_STATE_STORAGE_VERSION = 2 as const;
 export const LEGACY_ASSETS_STATE_STORAGE_KEY = "assets_state_v1";
 
+/** Per-tab Agent transcript (sessionStorage), bounded by the server's
+ * conversation TTL and cleared at the application session boundary. */
+export const AGENT_SESSION_STORAGE_KEY = "lumilio.agent.session";
+export const AGENT_SESSION_STORAGE_VERSION = 1 as const;
+
 export type SettingsTruthSource = "web_local_preference" | "server_runtime_capability";
 
 export interface SettingRegistryEntry {
