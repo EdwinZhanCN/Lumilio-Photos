@@ -30,7 +30,7 @@ func ToSetupStatusDTO(status service.SetupStatus) SetupStatusDTO {
 	}
 	if status.RepositoryDefaults != nil {
 		result.RepositoryDefaults = &RepositoryDefaultsDTO{
-			DefaultRoot:       status.RepositoryDefaults.DefaultRoot,
+			StorageLocation:   status.RepositoryDefaults.StorageLocation,
 			Strategy:          status.RepositoryDefaults.Strategy,
 			DuplicateHandling: status.RepositoryDefaults.DuplicateHandling,
 			RiskWarnings:      status.RepositoryDefaults.RiskWarnings,

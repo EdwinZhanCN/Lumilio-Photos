@@ -1529,6 +1529,9 @@ const docTemplate = `{
                     "message": {
                         "type": "string"
                     },
+                    "playlist_id": {
+                        "type": "string"
+                    },
                     "status": {
                         "type": "string"
                     },
@@ -1557,9 +1560,42 @@ const docTemplate = `{
                         "example": "Album Title",
                         "type": "string"
                     },
+                    "album_artist": {
+                        "example": "John Doe",
+                        "type": "string"
+                    },
+                    "album_artist_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "album_artists": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "artist": {
                         "example": "John Doe",
                         "type": "string"
+                    },
+                    "artist_ids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "artists": {
+                        "description": "Ordered credits and identifiers are kept as extracted evidence. They are\ndeliberately not inferred by splitting punctuation in a display name.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     },
                     "bitrate": {
                         "example": 128000,
@@ -1573,12 +1609,33 @@ const docTemplate = `{
                         "example": "AAC",
                         "type": "string"
                     },
+                    "compilation": {
+                        "type": "boolean"
+                    },
                     "description": {
                         "example": "Song Description",
                         "type": "string"
                     },
+                    "disc_number": {
+                        "type": "integer"
+                    },
+                    "disc_total": {
+                        "type": "integer"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
                     "genre": {
                         "example": "Pop",
+                        "type": "string"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "release_precision": {
                         "type": "string"
                     },
                     "sample_rate": {
@@ -1588,6 +1645,12 @@ const docTemplate = `{
                     "title": {
                         "example": "Song Title",
                         "type": "string"
+                    },
+                    "track_number": {
+                        "type": "integer"
+                    },
+                    "track_total": {
+                        "type": "integer"
                     },
                     "year": {
                         "example": 2023,
@@ -1728,6 +1791,26 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AdmissionDecisionDTO": {
+                "properties": {
+                    "allowed": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "reasons": {
+                        "example": [
+                            "offline",
+                            "paused"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.AgentDateRangeDTO": {
                 "properties": {
                     "from": {
@@ -1748,6 +1831,24 @@ const docTemplate = `{
                     "count": {
                         "example": 12,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AgentMusicRefDTO": {
+                "properties": {
+                    "total": {
+                        "type": "integer"
+                    },
+                    "tracks": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "truncated": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -3666,12 +3767,12 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
-                    "root_id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    },
                     "session_id": {
                         "example": "web-session-4d4d",
+                        "type": "string"
+                    },
+                    "storage_location_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     }
                 },
@@ -3719,8 +3820,8 @@ const docTemplate = `{
                         "example": "regular",
                         "type": "string"
                     },
-                    "root_id": {
-                        "description": "RootID identifies a registered Storage Location. Empty selects the\nconfigured default location. Clients never submit an arbitrary root path.",
+                    "storage_location_id": {
+                        "description": "StorageLocationID identifies a registered Storage Location. Empty selects the\nconfigured default location. Clients never submit an arbitrary root path.",
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
@@ -4729,7 +4830,7 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
-                    "root_id": {
+                    "storage_location_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
@@ -4788,12 +4889,12 @@ const docTemplate = `{
                     "result": {
                         "$ref": "#/components/schemas/dto.HostActionResultDTO"
                     },
-                    "root_id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    },
                     "status": {
                         "example": "pending",
+                        "type": "string"
+                    },
+                    "storage_location_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
                     "updated_at": {
@@ -4815,63 +4916,7 @@ const docTemplate = `{
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
-                    "root_id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "dto.IndexingRepositoryListResponseDTO": {
-                "properties": {
-                    "repositories": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.IndexingRepositoryOptionDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    }
-                },
-                "type": "object"
-            },
-            "dto.IndexingRepositoryOptionDTO": {
-                "properties": {
-                    "activity": {
-                        "example": "idle",
-                        "type": "string"
-                    },
-                    "id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    },
-                    "is_primary": {
-                        "example": false,
-                        "type": "boolean"
-                    },
-                    "name": {
-                        "example": "Family Repository",
-                        "type": "string"
-                    },
-                    "path": {
-                        "description": "Path is only populated for admin callers; repository filesystem\nlocations are never exposed to regular users.",
-                        "example": "/Volumes/Media/Photos",
-                        "type": "string"
-                    },
-                    "pause_reason": {
-                        "example": "low_space",
-                        "type": "string"
-                    },
-                    "reachability": {
-                        "description": "Reachability lets a selector keep an unreachable repository visible as a\nbrowse filter while refusing it as an upload target. Activity is separate\nso scanning never masks storage availability.",
-                        "example": "active",
-                        "type": "string"
-                    },
-                    "role": {
-                        "example": "regular",
-                        "type": "string"
-                    },
-                    "root_id": {
-                        "description": "RootID identifies the parent Storage Location so clients can derive an\neffective state with parent reachability taking priority.",
+                    "storage_location_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     }
@@ -5130,35 +5175,11 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.ListRepositoriesResponseDTO": {
-                "properties": {
-                    "repositories": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.RepositoryDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    }
-                },
-                "type": "object"
-            },
             "dto.ListRepositoryCandidatesResponseDTO": {
                 "properties": {
                     "candidates": {
                         "items": {
                             "$ref": "#/components/schemas/dto.RepositoryCandidateDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    }
-                },
-                "type": "object"
-            },
-            "dto.ListRepositoryRootsResponseDTO": {
-                "properties": {
-                    "roots": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.RepositoryRootDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -6005,6 +6026,802 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.MusicAlbumAssignmentRequestDTO": {
+                "properties": {
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicAlbumCreateRequestDTO": {
+                "properties": {
+                    "artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "cover_asset_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.MusicAlbumDTO": {
+                "properties": {
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "artists": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicCreditDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "cover_asset_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_identifier": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "enum": [
+                            "unknown",
+                            "year",
+                            "month",
+                            "day"
+                        ],
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "track_count": {
+                        "type": "integer"
+                    },
+                    "tracks": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicAlbumPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicAlbumPatchRequestDTO": {
+                "properties": {
+                    "artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "cover_asset_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicArtistDTO": {
+                "properties": {
+                    "album_count": {
+                        "type": "integer"
+                    },
+                    "artist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "track_count": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicArtistPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicArtistDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicArtistPatchRequestDTO": {
+                "properties": {
+                    "display_name": {
+                        "minLength": 1,
+                        "type": "string"
+                    },
+                    "favorite": {
+                        "type": "boolean"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicCreditDTO": {
+                "properties": {
+                    "artist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "role": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicDesignationRequestDTO": {
+                "properties": {
+                    "designation": {
+                        "enum": [
+                            "music",
+                            "other"
+                        ],
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "designation"
+                ],
+                "type": "object"
+            },
+            "dto.MusicLyricsDTO": {
+                "properties": {
+                    "content": {
+                        "maxLength": 65536,
+                        "type": "string"
+                    },
+                    "revision": {
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicOverrideDTO": {
+                "properties": {
+                    "field": {
+                        "type": "string"
+                    },
+                    "present": {
+                        "type": "boolean"
+                    },
+                    "value": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackEntryDTO": {
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "saved_title": {
+                        "type": "string"
+                    },
+                    "sequence": {
+                        "type": "integer"
+                    },
+                    "source_entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "track_album": {
+                        "type": "string"
+                    },
+                    "track_artist": {
+                        "type": "string"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "track_title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaybackEntryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackSessionDTO": {
+                "properties": {
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "session_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "source_id": {
+                        "type": "string"
+                    },
+                    "source_kind": {
+                        "type": "string"
+                    },
+                    "source_revision": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "total_entries": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaybackSourceRequestDTO": {
+                "properties": {
+                    "artist_id": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "enum": [
+                            "query",
+                            "album",
+                            "playlist",
+                            "liked"
+                        ],
+                        "type": "string"
+                    },
+                    "liked_only": {
+                        "type": "boolean"
+                    },
+                    "query": {
+                        "type": "string"
+                    },
+                    "sort": {
+                        "enum": [
+                            "title",
+                            "artist",
+                            "album",
+                            "track"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "kind"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistCreateRequestDTO": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistDTO": {
+                "properties": {
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "entry_count": {
+                        "type": "integer"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "playlist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntriesResponseDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaylistEntryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntryCreateRequestDTO": {
+                "properties": {
+                    "idempotency_key": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "saved_title": {
+                        "type": "string"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "track_id"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntryDTO": {
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "idempotency_key": {
+                        "type": "string"
+                    },
+                    "playlist_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "saved_title": {
+                        "type": "string"
+                    },
+                    "track": {
+                        "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistEntryPositionDTO": {
+                "properties": {
+                    "entry_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "entry_id"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicPlaylistPatchRequestDTO": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "dto.MusicPlaylistReorderRequestDTO": {
+                "properties": {
+                    "entries": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicPlaylistEntryPositionDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "revision": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "entries"
+                ],
+                "type": "object"
+            },
+            "dto.MusicTrackDTO": {
+                "properties": {
+                    "album_artist_name": {
+                        "type": "string"
+                    },
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "album_title": {
+                        "type": "string"
+                    },
+                    "artist_name": {
+                        "type": "string"
+                    },
+                    "artists": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicCreditDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "compilation": {
+                        "type": "boolean"
+                    },
+                    "designation": {
+                        "enum": [
+                            "music",
+                            "other"
+                        ],
+                        "type": "string"
+                    },
+                    "disc_number": {
+                        "type": "integer"
+                    },
+                    "disc_total": {
+                        "type": "integer"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "extracted_source_revision": {
+                        "type": "integer"
+                    },
+                    "genre": {
+                        "type": "string"
+                    },
+                    "is_deleted": {
+                        "type": "boolean"
+                    },
+                    "liked": {
+                        "type": "boolean"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "original_filename": {
+                        "type": "string"
+                    },
+                    "overrides": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicOverrideDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "type": "integer"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_identifier": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "enum": [
+                            "unknown",
+                            "year",
+                            "month",
+                            "day"
+                        ],
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "taken_at": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "track_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "track_number": {
+                        "type": "integer"
+                    },
+                    "track_total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicTrackPageDTO": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MusicTrackPatchRequestDTO": {
+                "properties": {
+                    "album_artist_name": {
+                        "type": "string"
+                    },
+                    "album_artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "album_id": {
+                        "format": "uuid",
+                        "type": "string"
+                    },
+                    "album_title": {
+                        "type": "string"
+                    },
+                    "artist_name": {
+                        "type": "string"
+                    },
+                    "artist_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "compilation": {
+                        "type": "boolean"
+                    },
+                    "designation": {
+                        "type": "string"
+                    },
+                    "disc_number": {
+                        "type": "integer"
+                    },
+                    "disc_total": {
+                        "type": "integer"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "genre": {
+                        "type": "string"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "release_precision": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "track_number": {
+                        "type": "integer"
+                    },
+                    "track_total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.NativeHostCapabilityDTO": {
                 "properties": {
                     "available": {
@@ -6849,7 +7666,7 @@ const docTemplate = `{
                         "example": "regular",
                         "type": "string"
                     },
-                    "root_id": {
+                    "storage_location_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
@@ -6862,10 +7679,6 @@ const docTemplate = `{
             },
             "dto.RepositoryDefaultsDTO": {
                 "properties": {
-                    "default_root": {
-                        "example": "/data/storage",
-                        "type": "string"
-                    },
                     "duplicate_handling": {
                         "example": "rename",
                         "type": "string"
@@ -6876,6 +7689,10 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    },
+                    "storage_location": {
+                        "example": "/data/storage",
+                        "type": "string"
                     },
                     "strategy": {
                         "example": "date",
@@ -6934,83 +7751,6 @@ const docTemplate = `{
                     "repository_name": {
                         "example": "Family Photos",
                         "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "dto.RepositoryRootDTO": {
-                "properties": {
-                    "active_operation_count": {
-                        "example": 0,
-                        "type": "integer"
-                    },
-                    "available_bytes": {
-                        "example": 500000000000,
-                        "type": "integer"
-                    },
-                    "can_remove": {
-                        "type": "boolean"
-                    },
-                    "capacity_known": {
-                        "type": "boolean"
-                    },
-                    "files_preserved": {
-                        "type": "boolean"
-                    },
-                    "filesystem": {
-                        "example": "apfs",
-                        "type": "string"
-                    },
-                    "id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    },
-                    "kind": {
-                        "example": "external",
-                        "type": "string"
-                    },
-                    "mount_fingerprint": {
-                        "type": "string"
-                    },
-                    "mount_fingerprint_changed": {
-                        "type": "boolean"
-                    },
-                    "name": {
-                        "example": "External Archive",
-                        "type": "string"
-                    },
-                    "path": {
-                        "example": "/Volumes/Photos",
-                        "type": "string"
-                    },
-                    "registered_mount_fingerprint": {
-                        "type": "string"
-                    },
-                    "removal_blocked_by": {
-                        "example": "registered_repositories",
-                        "type": "string"
-                    },
-                    "repository_count": {
-                        "example": 2,
-                        "type": "integer"
-                    },
-                    "risk_warnings": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
-                    "status": {
-                        "example": "active",
-                        "type": "string"
-                    },
-                    "total_bytes": {
-                        "example": 1000000000000,
-                        "type": "integer"
-                    },
-                    "writable": {
-                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -7331,7 +8071,7 @@ const docTemplate = `{
                         "example": "0.0.0.0:6680",
                         "type": "string"
                     },
-                    "storage_root": {
+                    "storage_location": {
                         "example": "/data/storage",
                         "type": "string"
                     },
@@ -7630,6 +8370,30 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.SetupPrimaryRepositoryRequestDTO": {
+                "properties": {
+                    "name": {
+                        "example": "Primary Repository",
+                        "type": "string"
+                    },
+                    "risk_confirmation": {
+                        "type": "boolean"
+                    },
+                    "storage_strategy": {
+                        "enum": [
+                            "date",
+                            "flat",
+                            "cas"
+                        ],
+                        "example": "date",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "type": "object"
+            },
             "dto.SetupStatusDTO": {
                 "properties": {
                     "admin_initialized": {
@@ -7908,6 +8672,31 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.StorageCapacityGroupDTO": {
+                "properties": {
+                    "available_bytes": {
+                        "example": 500000000000,
+                        "type": "integer"
+                    },
+                    "capacity_known": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "grouping_known": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "example": "0",
+                        "type": "string"
+                    },
+                    "total_bytes": {
+                        "example": 1000000000000,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.StorageDiagnosticDTO": {
                 "properties": {
                     "available_bytes": {
@@ -8044,6 +8833,168 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.StorageLocationRemovalImpactDTO": {
+                "properties": {
+                    "active_operation_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "blocking_reason": {
+                        "example": "registered_repositories",
+                        "type": "string"
+                    },
+                    "can_remove": {
+                        "type": "boolean"
+                    },
+                    "files_preserved": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "kind": {
+                        "enum": [
+                            "default",
+                            "external"
+                        ],
+                        "example": "external",
+                        "type": "string"
+                    },
+                    "repository_count": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "storage_location_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "storage_location_name": {
+                        "example": "External Archive",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageLocationViewDTO": {
+                "properties": {
+                    "blocking_reason": {
+                        "example": "registered_repositories",
+                        "type": "string"
+                    },
+                    "can_remove": {
+                        "type": "boolean"
+                    },
+                    "files_preserved": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "enum": [
+                            "default",
+                            "external"
+                        ],
+                        "example": "default",
+                        "type": "string"
+                    },
+                    "name": {
+                        "example": "Default Storage",
+                        "type": "string"
+                    },
+                    "repository_count": {
+                        "example": 2,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageRepositoryVerificationSummaryDTO": {
+                "properties": {
+                    "mode": {
+                        "example": "manual",
+                        "type": "string"
+                    },
+                    "operation_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "completed",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageRepositoryViewDTO": {
+                "properties": {
+                    "activity": {
+                        "example": "idle",
+                        "type": "string"
+                    },
+                    "asset_count": {
+                        "example": 1240,
+                        "type": "integer"
+                    },
+                    "capacity_group_id": {
+                        "example": "0",
+                        "type": "string"
+                    },
+                    "filesystem": {
+                        "example": "ext4",
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "mount_path": {
+                        "description": "MountPath is the directory where the backing filesystem is mounted on\nthe host running the Server: \"/\", \"/Volumes/Backup\", \"/volume1\", or a\nWindows drive root such as \"C:\". It names the storage an operator\nrecognizes. It is raw host data and is never localized by the Server.\nEmpty when the mount could not be resolved.",
+                        "example": "/data/storage",
+                        "type": "string"
+                    },
+                    "name": {
+                        "example": "Family Photos",
+                        "type": "string"
+                    },
+                    "reachability": {
+                        "example": "active",
+                        "type": "string"
+                    },
+                    "role": {
+                        "enum": [
+                            "primary",
+                            "regular"
+                        ],
+                        "example": "regular",
+                        "type": "string"
+                    },
+                    "storage_location_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "verification": {
+                        "$ref": "#/components/schemas/dto.StorageRepositoryVerificationSummaryDTO"
+                    },
+                    "write_policy": {
+                        "$ref": "#/components/schemas/dto.StorageRepositoryWritePolicyDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageRepositoryWritePolicyDTO": {
+                "properties": {
+                    "activity": {
+                        "example": "idle",
+                        "type": "string"
+                    },
+                    "pause_reason": {
+                        "example": "manual",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.StorageSupportBundleDTO": {
                 "properties": {
                     "audit_events": {
@@ -8065,6 +9016,74 @@ const docTemplate = `{
                     },
                     "paths_redacted": {
                         "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageTargetDTO": {
+                "properties": {
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "name": {
+                        "example": "Family Photos",
+                        "type": "string"
+                    },
+                    "read": {
+                        "$ref": "#/components/schemas/dto.AdmissionDecisionDTO"
+                    },
+                    "role": {
+                        "enum": [
+                            "primary",
+                            "regular"
+                        ],
+                        "example": "regular",
+                        "type": "string"
+                    },
+                    "upload": {
+                        "$ref": "#/components/schemas/dto.AdmissionDecisionDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageTargetsResponseDTO": {
+                "properties": {
+                    "targets": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.StorageTargetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StorageViewResponseDTO": {
+                "properties": {
+                    "capacity_groups": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.StorageCapacityGroupDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "observed_at": {
+                        "type": "string"
+                    },
+                    "repositories": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.StorageRepositoryViewDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "storage_locations": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.StorageLocationViewDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -9419,6 +10438,39 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "handler.DeliveryStatsDTO": {
+                "properties": {
+                    "available": {
+                        "type": "integer"
+                    },
+                    "cancelled": {
+                        "type": "integer"
+                    },
+                    "completed": {
+                        "type": "integer"
+                    },
+                    "discarded": {
+                        "type": "integer"
+                    },
+                    "queues": {
+                        "items": {
+                            "$ref": "#/components/schemas/handler.QueueSummaryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "retryable": {
+                        "type": "integer"
+                    },
+                    "running": {
+                        "type": "integer"
+                    },
+                    "scheduled": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "handler.FocalLengthBucket": {
                 "properties": {
                     "count": {
@@ -9477,27 +10529,47 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "handler.JobStatsResponse": {
+            "handler.ProcessingMonitorResponse": {
                 "properties": {
-                    "available": {
+                    "deliveries": {
+                        "$ref": "#/components/schemas/handler.DeliveryStatsDTO"
+                    },
+                    "generated_at": {
+                        "type": "string"
+                    },
+                    "processing": {
+                        "$ref": "#/components/schemas/handler.ProcessingStatsResponse"
+                    }
+                },
+                "type": "object"
+            },
+            "handler.ProcessingStatsResponse": {
+                "properties": {
+                    "failed_assets": {
                         "type": "integer"
                     },
-                    "cancelled": {
+                    "failed_operations": {
                         "type": "integer"
                     },
-                    "completed": {
+                    "failed_projections": {
                         "type": "integer"
                     },
-                    "discarded": {
+                    "failed_repositories": {
                         "type": "integer"
                     },
-                    "retryable": {
+                    "pending_assets": {
                         "type": "integer"
                     },
-                    "running": {
+                    "pending_operations": {
                         "type": "integer"
                     },
-                    "scheduled": {
+                    "pending_projections": {
+                        "type": "integer"
+                    },
+                    "pending_repositories": {
+                        "type": "integer"
+                    },
+                    "retry_waiting_stages": {
                         "type": "integer"
                     }
                 },
@@ -9576,21 +10648,6 @@ const docTemplate = `{
                     },
                     "total_jobs": {
                         "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "handler.QueueSummaryResponse": {
-                "properties": {
-                    "generated_at": {
-                        "type": "string"
-                    },
-                    "queues": {
-                        "items": {
-                            "$ref": "#/components/schemas/handler.QueueSummaryDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -9735,9 +10792,9 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/admin/river/queue-summary": {
+        "/api/v1/admin/monitor/processing": {
             "get": {
-                "description": "Get aggregated processing activity per queue, including recent error samples",
+                "description": "Catalog pending work and disposable queue delivery diagnostics. Global scope; reads across Catalog and QueueDB are not an atomic transaction.",
                 "parameters": [
                     {
                         "description": "Recent error samples per queue (default: 5, max: 20)",
@@ -9748,58 +10805,19 @@ const docTemplate = `{
                         }
                     }
                 ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "200": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/handler.QueueSummaryResponse"
+                                    "$ref": "#/components/schemas/handler.ProcessingMonitorResponse"
                                 }
                             }
                         },
                         "description": "OK"
                     }
                 },
-                "summary": "Get queue summaries",
-                "tags": [
-                    "Queue"
-                ]
-            }
-        },
-        "/api/v1/admin/river/stats": {
-            "get": {
-                "description": "Get aggregated statistics about jobs by state",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/handler.JobStatsResponse"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "summary": "Get job statistics",
+                "summary": "Get processing monitor snapshot",
                 "tags": [
                     "Queue"
                 ]
@@ -10838,6 +11856,56 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Get Agent Ref Assets",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/api/v1/agent/refs/{id}/music": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Ref ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Thread ID",
+                        "in": "query",
+                        "name": "thread_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.AgentMusicRefDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "summary": "Hydrate music selection",
                 "tags": [
                     "agent"
                 ]
@@ -12462,46 +13530,6 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Queue asset index rebuild",
-                "tags": [
-                    "assets"
-                ]
-            }
-        },
-        "/api/v1/assets/indexing/repositories": {
-            "get": {
-                "description": "Return the shared repository registry for browse-scope/upload selectors and indexing filters. Paths are only included for admins.",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.IndexingRepositoryListResponseDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository options retrieved successfully"
-                    },
-                    "500": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Internal server error"
-                    }
-                },
-                "summary": "List repositories for scope selection",
                 "tags": [
                     "assets"
                 ]
@@ -14981,7 +16009,8 @@ const docTemplate = `{
                             "enum": [
                                 "small",
                                 "medium",
-                                "large"
+                                "large",
+                                "waveform"
                             ],
                             "type": "string"
                         }
@@ -18398,299 +19427,6 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/host-actions": {
-            "get": {
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "items": {
-                                        "$ref": "#/components/schemas/dto.HostActionDTO"
-                                    },
-                                    "type": "array"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List unfinished native host actions",
-                "tags": [
-                    "host-actions"
-                ]
-            },
-            "post": {
-                "description": "Creates a persistent, expiring task. Filesystem paths and approval nonces never enter this HTTP request or response.",
-                "parameters": [
-                    {
-                        "description": "Stable request identifier",
-                        "in": "header",
-                        "name": "Idempotency-Key",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.CreateHostActionRequestDTO",
-                                        "description": "Native host action",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Native host action",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.HostActionDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Bad Request"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Conflict"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Request a native host storage action",
-                "tags": [
-                    "host-actions"
-                ]
-            }
-        },
-        "/api/v1/host-actions/native-capability": {
-            "get": {
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.NativeHostCapabilityDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Get native host capability",
-                "tags": [
-                    "host-actions"
-                ]
-            }
-        },
-        "/api/v1/host-actions/{id}": {
-            "delete": {
-                "parameters": [
-                    {
-                        "description": "Host action ID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.HostActionDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Conflict"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Cancel native host action",
-                "tags": [
-                    "host-actions"
-                ]
-            },
-            "get": {
-                "parameters": [
-                    {
-                        "description": "Host action ID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.HostActionDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Not Found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Get native host action",
-                "tags": [
-                    "host-actions"
-                ]
-            }
-        },
-        "/api/v1/host-actions/{id}/resolve": {
-            "post": {
-                "parameters": [
-                    {
-                        "description": "Host action ID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.ResolveHostActionRequestDTO",
-                                        "description": "Recovery decision",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Recovery decision",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.HostActionDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Bad Request"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Conflict"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Resolve native host action conflict",
-                "tags": [
-                    "host-actions"
-                ]
-            }
-        },
         "/api/v1/locations/clusters": {
             "get": {
                 "description": "Return paginated persisted photo location clusters with cached labels when available.",
@@ -18834,6 +19570,1337 @@ const docTemplate = `{
                 "summary": "Queue location cluster rebuild",
                 "tags": [
                     "locations"
+                ]
+            }
+        },
+        "/api/v1/music/albums": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Search album title",
+                        "in": "query",
+                        "name": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Only favorite albums",
+                        "in": "query",
+                        "name": "favorites_only",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music albums",
+                "tags": [
+                    "music"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicAlbumCreateRequestDTO",
+                                        "description": "Album data",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create music album",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/albums/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Album UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music album",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Album UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicAlbumPatchRequestDTO",
+                                        "description": "Album changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicAlbumDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music album",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/artists": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Only favorite artists",
+                        "in": "query",
+                        "name": "favorites_only",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Search artist name",
+                        "in": "query",
+                        "name": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicArtistPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music artists",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/artists/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Artist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicArtistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music artist",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Artist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicArtistPatchRequestDTO",
+                                        "description": "Artist changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Artist changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicArtistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music artist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playback-sessions": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaybackSourceRequestDTO",
+                                        "description": "Playback source",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Playback source",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaybackSessionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "413": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Request Entity Too Large"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create music playback session",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playback-sessions/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Session UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Expire playback session",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playback-sessions/{id}/entries": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Session UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaybackPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "410": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Gone"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List playback entries",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music playlists",
+                "tags": [
+                    "music"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistCreateRequestDTO",
+                                        "description": "Playlist data",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Playlist data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create music playlist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete music playlist",
+                "tags": [
+                    "music"
+                ]
+            },
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music playlist",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistPatchRequestDTO",
+                                        "description": "Playlist changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Playlist changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music playlist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}/entries": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistEntriesResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music playlist entries",
+                "tags": [
+                    "music"
+                ]
+            },
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistEntryCreateRequestDTO",
+                                        "description": "Entry data",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Entry data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicPlaylistEntryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Add music playlist entry",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}/entries/reorder": {
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicPlaylistReorderRequestDTO",
+                                        "description": "Entry positions",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Entry positions",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Reorder music playlist",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/playlists/{id}/entries/{entryId}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Playlist UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Entry UUID",
+                        "in": "path",
+                        "name": "entryId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Expected playlist revision",
+                        "in": "query",
+                        "name": "revision",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Remove music playlist entry",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Search title, artist, album, or filename",
+                        "in": "query",
+                        "name": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Sort by title, artist, album, or track",
+                        "in": "query",
+                        "name": "sort",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Only liked tracks",
+                        "in": "query",
+                        "name": "liked_only",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Filter by artist identity",
+                        "in": "query",
+                        "name": "artist_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackPageDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List music tracks",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get music track",
+                "tags": [
+                    "music"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicTrackPatchRequestDTO",
+                                        "description": "Track changes",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Track changes",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update music track",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/album": {
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicAlbumAssignmentRequestDTO",
+                                        "description": "Album assignment",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album assignment",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Assign music album to track",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/designation": {
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicDesignationRequestDTO",
+                                        "description": "Designation change",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Designation change",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Set music track designation",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/lyrics": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicLyricsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get local track lyrics",
+                "tags": [
+                    "music"
+                ]
+            },
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MusicLyricsDTO",
+                                        "description": "Local lyrics and expected revision",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Local lyrics and expected revision",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicLyricsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Save local track lyrics",
+                "tags": [
+                    "music"
+                ]
+            }
+        },
+        "/api/v1/music/tracks/{id}/reset-overrides": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Track UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.MusicTrackDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Reset music track overrides",
+                "tags": [
+                    "music"
                 ]
             }
         },
@@ -20403,351 +22470,6 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/repositories": {
-            "get": {
-                "description": "Return all registered repositories.",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.ListRepositoriesResponseDTO"
-                                }
-                            }
-                        },
-                        "description": "Repositories retrieved successfully"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List repositories",
-                "tags": [
-                    "repositories"
-                ]
-            },
-            "post": {
-                "description": "Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty root_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.CreateRepositoryRequestDTO",
-                                        "description": "Repository name",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Repository name",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.CreateRepositoryResponseDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository created successfully"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid request"
-                    },
-                    "401": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "403": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Forbidden"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.RepositoryConflictProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository identity conflict"
-                    },
-                    "500": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Internal server error"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Create repository",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/lifecycle-audit": {
-            "get": {
-                "parameters": [
-                    {
-                        "description": "Maximum events (1-200)",
-                        "in": "query",
-                        "name": "limit",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Pagination offset",
-                        "in": "query",
-                        "name": "offset",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.ListLifecycleAuditEventsResponseDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List repository lifecycle audit events",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/storage-diagnostics": {
-            "get": {
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.StorageDiagnosticsResponseDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Get Storage Location and repository diagnostics",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/storage-support-bundle": {
-            "get": {
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.StorageSupportBundleDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Download a path-redacted storage support bundle",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}": {
-            "delete": {
-                "description": "Remove a non-primary repository and its catalog/index/task state after an exact repository-name confirmation. Original media, marker, and private files remain on disk.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RemoveRepositoryRequestDTO",
-                                        "description": "Exact repository-name confirmation",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Exact repository-name confirmation",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository registration removed successfully"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid confirmation"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository not found"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Primary or busy repository"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Remove repository registration",
-                "tags": [
-                    "repositories"
-                ]
-            },
-            "get": {
-                "description": "Return a single repository.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository retrieved successfully"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository not found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Get repository",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
         "/api/v1/repositories/{id}/cloud": {
             "get": {
                 "description": "Return cloud credential binding and latest import run for a repository.",
@@ -20958,430 +22680,6 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/repositories/{id}/removal-impact": {
-            "get": {
-                "description": "Return the catalog, album, queued-work, and private-state impact of removing a non-primary repository registration. Files on disk are always preserved.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryRemovalImpactDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository removal impact"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Repository not found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Preview repository removal",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}/rename": {
-            "post": {
-                "description": "Change the display name without changing identity, path, storage strategy, duplicate handling, owner, role, or root.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RenameRepositoryRequestDTO",
-                                        "description": "New display name",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "New display name",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Bad Request"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Not Found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Rename repository",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}/scan": {
-            "post": {
-                "description": "Queue a manual scan for a repository free workspace.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.RepositoryScanRequestDTO",
-                                        "description": "Scan request",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Scan request"
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryScanQueuedDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository scan queued successfully"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Invalid request"
-                    },
-                    "401": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "403": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Forbidden"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Queue repository scan",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}/scans": {
-            "get": {
-                "description": "List recent scan runs for a repository.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Limit",
-                        "in": "query",
-                        "name": "limit",
-                        "schema": {
-                            "default": 20,
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Offset",
-                        "in": "query",
-                        "name": "offset",
-                        "schema": {
-                            "default": 0,
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryScanRunListDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository scan runs retrieved successfully"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List repository scans",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}/scans/latest": {
-            "get": {
-                "description": "Return the latest scan run for a repository.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
-                                }
-                            }
-                        },
-                        "description": "Latest repository scan retrieved successfully"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "No scan run found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Get latest repository scan",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}/scans/{operation_id}": {
-            "get": {
-                "description": "Return one durable Repository scan operation by immutable operation ID.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Scan operation UUID",
-                        "in": "path",
-                        "name": "operation_id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository scan operation retrieved successfully"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Scan operation not found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Get repository scan operation",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repositories/{id}/scans/{operation_id}/cancel": {
-            "post": {
-                "description": "Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.",
-                "parameters": [
-                    {
-                        "description": "Repository UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Scan operation UUID",
-                        "in": "path",
-                        "name": "operation_id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
-                                }
-                            }
-                        },
-                        "description": "Repository scan cancellation requested"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Scan operation not found"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Cancel repository scan operation",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
         "/api/v1/repositories/{id}/stacks/detect": {
             "post": {
                 "description": "Merges RAW/JPEG and Live Photo components into logical media items, then detects burst presentation stacks",
@@ -21414,267 +22712,6 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Auto-detect stacks",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repository-candidates": {
-            "get": {
-                "description": "Returns bounded direct-child facts for standalone and Docker workflows without accepting arbitrary filesystem paths.",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.ListRepositoryCandidatesResponseDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List repository candidates",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repository-candidates/open": {
-            "post": {
-                "description": "Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.",
-                "parameters": [
-                    {
-                        "description": "Stable request identifier",
-                        "in": "header",
-                        "name": "Idempotency-Key",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.OpenRepositoryCandidateRequestDTO",
-                                        "description": "Repository candidate",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Repository candidate",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Bad Request"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.RepositoryConflictProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Conflict"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Open repository candidate",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repository-candidates/resolve": {
-            "post": {
-                "description": "Resolves a same-identity direct child using user-facing decisions; no arbitrary filesystem path is accepted.",
-                "parameters": [
-                    {
-                        "description": "Stable request identifier",
-                        "in": "header",
-                        "name": "Idempotency-Key",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.ResolveRepositoryCandidateRequestDTO",
-                                        "description": "Repository candidate decision",
-                                        "summary": "request"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Repository candidate decision",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "400": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Bad Request"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Conflict"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Resolve repository candidate identity",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repository-roots": {
-            "get": {
-                "description": "Return registered repository roots with their current reachability. Filesystem paths are admin-only through this route.",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/dto.ListRepositoryRootsResponseDTO"
-                                }
-                            }
-                        },
-                        "description": "Storage Locations retrieved successfully"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List Storage Locations",
-                "tags": [
-                    "repositories"
-                ]
-            }
-        },
-        "/api/v1/repository-roots/{id}": {
-            "delete": {
-                "description": "Remove an empty, idle external Storage Location from Lumilio. The directory, .lumilioroot marker, and every disk file are preserved.",
-                "parameters": [
-                    {
-                        "description": "Storage Location UUID",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.SuccessResponse"
-                                }
-                            }
-                        },
-                        "description": "Storage Location registration removed successfully"
-                    },
-                    "404": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Storage Location not found"
-                    },
-                    "409": {
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ProblemResponse"
-                                }
-                            }
-                        },
-                        "description": "Default, non-empty, or busy Storage Location"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Remove Storage Location registration",
                 "tags": [
                     "repositories"
                 ]
@@ -22332,6 +23369,62 @@ const docTemplate = `{
                 "summary": "Validate an LLM settings draft",
                 "tags": [
                     "settings"
+                ]
+            }
+        },
+        "/api/v1/setup/primary-repository": {
+            "post": {
+                "description": "Create the single primary repository when first-run setup has not completed. Returns 409 once setup is complete.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.SetupPrimaryRepositoryRequestDTO",
+                                        "description": "Primary repository",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Primary repository",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.CreateRepositoryResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.RepositoryConflictProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Setup already completed"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create primary repository during setup",
+                "tags": [
+                    "setup"
                 ]
             }
         },
@@ -23135,6 +24228,1291 @@ const docTemplate = `{
                 "summary": "Get time distribution",
                 "tags": [
                     "stats"
+                ]
+            }
+        },
+        "/api/v1/storage/audit": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Maximum events (1-200)",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ListLifecycleAuditEventsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List repository lifecycle audit events",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/candidates": {
+            "get": {
+                "description": "Returns bounded direct-child facts for standalone and Docker workflows without accepting arbitrary filesystem paths.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ListRepositoryCandidatesResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List repository candidates",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/candidates/open": {
+            "post": {
+                "description": "Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.",
+                "parameters": [
+                    {
+                        "description": "Stable request identifier",
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.OpenRepositoryCandidateRequestDTO",
+                                        "description": "Repository candidate",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository candidate",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.RepositoryConflictProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Open repository candidate",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/candidates/resolve": {
+            "post": {
+                "description": "Resolves a same-identity direct child using user-facing decisions; no arbitrary filesystem path is accepted.",
+                "parameters": [
+                    {
+                        "description": "Stable request identifier",
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ResolveRepositoryCandidateRequestDTO",
+                                        "description": "Repository candidate decision",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository candidate decision",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Resolve repository candidate identity",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/diagnostics": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StorageDiagnosticsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get Storage Location and repository diagnostics",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/locations/{id}/detach": {
+            "post": {
+                "description": "Remove an empty, idle external Storage Location from Lumilio. Original files are preserved.",
+                "parameters": [
+                    {
+                        "description": "Storage Location UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Detach Storage Location registration",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/locations/{id}/detach-impact": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Storage Location UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StorageLocationRemovalImpactDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Preview Storage Location detach impact",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/native-capability": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.NativeHostCapabilityDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get native host capability",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/storage/native-tasks": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/dto.HostActionDTO"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List unfinished native host actions",
+                "tags": [
+                    "host-actions"
+                ]
+            },
+            "post": {
+                "description": "Creates a persistent, expiring task. Filesystem paths and approval nonces never enter this HTTP request or response.",
+                "parameters": [
+                    {
+                        "description": "Stable request identifier",
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CreateHostActionRequestDTO",
+                                        "description": "Native host action",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Native host action",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Request a native host storage action",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/storage/native-tasks/{id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Host action ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get native host action",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/storage/native-tasks/{id}/cancel": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Host action ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Cancel native host action",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/storage/native-tasks/{id}/resolve": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Host action ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ResolveHostActionRequestDTO",
+                                        "description": "Recovery decision",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Recovery decision",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.HostActionDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Resolve native host action conflict",
+                "tags": [
+                    "host-actions"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories": {
+            "post": {
+                "description": "Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty storage_location_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CreateRepositoryRequestDTO",
+                                        "description": "Repository name",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository name",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.CreateRepositoryResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository created successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.RepositoryConflictProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Repository identity conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create repository",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/detach": {
+            "post": {
+                "description": "Remove a non-primary repository registration after an exact repository-name confirmation. Original media remains on disk.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RemoveRepositoryRequestDTO",
+                                        "description": "Exact repository-name confirmation",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Exact repository-name confirmation",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.SuccessResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Detach repository registration",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/detach-impact": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryRemovalImpactDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Preview repository detach impact",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/rename": {
+            "post": {
+                "description": "Change the display name without changing identity, path, storage strategy, duplicate handling, owner, role, or root.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RenameRepositoryRequestDTO",
+                                        "description": "New display name",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "New display name",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Rename repository",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/verifications": {
+            "get": {
+                "description": "List recent scan runs for a repository.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Limit",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunListDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository scan runs retrieved successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List repository scans",
+                "tags": [
+                    "repositories"
+                ]
+            },
+            "post": {
+                "description": "Queue a manual scan for a repository free workspace.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RepositoryScanRequestDTO",
+                                        "description": "Scan request",
+                                        "summary": "request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Scan request"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryScanQueuedDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository scan queued successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Queue repository scan",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/verifications/latest": {
+            "get": {
+                "description": "Return the latest scan run for a repository.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
+                                }
+                            }
+                        },
+                        "description": "Latest repository scan retrieved successfully"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "No scan run found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get latest repository scan",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/verifications/{operation_id}": {
+            "get": {
+                "description": "Return one durable Repository scan operation by immutable operation ID.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Scan operation UUID",
+                        "in": "path",
+                        "name": "operation_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository scan operation retrieved successfully"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Scan operation not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get repository scan operation",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/repositories/{id}/verifications/{operation_id}/cancel": {
+            "post": {
+                "description": "Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Scan operation UUID",
+                        "in": "path",
+                        "name": "operation_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
+                                }
+                            }
+                        },
+                        "description": "Repository scan cancellation requested"
+                    },
+                    "404": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Scan operation not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Cancel repository scan operation",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/support-bundle": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StorageSupportBundleDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Download a path-redacted storage support bundle",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/storage/targets": {
+            "get": {
+                "description": "Return repository selectors with read and upload admission. Omits paths, Storage Locations, capacity, and verification.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StorageTargetsResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List storage targets",
+                "tags": [
+                    "storage"
+                ]
+            }
+        },
+        "/api/v1/storage/view": {
+            "get": {
+                "description": "Return Storage Locations, repositories, and capacity groups for administration.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.StorageViewResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get admin storage view",
+                "tags": [
+                    "storage"
                 ]
             }
         },

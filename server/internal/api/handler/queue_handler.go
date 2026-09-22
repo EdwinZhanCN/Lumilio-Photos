@@ -14,31 +14,35 @@ import (
 
 // QueueHandler handles River queue monitoring endpoints (read-only)
 type QueueHandler struct {
-	dbpool *sql.DB
+	dbpool  *sql.DB
+	catalog *sql.DB
 }
 
 // NewQueueHandler creates a new queue handler
-func NewQueueHandler(dbpool *sql.DB) *QueueHandler {
+func NewQueueHandler(dbpool, catalog *sql.DB) *QueueHandler {
 	return &QueueHandler{
-		dbpool: dbpool,
+		dbpool:  dbpool,
+		catalog: catalog,
 	}
 }
 
-// JobStatsResponse represents overall job statistics
-type JobStatsResponse struct {
-	Available int64 `json:"available"`
-	Scheduled int64 `json:"scheduled"`
-	Running   int64 `json:"running"`
-	Retryable int64 `json:"retryable"`
-	Completed int64 `json:"completed"`
-	Cancelled int64 `json:"cancelled"`
-	Discarded int64 `json:"discarded"`
+// ProcessingMonitorResponse separates catalog work from disposable delivery records.
+type ProcessingMonitorResponse struct {
+	Processing  ProcessingStatsResponse `json:"processing"`
+	Deliveries  DeliveryStatsDTO        `json:"deliveries"`
+	GeneratedAt time.Time               `json:"generated_at"`
 }
 
-// QueueSummaryResponse represents aggregated queue activity.
-type QueueSummaryResponse struct {
-	Queues      []QueueSummaryDTO `json:"queues"`
-	GeneratedAt time.Time         `json:"generated_at"`
+// DeliveryStatsDTO contains queue execution diagnostics, not file completion counts.
+type DeliveryStatsDTO struct {
+	Available int64             `json:"available"`
+	Scheduled int64             `json:"scheduled"`
+	Running   int64             `json:"running"`
+	Retryable int64             `json:"retryable"`
+	Completed int64             `json:"completed"`
+	Cancelled int64             `json:"cancelled"`
+	Discarded int64             `json:"discarded"`
+	Queues    []QueueSummaryDTO `json:"queues"`
 }
 
 // QueueSummaryDTO represents a single queue's aggregated activity.
@@ -70,75 +74,47 @@ type QueueErrorSampleDTO struct {
 	FinalizedAt *time.Time `json:"finalized_at,omitempty"`
 }
 
-// GetQueueSummary godoc
-// @Summary Get queue summaries
-// @Description Get aggregated processing activity per queue, including recent error samples
+// GetProcessingMonitor godoc
+// @Summary Get processing monitor snapshot
+// @Description Catalog pending work and disposable queue delivery diagnostics. Global scope; reads across Catalog and QueueDB are not an atomic transaction.
 // @Tags Queue
-// @Accept json
 // @Produce json
 // @Param error_limit query int false "Recent error samples per queue (default: 5, max: 20)"
-// @Success 200 {object} QueueSummaryResponse
-// @Router /api/v1/admin/river/queue-summary [get]
-func (h *QueueHandler) GetQueueSummary(c *gin.Context) {
+// @Success 200 {object} ProcessingMonitorResponse
+// @Router /api/v1/admin/monitor/processing [get]
+func (h *QueueHandler) GetProcessingMonitor(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
-
-	errorLimit := parseErrorLimit(c.DefaultQuery("error_limit", "5"))
+	processing, err := h.loadProcessingStats(ctx)
+	if err != nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
+		return
+	}
 	queues, err := h.loadQueueSummaries(ctx)
 	if err != nil {
 		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
 		return
 	}
-
+	errorLimit := parseErrorLimit(c.DefaultQuery("error_limit", "5"))
 	if len(queues) > 0 && errorLimit > 0 {
 		if err := h.attachQueueErrorSamples(ctx, queues, errorLimit); err != nil {
 			api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
 			return
 		}
 	}
-
-	api.JSONOK(c, QueueSummaryResponse{
-		Queues:      queues,
-		GeneratedAt: time.Now(),
-	})
-}
-
-// GetJobStats godoc
-// @Summary Get job statistics
-// @Description Get aggregated statistics about jobs by state
-// @Tags Queue
-// @Accept json
-// @Produce json
-// @Success 200 {object} JobStatsResponse
-// @Router /api/v1/admin/river/stats [get]
-func (h *QueueHandler) GetJobStats(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-	defer cancel()
-
-	// Count jobs by state using direct DB query for accurate counts
-	stats := JobStatsResponse{}
-
-	// Query for each state count
-	stateQueries := map[string]*int64{
-		"available": &stats.Available,
-		"scheduled": &stats.Scheduled,
-		"running":   &stats.Running,
-		"retryable": &stats.Retryable,
-		"completed": &stats.Completed,
-		"cancelled": &stats.Cancelled,
-		"discarded": &stats.Discarded,
+	deliveries := DeliveryStatsDTO{Queues: queues}
+	err = h.dbpool.QueryRowContext(ctx, `SELECT
+ COUNT(*) FILTER (WHERE state='available'), COUNT(*) FILTER (WHERE state='scheduled'),
+ COUNT(*) FILTER (WHERE state='running'), COUNT(*) FILTER (WHERE state='retryable'),
+ COUNT(*) FILTER (WHERE state='completed'), COUNT(*) FILTER (WHERE state='cancelled'),
+ COUNT(*) FILTER (WHERE state='discarded') FROM river_job`).Scan(
+		&deliveries.Available, &deliveries.Scheduled, &deliveries.Running, &deliveries.Retryable,
+		&deliveries.Completed, &deliveries.Cancelled, &deliveries.Discarded)
+	if err != nil {
+		api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
+		return
 	}
-
-	for state, countPtr := range stateQueries {
-		query := `SELECT COUNT(*) FROM river_job WHERE state = ?`
-		err := h.dbpool.QueryRowContext(ctx, query, state).Scan(countPtr)
-		if err != nil {
-			api.WriteProblem(c, api.StatusProblem(http.StatusInternalServerError, err))
-			return
-		}
-	}
-
-	api.JSONOK(c, stats)
+	api.JSONOK(c, ProcessingMonitorResponse{Processing: processing, Deliveries: deliveries, GeneratedAt: time.Now()})
 }
 
 func parseErrorLimit(raw string) int {

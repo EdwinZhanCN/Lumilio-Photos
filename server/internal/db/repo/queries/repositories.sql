@@ -10,7 +10,7 @@ INSERT INTO repositories (
     default_owner_id,
     created_at,
     updated_at,
-    root_id
+    storage_location_id
 ) VALUES (
     ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
 ) RETURNING *;
@@ -81,7 +81,7 @@ RETURNING *;
 UPDATE repositories
 SET
     path = ?2,
-    root_id = ?3,
+    storage_location_id = ?3,
     reachability = ?4,
     updated_at = ?5
 WHERE repo_id = ?1

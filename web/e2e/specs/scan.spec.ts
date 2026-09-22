@@ -4,29 +4,52 @@ import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
-type RepositoryOptions = components["schemas"]["dto.IndexingRepositoryListResponseDTO"];
+type StorageView = components["schemas"]["dto.StorageViewResponseDTO"];
 type ScanAccepted = components["schemas"]["dto.RepositoryScanQueuedDTO"];
+type ScanRun = components["schemas"]["dto.RepositoryScanRunDTO"];
 type AssetList = components["schemas"]["dto.QueryAssetsResponseDTO"];
+
+const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "crawling", "catching_up", "finalizing"]);
 
 test("@smoke administrator scans a real repository file and sees it", async ({
   page,
   workspace,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await expect(async () => {
-    const options = await api<RepositoryOptions>("/api/v1/assets/indexing/repositories", {
-      token: workspace.token,
-    });
-    const repository = options.repositories?.find(({ id }) => id === workspace.repositoryId);
+    const view = await api<StorageView>("/api/v1/storage/view", { token: workspace.token });
+    const repository = view.repositories?.find(({ id }) => id === workspace.repositoryId);
     expect(repository?.activity).toBe("idle");
   }).toPass({ timeout: 90_000 });
 
-  const queued = await api<ScanAccepted>(`/api/v1/repositories/${workspace.repositoryId}/scan`, {
-    method: "POST",
-    token: workspace.token,
-    body: JSON.stringify({ force: false }),
-  });
+  const requestScan = () =>
+    api<ScanAccepted>(`/api/v1/storage/repositories/${workspace.repositoryId}/verifications`, {
+      method: "POST",
+      token: workspace.token,
+      body: JSON.stringify({ force: true }),
+    });
+  const waitForTerminalScan = async (operationID: string) => {
+    await expect(async () => {
+      const run = await api<ScanRun>(
+        `/api/v1/storage/repositories/${workspace.repositoryId}/verifications/${operationID}`,
+        { token: workspace.token },
+      );
+      expect(ACTIVE_VERIFICATION_STATUSES.has(run.status ?? "")).toBe(false);
+      expect(["completed", "partial"]).toContain(run.status);
+    }).toPass({ timeout: 90_000 });
+  };
+
+  let queued = await requestScan();
   expect(queued.operation_id).toBeTruthy();
+  await waitForTerminalScan(queued.operation_id!);
+  // A fixture copy can overlap the repository's lifecycle scan. Its receipt
+  // is valid but its snapshot predates the copied file, so request one fresh
+  // verifier only after that coalesced operation reaches a terminal state.
+  if (queued.coalesced) {
+    queued = await requestScan();
+    expect(queued.operation_id).toBeTruthy();
+    await waitForTerminalScan(queued.operation_id!);
+  }
   await expect(async () => {
     const assets = await api<AssetList>("/api/v1/assets/list", {
       method: "POST",
@@ -39,8 +62,8 @@ test("@smoke administrator scans a real repository file and sees it", async ({
         stack_mode: "expanded",
       }),
     });
-    expect(assets.items?.length).toBe(1);
-  }).toPass({ timeout: 60_000 });
+    expect(assets.items ?? []).toHaveLength(1);
+  }).toPass({ timeout: 90_000 });
 
   await new LoginPage(page).signIn(workspace.username, workspace.password);
   await new GalleryPage(page).scopeTo(workspace.repositoryName);

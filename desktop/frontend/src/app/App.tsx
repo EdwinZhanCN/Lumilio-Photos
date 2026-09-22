@@ -973,12 +973,20 @@ function StoragePanel({
                   }
                   successText={t("storage.hostActionApproved", "Approved")}
                   icon={<FolderOpen className="size-3.5" />}
-                  disabled={decliningActionID !== null}
+                  disabled={
+                    decliningActionID !== null ||
+                    (action.status === "needs_decision" && !action.riskWarnings?.length)
+                  }
                   onClick={() => void approveHostAction(action)}
                 >
-                  {action.status === "needs_decision"
-                    ? t("storage.confirmRiskAndContinue", "Confirm risks and continue")
-                    : t("storage.reviewAndChoose", "Review and choose folder")}
+                  {action.status === "needs_decision" && !action.riskWarnings?.length
+                    ? t(
+                        "storage.hostActionResolveInWeb",
+                        "Resolve in Web Storage admin",
+                      )
+                    : action.status === "needs_decision"
+                      ? t("storage.confirmRiskAndContinue", "Confirm risks and continue")
+                      : t("storage.reviewAndChoose", "Review and choose folder")}
                 </StatefulButton>
               </RowActions>
             </SettingRow>
@@ -2082,29 +2090,9 @@ function storageLocationDescription(
 ): string {
   const details = [item.path || item.status];
   details.push(
-    item.writable ? t("storage.writable", "Writable") : t("storage.readOnly", "Read-only"),
-  );
-  if (item.capacityKnown) {
-    details.push(
-      t("storage.capacityAvailable", "{{available}} of {{total}} available", {
-        available: formatStorageBytes(item.availableBytes ?? 0),
-        total: formatStorageBytes(item.totalBytes ?? 0),
-      }),
-    );
-  } else {
-    details.push(t("storage.capacityUnknown", "Capacity unavailable"));
-  }
-  details.push(
     t("storage.repositoryCount", "{{count}} Repositories", { count: item.repositoryCount }),
   );
   return details.join(" · ");
-}
-
-function formatStorageBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-  const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${(bytes / 1024 ** unit).toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
 function normalizeRoute(route: string): MainRoute {

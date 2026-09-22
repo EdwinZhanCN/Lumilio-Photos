@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 import { api } from "./api";
 import { compose, docker, repositoryRoot } from "./docker.ts";
 import { isMFAInvalidError, loadBootstrapTOTP, nextTOTPCode, totpCode } from "./totp";
@@ -43,6 +44,9 @@ type Auth = {
 };
 type User = { user_id: number; username: string };
 type Repository = { id: string; name: string; path: string };
+type StorageTargets = components["schemas"]["dto.StorageTargetsResponseDTO"];
+type CreateRepositoryResponse = components["schemas"]["dto.CreateRepositoryResponseDTO"];
+type StorageDiagnostics = components["schemas"]["dto.StorageDiagnosticsResponseDTO"];
 
 async function ensureAttemptAdmin(index: number, adminToken: string) {
   const username = `e2e-a${index}`;
@@ -102,26 +106,30 @@ async function loginBootstrap(): Promise<{ token: string }> {
 
 async function ensureAttemptRepository(index: number, token: string) {
   const name = `E2E Attempt ${index}`;
-  const { repositories } = await api<{ repositories: Repository[] }>("/api/v1/repositories", {
-    token,
-  });
-  const existing = repositories?.find((repository) => repository.name === name);
-  if (existing) return existing;
+  const { targets } = await api<StorageTargets>("/api/v1/storage/targets", { token });
+  const existingTarget = targets?.find((target) => target.name === name);
+  if (existingTarget?.id) {
+    const diagnostics = await api<StorageDiagnostics>("/api/v1/storage/diagnostics", { token });
+    const path = diagnostics.items?.find(
+      (item) => item.target_id === existingTarget.id && item.target_type === "repository",
+    )?.path;
+    if (!path) throw new Error(`repository ${name} is registered but diagnostics omitted its path`);
+    return { id: existingTarget.id, name, path };
+  }
 
-  // Regular, not primary: `repositories_one_primary_idx` allows a single primary
-  // repository for the whole instance.
-  const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
+  const { repository } = await api<CreateRepositoryResponse>("/api/v1/storage/repositories", {
     method: "POST",
     token,
     body: JSON.stringify({
       name,
       directory_name: name,
-      role: "regular",
       storage_strategy: "flat",
-      duplicate_handling: "rename",
     }),
   });
-  return repository;
+  if (!repository?.id || !repository.path) {
+    throw new Error(`repository ${name} creation did not return id and path`);
+  }
+  return { id: repository.id, name: repository.name ?? name, path: repository.path };
 }
 
 function placeScanFixture(repository: Repository, source: string, scanFilename: string) {

@@ -328,8 +328,8 @@ func (c *Coordinator) process(items []submission) {
 	oldestWait := time.Since(items[0].enqueued)
 	results := c.apply(items)
 	for index, result := range results {
-		items[index].ack <- result
 		c.incrementAck(result)
+		items[index].ack <- result
 	}
 	c.metricsMu.Lock()
 	c.metrics.operations += uint64(len(items))

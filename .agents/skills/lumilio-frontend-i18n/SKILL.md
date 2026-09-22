@@ -29,6 +29,12 @@ bilingual labels, boundary definition, and forbidden synonyms together.
 | `storage-location` | `Storage Location` | `存储位置` | A host-authorized parent storage identity marked by `.lumilioroot`. It may contain zero or more direct-child Repositories; its path and display name are not its identity. | `Storage Root`, `Repository Root`; `存储根`, `存储根目录`, `资源库根` |
 | `default-storage-location` | `Default Storage Location` | `默认存储位置` | The instance's single non-removable Storage Location registered from `storage.path`. Startup creates or validates its marker but does not create a Repository. | `Default Storage Root`; `默认存储根`, `默认资源库位置` |
 | `repository` | `Repository` | `资源库` | A concrete media storage unit under a registered Storage Location, marked by `.lumiliorepo`, with a user-visible media tree and a private `.lumilio/` workspace. | `Library`, `Libraries`; `图库`, `媒体库`, `仓库` |
+| `music` | `Music` | `音乐` | The authenticated local listening domain: audio tracks, release metadata, artist credits, playlists, and transient playback state. It is a catalog projection, not a storage identity. | `Music Library` as a Repository synonym; `音乐库` as a Storage Location or Repository synonym |
+| `music-browse` | `Library` | `音乐库` | The YesPlayMusic-compatible listening navigation at `music.browse.title` only; a view over local Music, never a storage identity. | `Library` anywhere describing a Repository or Storage Location |
+| `music-album` | `Music Album` | `音乐专辑` | A release entity in the Music domain, separate from the existing mixed-media Albums collection. | `Album` when the UI means a mixed-media collection; `相册` for a Music release |
+| `track` | `Track` | `曲目` | A playable AUDIO asset rendition with Music metadata; it is not an abstract work shared across files. | `Song` when referring to Asset identity; `歌曲` as an abstract deduplicated work |
+| `artist` | `Artist` | `艺人` | An owner-scoped Music credit entity with ordered track or release relations. | `Person` / `人物` when referring to face-recognition entities |
+| `playlist` | `Playlist` | `歌单` | An owner-scoped ordered list of Music entries; repeated track occurrences are independent entries. | `Album` / `专辑`; `collection` / `合集` |
 | `primary-repository` | `Primary Repository` | `主资源库` | The instance's unique active primary-role Repository at `<storage.path>/primary` in the Default Storage Location. Authenticated first-run setup creates it; storage startup does not. | `Primary Library`; `主图库`, `主媒体库`, `主仓库` |
 | `siglip` | `Image Semantic Analysis` | `图像语义分析` | The Lumen `siglip` capability for semantic image analysis and the features it enables. | `Semantic Search`; `语义搜索` |
 | `siglip-video` | `Image Semantic Analysis (video)` | `图像语义分析（视频）` | The video-qualified presentation of `siglip`, not a fifth Lumen service; it requires the parent `siglip` capability. | A standalone Video Semantic Analysis capability; 独立的“视频语义分析”能力 |
@@ -43,26 +49,33 @@ and a Repository into one concept.
 
 ## Technical identifier mapping
 
-Keep stable technical identifiers unchanged and interpret them through this
-map. They are implementation vocabulary, not additional product concepts.
+Catalog, HTTP, and Go identifiers use `StorageLocation`, `storage_location`,
+or `StorageLocations`. The only retained exception is the on-disk marker
+filename `.lumilioroot` (and its lock file `.lumilioroot.lock`). Do not
+introduce `StorageRoot`, `RepositoryRoot`, `root_id`, or `roots` as Storage
+Location identifiers.
 
-| Product concept | Retained technical identifiers | Interpretation |
+| Product concept | Technical identifiers | Interpretation |
 | --- | --- | --- |
-| Storage Location | `.lumilioroot`, root UUID | Portable on-disk Storage Location identity; the marker name is a format, not a user-facing label. |
-| Storage Location | `repository_roots`, `repositories.root_id`, `root_id` | Catalog row and foreign-key association for a Storage Location. |
-| Storage Location | `repo.RepositoryRoot`, `RepositoryRoot*`, `RootID`, `ErrRepositoryRoot*` | Existing SQLC and Go symbols for Storage Location state, identity, lifecycle, and errors. |
-| Storage Location | `/api/v1/repository-roots`, `root_id`, `roots`, `RepositoryRootDTO` | Existing HTTP/OpenAPI wire contract for Storage Location resources. |
-| Storage Location | `useRepositoryRoots`, `repositoryRoot`, Repository Root query keys | Frontend adapters over that retained HTTP contract; UI text still says Storage Location / 存储位置. |
-| Default Storage Location | `storage.path`, `repository_roots.kind = 'default'`, `GetDefaultRepositoryRoot` | The single non-removable Default Storage Location. |
+| Storage Location | `.lumilioroot` | Portable on-disk Storage Location identity; the marker name is a format, not a user-facing label. |
+| Storage Location | `storage_locations`, `repositories.storage_location_id`, `storage_location_id`, `storage_location` | Catalog row, foreign key, and JSON fields for a Storage Location. |
+| Storage Location | `repo.StorageLocation`, `StorageLocation*`, `StorageLocationID`, `ErrStorageLocation*` | SQLC and Go symbols for Storage Location state, identity, lifecycle, and errors. |
+| Storage Location | `/api/v1/storage/view`, `StorageViewResponseDTO`, `storage_locations` | Admin HTTP read model for Storage Location registration. |
+| Storage Location | `/api/v1/storage/locations/{id}/detach-impact`, `/api/v1/storage/locations/{id}/detach` | Location registration lifecycle commands (already namespaced under `/storage/`). |
+| Storage Location | `useStorageView`, `storageViewQueryKey`, `useStorageLocations` | Frontend adapters over `/api/v1/storage/view`. |
+| Repository (selectors) | `/api/v1/storage/targets`, `StorageTargetDTO`, `StorageTargetsResponseDTO` | Non-admin browse/upload selector contract (replaces `IndexingRepositoryOptionDTO` and `GET /assets/indexing/repositories`). |
+| Primary Repository (setup) | `POST /api/v1/setup/primary-repository` | Authenticated initial Primary Repository creation outside completed-setup gates. |
+| Default Storage Location | `storage.path`, `storage_locations.kind = 'default'`, `GetDefaultStorageLocation` | The single non-removable Default Storage Location. |
 | Repository | `.lumiliorepo`, `repositories`, `repo_id`, `repository_id`, `Repository*` | Repository identity, catalog rows, and domain symbols. |
 | Primary Repository | `repositories.role = 'primary'`, `<storage.path>/primary` | The unique Primary Repository role and fixed directory. |
 
-Do not rename an on-disk, database, durable-payload, or HTTP identifier solely
-to match product copy. Do not add cosmetic aliases such as a second Go type for
-`repo.RepositoryRoot`; translate terminology at human-facing boundaries. When
-extending an existing technical contract, follow its mapped identifiers rather
-than creating parallel spellings. Comments, API descriptions, logs intended for
-operators, and UI text name the mapped product concept.
+Do not add cosmetic aliases such as a second Go type for `repo.StorageLocation`.
+When extending an existing technical contract, follow Storage Location
+identifiers rather than creating parallel spellings. Comments, API
+descriptions, logs intended for operators, and UI text name the mapped product
+concept. ROE content Locations (`asset_locations.location_id`) and geo
+`/locations/*` routes are a different Location concept and stay unchanged.
+The git project tree may still be called a repository root.
 
 The Chinese exception `打开项目仓库` refers to the source-code repository and
 is not a Repository synonym.

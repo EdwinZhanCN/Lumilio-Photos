@@ -1,47 +1,56 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
+import { t } from "@test/i18n";
 import { toast } from "sonner";
 import i18n from "@/lib/i18n";
-import type { QueueSummaryResponse } from "../../types";
+import type { ProcessingMonitorResponse } from "../../types";
 import { QueueSummaryList } from "./QueueSummaryList";
+import { useProcessingMonitor } from "../../api/useProcessingMonitor";
+
+function TestQueueSummaryList() {
+  const query = useProcessingMonitor();
+  return query.data ? <QueueSummaryList queues={query.data.deliveries?.queues ?? []} /> : null;
+}
 
 const now = new Date("2026-06-12T12:00:00.000Z").toISOString();
 const oneMinuteAgo = new Date("2026-06-12T11:59:00.000Z").toISOString();
 
 const summaryResponse = {
   generated_at: now,
-  queues: [
-    {
-      name: "catalog_macro",
-      total_jobs: 100,
-      processed_jobs: 80,
-      remaining_jobs: 20,
-      running_jobs: 1,
-      attention_jobs: 2,
-      average_latency_ms: 5000,
-      average_runtime_ms: 1200,
-      latest_activity_at: now,
-      oldest_remaining_at: oneMinuteAgo,
-      error_samples: [
-        {
-          job_id: 42,
-          kind: "generate_asset_derivatives",
-          state: "retryable",
-          attempt: 3,
-          max_attempts: 50,
-          created_at: oneMinuteAgo,
-          scheduled_at: now,
-          attempted_at: now,
-          last_error: "derivative generation failed: decode error",
-        },
-      ],
-    },
-  ],
-} satisfies QueueSummaryResponse;
+  deliveries: {
+    queues: [
+      {
+        name: "catalog_macro",
+        total_jobs: 100,
+        processed_jobs: 80,
+        remaining_jobs: 20,
+        running_jobs: 1,
+        attention_jobs: 2,
+        average_latency_ms: 5000,
+        average_runtime_ms: 1200,
+        latest_activity_at: now,
+        oldest_remaining_at: oneMinuteAgo,
+        error_samples: [
+          {
+            job_id: 42,
+            kind: "generate_asset_derivatives",
+            state: "retryable",
+            attempt: 3,
+            max_attempts: 50,
+            created_at: oneMinuteAgo,
+            scheduled_at: now,
+            attempted_at: now,
+            last_error: "derivative generation failed: decode error",
+          },
+        ],
+      },
+    ],
+  },
+} satisfies ProcessingMonitorResponse;
 
-function serveSummary(response: QueueSummaryResponse = summaryResponse) {
-  worker.use(http.get("/api/v1/admin/river/queue-summary", () => HttpResponse.json(response)));
+function serveSummary(response: ProcessingMonitorResponse = summaryResponse) {
+  worker.use(http.get("/api/v1/admin/monitor/processing", () => HttpResponse.json(response)));
 }
 
 describe("QueueSummaryList", () => {
@@ -55,23 +64,34 @@ describe("QueueSummaryList", () => {
 
   it("renders each queue as a processing area with aggregate metrics", async () => {
     serveSummary();
-    const screen = await renderWithProviders(<QueueSummaryList />);
+    const screen = await renderWithProviders(<TestQueueSummaryList />);
 
     await expect
-      .element(screen.getByRole("heading", { name: "Catalog processing" }))
-      .toBeInTheDocument();
-    await expect
       .element(
-        screen.getByText("Runs bounded catalog pipeline stages with shared resource limits."),
+        screen.getByRole("heading", {
+          name: t("monitor.queueSummary.queues.catalog_macro.name"),
+        }),
       )
       .toBeInTheDocument();
-    await expect.element(screen.getByText("Total", { exact: true })).toBeInTheDocument();
+    await expect.element(screen.getByText("100", { exact: true })).not.toBeInTheDocument();
+    await screen
+      .getByRole("button", { name: t("monitor.queueSummary.reviewErrors", { count: 2 }) })
+      .click();
+    await expect
+      .element(screen.getByText(t("monitor.queueSummary.metrics.total"), { exact: true }))
+      .toBeInTheDocument();
     await expect.element(screen.getByText("100", { exact: true })).toBeInTheDocument();
-    await expect.element(screen.getByText("Processed", { exact: true })).toBeInTheDocument();
+    await expect
+      .element(screen.getByText(t("monitor.queueSummary.metrics.processed"), { exact: true }))
+      .toBeInTheDocument();
     await expect.element(screen.getByText("80", { exact: true })).toBeInTheDocument();
-    await expect.element(screen.getByText("Remaining", { exact: true })).toBeInTheDocument();
+    await expect
+      .element(screen.getByText(t("monitor.queueSummary.metrics.remaining"), { exact: true }))
+      .toBeInTheDocument();
     await expect.element(screen.getByText("20", { exact: true })).toBeInTheDocument();
-    await expect.element(screen.getByText("Needs attention").first()).toBeInTheDocument();
+    await expect
+      .element(screen.getByText(t("monitor.queueSummary.status.needsAttention")).first())
+      .toBeInTheDocument();
     await expect.element(screen.getByText("2", { exact: true })).toBeInTheDocument();
   });
 
@@ -83,16 +103,26 @@ describe("QueueSummaryList", () => {
       value: { writeText: clipboardWriteText },
     });
 
-    const screen = await renderWithProviders(<QueueSummaryList />);
+    const screen = await renderWithProviders(<TestQueueSummaryList />);
 
-    await screen.getByRole("button", { name: "Review 2 issues" }).click();
+    await screen
+      .getByRole("button", { name: t("monitor.queueSummary.reviewErrors", { count: 2 }) })
+      .click();
+    await expect
+      .element(screen.getByText("derivative generation failed: decode error"))
+      .not.toBeVisible();
+    await screen
+      .getByText(t("monitor.queueSummary.kinds.generate_asset_derivatives"), { exact: true })
+      .click();
 
-    await expect.element(screen.getByText("Build previews")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText(t("monitor.queueSummary.kinds.generate_asset_derivatives")))
+      .toBeInTheDocument();
     await expect
       .element(screen.getByText("derivative generation failed: decode error"))
       .toBeInTheDocument();
 
-    await screen.getByRole("button", { name: "Copy error" }).click();
+    await screen.getByRole("button", { name: t("monitor.queueSummary.copyError") }).click();
 
     await vi.waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(
@@ -116,13 +146,18 @@ describe("QueueSummaryList", () => {
       configurable: true,
       value: vi.fn(() => false),
     });
-    const screen = await renderWithProviders(<QueueSummaryList />);
+    const screen = await renderWithProviders(<TestQueueSummaryList />);
 
-    await screen.getByRole("button", { name: "Review 2 issues" }).click();
-    await screen.getByRole("button", { name: "Copy error" }).click();
+    await screen
+      .getByRole("button", { name: t("monitor.queueSummary.reviewErrors", { count: 2 }) })
+      .click();
+    await screen
+      .getByText(t("monitor.queueSummary.kinds.generate_asset_derivatives"), { exact: true })
+      .click();
+    await screen.getByRole("button", { name: t("monitor.queueSummary.copyError") }).click();
 
     await vi.waitFor(() => {
-      expect(toastError).toHaveBeenCalledWith("Copy failed.", expect.any(Object));
+      expect(toastError).toHaveBeenCalledWith(t("common.copyFailed"), expect.any(Object));
     });
   });
 
@@ -130,19 +165,21 @@ describe("QueueSummaryList", () => {
     const queueNames = ["catalog_macro"] as const;
     serveSummary({
       generated_at: now,
-      queues: queueNames.map((name) => ({
-        name,
-        total_jobs: 0,
-        processed_jobs: 0,
-        remaining_jobs: 0,
-        running_jobs: 0,
-        attention_jobs: 0,
-        error_samples: [],
-      })),
+      deliveries: {
+        queues: queueNames.map((name) => ({
+          name,
+          total_jobs: 0,
+          processed_jobs: 0,
+          remaining_jobs: 0,
+          running_jobs: 0,
+          attention_jobs: 0,
+          error_samples: [],
+        })),
+      },
     });
     await i18n.changeLanguage("zh");
 
-    const screen = await renderWithProviders(<QueueSummaryList />);
+    const screen = await renderWithProviders(<TestQueueSummaryList />);
 
     for (const name of queueNames) {
       await expect

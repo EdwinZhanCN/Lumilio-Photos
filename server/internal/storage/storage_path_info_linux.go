@@ -30,6 +30,27 @@ func linuxFilesystemForPath(path string) (string, error) {
 	return filesystemFromMountInfo(file, path)
 }
 
+// capacityGroupKeyForPath proves shared backing capacity from statfs. The
+// filesystem ID identifies the mounted superblock, so bind mounts and repeated
+// mounts of one filesystem agree while the Linux mount ID, which is
+// namespace-local and changes across container recreation, is never used.
+func capacityGroupKeyForPath(path string, filesystem string) string {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return ""
+	}
+	return capacityGroupKeyFromStatfsID(capacityGroupKindLinuxStatfs, linuxStatfsFilesystemID(stat.Fsid.X__val), filesystem)
+}
+
+// linuxStatfsFilesystemID encodes the two-word statfs filesystem ID. A zero ID
+// cannot prove a shared pool, so it stays empty (unknown).
+func linuxStatfsFilesystemID(fsid [2]int32) string {
+	if fsid[0] == 0 && fsid[1] == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%08x%08x", uint32(fsid[0]), uint32(fsid[1]))
+}
+
 func inspectPathPlatform(path string) pathPlatformInfo {
 	result := pathPlatformInfo{EffectiveUID: fmt.Sprint(os.Geteuid()), EffectiveGID: fmt.Sprint(os.Getegid())}
 	var stat syscall.Stat_t
@@ -74,6 +95,7 @@ func inspectPathPlatform(path string) pathPlatformInfo {
 			}
 		}
 	}
+	result.MountPath = best
 	return result
 }
 

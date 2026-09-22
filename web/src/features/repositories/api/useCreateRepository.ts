@@ -2,11 +2,12 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { RepositoryStorageStrategy } from "../components/StorageStrategyPicker";
+import { storageViewQueryKey } from "./useStorageView";
 
 export type CreateRepositoryInput = {
   name: string;
   directoryName?: string;
-  rootId?: string;
+  storageLocationId?: string;
   role?: "primary" | "regular";
   storageStrategy: RepositoryStorageStrategy;
   riskConfirmation?: boolean;
@@ -15,7 +16,7 @@ export type CreateRepositoryInput = {
 export function buildCreateRepositoryRequestBody({
   name,
   directoryName,
-  rootId,
+  storageLocationId,
   role,
   storageStrategy,
   riskConfirmation,
@@ -23,7 +24,7 @@ export function buildCreateRepositoryRequestBody({
   return {
     name,
     directory_name: directoryName,
-    root_id: rootId,
+    storage_location_id: storageLocationId,
     role,
     storage_strategy: storageStrategy,
     risk_confirmation: riskConfirmation,
@@ -32,13 +33,13 @@ export function buildCreateRepositoryRequestBody({
 
 export function useCreateRepository() {
   const queryClient = useQueryClient();
-  const mutation = $api.useMutation("post", "/api/v1/repositories");
+  const mutation = $api.useMutation("post", "/api/v1/storage/repositories");
 
   const createRepository = useCallback(
     async ({
       name,
       directoryName,
-      rootId,
+      storageLocationId,
       role,
       storageStrategy,
       riskConfirmation,
@@ -47,7 +48,7 @@ export function useCreateRepository() {
         body: buildCreateRepositoryRequestBody({
           name,
           directoryName,
-          rootId,
+          storageLocationId,
           role,
           storageStrategy,
           riskConfirmation,
@@ -55,12 +56,8 @@ export function useCreateRepository() {
       });
 
       await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["get", "/api/v1/assets/indexing/repositories"],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["get", "/api/v1/repository-roots"],
-        }),
+        queryClient.invalidateQueries({ queryKey: [...storageViewQueryKey] }),
+        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/targets"] }),
         queryClient.invalidateQueries({
           queryKey: ["post", "/api/v1/assets/list"],
         }),

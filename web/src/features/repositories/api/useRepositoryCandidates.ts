@@ -3,13 +3,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
 import { createUUID } from "@/lib/uuid";
+import { storageViewQueryKey } from "./useStorageView";
 
 export type RepositoryCandidate = components["schemas"]["dto.RepositoryCandidateDTO"];
 
 export function useRepositoryCandidates(enabled = true) {
   return $api.useQuery(
     "get",
-    "/api/v1/repository-candidates",
+    "/api/v1/storage/candidates",
     {},
     { enabled, staleTime: 10_000, refetchOnWindowFocus: true },
   );
@@ -17,7 +18,7 @@ export function useRepositoryCandidates(enabled = true) {
 
 export function useOpenRepositoryCandidate() {
   const queryClient = useQueryClient();
-  const mutation = $api.useMutation("post", "/api/v1/repository-candidates/open");
+  const mutation = $api.useMutation("post", "/api/v1/storage/candidates/open");
 
   const openRepositoryCandidate = useCallback(
     async (directoryName: string, riskConfirmation = false) => {
@@ -26,11 +27,9 @@ export function useOpenRepositoryCandidate() {
         body: { directory_name: directoryName, risk_confirmation: riskConfirmation },
       });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/repository-candidates"] }),
-        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/repositories"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["get", "/api/v1/assets/indexing/repositories"],
-        }),
+        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/candidates"] }),
+        queryClient.invalidateQueries({ queryKey: [...storageViewQueryKey] }),
+        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/targets"] }),
       ]);
       return response;
     },
@@ -46,7 +45,7 @@ export function useOpenRepositoryCandidate() {
 
 export function useResolveRepositoryCandidate() {
   const queryClient = useQueryClient();
-  const mutation = $api.useMutation("post", "/api/v1/repository-candidates/resolve");
+  const mutation = $api.useMutation("post", "/api/v1/storage/candidates/resolve");
 
   const resolveRepositoryCandidate = useCallback(
     async (
@@ -59,11 +58,9 @@ export function useResolveRepositoryCandidate() {
         body: { directory_name: directoryName, resolution, risk_confirmation: riskConfirmation },
       });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/repository-candidates"] }),
-        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/repositories"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["get", "/api/v1/assets/indexing/repositories"],
-        }),
+        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/candidates"] }),
+        queryClient.invalidateQueries({ queryKey: [...storageViewQueryKey] }),
+        queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/targets"] }),
       ]);
       return response;
     },

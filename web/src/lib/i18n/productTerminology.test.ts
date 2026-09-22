@@ -22,18 +22,18 @@ describe("canonical product terminology", () => {
   });
 
   it("keeps the Storage Location and Repository hierarchy explicit", () => {
-    expect(en.manage.repositories.description).toBe(
-      "A Storage Location is an authorized parent location that can contain multiple Repositories. A Repository is a concrete media unit with its own identity.",
+    expect(en.storagePanel.emptyLocationFacts).toBe(
+      "Registered Storage Location with no Repositories. Detaching removes the registration only; nothing on disk is deleted.",
     );
-    expect(zh.manage.repositories.description).toBe(
-      "存储位置是可容纳多个资源库的已授权父级位置；资源库是各自拥有独立身份的具体媒体单元。",
+    expect(zh.storagePanel.emptyLocationFacts).toBe(
+      "已注册的存储位置，尚无资源库。移除注册仅取消登记，不会删除磁盘上的任何内容。",
     );
     expect(en.productTerms.defaultStorageLocation).toBe("Default Storage Location");
     expect(zh.productTerms.defaultStorageLocation).toBe("默认存储位置");
     expect(en.productTerms.primaryRepository).toBe("Primary Repository");
     expect(zh.productTerms.primaryRepository).toBe("主资源库");
-    expect(en.auth.primaryRepository.root).toBe("Default Storage Location");
-    expect(zh.auth.primaryRepository.root).toBe("默认存储位置");
+    expect(en.auth.primaryRepository.storageLocation).toBe("Default Storage Location");
+    expect(zh.auth.primaryRepository.storageLocation).toBe("默认存储位置");
 
     const englishViolations = translationValues(en).filter((value) =>
       /\b(?:storage|repository) roots?\b/i.test(value),
@@ -48,6 +48,22 @@ describe("canonical product terminology", () => {
     expect(englishViolations).toEqual([]);
     expect(englishCaseViolations).toEqual([]);
     expect(chineseViolations).toEqual([]);
+  });
+
+  it("keeps Music vocabulary separate from storage and mixed-media Albums", () => {
+    expect(en.music.title).toBe("Music");
+    expect(zh.music.title).toBe("音乐");
+    expect(en.music.album.label).toBe("Music Album");
+    expect(zh.music.album.label).toBe("音乐专辑");
+    expect(en.music.fields.artist).toBe("Track artist");
+    expect(zh.music.fields.artist).toBe("曲目艺人");
+    expect(en.music.playlists.create).toBe("Create playlist");
+    expect(zh.music.playlists.create).toBe("创建歌单");
+
+    const storageSynonymViolations = translationValues(en).filter((value) =>
+      /\bmusic library\b/i.test(value),
+    );
+    expect(storageSynonymViolations).toEqual([]);
   });
 
   it("keeps all four Lumen capability labels canonical", () => {

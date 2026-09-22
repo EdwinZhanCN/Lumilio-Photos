@@ -8,6 +8,13 @@ Last aligned with the codebase: 2026-09-19.
 
 ## Product paths
 
+- **Linux bind-mount capacity grouping is unexecuted without mount privileges.**
+  Owner: `server/internal/storage/storage_path_info_linux_test.go`
+  `TestInspectStoragePathProvesSharedCapacityGroupAcrossBindMount`. The test
+  creates a real `MS_BIND` mount and asserts one statfs-derived capacity group;
+  it skips without `CAP_SYS_ADMIN`. Darwin/Windows CI never compile it, and
+  Docker Desktop virtiofs/osxfs bind topologies are not this fixture.
+
 - **AgentBoard has no mobile column reflow.** Owner:
   `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one
   persisted 12-column layout at every width, so phone columns compress into
@@ -27,6 +34,12 @@ Last aligned with the codebase: 2026-09-19.
   `AssetFaceResultDTO` currently unmarshals them directly into `time.Time`.
   Mirror the internal aggregate conversion now used by OCR and add a focused
   relation test before relying on `include_faces=true` in a user-facing flow.
+- **Music embedded covers are not materialized as thumbnails.** Owner:
+  `server/internal/processors/audio_helpers.go` and
+  `web/src/features/music/components/MusicArtwork.tsx`. Bandcamp audio retains
+  embedded artwork, but the audio pipeline does not generate image thumbnails;
+  assigning an audio asset as album cover produces a 404. Demo albums use the
+  placeholder until cover extraction and thumbnail generation are implemented.
 - **Event rebuild still lacks a seven-media late-EXIF fixture and a legacy-data
   recovery run.** Owner: `server/internal/event`. Targeted API and domain tests
   cover the observed production failures, but there is no fixture of seven
@@ -41,4 +54,3 @@ Last aligned with the codebase: 2026-09-19.
   request acceptance. `queued_jobs` remains a global backlog even when queried
   with a repository filter, so a slice cannot treat queue-idle or that counter
   as proof that this repository's video finished.
-

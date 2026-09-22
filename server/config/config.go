@@ -99,7 +99,7 @@ type LoggingConfig struct {
 }
 
 type StorageConfig struct {
-	// Path is the configured default repository root. It contains only the
+	// Path is the configured Default Storage Location. It contains only the
 	// .lumilioroot marker and repository directories.
 	Path string
 	// CloudStatePath stores provider sessions and credential artifacts. It must
@@ -256,7 +256,7 @@ type loggingManifest struct {
 	RepositoryAuditVerbose *bool `toml:"repository_audit_verbose" json:"repository_audit_verbose"`
 }
 type storageManifest struct {
-	// Portable media root holding the .lumilioroot marker and repository
+	// Portable Default Storage Location holding the .lumilioroot marker and repository
 	// directories. This is the mount users back up and migrate.
 	Path *string `toml:"path" json:"path"`
 	// Cloud provider sessions and credential artifacts. Machine-bound private

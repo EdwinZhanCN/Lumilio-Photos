@@ -90,7 +90,12 @@ describe.skipIf(!webgl2Available())("studioEdit worker", () => {
       const exported = await call<{ blob: Blob; width: number; height: number }>(
         worker,
         "EXPORT_IMAGE",
-        { adjustments: DEFAULT_STUDIO_ADJUSTMENTS, format: "image/png", quality: 1, sizeMode: { kind: "original" } },
+        {
+          adjustments: DEFAULT_STUDIO_ADJUSTMENTS,
+          format: "image/png",
+          quality: 1,
+          sizeMode: { kind: "original" },
+        },
         "EXPORT_COMPLETE",
       );
       expect([exported.width, exported.height]).toEqual([64, 64]);

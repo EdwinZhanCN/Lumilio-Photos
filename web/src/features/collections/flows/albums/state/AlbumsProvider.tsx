@@ -11,11 +11,7 @@ const AlbumsContext = createContext<AlbumsContextType | undefined>(undefined);
 export const AlbumsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(albumsReducer, initialState);
 
-  return (
-    <AlbumsContext.Provider value={{ ...state, dispatch }}>
-      {children}
-    </AlbumsContext.Provider>
-  );
+  return <AlbumsContext.Provider value={{ ...state, dispatch }}>{children}</AlbumsContext.Provider>;
 };
 
 export const useAlbumsState = () => {

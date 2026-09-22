@@ -107,13 +107,13 @@ func (m *HashApplier) ApplyKnownContent(ctx context.Context, tx *sql.Tx, fact Kn
 			Normalization: pathsemantics.Normalization(state.PathNormalization),
 		}
 
-		root, err := queries.GetRepositoryRootNode(ctx, fact.RepositoryID)
+		root, err := queries.GetRepositoryTreeRootNode(ctx, fact.RepositoryID)
 		if errors.Is(err, sql.ErrNoRows) {
 			revision, allocateErr := allocateRevision(ctx, queries, fact.RepositoryID, now)
 			if allocateErr != nil {
 				return allocateErr
 			}
-			root, err = queries.InsertRepositoryRootNode(ctx, repo.InsertRepositoryRootNodeParams{
+			root, err = queries.InsertRepositoryTreeRootNode(ctx, repo.InsertRepositoryTreeRootNodeParams{
 				NodeID: uuid.New(), RepositoryID: fact.RepositoryID,
 				ObservationRevision: revision, StabilityToken: stringPtr("source-root"), CreatedAt: now,
 			})

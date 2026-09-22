@@ -543,6 +543,14 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 		return uuid.Nil, err
 	}
 
+	repository, err := s.queries.GetRepository(ctx, input.RepositoryID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if err := storage.CheckUploadAdmission(repository, storage.WriteFacts{}); err != nil {
+		return uuid.Nil, err
+	}
+
 	runID := uuid.New()
 	s.mu.Lock()
 	for _, imp := range s.activeImports {

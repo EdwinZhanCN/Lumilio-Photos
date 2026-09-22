@@ -123,7 +123,9 @@ describe("Lumilio chat run lifecycle", () => {
         callbacks.onSessionInfo("thread-1", "run-2", []);
         callbacks.onRunStatus("run-2", "running");
         expect(
-          useLumilioChatStore.getState().messages[1].blocks.find((block) => block.kind === "confirm"),
+          useLumilioChatStore
+            .getState()
+            .messages[1].blocks.find((block) => block.kind === "confirm"),
         ).toMatchObject({ state: "submitting_approval" });
         callbacks.onSideEvent({
           type: "effect_receipt",

@@ -39,6 +39,8 @@ type Repository = {
   name: string;
 };
 
+type CreateRepositoryResponse = components["schemas"]["dto.CreateRepositoryResponseDTO"];
+
 type IndexingTaskStats = {
   indexed_count: number;
   queued_jobs: number;
@@ -73,18 +75,19 @@ type SystemSettings = {
 const frameCap = 2;
 
 async function createRepository(token: string, name: string): Promise<Repository> {
-  const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
+  const { repository } = await api<CreateRepositoryResponse>("/api/v1/storage/repositories", {
     method: "POST",
     token,
     body: JSON.stringify({
       name,
       directory_name: name,
-      role: "regular",
       storage_strategy: "flat",
-      duplicate_handling: "rename",
     }),
   });
-  return repository;
+  if (!repository?.id || !repository.name) {
+    throw new Error(`repository creation for ${name} did not return id and name`);
+  }
+  return { id: repository.id, name: repository.name };
 }
 
 async function removeRepository(token: string, repository: Repository) {
@@ -92,8 +95,8 @@ async function removeRepository(token: string, repository: Repository) {
     .poll(
       async () => {
         try {
-          await api(`/api/v1/repositories/${repository.id}`, {
-            method: "DELETE",
+          await api(`/api/v1/storage/repositories/${repository.id}/detach`, {
+            method: "POST",
             token,
             body: JSON.stringify({ confirmation_name: repository.name }),
           });

@@ -3,16 +3,18 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   ChevronUp,
-  Folders,
+  HardDrive,
   Home,
   Image,
   LibraryBig,
   LogOut,
+  Music2,
   Moon,
   Paintbrush,
   Palette,
   SlidersHorizontal,
   Sun,
+  Upload,
   UserRound,
   Users,
 } from "lucide-react";
@@ -117,6 +119,16 @@ function SideBar() {
         </li>
         <li>
           <Link
+            to="/music"
+            onClick={closeMobileDrawer}
+            className={location.pathname.startsWith("/music") ? "active" : ""}
+          >
+            <Music2 className="size-5" />
+            {t("sidebar.music", { defaultValue: "Music" })}
+          </Link>
+        </li>
+        <li>
+          <Link
             to="/studio"
             onClick={closeMobileDrawer}
             className={location.pathname.startsWith("/studio") ? "active" : ""}
@@ -127,14 +139,26 @@ function SideBar() {
         </li>
         <li>
           <Link
-            to="/manage"
+            to="/upload"
             onClick={closeMobileDrawer}
-            className={location.pathname.startsWith("/manage") ? "active" : ""}
+            className={location.pathname.startsWith("/upload") ? "active" : ""}
           >
-            <Folders className="size-5" />
-            {t("sidebar.manage")}
+            <Upload className="size-5" />
+            {t("sidebar.upload", { defaultValue: "Upload" })}
           </Link>
         </li>
+        {user?.role === "admin" && (
+          <li>
+            <Link
+              to="/storage"
+              onClick={closeMobileDrawer}
+              className={location.pathname.startsWith("/storage") ? "active" : ""}
+            >
+              <HardDrive className="size-5" />
+              {t("sidebar.storage", { defaultValue: "Storage" })}
+            </Link>
+          </li>
+        )}
         <li>
           <Link
             to="/settings"

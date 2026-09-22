@@ -68,12 +68,13 @@ func (e *RepositoryConflictError) Error() string {
 //
 // Assets and Locations are untouched by construction: repository node paths
 // are relative graph projections, so every consumer resolves the new root
-// through RepositoryFS. Relocate is one UPDATE.
+// through RepositoryFS. The catalog path update and observation fence commit
+// together; original media bytes are never moved.
 func (rm *DefaultRepositoryManager) RelocateRepository(ctx context.Context, id string, newPath string, requests ...LifecycleRequest) (*repo.Repository, error) {
 	return rm.relocateRepository(ctx, id, newPath, nil, requests...)
 }
 
-func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id string, newPath string, associatedRootID *uuid.UUID, requests ...LifecycleRequest) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id string, newPath string, associatedStorageLocationID *uuid.UUID, requests ...LifecycleRequest) (*repo.Repository, error) {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
@@ -95,9 +96,6 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	}
 	if err := rm.claimRuntimeStoragePath(ctx, "repository", cleanPath); err != nil {
 		return nil, err
-	}
-	if current.Activity != dbtypes.RepositoryActivityIdle {
-		return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
 	}
 
 	result, err := rm.validateRepository(cleanPath)
@@ -121,25 +119,45 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	}
 
 	now := time.Now()
-	rootID := uuid.Nil
-	if associatedRootID == nil {
-		rootID, err = rm.repositoryRootIDForPath(ctx, cleanPath)
+	storageLocationID := uuid.Nil
+	if associatedStorageLocationID == nil {
+		storageLocationID, err = rm.storageLocationIDForPath(ctx, cleanPath)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rootID = *associatedRootID
+		storageLocationID = *associatedStorageLocationID
 	}
-	releaseRoot, err := rm.files.AccessCoordinator().AcquireRootReadContext(ctx, rootID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: Storage Location is busy: %v", ErrRepositoryBusy, err)
-	}
-	defer releaseRoot()
 	releaseMutation, err := rm.files.AccessCoordinator().AcquireMutationsContext(ctx, []uuid.UUID{repoUUID})
 	if err != nil {
 		return nil, fmt.Errorf("%w: repository is busy: %v", ErrRepositoryBusy, err)
 	}
 	defer releaseMutation()
+	current, err = rm.GetRepository(id)
+	if err != nil {
+		return nil, err
+	}
+	oldMarker, oldMarkerErr := repocfg.LoadConfigFromFile(current.Path)
+	if oldMarkerErr == nil && oldMarker.ID == id {
+		return nil, fmt.Errorf("%w: %s", ErrRepositoryOriginalOnline, current.Path)
+	}
+	if current.Activity != dbtypes.RepositoryActivityIdle {
+		if oldMarkerErr == nil && !repositoryReachabilityAllowsStaleActivityDetach(current.Reachability) {
+			return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
+		}
+		if _, err := rm.queries.FinishRepositoryActivity(ctx, repo.FinishRepositoryActivityParams{
+			RepoID: repoUUID, Activity: current.Activity, UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
+		}); err != nil {
+			return nil, fmt.Errorf("clear stale repository activity before relocate: %w", err)
+		}
+		current, err = rm.GetRepository(id)
+		if err != nil {
+			return nil, err
+		}
+		if current.Activity != dbtypes.RepositoryActivityIdle {
+			return nil, fmt.Errorf("%w: repository activity is %s", ErrRepositoryBusy, current.Activity)
+		}
+	}
 	tx, err := rm.writer.BeginTx(ctx, catalogtx.OperationRepositoryRelocate, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin repository relocation: %w", err)
@@ -147,11 +165,11 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 	defer func() { _ = tx.Rollback() }()
 	queries := rm.queries.WithTx(tx.Raw())
 	dbRepo, err := queries.UpdateRepositoryPath(ctx, repo.UpdateRepositoryPathParams{
-		RepoID:       repoUUID,
-		Path:         cleanPath,
-		RootID:       rootID,
-		Reachability: dbtypes.RepositoryReachabilityActive,
-		UpdatedAt:    dbtypes.NewTimestamp(now),
+		RepoID:            repoUUID,
+		Path:              cleanPath,
+		StorageLocationID: storageLocationID,
+		Reachability:      dbtypes.RepositoryReachabilityActive,
+		UpdatedAt:         dbtypes.NewTimestamp(now),
 	})
 	if err != nil {
 		if isUniquePathViolation(err) {
@@ -160,6 +178,10 @@ func (rm *DefaultRepositoryManager) relocateRepository(ctx context.Context, id s
 		}
 		rm.repoAudit(cleanPath).Error("repository.relocate", err, zap.String("repository_id", id))
 		return nil, fmt.Errorf("failed to relocate repository: %w", err)
+	}
+	nowStamp := dbtypes.NewTimestamp(now)
+	if err := invalidateRepositoryObservationAfterRelocation(ctx, tx, repoUUID, cleanPath, nowStamp); err != nil {
+		return nil, err
 	}
 	request := LifecycleRequest{}
 	if len(requests) > 0 {
@@ -236,7 +258,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	} else if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
 		return nil, fmt.Errorf("check copied repository role: %w", lookupErr)
 	}
-	rootID, err := rm.repositoryRootIDForPath(ctx, cleanPath)
+	storageLocationID, err := rm.storageLocationIDForPath(ctx, cleanPath)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +270,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 	operation, replay, err := rm.beginLifecycleOperation(ctx, lifecycleBeginInput{
 		RequestID: request.RequestID, Kind: lifecycleKindRegisterRepositoryCopy,
 		Payload: registerRepositoryCopyOperationPayload{
-			Path: cleanPath, RootID: rootID.String(), OwnerID: defaultOwnerID, Role: normalizeRepoRole(role), RiskConfirmation: request.RiskConfirmation,
+			Path: cleanPath, StorageLocationID: storageLocationID.String(), OwnerID: defaultOwnerID, Role: normalizeRepoRole(role), RiskConfirmation: request.RiskConfirmation,
 		},
 		Actor: request.Actor, ActorUserID: request.ActorUserID, HostInstanceID: request.HostInstanceID, TargetType: "repository", TargetID: &newID,
 		RollbackData: registerRepositoryCopyRollbackData{PreviousRepositoryID: previousID},
@@ -266,7 +288,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return rm.GetRepository(*operation.TargetID)
 	}
 	newID = *operation.TargetID
-	releaseRoot := rm.acquireRepositoryRootRead(rootID)
+	releaseStorageLocation := rm.acquireStorageLocationRead(storageLocationID)
 	releaseMutation := rm.acquireRepositoryMutation(previousUUID)
 	locksReleased := false
 	releaseLocks := func() {
@@ -275,7 +297,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		}
 		locksReleased = true
 		releaseMutation()
-		releaseRoot()
+		releaseStorageLocation()
 	}
 	defer releaseLocks()
 	rollbackData, err := planRepositoryPrivateStateIsolation(cleanPath, "copied-from-"+previousID)
@@ -314,7 +336,7 @@ func (rm *DefaultRepositoryManager) RegisterRepositoryCopy(ctx context.Context, 
 		return nil, rollback(fmt.Errorf("persist register-copy filesystem phase: %w", err))
 	}
 
-	dbRepo, err := rm.AddRepository(cleanPath, defaultOwnerID, role, rootID)
+	dbRepo, err := rm.AddRepository(cleanPath, defaultOwnerID, role, storageLocationID)
 	if err != nil {
 		return nil, rollback(err)
 	}

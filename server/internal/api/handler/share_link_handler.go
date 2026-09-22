@@ -503,7 +503,7 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, d
 		api.WriteProblem(c, api.BadRequest(fmt.Errorf("asset is not %s", strings.ToLower(assetType))))
 		return
 	}
-	repositoryFS, file, err := openWebOrOriginal(c.Request.Context(), h.locations, asset, derivedKind, webSuffix)
+	repositoryFS, file, optimized, err := openWebOrOriginalWithFallback(c.Request.Context(), h.locations, asset, derivedKind, webSuffix)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -514,6 +514,9 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, d
 	}
 
 	c.Header("Cache-Control", "private, max-age=300")
+	if !optimized && assetType == "AUDIO" {
+		contentType = assetAudioContentType(asset)
+	}
 	c.Header("Content-Type", contentType)
 	c.Header("Accept-Ranges", "bytes")
 	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)

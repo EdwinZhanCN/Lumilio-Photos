@@ -29,11 +29,6 @@ type StorageLocation struct {
 	CanRemove            bool
 	RemovalBlockedBy     string
 	FilesPreserved       bool
-	Writable             bool
-	CapacityKnown        bool
-	TotalBytes           uint64
-	AvailableBytes       uint64
-	Filesystem           string
 }
 
 type Repository struct {
@@ -71,8 +66,6 @@ func (a repositoryControlAdapter) ListStorageLocations(ctx context.Context) ([]S
 			ID: item.ID, Name: item.Name, Path: item.Path, Kind: item.Kind, Status: item.Status,
 			RepositoryCount: item.RepositoryCount, ActiveOperationCount: item.ActiveOperationCount,
 			CanRemove: item.CanRemove, RemovalBlockedBy: item.RemovalBlockedBy, FilesPreserved: item.FilesPreserved,
-			Writable: item.Writable, CapacityKnown: item.CapacityKnown, TotalBytes: item.TotalBytes,
-			AvailableBytes: item.AvailableBytes, Filesystem: item.Filesystem,
 		})
 	}
 	return result, nil

@@ -94,9 +94,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function num(value: unknown, fallback: number, min: number, max: number): number {
-  return typeof value === "number" && Number.isFinite(value)
-    ? clamp(value, min, max)
-    : fallback;
+  return typeof value === "number" && Number.isFinite(value) ? clamp(value, min, max) : fallback;
 }
 
 function hex(value: unknown, fallback: string): string {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -96,19 +97,24 @@ func serveRepositoryFile(c *gin.Context, repositoryFS *storage.RepositoryFS, fil
 	http.ServeContent(c.Writer, c.Request, filename, info.ModTime(), file)
 }
 
-func openWebOrOriginal(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, _ string, suffix string) (*storage.RepositoryFS, *os.File, error) {
+func openWebOrOriginal(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, directory, suffix string) (*storage.RepositoryFS, *os.File, error) {
+	repositoryFS, file, _, err := openWebOrOriginalWithFallback(ctx, resolver, asset, directory, suffix)
+	return repositoryFS, file, err
+}
+
+func openWebOrOriginalWithFallback(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, _ string, suffix string) (*storage.RepositoryFS, *os.File, bool, error) {
 	if resolver == nil || asset == nil {
-		return nil, nil, locations.ErrAssetUnavailable
+		return nil, nil, false, locations.ErrAssetUnavailable
 	}
 	opened, err := resolver.OpenAsset(ctx, asset.AssetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if asset.ContentID != uuid.Nil {
 		privatePath, parseErr := (artifact.Identity{SourceFence: asset.ContentID.String(), Stage: "transcode", PipelineVersion: pipeline.AssetPipelineVersion, Name: strings.TrimPrefix(suffix, "_")}).Path()
 		if parseErr != nil {
 			_ = opened.Close()
-			return nil, nil, parseErr
+			return nil, nil, false, parseErr
 		}
 		file, openErr := opened.Repository.OpenPrivate(privatePath)
 		if openErr == nil {
@@ -116,18 +122,30 @@ func openWebOrOriginal(ctx context.Context, resolver assetLocationResolver, asse
 			opened.File = nil
 			repositoryFS := opened.Repository
 			opened.Repository = nil
-			return repositoryFS, file, nil
+			return repositoryFS, file, true, nil
 		}
 		if !errors.Is(openErr, fs.ErrNotExist) {
 			_ = opened.Close()
-			return nil, nil, openErr
+			return nil, nil, false, openErr
 		}
 	}
 	repositoryFS := opened.Repository
 	file := opened.File
 	opened.Repository = nil
 	opened.File = nil
-	return repositoryFS, file, nil
+	return repositoryFS, file, false, nil
+}
+
+func assetAudioContentType(asset *repo.Asset) string {
+	if asset != nil && strings.TrimSpace(asset.MimeType) != "" {
+		return asset.MimeType
+	}
+	if asset != nil {
+		if contentType := mime.TypeByExtension(filepath.Ext(asset.OriginalFilename)); contentType != "" {
+			return contentType
+		}
+	}
+	return "application/octet-stream"
 }
 
 // writeAssetToZip streams one asset's original file into an open zip writer,

@@ -11,7 +11,7 @@ verification_status: "verified-with-todo"
 
 <!--
 code-evidence:
-- server/internal/storage/repository_roots.go
+- server/internal/storage/storage_locations.go
 - server/internal/storage/repo_relocate.go
 - server/internal/storage/repo_manager.go
 - server/app/repository_control.go

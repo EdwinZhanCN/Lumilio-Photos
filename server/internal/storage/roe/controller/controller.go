@@ -51,6 +51,7 @@ const (
 )
 
 type Config struct {
+	VerificationInterval time.Duration
 	BatchSize            int
 	TransactionBudget    time.Duration
 	ControllerLease      time.Duration

@@ -34,6 +34,7 @@ RETURNING *;
 UPDATE repository_observation_state
 SET desired_epoch = desired_epoch + 1,
     full_verification_required = CASE WHEN ?2 THEN 1 ELSE full_verification_required END,
+    full_verification_requested_epoch = CASE WHEN ?2 THEN desired_epoch + 1 ELSE full_verification_requested_epoch END,
     terminal_error = NULL,
     updated_at = ?3
 WHERE repository_id = ?1
@@ -81,7 +82,7 @@ UPDATE repository_observation_state
 SET applied_epoch = ?2,
     active_run_id = NULL,
     full_verification_required = CASE
-        WHEN desired_epoch > ?2 THEN full_verification_required
+        WHEN full_verification_requested_epoch > ?2 THEN full_verification_required
         ELSE ?3
     END,
     updated_at = ?4
@@ -122,6 +123,7 @@ RETURNING *;
 -- name: StartRepositoryScanRun :one
 UPDATE repository_scan_runs
 SET status = ?2,
+    full_verification_performed = ?7,
     started_at = COALESCE(started_at, ?3),
     cursor_start = ?4,
     cursor_end = ?4,
@@ -219,14 +221,14 @@ WHERE run_id = ?1
   AND status IN ('queued', 'crawling', 'catching_up', 'finalizing')
 RETURNING *;
 
--- name: InsertRepositoryRootNode :one
+-- name: InsertRepositoryTreeRootNode :one
 INSERT INTO repository_nodes (
     node_id, repository_id, parent_node_id, name, name_key, kind,
     lifecycle, observation_revision, stability_token, created_at, updated_at
 ) VALUES (?1, ?2, NULL, '', '', 'directory', 'active', ?3, ?4, ?5, ?5)
 RETURNING *;
 
--- name: GetRepositoryRootNode :one
+-- name: GetRepositoryTreeRootNode :one
 SELECT * FROM repository_nodes
 WHERE repository_id = ?1
   AND parent_node_id IS NULL
@@ -741,3 +743,9 @@ WHERE node.repository_id = ?1
   )
 ORDER BY node.observation_revision, node.node_id
 LIMIT ?2;
+
+-- name: GetLatestFullRepositoryVerificationRun :one
+SELECT * FROM repository_scan_runs
+WHERE repository_id = ?1 AND status = 'completed' AND full_verification_performed = 1
+ORDER BY finished_at DESC, run_id DESC
+LIMIT 1;

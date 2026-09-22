@@ -155,7 +155,10 @@ refreshes; otherwise colocate state with the owning flow.
 
 Repository scoping uses `useBrowseScope` for list pages,
 `useWorkingRepository` for upload only, the entity's own `repository_id` for
-entity actions, and Manage for maintenance jobs. Do not add repository
+entity actions, and Manage (`/manage`) for the non-admin upload surface backed
+by `GET /api/v1/storage/targets`. Storage administration (create/open, verify,
+detach, cloud bindings, maintenance jobs) lives on `/storage` and admin-only
+`/api/v1/storage/*`, chiefly `GET /api/v1/storage/view`. Do not add repository
 parameters to person/album detail pages or mutations.
 
 ## Routing And Shell
@@ -167,7 +170,7 @@ Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll
 - Home and library: `/`, `/assets/*`.
 - Collections: `/collections`, albums, places/map, people, folders, tags, liked, trash, shared links, and utility/classifier views.
 - Entity detail: album, Event, folder, tag, person, and asset routes with optional asset-viewer segments.
-- Operations: `/manage`, `/settings`, `/studio`, `/server-monitor`, and `/lumilio`.
+- Operations: `/manage`, `/storage` (admin), `/settings`, `/studio`, `/server-monitor`, and `/lumilio`.
 - Public/auth/setup: `/s/:token/*`, login, registration, password/MFA, and bootstrap routes outside or around the authenticated shell as appropriate.
 
 Studio, Map, Lumilio, Monitor, and Settings are route-level lazy chunks. The

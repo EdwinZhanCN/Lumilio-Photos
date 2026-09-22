@@ -219,7 +219,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		{name: "idle WAL checkpoint suppression", snippet: "walStateAlreadyCheckpointed(walState"},
 		{name: "independent queue WAL checkpoint", snippet: `checkpointWAL("queue"`},
 		{name: "backup source reader", snippet: "Source:   database.ReaderSQL"},
-		{name: "queue status reader", snippet: "handler.NewQueueHandler(queueDatabase.ReaderSQL)"},
+		{name: "queue status reader", snippet: "handler.NewQueueHandler(queueDatabase.ReaderSQL, database.ReaderSQL)"},
 		{name: "event planning reader", snippet: "event.NewServiceWithCatalog(database.Writer, database.Reader"},
 		{name: "event HTTP catalog capabilities", snippet: "handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL"},
 		{name: "agent library reader", snippet: "core.NewAuthorizedLibraryFactory(queries, assetService, database.ReaderSQL)"},
@@ -239,7 +239,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		pattern *regexp.Regexp
 	}{
 		{name: "raw production read on the writer", pattern: regexp.MustCompile(`\b(?:sqlDB|database\.SQL)\.(?:Query|QueryRow|Prepare)(?:Context)?\(`)},
-		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*\)`)},
+		{name: "queue status bound to the writer", pattern: regexp.MustCompile(`handler\.NewQueueHandler\(\s*sqlDB\s*[,)]`)},
 		{name: "backup copy bound to the writer", pattern: regexp.MustCompile(`Source:\s+sqlDB\b`)},
 		{name: "agent library bound to the writer", pattern: regexp.MustCompile(`NewAuthorizedLibraryFactory\(queries, assetService, sqlDB\)`)},
 	} {
@@ -274,12 +274,12 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		return errors.New("storage runtime status performs reconciliation; GET/setup status must read the cached projection without acquiring SQLite's writer")
 	}
 
-	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/repository_roots.go"))
+	repositoryRootSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/storage_locations.go"))
 	if err != nil {
 		return fmt.Errorf("read Storage Location list boundary: %w", err)
 	}
-	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListRepositoryRoots(ctx context.Context) ([]repo.RepositoryRoot, error) {\n\tif err := rm.ReconcileRepositoryRoots(ctx)") {
-		return errors.New("ListRepositoryRoots reconciles on a foreground read; background storage reconciliation owns projection writes")
+	if strings.Contains(string(repositoryRootSource), "func (rm *DefaultRepositoryManager) ListStorageLocations(ctx context.Context) ([]repo.StorageLocation, error) {\n\tif err := rm.ReconcileStorageLocations(ctx)") {
+		return errors.New("ListStorageLocations reconciles on a foreground read; background storage reconciliation owns projection writes")
 	}
 
 	hostActionSource, err := os.ReadFile(filepath.Join(root, "server/internal/storage/host_action.go"))
@@ -298,7 +298,7 @@ func checkSQLiteConnectionArchitecture(root string) error {
 		if strings.HasSuffix(relative, "_test.go") {
 			return false
 		}
-		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileRepositoryRoots(")
+		return strings.Contains(line, ".ReconcileAll(") || strings.Contains(line, ".ReconcileStorageLocations(")
 	})
 	if err != nil {
 		return err
@@ -1075,6 +1075,15 @@ func userFacingTerminologyViolation(relative, line string) bool {
 func allowedRepositoryTermContext(relative, line string) bool {
 	lower := strings.ToLower(line)
 	trimmed := strings.TrimSpace(line)
+	// The Music browse label is scoped to the listening domain. The Web
+	// terminology test additionally verifies its exact translation key.
+	if strings.HasPrefix(relative, "web/src/features/music/") && strings.Contains(line, `t("music.browse.title", "Library")`) {
+		return true
+	}
+	if relative == "web/src/locales/en/translation.json" && strings.TrimSuffix(trimmed, ",") == `"title": "Library"` {
+		return true
+	}
+
 	if (strings.HasSuffix(relative, ".go") || strings.HasSuffix(relative, ".ts") || strings.HasSuffix(relative, ".tsx")) &&
 		(strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*")) &&
 		!strings.HasPrefix(trimmed, "// @") && !strings.Contains(relative, "schema.d.ts") &&

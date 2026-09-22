@@ -33,7 +33,7 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
   test.setTimeout(120_000);
   await new LoginPage(page).signIn(workspace.username, workspace.password);
 
-  await page.goto("/manage");
+  await page.goto("/upload");
   const eventFilenames = [
     `e2e-event-${workspace.username}-1.jpg`,
     `e2e-event-${workspace.username}-2.jpg`,

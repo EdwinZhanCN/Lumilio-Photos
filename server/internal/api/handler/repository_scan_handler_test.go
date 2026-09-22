@@ -103,8 +103,8 @@ type createRepositoryManagerStub struct {
 
 type storageDiagnosticsManagerStub struct {
 	storage.RepositoryManager
-	roots        []repo.RepositoryRoot
-	repositories []*repo.Repository
+	storageLocations []repo.StorageLocation
+	repositories     []*repo.Repository
 }
 
 type repositoryScanServiceStub struct {
@@ -148,7 +148,7 @@ func TestCancelRepositoryScanReturnsDurableCancellationState(t *testing.T) {
 	handler := NewRepositoryScanHandler(stub, nil)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories/"+repositoryID.String()+"/scans/"+operationID.String()+"/cancel", nil)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories/"+repositoryID.String()+"/verifications/"+operationID.String()+"/cancel", nil)
 	ctx.Params = gin.Params{
 		{Key: "id", Value: repositoryID.String()},
 		{Key: "operation_id", Value: operationID.String()},
@@ -174,8 +174,8 @@ func TestCancelRepositoryScanReturnsDurableCancellationState(t *testing.T) {
 	}
 }
 
-func (s *storageDiagnosticsManagerStub) ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error) {
-	return s.roots, nil
+func (s *storageDiagnosticsManagerStub) ListStorageLocations(context.Context) ([]repo.StorageLocation, error) {
+	return s.storageLocations, nil
 }
 
 func (s *storageDiagnosticsManagerStub) ListRepositories() ([]*repo.Repository, error) {
@@ -183,23 +183,23 @@ func (s *storageDiagnosticsManagerStub) ListRepositories() ([]*repo.Repository, 
 }
 
 func TestStorageDiagnosticsCarriesStorageEntitySemantics(t *testing.T) {
-	rootID := uuid.MustParse("8df0b4a5-5c67-44d9-80d0-ea4119ae26f9")
+	storageLocationID := uuid.MustParse("8df0b4a5-5c67-44d9-80d0-ea4119ae26f9")
 	repositoryID := uuid.MustParse("6fd24928-9c5c-4b03-a8cc-84971654144c")
 	manager := &storageDiagnosticsManagerStub{
-		roots: []repo.RepositoryRoot{{
-			RootID: rootID,
-			Name:   "legacy default name",
-			Path:   t.TempDir(),
-			Kind:   dbtypes.RepositoryRootKindDefault,
-			Status: dbtypes.RepositoryRootStatusActive,
+		storageLocations: []repo.StorageLocation{{
+			StorageLocationID: storageLocationID,
+			Name:              "legacy default name",
+			Path:              t.TempDir(),
+			Kind:              dbtypes.StorageLocationKindDefault,
+			Status:            dbtypes.StorageLocationStatusActive,
 		}},
 		repositories: []*repo.Repository{{
-			RepoID:       repositoryID,
-			RootID:       rootID,
-			Name:         "legacy primary name",
-			Path:         t.TempDir(),
-			Role:         dbtypes.RepoRolePrimary,
-			Reachability: dbtypes.RepositoryReachabilityActive,
+			RepoID:            repositoryID,
+			StorageLocationID: storageLocationID,
+			Name:              "legacy primary name",
+			Path:              t.TempDir(),
+			Role:              dbtypes.RepoRolePrimary,
+			Reachability:      dbtypes.RepositoryReachabilityActive,
 		}},
 	}
 
@@ -210,7 +210,7 @@ func TestStorageDiagnosticsCarriesStorageEntitySemantics(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("diagnostic count = %d, want 2", len(items))
 	}
-	if items[0].Kind != string(dbtypes.RepositoryRootKindDefault) || items[0].Role != "" {
+	if items[0].Kind != string(dbtypes.StorageLocationKindDefault) || items[0].Role != "" {
 		t.Fatalf("Storage Location semantics = kind %q role %q", items[0].Kind, items[0].Role)
 	}
 	if items[1].Kind != "" || items[1].Role != string(dbtypes.RepoRolePrimary) {
@@ -247,7 +247,7 @@ func TestCreateRepositoryUsesHostOwnerNotActingAdmin(t *testing.T) {
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -277,7 +277,7 @@ func TestCreateRepositoryRejectsInvalidNameBeforeManagerCall(t *testing.T) {
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":" Family","directory_name":"family"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":" Family","directory_name":"family"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -298,7 +298,7 @@ func TestCreateRepositoryRejectsMissingRegularStorageFolder(t *testing.T) {
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -325,7 +325,7 @@ func TestCreateRepositoryReturnsExistingMarkerAsStructuredRecoveryFact(t *testin
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -359,7 +359,7 @@ func TestCreateRepositoryReturnsInvalidMarkerAsStructuredRecoveryFact(t *testing
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 
@@ -391,7 +391,7 @@ func TestCreateRepositoryReturnsRegisteredIdentityAsMoveOrCopyConflict(t *testin
 	handler := NewRepositoryScanHandler(nil, manager)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/storage/repositories", strings.NewReader(`{"name":"Family Media","directory_name":"family-media"}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("current_user", &service.UserResponse{UserID: 99, Role: "admin"})
 

@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - server/internal/storage/rootcfg/root_config.go
-- server/internal/storage/repository_roots.go
+- server/internal/storage/storage_locations.go
 - server/internal/storage/provisioning.go
 - desktop/internal/storage/controller.go
 -->

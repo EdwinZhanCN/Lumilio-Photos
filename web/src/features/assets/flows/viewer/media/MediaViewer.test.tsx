@@ -28,6 +28,7 @@ vi.mock("@vidstack/react", () => ({
 
 vi.mock("@vidstack/react/player/layouts/default", () => ({
   defaultLayoutIcons: {},
+  DefaultAudioLayout: () => null,
   DefaultVideoLayout: () => null,
 }));
 
@@ -83,8 +84,28 @@ describe("MediaViewer RAW/JPEG component selection", () => {
   });
 });
 
+describe("MediaViewer video playback container", () => {
+  it("attaches swiper-no-swiping to video wrapper to isolate swiper gesture conflicts", async () => {
+    serveMediaItem("video-1");
+    const asset = {
+      asset_id: "video-1",
+      original_filename: "sample-video.mp4",
+      mime_type: "video/mp4",
+      type: "VIDEO",
+    } as Asset;
+
+    const screen = await renderWithProviders(<MediaViewer asset={asset} isActive={true} />);
+
+    const region = screen.getByRole("region", { name: "sample-video.mp4" }).element();
+    const parentContainer = region.parentElement;
+    expect(parentContainer).not.toBeNull();
+    expect(parentContainer?.classList.contains("swiper-no-swiping")).toBe(true);
+  });
+});
+
 describe("MediaViewer video start time", () => {
   it("seeks to the semantic match timestamp from the URL", async () => {
+    serveMediaItem("video");
     const asset = {
       asset_id: "video",
       original_filename: "semantic-match.mp4",

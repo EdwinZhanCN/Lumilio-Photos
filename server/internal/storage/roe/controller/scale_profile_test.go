@@ -247,7 +247,7 @@ func newGeneratedControllerFixture(tb testing.TB, entries, directories int) *gen
 	if err != nil {
 		tb.Fatal(err)
 	}
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	repositoryID := uuid.New()
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	rootPath := tb.TempDir()
@@ -255,9 +255,9 @@ func newGeneratedControllerFixture(tb testing.TB, entries, directories int) *gen
 	if err := os.Mkdir(repositoryPath, 0o700); err != nil {
 		tb.Fatal(err)
 	}
-	if _, err := database.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID: rootID, Name: "generated root", Path: rootPath,
-		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+	if _, err := database.Queries.UpsertStorageLocation(ctx, repo.UpsertStorageLocationParams{
+		StorageLocationID: storageLocationID, Name: "generated root", Path: rootPath,
+		Kind: dbtypes.StorageLocationKindExternal, Status: dbtypes.StorageLocationStatusActive,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		tb.Fatal(err)
@@ -269,7 +269,7 @@ func newGeneratedControllerFixture(tb testing.TB, entries, directories int) *gen
 		Config: *repositoryConfig, Role: dbtypes.RepoRoleRegular,
 		Reachability: dbtypes.RepositoryReachabilityActive,
 		Activity:     dbtypes.RepositoryActivityIdle, DefaultOwnerID: &owner.UserID,
-		CreatedAt: now, UpdatedAt: now, RootID: rootID,
+		CreatedAt: now, UpdatedAt: now, StorageLocationID: storageLocationID,
 	})
 	if err != nil {
 		tb.Fatal(err)

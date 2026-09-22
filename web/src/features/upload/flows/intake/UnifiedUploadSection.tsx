@@ -8,7 +8,14 @@ import { getAcceptString } from "../../model/accept-file-extensions.ts";
 import { useMessage } from "@/features/notifications";
 import { Upload, Info, FolderPlus, FolderUp, TriangleAlert, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
-import { useWorkingRepository } from "@/features/repositories";
+import {
+  getRepositoryEffectiveState,
+  isRepositoryUnavailable,
+  isUploadLowSpaceBlocked,
+  uploadAdmissionReasonCopy,
+  uploadStateBadgeClass,
+  useWorkingRepository,
+} from "@/features/repositories";
 
 function UnifiedUploadSection(): React.JSX.Element {
   const { t } = useI18n(); // Initialize useI18n
@@ -30,6 +37,7 @@ function UnifiedUploadSection(): React.JSX.Element {
     repositoriesQuery,
     workingRepositoryId,
     selectedRepository,
+    scopeDescription,
     setWorkingRepositoryId,
     getRepositoryLabel,
   } = useWorkingRepository();
@@ -38,16 +46,40 @@ function UnifiedUploadSection(): React.JSX.Element {
     [repositories],
   );
   const uploadTargetRepository = selectedRepository ?? primaryRepository;
-  const uploadBlocked =
-    !uploadTargetRepository ||
-    uploadTargetRepository.reachability !== "active" ||
-    uploadTargetRepository.activity === "paused";
+  const uploadBlocked = !uploadTargetRepository || isRepositoryUnavailable(uploadTargetRepository);
   const lowSpaceBlocked =
-    uploadTargetRepository?.activity === "paused" &&
-    uploadTargetRepository.pauseReason === "low_space";
-  const uploadTargetDescription = uploadTargetRepository?.path
-    ? uploadTargetRepository.path
-    : t("upload.UnifiedUploadSection.default_upload_target_hint");
+    uploadTargetRepository !== undefined && isUploadLowSpaceBlocked(uploadTargetRepository);
+  const uploadTargetDescription =
+    uploadTargetRepository !== undefined
+      ? scopeDescription
+      : t("upload.UnifiedUploadSection.default_upload_target_hint");
+
+  // The badge states the Server's verdict for the chosen target.
+  const targetBadge = useMemo(() => {
+    if (repositoriesQuery.isError) {
+      return {
+        className: "badge-error",
+        label: t("navbar.repository.unavailable", {
+          defaultValue: "Repository options unavailable",
+        }),
+      };
+    }
+    if (!uploadTargetRepository) {
+      return {
+        className: "badge-ghost",
+        label: t("upload.UnifiedUploadSection.upload_target_none", "No upload target"),
+      };
+    }
+    const state = getRepositoryEffectiveState(uploadTargetRepository);
+    if (state === "active") {
+      return {
+        className: uploadStateBadgeClass(state),
+        label: t("manage.repositories.uploadEligible", "Ready for upload"),
+      };
+    }
+    const copy = uploadAdmissionReasonCopy(state);
+    return { className: uploadStateBadgeClass(state), label: t(copy.key, copy.defaultValue) };
+  }, [repositoriesQuery.isError, t, uploadTargetRepository]);
 
   const formatBytes = (value?: number) => {
     if (!value && value !== 0) return "-";
@@ -201,48 +233,40 @@ function UnifiedUploadSection(): React.JSX.Element {
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-col gap-2 rounded-lg border border-base-300 bg-base-200/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
+      {/* One nowrap line: the control group is width-bounded, so
+          `justify-between` has free space to work with and the state badge sits
+          at the far edge instead of hugging the target. */}
+      <div
+        className="mt-4 flex flex-nowrap items-center justify-between gap-3 rounded-lg border border-base-300 bg-base-200/40 px-4 py-3"
+        title={uploadTargetDescription}
+      >
+        <div className="flex w-full min-w-0 max-w-lg flex-nowrap items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <FolderUp size={18} />
+            <FolderUp size={18} aria-hidden />
           </div>
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <label
-                className="text-sm font-medium text-base-content/70"
-                htmlFor="upload-target-repository"
-              >
-                {t("upload.UnifiedUploadSection.upload_target_label")}
-              </label>
-              <select
-                id="upload-target-repository"
-                className="select select-bordered select-sm w-full max-w-56"
-                value={workingRepositoryId}
-                disabled={repositoriesQuery.isLoading || repositoriesQuery.isError}
-                onChange={(event) => setWorkingRepositoryId(event.target.value || null)}
-              >
-                {repositories.map((repository) => (
-                  <option key={repository.id} value={repository.id}>
-                    {getRepositoryLabel(repository)}
-                  </option>
-                ))}
-              </select>
-              {repositoriesQuery.isError && (
-                <span className="text-xs text-base-content/60">
-                  {t("navbar.repository.unavailable", {
-                    defaultValue: "Repository options unavailable",
-                  })}
-                </span>
-              )}
-            </div>
-            <p
-              className="mt-1 truncate text-xs text-base-content/55"
-              title={uploadTargetDescription}
-            >
-              {uploadTargetDescription}
-            </p>
-          </div>
+          <label
+            className="shrink-0 text-sm font-medium text-base-content/70"
+            htmlFor="upload-target-repository"
+          >
+            {t("upload.UnifiedUploadSection.upload_target_label")}
+          </label>
+          <select
+            id="upload-target-repository"
+            className="select select-bordered select-sm min-w-0 flex-1"
+            value={workingRepositoryId}
+            disabled={repositoriesQuery.isLoading || repositoriesQuery.isError}
+            onChange={(event) => setWorkingRepositoryId(event.target.value || null)}
+          >
+            {repositories.map((repository) => (
+              <option key={repository.id} value={repository.id}>
+                {getRepositoryLabel(repository)}
+              </option>
+            ))}
+          </select>
         </div>
+        <span className={`badge badge-sm badge-soft shrink-0 ${targetBadge.className}`}>
+          {targetBadge.label}
+        </span>
       </div>
 
       {/* Hidden file input */}
