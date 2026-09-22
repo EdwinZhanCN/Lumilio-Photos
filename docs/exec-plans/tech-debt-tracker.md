@@ -4,7 +4,7 @@ Keep this list short. Each item must describe current behavior, name a concrete
 owner path, and explain the user or release impact. Completed history belongs in
 the relevant exec plan, not in this file.
 
-Last aligned with the codebase: 2026-09-19.
+Last aligned with the codebase: 2026-09-22.
 
 ## Product paths
 
@@ -15,25 +15,6 @@ Last aligned with the codebase: 2026-09-19.
   it skips without `CAP_SYS_ADMIN`. Darwin/Windows CI never compile it, and
   Docker Desktop virtiofs/osxfs bind topologies are not this fixture.
 
-- **AgentBoard has no mobile column reflow.** Owner:
-  `web/src/features/lumilio/flows/board/AgentBoard.tsx`. It renders one
-  persisted 12-column layout at every width, so phone columns compress into
-  narrow slivers. Add a client-only narrow-screen remap or a separately
-  persisted breakpoint layout, then verify it against a live backend without
-  corrupting the canonical desktop layout.
-- **Agent confirmation does not reconcile after a post-commit disconnect.**
-  Owner: `web/src/features/lumilio/state/chatStore.ts`. If the effect commits
-  but the receipt SSE is lost, reloading the client does not query the durable
-  effect status and can leave the outcome ambiguous until the user inspects
-  the affected resource. Reconcile pending confirmation identity through the
-  scoped effect-status endpoint without replaying the mutation.
-- **Populated Person Recognition relations can be dropped by timestamp decoding.**
-  Owner: `server/internal/api/dto/asset_dto.go` and
-  `server/internal/db/repo/queries/relationships.sql`. SQLite relation JSON
-  emits Unix-microsecond integers for face-result timestamps, while
-  `AssetFaceResultDTO` currently unmarshals them directly into `time.Time`.
-  Mirror the internal aggregate conversion now used by OCR and add a focused
-  relation test before relying on `include_faces=true` in a user-facing flow.
 - **Music embedded covers are not materialized as thumbnails.** Owner:
   `server/internal/processors/audio_helpers.go` and
   `web/src/features/music/components/MusicArtwork.tsx`. Bandcamp audio retains
@@ -54,3 +35,12 @@ Last aligned with the codebase: 2026-09-19.
   request acceptance. `queued_jobs` remains a global backlog even when queried
   with a repository filter, so a slice cannot treat queue-idle or that counter
   as proof that this repository's video finished.
+- **The i18n extractor deletes keys referenced through lookup tables.** Owner:
+  `web/i18next.config.ts` and table-driven copy such as
+  `web/src/features/repositories/model/repositoryOptions.ts`
+  (`{ key: "manage.repositories.offlineBadge", defaultValue }`). Running
+  `vp exec i18next-cli extract` removes about eighty live keys whose `t()` call
+  receives a variable, so the zh values silently fall back to English defaults.
+  Until those tables call `t("literal", "default")` directly (or the config
+  preserves their patterns), review every extraction diff and restore removed
+  keys that are still referenced.

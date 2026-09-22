@@ -662,6 +662,23 @@ type AssetFaceItemDTO struct {
 	ClusterName *string         `json:"cluster_name,omitempty"`
 }
 
+// assetFaceResultAggregate is the raw SQLite JSON shape of `face_result`:
+// timestamps are Unix microseconds and `is_primary` is a 0/1 integer, neither
+// of which decodes into the public DTO directly.
+type assetFaceResultAggregate struct {
+	ModelID          string                   `json:"model_id"`
+	TotalFaces       *int32                   `json:"total_faces,omitempty"`
+	ProcessingTimeMs *int32                   `json:"processing_time_ms,omitempty"`
+	CreatedAt        *int64                   `json:"created_at,omitempty"`
+	UpdatedAt        *int64                   `json:"updated_at,omitempty"`
+	Faces            []assetFaceItemAggregate `json:"faces"`
+}
+
+type assetFaceItemAggregate struct {
+	AssetFaceItemDTO
+	IsPrimary *int64 `json:"is_primary,omitempty"`
+}
+
 // AssetFaceResultDTO mirrors the `face_result` object produced by
 // GetAssetWithRelations when include_faces is requested.
 type AssetFaceResultDTO struct {
@@ -804,9 +821,24 @@ func ToAssetDetailDTO(r repo.GetAssetWithRelationsRow, inc AssetDetailIncludes) 
 		}
 	}
 	if inc.Faces {
-		var face AssetFaceResultDTO
-		if unmarshalJSONColumn(r.FaceResult, &face) {
-			detail.FaceResult = &face
+		var aggregate assetFaceResultAggregate
+		if unmarshalJSONColumn(r.FaceResult, &aggregate) {
+			faces := make([]AssetFaceItemDTO, len(aggregate.Faces))
+			for i, item := range aggregate.Faces {
+				faces[i] = item.AssetFaceItemDTO
+				if item.IsPrimary != nil {
+					primary := *item.IsPrimary != 0
+					faces[i].IsPrimary = &primary
+				}
+			}
+			detail.FaceResult = &AssetFaceResultDTO{
+				ModelID:          aggregate.ModelID,
+				TotalFaces:       aggregate.TotalFaces,
+				ProcessingTimeMs: aggregate.ProcessingTimeMs,
+				CreatedAt:        timeFromUnixMicro(aggregate.CreatedAt),
+				UpdatedAt:        timeFromUnixMicro(aggregate.UpdatedAt),
+				Faces:            faces,
+			}
 		}
 	}
 
