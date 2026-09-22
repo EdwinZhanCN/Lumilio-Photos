@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_upload_handler.go
 - server/internal/service/duplicate_service.go
 - server/internal/storage/repocfg/repo_config.go
 - server/internal/sourcing/materializer.go

@@ -13,7 +13,7 @@ verification_status: "verified"
 code-evidence:
 - server/internal/storage/directory_manager.go
 - server/internal/db/migration.go
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_media_handler.go
 - server/internal/db/backup/backup.go
 -->
 

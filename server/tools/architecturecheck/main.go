@@ -930,7 +930,7 @@ func allowedPrivateErrorUse(relative, line string) bool {
 	}
 	// Upload-session manifests are private recovery state. The public progress
 	// DTO deliberately omits this diagnostic and exposes only the stable state.
-	return relative == "server/internal/api/handler/asset_handler.go" && strings.Contains(line, "SetSessionError(")
+	return relative == "server/internal/api/handler/asset_upload_handler.go" && strings.Contains(line, "SetSessionError(")
 }
 
 func checkProblemCatalogArtifacts(root string) error {

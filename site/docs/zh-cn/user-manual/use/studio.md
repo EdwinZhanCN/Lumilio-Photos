@@ -11,7 +11,7 @@ verification_status: "verified-with-todo"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_media_handler.go
 - server/internal/storage/directory_manager.go
 - web/src/features/studio
 - server/internal/utils/imaging/process.go
