@@ -84,38 +84,10 @@ function serve() {
           failed_projections: 1,
           pending_operations: 7,
           failed_operations: 0,
+          pending_analysis_assets: 32,
+          failed_analysis_assets: 0,
+          pending_reindex_requests: 3,
         },
-      }),
-    ),
-    http.get("*/api/v1/storage/diagnostics", () =>
-      HttpResponse.json({
-        generated_at: "2026-09-12T06:00:00Z",
-        items: [
-          {
-            target_type: "storage_location",
-            target_id: "fixture-location",
-            kind: "external",
-            name: "Archive Disk",
-            path: "/Volumes/archive",
-            reachability: "active",
-            writable: true,
-            capacity_known: true,
-            total_bytes: 1e12,
-            available_bytes: 38e10,
-            writable_budget_bytes: 33e10,
-            safety_margin_bytes: 5e10,
-          },
-          {
-            target_type: "repository",
-            target_id: "fixture-repo",
-            parent_target_id: "fixture-location",
-            name: "Family",
-            path: `/Volumes/archive/${"long-folder-name/".repeat(12)}`,
-            reachability: "offline",
-            writable: false,
-            capacity_known: false,
-          },
-        ],
       }),
     ),
     http.get("*/api/v1/capabilities", () => HttpResponse.json(capability)),
@@ -129,7 +101,7 @@ afterEach(async () => {
 
 for (const theme of ["light", "dark"])
   for (const width of [390, 800, 1280]) {
-    test(`four primary visuals stay readable at ${width}px in ${theme}`, async () => {
+    test(`three primary visuals stay readable at ${width}px in ${theme}`, async () => {
       await cdp().send("Emulation.setDeviceMetricsOverride", {
         width: 1600,
         height: 2400,
@@ -181,12 +153,12 @@ for (const theme of ["light", "dark"])
         await expect
           .element(files.element().querySelector("figure"))
           .toHaveAttribute("data-loaded", "true");
-        // Every work type loads and paints the same Rive asset independently.
+        // Only the files tray animates; every other kind of work is a list row.
         await expect
           .poll(() => {
             const canvases = [...screen.container.querySelectorAll("canvas")];
             return (
-              canvases.length === 4 &&
+              canvases.length === 1 &&
               canvases.every((canvas) =>
                 canvas
                   .getContext("2d")
@@ -198,7 +170,6 @@ for (const theme of ["light", "dark"])
           .toBe(true);
       }
       await capture("processing");
-      await screen.unmount();
       await screen.unmount();
       screen = await renderWithProviders(wrap(<CapabilitiesMonitor />));
       const orbit = screen.getByRole("group", { name: t("monitor.capabilities.orbitLabel") });

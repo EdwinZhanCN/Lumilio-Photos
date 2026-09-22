@@ -2,13 +2,13 @@
  * # Monitor
  *
  * Monitor owns the admin-only `/server-monitor` operational dashboard for
- * River queues, ML indexing coverage, rebuild commands, runtime capabilities,
- * and hierarchical storage health. It observes and triggers backend work but
- * does not define task enablement, queue semantics, or repository configuration.
+ * current Catalog processing, ML indexing coverage, rebuild commands, and
+ * runtime capabilities. It observes and triggers backend work but does not
+ * define task enablement, queue semantics, or repository configuration.
  *
  * ## State
  *
- * {@link MonitorOverview} keeps the selected queue/ML/capabilities/storage tab in the
+ * {@link MonitorOverview} keeps the selected queue/ML/capabilities tab in the
  * `tab` URL parameter. The ML view's optional repository scope is local to the
  * route and is not persisted as browse or upload preference.
  * {@link QueueSummaryList} keeps only expanded rows and transient copied status;
@@ -39,14 +39,16 @@
  * read retains cached facts with an explicit stale warning. Each tab retains
  * its own polling interval.
  *
- * {@link StatMonitor} contains four independently selected work trays and keeps
- * {@link QueueSummaryList} inside delivery diagnostics. The authored file tray
- * uses {@link ProcessingTray}; other work types use matching DOM stacks. A fixed
- * eighteen-layer reference uses 32 files, one Repository, two projections, or
- * one operation per layer. The Rive asset quantises that scale into four tiers;
- * exact counts and attention stay in the DOM, independent of rendering.
- * Only files load Rive, with bundled WASM and asset bytes. Reduced motion and
- * runtime failure use static geometry; rendering pauses off-screen.
+ * {@link StatMonitor} converges Processing on exactly two patterns. Files
+ * awaiting processing are the one animated tray, {@link ProcessingTray}: a
+ * fixed eighteen-layer reference of 32 files per layer that the Rive asset
+ * quantises into four tiers, with retry waits and attention beside it. Every
+ * other kind of work — Repository scans, optional ML analysis, reindex
+ * requests, projections, and operations — is a {@link WorkLaneList} row that
+ * states what the work is, its exact pending count, a status, attention, and
+ * the route that owns it. {@link QueueSummaryList} follows as historical
+ * delivery diagnostics. Exact counts always stay in the DOM, independent of
+ * rendering; reduced motion and runtime failure use static geometry.
  *
  * ML uses equal hundred-cell coverage fields with one shared detail region.
  * A cell is approximately one percent, not a file; no-applicable-content is
@@ -57,7 +59,8 @@
  * Advertisements filter nodes but do not override public capability composition.
  * Agent configuration, backend and full node diagnostics remain expandable.
  * {@link MLMonitor} combines coverage, repository options, and one confirmed
- * rebuild command. {@link CapabilitiesMonitor} is display-only; durable ML and
+ * rebuild command. It reports no job backlog: files still awaiting analysis
+ * are a Processing lane, and ML links there instead of repeating the count. {@link CapabilitiesMonitor} is display-only; durable ML and
  * agent settings stay in Settings.
  *
  * Storage administration is not a Monitor tab. Storage Locations,
@@ -72,7 +75,8 @@
  * `/api/v1/admin/monitor/processing`. The response separates `processing`
  * (Catalog work) from `deliveries` (state totals and queue diagnostics). StatMonitor reads
  * current Catalog file, Repository, projection, and operation work from the
- * processing response. File counts deduplicate stages; a terminal stage puts the file
+ * processing response, including `pending_analysis_assets` for the optional
+ * enrichment stage and `pending_reindex_requests`. File counts deduplicate stages; a terminal stage puts the file
  * in the attention count. Retry waits survive QueueDB replacement. River counts
  * are separately labeled delivery records and never stand in for file progress.
  * Queue summaries
@@ -107,6 +111,7 @@ import type { MLMonitor } from "./flows/overview/MLMonitor.tsx";
 import type MonitorOverview from "./flows/overview/MonitorOverview.tsx";
 import type { QueueSummaryList } from "./flows/overview/QueueSummaryList.tsx";
 import type { StatMonitor } from "./flows/overview/StatMonitor.tsx";
+import type { WorkLaneList } from "./flows/overview/WorkLaneList.tsx";
 import type { useCapabilities } from "../../lib/capabilities/useCapabilities.ts";
 import type { useProcessingMonitor } from "./api/useProcessingMonitor.ts";
 import type { useLumenRuntime } from "./api/useLumenRuntime.ts";

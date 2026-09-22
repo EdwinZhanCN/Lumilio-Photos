@@ -18,6 +18,14 @@ type ProcessingStatsResponse struct {
 	FailedProjections   int64 `json:"failed_projections"`
 	PendingOperations   int64 `json:"pending_operations"`
 	FailedOperations    int64 `json:"failed_operations"`
+	// PendingAnalysisAssets is the subset of files whose optional ML enrichment
+	// stage is still outstanding; FailedAnalysisAssets holds a terminal error
+	// there. Both are Catalog facts, so Processing owns the ML backlog while
+	// the ML view reports coverage only.
+	PendingAnalysisAssets int64 `json:"pending_analysis_assets"`
+	FailedAnalysisAssets  int64 `json:"failed_analysis_assets"`
+	// PendingReindexRequests counts accepted rebuild requests not yet applied.
+	PendingReindexRequests int64 `json:"pending_reindex_requests"`
 }
 
 func (h *QueueHandler) loadProcessingStats(ctx context.Context) (ProcessingStatsResponse, error) {
@@ -65,5 +73,17 @@ func (h *QueueHandler) loadProcessingStats(ctx context.Context) (ProcessingStats
  )
  SELECT COALESCE(SUM(state='pending'),0),COALESCE(SUM(state='failed'),0)
  FROM latest_operations WHERE position=1`).Scan(&stats.PendingOperations, &stats.FailedOperations)
+	if err != nil {
+		return stats, err
+	}
+	err = h.catalog.QueryRowContext(ctx, `
+ SELECT COALESCE(SUM(s.terminal_error IS NULL),0),COALESCE(SUM(s.terminal_error IS NOT NULL),0)
+ FROM asset_pipeline_state s JOIN assets a ON a.asset_id=s.asset_id
+ WHERE s.stage='enrich' AND s.desired_version>s.applied_version AND a.is_deleted=0`).Scan(&stats.PendingAnalysisAssets, &stats.FailedAnalysisAssets)
+	if err != nil {
+		return stats, err
+	}
+	err = h.catalog.QueryRowContext(ctx, `
+ SELECT count(*) FROM asset_reindex_requests WHERE requested_revision>applied_revision`).Scan(&stats.PendingReindexRequests)
 	return stats, err
 }

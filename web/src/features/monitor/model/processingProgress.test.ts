@@ -1,46 +1,44 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
-  LAYER_UNITS,
+  FILES_PER_LAYER,
   TRAY_LAYERS,
+  TRAY_REFERENCE,
   trayLayers,
   trayProgress,
-  trayReference,
   trayTier,
   type TrayTier,
-  type WorkType,
 } from "./processingProgress";
 
 describe("tray scale", () => {
   it("fills at the fixed reference and empties at zero pending", () => {
-    expect(trayProgress(trayReference("assets"), "assets")).toBe(0);
-    expect(trayProgress(0, "assets")).toBe(100);
+    expect(trayProgress(TRAY_REFERENCE)).toBe(0);
+    expect(trayProgress(0)).toBe(100);
   });
 
   it("never rescales to the current backlog", () => {
     // Same pending count, same percentage, regardless of what came before.
-    expect(trayProgress(288, "assets")).toBe(50);
-    expect(trayProgress(288, "assets")).toBe(50);
+    expect(trayProgress(288)).toBe(50);
+    expect(trayProgress(288)).toBe(50);
   });
 
   it("clamps work beyond the reference instead of going negative", () => {
-    expect(trayProgress(trayReference("assets") * 4, "assets")).toBe(0);
-    expect(trayProgress(-50, "assets")).toBe(100);
-    expect(trayProgress(Number.NaN, "assets")).toBe(100);
+    expect(trayProgress(TRAY_REFERENCE * 4)).toBe(0);
+    expect(trayProgress(-50)).toBe(100);
+    expect(trayProgress(Number.NaN)).toBe(100);
   });
 
-  it("uses a per-type unit so a count reads as a stack", () => {
-    expect(trayReference("repositories")).toBe(TRAY_LAYERS);
-    expect(trayReference("projections")).toBe(TRAY_LAYERS * 2);
-    expect(trayProgress(LAYER_UNITS.assets, "assets")).toBeCloseTo(100 - 100 / TRAY_LAYERS, 6);
+  it("uses a fixed file unit so a count reads as a stack", () => {
+    expect(TRAY_REFERENCE).toBe(576);
+    expect(trayProgress(FILES_PER_LAYER)).toBeCloseTo(100 - 100 / TRAY_LAYERS, 6);
   });
 
   it("counts pending work into layers, rounded up", () => {
-    expect(trayLayers(0, "assets")).toBe(0);
-    expect(trayLayers(1, "assets")).toBe(1);
-    expect(trayLayers(LAYER_UNITS.assets, "assets")).toBe(1);
-    expect(trayLayers(LAYER_UNITS.assets + 1, "assets")).toBe(2);
-    expect(trayLayers(trayReference("assets"), "assets")).toBe(TRAY_LAYERS);
-    expect(trayLayers(trayReference("assets") * 4, "assets")).toBe(TRAY_LAYERS);
+    expect(trayLayers(0)).toBe(0);
+    expect(trayLayers(1)).toBe(1);
+    expect(trayLayers(FILES_PER_LAYER)).toBe(1);
+    expect(trayLayers(FILES_PER_LAYER + 1)).toBe(2);
+    expect(trayLayers(TRAY_REFERENCE)).toBe(TRAY_LAYERS);
+    expect(trayLayers(TRAY_REFERENCE * 4)).toBe(TRAY_LAYERS);
   });
 });
 
@@ -65,14 +63,11 @@ describe("trayTier", () => {
       empty: (layers) => layers === 0,
     };
 
-    for (const type of Object.keys(LAYER_UNITS) as WorkType[]) {
-      const reference = trayReference(type);
-      for (let step = 0; step <= 40; step += 1) {
-        const pending = (reference * step) / 40;
-        const tier = trayTier(trayProgress(pending, type));
-        const layers = trayLayers(pending, type);
-        expect(bands[tier](layers), `${type}: ${pending} pending → ${tier}/${layers}`).toBe(true);
-      }
+    for (let step = 0; step <= 40; step += 1) {
+      const pending = (TRAY_REFERENCE * step) / 40;
+      const tier = trayTier(trayProgress(pending));
+      const layers = trayLayers(pending);
+      expect(bands[tier](layers), `${pending} pending → ${tier}/${layers}`).toBe(true);
     }
   });
 });

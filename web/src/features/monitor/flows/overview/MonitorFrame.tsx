@@ -100,15 +100,3 @@ export function MonitorFrame({
     </section>
   );
 }
-
-export function MonitorDiagnostics({ children, title }: { children: ReactNode; title?: string }) {
-  const { t } = useI18n();
-  return (
-    <details className="monitor-diagnostics border-t border-base-300 pt-4">
-      <summary className="cursor-pointer text-sm font-medium">
-        {title ?? t("monitor.snapshot.diagnostics", "Diagnostics")}
-      </summary>
-      <div className="mt-4 space-y-4">{children}</div>
-    </details>
-  );
-}

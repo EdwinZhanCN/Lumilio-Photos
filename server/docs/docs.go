@@ -10545,6 +10545,9 @@ const docTemplate = `{
             },
             "handler.ProcessingStatsResponse": {
                 "properties": {
+                    "failed_analysis_assets": {
+                        "type": "integer"
+                    },
                     "failed_assets": {
                         "type": "integer"
                     },
@@ -10557,6 +10560,10 @@ const docTemplate = `{
                     "failed_repositories": {
                         "type": "integer"
                     },
+                    "pending_analysis_assets": {
+                        "description": "PendingAnalysisAssets is the subset of files whose optional ML enrichment\nstage is still outstanding; FailedAnalysisAssets holds a terminal error\nthere. Both are Catalog facts, so Processing owns the ML backlog while\nthe ML view reports coverage only.",
+                        "type": "integer"
+                    },
                     "pending_assets": {
                         "type": "integer"
                     },
@@ -10564,6 +10571,10 @@ const docTemplate = `{
                         "type": "integer"
                     },
                     "pending_projections": {
+                        "type": "integer"
+                    },
+                    "pending_reindex_requests": {
+                        "description": "PendingReindexRequests counts accepted rebuild requests not yet applied.",
                         "type": "integer"
                     },
                     "pending_repositories": {

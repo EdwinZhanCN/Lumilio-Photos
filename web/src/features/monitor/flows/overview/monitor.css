@@ -36,44 +36,6 @@
 .monitor-weave-field span[data-covered="true"] {
   background: var(--color-primary);
 }
-.monitor-capacity-map {
-  height: 16rem;
-  position: relative;
-  overflow: hidden;
-  background: var(--color-base-200);
-}
-.monitor-capacity-area {
-  position: absolute;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  text-align: left;
-  cursor: pointer;
-  container-type: size;
-}
-.monitor-capacity-area[data-selected="true"] {
-  box-shadow: inset 0 0 0 2px var(--color-base-content);
-}
-.monitor-capacity-label {
-  display: none;
-  height: 100%;
-  padding: 1rem;
-  flex-direction: column;
-  justify-content: space-between;
-  font-size: 0.8rem;
-}
-@container (min-width: 150px) and (min-height: 90px) {
-  .monitor-capacity-label {
-    display: flex;
-  }
-}
-.monitor-reserve {
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-warning) 45%, var(--color-base-100)) 0 2px,
-    var(--color-base-200) 2px 8px
-  );
-}
 .monitor-orbit-workspace {
   container-type: inline-size;
 }

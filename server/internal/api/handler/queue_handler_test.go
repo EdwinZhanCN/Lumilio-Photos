@@ -80,10 +80,10 @@ func TestProcessingStatsCountCurrentFilesInsteadOfStagesOrDeliveryHistory(t *tes
 			if _, err := tx.Exec(`INSERT INTO assets(asset_id,owner_id,content_id,type,original_filename,mime_type,upload_time,updated_at,is_deleted) VALUES(?,1,?,'PHOTO','fixture.jpg','image/jpeg',1,1,?)`, assetID.String(), contentID.String(), deleted); err != nil {
 				return err
 			}
-			for _, stage := range []string{"analyze", "derivatives"} {
+			for _, stage := range []string{"analyze", "derivatives", "enrich"} {
 				applied := 0
 				var terminal any
-				if index == 1 && stage == "derivatives" || deleted {
+				if index == 1 && stage != "analyze" || deleted {
 					terminal = "unsupported_media"
 				}
 				if index == 2 {
@@ -109,4 +109,9 @@ func TestProcessingStatsCountCurrentFilesInsteadOfStagesOrDeliveryHistory(t *tes
 	require.Equal(t, int64(1), stats.RetryWaitingStages)
 	require.Zero(t, stats.PendingRepositories)
 	require.Zero(t, stats.PendingProjections)
+	// Enrichment is reported per file beside, not instead of, the file backlog:
+	// index 0 is pending, index 1 is terminal, index 2 is applied, index 3 is deleted.
+	require.Equal(t, int64(1), stats.PendingAnalysisAssets)
+	require.Equal(t, int64(1), stats.FailedAnalysisAssets)
+	require.Zero(t, stats.PendingReindexRequests)
 }

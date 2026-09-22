@@ -5,7 +5,7 @@ import { t } from "@test/i18n";
 import type { components } from "@/lib/http-commons/schema";
 import { MLMonitor } from "./MLMonitor";
 
-test("shows five coverage fields with local rebuild actions and one global backlog", async () => {
+test("shows five coverage fields with local rebuild actions and no job backlog", async () => {
   const reads: string[] = [];
   const rebuilds: unknown[] = [];
   worker.use(
@@ -40,13 +40,10 @@ test("shows five coverage fields with local rebuild actions and one global backl
     exact: true,
   });
   await expect.element(video.getByText(t("monitor.ml.noApplicable"))).toBeVisible();
-  const activity = screen.getByRole("region", {
-    name: t("monitor.ml.globalActivity"),
-    exact: true,
-  });
-  await expect.element(activity.getByText("7", { exact: true })).toBeVisible();
-  await expect.element(activity.getByText("35", { exact: true })).not.toBeInTheDocument();
-  await expect.element(activity.getByText("2", { exact: true })).toBeVisible();
+  // Backlog belongs to Processing; ML reports coverage and links there instead.
+  await expect
+    .element(screen.getByRole("link", { name: t("monitor.ml.openProcessing"), exact: true }))
+    .toHaveAttribute("href", "/server-monitor");
   await expect.element(screen.getByText(t("monitor.ml.cellMeaning"))).not.toBeVisible();
   await semantic.getByRole("button", { name: t("monitor.ml.reindex"), exact: true }).click();
   await expect

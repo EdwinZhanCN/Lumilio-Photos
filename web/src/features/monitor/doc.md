@@ -1,13 +1,13 @@
 # Monitor
 
 Monitor owns the admin-only `/server-monitor` operational dashboard for
-River queues, ML indexing coverage, rebuild commands, runtime capabilities,
-and hierarchical storage health. It observes and triggers backend work but
-does not define task enablement, queue semantics, or repository configuration.
+current Catalog processing, ML indexing coverage, rebuild commands, and
+runtime capabilities. It observes and triggers backend work but does not
+define task enablement, queue semantics, or repository configuration.
 
 ## State
 
-[MonitorOverview](./flows/overview/MonitorOverview.tsx) keeps the selected queue/ML/capabilities/storage tab in the
+[MonitorOverview](./flows/overview/MonitorOverview.tsx) keeps the selected queue/ML/capabilities tab in the
 `tab` URL parameter. The ML view's optional repository scope is local to the
 route and is not persisted as browse or upload preference.
 [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) keeps only expanded rows and transient copied status;
@@ -38,14 +38,16 @@ so the heading never repeats a title or tallies targets. A failed background
 read retains cached facts with an explicit stale warning. Each tab retains
 its own polling interval.
 
-[StatMonitor](./flows/overview/StatMonitor.tsx) contains four independently selected work trays and keeps
-[QueueSummaryList](./flows/overview/QueueSummaryList.tsx) inside delivery diagnostics. The authored file tray
-uses [ProcessingTray](./modules/rive/ProcessingTray.tsx); other work types use matching DOM stacks. A fixed
-eighteen-layer reference uses 32 files, one Repository, two projections, or
-one operation per layer. The Rive asset quantises that scale into four tiers;
-exact counts and attention stay in the DOM, independent of rendering.
-Only files load Rive, with bundled WASM and asset bytes. Reduced motion and
-runtime failure use static geometry; rendering pauses off-screen.
+[StatMonitor](./flows/overview/StatMonitor.tsx) converges Processing on exactly two patterns. Files
+awaiting processing are the one animated tray, [ProcessingTray](./modules/rive/ProcessingTray.tsx): a
+fixed eighteen-layer reference of 32 files per layer that the Rive asset
+quantises into four tiers, with retry waits and attention beside it. Every
+other kind of work — Repository scans, optional ML analysis, reindex
+requests, projections, and operations — is a [WorkLaneList](./flows/overview/WorkLaneList.tsx) row that
+states what the work is, its exact pending count, a status, attention, and
+the route that owns it. [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) follows as historical
+delivery diagnostics. Exact counts always stay in the DOM, independent of
+rendering; reduced motion and runtime failure use static geometry.
 
 ML uses equal hundred-cell coverage fields with one shared detail region.
 A cell is approximately one percent, not a file; no-applicable-content is
@@ -56,7 +58,8 @@ capabilities; layout encodes no hardware, latency, or performance topology.
 Advertisements filter nodes but do not override public capability composition.
 Agent configuration, backend and full node diagnostics remain expandable.
 [MLMonitor](./flows/overview/MLMonitor.tsx) combines coverage, repository options, and one confirmed
-rebuild command. [CapabilitiesMonitor](./flows/overview/CapabilitiesMonitor.tsx) is display-only; durable ML and
+rebuild command. It reports no job backlog: files still awaiting analysis
+are a Processing lane, and ML links there instead of repeating the count. [CapabilitiesMonitor](./flows/overview/CapabilitiesMonitor.tsx) is display-only; durable ML and
 agent settings stay in Settings.
 
 Storage administration is not a Monitor tab. Storage Locations,
@@ -71,7 +74,8 @@ authority for a storage fact.
 `/api/v1/admin/monitor/processing`. The response separates `processing`
 (Catalog work) from `deliveries` (state totals and queue diagnostics). StatMonitor reads
 current Catalog file, Repository, projection, and operation work from the
-processing response. File counts deduplicate stages; a terminal stage puts the file
+processing response, including `pending_analysis_assets` for the optional
+enrichment stage and `pending_reindex_requests`. File counts deduplicate stages; a terminal stage puts the file
 in the attention count. Retry waits survive QueueDB replacement. River counts
 are separately labeled delivery records and never stand in for file progress.
 Queue summaries

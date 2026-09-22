@@ -1271,7 +1271,8 @@
       "empty": "Start a conversation with Lumilio Agent!",
       "newConversation": "New conversation",
       "openAiSettings": "Open AI settings",
-      "sessionDisclosure": "This conversation is temporary. Pins, board widgets, and completed actions are kept."
+      "sessionDisclosure": "This conversation is temporary. Pins, board widgets, and completed actions are kept.",
+      "retry": "Retry"
     },
     "context": {
       "remove": "Remove",
@@ -1655,10 +1656,8 @@
       "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
       "cellMeaning": "Each cell ≈ 1% coverage, not one file. Task totals differ.",
       "covered": "Covered",
-      "globalActivity": "Global activity",
       "loadError": "Failed to load ML indexing stats.",
       "noApplicable": "No applicable content",
-      "pendingMedia": "Media awaiting analysis",
       "pendingRebuilds": "Reindex requests",
       "rebuildFailed": "Rebuild could not be started. Try again.",
       "reindex": "Reindex",
@@ -1675,7 +1674,9 @@
         "reindexAllCheckbox": "Reindex all (not just missing)",
         "title": "Reindex — {{task}}"
       },
-      "uncovered": "Uncovered"
+      "uncovered": "Uncovered",
+      "backlogHint": "Files still waiting for analysis are tracked in Processing.",
+      "openProcessing": "Open Processing"
     },
     "processing": {
       "attentionCount_one": "{{count}} needing attention",
@@ -1686,7 +1687,24 @@
       "pendingProjections": "Pending projection work",
       "pendingRepositories": "Repositories awaiting scan",
       "retryWaiting_one": "Stages waiting to retry: {{count}}",
-      "retryWaiting_other": "Stages waiting to retry: {{count}}"
+      "retryWaiting_other": "Stages waiting to retry: {{count}}",
+      "filesDescription": "New or changed files moving through metadata, thumbnails, and transcoding.",
+      "lanes": {
+        "analysis": "Optional Lumen analysis such as Image Semantic Analysis, OCR Text Recognition, and Person Recognition.",
+        "operations": "The latest ingest, reindex, and backup operation for each subject.",
+        "projections": "Events, places, and text search rebuilt from file facts.",
+        "reindex": "Accepted rebuild requests that have not been applied yet.",
+        "repositories": "Repositories whose files are being discovered or verified."
+      },
+      "openCoverage": "View coverage",
+      "openStorage": "Open Storage",
+      "otherWork": "Other work",
+      "pendingAnalysis": "Files awaiting analysis",
+      "status": {
+        "attention": "Needs attention",
+        "clear": "Clear",
+        "working": "In progress"
+      }
     },
     "queueSummary": {
       "copied": "Copied",
@@ -1755,7 +1773,6 @@
       "title": "Processing activity"
     },
     "snapshot": {
-      "diagnostics": "Diagnostics",
       "missing": "No snapshot is available.",
       "selection": "Selected detail",
       "stale": "Refresh failed. Showing the last successful snapshot; current state is unknown.",
@@ -2729,7 +2746,15 @@
       "actor": "Actor",
       "result": "Result"
     },
-    "capacityValue": "{{available}} available of {{total}}"
+    "capacityValue": "{{available}} available of {{total}}",
+    "pendingHostActions_one": "{{count}} storage request is waiting for approval in the Desktop app.",
+    "pendingHostActions_other": "{{count}} storage requests are waiting for approval in the Desktop app.",
+    "summaryAttention_one": "{{count}} needs attention",
+    "summaryAttention_other": "{{count}} need attention",
+    "summaryLocations_one": "{{count}} Storage Location",
+    "summaryLocations_other": "{{count}} Storage Locations",
+    "summaryRepositories_one": "{{count}} Repository",
+    "summaryRepositories_other": "{{count}} Repositories"
   },
   "studio": {
     "asset": {

@@ -5,7 +5,13 @@ import { t } from "@test/i18n";
 import type { components } from "@/lib/http-commons/schema";
 import { StatMonitor } from "./StatMonitor";
 
-test("current file work stays separate from large delivery history", async () => {
+type ProcessingMonitorResponse = components["schemas"]["handler.ProcessingMonitorResponse"];
+
+function lane(screen: Awaited<ReturnType<typeof renderWithProviders>>, key: string) {
+  return screen.getByRole("listitem", { name: t(key), exact: true });
+}
+
+test("files animate in one tray while other work is an exact list", async () => {
   let requests = 0;
   const response = {
     deliveries: {
@@ -28,8 +34,11 @@ test("current file work stays separate from large delivery history", async () =>
       failed_projections: 0,
       pending_operations: 0,
       failed_operations: 0,
+      pending_analysis_assets: 5,
+      failed_analysis_assets: 0,
+      pending_reindex_requests: 2,
     },
-  } satisfies components["schemas"]["handler.ProcessingMonitorResponse"];
+  } satisfies ProcessingMonitorResponse;
   worker.use(
     http.get("*/api/v1/admin/monitor/processing", () => {
       requests += 1;
@@ -38,19 +47,41 @@ test("current file work stays separate from large delivery history", async () =>
   );
   const screen = await renderWithProviders(<StatMonitor />);
 
-  // Every work type keeps its exact pending count as text, and the tray tier is
-  // derived from that count rather than from the canvas.
-  const expectedTiers: [string, string, string][] = [
-    [t("monitor.processing.pendingAssets"), "7", "oneThird"],
-    [t("monitor.processing.pendingRepositories"), "1", "oneThird"],
-    [t("monitor.processing.pendingProjections"), "6", "oneThird"],
-    [t("monitor.processing.pendingOperations"), "0", "empty"],
+  // Files keep their exact count as text; the tray tier derives from that count.
+  const files = screen.getByRole("region", {
+    name: t("monitor.processing.pendingAssets"),
+    exact: true,
+  });
+  await expect.element(files.getByText("7", { exact: true })).toBeVisible();
+  await expect
+    .element(files.element().querySelector("figure"))
+    .toHaveAttribute("data-tier", "oneThird");
+  // Retry waits are a file-work fact, shown beside the files they delay.
+  await expect
+    .element(files.getByText(t("monitor.processing.retryWaiting", { count: 2 }), { exact: true }))
+    .toBeVisible();
+  // Exactly one tray: every other kind of work is a list row, never a canvas.
+  expect(screen.container.querySelectorAll("figure")).toHaveLength(1);
+
+  const expectedLanes: [string, string, string][] = [
+    ["monitor.processing.pendingRepositories", "1", "monitor.processing.status.working"],
+    ["monitor.processing.pendingAnalysis", "5", "monitor.processing.status.working"],
+    ["monitor.ml.pendingRebuilds", "2", "monitor.processing.status.working"],
+    ["monitor.processing.pendingProjections", "6", "monitor.processing.status.working"],
+    ["monitor.processing.pendingOperations", "0", "monitor.processing.status.clear"],
   ];
-  for (const [label, pending, tier] of expectedTiers) {
-    const tray = screen.getByRole("region", { name: label });
-    await expect.element(tray.getByText(pending, { exact: true })).toBeVisible();
-    await expect.element(tray.element().querySelector("figure")).toHaveAttribute("data-tier", tier);
+  for (const [label, pending, status] of expectedLanes) {
+    const row = lane(screen, label);
+    await expect.element(row.getByText(pending, { exact: true })).toBeVisible();
+    await expect.element(row.getByText(t(status), { exact: true })).toBeVisible();
   }
+  await expect
+    .element(
+      lane(screen, "monitor.processing.pendingAnalysis").getByRole("link", {
+        name: t("monitor.processing.openCoverage"),
+      }),
+    )
+    .toHaveAttribute("href", "/server-monitor?tab=ml");
 
   await expect
     .element(
@@ -66,13 +97,9 @@ test("current file work stays separate from large delivery history", async () =>
     .click();
   await expect.poll(() => requests).toBe(2);
 
-  // Retry qualifiers and historical deliveries are available on demand.
+  // Historical deliveries are available on demand and stay separately labelled.
   await expect.element(screen.getByText("29911", { exact: true })).not.toBeInTheDocument();
   await screen.getByRole("button", { name: t("monitor.delivery.details"), exact: true }).click();
-  await expect
-    .element(screen.getByText(t("monitor.processing.retryWaiting", { count: 2 }), { exact: true }))
-    .toBeVisible();
-  // Delivery history stays separately labelled and unchanged.
   await expect.element(screen.getByText("29911", { exact: true })).toBeVisible();
   const active = screen.getByText(t("monitor.delivery.active"), { exact: true });
   await expect
@@ -105,42 +132,40 @@ test("cleared work never reads as all-clear while problems remain", async () => 
       failed_projections: 0,
       pending_operations: 0,
       failed_operations: 0,
+      pending_analysis_assets: 0,
+      failed_analysis_assets: 4,
+      pending_reindex_requests: 0,
     },
-  } satisfies components["schemas"]["handler.ProcessingMonitorResponse"];
+  } satisfies ProcessingMonitorResponse;
   worker.use(http.get("*/api/v1/admin/monitor/processing", () => HttpResponse.json(response)));
   const screen = await renderWithProviders(<StatMonitor />);
 
-  // Every tray is empty, because no work is pending…
-  for (const label of [
-    t("monitor.processing.pendingAssets"),
-    t("monitor.processing.pendingRepositories"),
-    t("monitor.processing.pendingProjections"),
-    t("monitor.processing.pendingOperations"),
-  ]) {
-    const tray = screen.getByRole("region", { name: label });
-    await expect.element(tray.getByText("0", { exact: true })).toBeVisible();
-    await expect
-      .element(tray.element().querySelector("figure"))
-      .toHaveAttribute("data-tier", "empty");
-  }
-
-  // …but the problems are still named, with counts, next to the tray that owns them.
-  const assetsTray = screen.getByRole("region", {
+  // The tray is empty, because no file work is pending…
+  const files = screen.getByRole("region", {
     name: t("monitor.processing.pendingAssets"),
+    exact: true,
   });
+  await expect.element(files.getByText("0", { exact: true })).toBeVisible();
+  await expect
+    .element(files.element().querySelector("figure"))
+    .toHaveAttribute("data-tier", "empty");
+  // …but the problems are still named, with counts, next to the work that owns them.
+  await expect
+    .element(files.getByText(t("monitor.processing.attentionCount", { count: 3 }), { exact: true }))
+    .toBeVisible();
+  const repositories = lane(screen, "monitor.processing.pendingRepositories");
   await expect
     .element(
-      assetsTray.getByText(t("monitor.processing.attentionCount", { count: 3 }), { exact: true }),
+      repositories.getByText(t("monitor.processing.attentionCount", { count: 1 }), { exact: true }),
     )
     .toBeVisible();
-  const repositoriesTray = screen.getByRole("region", {
-    name: t("monitor.processing.pendingRepositories"),
-  });
+  await expect
+    .element(repositories.getByText(t("monitor.processing.status.attention"), { exact: true }))
+    .toBeVisible();
+  const analysis = lane(screen, "monitor.processing.pendingAnalysis");
   await expect
     .element(
-      repositoriesTray.getByText(t("monitor.processing.attentionCount", { count: 1 }), {
-        exact: true,
-      }),
+      analysis.getByText(t("monitor.processing.attentionCount", { count: 4 }), { exact: true }),
     )
     .toBeVisible();
 
@@ -188,7 +213,7 @@ test("retains the last work count on refresh failure and never labels it ready",
   await expect.element(files.getByText("7", { exact: true })).toBeVisible();
 });
 
-test("discarded delivery history never becomes a current file failure", async () => {
+test("missing counts read as no data rather than clear", async () => {
   worker.use(
     http.get("*/api/v1/admin/monitor/processing", () =>
       HttpResponse.json({
@@ -207,12 +232,11 @@ test("discarded delivery history never becomes a current file failure", async ()
     .element(files.element().querySelector("figure"))
     .toHaveAttribute("data-tier", "empty");
   await expect.element(screen.getByText("999", { exact: true })).not.toBeInTheDocument();
-  const repositories = screen.getByRole("region", {
-    name: t("monitor.processing.pendingRepositories"),
-    exact: true,
-  });
+  const repositories = lane(screen, "monitor.processing.pendingRepositories");
   await expect
     .element(repositories.getByText(t("monitor.processing.noData"), { exact: true }))
     .toBeVisible();
-  await expect.element(repositories.element().querySelector("figure")).not.toBeInTheDocument();
+  await expect
+    .element(repositories.getByText(t("monitor.processing.status.clear"), { exact: true }))
+    .not.toBeInTheDocument();
 });

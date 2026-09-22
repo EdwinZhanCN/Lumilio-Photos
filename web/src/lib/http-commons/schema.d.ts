@@ -17858,13 +17858,23 @@ export interface components {
             processing?: components["schemas"]["handler.ProcessingStatsResponse"];
         };
         "handler.ProcessingStatsResponse": {
+            failed_analysis_assets?: number;
             failed_assets?: number;
             failed_operations?: number;
             failed_projections?: number;
             failed_repositories?: number;
+            /**
+             * @description PendingAnalysisAssets is the subset of files whose optional ML enrichment
+             *     stage is still outstanding; FailedAnalysisAssets holds a terminal error
+             *     there. Both are Catalog facts, so Processing owns the ML backlog while
+             *     the ML view reports coverage only.
+             */
+            pending_analysis_assets?: number;
             pending_assets?: number;
             pending_operations?: number;
             pending_projections?: number;
+            /** @description PendingReindexRequests counts accepted rebuild requests not yet applied. */
+            pending_reindex_requests?: number;
             pending_repositories?: number;
             retry_waiting_stages?: number;
         };

@@ -1257,7 +1257,8 @@
       "empty": "开始与 Lumilio Agent 对话吧！",
       "newConversation": "新对话",
       "openAiSettings": "打开 AI 设置",
-      "sessionDisclosure": "本次对话是临时的；固定结果、看板卡片和已完成操作会被保留。"
+      "sessionDisclosure": "本次对话是临时的；固定结果、看板卡片和已完成操作会被保留。",
+      "retry": "重试"
     },
     "context": {
       "remove": "移除",
@@ -1639,10 +1640,8 @@
       "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
       "cellMeaning": "每格约为 1% 覆盖率，并非一个文件；不同任务的总数不同。",
       "covered": "已覆盖",
-      "globalActivity": "全局活动",
       "loadError": "加载 ML 索引统计失败。",
       "noApplicable": "暂无适用内容",
-      "pendingMedia": "待分析媒体",
       "pendingRebuilds": "重建请求",
       "rebuildFailed": "无法启动索引重建，请重试。",
       "reindex": "重建索引",
@@ -1659,7 +1658,9 @@
         "reindexAllCheckbox": "全量重建（而非仅补缺）",
         "title": "重建索引 — {{task}}"
       },
-      "uncovered": "未覆盖"
+      "uncovered": "未覆盖",
+      "backlogHint": "仍在等待分析的文件会在“处理”中跟踪。",
+      "openProcessing": "打开处理"
     },
     "processing": {
       "attentionCount_other": "{{count}} 项需要关注",
@@ -1668,7 +1669,24 @@
       "pendingOperations": "待处理操作",
       "pendingProjections": "待执行投影工作",
       "pendingRepositories": "待扫描资源库",
-      "retryWaiting_other": "等待重试的阶段：{{count}}"
+      "retryWaiting_other": "等待重试的阶段：{{count}}",
+      "filesDescription": "新增或变更的文件正在进行元数据、缩略图和转码处理。",
+      "lanes": {
+        "analysis": "可选的 Lumen 分析，例如图像语义分析、OCR文字识别和人物识别。",
+        "operations": "每个对象最近一次的导入、重建索引和备份操作。",
+        "projections": "根据文件事实重建的事件、地点和文字搜索。",
+        "reindex": "已接受但尚未应用的重建请求。",
+        "repositories": "正在发现或校验文件的资源库。"
+      },
+      "openCoverage": "查看覆盖率",
+      "openStorage": "打开存储",
+      "otherWork": "其他工作",
+      "pendingAnalysis": "等待分析的文件",
+      "status": {
+        "attention": "需要处理",
+        "clear": "已清空",
+        "working": "进行中"
+      }
     },
     "queueSummary": {
       "copied": "已复制",
@@ -1737,7 +1755,6 @@
       "title": "处理活动"
     },
     "snapshot": {
-      "diagnostics": "诊断详情",
       "missing": "暂无可用快照。",
       "selection": "所选详情",
       "stale": "刷新失败。当前显示上次成功快照，最新状态未知。",
@@ -2700,7 +2717,11 @@
       "actor": "操作者",
       "result": "结果"
     },
-    "capacityValue": "{{available}} 可用 / 共 {{total}}"
+    "capacityValue": "{{available}} 可用 / 共 {{total}}",
+    "pendingHostActions_other": "有 {{count}} 个存储请求正在等待桌面应用批准。",
+    "summaryAttention_other": "{{count}} 项需要处理",
+    "summaryLocations_other": "{{count}} 个存储位置",
+    "summaryRepositories_other": "{{count}} 个资源库"
   },
   "studio": {
     "asset": {

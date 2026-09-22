@@ -2,12 +2,10 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { renderWithProviders } from "@test/render";
 import { ProcessingTray } from "./ProcessingTray";
 
-const props = { type: "assets" } as const;
-
 describe("ProcessingTray", () => {
   it("loads the asset and fills the tray at the reference backlog", async () => {
     // 576 pending files is the tray reference for the 32-files-per-layer unit.
-    const screen = await renderWithProviders(<ProcessingTray {...props} pending={576} />);
+    const screen = await renderWithProviders(<ProcessingTray pending={576} />);
 
     const figure = screen.container.querySelector("figure");
     expect(figure?.dataset.tier).toBe("full");
@@ -28,7 +26,7 @@ describe("ProcessingTray", () => {
   });
 
   it("advances the tier as pending work drains", async () => {
-    const screen = await renderWithProviders(<ProcessingTray {...props} pending={288} />);
+    const screen = await renderWithProviders(<ProcessingTray pending={288} />);
     const figure = screen.container.querySelector("figure");
     // Half the 576-file reference: past a third, so one tier has been extracted.
     expect(figure?.dataset.tier).toBe("twoThirds");
@@ -36,16 +34,14 @@ describe("ProcessingTray", () => {
   });
 
   it("shows an empty tray only when no work is left", async () => {
-    const screen = await renderWithProviders(
-      <ProcessingTray {...props} pending={0} type="repositories" />,
-    );
+    const screen = await renderWithProviders(<ProcessingTray pending={0} />);
     const figure = screen.container.querySelector("figure");
     expect(figure?.dataset.tier).toBe("empty");
   });
 
   it("preserves backlog geometry when the asset cannot load", async () => {
     const screen = await renderWithProviders(
-      <ProcessingTray {...props} pending={288} assetUrl="/missing/asset.riv" />,
+      <ProcessingTray pending={288} assetUrl="/missing/asset.riv" />,
     );
     const figure = screen.container.querySelector("figure");
 

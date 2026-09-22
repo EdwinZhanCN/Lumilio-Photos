@@ -1,18 +1,18 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import "./tray.css";
 import { useRive } from "@rive-app/react-canvas";
-import { trayLayers, trayProgress, trayTier, type WorkType } from "../../model/processingProgress";
+import { trayLayers, trayProgress, trayTier } from "../../model/processingProgress";
 import { PROCESSING_ARTBOARD, PROCESSING_STATE_MACHINE, processingAssetUrl } from "./runtime";
 
 /**
- * One Processing work tray.
+ * The Processing files tray.
  *
- * Decorative backlog indicator shared by all four work types. The owning card
- * renders the name, exact count, and any attention state independently.
+ * Decorative backlog indicator for files awaiting processing, the one kind of
+ * work the Processing tab animates. The owning card renders the name, exact
+ * count, and any attention state independently.
  */
 
 export interface ProcessingTrayProps {
-  type: WorkType;
   pending: number;
   /** Overridable so a spec can exercise the static fallback. */
   assetUrl?: string;
@@ -38,7 +38,7 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-export function ProcessingTray({ type, pending, assetUrl }: ProcessingTrayProps) {
+export function ProcessingTray({ pending, assetUrl }: ProcessingTrayProps) {
   const resolvedAssetUrl = assetUrl ?? processingAssetUrl();
   const reducedMotion = usePrefersReducedMotion();
   const [failed, setFailed] = useState(false);
@@ -65,8 +65,8 @@ export function ProcessingTray({ type, pending, assetUrl }: ProcessingTrayProps)
     return () => controller.abort();
   }, [wantsAnimation, resolvedAssetUrl]);
 
-  const progress = trayProgress(pending, type);
-  const layers = trayLayers(pending, type);
+  const progress = trayProgress(pending);
+  const layers = trayLayers(pending);
   const tier = trayTier(progress);
   const animate = wantsAnimation && !failed;
 

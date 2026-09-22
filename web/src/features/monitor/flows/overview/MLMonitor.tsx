@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, RefreshCcw, Sparkles } from "lucide-react";
+import { ChevronDown, RefreshCcw } from "lucide-react";
+import { Link } from "react-router-dom";
 import { MonitorFrame } from "./MonitorFrame";
 import {
   useAssetIndexingStats,
@@ -57,9 +58,6 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
   );
   const bioTaskStats = stats?.tasks.bioclip;
 
-  // The legacy API repeats the same global enrichment backlog in every lane.
-  // Read it once; these are pending media, not five independent job queues.
-  const pendingMedia = stats?.tasks.semantic.queuedJobs;
   const rebuildingTasks = rebuildMutation.variables?.body?.tasks ?? [];
   const selectedReindexTask = reindexModal
     ? taskCards.find((task) => task.key === reindexModal.taskKey)
@@ -152,31 +150,12 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
           <p>{t("monitor.ml.bioAlbumHint")}</p>
         </div>
       </details>
-      <section aria-label={t("monitor.ml.globalActivity", "Global activity")} className="space-y-3">
-        <h2 className="text-base font-semibold">
-          {t("monitor.ml.globalActivity", "Global activity")}
-        </h2>
-        <ul className="list rounded-box bg-base-100">
-          <li className="list-row grid-cols-[auto_minmax(0,1fr)_auto] items-center">
-            <div className="rounded-box bg-primary/10 p-3 text-primary">
-              <Sparkles aria-hidden className="size-5" />
-            </div>
-            <span className="font-medium">
-              {t("monitor.ml.pendingMedia", "Media awaiting analysis")}
-            </span>
-            <span className="text-xl font-semibold tabular-nums">{pendingMedia}</span>
-          </li>
-          <li className="list-row grid-cols-[auto_minmax(0,1fr)_auto] items-center">
-            <div className="rounded-box bg-primary/10 p-3 text-primary">
-              <RefreshCcw aria-hidden className="size-5" />
-            </div>
-            <span className="font-medium">
-              {t("monitor.ml.pendingRebuilds", "Reindex requests")}
-            </span>
-            <span className="text-xl font-semibold tabular-nums">{stats?.reindexJobs}</span>
-          </li>
-        </ul>
-      </section>
+      <p className="text-sm text-base-content/60">
+        {t("monitor.ml.backlogHint", "Files still waiting for analysis are tracked in Processing.")}{" "}
+        <Link className="link link-primary" to="/server-monitor">
+          {t("monitor.ml.openProcessing", "Open Processing")}
+        </Link>
+      </p>
       {reindexModal && (
         <div className="modal modal-open z-modal">
           <div className="modal-box max-w-sm">

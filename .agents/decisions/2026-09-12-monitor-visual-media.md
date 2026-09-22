@@ -1,6 +1,8 @@
 # Decision: One Monitor snapshot shell, four meaningful visual media
 
 Status: implemented, 2026-09-12. This completes the Monitor visual-redesign plan.
+The Processing bullet is superseded by
+[the two-pattern Processing decision](2026-09-22-processing-two-patterns.md).
 The source of architecture documentation is
 [Monitor doc.ts](../../web/src/features/monitor/doc.ts).
 

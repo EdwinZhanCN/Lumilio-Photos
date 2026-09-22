@@ -5,12 +5,3 @@ type Schemas = components["schemas"];
 export type ProcessingMonitorResponse = Schemas["handler.ProcessingMonitorResponse"];
 export type QueueErrorSampleDTO = Schemas["handler.QueueErrorSampleDTO"];
 export type QueueSummaryDTO = Schemas["handler.QueueSummaryDTO"];
-
-export type JobState =
-  | "available"
-  | "scheduled"
-  | "running"
-  | "retryable"
-  | "completed"
-  | "cancelled"
-  | "discarded";

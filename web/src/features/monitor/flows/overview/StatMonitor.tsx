@@ -1,13 +1,26 @@
 import { useId, useState } from "react";
-import { ChartNoAxesColumn, ChevronDown, CircleAlert } from "lucide-react";
+import {
+  ChartNoAxesColumn,
+  ChevronDown,
+  CircleAlert,
+  FolderSync,
+  ListChecks,
+  RefreshCcw,
+  Sparkles,
+  Waypoints,
+} from "lucide-react";
 import { MonitorFrame } from "./MonitorFrame";
 import { QueueSummaryList } from "./QueueSummaryList";
+import { WorkLaneList, type WorkLane } from "./WorkLaneList";
 import { useProcessingMonitor } from "../../api/useProcessingMonitor";
 import { useI18n } from "@/lib/i18n.tsx";
-import { type WorkType } from "../../model/processingProgress";
 import { ProcessingTray } from "../../modules/rive/ProcessingTray";
 
-/** Current Catalog work stays separate from historical queue deliveries. */
+/**
+ * Processing converges on two patterns: one animated tray for files, and one
+ * list for every other kind of Catalog work. Queue deliveries stay a separate,
+ * explicitly historical diagnostic below both.
+ */
 export function StatMonitor() {
   const { t } = useI18n();
   const id = useId();
@@ -29,37 +42,71 @@ export function StatMonitor() {
   };
   if (!stats || !processing) return <MonitorFrame {...frame} />;
 
-  const trays: {
-    type: WorkType;
-    label: string;
-    pending: number | undefined;
-    failed: number | undefined;
-  }[] = [
+  const filesPending = processing.pending_assets;
+  const filesFailed = processing.failed_assets ?? 0;
+  const retryWaiting = processing.retry_waiting_stages ?? 0;
+
+  const lanes: WorkLane[] = [
     {
-      type: "assets",
-      label: t("monitor.processing.pendingAssets", "Files awaiting processing"),
-      pending: processing.pending_assets,
-      failed: processing.failed_assets,
-    },
-    {
-      type: "repositories",
+      key: "repositories",
+      icon: FolderSync,
       label: t("monitor.processing.pendingRepositories", "Repositories awaiting scan"),
+      description: t(
+        "monitor.processing.lanes.repositories",
+        "Repositories whose files are being discovered or verified.",
+      ),
       pending: processing.pending_repositories,
       failed: processing.failed_repositories,
+      to: "/storage",
+      linkLabel: t("monitor.processing.openStorage", "Open Storage"),
     },
     {
-      type: "projections",
+      key: "analysis",
+      icon: Sparkles,
+      label: t("monitor.processing.pendingAnalysis", "Files awaiting analysis"),
+      description: t(
+        "monitor.processing.lanes.analysis",
+        "Optional Lumen analysis such as Image Semantic Analysis, OCR Text Recognition, and Person Recognition.",
+      ),
+      pending: processing.pending_analysis_assets,
+      failed: processing.failed_analysis_assets,
+      to: "/server-monitor?tab=ml",
+      linkLabel: t("monitor.processing.openCoverage", "View coverage"),
+    },
+    {
+      key: "reindex",
+      icon: RefreshCcw,
+      label: t("monitor.ml.pendingRebuilds", "Reindex requests"),
+      description: t(
+        "monitor.processing.lanes.reindex",
+        "Accepted rebuild requests that have not been applied yet.",
+      ),
+      pending: processing.pending_reindex_requests,
+    },
+    {
+      key: "projections",
+      icon: Waypoints,
       label: t("monitor.processing.pendingProjections", "Pending projection work"),
+      description: t(
+        "monitor.processing.lanes.projections",
+        "Events, places, and text search rebuilt from file facts.",
+      ),
       pending: processing.pending_projections,
       failed: processing.failed_projections,
     },
     {
-      type: "operations",
+      key: "operations",
+      icon: ListChecks,
       label: t("monitor.processing.pendingOperations", "Pending operations"),
+      description: t(
+        "monitor.processing.lanes.operations",
+        "The latest ingest, reindex, and backup operation for each subject.",
+      ),
       pending: processing.pending_operations,
       failed: processing.failed_operations,
     },
   ];
+
   const deliveries = [
     [
       t("monitor.delivery.active", "Active deliveries"),
@@ -75,43 +122,53 @@ export function StatMonitor() {
 
   return (
     <MonitorFrame {...frame}>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {trays.map((tray) => (
-          <section
-            key={tray.type}
-            aria-labelledby={`${id}-${tray.type}`}
-            className="card bg-base-100"
-          >
-            <div className="card-body grid min-h-44 grid-cols-[minmax(0,1fr)_38%] gap-3 p-5 sm:min-h-52 sm:p-6">
-              <div className="flex min-w-0 flex-col justify-between gap-5">
-                <h2 id={`${id}-${tray.type}`} className="text-base font-semibold text-primary">
-                  {tray.label}
-                </h2>
-                <div>
-                  <p
-                    className={
-                      tray.pending == null
-                        ? "text-xl font-semibold"
-                        : "text-4xl font-semibold tabular-nums sm:text-5xl"
-                    }
-                  >
-                    {tray.pending ?? t("monitor.processing.noData", "No data")}
-                  </p>
-                  {(tray.failed ?? 0) > 0 && (
-                    <p className="mt-2 flex items-center gap-1.5 text-sm text-warning">
-                      <CircleAlert className="size-4 shrink-0" aria-hidden />
-                      {t("monitor.processing.attentionCount", "{{count}} needing attention", {
-                        count: tray.failed,
-                      })}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {tray.pending != null && <ProcessingTray type={tray.type} pending={tray.pending} />}
+      <section aria-labelledby={`${id}-files`} className="card bg-base-100">
+        <div className="card-body grid min-h-52 grid-cols-[minmax(0,1fr)_minmax(8rem,34%)] gap-4 p-5 sm:p-6">
+          <div className="flex min-w-0 flex-col justify-between gap-5">
+            <div>
+              <h2 id={`${id}-files`} className="text-base font-semibold text-primary">
+                {t("monitor.processing.pendingAssets", "Files awaiting processing")}
+              </h2>
+              <p className="mt-1 max-w-md text-sm text-base-content/60">
+                {t(
+                  "monitor.processing.filesDescription",
+                  "New or changed files moving through metadata, thumbnails, and transcoding.",
+                )}
+              </p>
             </div>
-          </section>
-        ))}
-      </div>
+            <div>
+              <p
+                className={
+                  filesPending == null
+                    ? "text-xl font-semibold"
+                    : "text-5xl font-semibold tabular-nums sm:text-6xl"
+                }
+              >
+                {filesPending ?? t("monitor.processing.noData", "No data")}
+              </p>
+              {filesFailed > 0 && (
+                <p className="mt-2 flex items-center gap-1.5 text-sm text-warning">
+                  <CircleAlert className="size-4 shrink-0" aria-hidden />
+                  {t("monitor.processing.attentionCount", "{{count}} needing attention", {
+                    count: filesFailed,
+                  })}
+                </p>
+              )}
+              {retryWaiting > 0 && (
+                <p className="mt-1 text-sm text-base-content/60">
+                  {t("monitor.processing.retryWaiting", {
+                    defaultValue: "Stages waiting to retry: {{count}}",
+                    count: retryWaiting,
+                  })}
+                </p>
+              )}
+            </div>
+          </div>
+          {filesPending != null && <ProcessingTray pending={filesPending} />}
+        </div>
+      </section>
+
+      <WorkLaneList lanes={lanes} />
 
       <QueueSummaryList
         queues={stats.queues ?? []}
@@ -146,14 +203,6 @@ export function StatMonitor() {
                     "One file or scan can produce many deliveries. These records do not measure completed files or current file failures.",
                   )}
                 </p>
-                {(processing.retry_waiting_stages ?? 0) > 0 && (
-                  <p className="mt-2 text-sm">
-                    {t("monitor.processing.retryWaiting", {
-                      defaultValue: "Stages waiting to retry: {{count}}",
-                      count: processing.retry_waiting_stages,
-                    })}
-                  </p>
-                )}
               </div>
             )}
           </div>
