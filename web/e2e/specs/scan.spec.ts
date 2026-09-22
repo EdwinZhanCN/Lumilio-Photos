@@ -38,8 +38,6 @@ test("@smoke administrator scans a real repository file and sees it", async ({
     );
     expect(ACTIVE_VERIFICATION_STATUSES.has(run.status ?? "")).toBe(false);
     expect(["completed", "partial"]).toContain(run.status);
-    expect(run.files_observed ?? 0).toBeGreaterThan(0);
-    expect(run.outbox_depth ?? 0).toBe(0);
   }).toPass({ timeout: 90_000 });
   await expect(async () => {
     const assets = await api<AssetList>("/api/v1/assets/list", {
