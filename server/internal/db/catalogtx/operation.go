@@ -88,6 +88,7 @@ const (
 	OperationAssetStagingCommit
 	OperationAssetReprocess
 	OperationAssetReindexRequest
+	OperationProcessingStageRetry
 	OperationAssetUserStateMutate
 	OperationMusicMutation
 	OperationEventInitializeBackfill
@@ -327,6 +328,11 @@ var operationCatalog = [operationCount]OperationDescriptor{
 	OperationAssetReindexRequest: {
 		Operation: OperationAssetReindexRequest,
 		Name:      "asset.reindex.request",
+		Role:      RoleWriter,
+	},
+	OperationProcessingStageRetry: {
+		Operation: OperationProcessingStageRetry,
+		Name:      "processing.stage_retry",
 		Role:      RoleWriter,
 	},
 	OperationAssetUserStateMutate: {

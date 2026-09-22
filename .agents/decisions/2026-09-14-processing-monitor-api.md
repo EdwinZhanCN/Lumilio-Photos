@@ -1,6 +1,7 @@
 # Decision: One Processing Monitor read, separate work and delivery semantics
 
-Status: implemented — 2026-09-14.
+Status: implemented — 2026-09-14. The response shape and routes are superseded
+by [the stage grid decision](2026-09-22-processing-stage-grid.md).
 
 ## Problem
 

@@ -42,7 +42,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/monitor/processing": {
+    "/api/v1/admin/processing": {
         parameters: {
             query?: never;
             header?: never;
@@ -50,8 +50,47 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get processing monitor snapshot
-         * @description Catalog pending work and disposable queue delivery diagnostics. Global scope; reads across Catalog and QueueDB are not an atomic transaction.
+         * Get processing stages
+         * @description One card per processing stage in a declared unit, plus overall totals. Catalog facts, with River supplying only running and retryable deliveries; not an atomic cross-database snapshot.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["processing.Summary"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/processing/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get processing delivery diagnostics
+         * @description Disposable River delivery totals and per-queue summaries with recent error samples. Delivery records are not file progress.
          */
         get: {
             parameters: {
@@ -71,13 +110,104 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["handler.ProcessingMonitorResponse"];
+                        "application/json": components["schemas"]["handler.DeliveryStatsDTO"];
                     };
                 };
             };
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/processing/stages/{stage}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a processing stage's items
+         * @description One bounded page of a stage's failed (newest first) or queued (oldest first) subjects. Failures carry reason codes, never raw errors.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Item state */
+                    state: "failed" | "queued";
+                    /** @description Page size (max 50) */
+                    limit?: number;
+                    /** @description Cursor from the previous page */
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Stage ID */
+                    stage: "import" | "scan" | "metadata" | "thumbnails" | "video" | "analysis" | "events" | "places" | "text_search" | "backup";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["processing.ItemsPage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/processing/stages/{stage}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a processing stage's failures
+         * @description Re-requests at most 500 failed subjects of a stage through the Catalog. Import, Scan, and Backup are not retryable here.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Stage ID */
+                    stage: "metadata" | "thumbnails" | "video" | "analysis" | "events" | "places" | "text_search";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["processing.RetryResult"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -17852,32 +17982,6 @@ export interface components {
             count?: number;
             date?: string;
         };
-        "handler.ProcessingMonitorResponse": {
-            deliveries?: components["schemas"]["handler.DeliveryStatsDTO"];
-            generated_at?: string;
-            processing?: components["schemas"]["handler.ProcessingStatsResponse"];
-        };
-        "handler.ProcessingStatsResponse": {
-            failed_analysis_assets?: number;
-            failed_assets?: number;
-            failed_operations?: number;
-            failed_projections?: number;
-            failed_repositories?: number;
-            /**
-             * @description PendingAnalysisAssets is the subset of files whose optional ML enrichment
-             *     stage is still outstanding; FailedAnalysisAssets holds a terminal error
-             *     there. Both are Catalog facts, so Processing owns the ML backlog while
-             *     the ML view reports coverage only.
-             */
-            pending_analysis_assets?: number;
-            pending_assets?: number;
-            pending_operations?: number;
-            pending_projections?: number;
-            /** @description PendingReindexRequests counts accepted rebuild requests not yet applied. */
-            pending_reindex_requests?: number;
-            pending_repositories?: number;
-            retry_waiting_stages?: number;
-        };
         "handler.QueueErrorSampleDTO": {
             attempt?: number;
             attempted_at?: string;
@@ -17929,6 +18033,63 @@ export interface components {
             label?: string;
             type?: string;
         };
+        /** @enum {string} */
+        "processing.Group": "media" | "catalog";
+        "processing.Item": {
+            asset_id?: string;
+            attempts?: number;
+            label?: string;
+            /** @enum {string} */
+            reason_code?: "unsupported_media" | "processing_retry_exhausted" | "processing_failed";
+            subject_id?: string;
+            updated_at?: string;
+        };
+        "processing.ItemsPage": {
+            items?: components["schemas"]["processing.Item"][];
+            next_cursor?: string;
+        };
+        "processing.Overview": {
+            catalog_pending?: number;
+            failed_media?: number;
+            last_activity_at?: string;
+            media_in_progress?: number;
+            media_total?: number;
+            running?: number;
+        };
+        "processing.RetryResult": {
+            accepted?: number;
+            receipt_id?: string;
+            remaining?: number;
+        };
+        /** @enum {string} */
+        "processing.StageID": "import" | "scan" | "metadata" | "thumbnails" | "video" | "analysis" | "events" | "places" | "text_search" | "backup";
+        "processing.StageSummary": {
+            done?: number;
+            failed?: number;
+            group?: components["schemas"]["processing.Group"];
+            id?: components["schemas"]["processing.StageID"];
+            last_activity_at?: string;
+            oldest_queued_at?: string;
+            queued?: number;
+            remaining?: number;
+            retryable?: boolean;
+            retrying?: number;
+            running?: number;
+            sources?: {
+                [key: string]: number;
+            };
+            status?: components["schemas"]["processing.Status"];
+            unit?: components["schemas"]["processing.Unit"];
+        };
+        /** @enum {string} */
+        "processing.Status": "attention" | "working" | "retrying" | "waiting" | "idle";
+        "processing.Summary": {
+            generated_at?: string;
+            overview?: components["schemas"]["processing.Overview"];
+            stages?: components["schemas"]["processing.StageSummary"][];
+        };
+        /** @enum {string} */
+        "processing.Unit": "files" | "repositories" | "updates" | "runs";
         "api.AboutBlankProblem": {
             /** Format: uri */
             instance: string;

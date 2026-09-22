@@ -7,7 +7,7 @@ import { useAuth } from "@/features/auth";
 import { getStorageEntityDisplayName, useRepositoryOptions } from "@/features/repositories";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
 import { MLMonitor } from "./MLMonitor";
-import { StatMonitor } from "./StatMonitor";
+import { ProcessingMonitor } from "./ProcessingMonitor";
 
 type MonitorView = "queue" | "ml" | "capabilities";
 
@@ -24,6 +24,8 @@ export default function MonitorOverview() {
 
   const setView = (nextView: MonitorView) => {
     const params = new URLSearchParams(searchParams);
+    // A selected Processing stage belongs to that tab only.
+    params.delete("stage");
 
     if (nextView === "queue") {
       params.delete("tab");
@@ -109,7 +111,7 @@ export default function MonitorOverview() {
       >
         <div className="mx-auto w-full max-w-7xl space-y-5 p-4 pb-8 sm:p-6">
           {view === "queue" ? (
-            <StatMonitor />
+            <ProcessingMonitor />
           ) : view === "ml" ? (
             <MLMonitor localRepoId={localRepoId} />
           ) : (

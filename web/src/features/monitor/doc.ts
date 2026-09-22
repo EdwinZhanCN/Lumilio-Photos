@@ -9,15 +9,17 @@
  * ## State
  *
  * {@link MonitorOverview} keeps the selected queue/ML/capabilities tab in the
- * `tab` URL parameter. The ML view's optional repository scope is local to the
- * route and is not persisted as browse or upload preference.
+ * `tab` URL parameter, and {@link ProcessingMonitor} keeps the selected stage
+ * in `stage` beside it. The ML view's optional repository scope is local to
+ * the route and is not persisted as browse or upload preference.
  * {@link QueueSummaryList} keeps only expanded rows and transient copied status;
- * {@link MLMonitor} keeps its selected coverage field, confirmation dialog, and
- * missing-only/full choice. Hub selection and capability filtering remain local
- * to the overview; nodes are ordered by identity, four per orbit page.
+ * {@link MLMonitor} keeps its confirmation dialog and missing-only/full choice.
+ * Hub selection and capability filtering remain local to the overview; nodes
+ * are ordered by identity, four per orbit page.
  *
- * Queue, capability, Lumen runtime, and indexing results remain TanStack Query server state.
- * The route checks the authenticated user before monitor queries render.
+ * Processing, capability, Lumen runtime, and indexing results remain TanStack
+ * Query server state. The route checks the authenticated user before monitor
+ * queries render.
  *
  * ## Flows
  *
@@ -25,7 +27,10 @@
  * flowchart TD
  *     ROUTE["/server-monitor"] --> ADMIN["admin gate"]
  *     ADMIN --> TABS["queue / ML / capabilities"]
- *     TABS --> QUEUE["StatMonitor + QueueSummaryList"]
+ *     TABS --> QUEUE["ProcessingMonitor"]
+ *     QUEUE --> GRID["StageCard grid"]
+ *     QUEUE --> PANEL["OverviewPanel / StageDetailPanel"]
+ *     QUEUE --> DIAG["DiagnosticsDialog + QueueSummaryList"]
  *     TABS --> ML["MLMonitor"]
  *     TABS --> CAP["CapabilitiesMonitor"]
  *     ML --> REPOSITORY["optional repository scope"]
@@ -39,16 +44,20 @@
  * read retains cached facts with an explicit stale warning. Each tab retains
  * its own polling interval.
  *
- * {@link StatMonitor} converges Processing on exactly two patterns. Files
- * awaiting processing are the one animated tray, {@link ProcessingTray}: a
- * fixed eighteen-layer reference of 32 files per layer that the Rive asset
- * quantises into four tiers, with retry waits and attention beside it. Every
- * other kind of work — Repository scans, optional ML analysis, reindex
- * requests, projections, and operations — is a {@link WorkLaneList} row that
- * states what the work is, its exact pending count, a status, attention, and
- * the route that owns it. {@link QueueSummaryList} follows as historical
- * delivery diagnostics. Exact counts always stay in the DOM, independent of
- * rendering; reduced motion and runtime failure use static geometry.
+ * {@link ProcessingMonitor} is a grid of identical {@link StageCard}s beside one
+ * panel. Media cards (Import, Scan, Metadata, Thumbnails, Video, Analysis)
+ * count files or Repositories; Catalog cards (Events, Places, Text search,
+ * Backup) count updates or runs. Each card shows its status, the remaining
+ * count in its unit, and one line: failures first, otherwise running work.
+ * With nothing selected the panel is {@link OverviewPanel}: the Rive tray
+ * driven by media in progress and six totals. Selecting a card turns it into
+ * {@link StageDetailPanel}: four counts, facts (done, requesting sources,
+ * oldest waiting, last activity), failed items with per-file and whole-stage
+ * retry, then waiting items. Back or re-selecting the card restores the
+ * overview. {@link DiagnosticsDialog} holds River delivery totals and queue
+ * error samples, labelled as delivery attempts rather than file progress.
+ * The Rive {@link ProcessingTray} appears once; reduced motion and runtime failure use static
+ * geometry.
  *
  * ML uses equal hundred-cell coverage fields with one shared detail region.
  * A cell is approximately one percent, not a file; no-applicable-content is
@@ -71,16 +80,16 @@
  *
  * ## Data
  *
- * {@link useProcessingMonitor} shares one five-second query and refresh for
- * `/api/v1/admin/monitor/processing`. The response separates `processing`
- * (Catalog work) from `deliveries` (state totals and queue diagnostics). StatMonitor reads
- * current Catalog file, Repository, projection, and operation work from the
- * processing response, including `pending_analysis_assets` for the optional
- * enrichment stage and `pending_reindex_requests`. File counts deduplicate stages; a terminal stage puts the file
- * in the attention count. Retry waits survive QueueDB replacement. River counts
- * are separately labeled delivery records and never stand in for file progress.
- * Queue summaries
- * include bounded error samples suitable for copied diagnostics.
+ * {@link useProcessingSummary} polls `/api/v1/admin/processing` every five
+ * seconds. Every stage has the same fields — remaining, queued, running,
+ * retrying, failed, and done for per-file stages — computed from Catalog
+ * desired/applied facts; River supplies only running and retryable
+ * deliveries. Reindex work is attributed as a source of Analysis, never a
+ * stage. {@link useProcessingStageItems} pages a stage's failed or waiting
+ * subjects with public reason codes; {@link useRetryProcessingStage} and
+ * {@link useRetryProcessingItem} re-request failures through the Catalog.
+ * {@link useProcessingDiagnostics} reads delivery diagnostics only while the
+ * dialog is open.
  * {@link useCapabilities} and {@link useLumenRuntime} poll every five seconds.
  * The public capability snapshot supplies de-sensitized task availability;
  * the administrator runtime snapshot supplies typed discovery-backend,
@@ -110,10 +119,18 @@ import type { ProcessingTray } from "./modules/rive/ProcessingTray.tsx";
 import type { MLMonitor } from "./flows/overview/MLMonitor.tsx";
 import type MonitorOverview from "./flows/overview/MonitorOverview.tsx";
 import type { QueueSummaryList } from "./flows/overview/QueueSummaryList.tsx";
-import type { StatMonitor } from "./flows/overview/StatMonitor.tsx";
-import type { WorkLaneList } from "./flows/overview/WorkLaneList.tsx";
+import type { ProcessingMonitor } from "./flows/overview/ProcessingMonitor.tsx";
+import type { StageCard } from "./flows/overview/StageCard.tsx";
+import type { OverviewPanel, StageDetailPanel } from "./flows/overview/StagePanel.tsx";
+import type { DiagnosticsDialog } from "./flows/overview/DiagnosticsDialog.tsx";
 import type { useCapabilities } from "../../lib/capabilities/useCapabilities.ts";
-import type { useProcessingMonitor } from "./api/useProcessingMonitor.ts";
+import type {
+  useProcessingDiagnostics,
+  useProcessingStageItems,
+  useProcessingSummary,
+  useRetryProcessingItem,
+  useRetryProcessingStage,
+} from "./api/useProcessing.ts";
 import type { useLumenRuntime } from "./api/useLumenRuntime.ts";
 
 export {};

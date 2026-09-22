@@ -4,8 +4,8 @@ Status: active, created 2026-09-22 for a release candidate on 2026-09-29.
 Landed on `dev` so far (`bdd1375..74526ae`): Processing two-pattern pass, Agent
 per-tab transcript and retry, Person Recognition relation decoding, UI
 language normalization (Storage page crash), `asset_handler.go` and desktop
-`App.tsx` splits, ML-tab cleanup. The Processing stage grid runs under its own
-plan, [processing-stage-grid.md](processing-stage-grid.md).
+`App.tsx` splits, ML-tab cleanup, and the Processing stage grid
+([decision](../../../.agents/decisions/2026-09-22-processing-stage-grid.md)).
 
 Goal: a `YY.TRAIN.PATCH-rc.1` tag on `main`, promoted from a green `dev`, with
 every release-blocking item below closed or explicitly deferred with a reason.
@@ -37,7 +37,9 @@ follow-up in the tech-debt tracker.
   environment-specific; if CI also fails, it is a blocker.
 
 ### Phase 1 — Processing stage grid
-- [ ] Deliver [processing-stage-grid.md](processing-stage-grid.md).
+- [x] Stage catalog read model, items, retry, diagnostics, and the stage-grid
+  UI; its plan is complete and deleted, and its decision is recorded in
+  `.agents/decisions/2026-09-22-processing-stage-grid.md`.
 
 ### Phase 2 — i18n integrity
 - [ ] Make table-driven copy extractor-visible: tables call

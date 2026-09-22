@@ -8,15 +8,17 @@ define task enablement, queue semantics, or repository configuration.
 ## State
 
 [MonitorOverview](./flows/overview/MonitorOverview.tsx) keeps the selected queue/ML/capabilities tab in the
-`tab` URL parameter. The ML view's optional repository scope is local to the
-route and is not persisted as browse or upload preference.
+`tab` URL parameter, and [ProcessingMonitor](./flows/overview/ProcessingMonitor.tsx) keeps the selected stage
+in `stage` beside it. The ML view's optional repository scope is local to
+the route and is not persisted as browse or upload preference.
 [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) keeps only expanded rows and transient copied status;
-[MLMonitor](./flows/overview/MLMonitor.tsx) keeps its selected coverage field, confirmation dialog, and
-missing-only/full choice. Hub selection and capability filtering remain local
-to the overview; nodes are ordered by identity, four per orbit page.
+[MLMonitor](./flows/overview/MLMonitor.tsx) keeps its confirmation dialog and missing-only/full choice.
+Hub selection and capability filtering remain local to the overview; nodes
+are ordered by identity, four per orbit page.
 
-Queue, capability, Lumen runtime, and indexing results remain TanStack Query server state.
-The route checks the authenticated user before monitor queries render.
+Processing, capability, Lumen runtime, and indexing results remain TanStack
+Query server state. The route checks the authenticated user before monitor
+queries render.
 
 ## Flows
 
@@ -24,7 +26,10 @@ The route checks the authenticated user before monitor queries render.
 flowchart TD
     ROUTE["/server-monitor"] --> ADMIN["admin gate"]
     ADMIN --> TABS["queue / ML / capabilities"]
-    TABS --> QUEUE["StatMonitor + QueueSummaryList"]
+    TABS --> QUEUE["ProcessingMonitor"]
+    QUEUE --> GRID["StageCard grid"]
+    QUEUE --> PANEL["OverviewPanel / StageDetailPanel"]
+    QUEUE --> DIAG["DiagnosticsDialog + QueueSummaryList"]
     TABS --> ML["MLMonitor"]
     TABS --> CAP["CapabilitiesMonitor"]
     ML --> REPOSITORY["optional repository scope"]
@@ -38,16 +43,20 @@ so the heading never repeats a title or tallies targets. A failed background
 read retains cached facts with an explicit stale warning. Each tab retains
 its own polling interval.
 
-[StatMonitor](./flows/overview/StatMonitor.tsx) converges Processing on exactly two patterns. Files
-awaiting processing are the one animated tray, [ProcessingTray](./modules/rive/ProcessingTray.tsx): a
-fixed eighteen-layer reference of 32 files per layer that the Rive asset
-quantises into four tiers, with retry waits and attention beside it. Every
-other kind of work — Repository scans, optional ML analysis, reindex
-requests, projections, and operations — is a [WorkLaneList](./flows/overview/WorkLaneList.tsx) row that
-states what the work is, its exact pending count, a status, attention, and
-the route that owns it. [QueueSummaryList](./flows/overview/QueueSummaryList.tsx) follows as historical
-delivery diagnostics. Exact counts always stay in the DOM, independent of
-rendering; reduced motion and runtime failure use static geometry.
+[ProcessingMonitor](./flows/overview/ProcessingMonitor.tsx) is a grid of identical [StageCard](./flows/overview/StageCard.tsx)s beside one
+panel. Media cards (Import, Scan, Metadata, Thumbnails, Video, Analysis)
+count files or Repositories; Catalog cards (Events, Places, Text search,
+Backup) count updates or runs. Each card shows its status, the remaining
+count in its unit, and one line: failures first, otherwise running work.
+With nothing selected the panel is [OverviewPanel](./flows/overview/StagePanel.tsx): the Rive tray
+driven by media in progress and six totals. Selecting a card turns it into
+[StageDetailPanel](./flows/overview/StagePanel.tsx): four counts, facts (done, requesting sources,
+oldest waiting, last activity), failed items with per-file and whole-stage
+retry, then waiting items. Back or re-selecting the card restores the
+overview. [DiagnosticsDialog](./flows/overview/DiagnosticsDialog.tsx) holds River delivery totals and queue
+error samples, labelled as delivery attempts rather than file progress.
+The Rive [ProcessingTray](./modules/rive/ProcessingTray.tsx) appears once; reduced motion and runtime failure use static
+geometry.
 
 ML uses equal hundred-cell coverage fields with one shared detail region.
 A cell is approximately one percent, not a file; no-applicable-content is
@@ -70,16 +79,16 @@ authority for a storage fact.
 
 ## Data
 
-[useProcessingMonitor](./api/useProcessingMonitor.ts) shares one five-second query and refresh for
-`/api/v1/admin/monitor/processing`. The response separates `processing`
-(Catalog work) from `deliveries` (state totals and queue diagnostics). StatMonitor reads
-current Catalog file, Repository, projection, and operation work from the
-processing response, including `pending_analysis_assets` for the optional
-enrichment stage and `pending_reindex_requests`. File counts deduplicate stages; a terminal stage puts the file
-in the attention count. Retry waits survive QueueDB replacement. River counts
-are separately labeled delivery records and never stand in for file progress.
-Queue summaries
-include bounded error samples suitable for copied diagnostics.
+[useProcessingSummary](./api/useProcessing.ts) polls `/api/v1/admin/processing` every five
+seconds. Every stage has the same fields — remaining, queued, running,
+retrying, failed, and done for per-file stages — computed from Catalog
+desired/applied facts; River supplies only running and retryable
+deliveries. Reindex work is attributed as a source of Analysis, never a
+stage. [useProcessingStageItems](./api/useProcessing.ts) pages a stage's failed or waiting
+subjects with public reason codes; [useRetryProcessingStage](./api/useProcessing.ts) and
+[useRetryProcessingItem](./api/useProcessing.ts) re-request failures through the Catalog.
+[useProcessingDiagnostics](./api/useProcessing.ts) reads delivery diagnostics only while the
+dialog is open.
 [useCapabilities](../../lib/capabilities/useCapabilities.ts) and [useLumenRuntime](./api/useLumenRuntime.ts) poll every five seconds.
 The public capability snapshot supplies de-sensitized task availability;
 the administrator runtime snapshot supplies typed discovery-backend,

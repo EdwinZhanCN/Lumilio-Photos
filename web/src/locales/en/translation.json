@@ -1646,15 +1646,12 @@
       "active": "Active deliveries",
       "cancelled": "Cancelled deliveries",
       "completed": "Completed deliveries",
-      "description": "One file or scan can produce many deliveries. These records do not measure completed files or current file failures.",
-      "details": "Statistics",
       "discarded": "Discarded deliveries"
     },
     "ml": {
       "bioAlbumCoverage": "Bio album species coverage",
       "loadError": "Failed to load ML indexing stats.",
       "noApplicable": "No applicable content",
-      "pendingRebuilds": "Reindex requests",
       "rebuildFailed": "Rebuild could not be started. Try again.",
       "reindex": "Reindex",
       "reindexModal": {
@@ -1672,31 +1669,89 @@
       }
     },
     "processing": {
-      "attentionCount_one": "{{count}} needing attention",
-      "attentionCount_other": "{{count}} needing attention",
-      "noData": "No data",
-      "pendingAssets": "Files awaiting processing",
-      "pendingOperations": "Pending operations",
-      "pendingProjections": "Pending projection work",
-      "pendingRepositories": "Repositories awaiting scan",
-      "retryWaiting_one": "Stages waiting to retry: {{count}}",
-      "retryWaiting_other": "Stages waiting to retry: {{count}}",
-      "filesDescription": "New or changed files moving through metadata, thumbnails, and transcoding.",
-      "lanes": {
-        "analysis": "Optional Lumen analysis such as Image Semantic Analysis, OCR Text Recognition, and Person Recognition.",
-        "operations": "The latest ingest, reindex, and backup operation for each subject.",
-        "projections": "Events, places, and text search rebuilt from file facts.",
-        "reindex": "Accepted rebuild requests that have not been applied yet.",
-        "repositories": "Repositories whose files are being discovered or verified."
-      },
-      "openCoverage": "View coverage",
-      "openStorage": "Open Storage",
-      "otherWork": "Other work",
-      "pendingAnalysis": "Files awaiting analysis",
       "status": {
         "attention": "Needs attention",
-        "clear": "Clear",
-        "working": "In progress"
+        "working": "In progress",
+        "idle": "Idle",
+        "retrying": "Retrying",
+        "waiting": "Waiting"
+      },
+      "detail": {
+        "attempts_one": "{{count}} attempt",
+        "attempts_other": "{{count}} attempts",
+        "back": "Back to overview",
+        "done": "Done",
+        "failed": "Failed",
+        "failedItems": "Failed",
+        "lastActivity": "Last activity",
+        "more": "Show more",
+        "oldest": "Oldest waiting",
+        "queued": "Queued",
+        "queuedItems": "Waiting",
+        "retry": "Retry",
+        "retryAccepted_one": "{{count}} queued for retry",
+        "retryAccepted_other": "{{count}} queued for retry",
+        "retryAll": "Retry all failed",
+        "retryFailed": "Retry could not be started.",
+        "retrying": "Retrying",
+        "running": "Running",
+        "sources": "Requested by"
+      },
+      "diagnostics": {
+        "title": "Diagnostics"
+      },
+      "groups": {
+        "catalog": "Catalog",
+        "media": "Media"
+      },
+      "line": {
+        "failed_one": "{{count}} failed",
+        "failed_other": "{{count}} failed",
+        "retrying_one": "{{count}} retrying",
+        "retrying_other": "{{count}} retrying",
+        "running_one": "{{count}} running",
+        "running_other": "{{count}} running"
+      },
+      "overview": {
+        "catalog": "Catalog updates",
+        "failed": "Failed",
+        "inProgress": "In progress",
+        "lastActivity": "Last activity",
+        "mediaTotal": "Media",
+        "running": "Running now",
+        "title": "Overview"
+      },
+      "reasons": {
+        "exhausted": "Failed after every retry",
+        "failed": "Processing failed",
+        "unsupported": "Format not supported"
+      },
+      "sources": {
+        "reindex": "Reindex",
+        "reprocess": "Reprocess",
+        "retry": "Retry"
+      },
+      "stages": {
+        "analysis": "Analysis",
+        "backup": "Backup",
+        "events": "Events",
+        "import": "Import",
+        "metadata": "Metadata",
+        "places": "Places",
+        "scan": "Scan",
+        "textSearch": "Text search",
+        "thumbnails": "Thumbnails",
+        "video": "Video"
+      },
+      "units": {
+        "files_one": "file",
+        "files_other": "files",
+        "repositories_one": "Repository",
+        "repositories_other": "Repositories",
+        "runs_one": "run",
+        "runs_other": "runs",
+        "updates_one": "update",
+        "updates_other": "updates"
       }
     },
     "queueSummary": {

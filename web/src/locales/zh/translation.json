@@ -1630,15 +1630,12 @@
       "active": "活跃投递",
       "cancelled": "已取消投递",
       "completed": "已完成投递",
-      "description": "一个文件或一次扫描可能产生多次投递。这些记录不代表已完成的文件数或当前文件失败数。",
-      "details": "统计详情",
       "discarded": "已丢弃投递"
     },
     "ml": {
       "bioAlbumCoverage": "生物图鉴相册覆盖率",
       "loadError": "加载 ML 索引统计失败。",
       "noApplicable": "暂无适用内容",
-      "pendingRebuilds": "重建请求",
       "rebuildFailed": "无法启动索引重建，请重试。",
       "reindex": "重建索引",
       "reindexModal": {
@@ -1656,29 +1653,80 @@
       }
     },
     "processing": {
-      "attentionCount_other": "{{count}} 项需要关注",
-      "noData": "暂无数据",
-      "pendingAssets": "待处理文件",
-      "pendingOperations": "待处理操作",
-      "pendingProjections": "待执行投影工作",
-      "pendingRepositories": "待扫描资源库",
-      "retryWaiting_other": "等待重试的阶段：{{count}}",
-      "filesDescription": "新增或变更的文件正在进行元数据、缩略图和转码处理。",
-      "lanes": {
-        "analysis": "可选的 Lumen 分析，例如图像语义分析、OCR文字识别和人物识别。",
-        "operations": "每个对象最近一次的导入、重建索引和备份操作。",
-        "projections": "根据文件事实重建的事件、地点和文字搜索。",
-        "reindex": "已接受但尚未应用的重建请求。",
-        "repositories": "正在发现或校验文件的资源库。"
-      },
-      "openCoverage": "查看覆盖率",
-      "openStorage": "打开存储",
-      "otherWork": "其他工作",
-      "pendingAnalysis": "等待分析的文件",
       "status": {
         "attention": "需要处理",
-        "clear": "已清空",
-        "working": "进行中"
+        "working": "进行中",
+        "idle": "空闲",
+        "retrying": "重试中",
+        "waiting": "等待中"
+      },
+      "detail": {
+        "attempts_other": "已尝试 {{count}} 次",
+        "back": "返回概览",
+        "done": "已完成",
+        "failed": "失败",
+        "failedItems": "失败项",
+        "lastActivity": "最近活动",
+        "more": "显示更多",
+        "oldest": "最早等待",
+        "queued": "排队中",
+        "queuedItems": "等待中",
+        "retry": "重试",
+        "retryAccepted_other": "已将 {{count}} 项加入重试",
+        "retryAll": "全部重试",
+        "retryFailed": "无法开始重试。",
+        "retrying": "重试中",
+        "running": "运行中",
+        "sources": "来源"
+      },
+      "diagnostics": {
+        "title": "诊断"
+      },
+      "groups": {
+        "catalog": "目录",
+        "media": "媒体"
+      },
+      "line": {
+        "failed_other": "{{count}} 项失败",
+        "retrying_other": "{{count}} 项重试中",
+        "running_other": "{{count}} 项运行中"
+      },
+      "overview": {
+        "catalog": "目录更新",
+        "failed": "失败",
+        "inProgress": "处理中",
+        "lastActivity": "最近活动",
+        "mediaTotal": "媒体",
+        "running": "正在运行",
+        "title": "概览"
+      },
+      "reasons": {
+        "exhausted": "多次重试后仍失败",
+        "failed": "处理失败",
+        "unsupported": "格式不受支持"
+      },
+      "sources": {
+        "reindex": "重建索引",
+        "reprocess": "重新处理",
+        "retry": "重试"
+      },
+      "stages": {
+        "analysis": "分析",
+        "backup": "备份",
+        "events": "事件",
+        "import": "导入",
+        "metadata": "元数据",
+        "places": "地点",
+        "scan": "扫描",
+        "textSearch": "文字搜索",
+        "thumbnails": "缩略图",
+        "video": "视频"
+      },
+      "units": {
+        "files_other": "个文件",
+        "repositories_other": "个资源库",
+        "runs_other": "次运行",
+        "updates_other": "项更新"
       }
     },
     "queueSummary": {

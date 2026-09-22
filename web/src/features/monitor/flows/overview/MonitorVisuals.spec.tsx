@@ -5,7 +5,7 @@ import { http, HttpResponse, worker } from "@test/msw";
 import { t } from "@test/i18n";
 import type { components } from "@/lib/http-commons/schema";
 import { MLMonitor } from "./MLMonitor";
-import { StatMonitor } from "./StatMonitor";
+import { ProcessingMonitor } from "./ProcessingMonitor";
 import { CapabilitiesMonitor } from "./CapabilitiesMonitor";
 import "@/styles/App.css";
 
@@ -56,6 +56,64 @@ const capability = {
     model_name: "fixture-model",
   },
 } satisfies components["schemas"]["dto.CapabilitiesResponseDTO"];
+const stage = (
+  id: components["schemas"]["processing.StageSummary"]["id"],
+  group: "media" | "catalog",
+  unit: "files" | "repositories" | "updates" | "runs",
+  counts: { queued?: number; running?: number; retrying?: number; failed?: number; done?: number },
+) => {
+  const queued = counts.queued ?? 0;
+  const running = counts.running ?? 0;
+  const retrying = counts.retrying ?? 0;
+  const failed = counts.failed ?? 0;
+  return {
+    id,
+    group,
+    unit,
+    queued,
+    running,
+    retrying,
+    failed,
+    remaining: queued + running + retrying,
+    done: counts.done,
+    retryable: !["import", "scan", "backup"].includes(id ?? ""),
+    status:
+      failed > 0
+        ? "attention"
+        : running > 0
+          ? "working"
+          : retrying > 0
+            ? "retrying"
+            : queued > 0
+              ? "waiting"
+              : "idle",
+  } satisfies components["schemas"]["processing.StageSummary"];
+};
+
+const processingSummary = {
+  generated_at: "2026-09-22T20:26:00Z",
+  overview: {
+    media_total: 2000,
+    media_in_progress: 248,
+    running: 7,
+    failed_media: 3,
+    catalog_pending: 2,
+    last_activity_at: "2026-09-22T20:25:40Z",
+  },
+  stages: [
+    stage("import", "media", "files", { queued: 12, running: 2 }),
+    stage("scan", "media", "repositories", { running: 1 }),
+    stage("metadata", "media", "files", { queued: 27, retrying: 1, failed: 3, done: 1968 }),
+    stage("thumbnails", "media", "files", { queued: 114, running: 3, done: 1880 }),
+    stage("video", "media", "files", { queued: 21, running: 1, done: 218 }),
+    stage("analysis", "media", "files", { queued: 96, done: 1640 }),
+    stage("events", "catalog", "updates", { queued: 1 }),
+    stage("places", "catalog", "updates", { retrying: 1 }),
+    stage("text_search", "catalog", "updates", {}),
+    stage("backup", "catalog", "runs", {}),
+  ],
+} satisfies components["schemas"]["processing.Summary"];
+
 function serve() {
   worker.use(
     http.get("*/api/v1/assets/indexing/stats", () =>
@@ -72,24 +130,7 @@ function serve() {
         },
       }),
     ),
-    http.get("*/api/v1/admin/monitor/processing", () =>
-      HttpResponse.json({
-        deliveries: { completed: 1200, discarded: 2, queues: [] },
-        processing: {
-          pending_assets: 248,
-          failed_assets: 3,
-          pending_repositories: 4,
-          failed_repositories: 0,
-          pending_projections: 12,
-          failed_projections: 1,
-          pending_operations: 7,
-          failed_operations: 0,
-          pending_analysis_assets: 32,
-          failed_analysis_assets: 0,
-          pending_reindex_requests: 3,
-        },
-      }),
-    ),
+    http.get("*/api/v1/admin/processing", () => HttpResponse.json(processingSummary)),
     http.get("*/api/v1/capabilities", () => HttpResponse.json(capability)),
     http.get("*/api/v1/admin/lumen/runtime", () => HttpResponse.json(runtime)),
   );
@@ -138,22 +179,26 @@ for (const theme of ["light", "dark"])
       };
       await capture("ml");
       await screen.unmount();
-      screen = await renderWithProviders(wrap(<StatMonitor />));
-      const files = screen.getByRole("region", {
-        name: t("monitor.processing.pendingAssets"),
-        exact: true,
-      });
-      await expect.element(files.getByText("248", { exact: true })).toBeVisible();
+      screen = await renderWithProviders(wrap(<ProcessingMonitor />));
+      await expect
+        .element(
+          screen.getByRole("button", {
+            name: t("monitor.processing.stages.metadata"),
+            exact: true,
+          }),
+        )
+        .toBeVisible();
+      const tray = () => screen.container.querySelector("figure");
+      await expect.element(screen.getByText("248", { exact: true })).toBeVisible();
       if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        await expect
-          .element(files.element().querySelector("figure"))
-          .toHaveAttribute("data-animated", "false");
+        await expect.element(tray()).toHaveAttribute("data-animated", "false");
         expect(screen.container.querySelector("canvas")).toBeNull();
       } else {
-        await expect
-          .element(files.element().querySelector("figure"))
-          .toHaveAttribute("data-loaded", "true");
-        // Only the files tray animates; every other kind of work is a list row.
+        // On narrow widths the panel stacks below the grid, and Rive pauses
+        // off-screen rendering, so bring the tray into view before sampling.
+        tray()?.scrollIntoView({ block: "center" });
+        await expect.element(tray()).toHaveAttribute("data-loaded", "true");
+        // The overview holds the only Rive tray; stage cards never animate.
         await expect
           .poll(() => {
             const canvases = [...screen.container.querySelectorAll("canvas")];
@@ -227,14 +272,10 @@ test("reduced motion renders static trays without loading a canvas", async () =>
     serve();
     const screen = await renderWithProviders(
       <main data-theme="dark" className="bg-base-100 p-6 text-base-content">
-        <StatMonitor />
+        <ProcessingMonitor />
       </main>,
     );
-    const files = screen.getByRole("region", {
-      name: t("monitor.processing.pendingAssets"),
-      exact: true,
-    });
-    await expect.element(files.getByText("248", { exact: true })).toBeVisible();
+    await expect.element(screen.getByText("248", { exact: true })).toBeVisible();
     expect(matchMedia("(prefers-reduced-motion: reduce)").matches).toBe(true);
     expect(screen.container.querySelector("canvas")).toBeNull();
     const sheet = screen.container.querySelector(".monitor-tray-sheet")!;

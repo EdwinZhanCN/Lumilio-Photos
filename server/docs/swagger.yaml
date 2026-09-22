@@ -6354,48 +6354,6 @@ components:
                 date:
                     type: string
             type: object
-        handler.ProcessingMonitorResponse:
-            properties:
-                deliveries:
-                    $ref: '#/components/schemas/handler.DeliveryStatsDTO'
-                generated_at:
-                    type: string
-                processing:
-                    $ref: '#/components/schemas/handler.ProcessingStatsResponse'
-            type: object
-        handler.ProcessingStatsResponse:
-            properties:
-                failed_analysis_assets:
-                    type: integer
-                failed_assets:
-                    type: integer
-                failed_operations:
-                    type: integer
-                failed_projections:
-                    type: integer
-                failed_repositories:
-                    type: integer
-                pending_analysis_assets:
-                    description: |-
-                        PendingAnalysisAssets is the subset of files whose optional ML enrichment
-                        stage is still outstanding; FailedAnalysisAssets holds a terminal error
-                        there. Both are Catalog facts, so Processing owns the ML backlog while
-                        the ML view reports coverage only.
-                    type: integer
-                pending_assets:
-                    type: integer
-                pending_operations:
-                    type: integer
-                pending_projections:
-                    type: integer
-                pending_reindex_requests:
-                    description: PendingReindexRequests counts accepted rebuild requests not yet applied.
-                    type: integer
-                pending_repositories:
-                    type: integer
-                retry_waiting_stages:
-                    type: integer
-            type: object
         handler.QueueErrorSampleDTO:
             properties:
                 attempt:
@@ -6497,6 +6455,162 @@ components:
                 type:
                     type: string
             type: object
+        processing.Group:
+            enum:
+                - media
+                - catalog
+            type: string
+            x-enum-varnames:
+                - GroupMedia
+                - GroupCatalog
+        processing.Item:
+            properties:
+                asset_id:
+                    type: string
+                attempts:
+                    type: integer
+                label:
+                    type: string
+                reason_code:
+                    enum:
+                        - unsupported_media
+                        - processing_retry_exhausted
+                        - processing_failed
+                    type: string
+                subject_id:
+                    type: string
+                updated_at:
+                    type: string
+            type: object
+        processing.ItemsPage:
+            properties:
+                items:
+                    items:
+                        $ref: '#/components/schemas/processing.Item'
+                    type: array
+                    uniqueItems: false
+                next_cursor:
+                    type: string
+            type: object
+        processing.Overview:
+            properties:
+                catalog_pending:
+                    type: integer
+                failed_media:
+                    type: integer
+                last_activity_at:
+                    type: string
+                media_in_progress:
+                    type: integer
+                media_total:
+                    type: integer
+                running:
+                    type: integer
+            type: object
+        processing.RetryResult:
+            properties:
+                accepted:
+                    type: integer
+                receipt_id:
+                    type: string
+                remaining:
+                    type: integer
+            type: object
+        processing.StageID:
+            enum:
+                - import
+                - scan
+                - metadata
+                - thumbnails
+                - video
+                - analysis
+                - events
+                - places
+                - text_search
+                - backup
+            type: string
+            x-enum-varnames:
+                - StageImport
+                - StageScan
+                - StageMetadata
+                - StageThumbnails
+                - StageVideo
+                - StageAnalysis
+                - StageEvents
+                - StagePlaces
+                - StageTextSearch
+                - StageBackup
+        processing.StageSummary:
+            properties:
+                done:
+                    type: integer
+                failed:
+                    type: integer
+                group:
+                    $ref: '#/components/schemas/processing.Group'
+                id:
+                    $ref: '#/components/schemas/processing.StageID'
+                last_activity_at:
+                    type: string
+                oldest_queued_at:
+                    type: string
+                queued:
+                    type: integer
+                remaining:
+                    type: integer
+                retryable:
+                    type: boolean
+                retrying:
+                    type: integer
+                running:
+                    type: integer
+                sources:
+                    additionalProperties:
+                        type: integer
+                    type: object
+                status:
+                    $ref: '#/components/schemas/processing.Status'
+                unit:
+                    $ref: '#/components/schemas/processing.Unit'
+            type: object
+        processing.Status:
+            enum:
+                - attention
+                - working
+                - retrying
+                - waiting
+                - idle
+            type: string
+            x-enum-varnames:
+                - StatusAttention
+                - StatusWorking
+                - StatusRetrying
+                - StatusWaiting
+                - StatusIdle
+        processing.Summary:
+            properties:
+                generated_at:
+                    type: string
+                overview:
+                    $ref: '#/components/schemas/processing.Overview'
+                stages:
+                    items:
+                        $ref: '#/components/schemas/processing.StageSummary'
+                    type: array
+                    uniqueItems: false
+            type: object
+        processing.Unit:
+            enum:
+                - files
+                - repositories
+                - updates
+                - runs
+            type: string
+            x-enum-varnames:
+                - UnitFiles
+                - UnitRepositories
+                - UnitUpdates
+                - UnitRuns
         api.AboutBlankProblem:
             additionalProperties: false
             properties:
@@ -7524,9 +7638,22 @@ paths:
             summary: Get Lumen runtime diagnostics
             tags:
                 - capabilities
-    /api/v1/admin/monitor/processing:
+    /api/v1/admin/processing:
         get:
-            description: Catalog pending work and disposable queue delivery diagnostics. Global scope; reads across Catalog and QueueDB are not an atomic transaction.
+            description: One card per processing stage in a declared unit, plus overall totals. Catalog facts, with River supplying only running and retryable deliveries; not an atomic cross-database snapshot.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/processing.Summary'
+                    description: OK
+            summary: Get processing stages
+            tags:
+                - Queue
+    /api/v1/admin/processing/diagnostics:
+        get:
+            description: Disposable River delivery totals and per-queue summaries with recent error samples. Delivery records are not file progress.
             parameters:
                 - description: 'Recent error samples per queue (default: 5, max: 20)'
                   in: query
@@ -7538,9 +7665,87 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/handler.ProcessingMonitorResponse'
+                                $ref: '#/components/schemas/handler.DeliveryStatsDTO'
                     description: OK
-            summary: Get processing monitor snapshot
+            summary: Get processing delivery diagnostics
+            tags:
+                - Queue
+    /api/v1/admin/processing/stages/{stage}/items:
+        get:
+            description: One bounded page of a stage's failed (newest first) or queued (oldest first) subjects. Failures carry reason codes, never raw errors.
+            parameters:
+                - description: Stage ID
+                  in: path
+                  name: stage
+                  required: true
+                  schema:
+                    enum:
+                        - import
+                        - scan
+                        - metadata
+                        - thumbnails
+                        - video
+                        - analysis
+                        - events
+                        - places
+                        - text_search
+                        - backup
+                    type: string
+                - description: Item state
+                  in: query
+                  name: state
+                  required: true
+                  schema:
+                    enum:
+                        - failed
+                        - queued
+                    type: string
+                - description: Page size (max 50)
+                  in: query
+                  name: limit
+                  schema:
+                    type: integer
+                - description: Cursor from the previous page
+                  in: query
+                  name: cursor
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/processing.ItemsPage'
+                    description: OK
+            summary: List a processing stage's items
+            tags:
+                - Queue
+    /api/v1/admin/processing/stages/{stage}/retry:
+        post:
+            description: Re-requests at most 500 failed subjects of a stage through the Catalog. Import, Scan, and Backup are not retryable here.
+            parameters:
+                - description: Stage ID
+                  in: path
+                  name: stage
+                  required: true
+                  schema:
+                    enum:
+                        - metadata
+                        - thumbnails
+                        - video
+                        - analysis
+                        - events
+                        - places
+                        - text_search
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/processing.RetryResult'
+                    description: OK
+            summary: Retry a processing stage's failures
             tags:
                 - Queue
     /api/v1/agent/chat:

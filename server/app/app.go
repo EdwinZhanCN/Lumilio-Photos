@@ -815,6 +815,7 @@ func run(
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService, securityLogger)
 	queueController := handler.NewQueueHandler(queueDatabase.ReaderSQL, database.ReaderSQL)
+	queueController.SetRetryWriter(database.Writer)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, authorizedLibraries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)

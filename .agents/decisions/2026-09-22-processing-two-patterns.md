@@ -1,6 +1,8 @@
 # Decision: Processing is one animated file tray plus one exact work list
 
-Status: implemented, 2026-09-22. Supersedes the Processing bullet of
+Status: superseded on 2026-09-22 by
+[the stage grid decision](2026-09-22-processing-stage-grid.md). Originally
+implemented 2026-09-22. Superseded the Processing bullet of
 [the Monitor visual-media decision](2026-09-12-monitor-visual-media.md); the
 Rive runtime contract stays
 [the Rive decision](2026-09-10-rive-processing-tray-runtime.md), and the

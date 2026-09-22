@@ -157,7 +157,10 @@ type SpeciesControllerInterface interface {
 
 // QueueControllerInterface defines the interface for queue monitoring controllers
 type QueueControllerInterface interface {
-	GetProcessingMonitor(c *gin.Context)
+	GetProcessing(c *gin.Context)            // GET /admin/processing - Stage cards and overview
+	GetProcessingStageItems(c *gin.Context)  // GET /admin/processing/stages/:stage/items - Failed or queued subjects
+	RetryProcessingStage(c *gin.Context)     // POST /admin/processing/stages/:stage/retry - Re-request failures
+	GetProcessingDiagnostics(c *gin.Context) // GET /admin/processing/diagnostics - River delivery diagnostics
 }
 
 // StatsControllerInterface defines the interface for statistics controllers
@@ -756,7 +759,10 @@ func NewRouter(
 			{
 				lumen.GET("/runtime", capabilitiesController.GetLumenRuntime)
 			}
-			admin.GET("/monitor/processing", queueController.GetProcessingMonitor)
+			admin.GET("/processing", queueController.GetProcessing)
+			admin.GET("/processing/diagnostics", queueController.GetProcessingDiagnostics)
+			admin.GET("/processing/stages/:stage/items", queueController.GetProcessingStageItems)
+			admin.POST("/processing/stages/:stage/retry", queueController.RetryProcessingStage)
 		}
 
 		// Stats routes - with optional authentication

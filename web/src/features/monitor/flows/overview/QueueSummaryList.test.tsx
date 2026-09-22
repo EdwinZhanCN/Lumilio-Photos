@@ -4,53 +4,50 @@ import { renderWithProviders } from "@test/render";
 import { t } from "@test/i18n";
 import { toast } from "sonner";
 import i18n from "@/lib/i18n";
-import type { ProcessingMonitorResponse } from "../../types";
+import type { DeliveryStatsDTO } from "../../types";
 import { QueueSummaryList } from "./QueueSummaryList";
-import { useProcessingMonitor } from "../../api/useProcessingMonitor";
+import { useProcessingDiagnostics } from "../../api/useProcessing";
 
 function TestQueueSummaryList() {
-  const query = useProcessingMonitor();
-  return query.data ? <QueueSummaryList queues={query.data.deliveries?.queues ?? []} /> : null;
+  const query = useProcessingDiagnostics(true);
+  return query.data ? <QueueSummaryList queues={query.data.queues ?? []} /> : null;
 }
 
 const now = new Date("2026-06-12T12:00:00.000Z").toISOString();
 const oneMinuteAgo = new Date("2026-06-12T11:59:00.000Z").toISOString();
 
 const summaryResponse = {
-  generated_at: now,
-  deliveries: {
-    queues: [
-      {
-        name: "catalog_macro",
-        total_jobs: 100,
-        processed_jobs: 80,
-        remaining_jobs: 20,
-        running_jobs: 1,
-        attention_jobs: 2,
-        average_latency_ms: 5000,
-        average_runtime_ms: 1200,
-        latest_activity_at: now,
-        oldest_remaining_at: oneMinuteAgo,
-        error_samples: [
-          {
-            job_id: 42,
-            kind: "generate_asset_derivatives",
-            state: "retryable",
-            attempt: 3,
-            max_attempts: 50,
-            created_at: oneMinuteAgo,
-            scheduled_at: now,
-            attempted_at: now,
-            last_error: "derivative generation failed: decode error",
-          },
-        ],
-      },
-    ],
-  },
-} satisfies ProcessingMonitorResponse;
+  queues: [
+    {
+      name: "catalog_macro",
+      total_jobs: 100,
+      processed_jobs: 80,
+      remaining_jobs: 20,
+      running_jobs: 1,
+      attention_jobs: 2,
+      average_latency_ms: 5000,
+      average_runtime_ms: 1200,
+      latest_activity_at: now,
+      oldest_remaining_at: oneMinuteAgo,
+      error_samples: [
+        {
+          job_id: 42,
+          kind: "generate_asset_derivatives",
+          state: "retryable",
+          attempt: 3,
+          max_attempts: 50,
+          created_at: oneMinuteAgo,
+          scheduled_at: now,
+          attempted_at: now,
+          last_error: "derivative generation failed: decode error",
+        },
+      ],
+    },
+  ],
+} satisfies DeliveryStatsDTO;
 
-function serveSummary(response: ProcessingMonitorResponse = summaryResponse) {
-  worker.use(http.get("/api/v1/admin/monitor/processing", () => HttpResponse.json(response)));
+function serveSummary(response: DeliveryStatsDTO = summaryResponse) {
+  worker.use(http.get("/api/v1/admin/processing/diagnostics", () => HttpResponse.json(response)));
 }
 
 describe("QueueSummaryList", () => {
@@ -164,18 +161,15 @@ describe("QueueSummaryList", () => {
   it("localizes the canonical macro queue", async () => {
     const queueNames = ["catalog_macro"] as const;
     serveSummary({
-      generated_at: now,
-      deliveries: {
-        queues: queueNames.map((name) => ({
-          name,
-          total_jobs: 0,
-          processed_jobs: 0,
-          remaining_jobs: 0,
-          running_jobs: 0,
-          attention_jobs: 0,
-          error_samples: [],
-        })),
-      },
+      queues: queueNames.map((name) => ({
+        name,
+        total_jobs: 0,
+        processed_jobs: 0,
+        remaining_jobs: 0,
+        running_jobs: 0,
+        attention_jobs: 0,
+        error_samples: [],
+      })),
     });
     await i18n.changeLanguage("zh");
 
