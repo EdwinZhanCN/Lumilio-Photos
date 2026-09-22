@@ -1635,11 +1635,7 @@
       "discarded": "已丢弃投递"
     },
     "ml": {
-      "aboutCoverage": "关于覆盖率",
       "bioAlbumCoverage": "生物图鉴相册覆盖率",
-      "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
-      "cellMeaning": "每格约为 1% 覆盖率，并非一个文件；不同任务的总数不同。",
-      "covered": "已覆盖",
       "loadError": "加载 ML 索引统计失败。",
       "noApplicable": "暂无适用内容",
       "pendingRebuilds": "重建请求",
@@ -1657,10 +1653,7 @@
         "existingJobsWarning_other": "已有 {{count}} 个重新索引任务在队列中。",
         "reindexAllCheckbox": "全量重建（而非仅补缺）",
         "title": "重建索引 — {{task}}"
-      },
-      "uncovered": "未覆盖",
-      "backlogHint": "仍在等待分析的文件会在“处理”中跟踪。",
-      "openProcessing": "打开处理"
+      }
     },
     "processing": {
       "attentionCount_other": "{{count}} 项需要关注",

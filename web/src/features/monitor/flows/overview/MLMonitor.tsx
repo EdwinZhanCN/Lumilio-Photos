@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, RefreshCcw } from "lucide-react";
-import { Link } from "react-router-dom";
+import { RefreshCcw } from "lucide-react";
 import { MonitorFrame } from "./MonitorFrame";
 import {
   useAssetIndexingStats,
@@ -125,37 +124,6 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
           );
         })}
       </div>
-      <details className="collapse group rounded-none">
-        <summary className="collapse-title flex min-h-0 items-center gap-2 p-0 py-2 text-sm text-base-content/60">
-          <ChevronDown aria-hidden className="size-4 transition-transform group-open:rotate-180" />
-          {t("monitor.ml.aboutCoverage", "About coverage")}
-        </summary>
-        <div className="collapse-content space-y-2 px-0 text-sm text-base-content/60">
-          <div className="flex flex-wrap gap-5 pt-2">
-            <span className="flex items-center gap-2">
-              <i className="size-2.5 bg-primary" aria-hidden />
-              {t("monitor.ml.covered", "Covered")}
-            </span>
-            <span className="flex items-center gap-2">
-              <i className="size-2.5 bg-base-300" aria-hidden />
-              {t("monitor.ml.uncovered", "Uncovered")}
-            </span>
-          </div>
-          <p>
-            {t(
-              "monitor.ml.cellMeaning",
-              "Each cell ≈ 1% coverage, not one file. Task totals differ.",
-            )}
-          </p>
-          <p>{t("monitor.ml.bioAlbumHint")}</p>
-        </div>
-      </details>
-      <p className="text-sm text-base-content/60">
-        {t("monitor.ml.backlogHint", "Files still waiting for analysis are tracked in Processing.")}{" "}
-        <Link className="link link-primary" to="/server-monitor">
-          {t("monitor.ml.openProcessing", "Open Processing")}
-        </Link>
-      </p>
       {reindexModal && (
         <div className="modal modal-open z-modal">
           <div className="modal-box max-w-sm">

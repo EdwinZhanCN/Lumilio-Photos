@@ -40,11 +40,8 @@ test("shows five coverage fields with local rebuild actions and no job backlog",
     exact: true,
   });
   await expect.element(video.getByText(t("monitor.ml.noApplicable"))).toBeVisible();
-  // Backlog belongs to Processing; ML reports coverage and links there instead.
-  await expect
-    .element(screen.getByRole("link", { name: t("monitor.ml.openProcessing"), exact: true }))
-    .toHaveAttribute("href", "/server-monitor");
-  await expect.element(screen.getByText(t("monitor.ml.cellMeaning"))).not.toBeVisible();
+  // Coverage only: no backlog, cross-tab link, or hidden legend.
+  expect(screen.container.querySelector("a, details")).toBeNull();
   await semantic.getByRole("button", { name: t("monitor.ml.reindex"), exact: true }).click();
   await expect
     .element(screen.getByText(t("monitor.ml.reindexModal.descriptionMissing", { count: 80 })))
@@ -70,8 +67,6 @@ test("shows five coverage fields with local rebuild actions and no job backlog",
   await expect.element(video.getByRole("button")).not.toBeInTheDocument();
   const bio = screen.getByRole("region", { name: t("monitor.ml.bioAlbumCoverage"), exact: true });
   await expect.element(bio.getByRole("button")).not.toBeInTheDocument();
-  await screen.getByText(t("monitor.ml.aboutCoverage"), { exact: true }).click();
-  await expect.element(screen.getByText(t("monitor.ml.bioAlbumHint"))).toBeVisible();
 });
 
 test("retains successful coverage and marks a failed refresh stale", async () => {

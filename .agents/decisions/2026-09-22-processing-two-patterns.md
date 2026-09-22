@@ -35,8 +35,8 @@ Queue delivery diagnostics remain a separate, explicitly historical section.
 `/api/v1/admin/monitor/processing` now carries `pending_analysis_assets`,
 `failed_analysis_assets` (the per-file `enrich` stage, excluding deleted
 assets), and `pending_reindex_requests`, so the ML backlog is a Catalog fact in
-the Processing snapshot. The ML tab reports coverage and rebuild commands only
-and links to Processing for backlog; its rebuild dialog still warns about
+the Processing snapshot. The ML tab reports coverage and rebuild commands only,
+with no cross-tab link or hidden legend; its rebuild dialog still warns about
 already-pending reindex requests because that fact gates the action.
 
 ## Alternatives considered

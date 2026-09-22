@@ -59,8 +59,8 @@
  * Advertisements filter nodes but do not override public capability composition.
  * Agent configuration, backend and full node diagnostics remain expandable.
  * {@link MLMonitor} combines coverage, repository options, and one confirmed
- * rebuild command. It reports no job backlog: files still awaiting analysis
- * are a Processing lane, and ML links there instead of repeating the count. {@link CapabilitiesMonitor} is display-only; durable ML and
+ * rebuild command. It reports no job backlog, cross-tab links, or hidden
+ * legend: files still awaiting analysis are a Processing lane. {@link CapabilitiesMonitor} is display-only; durable ML and
  * agent settings stay in Settings.
  *
  * Storage administration is not a Monitor tab. Storage Locations,

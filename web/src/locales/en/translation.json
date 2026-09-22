@@ -1651,11 +1651,7 @@
       "discarded": "Discarded deliveries"
     },
     "ml": {
-      "aboutCoverage": "About coverage",
       "bioAlbumCoverage": "Bio album species coverage",
-      "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
-      "cellMeaning": "Each cell ≈ 1% coverage, not one file. Task totals differ.",
-      "covered": "Covered",
       "loadError": "Failed to load ML indexing stats.",
       "noApplicable": "No applicable content",
       "pendingRebuilds": "Reindex requests",
@@ -1673,10 +1669,7 @@
         "existingJobsWarning_other": "{{count}} reindex jobs already queued.",
         "reindexAllCheckbox": "Reindex all (not just missing)",
         "title": "Reindex — {{task}}"
-      },
-      "uncovered": "Uncovered",
-      "backlogHint": "Files still waiting for analysis are tracked in Processing.",
-      "openProcessing": "Open Processing"
+      }
     },
     "processing": {
       "attentionCount_one": "{{count}} needing attention",
