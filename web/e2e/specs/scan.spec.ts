@@ -22,23 +22,34 @@ test("@smoke administrator scans a real repository file and sees it", async ({
     expect(repository?.activity).toBe("idle");
   }).toPass({ timeout: 90_000 });
 
-  const queued = await api<ScanAccepted>(
-    `/api/v1/storage/repositories/${workspace.repositoryId}/verifications`,
-    {
+  const requestScan = () =>
+    api<ScanAccepted>(`/api/v1/storage/repositories/${workspace.repositoryId}/verifications`, {
       method: "POST",
       token: workspace.token,
       body: JSON.stringify({ force: true }),
-    },
-  );
+    });
+  const waitForTerminalScan = async (operationID: string) => {
+    await expect(async () => {
+      const run = await api<ScanRun>(
+        `/api/v1/storage/repositories/${workspace.repositoryId}/verifications/${operationID}`,
+        { token: workspace.token },
+      );
+      expect(ACTIVE_VERIFICATION_STATUSES.has(run.status ?? "")).toBe(false);
+      expect(["completed", "partial"]).toContain(run.status);
+    }).toPass({ timeout: 90_000 });
+  };
+
+  let queued = await requestScan();
   expect(queued.operation_id).toBeTruthy();
-  await expect(async () => {
-    const run = await api<ScanRun>(
-      `/api/v1/storage/repositories/${workspace.repositoryId}/verifications/${queued.operation_id}`,
-      { token: workspace.token },
-    );
-    expect(ACTIVE_VERIFICATION_STATUSES.has(run.status ?? "")).toBe(false);
-    expect(["completed", "partial"]).toContain(run.status);
-  }).toPass({ timeout: 90_000 });
+  await waitForTerminalScan(queued.operation_id!);
+  // A fixture copy can overlap the repository's lifecycle scan. Its receipt
+  // is valid but its snapshot predates the copied file, so request one fresh
+  // verifier only after that coalesced operation reaches a terminal state.
+  if (queued.coalesced) {
+    queued = await requestScan();
+    expect(queued.operation_id).toBeTruthy();
+    await waitForTerminalScan(queued.operation_id!);
+  }
   await expect(async () => {
     const assets = await api<AssetList>("/api/v1/assets/list", {
       method: "POST",
