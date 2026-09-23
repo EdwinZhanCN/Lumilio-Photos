@@ -61,7 +61,7 @@ follow-up in the tech-debt tracker.
 - [ ] Decide blocker or deferred for each tracker item: Music embedded covers
   (placeholder today), Event late-EXIF fixture and legacy recovery, video
   semantic operation-scoped E2E proof, Linux bind-mount capacity test.
-- [ ] `NewShareLinkService` panics on secret-key failure at construction;
+- [x] `NewShareLinkService` panics on secret-key failure at construction;
   return an error so startup reports a diagnosable failure instead.
 
 ### Phase 5 — Low-risk cleanups (only if Phases 0–4 are done)
