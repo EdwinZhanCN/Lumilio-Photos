@@ -1257,8 +1257,8 @@
       "empty": "开始与 Lumilio Agent 对话吧！",
       "newConversation": "新对话",
       "openAiSettings": "打开 AI 设置",
-      "sessionDisclosure": "本次对话是临时的；固定结果、看板卡片和已完成操作会被保留。",
-      "retry": "重试"
+      "retry": "重试",
+      "sessionDisclosure": "本次对话是临时的；固定结果、看板卡片和已完成操作会被保留。"
     },
     "context": {
       "remove": "移除",
@@ -1465,7 +1465,6 @@
       "detectStacksCompleted_one": "在 {{name}} 中检测到 {{count}} 个堆叠。",
       "detectStacksCompleted_other": "在 {{name}} 中检测到 {{count}} 个堆叠。",
       "detectStacksFailed": "堆叠检测失败。",
-      "empty": "暂无可用资源库。",
       "hostAction": {
         "addLocation": "添加存储位置",
         "addPurpose": "选择并授权一个用于存放资源库的文件夹",
@@ -1499,14 +1498,12 @@
         "waitingHint": "打开 Desktop 设置 → 存储，在本机检查此请求并选择文件夹。"
       },
       "identityErrorBadge": "资源库身份不匹配",
-      "lifecycleActive": "正常",
       "locationRebuildFailed": "无法加入位置重建队列。",
       "locationRebuildQueued": "已为 {{name}} 加入位置重建队列。",
       "lowSpaceBadge": "空间不足",
       "offlineBadge": "离线",
       "openExisting": "打开现有资源库",
       "pausedBadge": "已暂停",
-      "primaryRoleBadge": "主资源库",
       "readOnlyBadge": "只读",
       "rebuildEvents": "重建活动",
       "rebuildPeople": "重建人物",
@@ -1531,8 +1528,6 @@
       "scanCoalesced": "{{name}} 已有扫描任务在运行；此次请求已并入现有操作。",
       "scanFailed": "加入扫描队列失败。",
       "scanQueued": "已为 {{name}} 加入扫描队列。扫描运行时，你仍可继续使用流明集。",
-      "storageLocationCapacity": "可用 {{available}}，总计 {{total}}",
-      "storageLocationCapacityUnknown": "容量不可用",
       "storageLocationEmpty": "没有可写的位置",
       "storageLocationError": "无法获取存储位置。",
       "storageLocationHint": "一个存储位置可以容纳多个资源库；请在 Desktop 控制面板中授权外部存储位置。",
@@ -1555,12 +1550,8 @@
         "immutableHint": "此选项决定磁盘目录布局，资源库创建后无法修改。",
         "label": "存储布局"
       },
-      "title": "资源库",
-      "unavailable": "资源库选项暂时不可用。",
-      "uploadBlockedBadge": "无法上传",
       "uploadBlockedReasons": "无法上传：{{reasons}}",
-      "uploadEligible": "可上传",
-      "uploadSurfaceDescription": "请在上方选择上传目标。下方列表中的资源库会显示当前是否可以接收新文件。"
+      "uploadEligible": "可上传"
     }
   },
   "map": {
@@ -1653,13 +1644,6 @@
       }
     },
     "processing": {
-      "status": {
-        "attention": "需要处理",
-        "working": "进行中",
-        "idle": "空闲",
-        "retrying": "重试中",
-        "waiting": "等待中"
-      },
       "detail": {
         "attempts_other": "已尝试 {{count}} 次",
         "back": "返回概览",
@@ -1721,6 +1705,13 @@
         "textSearch": "文字搜索",
         "thumbnails": "缩略图",
         "video": "视频"
+      },
+      "status": {
+        "attention": "需要处理",
+        "idle": "空闲",
+        "retrying": "重试中",
+        "waiting": "等待中",
+        "working": "进行中"
       },
       "units": {
         "files_other": "个文件",
@@ -1807,8 +1798,7 @@
     "tabs": {
       "capabilities": "能力",
       "ml": "ML",
-      "queue": "处理活动",
-      "storage": "存储"
+      "queue": "处理活动"
     },
     "title": "系统状态"
   },
@@ -2646,23 +2636,58 @@
       "rename": "重命名资源库",
       "scan": "立即扫描",
       "stacks": "检测堆叠",
-      "verificationHistory": "扫描历史",
-      "supportBundle": "下载支持包"
+      "supportBundle": "下载支持包",
+      "verificationHistory": "扫描历史"
     },
     "actionsFor": "{{name}} 的操作",
+    "audit": {
+      "action": "操作",
+      "actor": "操作者",
+      "empty": "尚无生命周期操作记录。",
+      "loadFailed": "生命周期历史加载失败。",
+      "result": "结果",
+      "target": "对象",
+      "time": "时间"
+    },
     "authorize": "授权存储位置",
     "authorizeNativeOnly": "授权存储位置需要使用 Lumilio 桌面应用。",
     "cancelVerificationFailed": "无法取消扫描。",
     "cancelVerificationSuccess": "已为 {{name}} 请求取消扫描。",
     "capacityUnknownShort": "当前无法获取容量信息。",
+    "capacityValue": "{{available}} 可用 / 共 {{total}}",
+    "column": {
+      "actions": "操作",
+      "assets": "资产",
+      "available": "可用空间",
+      "name": "资源库",
+      "state": "状态",
+      "storage": "存储",
+      "verification": "扫描"
+    },
     "detectDuplicatesCompleted": "已在 {{name}} 完成重复扫描：发现 {{groups}} 组。",
     "detectDuplicatesFailed": "无法完成重复检测。",
     "emptyLocationFacts": "已注册的存储位置，尚无资源库。移除注册仅取消登记，不会删除磁盘上的任何内容。",
+    "inspector": {
+      "assets": "资产",
+      "available": "容量",
+      "mountPath": "挂载点",
+      "repository": "资源库",
+      "state": "状态",
+      "storage": "存储",
+      "verification": "扫描"
+    },
+    "kind": {
+      "external": "外部"
+    },
     "loadFailed": "无法加载存储视图。",
-    "location": {},
     "locationActions": "{{name}} 的操作",
     "maintenance": "维护",
     "menuDanger": "危险操作",
+    "menuRepository": "资源库",
+    "menuVerification": "扫描",
+    "moreActions": "更多存储操作",
+    "pendingHostActions_other": "有 {{count}} 个存储请求正在等待桌面应用批准。",
+    "removeBlocked": "请先移除其下的资源库。",
     "repositoryCount_one": "{{count}} 个资源库",
     "repositoryCount_other": "{{count}} 个资源库",
     "state": {
@@ -2677,92 +2702,51 @@
       "recoveryRequired": "需要恢复",
       "scanning": "正在扫描"
     },
+    "storage": {
+      "system": "内置存储",
+      "unknown": "未识别存储"
+    },
+    "summaryAttention_other": "{{count}} 项需要处理",
+    "summaryLocations_other": "{{count}} 个存储位置",
+    "summaryObserved": "实测于 {{time}}",
+    "summaryRepositories_other": "{{count}} 个资源库",
+    "technical": {
+      "caseBehavior": "大小写行为",
+      "caseInsensitive": "不区分大小写",
+      "caseSensitive": "区分大小写",
+      "effectiveIdentity": "有效身份",
+      "lockHolder": "锁持有者",
+      "marker": "标记身份",
+      "mount": "挂载"
+    },
     "title": "存储",
     "unlinked": {
       "description": "它们的存储位置未在此注册。文件未被改动；重新连接或定位后即可恢复访问。",
       "title": "没有存储位置的资源库"
     },
-    "verification": {},
+    "verificationBadge": {
+      "failed": "失败",
+      "never": "未扫描",
+      "partial": "不完整",
+      "verified": "正常"
+    },
     "verificationHistory": {
       "empty": "尚无扫描记录。",
       "fieldErrorDirectories": "出错目录",
       "fieldFinished": "结束",
       "fieldMode": "模式",
+      "fieldOperation": "操作 ID",
       "fieldPartialCoverage": "部分覆盖",
       "fieldStarted": "开始",
       "fieldStatus": "状态",
       "loadFailed": "无法加载扫描历史。",
-      "title": "扫描历史",
-      "fieldOperation": "操作 ID",
-      "selectRun": "选择一次扫描以查看详情。"
-    },
-    "summaryLocations": "{{count}} 个存储位置",
-    "summaryRepositories": "{{count}} 个资源库",
-    "summaryAttention": "{{count}} 个需要处理",
-    "summaryObserved": "实测于 {{time}}",
-    "moreActions": "更多存储操作",
-    "menuVerification": "扫描",
-    "menuRepository": "资源库",
-    "removeBlocked": "请先移除其下的资源库。",
-    "kind": {
-      "external": "外部"
-    },
-    "pendingHostActions": "有 {{count}} 个存储请求正在等待 Lumilio 桌面应用批准。",
-    "inspector": {
-      "storage": "存储",
-      "mountPath": "挂载点",
-      "state": "状态",
-      "assets": "资产",
-      "verification": "扫描",
-      "repository": "资源库",
-      "available": "容量"
-    },
-    "column": {
-      "name": "资源库",
-      "storage": "存储",
-      "available": "可用空间",
-      "state": "状态",
-      "assets": "资产",
-      "verification": "扫描",
-      "actions": "操作"
+      "selectRun": "选择一次扫描以查看详情。",
+      "title": "扫描历史"
     },
     "view": {
       "browse": "浏览",
       "history": "历史"
-    },
-    "storage": {
-      "system": "内置存储",
-      "unknown": "未识别存储"
-    },
-    "verificationBadge": {
-      "verified": "正常",
-      "partial": "不完整",
-      "failed": "失败",
-      "never": "未扫描"
-    },
-    "technical": {
-      "mount": "挂载",
-      "marker": "标记身份",
-      "lockHolder": "锁持有者",
-      "effectiveIdentity": "有效身份",
-      "caseBehavior": "大小写行为",
-      "caseSensitive": "区分大小写",
-      "caseInsensitive": "不区分大小写"
-    },
-    "audit": {
-      "loadFailed": "生命周期历史加载失败。",
-      "empty": "尚无生命周期操作记录。",
-      "time": "时间",
-      "action": "操作",
-      "target": "对象",
-      "actor": "操作者",
-      "result": "结果"
-    },
-    "capacityValue": "{{available}} 可用 / 共 {{total}}",
-    "pendingHostActions_other": "有 {{count}} 个存储请求正在等待桌面应用批准。",
-    "summaryAttention_other": "{{count}} 项需要处理",
-    "summaryLocations_other": "{{count}} 个存储位置",
-    "summaryRepositories_other": "{{count}} 个资源库"
+    }
   },
   "studio": {
     "asset": {
@@ -3035,9 +3019,9 @@
       "upload_button": "上传{{countLabel}}",
       "upload_information_title": "上传信息",
       "upload_target_label": "上传目标",
+      "upload_target_none": "没有上传目标",
       "upload_target_ready": "此资源库可以接收上传。",
-      "uploading_status": "上传中...",
-      "upload_target_none": "没有上传目标"
+      "uploading_status": "上传中..."
     },
     "UploadAssets": {
       "files_ready_to_upload_one": "{{count}} 个文件准备上传",

@@ -47,7 +47,7 @@ export {
   getRepositoryEffectiveState,
   isRepositoryUnavailable,
   isUploadLowSpaceBlocked,
-  uploadAdmissionReasonCopy,
+  uploadAdmissionReasonLabel,
   uploadStateBadgeClass,
 } from "./model/repositoryOptions";
 export {

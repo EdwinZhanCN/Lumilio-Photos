@@ -34,7 +34,24 @@ follow-up in the tech-debt tracker.
   CI runs.
 - [ ] Confirm `internal/llm` `ark` conformance passes in CI. It fails in the
   agent sandbox identically on untouched `dev`, so it is believed to be
-  environment-specific; if CI also fails, it is a blocker.
+  environment-specific; if CI also fails, it is a blocker. (2026-09-22: passes
+  on a macOS host, supporting the sandbox theory.)
+- Local baseline, 2026-09-22 at `b0d5b932`: `task test` green. `ci.yml` runs
+  only on `main` pushes and PRs, so the 25 commits since `88400fc8` have no CI
+  run; the promotion PR is the first. The E2E slices, run on the Intel N100
+  qualification host, found three timing assumptions, all fixed:
+  - `@smoke` music playback: default 5s poll for the first audio bytes while
+    the host drains the seed backlog.
+  - `@auth-hardening` lockout: four hashed logins did not fit the 1s
+    rate-limit window.
+  - `@agent-runtime` music audition: the same 5s audio-start poll. Both music
+    specs now share `PLAYBACK_START_TIMEOUT` from `e2e/support/assets.ts`.
+  - Not fixed: `agent-runtime.spec.ts` plain chat and the music-agent
+    selection each missed a 5s reply-visibility wait once and passed on retry
+    and on rerun. Watch them in CI before widening any timeout.
+  - A clean rerun on a fresh stack passed every slice without retries except
+    one `@video-regression` retry on `fetch failed: other side closed`, most
+    likely the SSH port forward the remote run needs, not the spec.
 
 ### Phase 1 — Processing stage grid
 - [x] Stage catalog read model, items, retry, diagnostics, and the stage-grid
@@ -42,12 +59,14 @@ follow-up in the tech-debt tracker.
   `.agents/decisions/2026-09-22-processing-stage-grid.md`.
 
 ### Phase 2 — i18n integrity
-- [ ] Make table-driven copy extractor-visible: tables call
-  `t("literal", "default")` (or `i18next.config.ts` preserves their keys), so
-  `vp exec i18next-cli extract` no longer deletes the ~80 live keys recorded in
-  the tech-debt tracker.
-- [ ] One clean extraction with zero unexpected removals; zh 100%.
-- [ ] Remove the tracker item.
+- [x] Make table-driven copy extractor-visible: the Storage state,
+  verification, and upload admission-reason tables now call
+  `t("literal", "default")` per entry. Extraction was deleting 20 live keys
+  (the tracker's ~80 had shrunk as other tables were rewritten).
+- [x] One clean extraction: the only removals are 10 unreferenced keys and 4
+  plural base keys superseded by `_one`/`_other`; no values changed; zh 100%
+  (2215/2215).
+- [x] Tracker item removed; `lumilio-frontend-i18n` now requires literal keys.
 
 ### Phase 3 — Flow coverage for untested journeys
 - [ ] Manual smoke checklist on a fresh Docker Compose install and on Desktop
@@ -55,7 +74,10 @@ follow-up in the tech-debt tracker.
   Settings/Users, Storage admin, Map. Record results here.
 - [ ] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
-  - Storage admin: `web/e2e/specs/storage-admin.spec.ts` (`@smoke`) adds a
+  - [x] Share link create/open/revoke: `web/e2e/specs/share-links.spec.ts`
+    (`@smoke`, `task web:test:browser`; the `browser_smoke` CI filter follows
+    the share handler, service, and `web/src/features/share/**`).
+  - [x] Storage admin: `web/e2e/specs/storage-admin.spec.ts` (`@smoke`) adds a
     Repository through the wizard, scans it from the row menu, and asserts
     the scan run, the ingested asset, and the Storage view. It found a
     blocker-candidate: `GET /api/v1/storage/view` never returns
@@ -66,15 +88,15 @@ follow-up in the tech-debt tracker.
     queries bind the state as TEXT, the view counts every non-deleted Asset
     with an active occurrence whatever its processing state (user decision,
     matching the removal-impact dialog), and a count failure is a Problem
-    instead of a silent omission. The spec's full pass awaits a rebuilt E2E
-    image.
+    instead of a silent omission. Verified end to end on the N100 with all
+    release-hardening branches combined (every slice green, no retries).
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage
 - [ ] Decide blocker or deferred for each tracker item: Music embedded covers
   (placeholder today), Event late-EXIF fixture and legacy recovery, video
   semantic operation-scoped E2E proof, Linux bind-mount capacity test.
-- [ ] `NewShareLinkService` panics on secret-key failure at construction;
+- [x] `NewShareLinkService` panics on secret-key failure at construction;
   return an error so startup reports a diagnosable failure instead.
 
 ### Phase 5 — Low-risk cleanups (only if Phases 0–4 are done)

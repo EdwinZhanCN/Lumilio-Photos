@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "@/lib/utils/formatters";
 import { useStorageDiagnostics } from "../../api/useStorageDiagnostics";
 import type { RepositoryRow } from "./storageViewModel";
-import { storageStateLabelKey, verificationLabelKey } from "./storageStateCopy";
+import { storageStateLabel, verificationLabel } from "./storageStateCopy";
 
 type Props = {
   repository: RepositoryRow;
@@ -56,12 +56,12 @@ export default function RepositoryInspector({ repository, displayName }: Props) 
     },
     {
       term: t("storagePanel.inspector.state", "State"),
-      value: t(storageStateLabelKey(repository.state), repository.state),
+      value: storageStateLabel(t, repository.state),
     },
     { term: t("storagePanel.inspector.assets", "Assets"), value: String(repository.assetCount) },
     {
       term: t("storagePanel.inspector.verification", "Scan"),
-      value: t(verificationLabelKey(repository.verification), repository.verification),
+      value: verificationLabel(t, repository.verification),
     },
   ];
 

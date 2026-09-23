@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { api, baseURL } from "../support/api";
-import { smokeAsset } from "../support/assets";
+import { PLAYBACK_START_TIMEOUT, smokeAsset } from "../support/assets";
 import { t } from "../support/i18n";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
@@ -115,11 +115,13 @@ test("@smoke music imports tags, separates editions, and preserves album playbac
   await expect(dock.getByText(first.title!, { exact: true })).toBeVisible();
   const audio = page.locator("audio");
   await expect
-    .poll(() =>
-      audio.evaluate(
-        (element: HTMLAudioElement) =>
-          !element.paused && element.currentTime > 0 && element.error === null,
-      ),
+    .poll(
+      () =>
+        audio.evaluate(
+          (element: HTMLAudioElement) =>
+            !element.paused && element.currentTime > 0 && element.error === null,
+        ),
+      { timeout: PLAYBACK_START_TIMEOUT },
     )
     .toBe(true);
   const source = await audio.getAttribute("src");
@@ -138,11 +140,13 @@ test("@smoke music imports tags, separates editions, and preserves album playbac
   await expect(dock.getByText(second.title!, { exact: true })).toBeVisible();
   await expect(audio).not.toHaveAttribute("src", source!);
   await expect
-    .poll(() =>
-      audio.evaluate(
-        (element: HTMLAudioElement) =>
-          !element.paused && element.currentTime > 0 && element.error === null,
-      ),
+    .poll(
+      () =>
+        audio.evaluate(
+          (element: HTMLAudioElement) =>
+            !element.paused && element.currentTime > 0 && element.error === null,
+        ),
+      { timeout: PLAYBACK_START_TIMEOUT },
     )
     .toBe(true);
   await dock.getByRole("button", { name: t("music.queue.title"), exact: true }).click();

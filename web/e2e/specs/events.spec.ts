@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 import { expect, test } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
+import { uniqueJpeg } from "../support/assets";
 import { t } from "../support/i18n";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
@@ -11,20 +11,6 @@ type EventRebuildStatus = components["schemas"]["dto.EventRebuildStatusDTO"];
 type EventMutation = components["schemas"]["dto.EventMutationResponseDTO"];
 type EventShare = components["schemas"]["dto.CreateShareLinkResponseDTO"];
 type PublicShare = components["schemas"]["dto.PublicShareMetadataDTO"];
-
-function uniqueJpeg(sourcePath: string, markerText: string) {
-  const source = readFileSync(sourcePath);
-  const endOfImage = source.lastIndexOf(Buffer.from([0xff, 0xd9]));
-  if (endOfImage < 0) throw new Error("Events fixture is not a JPEG");
-  const marker = Buffer.from(markerText, "utf8");
-  const markerLength = marker.length + 2;
-  return Buffer.concat([
-    source.subarray(0, endOfImage),
-    Buffer.from([0xff, 0xfe, markerLength >> 8, markerLength & 0xff]),
-    marker,
-    source.subarray(endOfImage),
-  ]);
-}
 
 test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", async ({
   page,
