@@ -46,14 +46,15 @@ type AssetControllerInterface interface {
 	GetAssetThumbnail(c *gin.Context)
 
 	// New filtering and search operations
-	QueryAssets(c *gin.Context)         // POST /assets/list - Unified asset listing, filtering, and search
-	SearchAssets(c *gin.Context)        // POST /assets/search - Sectioned search with top results and fallback results
-	SearchAssetsByImage(c *gin.Context) // POST /assets/search/by-image - Visual search from an uploaded image
-	GetIndexingStats(c *gin.Context)    // GET /assets/indexing/stats - Index coverage and queue status
-	RebuildAssetIndexes(c *gin.Context) // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
-	GetFilterOptions(c *gin.Context)    // GET /assets/filter-options - Get available filter options
-	GetFeaturedAssets(c *gin.Context)   // GET /assets/featured - Curated featured photos for home/gallery
-	GetPhotoMapPoints(c *gin.Context)   // GET /assets/map-points - Lightweight photo map points with GPS
+	QueryAssets(c *gin.Context)          // POST /assets/list - Unified asset listing, filtering, and search
+	SearchAssets(c *gin.Context)         // POST /assets/search - Sectioned search with top results and fallback results
+	SearchAssetsByImage(c *gin.Context)  // POST /assets/search/by-image - Visual search from an uploaded image
+	GetIndexingStats(c *gin.Context)     // GET /assets/indexing/stats - Index coverage and queue status
+	RebuildAssetIndexes(c *gin.Context)  // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
+	GetAssetIndexRebuild(c *gin.Context) // GET /assets/indexing/rebuild/:receipt_id - Rebuild receipt state
+	GetFilterOptions(c *gin.Context)     // GET /assets/filter-options - Get available filter options
+	GetFeaturedAssets(c *gin.Context)    // GET /assets/featured - Curated featured photos for home/gallery
+	GetPhotoMapPoints(c *gin.Context)    // GET /assets/map-points - Lightweight photo map points with GPS
 
 	// Rating management operations
 	UpdateAssetRating(c *gin.Context)        // PUT /assets/:id/rating - Update asset rating
@@ -563,6 +564,7 @@ func NewRouter(
 			assets.GET("/map-points", assetController.GetPhotoMapPoints)
 			assets.GET("/indexing/stats", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.GetIndexingStats)
 			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.RebuildAssetIndexes)
+			assets.GET("/indexing/rebuild/:receipt_id", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.GetAssetIndexRebuild)
 			assets.POST("/list", assetController.QueryAssets)
 			assets.POST("/search", assetController.SearchAssets)
 			assets.POST("/search/by-image", assetController.SearchAssetsByImage)

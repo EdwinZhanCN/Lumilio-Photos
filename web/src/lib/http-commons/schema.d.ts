@@ -4407,6 +4407,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/indexing/rebuild/{receipt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get asset index rebuild status
+         * @description Report whether a rebuild receipt is pending, completed, or failed. A receipt completes only after every page was requested and every enrichment stage it requested was applied.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Rebuild receipt ID */
+                    receipt_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AssetIndexingRebuildStatusDTO"];
+                    };
+                };
+                /** @description Invalid receipt ID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Rebuild receipt not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/indexing/stats": {
         parameters: {
             query?: never;
@@ -14995,6 +15064,17 @@ export interface components {
              *     ]
              */
             types?: string[];
+        };
+        "dto.AssetIndexingRebuildStatusDTO": {
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
+            /**
+             * @example pending
+             * @enum {string}
+             */
+            state?: "pending" | "completed" | "failed";
+            /** @example attempts_exhausted */
+            terminal_error?: string;
         };
         "dto.AssetIndexingStatsResponseDTO": {
             /** @example 2400 */
