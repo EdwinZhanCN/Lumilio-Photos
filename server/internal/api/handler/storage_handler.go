@@ -15,16 +15,12 @@ import (
 	"server/internal/storage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
-
-// storageViewCountedAssetState is the asset status state the storage view
-// counts: the terminal success state the commit coordinator writes once every
-// desired pipeline stage has applied (see commit.refreshAssetProductStatus).
-const storageViewCountedAssetState = "completed"
 
 // StorageViewAssetCounter loads cheap catalog counts for the admin storage view.
 type StorageViewAssetCounter interface {
-	CountAssetsByStatusAndRepository(ctx context.Context, arg repo.CountAssetsByStatusAndRepositoryParams) (int64, error)
+	CountActiveAssetsByRepository(ctx context.Context, repositoryID uuid.UUID) (int64, error)
 }
 
 // StorageViewScanReader loads latest verification summaries when available.
@@ -160,10 +156,9 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 			view.Filesystem = sampled.Filesystem
 		}
 		if h.assetCounter != nil {
-			count, countErr := h.assetCounter.CountAssetsByStatusAndRepository(ctx, repo.CountAssetsByStatusAndRepositoryParams{
-				RepositoryID: repository.RepoID,
-				State:        storageViewCountedAssetState,
-			})
+			// Every non-deleted Asset counts, whatever its processing state,
+			// so the column agrees with the removal-impact dialog.
+			count, countErr := h.assetCounter.CountActiveAssetsByRepository(ctx, repository.RepoID)
 			if countErr != nil {
 				api.WriteProblem(c, api.Internal(fmt.Errorf("count repository assets: %w", countErr)))
 				return

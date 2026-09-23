@@ -219,6 +219,18 @@ WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT)
       AND occurrence.repository_id = sqlc.arg(repository_id)
   );
 
+-- name: CountActiveAssetsByRepository :one
+-- Counts every non-deleted Asset with an active occurrence in the Repository,
+-- whatever its processing state, matching the removal-impact count.
+SELECT COUNT(*) as count
+FROM assets
+WHERE is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = sqlc.arg(repository_id)
+  );
+
 -- name: CountAssetsByStatusAndOwner :one
 SELECT COUNT(*) as count
 FROM assets

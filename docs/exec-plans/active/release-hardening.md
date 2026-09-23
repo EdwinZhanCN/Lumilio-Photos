@@ -63,9 +63,11 @@ follow-up in the tech-debt tracker.
     because `storage_handler.go` binds `dbtypes.JSON("ready")`, which is
     invalid JSON, and swallows the error; `ready` is also not a state the
     pipeline writes (`completed` is). Fixed on the same branch: the status
-    queries bind the state as TEXT, the view counts `completed` Assets, and
-    a count failure is a Problem instead of a silent omission. The spec's
-    full pass awaits a rebuilt E2E image.
+    queries bind the state as TEXT, the view counts every non-deleted Asset
+    with an active occurrence whatever its processing state (user decision,
+    matching the removal-impact dialog), and a count failure is a Problem
+    instead of a silent omission. The spec's full pass awaits a rebuilt E2E
+    image.
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage

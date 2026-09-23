@@ -166,6 +166,26 @@ func (q *Queries) BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAsset
 	return err
 }
 
+const countActiveAssetsByRepository = `-- name: CountActiveAssetsByRepository :one
+SELECT COUNT(*) as count
+FROM assets
+WHERE is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = ?1
+  )
+`
+
+// Counts every non-deleted Asset with an active occurrence in the Repository,
+// whatever its processing state, matching the removal-impact count.
+func (q *Queries) CountActiveAssetsByRepository(ctx context.Context, repositoryID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countActiveAssetsByRepository, repositoryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countAssetsByRating = `-- name: CountAssetsByRating :many
 SELECT rating, COUNT(*) as count
 FROM assets

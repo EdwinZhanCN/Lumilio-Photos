@@ -36,10 +36,10 @@ func (stub storageViewCountRepositoryManager) ListRepositories() ([]*repo.Reposi
 	return stub.repositories, nil
 }
 
-// The storage view counts a Repository's completed, non-deleted Assets against
-// the real catalog schema, so the state parameter binding and the state name
-// the commit coordinator writes are both exercised.
-func TestStorageViewCountsCompletedRepositoryAssets(t *testing.T) {
+// The storage view counts every non-deleted Asset with an active occurrence in
+// a Repository, whatever its processing state, against the real catalog schema.
+// Deleted Assets and other Repositories' Assets are excluded.
+func TestStorageViewCountsActiveRepositoryAssets(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -108,5 +108,5 @@ INSERT INTO repositories (
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Len(t, response.Repositories, 1)
 	require.NotNil(t, response.Repositories[0].AssetCount, "asset_count must be present")
-	require.Equal(t, int64(2), *response.Repositories[0].AssetCount)
+	require.Equal(t, int64(4), *response.Repositories[0].AssetCount)
 }
