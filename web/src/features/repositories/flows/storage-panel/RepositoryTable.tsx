@@ -6,9 +6,9 @@ import RepositoryInspector from "./RepositoryInspector";
 import type { RepositoryRow } from "./storageViewModel";
 import {
   storageStateBadgeClass,
-  storageStateLabelKey,
+  storageStateLabel,
   verificationBadgeClass,
-  verificationLabelKey,
+  verificationLabel,
 } from "./storageStateCopy";
 
 type Props = {
@@ -105,7 +105,7 @@ export default function RepositoryTable({ rows, expandedId, onToggleRow, renderA
                     <span
                       className={`badge badge-sm badge-soft ${storageStateBadgeClass(row.state)}`}
                     >
-                      {t(storageStateLabelKey(row.state), row.state)}
+                      {storageStateLabel(t, row.state)}
                     </span>
                   </td>
                   <td className="text-xs tabular-nums text-base-content/75">{row.assetCount}</td>
@@ -113,7 +113,7 @@ export default function RepositoryTable({ rows, expandedId, onToggleRow, renderA
                     <span
                       className={`badge badge-sm badge-soft ${verificationBadgeClass(row.verification)}`}
                     >
-                      {t(verificationLabelKey(row.verification), row.verification)}
+                      {verificationLabel(t, row.verification)}
                     </span>
                   </td>
                   <td className="text-right">{renderActions(row)}</td>

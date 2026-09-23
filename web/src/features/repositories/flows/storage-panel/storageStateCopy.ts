@@ -1,34 +1,36 @@
+import type { TFunction } from "i18next";
 import type { RepositoryState, VerificationState } from "./storageViewModel";
 
 /**
- * i18n key per Repository state. An explicit record, not string interpolation:
+ * Label per Repository state. An explicit record, not string interpolation:
  * snake_case states (`identity_error`) and camelCase locale keys
  * (`identityError`) do not agree, and a missing entry must fail the type check
- * rather than let a badge fall back to the raw enum.
+ * rather than let a badge fall back to the raw enum. Each entry calls `t` with
+ * a literal key so `i18next-cli extract` keeps the key.
  */
-const STATE_LABEL_KEYS: Record<RepositoryState, string> = {
-  available: "storagePanel.state.available",
-  scanning: "storagePanel.state.scanning",
-  importing: "storagePanel.state.importing",
-  low_space: "storagePanel.state.lowSpace",
-  paused: "storagePanel.state.paused",
-  read_only: "storagePanel.state.readOnly",
-  offline: "storagePanel.state.offline",
-  identity_error: "storagePanel.state.identityError",
-  recovery_required: "storagePanel.state.recoveryRequired",
-  maintenance: "storagePanel.state.maintenance",
+const STATE_LABELS: Record<RepositoryState, (t: TFunction) => string> = {
+  available: (t) => t("storagePanel.state.available", "Available"),
+  scanning: (t) => t("storagePanel.state.scanning", "Scanning"),
+  importing: (t) => t("storagePanel.state.importing", "Importing"),
+  low_space: (t) => t("storagePanel.state.lowSpace", "Low space"),
+  paused: (t) => t("storagePanel.state.paused", "Paused"),
+  read_only: (t) => t("storagePanel.state.readOnly", "Read-only"),
+  offline: (t) => t("storagePanel.state.offline", "Offline"),
+  identity_error: (t) => t("storagePanel.state.identityError", "Identity mismatch"),
+  recovery_required: (t) => t("storagePanel.state.recoveryRequired", "Recovery required"),
+  maintenance: (t) => t("storagePanel.state.maintenance", "Maintenance"),
 };
 
-const VERIFICATION_LABEL_KEYS: Record<VerificationState, string> = {
-  never: "storagePanel.verificationBadge.never",
-  verified: "storagePanel.verificationBadge.verified",
-  partial: "storagePanel.verificationBadge.partial",
-  failed: "storagePanel.verificationBadge.failed",
+const VERIFICATION_LABELS: Record<VerificationState, (t: TFunction) => string> = {
+  never: (t) => t("storagePanel.verificationBadge.never", "Not scanned"),
+  verified: (t) => t("storagePanel.verificationBadge.verified", "Scanned"),
+  partial: (t) => t("storagePanel.verificationBadge.partial", "Partial"),
+  failed: (t) => t("storagePanel.verificationBadge.failed", "Failed"),
 };
 
-/** i18n key for one Repository state. Copy lives in the locale files, not here. */
-export function storageStateLabelKey(state: RepositoryState): string {
-  return STATE_LABEL_KEYS[state];
+/** Localized label for one Repository state. Copy lives in the locale files. */
+export function storageStateLabel(t: TFunction, state: RepositoryState): string {
+  return STATE_LABELS[state](t);
 }
 
 /**
@@ -55,8 +57,8 @@ export function storageStateBadgeClass(state: RepositoryState): string {
   }
 }
 
-export function verificationLabelKey(state: VerificationState): string {
-  return VERIFICATION_LABEL_KEYS[state];
+export function verificationLabel(t: TFunction, state: VerificationState): string {
+  return VERIFICATION_LABELS[state](t);
 }
 
 export function verificationBadgeClass(state: VerificationState): string {

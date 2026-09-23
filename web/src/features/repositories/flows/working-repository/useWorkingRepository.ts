@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { usePreference } from "@/lib/preferences/preferences";
 import type { RepositoryOption } from "../../types";
 import { getStorageEntityDisplayName } from "../../model/storageEntities";
-import { isRepositoryUnavailable, uploadAdmissionReasonCopy } from "../../model/repositoryOptions";
+import { isRepositoryUnavailable, uploadAdmissionReasonLabel } from "../../model/repositoryOptions";
 import { useRepositoryOptions } from "../../api/useRepositoryOptions";
 
 export function useWorkingRepository() {
@@ -104,10 +104,7 @@ function uploadScopeDescription(
   if (repository.upload.reasons.length > 0) {
     return t("manage.repositories.uploadBlockedReasons", "Upload unavailable: {{reasons}}", {
       reasons: repository.upload.reasons
-        .map((reason) => {
-          const copy = uploadAdmissionReasonCopy(reason);
-          return t(copy.key, copy.defaultValue);
-        })
+        .map((reason) => uploadAdmissionReasonLabel(t, reason))
         .join(", "),
     });
   }

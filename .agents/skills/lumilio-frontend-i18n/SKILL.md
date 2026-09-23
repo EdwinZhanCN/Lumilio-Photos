@@ -90,6 +90,10 @@ Run from `web/` (or use the stated root Task target):
    source intent, provides the runtime fallback, and tells the extractor the key
    exists. When the string names a registered product term, copy the English
    label from the table into the default; do not paraphrase it.
+   The key must be a literal at the `t()` call: the extractor deletes keys it
+   only sees as data (`t(table[state].key)`). Map an enum to copy with
+   `Record<State, (t: TFunction) => string>` whose entries call `t` directly,
+   as in `repositories/flows/storage-panel/storageStateCopy.ts`.
 3. Extract with `task web:i18n:extract` from the root, or
    `vp exec i18next-cli extract` from `web/`. The extractor creates and removes
    keys, but preserves values for existing keys; it does not synchronize a

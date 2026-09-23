@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { components } from "@/lib/http-commons/schema";
 import type {
   AdmissionDecision,
@@ -71,23 +72,19 @@ export function getRepositoryEffectiveState(
   return "blocked";
 }
 
-const ADMISSION_REASON_COPY: Record<
-  RepositoryAdmissionReason,
-  { key: string; defaultValue: string }
-> = {
-  offline: { key: "manage.repositories.offlineBadge", defaultValue: "Offline" },
-  identity_error: {
-    key: "manage.repositories.identityErrorBadge",
-    defaultValue: "Repository identity mismatch",
-  },
-  recovery_required: {
-    key: "manage.repositories.recoveryRequiredBadge",
-    defaultValue: "Recovery required",
-  },
-  busy: { key: "manage.repositories.busyBadge", defaultValue: "Busy" },
-  paused: { key: "manage.repositories.pausedBadge", defaultValue: "Paused" },
-  read_only: { key: "manage.repositories.readOnlyBadge", defaultValue: "Read only" },
-  low_space: { key: "manage.repositories.lowSpaceBadge", defaultValue: "Low space" },
+/**
+ * Label per admission reason. Each entry calls `t` with a literal key so
+ * `i18next-cli extract` keeps the key.
+ */
+const ADMISSION_REASON_LABELS: Record<RepositoryAdmissionReason, (t: TFunction) => string> = {
+  offline: (t) => t("manage.repositories.offlineBadge", "Offline"),
+  identity_error: (t) =>
+    t("manage.repositories.identityErrorBadge", "Repository identity mismatch"),
+  recovery_required: (t) => t("manage.repositories.recoveryRequiredBadge", "Recovery required"),
+  busy: (t) => t("manage.repositories.busyBadge", "Busy"),
+  paused: (t) => t("manage.repositories.pausedBadge", "Paused"),
+  read_only: (t) => t("manage.repositories.readOnlyBadge", "Read only"),
+  low_space: (t) => t("manage.repositories.lowSpaceBadge", "Low space"),
 };
 
 /**
@@ -114,11 +111,11 @@ export function uploadStateBadgeClass(state: RepositoryEffectiveState): string {
   }
 }
 
-export function uploadAdmissionReasonCopy(reason: string): { key: string; defaultValue: string } {
-  return (
-    ADMISSION_REASON_COPY[reason as RepositoryAdmissionReason] ?? {
-      key: `manage.repositories.admissionReason.${reason}`,
-      defaultValue: reason,
-    }
-  );
+/**
+ * Localized label for an admission reason. A reason the client does not know
+ * yet falls back to the raw server value.
+ */
+export function uploadAdmissionReasonLabel(t: TFunction, reason: string): string {
+  const label = ADMISSION_REASON_LABELS[reason as RepositoryAdmissionReason];
+  return label ? label(t) : reason;
 }
