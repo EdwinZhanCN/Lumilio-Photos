@@ -29,27 +29,33 @@ test("@smoke administrator scans a real repository file and sees it", async ({
       body: JSON.stringify({ force: true }),
     });
   const waitForTerminalScan = async (operationID: string) => {
+    let run: ScanRun = {};
     await expect(async () => {
-      const run = await api<ScanRun>(
+      run = await api<ScanRun>(
         `/api/v1/storage/repositories/${workspace.repositoryId}/verifications/${operationID}`,
         { token: workspace.token },
       );
       expect(ACTIVE_VERIFICATION_STATUSES.has(run.status ?? "")).toBe(false);
-      expect(["completed", "partial"]).toContain(run.status);
     }).toPass({ timeout: 90_000 });
+    return run;
   };
 
   let queued = await requestScan();
   expect(queued.operation_id).toBeTruthy();
-  await waitForTerminalScan(queued.operation_id!);
+  let run = await waitForTerminalScan(queued.operation_id!);
   // A fixture copy can overlap the repository's lifecycle scan. Its receipt
   // is valid but its snapshot predates the copied file, so request one fresh
   // verifier only after that coalesced operation reaches a terminal state.
   if (queued.coalesced) {
     queued = await requestScan();
     expect(queued.operation_id).toBeTruthy();
-    await waitForTerminalScan(queued.operation_id!);
+    run = await waitForTerminalScan(queued.operation_id!);
   }
+  // The fixture file is settled and readable, so the verifier that runs after
+  // the copy must cover it fully. A partial run (for example a file skipped as
+  // still settling) would never surface the asset; fail on it here.
+  expect(run.status).toBe("completed");
+  expect(run.files_observed ?? 0).toBeGreaterThan(0);
   await expect(async () => {
     const assets = await api<AssetList>("/api/v1/assets/list", {
       method: "POST",
