@@ -59,6 +59,23 @@ export const VIDEO_REGRESSION_ASSETS = [
 ] as const;
 
 /**
+ * Portraits of two different people for the People merge regression. Only the
+ * `demo` profile carries more than one of them, so the `@people` slice syncs
+ * that profile. Face recognition answers for these exact pixels are recorded
+ * under `server/tools/fakelumen/fixtures/records/face_recognition/`.
+ */
+export const PEOPLE_PROFILE = "demo";
+export const PEOPLE_PERSON_A_ASSETS = [
+  "landing-07-portrait-a",
+  "landing-19-portrait-a-close",
+  "landing-20-portrait-a-warm",
+] as const;
+export const PEOPLE_PERSON_B_ASSETS = [
+  "landing-08-portrait-b",
+  "landing-21-portrait-b-close",
+] as const;
+
+/**
  * Returns the JPEG at `sourcePath` with a comment segment carrying
  * `markerText`. Pixels are unchanged but content identity is unique, so an
  * upload cannot be deduplicated against another attempt's copy of the same

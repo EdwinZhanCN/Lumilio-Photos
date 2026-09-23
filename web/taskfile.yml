@@ -121,6 +121,16 @@ tasks:
       - task: e2e:seed:video-semantic
       - vp run e2e:test --grep @video-regression --workers=1
 
+  test:people:
+    desc: Run the People merge regression on recorded face recognition
+    env:
+      CI: "1"
+    cmds:
+      - task: e2e:seed
+      # The portraits of two different people exist only in the demo profile.
+      - vp run assets:sync -- --profile demo
+      - vp run e2e:test --grep @people --workers=1
+
   test:agent-trust:
     desc: Run the deterministic Lumilio Agent trust-contract regression
     env:

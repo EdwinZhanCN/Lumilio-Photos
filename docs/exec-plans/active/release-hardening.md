@@ -72,7 +72,7 @@ follow-up in the tech-debt tracker.
 - [ ] Manual smoke checklist on a fresh Docker Compose install and on Desktop
   (macOS or Windows): People, Albums/Collections, Share links, Studio,
   Settings/Users, Storage admin, Map. Record results here.
-- [ ] Playwright specs for the three highest-risk untested flows: Share link
+- [x] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
   - [x] Share link create/open/revoke: `web/e2e/specs/share-links.spec.ts`
     (`@smoke`, `task web:test:browser`; the `browser_smoke` CI filter follows
@@ -90,6 +90,17 @@ follow-up in the tech-debt tracker.
     matching the removal-impact dialog), and a count failure is a Problem
     instead of a silent omission. Verified end to end on the N100 with all
     release-hardening branches combined (every slice green, no retries).
+  - [x] People merge: `web/e2e/specs/people-merge.spec.ts` (`@people`, new
+    slice `task web:test:people`, CI filter `people_e2e`). It uploads five
+    `demo`-profile portraits (plus one duplicate: clustering needs three
+    faces per person), enables face recognition for the test, waits for two
+    people, merges them in the edit dialog, and asserts one survivor owning
+    all six faces/assets and a 404 for the merged id. Face results are real
+    Hub recordings (antelopev2, five payloads) replayed by fakelumen;
+    fakelumen now overlays recorded capabilities per service so recording
+    face does not change SigLIP/BioCLIP/OCR for other slices. Follow-up:
+    the slice syncs the whole 1.6 GB `demo` profile; move the five portraits
+    into the `e2e` profile in the next assets release.
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage
