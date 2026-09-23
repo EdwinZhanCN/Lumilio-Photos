@@ -107,10 +107,13 @@ type Querier interface {
 	ContinueRepositoryAbsenceFrontier(ctx context.Context, arg ContinueRepositoryAbsenceFrontierParams) (RepositoryScanFrontier, error)
 	ContinueRepositoryScanFrontier(ctx context.Context, arg ContinueRepositoryScanFrontierParams) (RepositoryScanFrontier, error)
 	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
+	// Counts every non-deleted Asset with an active occurrence in the Repository,
+	// whatever its processing state, matching the removal-impact count.
+	CountActiveAssetsByRepository(ctx context.Context, repositoryID uuid.UUID) (int64, error)
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID interface{}) ([]CountAssetsByRatingRow, error)
-	CountAssetsByStatus(ctx context.Context, status dbtypes.JSON) (int64, error)
+	CountAssetsByStatus(ctx context.Context, state string) (int64, error)
 	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
 	CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error)
 	CountAssetsWithSearchEmbedding(ctx context.Context) (int64, error)

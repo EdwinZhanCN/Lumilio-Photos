@@ -169,9 +169,9 @@ LIMIT ?3 OFFSET ?4;
 
 -- name: GetAssetsByStatus :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND is_deleted = false
 ORDER BY upload_time DESC
-LIMIT ?2 OFFSET ?3;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsWithWarnings :many
 SELECT * FROM assets
@@ -187,42 +187,54 @@ LIMIT ?1 OFFSET ?2;
 
 -- name: GetAssetsByStatusAndRepository :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT)
   AND is_deleted = false
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
-      AND occurrence.repository_id = ?2
+      AND occurrence.repository_id = sqlc.arg(repository_id)
   )
 ORDER BY upload_time DESC
-LIMIT ?3 OFFSET ?4;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsByStatusAndOwner :many
 SELECT * FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND owner_id = sqlc.arg(owner_id) AND is_deleted = false
 ORDER BY upload_time DESC
-LIMIT ?3 OFFSET ?4;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountAssetsByStatus :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false;
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND is_deleted = false;
 
 -- name: CountAssetsByStatusAndRepository :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT)
   AND is_deleted = false
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
-      AND occurrence.repository_id = ?2
+      AND occurrence.repository_id = sqlc.arg(repository_id)
+  );
+
+-- name: CountActiveAssetsByRepository :one
+-- Counts every non-deleted Asset with an active occurrence in the Repository,
+-- whatever its processing state, matching the removal-impact count.
+SELECT COUNT(*) as count
+FROM assets
+WHERE is_deleted = false
+  AND EXISTS (
+    SELECT 1 FROM active_asset_occurrences occurrence
+    WHERE occurrence.asset_id = assets.asset_id
+      AND occurrence.repository_id = sqlc.arg(repository_id)
   );
 
 -- name: CountAssetsByStatusAndOwner :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false;
+WHERE json_extract(status, char(36) || '.state') = CAST(sqlc.arg(state) AS TEXT) AND owner_id = sqlc.arg(owner_id) AND is_deleted = false;
 
 -- name: GetAssetsByContentHash :many
 SELECT * FROM assets

@@ -77,6 +77,19 @@ follow-up in the tech-debt tracker.
   - [x] Share link create/open/revoke: `web/e2e/specs/share-links.spec.ts`
     (`@smoke`, `task web:test:browser`; the `browser_smoke` CI filter follows
     the share handler, service, and `web/src/features/share/**`).
+  - [x] Storage admin: `web/e2e/specs/storage-admin.spec.ts` (`@smoke`) adds a
+    Repository through the wizard, scans it from the row menu, and asserts
+    the scan run, the ingested asset, and the Storage view. It found a
+    blocker-candidate: `GET /api/v1/storage/view` never returns
+    `asset_count` (the Storage page shows 0 Assets for every Repository)
+    because `storage_handler.go` binds `dbtypes.JSON("ready")`, which is
+    invalid JSON, and swallows the error; `ready` is also not a state the
+    pipeline writes (`completed` is). Fixed on the same branch: the status
+    queries bind the state as TEXT, the view counts every non-deleted Asset
+    with an active occurrence whatever its processing state (user decision,
+    matching the removal-impact dialog), and a count failure is a Problem
+    instead of a silent omission. Verified end to end on the N100 with all
+    release-hardening branches combined (every slice green, no retries).
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage

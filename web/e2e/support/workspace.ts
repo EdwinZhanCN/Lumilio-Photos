@@ -132,7 +132,7 @@ async function ensureAttemptRepository(index: number, token: string) {
   return { id: repository.id, name: repository.name ?? name, path: repository.path };
 }
 
-function placeScanFixture(repository: Repository, source: string, scanFilename: string) {
+export function placeScanFixture(repository: Repository, source: string, scanFilename: string) {
   // ROE assigns scanned files to the bootstrap owner, so distinct users and
   // paths alone do not isolate exact-content deduplication. Add a JPEG comment
   // without changing pixels or the pinned source, giving each attempt its own
