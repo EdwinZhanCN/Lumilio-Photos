@@ -207,11 +207,11 @@ func (q *Queries) CountAssetsByRating(ctx context.Context, ownerID interface{}) 
 const countAssetsByStatus = `-- name: CountAssetsByStatus :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND is_deleted = false
 `
 
-func (q *Queries) CountAssetsByStatus(ctx context.Context, status dbtypes.JSON) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAssetsByStatus, status)
+func (q *Queries) CountAssetsByStatus(ctx context.Context, state string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAssetsByStatus, state)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -220,16 +220,16 @@ func (q *Queries) CountAssetsByStatus(ctx context.Context, status dbtypes.JSON) 
 const countAssetsByStatusAndOwner = `-- name: CountAssetsByStatusAndOwner :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND owner_id = ?2 AND is_deleted = false
 `
 
 type CountAssetsByStatusAndOwnerParams struct {
-	Status  dbtypes.JSON `db:"status" json:"status"`
-	OwnerID *int32       `db:"owner_id" json:"owner_id"`
+	State   string `db:"state" json:"state"`
+	OwnerID *int32 `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAssetsByStatusAndOwner, arg.Status, arg.OwnerID)
+	row := q.db.QueryRowContext(ctx, countAssetsByStatusAndOwner, arg.State, arg.OwnerID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -238,7 +238,7 @@ func (q *Queries) CountAssetsByStatusAndOwner(ctx context.Context, arg CountAsse
 const countAssetsByStatusAndRepository = `-- name: CountAssetsByStatusAndRepository :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT)
   AND is_deleted = false
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
@@ -248,12 +248,12 @@ WHERE json_extract(status, char(36) || '.state') = ?1
 `
 
 type CountAssetsByStatusAndRepositoryParams struct {
-	Status       dbtypes.JSON `db:"status" json:"status"`
-	RepositoryID uuid.UUID    `db:"repository_id" json:"repository_id"`
+	State        string    `db:"state" json:"state"`
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
 }
 
 func (q *Queries) CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAssetsByStatusAndRepository, arg.Status, arg.RepositoryID)
+	row := q.db.QueryRowContext(ctx, countAssetsByStatusAndRepository, arg.State, arg.RepositoryID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -1376,19 +1376,19 @@ func (q *Queries) GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRat
 
 const getAssetsByStatus = `-- name: GetAssetsByStatus :many
 SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND is_deleted = false
 ORDER BY upload_time DESC
-LIMIT ?2 OFFSET ?3
+LIMIT ?3 OFFSET ?2
 `
 
 type GetAssetsByStatusParams struct {
-	Status dbtypes.JSON `db:"status" json:"status"`
-	Limit  int64        `db:"limit" json:"limit"`
-	Offset int64        `db:"offset" json:"offset"`
+	State  string `db:"state" json:"state"`
+	Offset int64  `db:"offset" json:"offset"`
+	Limit  int64  `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusParams) ([]Asset, error) {
-	rows, err := q.db.QueryContext(ctx, getAssetsByStatus, arg.Status, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, getAssetsByStatus, arg.State, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1437,24 +1437,24 @@ func (q *Queries) GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusPa
 
 const getAssetsByStatusAndOwner = `-- name: GetAssetsByStatusAndOwner :many
 SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1 AND owner_id = ?2 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND owner_id = ?2 AND is_deleted = false
 ORDER BY upload_time DESC
-LIMIT ?3 OFFSET ?4
+LIMIT ?4 OFFSET ?3
 `
 
 type GetAssetsByStatusAndOwnerParams struct {
-	Status  dbtypes.JSON `db:"status" json:"status"`
-	OwnerID *int32       `db:"owner_id" json:"owner_id"`
-	Limit   int64        `db:"limit" json:"limit"`
-	Offset  int64        `db:"offset" json:"offset"`
+	State   string `db:"state" json:"state"`
+	OwnerID *int32 `db:"owner_id" json:"owner_id"`
+	Offset  int64  `db:"offset" json:"offset"`
+	Limit   int64  `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsByStatusAndOwnerParams) ([]Asset, error) {
 	rows, err := q.db.QueryContext(ctx, getAssetsByStatusAndOwner,
-		arg.Status,
+		arg.State,
 		arg.OwnerID,
-		arg.Limit,
 		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -1504,7 +1504,7 @@ func (q *Queries) GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsBy
 
 const getAssetsByStatusAndRepository = `-- name: GetAssetsByStatusAndRepository :many
 SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = ?1
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT)
   AND is_deleted = false
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
@@ -1512,22 +1512,22 @@ WHERE json_extract(status, char(36) || '.state') = ?1
       AND occurrence.repository_id = ?2
   )
 ORDER BY upload_time DESC
-LIMIT ?3 OFFSET ?4
+LIMIT ?4 OFFSET ?3
 `
 
 type GetAssetsByStatusAndRepositoryParams struct {
-	Status       dbtypes.JSON `db:"status" json:"status"`
-	RepositoryID uuid.UUID    `db:"repository_id" json:"repository_id"`
-	Limit        int64        `db:"limit" json:"limit"`
-	Offset       int64        `db:"offset" json:"offset"`
+	State        string    `db:"state" json:"state"`
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	Offset       int64     `db:"offset" json:"offset"`
+	Limit        int64     `db:"limit" json:"limit"`
 }
 
 func (q *Queries) GetAssetsByStatusAndRepository(ctx context.Context, arg GetAssetsByStatusAndRepositoryParams) ([]Asset, error) {
 	rows, err := q.db.QueryContext(ctx, getAssetsByStatusAndRepository,
-		arg.Status,
+		arg.State,
 		arg.RepositoryID,
-		arg.Limit,
 		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err

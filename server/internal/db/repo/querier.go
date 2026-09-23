@@ -110,7 +110,7 @@ type Querier interface {
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID interface{}) ([]CountAssetsByRatingRow, error)
-	CountAssetsByStatus(ctx context.Context, status dbtypes.JSON) (int64, error)
+	CountAssetsByStatus(ctx context.Context, state string) (int64, error)
 	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
 	CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error)
 	CountAssetsWithSearchEmbedding(ctx context.Context) (int64, error)

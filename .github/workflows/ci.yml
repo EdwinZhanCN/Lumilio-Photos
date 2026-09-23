@@ -68,6 +68,7 @@ jobs:
                           - 'server/internal/api/handler/asset_handler*.go'
                           - 'server/internal/api/handler/repository_scan_handler*.go'
                           - 'server/internal/api/handler/storage_handler*.go'
+                          - 'server/internal/db/repo/queries/assets_*.sql'
                           - 'server/internal/processors/asset_*.go'
                           - 'server/internal/processors/discover_task*.go'
                           - 'server/internal/processors/ingest_task*.go'

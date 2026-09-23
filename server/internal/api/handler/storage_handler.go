@@ -17,6 +17,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// storageViewCountedAssetState is the asset status state the storage view
+// counts: the terminal success state the commit coordinator writes once every
+// desired pipeline stage has applied (see commit.refreshAssetProductStatus).
+const storageViewCountedAssetState = "completed"
+
 // StorageViewAssetCounter loads cheap catalog counts for the admin storage view.
 type StorageViewAssetCounter interface {
 	CountAssetsByStatusAndRepository(ctx context.Context, arg repo.CountAssetsByStatusAndRepositoryParams) (int64, error)
@@ -157,11 +162,13 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 		if h.assetCounter != nil {
 			count, countErr := h.assetCounter.CountAssetsByStatusAndRepository(ctx, repo.CountAssetsByStatusAndRepositoryParams{
 				RepositoryID: repository.RepoID,
-				Status:       dbtypes.JSON("ready"),
+				State:        storageViewCountedAssetState,
 			})
-			if countErr == nil {
-				view.AssetCount = &count
+			if countErr != nil {
+				api.WriteProblem(c, api.Internal(fmt.Errorf("count repository assets: %w", countErr)))
+				return
 			}
+			view.AssetCount = &count
 		}
 		if h.scanReader != nil {
 			if scanRun, scanErr := h.scanReader.GetLatestScanRun(ctx, repository.RepoID.String()); scanErr == nil {
