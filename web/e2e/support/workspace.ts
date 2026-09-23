@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
@@ -152,6 +152,13 @@ function placeScanFixture(repository: Repository, source: string, scanFilename: 
       attemptSource,
       Buffer.concat([original.subarray(0, 2), marker, comment, original.subarray(2)]),
     );
+    // The fixture models a file already at rest in the repository. The
+    // verifier deliberately skips files modified within
+    // `repository_scan.settle_seconds` of its crawl and reports a partial scan,
+    // and `docker cp` carries this mtime into the volume. Backdate it past the
+    // settle window so a scan requested right after the copy cannot race it.
+    const settled = new Date(Date.now() - 60_000);
+    utimesSync(attemptSource, settled, settled);
     // Storage is a named volume, so the fixture goes in through the container.
     const result = spawnSync(
       "docker",
