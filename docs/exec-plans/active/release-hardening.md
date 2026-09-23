@@ -55,6 +55,14 @@ follow-up in the tech-debt tracker.
   Settings/Users, Storage admin, Map. Record results here.
 - [ ] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
+  - Storage admin: `web/e2e/specs/storage-admin.spec.ts` (`@smoke`) adds a
+    Repository through the wizard, scans it from the row menu, and asserts
+    the scan run, the ingested asset, and the Storage view. It found a
+    blocker-candidate: `GET /api/v1/storage/view` never returns
+    `asset_count` (the Storage page shows 0 Assets for every Repository)
+    because `storage_handler.go` binds `dbtypes.JSON("ready")`, which is
+    invalid JSON, and swallows the error. The spec stays red until the
+    Server fix lands with it.
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage
