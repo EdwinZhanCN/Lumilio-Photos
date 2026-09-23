@@ -300,7 +300,13 @@ func (h *EventHandler) PatchEvent(c *gin.Context) {
 	if request.IsHidden != nil {
 		hidden = *request.IsHidden
 	}
-	result, err := h.writer.ExecContext(c, catalogtx.OperationEventPatch, `
+	tx, err := h.writer.BeginTx(c, catalogtx.OperationEventPatch, nil)
+	if err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(c, `
 UPDATE events SET title_override=?,cover_override_media_item_id=?,is_hidden=?,updated_at=?
 WHERE event_id=? AND owner_id=? AND status='active'`,
 		title, cover, hidden, apiNowMicros(), summary.EventID, ownerID)
@@ -310,6 +316,18 @@ WHERE event_id=? AND owner_id=? AND status='active'`,
 	}
 	if affected, _ := result.RowsAffected(); affected != 1 {
 		h.respondError(c, event.ErrNotFound)
+		return
+	}
+	// Title, cover, and hidden state are reconciliation inputs that every
+	// projection snapshot copies and republishes. Advancing the source
+	// revision in this transaction fences out a projection prepared before
+	// the edit, which would otherwise silently revert it on publish.
+	if err := event.MarkEventFactsChangedTx(c, tx.Raw(), ownerID, "event_user_state_changed"); err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		api.WriteProblem(c, api.Internal(err))
 		return
 	}
 	updated, err := h.service.Resolver().Resolve(c, ownerID, summary.EventID)
