@@ -116,6 +116,7 @@ jobs:
                           - 'server/internal/service/webauthn*.go'
                           - 'web/e2e/specs/auth-session.spec.ts'
                           - 'web/e2e/specs/auth-totp-bootstrap.spec.ts'
+                          - 'web/e2e/support/server.e2e.toml'
                           - 'web/e2e/support/totp.ts'
                           - 'web/src/features/auth/**'
                           - 'web/src/lib/http-commons/auth.ts'
