@@ -2397,7 +2397,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /**
@@ -2418,6 +2421,13 @@ export interface paths {
                     content: {
                         "audio/mpeg": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Invalid asset ID */
                 400: {
@@ -3666,7 +3676,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /**
@@ -3687,6 +3700,13 @@ export interface paths {
                     content: {
                         "video/mp4": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Invalid asset ID */
                 400: {
@@ -10925,7 +10945,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /** @description Share token */
@@ -10945,6 +10968,13 @@ export interface paths {
                     content: {
                         "audio/mpeg": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Not found */
                 404: {
@@ -10978,7 +11008,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /** @description Share token */
@@ -10998,6 +11031,13 @@ export interface paths {
                     content: {
                         "video/mp4": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Not found */
                 404: {

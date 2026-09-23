@@ -9237,6 +9237,14 @@ paths:
                   required: true
                   schema:
                     type: string
+                - description: Pinned representation; omitted, the request redirects to the currently available one
+                  in: query
+                  name: variant
+                  schema:
+                    enum:
+                        - web
+                        - original
+                    type: string
             responses:
                 "200":
                     content:
@@ -9244,6 +9252,8 @@ paths:
                             schema:
                                 type: file
                     description: Web-optimized audio file
+                "307":
+                    description: Temporary Redirect
                 "400":
                     content:
                         application/problem+json:
@@ -10046,6 +10056,14 @@ paths:
                   required: true
                   schema:
                     type: string
+                - description: Pinned representation; omitted, the request redirects to the currently available one
+                  in: query
+                  name: variant
+                  schema:
+                    enum:
+                        - web
+                        - original
+                    type: string
             responses:
                 "200":
                     content:
@@ -10053,6 +10071,8 @@ paths:
                             schema:
                                 type: file
                     description: Web-optimized video file
+                "307":
+                    description: Temporary Redirect
                 "400":
                     content:
                         application/problem+json:
@@ -14613,6 +14633,14 @@ paths:
                   required: true
                   schema:
                     type: string
+                - description: Pinned representation; omitted, the request redirects to the currently available one
+                  in: query
+                  name: variant
+                  schema:
+                    enum:
+                        - web
+                        - original
+                    type: string
             responses:
                 "200":
                     content:
@@ -14620,6 +14648,8 @@ paths:
                             schema:
                                 type: file
                     description: Web-optimized audio file
+                "307":
+                    description: Temporary Redirect
                 "404":
                     content:
                         application/problem+json:
@@ -14645,6 +14675,14 @@ paths:
                   required: true
                   schema:
                     type: string
+                - description: Pinned representation; omitted, the request redirects to the currently available one
+                  in: query
+                  name: variant
+                  schema:
+                    enum:
+                        - web
+                        - original
+                    type: string
             responses:
                 "200":
                     content:
@@ -14652,6 +14690,8 @@ paths:
                             schema:
                                 type: file
                     description: Web-optimized video file
+                "307":
+                    description: Temporary Redirect
                 "404":
                     content:
                         application/problem+json:
