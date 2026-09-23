@@ -47,6 +47,13 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
     .click();
   await accepted;
 
+  // Event topology is derived from capture facts, and those land after the
+  // asset row: taken_time first holds the file mtime and is replaced when the
+  // analyze stage extracts EXIF (which also writes the fixture's GPS). Until
+  // both photos carry EXIF, the projection legitimately passes through a
+  // split state (one photo at its 2025 capture time, the other at upload
+  // time) and keeps republishing while the spec edits the Event. Wait for the
+  // extracted facts so the rebuild below is the settled topology.
   for (const filename of eventFilenames) {
     await expect(async () => {
       const result = await api<components["schemas"]["dto.QueryAssetsResponseDTO"]>(
@@ -64,6 +71,7 @@ test("@smoke Events rebuild, correct, redirect, and freeze a share snapshot", as
         },
       );
       expect(result.items?.length).toBe(1);
+      expect(result.items?.[0]?.media_item?.primary_asset?.gps_latitude).toBeDefined();
     }).toPass({ timeout: 60_000 });
   }
 
