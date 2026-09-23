@@ -127,8 +127,13 @@ tasks:
       CI: "1"
     cmds:
       - task: e2e:seed
-      # The portraits of two different people exist only in the demo profile.
-      - vp run assets:sync -- --profile demo
+      # The portraits of two different people exist only in the demo profile;
+      # fetch just those five instead of the whole profile's LFS objects.
+      - >-
+        vp run assets:sync -- --profile demo
+        --asset landing-07-portrait-a --asset landing-19-portrait-a-close
+        --asset landing-20-portrait-a-warm --asset landing-08-portrait-b
+        --asset landing-21-portrait-b-close
       - vp run e2e:test --grep @people --workers=1
 
   test:agent-trust:

@@ -98,9 +98,11 @@ follow-up in the tech-debt tracker.
     all six faces/assets and a 404 for the merged id. Face results are real
     Hub recordings (antelopev2, five payloads) replayed by fakelumen;
     fakelumen now overlays recorded capabilities per service so recording
-    face does not change SigLIP/BioCLIP/OCR for other slices. Follow-up:
-    the slice syncs the whole 1.6 GB `demo` profile; move the five portraits
-    into the `e2e` profile in the next assets release.
+    face does not change SigLIP/BioCLIP/OCR for other slices. The slice
+    fetches only its five portraits (`assets:sync --profile demo --asset …`,
+    about 1.9 MB of LFS objects) instead of the whole demo profile. Later
+    cleanup: move the portraits into the `e2e` profile in the next assets
+    release and drop the selection.
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage

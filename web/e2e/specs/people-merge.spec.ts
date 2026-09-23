@@ -6,7 +6,7 @@ import {
   PEOPLE_PERSON_A_ASSETS,
   PEOPLE_PERSON_B_ASSETS,
   PEOPLE_PROFILE,
-  profileAsset,
+  selectedProfileAsset,
   uniqueJpeg,
 } from "../support/assets";
 import { t } from "../support/i18n";
@@ -38,7 +38,10 @@ async function uploadPortrait(
       file: {
         name: filename,
         mimeType: "image/jpeg",
-        buffer: uniqueJpeg(profileAsset(PEOPLE_PROFILE, assetId), `lumilio-people:${filename}`),
+        buffer: uniqueJpeg(
+          selectedProfileAsset(PEOPLE_PROFILE, assetId),
+          `lumilio-people:${filename}`,
+        ),
       },
     },
   });
