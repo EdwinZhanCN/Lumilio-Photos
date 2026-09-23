@@ -1271,8 +1271,8 @@
       "empty": "Start a conversation with Lumilio Agent!",
       "newConversation": "New conversation",
       "openAiSettings": "Open AI settings",
-      "sessionDisclosure": "This conversation is temporary. Pins, board widgets, and completed actions are kept.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "sessionDisclosure": "This conversation is temporary. Pins, board widgets, and completed actions are kept."
     },
     "context": {
       "remove": "Remove",
@@ -1481,7 +1481,6 @@
       "detectStacksCompleted_one": "Detected {{count}} stack for {{name}}.",
       "detectStacksCompleted_other": "Detected {{count}} stacks for {{name}}.",
       "detectStacksFailed": "Failed to detect stacks.",
-      "empty": "No Repositories are available.",
       "hostAction": {
         "addLocation": "Add Storage Location",
         "addPurpose": "Choose and authorize a folder for Repositories",
@@ -1515,14 +1514,12 @@
         "waitingHint": "Open Desktop Settings → Storage, review this request, then choose a folder locally."
       },
       "identityErrorBadge": "Repository identity mismatch",
-      "lifecycleActive": "Active",
       "locationRebuildFailed": "Location rebuild could not be queued.",
       "locationRebuildQueued": "Location rebuild queued for {{name}}.",
       "lowSpaceBadge": "Low space",
       "offlineBadge": "Offline",
       "openExisting": "Open existing Repository",
       "pausedBadge": "Paused",
-      "primaryRoleBadge": "Primary",
       "readOnlyBadge": "Read only",
       "rebuildEvents": "Rebuild events",
       "rebuildPeople": "Rebuild people",
@@ -1547,8 +1544,6 @@
       "scanCoalesced": "A scan is already active for {{name}}; this request joined the existing operation.",
       "scanFailed": "Failed to queue scan.",
       "scanQueued": "Scan queued for {{name}}. You can keep using Lumilio while it runs.",
-      "storageLocationCapacity": "{{available}} of {{total}} available",
-      "storageLocationCapacityUnknown": "Capacity unavailable",
       "storageLocationEmpty": "No writable location",
       "storageLocationError": "Storage Locations are unavailable.",
       "storageLocationHint": "A Storage Location can contain multiple Repositories. Authorize external Storage Locations in the Desktop Control Panel.",
@@ -1571,12 +1566,8 @@
         "immutableHint": "This choice determines the on-disk layout and cannot be changed after creation.",
         "label": "Storage layout"
       },
-      "title": "Repositories",
-      "unavailable": "Repository options are temporarily unavailable.",
-      "uploadBlockedBadge": "Upload unavailable",
       "uploadBlockedReasons": "Upload unavailable: {{reasons}}",
-      "uploadEligible": "Ready for upload",
-      "uploadSurfaceDescription": "Choose an upload destination above. Repositories listed here show whether they can accept new files right now."
+      "uploadEligible": "Ready for upload"
     }
   },
   "map": {
@@ -1669,13 +1660,6 @@
       }
     },
     "processing": {
-      "status": {
-        "attention": "Needs attention",
-        "working": "In progress",
-        "idle": "Idle",
-        "retrying": "Retrying",
-        "waiting": "Waiting"
-      },
       "detail": {
         "attempts_one": "{{count}} attempt",
         "attempts_other": "{{count}} attempts",
@@ -1742,6 +1726,13 @@
         "textSearch": "Text search",
         "thumbnails": "Thumbnails",
         "video": "Video"
+      },
+      "status": {
+        "attention": "Needs attention",
+        "idle": "Idle",
+        "retrying": "Retrying",
+        "waiting": "Waiting",
+        "working": "In progress"
       },
       "units": {
         "files_one": "file",
@@ -1832,8 +1823,7 @@
     "tabs": {
       "capabilities": "Capabilities",
       "ml": "ML",
-      "queue": "Processing",
-      "storage": "Storage"
+      "queue": "Processing"
     },
     "title": "System Status"
   },
@@ -2682,23 +2672,59 @@
       "rename": "Rename Repository",
       "scan": "Scan now",
       "stacks": "Detect stacks",
-      "verificationHistory": "Scan history",
-      "supportBundle": "Download support bundle"
+      "supportBundle": "Download support bundle",
+      "verificationHistory": "Scan history"
     },
     "actionsFor": "Actions for {{name}}",
+    "audit": {
+      "action": "Action",
+      "actor": "Actor",
+      "empty": "No lifecycle actions have been recorded yet.",
+      "loadFailed": "Lifecycle history could not be loaded.",
+      "result": "Result",
+      "target": "Target",
+      "time": "Time"
+    },
     "authorize": "Authorize Storage Location",
     "authorizeNativeOnly": "Authorizing a Storage Location requires the Lumilio desktop app.",
     "cancelVerificationFailed": "The scan could not be cancelled.",
     "cancelVerificationSuccess": "Cancellation requested for {{name}}.",
     "capacityUnknownShort": "Capacity is unknown right now.",
+    "capacityValue": "{{available}} available of {{total}}",
+    "column": {
+      "actions": "Actions",
+      "assets": "Assets",
+      "available": "Available",
+      "name": "Repository",
+      "state": "State",
+      "storage": "Storage",
+      "verification": "Scan"
+    },
     "detectDuplicatesCompleted": "Duplicate scan finished for {{name}}: {{groups}} groups found.",
     "detectDuplicatesFailed": "Duplicate detection could not be completed.",
     "emptyLocationFacts": "Registered Storage Location with no Repositories. Detaching removes the registration only; nothing on disk is deleted.",
+    "inspector": {
+      "assets": "Assets",
+      "available": "Capacity",
+      "mountPath": "Mount point",
+      "repository": "Repository",
+      "state": "State",
+      "storage": "Storage",
+      "verification": "Scan"
+    },
+    "kind": {
+      "external": "External"
+    },
     "loadFailed": "Storage view could not be loaded.",
-    "location": {},
     "locationActions": "Actions for {{name}}",
     "maintenance": "Maintenance",
     "menuDanger": "Danger zone",
+    "menuRepository": "Repository",
+    "menuVerification": "Scan",
+    "moreActions": "More storage actions",
+    "pendingHostActions_one": "{{count}} storage request is waiting for approval in the Desktop app.",
+    "pendingHostActions_other": "{{count}} storage requests are waiting for approval in the Desktop app.",
+    "removeBlocked": "Remove its Repositories first.",
     "repositoryCount_one": "{{count}} Repositories",
     "repositoryCount_other": "{{count}} Repositories",
     "state": {
@@ -2713,96 +2739,54 @@
       "recoveryRequired": "Recovery required",
       "scanning": "Scanning"
     },
+    "storage": {
+      "system": "Built-in storage",
+      "unknown": "Storage not resolved"
+    },
+    "summaryAttention_one": "{{count}} needs attention",
+    "summaryAttention_other": "{{count}} need attention",
+    "summaryLocations_one": "{{count}} Storage Location",
+    "summaryLocations_other": "{{count}} Storage Locations",
+    "summaryObserved": "measured at {{time}}",
+    "summaryRepositories_one": "{{count}} Repository",
+    "summaryRepositories_other": "{{count}} Repositories",
+    "technical": {
+      "caseBehavior": "Case behavior",
+      "caseInsensitive": "Case-insensitive",
+      "caseSensitive": "Case-sensitive",
+      "effectiveIdentity": "Effective identity",
+      "lockHolder": "Lock holder",
+      "marker": "Marker identity",
+      "mount": "Mount"
+    },
     "title": "Storage",
     "unlinked": {
       "description": "Their Storage Location is not registered here. Files are untouched; reconnecting or locating them restores access.",
       "title": "Repositories without a Storage Location"
     },
-    "verification": {},
+    "verificationBadge": {
+      "failed": "Failed",
+      "never": "Not scanned",
+      "partial": "Partial",
+      "verified": "Scanned"
+    },
     "verificationHistory": {
       "empty": "No scans yet.",
       "fieldErrorDirectories": "Directories with errors",
       "fieldFinished": "Finished",
       "fieldMode": "Mode",
+      "fieldOperation": "Operation",
       "fieldPartialCoverage": "Partial coverage",
       "fieldStarted": "Started",
       "fieldStatus": "Status",
       "loadFailed": "Scan history could not be loaded.",
-      "title": "Scan history",
-      "fieldOperation": "Operation",
-      "selectRun": "Select a scan to see its details."
-    },
-    "summaryLocations": "{{count}} Storage Locations",
-    "summaryRepositories": "{{count}} Repositories",
-    "summaryAttention": "{{count}} need attention",
-    "summaryObserved": "measured at {{time}}",
-    "moreActions": "More storage actions",
-    "menuVerification": "Scan",
-    "menuRepository": "Repository",
-    "removeBlocked": "Remove its Repositories first.",
-    "kind": {
-      "external": "External"
-    },
-    "pendingHostActions": "{{count}} storage request(s) are waiting for approval in the Lumilio desktop app.",
-    "inspector": {
-      "storage": "Storage",
-      "mountPath": "Mount point",
-      "state": "State",
-      "assets": "Assets",
-      "verification": "Scan",
-      "repository": "Repository",
-      "available": "Capacity"
-    },
-    "column": {
-      "name": "Repository",
-      "storage": "Storage",
-      "available": "Available",
-      "state": "State",
-      "assets": "Assets",
-      "verification": "Scan",
-      "actions": "Actions"
+      "selectRun": "Select a scan to see its details.",
+      "title": "Scan history"
     },
     "view": {
       "browse": "Browse",
       "history": "History"
-    },
-    "storage": {
-      "system": "Built-in storage",
-      "unknown": "Storage not resolved"
-    },
-    "verificationBadge": {
-      "verified": "Scanned",
-      "partial": "Partial",
-      "failed": "Failed",
-      "never": "Not scanned"
-    },
-    "technical": {
-      "mount": "Mount",
-      "marker": "Marker identity",
-      "lockHolder": "Lock holder",
-      "effectiveIdentity": "Effective identity",
-      "caseBehavior": "Case behavior",
-      "caseSensitive": "Case-sensitive",
-      "caseInsensitive": "Case-insensitive"
-    },
-    "audit": {
-      "loadFailed": "Lifecycle history could not be loaded.",
-      "empty": "No lifecycle actions have been recorded yet.",
-      "time": "Time",
-      "action": "Action",
-      "target": "Target",
-      "actor": "Actor",
-      "result": "Result"
-    },
-    "capacityValue": "{{available}} available of {{total}}",
-    "pendingHostActions_one": "{{count}} storage request is waiting for approval in the Desktop app.",
-    "pendingHostActions_other": "{{count}} storage requests are waiting for approval in the Desktop app.",
-    "summaryAttention_one": "{{count}} needs attention",
-    "summaryAttention_other": "{{count}} need attention",
-    "summaryLocations_one": "{{count}} Storage Location",
-    "summaryLocations_other": "{{count}} Storage Locations",
-    "summaryRepositories_one": "{{count}} Repository",
-    "summaryRepositories_other": "{{count}} Repositories"
+    }
   },
   "studio": {
     "asset": {
@@ -3076,9 +3060,9 @@
       "upload_button": "Upload{{countLabel}}",
       "upload_information_title": "Upload Information",
       "upload_target_label": "Upload target",
+      "upload_target_none": "No upload target",
       "upload_target_ready": "This Repository can accept uploads.",
-      "uploading_status": "Uploading...",
-      "upload_target_none": "No upload target"
+      "uploading_status": "Uploading..."
     },
     "UploadAssets": {
       "files_ready_to_upload_one": "{{count}} file ready to upload",

@@ -12,7 +12,7 @@ import {
   getRepositoryEffectiveState,
   isRepositoryUnavailable,
   isUploadLowSpaceBlocked,
-  uploadAdmissionReasonCopy,
+  uploadAdmissionReasonLabel,
   uploadStateBadgeClass,
   useWorkingRepository,
 } from "@/features/repositories";
@@ -77,8 +77,7 @@ function UnifiedUploadSection(): React.JSX.Element {
         label: t("manage.repositories.uploadEligible", "Ready for upload"),
       };
     }
-    const copy = uploadAdmissionReasonCopy(state);
-    return { className: uploadStateBadgeClass(state), label: t(copy.key, copy.defaultValue) };
+    return { className: uploadStateBadgeClass(state), label: uploadAdmissionReasonLabel(t, state) };
   }, [repositoriesQuery.isError, t, uploadTargetRepository]);
 
   const formatBytes = (value?: number) => {

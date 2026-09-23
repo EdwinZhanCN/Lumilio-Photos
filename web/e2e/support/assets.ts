@@ -38,6 +38,13 @@ export function smokeAsset(id: string): string {
   return profileAsset(lock.profile, id);
 }
 
+/**
+ * How long a spec waits for audio to start. Starting a track waits for its
+ * first bytes, and right after a seed a low-power host is still draining
+ * ingestion and can take several seconds to answer.
+ */
+export const PLAYBACK_START_TIMEOUT = 30_000;
+
 export const SMOKE_SCAN_ASSET = "picsum-scan-000";
 export const SMOKE_UPLOAD_ASSET = "picsum-upload-123";
 export const SMOKE_VIDEO_ASSET = "commons-video-ocean-waves";

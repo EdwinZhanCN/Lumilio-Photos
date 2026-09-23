@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test } from "../fixtures/test";
 import { LoginPage } from "../pages/login.page";
 import { api, baseURL } from "../support/api";
-import { smokeAsset } from "../support/assets";
+import { PLAYBACK_START_TIMEOUT, smokeAsset } from "../support/assets";
 import { t } from "../support/i18n";
 import { agentScenarioPrompt } from "../support/agentRuntime";
 import type { components } from "../../src/lib/http-commons/schema.d.ts";
@@ -102,14 +102,16 @@ test("@agent-runtime music selection auditions, refines and saves after confirma
     .toBe(true);
   await selection.getByRole("button", { name: t("music.agent.audition"), exact: true }).click();
   await expect
-    .poll(() =>
-      page
-        .locator("audio")
-        .evaluateAll((nodes) =>
-          nodes.some(
-            (node) => node instanceof HTMLAudioElement && !node.paused && node.currentTime > 0,
+    .poll(
+      () =>
+        page
+          .locator("audio")
+          .evaluateAll((nodes) =>
+            nodes.some(
+              (node) => node instanceof HTMLAudioElement && !node.paused && node.currentTime > 0,
+            ),
           ),
-        ),
+      { timeout: PLAYBACK_START_TIMEOUT },
     )
     .toBe(true);
   const light = tracks.find((track) => track.title === "Light chamber")!;
@@ -159,14 +161,16 @@ test("@agent-runtime music selection auditions, refines and saves after confirma
   await open.click();
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
   await expect
-    .poll(() =>
-      page
-        .locator("audio")
-        .evaluateAll((nodes) =>
-          nodes.some(
-            (node) => node instanceof HTMLAudioElement && !node.paused && node.currentTime > 0,
+    .poll(
+      () =>
+        page
+          .locator("audio")
+          .evaluateAll((nodes) =>
+            nodes.some(
+              (node) => node instanceof HTMLAudioElement && !node.paused && node.currentTime > 0,
+            ),
           ),
-        ),
+      { timeout: PLAYBACK_START_TIMEOUT },
     )
     .toBe(true);
 });

@@ -35,12 +35,3 @@ Last aligned with the codebase: 2026-09-22.
   request acceptance. `queued_jobs` remains a global backlog even when queried
   with a repository filter, so a slice cannot treat queue-idle or that counter
   as proof that this repository's video finished.
-- **The i18n extractor deletes keys referenced through lookup tables.** Owner:
-  `web/i18next.config.ts` and table-driven copy such as
-  `web/src/features/repositories/model/repositoryOptions.ts`
-  (`{ key: "manage.repositories.offlineBadge", defaultValue }`). Running
-  `vp exec i18next-cli extract` removes about eighty live keys whose `t()` call
-  receives a variable, so the zh values silently fall back to English defaults.
-  Until those tables call `t("literal", "default")` directly (or the config
-  preserves their patterns), review every extraction diff and restore removed
-  keys that are still referenced.

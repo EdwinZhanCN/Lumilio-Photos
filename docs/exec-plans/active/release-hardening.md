@@ -34,7 +34,24 @@ follow-up in the tech-debt tracker.
   CI runs.
 - [ ] Confirm `internal/llm` `ark` conformance passes in CI. It fails in the
   agent sandbox identically on untouched `dev`, so it is believed to be
-  environment-specific; if CI also fails, it is a blocker.
+  environment-specific; if CI also fails, it is a blocker. (2026-09-22: passes
+  on a macOS host, supporting the sandbox theory.)
+- Local baseline, 2026-09-22 at `b0d5b932`: `task test` green. `ci.yml` runs
+  only on `main` pushes and PRs, so the 25 commits since `88400fc8` have no CI
+  run; the promotion PR is the first. The E2E slices, run on the Intel N100
+  qualification host, found three timing assumptions, all fixed:
+  - `@smoke` music playback: default 5s poll for the first audio bytes while
+    the host drains the seed backlog.
+  - `@auth-hardening` lockout: four hashed logins did not fit the 1s
+    rate-limit window.
+  - `@agent-runtime` music audition: the same 5s audio-start poll. Both music
+    specs now share `PLAYBACK_START_TIMEOUT` from `e2e/support/assets.ts`.
+  - Not fixed: `agent-runtime.spec.ts` plain chat and the music-agent
+    selection each missed a 5s reply-visibility wait once and passed on retry
+    and on rerun. Watch them in CI before widening any timeout.
+  - A clean rerun on a fresh stack passed every slice without retries except
+    one `@video-regression` retry on `fetch failed: other side closed`, most
+    likely the SSH port forward the remote run needs, not the spec.
 
 ### Phase 1 — Processing stage grid
 - [x] Stage catalog read model, items, retry, diagnostics, and the stage-grid
@@ -42,12 +59,14 @@ follow-up in the tech-debt tracker.
   `.agents/decisions/2026-09-22-processing-stage-grid.md`.
 
 ### Phase 2 — i18n integrity
-- [ ] Make table-driven copy extractor-visible: tables call
-  `t("literal", "default")` (or `i18next.config.ts` preserves their keys), so
-  `vp exec i18next-cli extract` no longer deletes the ~80 live keys recorded in
-  the tech-debt tracker.
-- [ ] One clean extraction with zero unexpected removals; zh 100%.
-- [ ] Remove the tracker item.
+- [x] Make table-driven copy extractor-visible: the Storage state,
+  verification, and upload admission-reason tables now call
+  `t("literal", "default")` per entry. Extraction was deleting 20 live keys
+  (the tracker's ~80 had shrunk as other tables were rewritten).
+- [x] One clean extraction: the only removals are 10 unreferenced keys and 4
+  plural base keys superseded by `_one`/`_other`; no values changed; zh 100%
+  (2215/2215).
+- [x] Tracker item removed; `lumilio-frontend-i18n` now requires literal keys.
 
 ### Phase 3 — Flow coverage for untested journeys
 - [ ] Manual smoke checklist on a fresh Docker Compose install and on Desktop
