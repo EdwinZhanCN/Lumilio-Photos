@@ -540,7 +540,10 @@ func run(
 	// Share links reuse the same asset-set-source query path pins use
 	// (resolveSourceAssetIDs -> AssetService.QueryAssets / agentPins.AssetIDs),
 	// so it's constructed here once both dependencies exist.
-	shareLinkService := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyFile)
+	shareLinkService, err := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyFile)
+	if err != nil {
+		return fmt.Errorf("initialize share link service: %w", err)
+	}
 
 	// Register agent tools
 	tools.RegisterAll()

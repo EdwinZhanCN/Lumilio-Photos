@@ -55,13 +55,16 @@ follow-up in the tech-debt tracker.
   Settings/Users, Storage admin, Map. Record results here.
 - [ ] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
+  - [x] Share link create/open/revoke: `web/e2e/specs/share-links.spec.ts`
+    (`@smoke`, `task web:test:browser`; the `browser_smoke` CI filter follows
+    the share handler, service, and `web/src/features/share/**`).
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage
 - [ ] Decide blocker or deferred for each tracker item: Music embedded covers
   (placeholder today), Event late-EXIF fixture and legacy recovery, video
   semantic operation-scoped E2E proof, Linux bind-mount capacity test.
-- [ ] `NewShareLinkService` panics on secret-key failure at construction;
+- [x] `NewShareLinkService` panics on secret-key failure at construction;
   return an error so startup reports a diagnosable failure instead.
 
 ### Phase 5 — Low-risk cleanups (only if Phases 0–4 are done)

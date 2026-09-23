@@ -50,3 +50,23 @@ export const VIDEO_REGRESSION_ASSETS = [
   "commons-video-chameleon-flowers",
   "commons-video-mountain-landscape",
 ] as const;
+
+/**
+ * Returns the JPEG at `sourcePath` with a comment segment carrying
+ * `markerText`. Pixels are unchanged but content identity is unique, so an
+ * upload cannot be deduplicated against another attempt's copy of the same
+ * pinned source.
+ */
+export function uniqueJpeg(sourcePath: string, markerText: string): Buffer {
+  const source = readFileSync(sourcePath);
+  const endOfImage = source.lastIndexOf(Buffer.from([0xff, 0xd9]));
+  if (endOfImage < 0) throw new Error(`${sourcePath} is not a JPEG`);
+  const marker = Buffer.from(markerText, "utf8");
+  const markerLength = marker.length + 2;
+  return Buffer.concat([
+    source.subarray(0, endOfImage),
+    Buffer.from([0xff, 0xfe, markerLength >> 8, markerLength & 0xff]),
+    marker,
+    source.subarray(endOfImage),
+  ]);
+}
