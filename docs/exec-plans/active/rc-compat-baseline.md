@@ -1,6 +1,6 @@
 # RC compatibility baseline and upgrade paths
 
-Status: active, created 2026-09-24. Phases 0–2 done; Phase 3 (radxa proof) next. Child of
+Status: active, created 2026-09-24. Phases 0–3 done; Phase 4 (rc.1 fixture) waits for the tag. Child of
 [release-hardening.md](release-hardening.md); tracked by issue #221 in the
 `v26.1.0-rc.1` milestone, so it blocks the tag. Supersedes the beta.1 upgrade
 test that was planned here earlier (pre-release data is not migrated).
@@ -142,12 +142,37 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   `docs/BACKEND.md`, and the `lumilio-api-contract-change` skill.
 
 ### Phase 3 — Prove it on the RC build
-- [ ] On the radxa (build on the Mac for linux/amd64, ship, run — see the
+- [x] On the radxa (build on the Mac for linux/amd64, ship, run — see the
   parent plan's resume section): fresh install stamps version 1 everywhere;
   a pre-release catalog and config are rejected with the intended messages;
   backup → restore round-trip on the RC build keeps counts, user edits
   (album cover, Event rename, person rename, share link), and original-file
   checksums.
+  Done 2026-09-24 with image `lumilio-server:rc-compat-deb8f32a` (built on the
+  Mac for linux/amd64 from `deb8f32a`, `VERSION=26.1.0-rc.1`), installed with
+  `deploy/compose/compose.yml` as project `rc-compat` in `~/rc-compat/`:
+  - Pre-release catalog: the published `ghcr.io/edwinzhancn/lumilio-server:26.1.0-beta.2`
+    created one (`application_id` 0x4c554d49, `user_version` 8, ledger
+    table). The RC image refused to start with "catalog was created by a
+    pre-release build of Lumilio Photos, whose data is not migrated: move the
+    SQLite catalog aside …"; the catalog was left unchanged.
+  - Pre-release config: beta.2's built-in `docker-http.toml`
+    (`schema_version = 6`) fails `server config validate` and
+    `server config upgrade` with the newer-or-pre-release message; the file is
+    unchanged and no `.bak` is written.
+  - Fresh install: backup manifest `format_version` 1,
+    `config_schema_version` 1, `schema_version` 1; catalog `application_id`
+    0x4c554d43 ("LUMC"), `user_version` 1; image config `schema_version = 1`;
+    `.lumilioroot` and `.lumiliorepo` `"1.0"`.
+  - Round trip: 25 demo JPEGs uploaded; the real Lumen Hub clustered one
+    person (3 faces); 18 Events. Edits: person renamed, Event
+    `title_override`, album with explicit cover and 3 assets, asset-snapshot
+    share link. Backup, then every edit changed and the share revoked, then
+    restore (`completed`, restore point taken): the captured state (file
+    counts, person name, Event title, album name/cover/count, share status,
+    public share HTTP 200) is identical to the pre-backup capture, and all 25
+    stored originals are byte-identical (SHA-256) to the sources.
+
 
 ### Phase 4 — Lock the rc.1 fixture (at tag time, with rc-release)
 - [ ] Right after tagging, generate a small rc.1 catalog (plus its config,
