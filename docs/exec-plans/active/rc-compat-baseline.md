@@ -1,6 +1,6 @@
 # RC compatibility baseline and upgrade paths
 
-Status: active, created 2026-09-24. Not started. Child of
+Status: active, created 2026-09-24. Phase 0 done (decision approved). Child of
 [release-hardening.md](release-hardening.md); tracked by issue #221 in the
 `v26.1.0-rc.1` milestone, so it blocks the tag. Supersedes the beta.1 upgrade
 test that was planned here earlier (pre-release data is not migrated).
@@ -58,7 +58,7 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
 ## Execution phases
 
 ### Phase 0 — Decision record
-- [ ] Write `.agents/decisions/2026-09-2x-rc-compatibility-baseline.md`
+- [x] Write `.agents/decisions/2026-09-24-rc-compatibility-baseline.md`
   recording the contracts above, with alternatives and why they lost
   (edit-in-place forever; wipe per RC; baseline-kept-current + equivalence
   test; checksum ledger). Mark
@@ -66,6 +66,11 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   of a chain rested on "no instance exists to upgrade", which ends at rc.1).
   Update `docs/BACKEND.md` and the `migration.go` doc comments to match.
   Get the user's approval of the record before Phase 2.
+  (Approved 2026-09-24 with three refinements: catalog identity via
+  `PRAGMA application_id` "LUMC" checked before any version; `.lumilioroot`
+  stays `"1.0"` and pre-release markers are accepted; pre-release server
+  configs are caught by the strict decoder. `docs/BACKEND.md` and the
+  `migration.go` comments change with the Phase 1 code they describe.)
 
 ### Phase 1 — Reset to version 1 (internal era, last edit-in-place)
 - [ ] Catalog `SchemaVersion` 9 → 1 (`server/internal/db/migration.go`) and
