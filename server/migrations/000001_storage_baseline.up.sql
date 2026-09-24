@@ -1,10 +1,10 @@
 -- Lumilio Photos catalog baseline.
 --
--- This is the single standalone schema for schema version 9. A fresh catalog
--- is created by this file alone; a catalog whose PRAGMA user_version is not 9
--- is rejected rather than upgraded. The file is edited in place when the
--- schema changes. There is no migration sequence, checksum ledger, or
--- historical generation selection.
+-- This is the standalone schema for catalog schema version 1, the
+-- v26.1.0-rc.1 compatibility baseline. Until the rc.1 tag it is edited in
+-- place; from the tag on it is frozen, and later schema changes are numbered
+-- forward steps. PRAGMA user_version is the only version discriminator; there
+-- is no checksum ledger.
 --
 -- Every ordinary table is STRICT. FTS5 and Vec1 virtual tables own their
 -- shadow/internal tables, which the modules create and this file therefore
@@ -2560,4 +2560,4 @@ INSERT INTO classifier_definitions (
 INSERT INTO search_embeddings_vec (cmd, arg)
 VALUES ('rebuild', '{"index":"flat","distance":"l2"}');
 
-PRAGMA user_version = 9;
+PRAGMA user_version = 1;

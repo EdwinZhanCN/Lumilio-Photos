@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 )
 
 const InstallSchemaVersion = 1
@@ -72,7 +73,10 @@ func LoadCurrent(root string) (CurrentPointer, error) {
 	if err := decoder.Decode(&current); err != nil {
 		return CurrentPointer{}, err
 	}
-	if current.SchemaVersion != InstallSchemaVersion || strings.TrimSpace(current.Version) == "" || strings.TrimSpace(current.Profile) == "" {
+	if err := stateversion.Check("Lumen current pointer", current.SchemaVersion, InstallSchemaVersion); err != nil {
+		return CurrentPointer{}, err
+	}
+	if strings.TrimSpace(current.Version) == "" || strings.TrimSpace(current.Profile) == "" {
 		return CurrentPointer{}, errors.New("invalid Lumen current pointer")
 	}
 	if err := validateRelativePath(current.Binary); err != nil {

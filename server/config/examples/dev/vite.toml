@@ -1,5 +1,5 @@
 #:schema ../../schema/lumilio-server.schema.json
-# Lumilio Photos runtime manifest, schema v6.
+# Lumilio Photos runtime manifest, schema v1.
 # Local development behind the Vite development proxy.
 #
 # Scenario: dynamic request origin development
@@ -17,7 +17,7 @@
 
 # Manifest format version. The loader accepts exactly this version and
 # never migrates an older file in place.
-schema_version = 6
+schema_version = 1
 
 # Deployment environment. Selects test-only affordances; it does not relax
 # runtime manifest validation.

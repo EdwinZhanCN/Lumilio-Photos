@@ -512,10 +512,10 @@ func TestMigrateCatalogBaselineIsIdempotentAndLedgerFree(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close(context.Background())
-	if err := database.MigrateCatalog(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatalf("first baseline: %v", err)
 	}
-	if err := database.MigrateCatalog(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatalf("idempotent restart: %v", err)
 	}
 
@@ -559,17 +559,17 @@ func TestMigrateCatalogRejectsIncompatibleSchemaVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close(context.Background())
-	if err := database.MigrateCatalog(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	for _, stale := range []int{1, 8} {
-		if _, err := database.SQL.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", stale)); err != nil {
+	for _, newer := range []int{SchemaVersion + 1, 9} {
+		if _, err := database.SQL.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", newer)); err != nil {
 			t.Fatal(err)
 		}
-		err = database.MigrateCatalog(ctx)
-		if err == nil || !strings.Contains(err.Error(), "catalog schema version") {
-			t.Fatalf("stale schema version %d error = %v", stale, err)
+		err = database.MigrateCatalog(ctx, nil)
+		if err == nil || !strings.Contains(err.Error(), "newer than this build supports") {
+			t.Fatalf("newer schema version %d error = %v", newer, err)
 		}
 	}
 }
@@ -598,24 +598,52 @@ func TestOpenRejectsUnversionedCatalogWithTables(t *testing.T) {
 	}
 }
 
-func TestOpenRejectsSupersededGeneration(t *testing.T) {
-	ctx := context.Background()
-	path := filepath.Join(secureTempDir(t), "superseded-generation.sqlite3")
-	catalog, err := Open(ctx, config.DatabaseConfig{Path: path})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, "PRAGMA user_version = 8"); err != nil {
-		_ = catalog.Close(ctx)
-		t.Fatal(err)
-	}
-	if err := catalog.Close(ctx); err != nil {
-		t.Fatal(err)
-	}
+// TestOpenRejectsPreReleaseCatalog proves identity is checked before any
+// version: a pre-release catalog is rejected as pre-release whatever
+// user_version it carries, including the published beta shape (stamp 8 plus the
+// legacy migration ledger) and a stamp that collides with the rc.1 baseline.
+func TestOpenRejectsPreReleaseCatalog(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		userVersion int
+		ledger      bool
+	}{
+		{name: "published beta", userVersion: 8, ledger: true},
+		{name: "internal generation 9", userVersion: 9},
+		{name: "colliding version", userVersion: SchemaVersion},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			path := filepath.Join(secureTempDir(t), "pre-release.sqlite3")
+			catalog, err := Open(ctx, config.DatabaseConfig{Path: path})
+			if err != nil {
+				t.Fatal(err)
+			}
+			statements := fmt.Sprintf(
+				"PRAGMA application_id = %d; PRAGMA user_version = %d;",
+				preReleaseApplicationID,
+				tc.userVersion,
+			)
+			if tc.ledger {
+				statements = "CREATE TABLE lumilio_schema_migrations (version INTEGER PRIMARY KEY);" + statements
+			}
+			if _, err := catalog.SQL.ExecContext(ctx, statements); err != nil {
+				_ = catalog.Close(ctx)
+				t.Fatal(err)
+			}
+			if err := catalog.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
 
-	_, err = Open(ctx, config.DatabaseConfig{Path: path})
-	if err == nil || !strings.Contains(err.Error(), "catalog schema version = 8, want 9") {
-		t.Fatalf("superseded generation open error = %v", err)
+			_, err = Open(ctx, config.DatabaseConfig{Path: path})
+			if !errors.Is(err, ErrPreReleaseCatalog) {
+				t.Fatalf("pre-release catalog open error = %v, want ErrPreReleaseCatalog", err)
+			}
+			_, err = InspectCatalog(ctx, path)
+			if !errors.Is(err, ErrPreReleaseCatalog) {
+				t.Fatalf("pre-release catalog inspect error = %v, want ErrPreReleaseCatalog", err)
+			}
+		})
 	}
 }
 

@@ -21,7 +21,10 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-const SchemaVersion = 6
+// SchemaVersion is the runtime manifest version. Version 1 is the
+// v26.1.0-rc.1 compatibility baseline; pre-release manifests used 1–6 and are
+// not migrated.
+const SchemaVersion = 1
 
 // AppConfig is the fully resolved, runtime-immutable configuration consumed by
 // server/app. Production hosts obtain it only from LoadAppConfig.
@@ -408,6 +411,9 @@ func LoadAppConfigBytes(manifestPath string, data []byte) (AppConfig, error) {
 		return AppConfig{}, fmt.Errorf("resolve config path %q: %w", manifestPath, err)
 	}
 	absPath = filepath.Clean(absPath)
+	if err := checkManifestVersion(data, SchemaVersion); err != nil {
+		return AppConfig{}, fmt.Errorf("runtime manifest %s: %w", absPath, err)
+	}
 	var raw manifest
 	decoder := toml.NewDecoder(bytes.NewReader(data)).DisallowUnknownFields()
 	if err := decoder.Decode(&raw); err != nil {

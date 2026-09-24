@@ -25,9 +25,15 @@ import (
 )
 
 const (
-	applicationID = 0x4c554d49 // "LUMI"
-	fileMode      = 0o600
-	directoryMode = 0o700
+	// applicationID identifies a catalog in the v26.1.0-rc.1 compatibility
+	// lineage. It is checked before any version is read, so a pre-release
+	// catalog is never misread by a reused user_version.
+	applicationID = 0x4c554d43 // "LUMC"
+	// preReleaseApplicationID is the identity every pre-release catalog
+	// carries. Pre-release data is not migrated.
+	preReleaseApplicationID = 0x4c554d49 // "LUMI"
+	fileMode                = 0o600
+	directoryMode           = 0o700
 )
 
 var registerVec1Extension sync.Once
@@ -152,7 +158,7 @@ func Open(ctx context.Context, cfg config.DatabaseConfig, suppliedOptions ...Ope
 	if err := claimOrVerifyCatalog(ctx, database); err != nil {
 		return closeOnError("verify identity of", err)
 	}
-	if err := assertSchemaVersion(ctx, database); err != nil {
+	if err := assertSchemaVersion(ctx, database, SchemaVersion); err != nil {
 		return closeOnError("verify schema version of", err)
 	}
 	if err := validateIntegrity(ctx, database); err != nil {
@@ -394,7 +400,9 @@ func (d *DB) Check(ctx context.Context) error {
 
 // InspectCatalog opens a catalog through an independent read-only connection
 // and verifies that it is a healthy Lumilio SQLite database. Backup validation
-// deliberately does not reuse the live application handle.
+// deliberately does not reuse the live application handle. Any supported
+// schema version (1..SchemaVersion) passes, so an older backup can be restored
+// and then upgraded; callers compare SchemaVersion when they need an exact one.
 func InspectCatalog(ctx context.Context, path string) (CatalogInfo, error) {
 	return inspectCatalog(ctx, path, false)
 }
@@ -431,6 +439,9 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	var catalogApplicationID int
 	if err := database.QueryRowContext(ctx, "PRAGMA application_id").Scan(&catalogApplicationID); err != nil {
 		return CatalogInfo{}, fmt.Errorf("read SQLite application_id: %w", err)
+	}
+	if catalogApplicationID == preReleaseApplicationID {
+		return CatalogInfo{}, preReleaseCatalogError()
 	}
 	if catalogApplicationID != applicationID {
 		return CatalogInfo{}, fmt.Errorf("SQLite application_id = %#x, want %#x", catalogApplicationID, applicationID)
@@ -475,12 +486,15 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&info.SchemaVersion); err != nil {
 		return CatalogInfo{}, fmt.Errorf("read SQLite schema version: %w", err)
 	}
-	if info.SchemaVersion != SchemaVersion {
+	if info.SchemaVersion > SchemaVersion {
 		return CatalogInfo{}, fmt.Errorf(
-			"SQLite catalog schema version = %d, want %d",
+			"SQLite catalog schema version = %d is newer than this build supports (%d): it was written by a newer Lumilio Photos",
 			info.SchemaVersion,
 			SchemaVersion,
 		)
+	}
+	if info.SchemaVersion < 1 {
+		return CatalogInfo{}, fmt.Errorf("SQLite catalog schema version = %d, want 1..%d", info.SchemaVersion, SchemaVersion)
 	}
 	// River lives in QueueDB for production catalogs. Keep this field as an
 	// optional compatibility observation for historical snapshots and tests;
@@ -676,6 +690,9 @@ func claimOrVerifyCatalog(ctx context.Context, database *sql.DB) error {
 	}
 	if got == applicationID {
 		return nil
+	}
+	if got == preReleaseApplicationID {
+		return preReleaseCatalogError()
 	}
 	if got != 0 {
 		return fmt.Errorf("application_id = %#x, want Lumilio %#x", got, applicationID)
