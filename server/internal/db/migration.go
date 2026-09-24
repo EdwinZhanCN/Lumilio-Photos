@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -15,16 +16,26 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 )
 
-// SchemaVersion is the single catalog schema discriminator stored in
-// PRAGMA user_version. It is written once by the baseline and never
-// incremented in place: a catalog carrying any other value is rejected rather
-// than upgraded.
-const SchemaVersion = 9
+// SchemaVersion is the catalog schema version stored in PRAGMA user_version.
+// Version 1 is the v26.1.0-rc.1 compatibility baseline; 0 is reserved for an
+// empty catalog. Later builds reach higher versions through forward steps and
+// never edit a shipped baseline or step.
+const SchemaVersion = 1
 
 // baselineMigrationFile is the one embedded catalog baseline. It is edited in
-// place when the schema changes. There is deliberately no migration sequence,
-// checksum ledger, or historical generation selection.
+// place only until the rc.1 tag, and frozen afterwards.
 const baselineMigrationFile = "000001_storage_baseline.up.sql"
+
+// ErrPreReleaseCatalog marks a catalog created by a pre-release build. Such
+// catalogs are rejected, never migrated.
+var ErrPreReleaseCatalog = errors.New("catalog was created by a pre-release build of Lumilio Photos, whose data is not migrated")
+
+func preReleaseCatalogError() error {
+	return fmt.Errorf(
+		"%w: move the SQLite catalog aside and restart Lumilio Photos to create a new one (media repositories and original files are not touched)",
+		ErrPreReleaseCatalog,
+	)
+}
 
 // Migrate applies the catalog baseline and, for standalone package tests,
 // River's schema on the same handle. Production calls MigrateCatalog for the
@@ -58,7 +69,8 @@ func (d *DB) MigrateCatalog(ctx context.Context) error {
 
 // assertSchemaVersion refuses to start against a catalog that is not the
 // current schema version. An empty catalog passes so the baseline can claim
-// it; a catalog with any user table must already carry SchemaVersion.
+// it; a catalog with any user table must already carry a version, and one
+// newer than this build is rejected rather than read.
 func assertSchemaVersion(ctx context.Context, database *sql.DB) error {
 	var version int
 	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
@@ -67,9 +79,16 @@ func assertSchemaVersion(ctx context.Context, database *sql.DB) error {
 	if version == SchemaVersion {
 		return nil
 	}
+	if version > SchemaVersion {
+		return fmt.Errorf(
+			"catalog schema version = %d is newer than this build supports (%d): it was written by a newer Lumilio Photos; upgrade Lumilio Photos to open it",
+			version,
+			SchemaVersion,
+		)
+	}
 	if version != 0 {
 		return fmt.Errorf(
-			"catalog schema version = %d, want %d: this catalog belongs to an incompatible schema; delete the SQLite catalog and restart Lumilio Photos (media repositories and original files are not deleted)",
+			"catalog schema version = %d, want %d: this catalog has no supported upgrade path",
 			version,
 			SchemaVersion,
 		)
@@ -85,7 +104,7 @@ func assertSchemaVersion(ctx context.Context, database *sql.DB) error {
 	}
 	if userTables != 0 {
 		return fmt.Errorf(
-			"catalog has %d user tables but PRAGMA user_version = 0, want %d: this catalog belongs to an incompatible schema; delete the SQLite catalog and restart Lumilio Photos (media repositories and original files are not deleted)",
+			"catalog has %d user tables but PRAGMA user_version = 0, want %d: this catalog is incomplete or damaged; restore a backup, or move the SQLite catalog aside and restart Lumilio Photos (media repositories and original files are not touched)",
 			userTables,
 			SchemaVersion,
 		)

@@ -46,9 +46,12 @@ stays reserved for "absent/empty" (SQLite's `user_version` default and Go/JSON
 zero values) and is never a real version.
 
 **Catalog: identity, frozen baseline, forward steps.**
-- The rc.1 baseline `server/migrations/000001_storage_baseline.up.sql` stamps
-  `PRAGMA user_version = 1` and `PRAGMA application_id = 0x4c554d43` ("LUMC",
-  the catalog sibling of QueueDB's "LUMQ"). At the tag it is frozen.
+- A fresh rc.1 catalog is claimed with `PRAGMA application_id = 0x4c554d43`
+  ("LUMC") when it is opened, and the baseline
+  `server/migrations/000001_storage_baseline.up.sql` stamps
+  `PRAGMA user_version = 1`. Every pre-release catalog carries
+  `0x4c554d49` ("LUMI"), so the new identity alone marks the rc.1 lineage. At
+  the tag the baseline is frozen.
 - Later schema changes are embedded steps N→N+1 under
   `server/migrations/steps/`, SQL or Go where SQL cannot express the change,
   each in one transaction that also sets `user_version`. A fresh install runs
@@ -57,10 +60,9 @@ zero values) and is never a real version.
   checksum ledger.
 - The startup gate, in order:
   1. No user tables and `application_id` 0 → apply baseline and steps.
-  2. `application_id` ≠ "LUMC" → reject as pre-release (the legacy
-     `lumilio_schema_migrations` ledger is named in the message when present)
-     or as not a Lumilio catalog. This check runs before any version is read,
-     so reused numbers can never be misread.
+  2. `application_id` "LUMI" → reject as pre-release; any other value but
+     "LUMC" → reject as not a Lumilio catalog. This check runs before any
+     version is read, so reused numbers can never be misread.
   3. `user_version` > current → reject: written by a newer Lumilio Photos.
   4. 1 ≤ `user_version` < current → automatic backup through the existing
      backup subsystem, then apply the remaining steps. A failed step rolls
@@ -136,8 +138,9 @@ it.
 **Detect pre-release catalogs by version number or the legacy ledger alone.**
 Rejected: the ledger catches the published betas (stamp 8), but internal
 catalogs stamped 3–9 have no ledger, and step versions 2–9 will reuse those
-numbers. `application_id` is one extra pragma, already the pattern for
-QueueDB, and makes identity independent of version.
+numbers. The catalog already carried an `application_id` ("LUMI", as does
+QueueDB with "LUMQ"); giving the rc.1 lineage a new value makes identity
+independent of version at no extra cost.
 
 **Start rc.1 versions above every pre-release number (e.g. catalog 10).**
 Rejected: it leaves a permanent unexplained gap and still does not

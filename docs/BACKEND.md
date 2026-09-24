@@ -323,7 +323,7 @@ without holding a filesystem operation inside a database transaction.
   host-side sampling; there is deliberately no private-data HTTP debug API.
   Slow named transactions remain logged against the write-transaction budget.
   Online Backup reads use a reader connection, never the writer semaphore.
-- The generation-9 baseline includes stable Events, membership, correction
+- The catalog baseline includes stable Events, membership, correction
   constraints, one-hop redirects, factual dirty ranges, per-owner rebuild state,
   owner-wide source/published revision pairs, rebuild leases, persisted rebuild
   runs, and the terminal `retired` state. Event and other derived projections
@@ -357,10 +357,17 @@ without holding a filesystem operation inside a database transaction.
   mapping-mismatched, and post-restore indexes are deleted and rebuilt before
   HTTP starts.
 - The catalog schema is one standalone baseline in `server/migrations`
-  (`000001_storage_baseline.up.sql`). `PRAGMA user_version` is the only schema
-  discriminator: version 9 is current, any other catalog is rejected and must
-  be recreated. There is no migration sequence or checksum ledger. QueueDB
-  River migrations remain independent and disposable.
+  (`000001_storage_baseline.up.sql`), schema version 1: the `v26.1.0-rc.1`
+  compatibility baseline. `PRAGMA application_id` "LUMC" is the catalog's
+  identity and is checked before any version; a pre-release catalog ("LUMI")
+  is rejected as pre-release whatever `user_version` it carries.
+  `PRAGMA user_version` is the only version discriminator; a newer version is
+  rejected as written by a newer build. There is no checksum ledger. The
+  baseline is edited in place only until the rc.1 tag; after it, schema
+  changes are numbered forward steps and shipped files are never edited
+  ([the rc.1 compatibility decision](../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
+  The server TOML `schema_version` and the backup manifest format also start
+  at 1. QueueDB River migrations remain independent and disposable.
 - The current schema deliberately has no catalog-to-QueueDB cutover journal or
   task-state compatibility layer. A fresh QueueDB is disposable: startup and
   periodic reconciliation rebuild its macro jobs from catalog desired/applied

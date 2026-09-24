@@ -22,10 +22,11 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
-// manifestFormatVersion is bumped whenever the manifest contract changes.
-// Snapshots written by an earlier format are rejected outright; restore never
-// translates a manifest.
-const manifestFormatVersion = 3
+// manifestFormatVersion is the snapshot manifest contract. Format 1 is the
+// v26.1.0-rc.1 compatibility baseline. Pre-release manifests reused higher
+// numbers, so a mismatch is attributed only after the snapshot catalog's
+// identity has been inspected.
+const manifestFormatVersion = 1
 
 // Logf matches the supervisor-style logging callback used across the app.
 type Logf func(format string, args ...any)
@@ -308,6 +309,12 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 		return Manifest{}, db.CatalogInfo{}, err
 	}
 	if manifest.FormatVersion != manifestFormatVersion {
+		if _, inspectErr := db.InspectStandaloneCatalog(ctx, snapshotPath); errors.Is(inspectErr, db.ErrPreReleaseCatalog) {
+			return Manifest{}, db.CatalogInfo{}, fmt.Errorf("inspect SQLite snapshot: %w", inspectErr)
+		}
+		if manifest.FormatVersion > manifestFormatVersion {
+			return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot manifest format %d is newer than this build supports (%d): it was written by a newer Lumilio Photos", manifest.FormatVersion, manifestFormatVersion)
+		}
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot manifest format %d is unsupported", manifest.FormatVersion)
 	}
 	fileInfo, err := os.Stat(snapshotPath)

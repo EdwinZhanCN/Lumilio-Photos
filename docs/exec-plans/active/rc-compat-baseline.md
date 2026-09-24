@@ -1,6 +1,6 @@
 # RC compatibility baseline and upgrade paths
 
-Status: active, created 2026-09-24. Phase 0 done (decision approved). Child of
+Status: active, created 2026-09-24. Phases 0–1 done; Phase 2 next. Child of
 [release-hardening.md](release-hardening.md); tracked by issue #221 in the
 `v26.1.0-rc.1` milestone, so it blocks the tag. Supersedes the beta.1 upgrade
 test that was planned here earlier (pre-release data is not migrated).
@@ -73,18 +73,22 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   `migration.go` comments change with the Phase 1 code they describe.)
 
 ### Phase 1 — Reset to version 1 (internal era, last edit-in-place)
-- [ ] Catalog `SchemaVersion` 9 → 1 (`server/internal/db/migration.go`) and
+- [x] Catalog `SchemaVersion` 9 → 1 (`server/internal/db/migration.go`) and
   the baseline's `PRAGMA user_version` stamp together; backup inspection
-  (`InspectStandaloneCatalog`) follows.
-- [ ] Server TOML `schema_version` 6 → 1 (`server/config/config.go`); regenerate
+  (`InspectStandaloneCatalog`) follows. Catalog `application_id` "LUMI" →
+  "LUMC"; "LUMI" is rejected as `ErrPreReleaseCatalog` before any version.
+- [x] Server TOML `schema_version` 6 → 1 (`server/config/config.go`); regenerate
   `server/config/examples/**` with the repo's config-examples task; update any
-  docs showing it (`site/docs/en` and `site/docs/zh-cn`).
-- [ ] Backup `manifestFormatVersion` 3 → 1 (`server/internal/db/backup`).
-- [ ] Repository root config: decide `"1.0"` stays or becomes integer `1`
-  (record in the decision); either way it is the rc.1 baseline.
-- [ ] Pre-release rejection with clear messages for catalog, config, backup,
-  root config; unit tests for each (a catalog stamped 9, one with the legacy
-  ledger table, a config with `schema_version = 6`, a v3 backup manifest).
+  docs showing it (`site/docs/en` and `site/docs/zh-cn`; none do). The
+  schema id is now `lumilio-server-v1.schema.json`.
+- [x] Backup `manifestFormatVersion` 3 → 1 (`server/internal/db/backup`).
+- [x] Repository root config: `"1.0"` stays (decision record); pre-release
+  markers are the same shape and are accepted, so no code change.
+- [x] Pre-release rejection with clear messages for catalog, config, backup
+  (root config is accepted, above); unit tests: `TestOpenRejectsPreReleaseCatalog`
+  (beta stamp 8 + ledger, stamp 9, colliding stamp 1),
+  `TestValidateSnapshotAttributesManifestFormatMismatch` (v2/v3 pre-release,
+  newer, missing), `TestLoadAppConfigRejectsNewerOrPreReleaseSchemaVersion`.
 - [ ] `task server:test`, `task verify:generated`, `task desktop:test`; wipe
   local/radxa E2E and Desktop state before any manual testing.
 
