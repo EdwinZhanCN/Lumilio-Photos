@@ -28,6 +28,12 @@ revision represented by published Events. `source_revision > published_revision`
 is the only definition of pending rebuild work. `MarkEventFactsChangedTx` is
 the single factual invalidation boundary and must run in the same catalog
 transaction as the media, Stack, metadata, trash, or correction mutation.
+Event user state (title override, cover override, hidden) is a
+reconciliation input that every rebuild snapshot copies and republishes, so a
+`PATCH /api/v1/events/{id}` advances `source_revision` too; otherwise a
+rebuild prepared before the edit passes the revision check and silently
+reverts it (found 2026-09-23 through a flaky `events.spec.ts` while late EXIF
+kept a rebuild in flight).
 `event_dirty_ranges` is a recovery ledger, not an incremental computation
 window. Rebuild work uses the closed `rebuild_projection_batch` macro.
 
