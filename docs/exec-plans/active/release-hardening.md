@@ -1,11 +1,27 @@
 # Release hardening week
 
 Status: active, created 2026-09-22 for a release candidate on 2026-09-29.
-Landed on `dev` so far (`bdd1375..74526ae`): Processing two-pattern pass, Agent
-per-tab transcript and retry, Person Recognition relation decoding, UI
+As of 2026-09-24: Phases 0–2 done; Phase 3 E2E specs done; `dev` at
+`f598310a` is fully green in CI on draft promotion PR #210 (every job and all
+eight E2E slices, including the new `@people`). Remaining work is split into
+three child plans, each written to be picked up by a fresh session:
+[rc-upgrade-restore.md](rc-upgrade-restore.md) (Phase 6 upgrade/restore),
+[rc-smoke-checklist.md](rc-smoke-checklist.md) (Phase 3 manual smoke), and
+[rc-release.md](rc-release.md) (notes, release workflow, promotion, tag).
+Phase 4 verdicts below await the user.
+
+Landed before this plan (`bdd1375..74526ae`): Processing two-pattern pass,
+Agent per-tab transcript and retry, Person Recognition relation decoding, UI
 language normalization (Storage page crash), `asset_handler.go` and desktop
 `App.tsx` splits, ML-tab cleanup, and the Processing stage grid
 ([decision](../../../.agents/decisions/2026-09-22-processing-stage-grid.md)).
+Landed during it (PRs into `dev`): #205 i18n extractor + low-power E2E
+timing, #206 commit-metric race, #207 scan settle race, #208 share-link
+startup error + E2E, #209 Storage asset count (blocker) + E2E, #211 tracker,
+#212 paged reindex abandoned pages (blocker) + video flake, #213 Event edits
+reverted by in-flight rebuilds (blocker) + events flake, #214 sign-out double
+login mount + TOTP flake, #215 People merge E2E with recorded faces, #216 web
+media URL switched representation mid-playback (blocker).
 
 Goal: a `YY.TRAIN.PATCH-rc.1` tag on `main`, promoted from a green `dev`, with
 every release-blocking item below closed or explicitly deferred with a reason.
@@ -26,6 +42,27 @@ follow-up in the tech-debt tracker.
   flow (sign-in, upload, browse, view, search, albums, people, share, storage,
   backup/restore), or breaks install/upgrade. Everything else is deferrable.
 - No check is skipped, disabled, or quarantined to reach green.
+
+## Handoff: how to resume
+
+- Start a fresh session in this repo, read this file, then the child plan you
+  are working on. Each child plan lists its own environment, phases, and
+  validation boundaries; keep its `Status:` and checkboxes current in the
+  same PR that changes reality.
+- Run the child plans in this order: rc-release Phase 0 (release workflow
+  de-risk) and rc-upgrade-restore can start in parallel; rc-smoke-checklist
+  Part A after an RC image exists on the radxa; rc-release Phases 1–4 last.
+- Remote Docker host `radxa-x4` (Intel N100, 7.5 GiB, Fedora 44, fish shell):
+  build images on the Mac for `linux/amd64`, ship with `docker save | gzip -1
+  | ssh radxa-x4 'gunzip | docker load'`, run there. For the E2E stack, do not
+  use `task web:e2e:up` against the remote (it passes `--build`); use
+  `DOCKER_HOST=ssh://radxa-x4 docker compose -f web/e2e/compose.yml -p
+  lumilio-photos-e2e up -d --no-build --wait`, tunnel ports 16657–16659, and
+  run slices from the Mac with `LUMILIO_E2E_DOCKER_HOST=ssh://radxa-x4`.
+- A real Lumen Hub runs on the radxa at `:50051` (face, siglip, ocr).
+- CI runs only on PRs and `main` pushes, and a PR into `dev` only runs the
+  jobs its paths touch; #210's CI is the full baseline. CI fails on any flaky
+  test (`failOnFlakyTests`).
 
 ## Execution phases
 
@@ -76,7 +113,8 @@ follow-up in the tech-debt tracker.
 ### Phase 3 — Flow coverage for untested journeys
 - [ ] Manual smoke checklist on a fresh Docker Compose install and on Desktop
   (macOS or Windows): People, Albums/Collections, Share links, Studio,
-  Settings/Users, Storage admin, Map. Record results here.
+  Settings/Users, Storage admin, Map. Owned by
+  [rc-smoke-checklist.md](rc-smoke-checklist.md).
 - [x] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
   - [x] Share link create/open/revoke: `web/e2e/specs/share-links.spec.ts`
@@ -111,9 +149,25 @@ follow-up in the tech-debt tracker.
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage
-- [ ] Decide blocker or deferred for each tracker item: Music embedded covers
-  (placeholder today), Event late-EXIF fixture and legacy recovery, video
-  semantic operation-scoped E2E proof, Linux bind-mount capacity test.
+- [ ] Decide blocker or deferred for each tracker item (recommendations
+  below; the user decides, then record the verdict here):
+  - Music embedded covers (placeholder; audio as album cover 404s) —
+    **defer**, list under Known issues in the release notes.
+  - Event late-EXIF fixture and legacy recovery — **defer the fixture**; the
+    user-visible half (edits reverted by rebuilds) was fixed in #213. The
+    legacy-claims risk is checked by rc-upgrade-restore Phase 1 (Events
+    present and stable after upgrading a beta.1 catalog); promote to blocker
+    only if that fails.
+  - Video semantic reprocess completion proof — **defer**; narrowed by #212
+    (rebuild receipts are now observable), remaining gap is test-only.
+  - Linux bind-mount capacity test — **defer**; privileged-test gap, no known
+    user impact.
+  - Manual scan within the settle window — **deferred** (user decision
+    2026-09-23, tracker entry from #211); Known issue in the release notes.
+  - Follow-ups found this week (tracker entries added 2026-09-24):
+    `LoginPage.signIn` 5s wait, share UI accessible names, pre-commit hook on
+    `doc.md`-only commits, `useMergePeople` cast, unexplained idle
+    `music-agent` pause — **defer** all; none is user-data or core-flow.
 - [x] `NewShareLinkService` panics on secret-key failure at construction;
   return an error so startup reports a diagnosable failure instead.
 
@@ -123,9 +177,14 @@ follow-up in the tech-debt tracker.
 - [ ] Agent: per-tool progress and duration in tool chips; copy-answer action.
 
 ### Phase 6 — Release candidate
-- [ ] Release notes (user-facing, bilingual per the terminology registry).
-- [ ] Upgrade test: an existing catalog from the last published version starts
-  and migrates; a backup from it restores.
+- [ ] Release notes (user-facing, bilingual per the terminology registry) —
+  [rc-release.md](rc-release.md) Phase 1.
+- [ ] Upgrade test: an existing catalog from the last published version
+  (v26.1.0-beta.1) starts and migrates; a backup from it restores —
+  [rc-upgrade-restore.md](rc-upgrade-restore.md).
+- [ ] Release workflow proven on current `dev` (the v26.1.0-beta.2 release run
+  failed in the Windows portable build) — [rc-release.md](rc-release.md)
+  Phase 0.
 - [ ] `dev` → `main` promotion PR, green CI, then the `rc.1` tag; the release
   workflow builds every Desktop and Server artifact.
 - [ ] Smoke the published artifacts once (Docker image digest, one Desktop

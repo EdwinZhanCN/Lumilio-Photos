@@ -49,3 +49,31 @@ Last aligned with the codebase: 2026-09-23.
   so that step still asserts acceptance only. `queued_jobs` remains a global
   backlog even when queried with a repository filter, so a slice cannot treat
   queue-idle or that counter as proof that this repository's video finished.
+
+## Found during release hardening (2026-09-24)
+
+- **Share UI controls have no accessible names.** Owner:
+  `web/src/features/assets/flows/export/AssetExportDialog.tsx` (icon-only
+  Share, Studio, Add to album buttons; tooltip text is not a name) and
+  `web/src/features/share/flows/public/PublicShareGrid.tsx` (tiles are buttons whose
+  only content is an `alt=""` image). Screen-reader users cannot identify
+  these controls; E2E has to go through the gallery bulk action instead.
+- **`LoginPage.signIn` waits only the default 5s for the post-login URL.**
+  Owner: `web/e2e/pages/login.page.ts`. Every spec that signs in inherits it;
+  it timed out under heavy CPU throttling (never yet in CI). Give it an
+  explicit, commented budget like `PLAYBACK_START_TIMEOUT` if it appears in CI.
+- **One unexplained pause during music-agent audition.** Owner:
+  `web/e2e/specs/music-agent.spec.ts:163` and
+  `web/src/features/music/state/MusicPlayerProvider.tsx`. Seen once on an idle
+  local stack (a real `pause` at 0.067s between filling and clicking Refine);
+  not reproduced in ~125 runs, no code path found. Capture a trace if it
+  recurs.
+- **`useMergePeople` casts its response.** Owner:
+  `web/src/features/people/api/usePeople.ts` (`as
+  Promise<PersonCorrectionResponse>`). A cast around an API response usually
+  means a stale DTO or `@Success` annotation; check the merge handler's
+  OpenAPI annotation and regenerate instead.
+- **Pre-commit fails on a commit whose only Markdown file is a generated
+  `doc.md`.** Owner: `web/` lint-staged/`vp staged` config. `vp fmt` ignores
+  `doc.md`, so the Markdown task errors with "Expected at least one target
+  file"; the only workaround today is `--no-verify`.
