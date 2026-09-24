@@ -23,7 +23,7 @@ the promotion commit, with bilingual release notes, smoked once.
   run failed).
 - `main` changes only via the single promotion PR #210; never push to `main`
   directly. Merge only when [release-hardening.md](release-hardening.md)
-  validation boundaries hold and [rc-upgrade-restore.md](rc-upgrade-restore.md)
+  validation boundaries hold and [rc-compat-baseline.md](rc-compat-baseline.md)
   and [rc-smoke-checklist.md](rc-smoke-checklist.md) are closed.
 - Tags and releases are outward-facing: the user confirms before any tag is
   pushed.
@@ -70,8 +70,10 @@ the promotion commit, with bilingual release notes, smoked once.
   release workflow reads them (check `release.yml`; otherwise the GitHub
   release body) and, if the docs site has a changelog/upgrade page, update
   `site/docs/en` and `site/docs/zh-cn` together.
-- [ ] Include upgrade guidance from rc-upgrade-restore.md results (back up
-  first; what the migration does).
+- [ ] Upgrade guidance: rc.1 is the first supported release; data from
+  pre-release builds (`v1.0.0-beta.*`, `v26.1.0-beta.*`) is not migrated —
+  start fresh. From rc.1 on, updates upgrade in place and take an automatic
+  backup first (see rc-compat-baseline.md).
 
 ### Phase 2 — Promote
 - [ ] Run the RC blocker gate (Fixed contracts). Stop if anything is open.
@@ -87,6 +89,11 @@ the promotion commit, with bilingual release notes, smoked once.
 - [ ] Verify outputs: GitHub pre-release created with notes; Server image
   `ghcr.io/edwinzhancn/lumilio-server` with the expected tags and a recorded
   digest; Desktop macOS DMG and Windows installer/portable attached.
+
+- [ ] Lock the rc.1 compatibility fixture from the published image
+  ([rc-compat-baseline.md](rc-compat-baseline.md) Phase 4) and land it via a
+  PR into `dev`. From here on, no shipped migration or format is edited in
+  place.
 
 ### Phase 4 — Smoke the published artifacts
 - [ ] Docker: on the radxa, pull the published image **by digest**, fresh

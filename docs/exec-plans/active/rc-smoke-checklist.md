@@ -14,7 +14,7 @@ copy, i18n, keyboard and error paths), not a replacement for the E2E slices.
 - Re-testing what E2E already proves on every PR: sign-in/TOTP, upload,
   scan, Storage admin add/scan, share link create/open/revoke, People merge,
   Agent runtime, video semantic search, backup/restore (restore is covered by
-  [rc-upgrade-restore.md](rc-upgrade-restore.md)). Spot-check them only.
+  [rc-compat-baseline.md](rc-compat-baseline.md)). Spot-check them only.
 - Fixing cosmetic issues during the run. File them; fix only blockers.
 
 ## Fixed contracts
@@ -39,7 +39,7 @@ docker load'`, then install with `deploy/compose/compose.yml` exactly as
 `site/docs/en/user-manual/introduction/first-use.md` tells a user (set
 `LUMILIO_IMAGE` to the shipped tag). Use its own compose project (`-p
 rc-smoke`), its own data dir (`~/rc-smoke/`), and a port that doesn't collide
-with `lumilio-photos-e2e` (16657–16659) or `rc-upgrade`. Reach it from the Mac
+with `lumilio-photos-e2e` (16657–16659) or `rc-compat`. Reach it from the Mac
 with an SSH tunnel and drive a real browser (Chrome via the claude-in-chrome
 tools, or Playwright headed). For ML flows, the radxa runs a real Lumen Hub
 on `:50051` (face, siglip, ocr); connect it through the documented settings
