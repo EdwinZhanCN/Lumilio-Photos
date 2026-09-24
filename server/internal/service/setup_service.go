@@ -22,9 +22,9 @@ type SetupStatus struct {
 const SetupRuntimeStateInitializing = "initializing"
 
 // RepositoryDefaults is the setup-wizard view of the storage-owned repository
-// defaults plus the immutable default root (the storage root).
+// defaults plus the immutable Default Storage Location path.
 type RepositoryDefaults struct {
-	DefaultRoot       string
+	StorageLocation   string
 	Strategy          string
 	DuplicateHandling string
 	RiskWarnings      []string
@@ -46,22 +46,22 @@ type setupRepositoryReader interface {
 // SetupService exposes first-run state after the catalog has opened and
 // migrated. There is no separate database initialization endpoint.
 type SetupService struct {
-	bootstrap    BootstrapService
-	repoDefaults repositoryDefaultsReader
-	storage      storageRuntimeReader
-	storageRoot  string
+	bootstrap       BootstrapService
+	repoDefaults    repositoryDefaultsReader
+	storage         storageRuntimeReader
+	storageLocation string
 }
 
 func NewSetupService(
 	bootstrap BootstrapService,
 	repositories setupRepositoryReader,
-	storageRoot string,
+	storageLocation string,
 ) *SetupService {
 	return &SetupService{
-		bootstrap:    bootstrap,
-		repoDefaults: repositories,
-		storage:      repositories,
-		storageRoot:  strings.TrimSpace(storageRoot),
+		bootstrap:       bootstrap,
+		repoDefaults:    repositories,
+		storage:         repositories,
+		storageLocation: strings.TrimSpace(storageLocation),
 	}
 }
 
@@ -98,10 +98,10 @@ func (s *SetupService) Status(ctx context.Context) (SetupStatus, error) {
 			return SetupStatus{}, fmt.Errorf("load repository defaults: %w", err)
 		}
 		status.RepositoryDefaults = &RepositoryDefaults{
-			DefaultRoot:       s.storageRoot,
+			StorageLocation:   s.storageLocation,
 			Strategy:          defaults.Strategy,
 			DuplicateHandling: defaults.DuplicateHandling,
-			RiskWarnings:      storage.StoragePlacementWarnings(s.storageRoot),
+			RiskWarnings:      storage.StoragePlacementWarnings(s.storageLocation),
 		}
 	}
 

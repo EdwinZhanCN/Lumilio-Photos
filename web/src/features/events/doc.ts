@@ -6,7 +6,11 @@
  * ## State
  *
  * Server Event state remains in TanStack Query through {@link useEvents} and
- * {@link useEvent}. Gallery selection remains owned by the Assets scope.
+ * {@link useEvent}. {@link useEventRebuildStatus} polls the owner-wide rebuild
+ * lifecycle only while a source revision is pending. Gallery selection remains
+ * owned by the Assets scope. List and detail apply Repository Browse Scope as
+ * a read projection; counts, cover, and gallery come from that same resolved
+ * set.
  *
  * ## Flows
  *
@@ -23,17 +27,19 @@
  * presentation and entry points into focused edit, share, and add-media
  * dialogs. {@link EventEditModal} keeps metadata and merge correction together,
  * using {@link EventPicker} instead of exposing internal Event IDs.
- * {@link useEventBulkActions} owns selection-derived cover, split, move,
- * remove, and snapshot-share workflows outside the route component.
+ * {@link EventPicker} searches on the server rather than filtering the first
+ * loaded page. {@link useEventBulkActions} owns selection-derived cover, split,
+ * move, remove, and snapshot-share workflows outside the route component.
  *
  * ## Data
  *
- * {@link EventSummary} is generated from OpenAPI. Event titles are live,
+ * {@link EventSummary} is generated from OpenAPI and carries canonical and
+ * projected counts from the shared Event resolver. Event titles are live,
  * localized presentation fallbacks rather than persisted prose.
  *
  * @module
  */
-import type { useEvent, useEvents } from "./api/useEvents.ts";
+import type { useEvent, useEventRebuildStatus, useEvents } from "./api/useEvents.ts";
 import type { EventDetailFlow } from "./flows/detail/EventDetailFlow.tsx";
 import type EventEditModal from "./flows/detail/components/EventEditModal.tsx";
 import type EventHero from "./flows/detail/components/EventHero.tsx";

@@ -119,8 +119,12 @@ loading/error state, pagination and refetch behavior.
 Events follow this boundary directly: the index uses opaque server cursors,
 detail and mutation state remain in TanStack Query, and the detail gallery
 composes the public Assets entry with an immutable `event_id` constraint.
-Assets exposes feature-neutral logical selection values to Event correction
-actions; Events never imports Assets selection internals.
+List and detail apply Repository Browse Scope as a read projection after
+owner and Event authorization; header count, cover, and gallery come from that
+same resolved set. Rebuild status is polled only while a source revision is
+pending. Event picker search is server-side. Assets exposes feature-neutral
+logical selection values to Event correction actions; Events never imports
+Assets selection internals.
 
 Use Context for cross-cutting runtime capabilities: auth session, global
 runtime/notification coordination, worker dependencies.
@@ -151,7 +155,10 @@ refreshes; otherwise colocate state with the owning flow.
 
 Repository scoping uses `useBrowseScope` for list pages,
 `useWorkingRepository` for upload only, the entity's own `repository_id` for
-entity actions, and Manage for maintenance jobs. Do not add repository
+entity actions, and Manage (`/manage`) for the non-admin upload surface backed
+by `GET /api/v1/storage/targets`. Storage administration (create/open, verify,
+detach, cloud bindings, maintenance jobs) lives on `/storage` and admin-only
+`/api/v1/storage/*`, chiefly `GET /api/v1/storage/view`. Do not add repository
 parameters to person/album detail pages or mutations.
 
 ## Routing And Shell
@@ -163,7 +170,7 @@ Main app routes are rendered inside the shell with `NavBar`, `SideBar`, a scroll
 - Home and library: `/`, `/assets/*`.
 - Collections: `/collections`, albums, places/map, people, folders, tags, liked, trash, shared links, and utility/classifier views.
 - Entity detail: album, Event, folder, tag, person, and asset routes with optional asset-viewer segments.
-- Operations: `/manage`, `/settings`, `/studio`, `/server-monitor`, and `/lumilio`.
+- Operations: `/manage`, `/storage` (admin), `/settings`, `/studio`, `/server-monitor`, and `/lumilio`.
 - Public/auth/setup: `/s/:token/*`, login, registration, password/MFA, and bootstrap routes outside or around the authenticated shell as appropriate.
 
 Studio, Map, Lumilio, Monitor, and Settings are route-level lazy chunks. The
@@ -235,6 +242,12 @@ accidental browser dependency fails instead of hiding; `integration` and
 `browser` run real Chromium via the Playwright provider. Core-browsing UI is
 assigned to Playwright by the
 [test-layer assignment decision](../.agents/decisions/2026-08-14-frontend-test-layer-assignment.md).
+Playwright attempts own distinct mutable state through the shared workspace
+fixture (`test`, `repeatEachIndex`, and `retry`). E2E assertions use
+repository- or operation-scoped facts; a global queue reaching zero is not
+completion for one test. A retry-only pass is a CI failure until the cause is
+removed. Determinism contract:
+[the test-matrix decision](../.agents/decisions/2026-09-03-test-matrix-determinism.md).
 
 Flow specs: [lumilio-integration-spec](../.agents/skills/lumilio-integration-spec/SKILL.md).
 Playwright specs: [lumilio-e2e-spec](../.agents/skills/lumilio-e2e-spec/SKILL.md).

@@ -223,8 +223,10 @@ function resizeFixedCropRect(
   bounds: CropBounds,
   aspect: number,
 ): CropRect {
-  if (handle === "n" || handle === "s") return fitVerticalEdgeRect(rect, point, bounds, aspect, handle);
-  if (handle === "w" || handle === "e") return fitHorizontalEdgeRect(rect, point, bounds, aspect, handle);
+  if (handle === "n" || handle === "s")
+    return fitVerticalEdgeRect(rect, point, bounds, aspect, handle);
+  if (handle === "w" || handle === "e")
+    return fitHorizontalEdgeRect(rect, point, bounds, aspect, handle);
 
   const anchors: Record<string, { x: number; y: number; dx: number; dy: number }> = {
     nw: { x: rect.x + rect.width, y: rect.y + rect.height, dx: -1, dy: -1 },

@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
+import { storageViewQueryKey } from "./useStorageView";
 
 const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await Promise.all([
-    queryClient.invalidateQueries({
-      queryKey: ["get", "/api/v1/assets/indexing/repositories"],
-    }),
+    queryClient.invalidateQueries({ queryKey: [...storageViewQueryKey] }),
+    queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/storage/targets"] }),
     queryClient.invalidateQueries({
       queryKey: ["post", "/api/v1/assets/list"],
     }),
@@ -14,14 +14,14 @@ const invalidateRepositoryAwareQueries = async (queryClient: ReturnType<typeof u
       queryKey: ["post", "/api/v1/assets/search"],
     }),
     queryClient.invalidateQueries({
-      queryKey: ["get", "/api/v1/repositories/{id}/scans/latest"],
+      queryKey: ["get", "/api/v1/storage/repositories/{id}/verifications/latest"],
     }),
   ]);
 };
 
 export function useRepositoryScan() {
   const queryClient = useQueryClient();
-  const scanMutation = $api.useMutation("post", "/api/v1/repositories/{id}/scan");
+  const scanMutation = $api.useMutation("post", "/api/v1/storage/repositories/{id}/verifications");
   const detectStacksMutation = $api.useMutation("post", "/api/v1/repositories/{id}/stacks/detect");
   const [scanningIds, setScanningIds] = useState<Set<string>>(() => new Set());
   const [detectingIds, setDetectingIds] = useState<Set<string>>(() => new Set());

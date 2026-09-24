@@ -64,6 +64,7 @@ Each regression slice is one Task target wrapping a Playwright tag:
 | `task web:test:agent-trust` | `@agent-trust` | deterministic agent trust contract |
 | `task web:test:agent-runtime` | `@agent-runtime` | keyless fake Ollama through real SSE, SQLite, tools, confirmation, cancel, and recovery; one worker, but a distinct user/repository per test and repeat |
 | `task web:test:video-semantic` | `@video-regression` | video-semantic seed profile; asserts fakelumen metrics |
+| `task web:test:people` | `@people` | syncs the `demo` profile for its portraits; replays recorded face recognition |
 | `task web:test:backup-recovery` | `@backup-recovery` | |
 
 Run only the slice the change reaches

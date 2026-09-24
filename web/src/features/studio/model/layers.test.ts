@@ -23,7 +23,8 @@ describe("createTextLayer", () => {
 });
 
 describe("displayText", () => {
-  const layer = (overrides: Partial<TextLayer>) => createTextLayer({ text: "hello world", ...overrides });
+  const layer = (overrides: Partial<TextLayer>) =>
+    createTextLayer({ text: "hello world", ...overrides });
 
   it("applies the case transform", () => {
     expect(displayText(layer({ textCase: "upper" }))).toBe("HELLO WORLD");

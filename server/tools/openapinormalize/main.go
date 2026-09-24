@@ -162,7 +162,7 @@ func problemSchemaRef(path string, status int) string {
 	if status == 429 {
 		return "#/components/schemas/api.RateLimitedProblemResponse"
 	}
-	if status == 409 && (path == "/api/v1/repositories" || path == "/api/v1/repository-candidates/open") {
+	if status == 409 && (path == "/api/v1/storage/repositories" || path == "/api/v1/setup/primary-repository" || path == "/api/v1/storage/candidates/open") {
 		return "#/components/schemas/api.RepositoryConflictProblemResponse"
 	}
 	return "#/components/schemas/api.ProblemResponse"

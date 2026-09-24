@@ -27,12 +27,13 @@ jobs:
         outputs:
             server: ${{ steps.filter.outputs.server }}
             web: ${{ steps.filter.outputs.web }}
-            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
-            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
             browser_smoke: ${{ steps.filter.outputs.browser_smoke }}
             auth_e2e: ${{ steps.filter.outputs.auth_e2e }}
             agent_e2e: ${{ steps.filter.outputs.agent_e2e }}
             video_e2e: ${{ steps.filter.outputs.video_e2e }}
+            people_e2e: ${{ steps.filter.outputs.people_e2e }}
             recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
@@ -67,6 +68,9 @@ jobs:
                           - 'server/internal/api/handler/album_handler.go'
                           - 'server/internal/api/handler/asset_handler*.go'
                           - 'server/internal/api/handler/repository_scan_handler*.go'
+                          - 'server/internal/api/handler/share_link_handler*.go'
+                          - 'server/internal/api/handler/storage_handler*.go'
+                          - 'server/internal/db/repo/queries/assets_*.sql'
                           - 'server/internal/processors/asset_*.go'
                           - 'server/internal/processors/discover_task*.go'
                           - 'server/internal/processors/ingest_task*.go'
@@ -81,6 +85,7 @@ jobs:
                           - 'server/internal/queue/jobs/**'
                           - 'server/internal/service/album_service*.go'
                           - 'server/internal/service/asset_service*.go'
+                          - 'server/internal/service/share_link_service*.go'
                           - 'server/internal/sourcing/**'
                           - 'server/internal/storage/**'
                           - 'web/playwright.config.ts'
@@ -92,6 +97,8 @@ jobs:
                           - 'web/e2e/specs/capabilities.spec.ts'
                           - 'web/e2e/specs/login.spec.ts'
                           - 'web/e2e/specs/scan.spec.ts'
+                          - 'web/e2e/specs/share-links.spec.ts'
+                          - 'web/e2e/specs/storage-admin.spec.ts'
                           - 'web/e2e/specs/upload.spec.ts'
                           - 'web/src/app/**'
                           - 'web/src/contexts/WorkerProvider.tsx'
@@ -99,6 +106,7 @@ jobs:
                           - 'web/src/features/collections/**'
                           - 'web/src/features/manage/**'
                           - 'web/src/features/repositories/**'
+                          - 'web/src/features/share/**'
                           - 'web/src/features/upload/**'
                           - 'web/src/lib/assets/**'
                           - 'web/src/lib/http-commons/**'
@@ -116,6 +124,7 @@ jobs:
                           - 'server/internal/service/webauthn*.go'
                           - 'web/e2e/specs/auth-session.spec.ts'
                           - 'web/e2e/specs/auth-totp-bootstrap.spec.ts'
+                          - 'web/e2e/support/server.e2e.toml'
                           - 'web/e2e/support/totp.ts'
                           - 'web/src/features/auth/**'
                           - 'web/src/lib/http-commons/auth.ts'
@@ -169,6 +178,38 @@ jobs:
                           - 'web/src/features/assets/model/browseItems.ts'
                           - 'web/src/features/monitor/api/useAssetIndexing.ts'
                           - 'web/src/features/settings/flows/ai/**'
+                      # Replays recorded Hub face recognition for the demo
+                      # profile portraits; the slice also syncs that profile.
+                      people_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'taskfile.yml'
+                          - 'web/taskfile.yml'
+                          - 'assets.lock.json'
+                          - 'server/Dockerfile'
+                          - 'server/go.mod'
+                          - 'server/go.sum'
+                          - 'server/migrations/**'
+                          - 'server/tools/fakelumen/**'
+                          - 'server/internal/api/handler/people_handler*.go'
+                          - 'server/internal/api/dto/people_dto*.go'
+                          - 'server/internal/db/repo/queries/face*.sql'
+                          - 'server/internal/queue/enrichment_*.go'
+                          - 'server/internal/service/face_*.go'
+                          - 'server/internal/service/lumen_service.go'
+                          - 'web/playwright.config.ts'
+                          - 'web/package.json'
+                          - 'web/pnpm-lock.yaml'
+                          - 'web/scripts/assets-sync.ts'
+                          - 'web/e2e/compose*.yml'
+                          - 'web/e2e/fixtures/**'
+                          - 'web/e2e/pages/**'
+                          - 'web/e2e/support/**'
+                          - 'web/e2e/specs/people-*.spec.ts'
+                          - 'web/src/components/collection/**'
+                          - 'web/src/components/ui/Modal.tsx'
+                          - 'web/src/features/people/**'
+                          - 'web/src/lib/http-commons/**'
+                          - 'web/src/locales/**'
                       recovery_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
@@ -243,7 +284,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Authenticate GitHub Packages
               run: echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
@@ -312,7 +359,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             # @edwinzhancn/docts lives on GitHub Packages, which requires a
             # token even for public packages (web/.npmrc maps the scope).
@@ -385,6 +438,10 @@ jobs:
               if: needs.changes.outputs.video_e2e == 'true'
               run: task web:test:video-semantic
 
+            - name: Run People merge regression
+              if: needs.changes.outputs.people_e2e == 'true'
+              run: task web:test:people
+
             - name: Run database backup and recovery regression
               if: needs.changes.outputs.recovery_e2e == 'true'
               run: task web:test:backup-recovery
@@ -442,7 +499,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             # CGO deps: both the complete Server suite and the Desktop module
             # compile govips/libraw. SQLite, FTS5, and Vec1 are linked into the
@@ -500,7 +563,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Build control panel
               run: task ci:desktop:panel
@@ -551,7 +620,13 @@ jobs:
             - uses: voidzero-dev/setup-vp@v1
               with:
                   node-version: '24'
-                  cache: true
+                  # Vite+ workspaces live in web/, site/, and desktop/frontend/,
+                  # never the repo root, so each job's Taskfile target runs the
+                  # workspace-scoped `vp install`. Disable the action's implicit
+                  # root `vp install`: it has no root package.json to install and
+                  # newer vp fails there with an npm ENOENT (root-level caching
+                  # was already a no-op for the same reason).
+                  run-install: false
 
             - name: Install and build docs site
               run: task ci:site

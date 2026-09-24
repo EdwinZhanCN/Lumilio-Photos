@@ -15,26 +15,26 @@ type CreateRepositoryRequestDTO struct {
 	// Storage Location. It is required for regular repositories and omitted for
 	// the primary repository, whose folder is always "primary".
 	DirectoryName string `json:"directory_name,omitempty" example:"family-photos"`
-	// RootID identifies a registered Storage Location. Empty selects the
+	// StorageLocationID identifies a registered Storage Location. Empty selects the
 	// configured default location. Clients never submit an arbitrary root path.
-	RootID           string `json:"root_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Role             string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
-	StorageStrategy  string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
-	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
+	StorageLocationID string `json:"storage_location_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Role              string `json:"role,omitempty" binding:"omitempty,oneof=primary regular" example:"regular"`
+	StorageStrategy   string `json:"storage_strategy,omitempty" binding:"omitempty,oneof=date flat cas" example:"date"`
+	RiskConfirmation  bool   `json:"risk_confirmation,omitempty"`
 }
 
 type RepositoryDTO struct {
-	ID              string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name            string                  `json:"name" example:"Family Photos"`
-	Path            string                  `json:"path" example:"/data/storage/Family Photos"`
-	Role            string                  `json:"role" example:"regular"`
-	IsPrimary       bool                    `json:"is_primary" example:"false"`
-	RootID          string                  `json:"root_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Reachability    string                  `json:"reachability" example:"active"`
-	Activity        string                  `json:"activity" example:"idle"`
-	DefaultOwnerID  *int32                  `json:"default_owner_id,omitempty"`
-	StorageStrategy string                  `json:"storage_strategy" example:"date"`
-	LocalSettings   RepositoryLocalSettings `json:"local_settings"`
+	ID                string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name              string                  `json:"name" example:"Family Photos"`
+	Path              string                  `json:"path" example:"/data/storage/Family Photos"`
+	Role              string                  `json:"role" example:"regular"`
+	IsPrimary         bool                    `json:"is_primary" example:"false"`
+	StorageLocationID string                  `json:"storage_location_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Reachability      string                  `json:"reachability" example:"active"`
+	Activity          string                  `json:"activity" example:"idle"`
+	DefaultOwnerID    *int32                  `json:"default_owner_id,omitempty"`
+	StorageStrategy   string                  `json:"storage_strategy" example:"date"`
+	LocalSettings     RepositoryLocalSettings `json:"local_settings"`
 }
 
 type RepositoryLocalSettings struct {
@@ -72,32 +72,6 @@ type CreateRepositoryResponseDTO struct {
 	// Warnings are non-fatal notes about the chosen location, such as it being
 	// inside a cloud-sync folder. The repository was created regardless.
 	Warnings []string `json:"warnings,omitempty"`
-}
-
-type RepositoryRootDTO struct {
-	ID                         string   `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name                       string   `json:"name" example:"External Archive"`
-	Path                       string   `json:"path" example:"/Volumes/Photos"`
-	Kind                       string   `json:"kind" example:"external"`
-	Status                     string   `json:"status" example:"active"`
-	Writable                   bool     `json:"writable"`
-	CapacityKnown              bool     `json:"capacity_known"`
-	TotalBytes                 uint64   `json:"total_bytes,omitempty" example:"1000000000000"`
-	AvailableBytes             uint64   `json:"available_bytes,omitempty" example:"500000000000"`
-	Filesystem                 string   `json:"filesystem,omitempty" example:"apfs"`
-	RepositoryCount            int64    `json:"repository_count" example:"2"`
-	ActiveOperationCount       int64    `json:"active_operation_count" example:"0"`
-	CanRemove                  bool     `json:"can_remove"`
-	RemovalBlockedBy           string   `json:"removal_blocked_by,omitempty" example:"registered_repositories"`
-	FilesPreserved             bool     `json:"files_preserved"`
-	RiskWarnings               []string `json:"risk_warnings,omitempty"`
-	MountFingerprint           string   `json:"mount_fingerprint,omitempty"`
-	RegisteredMountFingerprint string   `json:"registered_mount_fingerprint,omitempty"`
-	MountFingerprintChanged    bool     `json:"mount_fingerprint_changed"`
-}
-
-type ListRepositoryRootsResponseDTO struct {
-	Roots []RepositoryRootDTO `json:"roots"`
 }
 
 type LifecycleAuditEventDTO struct {

@@ -244,3 +244,35 @@ export const cancelActiveBlocks = (messages: ChatMessage[]): ChatMessage[] => {
   };
   return next;
 };
+
+/** Restores a transcript persisted before a reload. Nothing can still be
+ * streaming, so unfinished tools read as cancelled and an empty assistant
+ * placeholder is dropped. A confirmation awaiting the user's decision stays
+ * actionable: its interrupt checkpoint is durable on the server. */
+export const restorePersistedMessages = (
+  messages: ChatMessage[],
+): { messages: ChatMessage[]; awaitingConfirmation: boolean } => {
+  const next = removeTrailingEmptyAssistant(messages).slice();
+  const last = next[next.length - 1];
+  if (last?.role !== "assistant") return { messages: next, awaitingConfirmation: false };
+  const unfinished = last.blocks.some(
+    (block) => block.kind === "tool" && block.status === "running",
+  );
+  if (unfinished) {
+    next[next.length - 1] = {
+      ...last,
+      status: "stopped",
+      blocks: last.blocks.map((block) =>
+        block.kind === "tool" && block.status === "running"
+          ? { ...block, status: "cancelled" }
+          : block,
+      ),
+    };
+  }
+  return {
+    messages: next,
+    awaitingConfirmation: next[next.length - 1].blocks.some(
+      (block) => block.kind === "confirm" && ["pending", "failed"].includes(block.state),
+    ),
+  };
+};

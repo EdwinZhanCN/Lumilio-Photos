@@ -6,6 +6,7 @@ import { LoginPage } from "../pages/login.page";
 import { api } from "../support/api";
 import { compose, docker, repositoryRoot } from "../support/docker";
 import { t } from "../support/i18n";
+import type { components } from "../../src/lib/http-commons/schema.d.ts";
 
 type BackupEntry = {
   name: string;
@@ -21,9 +22,8 @@ type Repository = {
   name: string;
 };
 
-type RepositoryList = {
-  repositories?: Repository[];
-};
+type StorageTargets = components["schemas"]["dto.StorageTargetsResponseDTO"];
+type CreateRepositoryResponse = components["schemas"]["dto.CreateRepositoryResponseDTO"];
 
 type RestoreOperation = {
   id: string;
@@ -48,23 +48,24 @@ async function listBackups(token: string): Promise<BackupEntry[]> {
 }
 
 async function createRepository(token: string, name: string): Promise<Repository> {
-  const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
+  const { repository } = await api<CreateRepositoryResponse>("/api/v1/storage/repositories", {
     method: "POST",
     token,
     body: JSON.stringify({
       name,
       directory_name: name,
-      role: "regular",
       storage_strategy: "flat",
-      duplicate_handling: "rename",
     }),
   });
-  return repository;
+  if (!repository?.id || !repository.name) {
+    throw new Error(`repository creation for ${name} did not return id and name`);
+  }
+  return { id: repository.id, name: repository.name };
 }
 
 async function repositoryExists(token: string, repositoryID: string): Promise<boolean> {
-  const repositories = (await api<RepositoryList>("/api/v1/repositories", { token })).repositories;
-  return repositories?.some((repository) => repository.id === repositoryID) ?? false;
+  const { targets } = await api<StorageTargets>("/api/v1/storage/targets", { token });
+  return targets?.some((target) => target.id === repositoryID) ?? false;
 }
 
 async function repositoryPresence(token: string, repositoryID: string): Promise<boolean | null> {
@@ -125,7 +126,7 @@ function installCorruptBackupFixture(): string {
         format_version: 2,
         app_version: "e2e-corrupt",
         config_schema_version: 4,
-        application_migration_version: 3,
+        schema_version: 9,
         river_migration_version: 1,
         sqlite_version: "invalid-fixture",
         vec1_version: "invalid-fixture",

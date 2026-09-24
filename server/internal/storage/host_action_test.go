@@ -28,7 +28,7 @@ func TestHostActionIsDurableIdempotentAndNativeApproved(t *testing.T) {
 	}
 
 	input := CreateHostActionInput{
-		RequestID:   "host-action-add-root-1",
+		RequestID:   "host-action-add-storageLocation-1",
 		Kind:        HostActionAuthorizeStorageLocation,
 		Actor:       "web:user:native-approval-admin",
 		ActorUserID: &actor.UserID,
@@ -90,10 +90,10 @@ func TestHostActionIsDurableIdempotentAndNativeApproved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if action.Status != HostActionSucceeded || action.Result == nil || action.Result.RootID == "" {
+	if action.Status != HostActionSucceeded || action.Result == nil || action.Result.StorageLocationID == "" {
 		t.Fatalf("completed action = %#v", action)
 	}
-	root, err := manager.GetRepositoryRoot(ctx, action.Result.RootID)
+	storageLocation, err := manager.GetStorageLocation(ctx, action.Result.StorageLocationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,14 +101,14 @@ func TestHostActionIsDurableIdempotentAndNativeApproved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if root.Path != canonicalExternal || root.Name != "External Archive" {
-		t.Fatalf("created Storage Location = %#v", root)
+	if storageLocation.Path != canonicalExternal || storageLocation.Name != "External Archive" {
+		t.Fatalf("created Storage Location = %#v", storageLocation)
 	}
 	if pending, err = manager.ListPendingHostActions(ctx); err != nil || len(pending) != 0 {
 		t.Fatalf("pending actions after approval = %#v, err=%v", pending, err)
 	}
 	auditEvents, err := manager.ListLifecycleAudit(ctx, LifecycleAuditFilter{
-		TargetType: "storage_location", TargetID: action.Result.RootID, Limit: 20,
+		TargetType: "storage_location", TargetID: action.Result.StorageLocationID, Limit: 20,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -257,7 +257,7 @@ func TestHostActionRequiresExplicitStorageRiskConfirmationBeforeMutation(t *test
 		decision.Result.Conflict.Type != "storage_risk" || len(decision.Result.Conflict.RiskWarnings) != 3 {
 		t.Fatalf("risk decision = %#v", decision)
 	}
-	if _, lookupErr := manager.queries.GetRepositoryRootByPath(ctx, selected); !errors.Is(lookupErr, sql.ErrNoRows) {
+	if _, lookupErr := manager.queries.GetStorageLocationByPath(ctx, selected); !errors.Is(lookupErr, sql.ErrNoRows) {
 		t.Fatalf("unconfirmed risk mutated Storage Locations: %v", lookupErr)
 	}
 	if _, err := manager.ResolveHostAction(ctx, action.ActionID, "confirm_risk", false); !errors.Is(err, ErrRepositoryRiskConfirmationRequired) {
@@ -267,7 +267,7 @@ func TestHostActionRequiresExplicitStorageRiskConfirmationBeforeMutation(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Status != HostActionSucceeded || completed.Result == nil || completed.Result.RootID == "" {
+	if completed.Status != HostActionSucceeded || completed.Result == nil || completed.Result.StorageLocationID == "" {
 		t.Fatalf("confirmed host action = %#v", completed)
 	}
 	events, err := manager.ListLifecycleAudit(ctx, LifecycleAuditFilter{Limit: 20})
@@ -297,7 +297,7 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	}
 	base := t.TempDir()
 	initializeDefaultStorageForTest(t, manager, filepath.Join(base, "default"))
-	defaultRoot, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	defaultStorageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 
 	openSource, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "host-risk-open-source", Actor: "test", Name: "Open Source", DirectoryName: "open-source",
-		Role: dbtypes.RepoRoleRegular, RootID: defaultRoot.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: defaultStorageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -345,13 +345,13 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 
 	relocateSource, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "host-risk-relocate-source", Actor: "test", Name: "Relocate Source", DirectoryName: "relocate-source",
-		Role: dbtypes.RepoRoleRegular, RootID: defaultRoot.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: defaultStorageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	oldRepositoryPath := relocateSource.Repository.Path
-	newRepositoryPath := filepath.Join(defaultRoot.Path, "relocate-target")
+	newRepositoryPath := filepath.Join(defaultStorageLocation.Path, "relocate-target")
 	if err := os.Rename(oldRepositoryPath, newRepositoryPath); err != nil {
 		t.Fatal(err)
 	}
@@ -376,21 +376,21 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 		t.Fatalf("confirmed Repository locate = %#v, err=%v", repositoryCompleted, err)
 	}
 
-	oldRootPath := filepath.Join(base, "external-root")
+	oldRootPath := filepath.Join(base, "external-storageLocation")
 	if err := os.Mkdir(oldRootPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	externalRoot, err := manager.AddRepositoryRoot(ctx, oldRootPath, "External")
+	externalRoot, err := manager.AddStorageLocation(ctx, oldRootPath, "External")
 	if err != nil {
 		t.Fatal(err)
 	}
-	newRootPath := filepath.Join(base, "external-root-moved")
+	newRootPath := filepath.Join(base, "external-storageLocation-moved")
 	if err := os.Rename(oldRootPath, newRootPath); err != nil {
 		t.Fatal(err)
 	}
 	locateRootAction, err := manager.CreateHostAction(ctx, CreateHostActionInput{
-		RequestID: "host-risk-locate-root", Kind: HostActionLocateStorageLocation,
-		Summary: HostActionSummary{RootID: externalRoot.RootID.String()}, TTL: time.Minute,
+		RequestID: "host-risk-locate-storageLocation", Kind: HostActionLocateStorageLocation,
+		Summary: HostActionSummary{StorageLocationID: externalRoot.StorageLocationID.String()}, TTL: time.Minute,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -403,7 +403,7 @@ func TestHostActionOpenAndLocateRequireRiskDecisionBeforeCatalogMutation(t *test
 	if !containsString(rootDecision.Result.Conflict.RiskWarnings, "mount_fingerprint_changed") {
 		t.Fatalf("mount fingerprint warning missing: %#v", rootDecision.Result.Conflict.RiskWarnings)
 	}
-	stillOldRoot, err := manager.GetRepositoryRoot(ctx, externalRoot.RootID.String())
+	stillOldRoot, err := manager.GetStorageLocation(ctx, externalRoot.StorageLocationID.String())
 	if err != nil || stillOldRoot.Path != externalRoot.Path {
 		t.Fatalf("unconfirmed Storage Location locate changed path: %#v, err=%v", stillOldRoot, err)
 	}
@@ -433,13 +433,13 @@ func TestHostActionAddSeparateCarriesActorHostAndIndependentIdentityAudit(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	root, err := manager.queries.GetDefaultRepositoryRoot(ctx)
+	storageLocation, err := manager.queries.GetDefaultStorageLocation(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	original, err := manager.CreateRepository(ctx, CreateRepositorySpec{
 		RequestID: "copy-audit-original", Actor: "test", Name: "Original", DirectoryName: "original",
-		Role: dbtypes.RepoRoleRegular, RootID: root.RootID.String(),
+		Role: dbtypes.RepoRoleRegular, StorageLocationID: storageLocation.StorageLocationID.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -448,7 +448,7 @@ func TestHostActionAddSeparateCarriesActorHostAndIndependentIdentityAudit(t *tes
 	if err := os.Mkdir(externalPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	external, err := manager.AddRepositoryRoot(ctx, externalPath, "External")
+	external, err := manager.AddStorageLocation(ctx, externalPath, "External")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,11 +1,10 @@
 import React, { useState } from "react";
-import { FileTextIcon, Folders } from "lucide-react";
+import { FileTextIcon, Upload } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorFallback from "@/components/ui/ErrorFallback";
 import PageHeader from "@/components/ui/PageHeader";
 import { SupportedFormatsModal, UnifiedUploadSection, useUploadContext } from "@/features/upload";
 import { useI18n } from "@/lib/i18n";
-import RepositoryMaintenancePanel from "./RepositoryMaintenancePanel";
 
 const ManageHeader: React.FC = () => {
   const { t } = useI18n();
@@ -25,7 +24,7 @@ const ManageHeader: React.FC = () => {
       <PageHeader
         title={t("manage.pageTitle")}
         subtitle={subtitle}
-        icon={<Folders className="h-6 w-6 text-primary" />}
+        icon={<Upload className="h-6 w-6 text-primary" />}
       >
         <button
           type="button"
@@ -60,7 +59,6 @@ const Manage = () => {
           )}
         >
           <UnifiedUploadSection />
-          <RepositoryMaintenancePanel />
         </ErrorBoundary>
       </div>
     </div>

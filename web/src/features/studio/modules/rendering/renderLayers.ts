@@ -140,12 +140,7 @@ function lineOffsetX(align: TextLayer["align"], blockWidth: number, lineWidth: n
   return -lineWidth / 2;
 }
 
-function drawTextLayer(
-  ctx: Ctx,
-  layer: TextLayer,
-  outWidth: number,
-  outHeight: number,
-): void {
+function drawTextLayer(ctx: Ctx, layer: TextLayer, outWidth: number, outHeight: number): void {
   const metrics = measureTextLayer(ctx, layer, outWidth);
   if (!metrics.width && !layer.background) return;
 
@@ -299,10 +294,7 @@ function drawOneLayer(
  * A field-resolution occlusion mask for `zPosition`, stretched by the caller to
  * output size on draw. Returns null when the plane is fully in front.
  */
-function occlusionMask(
-  occlusion: DepthOcclusion,
-  zPosition: number,
-): OffscreenCanvas | null {
+function occlusionMask(occlusion: DepthOcclusion, zPosition: number): OffscreenCanvas | null {
   const { field, feather } = occlusion;
   const bytes = buildDepthAlphaMask(field.data, field.width, field.height, zPosition, feather);
   if (!bytes) return null;
@@ -331,7 +323,8 @@ export function drawLayers(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   for (const layer of layers) {
-    const mask = occlusion && layer.zPosition < 1 ? occlusionMask(occlusion, layer.zPosition) : null;
+    const mask =
+      occlusion && layer.zPosition < 1 ? occlusionMask(occlusion, layer.zPosition) : null;
     if (mask) {
       const scratch = new OffscreenCanvas(
         Math.max(1, Math.round(outWidth)),

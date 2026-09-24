@@ -165,6 +165,9 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 	if err != nil {
 		return nil, err
 	}
+	if err := storage.CheckUploadAdmission(repository, storage.WriteFacts{}); err != nil {
+		return nil, err
+	}
 	validation := fileutil.ValidateFile(record.OriginalFilename, record.MimeType)
 	if !validation.Valid {
 		return nil, m.quarantine(ctx, repository, record, "unsupported_media", errors.New(validation.ErrorReason))
@@ -227,6 +230,9 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 		if !stagingExists {
 			return nil, m.quarantine(ctx, repository, record, "source_missing", errors.New("neither staged nor committed source exists"))
 		}
+		if err := m.checkWriteAdmission(ctx, repository, uint64(record.FileSize)); err != nil {
+			return nil, err
+		}
 		if err := m.stagingManager.CommitStagingFile(repository, stagingFile, target); err != nil {
 			return nil, m.quarantine(ctx, repository, record, "staging_commit_failed", err)
 		}
@@ -288,17 +294,24 @@ func (m *SourceMaterializer) hashStaging(ctx context.Context, repository repo.Re
 		_ = opened.Close()
 		return nil, err
 	}
-	if m.capacityGuard != nil {
-		size := uint64(0)
-		if info.Size() > 0 {
-			size = uint64(info.Size())
-		}
-		if _, err := m.capacityGuard.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), size); err != nil {
-			_ = opened.Close()
-			return nil, err
-		}
+	if err := m.checkWriteAdmission(ctx, repository, uint64(max(info.Size(), 0))); err != nil {
+		_ = opened.Close()
+		return nil, err
 	}
 	return hashOpenedStaging(opened)
+}
+
+func (m *SourceMaterializer) checkWriteAdmission(ctx context.Context, repository repo.Repository, size uint64) error {
+	facts := storage.WriteFacts{}
+	if m.capacityGuard != nil {
+		decision, capErr := m.capacityGuard.CheckRepositoryWriteCapacity(ctx, repository.RepoID.String(), size)
+		facts = storage.WriteFactsFromCapacity(decision)
+		if err := storage.CheckUploadAdmission(repository, facts); err != nil {
+			return err
+		}
+		return capErr
+	}
+	return storage.CheckUploadAdmission(repository, facts)
 }
 
 func hashOpenedStaging(opened *storage.RepositoryFile) (*hash.LayeredHashResult, error) {

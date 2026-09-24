@@ -38,7 +38,9 @@ password fallback, MFA challenge, and redirect recovery.
 passkey, and recovery-code onboarding. [useMFAFlow](./flows/mfa/useMFAFlow.ts) owns authenticated
 MFA management, with its `mfa` and `action` URL parameters authoritative.
 [useBootstrapFlow](./flows/bootstrap/useBootstrapFlow.ts) composes first-admin registration with repository
-creation without copying either domain's server state.
+creation without copying either domain's server state. [useSignOut](./flows/sign-out/useSignOut.ts)
+is the only sign-out path: it awaits `logout` before opening `/login`, so the
+login form never mounts while the session is still authenticated.
 
 [ProtectedRoute](./modules/access/ProtectedRoute.tsx), [BootstrapGate](./modules/access/BootstrapGate.tsx), and
 [PrimaryRepositoryGate](./modules/access/PrimaryRepositoryGate.tsx) are composition capabilities, not page

@@ -635,6 +635,9 @@ func ApplyAssetExtractedMetadataTx(
 	}); err != nil {
 		return err
 	}
+	if err := SyncMusicTrackFromAssetTx(ctx, tx, queries, id, metadata); err != nil {
+		return fmt.Errorf("sync music track metadata: %w", err)
+	}
 	if firstExtraction {
 		if err := importEmbeddedKeywords(ctx, queries, id, common.Keywords); err != nil {
 			return err

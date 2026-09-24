@@ -58,10 +58,10 @@ func newCatalogFixture(t *testing.T) *catalogFixture {
 	}
 	now := dbtypes.NewTimestamp(time.Now().UTC())
 	repositoryID := uuid.New()
-	rootID := uuid.New()
-	if _, err := database.Queries.UpsertRepositoryRoot(ctx, repo.UpsertRepositoryRootParams{
-		RootID: rootID, Name: "ROE catalog root", Path: t.TempDir(),
-		Kind: dbtypes.RepositoryRootKindExternal, Status: dbtypes.RepositoryRootStatusActive,
+	storageLocationID := uuid.New()
+	if _, err := database.Queries.UpsertStorageLocation(ctx, repo.UpsertStorageLocationParams{
+		StorageLocationID: storageLocationID, Name: "ROE catalog root", Path: t.TempDir(),
+		Kind: dbtypes.StorageLocationKindExternal, Status: dbtypes.StorageLocationStatusActive,
 		CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func newCatalogFixture(t *testing.T) *catalogFixture {
 		Reachability:   dbtypes.RepositoryReachabilityActive,
 		Activity:       dbtypes.RepositoryActivityIdle,
 		DefaultOwnerID: &owner.UserID,
-		CreatedAt:      now, UpdatedAt: now, RootID: rootID,
+		CreatedAt:      now, UpdatedAt: now, StorageLocationID: storageLocationID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func newCatalogFixture(t *testing.T) *catalogFixture {
 		t.Fatal(err)
 	}
 	rootNodeID := uuid.New()
-	if _, err := database.Queries.InsertRepositoryRootNode(ctx, repo.InsertRepositoryRootNodeParams{
+	if _, err := database.Queries.InsertRepositoryTreeRootNode(ctx, repo.InsertRepositoryTreeRootNodeParams{
 		NodeID: rootNodeID, RepositoryID: repositoryID,
 		ObservationRevision: 1, CreatedAt: now,
 	}); err != nil {

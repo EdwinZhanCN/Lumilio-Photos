@@ -327,15 +327,19 @@ func (c *Coordinator) run() {
 func (c *Coordinator) process(items []submission) {
 	oldestWait := time.Since(items[0].enqueued)
 	results := c.apply(items)
-	for index, result := range results {
-		items[index].ack <- result
-		c.incrementAck(result)
-	}
+	// Record every metric for this batch before releasing any submitter, so a
+	// Snapshot taken after SubmitOperation returns always includes it.
 	c.metricsMu.Lock()
 	c.metrics.operations += uint64(len(items))
 	c.metrics.uniqueOperations += uint64(len(items))
 	c.metrics.oldestWait.record(oldestWait)
 	c.metricsMu.Unlock()
+	for _, result := range results {
+		c.incrementAck(result)
+	}
+	for index, result := range results {
+		items[index].ack <- result
+	}
 }
 
 func (c *Coordinator) apply(items []submission) []submissionResult {

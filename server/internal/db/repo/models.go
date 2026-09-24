@@ -176,12 +176,57 @@ type AssetLocation struct {
 	UpdatedAt                  dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type AssetPipelineFailure struct {
+	AssetID         uuid.UUID         `db:"asset_id" json:"asset_id"`
+	Stage           string            `db:"stage" json:"stage"`
+	SourceContentID string            `db:"source_content_id" json:"source_content_id"`
+	PipelineVersion string            `db:"pipeline_version" json:"pipeline_version"`
+	DesiredVersion  int64             `db:"desired_version" json:"desired_version"`
+	FailureCount    int64             `db:"failure_count" json:"failure_count"`
+	RetryAfter      int64             `db:"retry_after" json:"retry_after"`
+	FailureCode     string            `db:"failure_code" json:"failure_code"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type AssetPipelineReceiptStage struct {
+	ReceiptID      string    `db:"receipt_id" json:"receipt_id"`
+	AssetID        uuid.UUID `db:"asset_id" json:"asset_id"`
+	Stage          string    `db:"stage" json:"stage"`
+	DesiredVersion int64     `db:"desired_version" json:"desired_version"`
+}
+
+type AssetPipelineState struct {
+	AssetID         uuid.UUID         `db:"asset_id" json:"asset_id"`
+	SourceContentID string            `db:"source_content_id" json:"source_content_id"`
+	Stage           string            `db:"stage" json:"stage"`
+	PipelineVersion string            `db:"pipeline_version" json:"pipeline_version"`
+	DesiredVersion  int64             `db:"desired_version" json:"desired_version"`
+	AppliedVersion  int64             `db:"applied_version" json:"applied_version"`
+	Priority        int64             `db:"priority" json:"priority"`
+	TerminalError   *string           `db:"terminal_error" json:"terminal_error"`
+	UpdatedAt       dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type AssetQualityScore struct {
 	AssetID      uuid.UUID         `db:"asset_id" json:"asset_id"`
 	Score        float64           `db:"score" json:"score"`
 	ModelVersion string            `db:"model_version" json:"model_version"`
 	CreatedAt    dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type AssetReindexRequest struct {
+	ReceiptID         string            `db:"receipt_id" json:"receipt_id"`
+	RepositoryID      uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Tasks             string            `db:"tasks" json:"tasks"`
+	PageLimit         int64             `db:"page_limit" json:"page_limit"`
+	Cursor            *string           `db:"cursor" json:"cursor"`
+	MissingOnly       int64             `db:"missing_only" json:"missing_only"`
+	ResetSemantic     int64             `db:"reset_semantic" json:"reset_semantic"`
+	Priority          int64             `db:"priority" json:"priority"`
+	RequestedRevision int64             `db:"requested_revision" json:"requested_revision"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type AssetSearchFt struct {
@@ -222,6 +267,24 @@ type AuthSecurityVerification struct {
 	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
 	ExpiresAt      dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
 	ConsumedAt     *int64            `db:"consumed_at" json:"consumed_at"`
+}
+
+type CatalogBackupRequest struct {
+	ReceiptID string `db:"receipt_id" json:"receipt_id"`
+	Force     int64  `db:"force" json:"force"`
+	Priority  int64  `db:"priority" json:"priority"`
+}
+
+type CatalogOperationReceipt struct {
+	ReceiptID      string            `db:"receipt_id" json:"receipt_id"`
+	Kind           string            `db:"kind" json:"kind"`
+	SubjectID      string            `db:"subject_id" json:"subject_id"`
+	DesiredVersion int64             `db:"desired_version" json:"desired_version"`
+	AppliedVersion int64             `db:"applied_version" json:"applied_version"`
+	State          string            `db:"state" json:"state"`
+	TerminalError  *string           `db:"terminal_error" json:"terminal_error"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type ClassifierDefinition struct {
@@ -428,6 +491,17 @@ type EventOwnerState struct {
 	RebuildLeaseExpiresAt  *int64            `db:"rebuild_lease_expires_at" json:"rebuild_lease_expires_at"`
 }
 
+type EventProjectionPipelineState struct {
+	OwnerID           int32             `db:"owner_id" json:"owner_id"`
+	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
+	ProjectionVersion int64             `db:"projection_version" json:"projection_version"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	Priority          int64             `db:"priority" json:"priority"`
+	Cursor            *string           `db:"cursor" json:"cursor"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type EventRebuildRun struct {
 	RunID             uuid.UUID         `db:"run_id" json:"run_id"`
 	OwnerID           int32             `db:"owner_id" json:"owner_id"`
@@ -597,11 +671,28 @@ type LocationClusterAsset struct {
 	CreatedAt dbtypes.Timestamp `db:"created_at" json:"created_at"`
 }
 
+type LocationProjectionReceiptScope struct {
+	ReceiptID       string    `db:"receipt_id" json:"receipt_id"`
+	RepositoryID    uuid.UUID `db:"repository_id" json:"repository_id"`
+	OwnerID         int32     `db:"owner_id" json:"owner_id"`
+	DesiredRevision int64     `db:"desired_revision" json:"desired_revision"`
+}
+
 type LocationProjectionState struct {
 	RepositoryID      uuid.UUID         `db:"repository_id" json:"repository_id"`
 	OwnerID           int32             `db:"owner_id" json:"owner_id"`
 	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
 	PublishedRevision int64             `db:"published_revision" json:"published_revision"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
+}
+
+type LocationResolutionPipelineState struct {
+	Scope             string            `db:"scope" json:"scope"`
+	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
+	ProjectionVersion int64             `db:"projection_version" json:"projection_version"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
 	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
@@ -648,6 +739,142 @@ type MediaItemBrowseFact struct {
 	StackKind      *string     `db:"stack_kind" json:"stack_kind"`
 }
 
+type MusicAlbum struct {
+	AlbumID           uuid.UUID         `db:"album_id" json:"album_id"`
+	OwnerID           int32             `db:"owner_id" json:"owner_id"`
+	Title             string            `db:"title" json:"title"`
+	ReleaseDate       *string           `db:"release_date" json:"release_date"`
+	ReleasePrecision  string            `db:"release_precision" json:"release_precision"`
+	Edition           string            `db:"edition" json:"edition"`
+	ReleaseIdentifier string            `db:"release_identifier" json:"release_identifier"`
+	SourceGroup       string            `db:"source_group" json:"source_group"`
+	ArtistSource      string            `db:"artist_source" json:"artist_source"`
+	CoverAssetID      uuid.NullUUID     `db:"cover_asset_id" json:"cover_asset_id"`
+	Revision          int64             `db:"revision" json:"revision"`
+	CreatedAt         dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	Favorite          int64             `db:"favorite" json:"favorite"`
+}
+
+type MusicAlbumArtist struct {
+	AlbumID  uuid.UUID `db:"album_id" json:"album_id"`
+	ArtistID uuid.UUID `db:"artist_id" json:"artist_id"`
+	Position int64     `db:"position" json:"position"`
+	Role     string    `db:"role" json:"role"`
+}
+
+type MusicArtist struct {
+	ArtistID       uuid.UUID         `db:"artist_id" json:"artist_id"`
+	OwnerID        int32             `db:"owner_id" json:"owner_id"`
+	DisplayName    string            `db:"display_name" json:"display_name"`
+	NormalizedName string            `db:"normalized_name" json:"normalized_name"`
+	ExternalID     string            `db:"external_id" json:"external_id"`
+	Revision       int64             `db:"revision" json:"revision"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	Favorite       int64             `db:"favorite" json:"favorite"`
+}
+
+type MusicPlaybackEntry struct {
+	EntryID       string        `db:"entry_id" json:"entry_id"`
+	SessionID     uuid.UUID     `db:"session_id" json:"session_id"`
+	Sequence      int64         `db:"sequence" json:"sequence"`
+	TrackID       uuid.NullUUID `db:"track_id" json:"track_id"`
+	SourceEntryID *string       `db:"source_entry_id" json:"source_entry_id"`
+	SavedTitle    string        `db:"saved_title" json:"saved_title"`
+}
+
+type MusicPlaybackSession struct {
+	SessionID      uuid.UUID         `db:"session_id" json:"session_id"`
+	OwnerID        int32             `db:"owner_id" json:"owner_id"`
+	SourceKind     string            `db:"source_kind" json:"source_kind"`
+	SourceID       string            `db:"source_id" json:"source_id"`
+	SourceRevision int64             `db:"source_revision" json:"source_revision"`
+	Status         string            `db:"status" json:"status"`
+	ExpiresAt      dbtypes.Timestamp `db:"expires_at" json:"expires_at"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicPlaylist struct {
+	PlaylistID  uuid.UUID         `db:"playlist_id" json:"playlist_id"`
+	OwnerID     int32             `db:"owner_id" json:"owner_id"`
+	Title       string            `db:"title" json:"title"`
+	Description string            `db:"description" json:"description"`
+	Revision    int64             `db:"revision" json:"revision"`
+	CreatedAt   dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt   dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicPlaylistEntry struct {
+	EntryID        string            `db:"entry_id" json:"entry_id"`
+	PlaylistID     uuid.UUID         `db:"playlist_id" json:"playlist_id"`
+	TrackID        uuid.NullUUID     `db:"track_id" json:"track_id"`
+	SavedTitle     string            `db:"saved_title" json:"saved_title"`
+	Position       int64             `db:"position" json:"position"`
+	IdempotencyKey *string           `db:"idempotency_key" json:"idempotency_key"`
+	CreatedAt      dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicSearchFt struct {
+	TrackID  string `db:"track_id" json:"track_id"`
+	Title    string `db:"title" json:"title"`
+	Artist   string `db:"artist" json:"artist"`
+	Album    string `db:"album" json:"album"`
+	Filename string `db:"filename" json:"filename"`
+}
+
+type MusicTrack struct {
+	TrackID                 uuid.UUID         `db:"track_id" json:"track_id"`
+	OwnerID                 int32             `db:"owner_id" json:"owner_id"`
+	Designation             string            `db:"designation" json:"designation"`
+	AlbumID                 uuid.NullUUID     `db:"album_id" json:"album_id"`
+	Title                   string            `db:"title" json:"title"`
+	AlbumTitle              string            `db:"album_title" json:"album_title"`
+	ArtistName              string            `db:"artist_name" json:"artist_name"`
+	AlbumArtistName         string            `db:"album_artist_name" json:"album_artist_name"`
+	Genre                   string            `db:"genre" json:"genre"`
+	ReleaseDate             *string           `db:"release_date" json:"release_date"`
+	ReleasePrecision        string            `db:"release_precision" json:"release_precision"`
+	Edition                 string            `db:"edition" json:"edition"`
+	ReleaseIdentifier       string            `db:"release_identifier" json:"release_identifier"`
+	DiscNumber              *int64            `db:"disc_number" json:"disc_number"`
+	DiscTotal               *int64            `db:"disc_total" json:"disc_total"`
+	TrackNumber             *int64            `db:"track_number" json:"track_number"`
+	TrackTotal              *int64            `db:"track_total" json:"track_total"`
+	IsCompilation           int64             `db:"is_compilation" json:"is_compilation"`
+	ExtractedArtists        string            `db:"extracted_artists" json:"extracted_artists"`
+	ExtractedAlbumArtists   string            `db:"extracted_album_artists" json:"extracted_album_artists"`
+	ExtractedArtistIds      string            `db:"extracted_artist_ids" json:"extracted_artist_ids"`
+	ExtractedAlbumArtistIds string            `db:"extracted_album_artist_ids" json:"extracted_album_artist_ids"`
+	ExtractedSourceRevision int64             `db:"extracted_source_revision" json:"extracted_source_revision"`
+	Revision                int64             `db:"revision" json:"revision"`
+	CreatedAt               dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt               dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type MusicTrackArtist struct {
+	TrackID  uuid.UUID `db:"track_id" json:"track_id"`
+	ArtistID uuid.UUID `db:"artist_id" json:"artist_id"`
+	Position int64     `db:"position" json:"position"`
+	Role     string    `db:"role" json:"role"`
+}
+
+type MusicTrackLyric struct {
+	TrackID  string `db:"track_id" json:"track_id"`
+	Content  string `db:"content" json:"content"`
+	Revision int64  `db:"revision" json:"revision"`
+}
+
+type MusicTrackOverride struct {
+	TrackID   string            `db:"track_id" json:"track_id"`
+	Field     string            `db:"field" json:"field"`
+	Value     *string           `db:"value" json:"value"`
+	IsPresent int64             `db:"is_present" json:"is_present"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type OcrIndexMetadatum struct {
 	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
 	Revision  int64             `db:"revision" json:"revision"`
@@ -658,6 +885,16 @@ type OcrIndexOutbox struct {
 	AssetID   uuid.UUID         `db:"asset_id" json:"asset_id"`
 	Revision  int64             `db:"revision" json:"revision"`
 	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type OcrProjectionPipelineState struct {
+	Scope             string            `db:"scope" json:"scope"`
+	SourceRevision    int64             `db:"source_revision" json:"source_revision"`
+	ProjectionVersion int64             `db:"projection_version" json:"projection_version"`
+	AppliedRevision   int64             `db:"applied_revision" json:"applied_revision"`
+	Cursor            *string           `db:"cursor" json:"cursor"`
+	TerminalError     *string           `db:"terminal_error" json:"terminal_error"`
+	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type OcrResult struct {
@@ -702,19 +939,19 @@ type RefreshToken struct {
 }
 
 type Repository struct {
-	RepoID         uuid.UUID                      `db:"repo_id" json:"repo_id"`
-	Name           string                         `db:"name" json:"name"`
-	Path           string                         `db:"path" json:"path"`
-	Config         repocfg.RepositoryConfig       `db:"config" json:"config"`
-	Reachability   dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
-	Activity       dbtypes.RepositoryActivity     `db:"activity" json:"activity"`
-	PauseReason    string                         `db:"pause_reason" json:"pause_reason"`
-	LastSync       dbtypes.Timestamp              `db:"last_sync" json:"last_sync"`
-	CreatedAt      dbtypes.Timestamp              `db:"created_at" json:"created_at"`
-	UpdatedAt      dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
-	DefaultOwnerID *int32                         `db:"default_owner_id" json:"default_owner_id"`
-	Role           dbtypes.RepoRole               `db:"role" json:"role"`
-	RootID         uuid.UUID                      `db:"root_id" json:"root_id"`
+	RepoID            uuid.UUID                      `db:"repo_id" json:"repo_id"`
+	Name              string                         `db:"name" json:"name"`
+	Path              string                         `db:"path" json:"path"`
+	Config            repocfg.RepositoryConfig       `db:"config" json:"config"`
+	Reachability      dbtypes.RepositoryReachability `db:"reachability" json:"reachability"`
+	Activity          dbtypes.RepositoryActivity     `db:"activity" json:"activity"`
+	PauseReason       string                         `db:"pause_reason" json:"pause_reason"`
+	LastSync          dbtypes.Timestamp              `db:"last_sync" json:"last_sync"`
+	CreatedAt         dbtypes.Timestamp              `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp              `db:"updated_at" json:"updated_at"`
+	DefaultOwnerID    *int32                         `db:"default_owner_id" json:"default_owner_id"`
+	Role              dbtypes.RepoRole               `db:"role" json:"role"`
+	StorageLocationID uuid.UUID                      `db:"storage_location_id" json:"storage_location_id"`
 }
 
 type RepositoryChangeCursor struct {
@@ -802,33 +1039,24 @@ type RepositoryObservation struct {
 }
 
 type RepositoryObservationState struct {
-	RepositoryID             uuid.UUID         `db:"repository_id" json:"repository_id"`
-	DesiredEpoch             int64             `db:"desired_epoch" json:"desired_epoch"`
-	AppliedEpoch             int64             `db:"applied_epoch" json:"applied_epoch"`
-	NextRevision             int64             `db:"next_revision" json:"next_revision"`
-	ActiveRunID              uuid.NullUUID     `db:"active_run_id" json:"active_run_id"`
-	ControllerLeaseID        *string           `db:"controller_lease_id" json:"controller_lease_id"`
-	ControllerLeaseExpiresAt *int64            `db:"controller_lease_expires_at" json:"controller_lease_expires_at"`
-	AdapterKind              string            `db:"adapter_kind" json:"adapter_kind"`
-	AdapterIdentity          *string           `db:"adapter_identity" json:"adapter_identity"`
-	VolumeIdentity           *string           `db:"volume_identity" json:"volume_identity"`
-	VolumeKind               string            `db:"volume_kind" json:"volume_kind"`
-	PathCaseMode             string            `db:"path_case_mode" json:"path_case_mode"`
-	PathNormalization        string            `db:"path_normalization" json:"path_normalization"`
-	CursorHealth             string            `db:"cursor_health" json:"cursor_health"`
-	FullVerificationRequired int64             `db:"full_verification_required" json:"full_verification_required"`
-	UpdatedAt                dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-}
-
-type RepositoryRoot struct {
-	RootID           uuid.UUID                    `db:"root_id" json:"root_id"`
-	Name             string                       `db:"name" json:"name"`
-	Path             string                       `db:"path" json:"path"`
-	Kind             dbtypes.RepositoryRootKind   `db:"kind" json:"kind"`
-	Status           dbtypes.RepositoryRootStatus `db:"status" json:"status"`
-	MountFingerprint string                       `db:"mount_fingerprint" json:"mount_fingerprint"`
-	CreatedAt        dbtypes.Timestamp            `db:"created_at" json:"created_at"`
-	UpdatedAt        dbtypes.Timestamp            `db:"updated_at" json:"updated_at"`
+	RepositoryID                   uuid.UUID         `db:"repository_id" json:"repository_id"`
+	DesiredEpoch                   int64             `db:"desired_epoch" json:"desired_epoch"`
+	AppliedEpoch                   int64             `db:"applied_epoch" json:"applied_epoch"`
+	NextRevision                   int64             `db:"next_revision" json:"next_revision"`
+	ActiveRunID                    uuid.NullUUID     `db:"active_run_id" json:"active_run_id"`
+	ControllerLeaseID              *string           `db:"controller_lease_id" json:"controller_lease_id"`
+	ControllerLeaseExpiresAt       *int64            `db:"controller_lease_expires_at" json:"controller_lease_expires_at"`
+	AdapterKind                    string            `db:"adapter_kind" json:"adapter_kind"`
+	AdapterIdentity                *string           `db:"adapter_identity" json:"adapter_identity"`
+	VolumeIdentity                 *string           `db:"volume_identity" json:"volume_identity"`
+	VolumeKind                     string            `db:"volume_kind" json:"volume_kind"`
+	PathCaseMode                   string            `db:"path_case_mode" json:"path_case_mode"`
+	PathNormalization              string            `db:"path_normalization" json:"path_normalization"`
+	CursorHealth                   string            `db:"cursor_health" json:"cursor_health"`
+	FullVerificationRequired       int64             `db:"full_verification_required" json:"full_verification_required"`
+	UpdatedAt                      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	TerminalError                  *string           `db:"terminal_error" json:"terminal_error"`
+	FullVerificationRequestedEpoch int64             `db:"full_verification_requested_epoch" json:"full_verification_requested_epoch"`
 }
 
 type RepositoryScanFrontier struct {
@@ -850,33 +1078,34 @@ type RepositoryScanFrontier struct {
 }
 
 type RepositoryScanRun struct {
-	RunID                    uuid.UUID         `db:"run_id" json:"run_id"`
-	RepositoryID             uuid.UUID         `db:"repository_id" json:"repository_id"`
-	RequestedEpoch           int64             `db:"requested_epoch" json:"requested_epoch"`
-	Mode                     string            `db:"mode" json:"mode"`
-	RequestedBy              *string           `db:"requested_by" json:"requested_by"`
-	CoalescedCount           int64             `db:"coalesced_count" json:"coalesced_count"`
-	Status                   string            `db:"status" json:"status"`
-	CreatedAt                dbtypes.Timestamp `db:"created_at" json:"created_at"`
-	StartedAt                dbtypes.Timestamp `db:"started_at" json:"started_at"`
-	FinishedAt               dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
-	CursorStart              []byte            `db:"cursor_start" json:"cursor_start"`
-	CursorEnd                []byte            `db:"cursor_end" json:"cursor_end"`
-	CursorTarget             []byte            `db:"cursor_target" json:"cursor_target"`
-	VolumeIdentity           *string           `db:"volume_identity" json:"volume_identity"`
-	DirectoriesObserved      int64             `db:"directories_observed" json:"directories_observed"`
-	FilesObserved            int64             `db:"files_observed" json:"files_observed"`
-	BytesQueued              int64             `db:"bytes_queued" json:"bytes_queued"`
-	BytesHashed              int64             `db:"bytes_hashed" json:"bytes_hashed"`
-	AuthoritativeDirectories int64             `db:"authoritative_directories" json:"authoritative_directories"`
-	ErrorDirectories         int64             `db:"error_directories" json:"error_directories"`
-	OutboxDepth              int64             `db:"outbox_depth" json:"outbox_depth"`
-	PartialCoverage          int64             `db:"partial_coverage" json:"partial_coverage"`
-	CancellationRequested    int64             `db:"cancellation_requested" json:"cancellation_requested"`
-	ForceFullVerification    int64             `db:"force_full_verification" json:"force_full_verification"`
-	FailureCode              *string           `db:"failure_code" json:"failure_code"`
-	FailureProblemType       *string           `db:"failure_problem_type" json:"failure_problem_type"`
-	UpdatedAt                dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	RunID                     uuid.UUID         `db:"run_id" json:"run_id"`
+	RepositoryID              uuid.UUID         `db:"repository_id" json:"repository_id"`
+	RequestedEpoch            int64             `db:"requested_epoch" json:"requested_epoch"`
+	Mode                      string            `db:"mode" json:"mode"`
+	RequestedBy               *string           `db:"requested_by" json:"requested_by"`
+	CoalescedCount            int64             `db:"coalesced_count" json:"coalesced_count"`
+	Status                    string            `db:"status" json:"status"`
+	CreatedAt                 dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	StartedAt                 dbtypes.Timestamp `db:"started_at" json:"started_at"`
+	FinishedAt                dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	CursorStart               []byte            `db:"cursor_start" json:"cursor_start"`
+	CursorEnd                 []byte            `db:"cursor_end" json:"cursor_end"`
+	CursorTarget              []byte            `db:"cursor_target" json:"cursor_target"`
+	VolumeIdentity            *string           `db:"volume_identity" json:"volume_identity"`
+	DirectoriesObserved       int64             `db:"directories_observed" json:"directories_observed"`
+	FilesObserved             int64             `db:"files_observed" json:"files_observed"`
+	BytesQueued               int64             `db:"bytes_queued" json:"bytes_queued"`
+	BytesHashed               int64             `db:"bytes_hashed" json:"bytes_hashed"`
+	AuthoritativeDirectories  int64             `db:"authoritative_directories" json:"authoritative_directories"`
+	ErrorDirectories          int64             `db:"error_directories" json:"error_directories"`
+	OutboxDepth               int64             `db:"outbox_depth" json:"outbox_depth"`
+	PartialCoverage           int64             `db:"partial_coverage" json:"partial_coverage"`
+	CancellationRequested     int64             `db:"cancellation_requested" json:"cancellation_requested"`
+	ForceFullVerification     int64             `db:"force_full_verification" json:"force_full_verification"`
+	FailureCode               *string           `db:"failure_code" json:"failure_code"`
+	FailureProblemType        *string           `db:"failure_problem_type" json:"failure_problem_type"`
+	UpdatedAt                 dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	FullVerificationPerformed int64             `db:"full_verification_performed" json:"full_verification_performed"`
 }
 
 type RepositoryStagingCommit struct {
@@ -1000,6 +1229,17 @@ type SpeciesPrediction struct {
 
 type SpeciesSearchFt struct {
 	Label string `db:"label" json:"label"`
+}
+
+type StorageLocation struct {
+	StorageLocationID uuid.UUID                     `db:"storage_location_id" json:"storage_location_id"`
+	Name              string                        `db:"name" json:"name"`
+	Path              string                        `db:"path" json:"path"`
+	Kind              dbtypes.StorageLocationKind   `db:"kind" json:"kind"`
+	Status            dbtypes.StorageLocationStatus `db:"status" json:"status"`
+	MountFingerprint  string                        `db:"mount_fingerprint" json:"mount_fingerprint"`
+	CreatedAt         dbtypes.Timestamp             `db:"created_at" json:"created_at"`
+	UpdatedAt         dbtypes.Timestamp             `db:"updated_at" json:"updated_at"`
 }
 
 type SystemState struct {

@@ -92,15 +92,15 @@ func newBrowseFixture(t *testing.T, items []fixtureItem) *browseFixture {
 		stackIDs:     map[string]uuid.UUID{},
 	}
 
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	f.exec(`
-		INSERT INTO repository_roots (root_id, name, path, kind, created_at, updated_at)
+		INSERT INTO storage_locations (storage_location_id, name, path, kind, created_at, updated_at)
 		VALUES (?, 'Matrix root', '/', 'external', 1, 1)
-	`, rootID)
+	`, storageLocationID)
 	f.exec(`
-		INSERT INTO repositories (repo_id, name, path, role, reachability, activity, created_at, updated_at, root_id)
+		INSERT INTO repositories (repo_id, name, path, role, reachability, activity, created_at, updated_at, storage_location_id)
 		VALUES (?, 'Matrix', '/matrix', 'regular', 'active', 'idle', 1, 1, ?)
-	`, f.repositoryID, rootID)
+	`, f.repositoryID, storageLocationID)
 
 	for index, item := range items {
 		f.insertItem(index, item)

@@ -106,3 +106,16 @@ func TestExecutionCouplingArchitecturePredicates(t *testing.T) {
 		t.Fatal("flag in non-processors file unexpectedly flagged")
 	}
 }
+
+func TestMusicBrowseLabelDoesNotAllowStorageSynonyms(t *testing.T) {
+	line := `t("music.browse.title", "Library")`
+	if !allowedRepositoryTermContext("web/src/features/music/components/MusicNavigation.tsx", line) {
+		t.Fatal("Music navigation label was rejected")
+	}
+	if allowedRepositoryTermContext("web/src/features/settings/Storage.tsx", line) {
+		t.Fatal("Music label exception escaped the listening domain")
+	}
+	if allowedRepositoryTermContext("web/src/features/music/components/MusicNavigation.tsx", `t("storage.title", "Library")`) {
+		t.Fatal("storage synonym was accepted inside Music")
+	}
+}

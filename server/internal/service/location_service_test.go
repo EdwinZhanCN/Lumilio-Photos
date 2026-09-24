@@ -155,20 +155,20 @@ func TestRebuildLocationClustersBulkPublishesTopology(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
 			display_name, role, webauthn_user_handle
 		) VALUES (1, 'owner', 'unused', 1, 1, 'Owner', 'admin', x'01');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
+			default_owner_id, role, storage_location_id
 		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
-	`, rootID, repositoryID, rootID)
+	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
 	geohashes := []string{"9q8yyk8", "9q8yyk8", "9q8yyk9"}
@@ -231,20 +231,20 @@ func TestLocationProjectionRevisionTracksSourceFacts(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
 			display_name, role, webauthn_user_handle
 		) VALUES (1, 'owner', 'unused', 1, 1, 'Owner', 'admin', x'01');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
+			default_owner_id, role, storage_location_id
 		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
-	`, rootID, repositoryID, rootID)
+	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
 	assetID := uuid.New()
@@ -357,20 +357,20 @@ func TestLocationRebuildYieldsAndRecoversFromNewSourceRevision(t *testing.T) {
 	require.NoError(t, catalog.Migrate(ctx))
 
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	_, err = catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at,
 			display_name, role, webauthn_user_handle
 		) VALUES (1, 'owner', 'unused', 1, 1, 'Owner', 'admin', x'01');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'Root', '/test/root', 'default', 1, 1);
 		INSERT INTO repositories (
 			repo_id, name, path, created_at, updated_at,
-			default_owner_id, role, root_id
+			default_owner_id, role, storage_location_id
 		) VALUES (?, 'Repository', '/test/root/repository', 1, 1, 1, 'primary', ?);
-	`, rootID, repositoryID, rootID)
+	`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 
 	seedTx, err := catalog.SQL.BeginTx(ctx, nil)

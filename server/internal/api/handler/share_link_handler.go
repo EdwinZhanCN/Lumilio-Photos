@@ -466,7 +466,9 @@ func (h *ShareLinkHandler) GetPublicShareThumbnail(c *gin.Context) {
 // @Produce video/mp4
 // @Param token path string true "Share token"
 // @Param assetId path string true "Asset ID"
+// @Param variant query string false "Pinned representation; omitted, the request redirects to the currently available one" Enums(web, original)
 // @Success 200 {file} file "Web-optimized video file"
+// @Success 307
 // @Failure 404 {object} api.ProblemResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/web-video [get]
 func (h *ShareLinkHandler) GetPublicShareWebVideo(c *gin.Context) {
@@ -481,7 +483,9 @@ func (h *ShareLinkHandler) GetPublicShareWebVideo(c *gin.Context) {
 // @Produce audio/mpeg
 // @Param token path string true "Share token"
 // @Param assetId path string true "Asset ID"
+// @Param variant query string false "Pinned representation; omitted, the request redirects to the currently available one" Enums(web, original)
 // @Success 200 {file} file "Web-optimized audio file"
+// @Success 307
 // @Failure 404 {object} api.ProblemResponse "Not found"
 // @Router /api/v1/public/shares/{token}/assets/{assetId}/web-audio [get]
 func (h *ShareLinkHandler) GetPublicShareWebAudio(c *gin.Context) {
@@ -503,20 +507,12 @@ func (h *ShareLinkHandler) servePublicShareWebMedia(c *gin.Context, assetType, d
 		api.WriteProblem(c, api.BadRequest(fmt.Errorf("asset is not %s", strings.ToLower(assetType))))
 		return
 	}
-	repositoryFS, file, err := openWebOrOriginal(c.Request.Context(), h.locations, asset, derivedKind, webSuffix)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			api.WriteProblem(c, api.NotFound(err))
-		} else {
-			api.WriteProblem(c, api.Internal(err))
+	servePinnedWebMedia(c, h.locations, asset, webSuffix, "private, max-age=300", func(variant webMediaVariant) string {
+		if variant != webMediaVariantWeb && assetType == "AUDIO" {
+			return assetAudioContentType(asset)
 		}
-		return
-	}
-
-	c.Header("Cache-Control", "private, max-age=300")
-	c.Header("Content-Type", contentType)
-	c.Header("Accept-Ranges", "bytes")
-	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
+		return contentType
+	})
 }
 
 // GetPublicShareOriginal serves a share asset's original file. Requires the

@@ -47,14 +47,14 @@ func TestEmbeddingRetrieverUsesVec1FiltersAndExactReranking(t *testing.T) {
 		) VALUES
 			(1, 'owner-one', 'hash', 1, 1, x'01'),
 			(2, 'owner-two', 'hash', 1, 1, x'02');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (
 			'00000000-0000-0000-0000-000000000001',
 			'root', '/media', 'default', 1, 1
 		);
 		INSERT INTO repositories (
-			repo_id, name, path, created_at, updated_at, default_owner_id, root_id
+			repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
 		) VALUES (
 			'00000000-0000-0000-0000-000000000002',
 			'repo', '/media/repo', 1, 1, 1,

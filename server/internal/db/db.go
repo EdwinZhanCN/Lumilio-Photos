@@ -74,7 +74,7 @@ type CatalogInfo struct {
 	LibraryID                string
 	SQLiteVersion            string
 	Vec1Version              string
-	ApplicationMigration     int64
+	SchemaVersion            int64
 	RiverMigration           int64
 	SizeBytes                int64
 	QuickCheck               string
@@ -152,8 +152,8 @@ func Open(ctx context.Context, cfg config.DatabaseConfig, suppliedOptions ...Ope
 	if err := claimOrVerifyCatalog(ctx, database); err != nil {
 		return closeOnError("verify identity of", err)
 	}
-	if err := assertSchemaGeneration(ctx, database); err != nil {
-		return closeOnError("verify schema generation of", err)
+	if err := assertSchemaVersion(ctx, database); err != nil {
+		return closeOnError("verify schema version of", err)
 	}
 	if err := validateIntegrity(ctx, database); err != nil {
 		return closeOnError("validate", err)
@@ -472,8 +472,15 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 	if err := database.QueryRowContext(ctx, "SELECT library_id FROM system_state WHERE id = 1").Scan(&info.LibraryID); err != nil {
 		return CatalogInfo{}, fmt.Errorf("read SQLite library identity: %w", err)
 	}
-	if err := database.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM lumilio_schema_migrations").Scan(&info.ApplicationMigration); err != nil {
-		return CatalogInfo{}, fmt.Errorf("read application migration version: %w", err)
+	if err := database.QueryRowContext(ctx, "PRAGMA user_version").Scan(&info.SchemaVersion); err != nil {
+		return CatalogInfo{}, fmt.Errorf("read SQLite schema version: %w", err)
+	}
+	if info.SchemaVersion != SchemaVersion {
+		return CatalogInfo{}, fmt.Errorf(
+			"SQLite catalog schema version = %d, want %d",
+			info.SchemaVersion,
+			SchemaVersion,
+		)
 	}
 	// River lives in QueueDB for production catalogs. Keep this field as an
 	// optional compatibility observation for historical snapshots and tests;

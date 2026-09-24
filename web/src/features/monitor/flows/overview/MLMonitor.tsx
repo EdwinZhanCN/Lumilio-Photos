@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Bird, Cpu, Database, Loader2, RefreshCcw, Workflow } from "lucide-react";
+import { RefreshCcw } from "lucide-react";
+import { MonitorFrame } from "./MonitorFrame";
 import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
@@ -56,9 +57,6 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
   );
   const bioTaskStats = stats?.tasks.bioclip;
 
-  const totalQueuedMLJobs =
-    taskCards.reduce((sum, task) => sum + (task.stats?.queuedJobs ?? 0), 0) +
-    (bioTaskStats?.queuedJobs ?? 0);
   const rebuildingTasks = rebuildMutation.variables?.body?.tasks ?? [];
   const selectedReindexTask = reindexModal
     ? taskCards.find((task) => task.key === reindexModal.taskKey)
@@ -69,188 +67,63 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
     0,
   );
 
-  if (statsQuery.isLoading && !stats) {
-    return (
-      <div className="bg-base-100 rounded-lg shadow-sm p-6 text-center">
-        <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-        <p className="mt-3 text-sm opacity-60">{t("common.loading")}</p>
-      </div>
-    );
-  }
-
-  if (statsQuery.isError && !stats) {
-    return (
-      <div className="bg-base-100 rounded-lg shadow-sm p-6 text-center">
-        <div className="text-warning text-sm">{t("monitor.ml.loadError")}</div>
-      </div>
-    );
-  }
+  const fields = [
+    ...taskCards,
+    { key: "bioclip" as const, label: t("monitor.ml.bioAlbumCoverage"), stats: bioTaskStats },
+  ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => statsQuery.refetch()}
-          disabled={statsQuery.isFetching}
-        >
-          <RefreshCcw className={`w-4 h-4 ${statsQuery.isFetching ? "animate-spin" : ""}`} />
-          {t("settings.serverSettings.refresh")}
-        </button>
-      </div>
-
-      <div className="stats stats-vertical xl:stats-horizontal shadow-sm w-full">
-        <div className="stat">
-          <div className="stat-figure text-primary">
-            <Database className="w-8 h-8" />
-          </div>
-          <div className="stat-title">{t("monitor.ml.existingPhotos")}</div>
-          <div className="stat-value text-primary">{stats?.photoTotal ?? 0}</div>
-        </div>
-
-        <div className="stat">
-          <div className="stat-figure text-info">
-            <Cpu className="w-8 h-8" />
-          </div>
-          <div className="stat-title">{t("monitor.ml.queuedMlJobs")}</div>
-          <div className="stat-value text-info">{totalQueuedMLJobs}</div>
-        </div>
-
-        <div className="stat">
-          <div className="stat-figure text-secondary">
-            <Workflow className="w-8 h-8" />
-          </div>
-          <div className="stat-title">{t("monitor.ml.reindexJobs")}</div>
-          <div className="stat-value text-secondary">{stats?.reindexJobs ?? 0}</div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {taskCards.map(({ key, label, stats: taskStats }) => {
-          const indexedCount = taskStats?.indexedCount ?? 0;
-          const queuedJobs = taskStats?.queuedJobs ?? 0;
-          const totalCount = taskStats?.totalCount ?? stats?.photoTotal ?? 0;
-          const coverage = taskStats?.coverage ?? 0;
-          const remaining = Math.max(totalCount - indexedCount, 0);
-
+    <MonitorFrame
+      hasData={!!stats}
+      isLoading={statsQuery.isLoading}
+      isFetching={statsQuery.isFetching}
+      error={statsQuery.isError ? t("monitor.ml.loadError") : undefined}
+      onRefresh={() => void statsQuery.refetch()}
+      updatedAt={statsQuery.dataUpdatedAt}
+    >
+      <div className="monitor-weave py-3">
+        {fields.map(({ key, label, stats: taskStats }) => {
+          const percent = Math.min(100, Math.max(0, Math.round((taskStats?.coverage ?? 0) * 100)));
+          const empty = !taskStats?.totalCount;
           return (
-            <section key={key} className="bg-base-100 rounded-lg shadow-sm p-4 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">{label}</h2>
-                  <p className="text-sm text-base-content/70">
-                    {t("monitor.ml.coverageValue", {
-                      indexed: indexedCount,
-                      total: totalCount,
-                      percent: formatCoveragePercent(coverage),
-                    })}
-                  </p>
-                </div>
-                <span className="badge badge-outline">{formatCoveragePercent(coverage)}</span>
-              </div>
-
-              <progress
-                className="progress progress-primary w-full"
-                value={Math.round(coverage * 100)}
-                max="100"
-              />
-
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">{t("monitor.ml.indexedAssets")}</div>
-                  <div className="mt-1 font-semibold">{indexedCount}</div>
-                </div>
-                <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">{t("monitor.ml.remainingAssets")}</div>
-                  <div className="mt-1 font-semibold">{remaining}</div>
-                </div>
-                <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">{t("monitor.ml.queuedJobs")}</div>
-                  <div className="mt-1 font-semibold">{queuedJobs}</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setReindexAll(remaining === 0);
-                    setReindexModal({ taskKey: key, taskLabel: label });
-                  }}
-                  disabled={rebuildMutation.isPending && rebuildingTasks.includes(key)}
-                >
-                  <RefreshCcw
-                    className={`w-4 h-4 ${
-                      rebuildMutation.isPending && rebuildingTasks.includes(key)
-                        ? "animate-spin"
-                        : ""
-                    }`}
-                  />
-                  {t("monitor.ml.reindex")}
-                </button>
-                {remaining === 0 && (
-                  <span className="text-xs text-base-content/40">
-                    {t("monitor.ml.allIndexed", "All indexed")}
-                  </span>
+            <section key={key} aria-label={label} className="min-w-0">
+              <span className="block min-h-10 text-sm font-medium">{label}</span>
+              <span className="monitor-weave-field" aria-hidden="true">
+                {Array.from({ length: 100 }, (_, i) => (
+                  <span key={i} data-covered={!empty && i < percent} />
+                ))}
+              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xl font-medium tabular-nums">
+                  {empty ? "—" : formatCoveragePercent(taskStats?.coverage ?? 0)}
+                </span>
+                {key !== "bioclip" && !empty && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={statsQuery.isError || rebuildMutation.isPending}
+                    onClick={() => {
+                      setReindexAll((taskStats?.indexedCount ?? 0) >= (taskStats?.totalCount ?? 0));
+                      setReindexModal({ taskKey: key, taskLabel: label });
+                    }}
+                  >
+                    <RefreshCcw
+                      aria-hidden
+                      className={`size-4 ${rebuildMutation.isPending && rebuildingTasks.includes(key) ? "motion-safe:animate-spin" : ""}`}
+                    />
+                    {t("monitor.ml.reindex")}
+                  </button>
                 )}
               </div>
+              <span className="mt-1 block text-xs text-base-content/60 tabular-nums">
+                {empty
+                  ? t("monitor.ml.noApplicable", "No applicable content")
+                  : `${taskStats?.indexedCount} / ${taskStats?.totalCount}`}
+              </span>
             </section>
           );
         })}
-
-        {(() => {
-          const indexedCount = bioTaskStats?.indexedCount ?? 0;
-          const queuedJobs = bioTaskStats?.queuedJobs ?? 0;
-          const totalCount = bioTaskStats?.totalCount ?? 0;
-          const coverage = bioTaskStats?.coverage ?? 0;
-          const remaining = Math.max(totalCount - indexedCount, 0);
-
-          return (
-            <section className="bg-base-100 rounded-lg shadow-sm p-4 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Bird className="size-5 text-primary" />
-                    {t("monitor.ml.bioAlbumCoverage")}
-                  </h2>
-                  <p className="text-sm text-base-content/70">
-                    {t("monitor.ml.coverageValue", {
-                      indexed: indexedCount,
-                      total: totalCount,
-                      percent: formatCoveragePercent(coverage),
-                    })}
-                  </p>
-                </div>
-                <span className="badge badge-outline">{formatCoveragePercent(coverage)}</span>
-              </div>
-
-              <progress
-                className="progress progress-primary w-full"
-                value={Math.round(coverage * 100)}
-                max="100"
-              />
-
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">{t("monitor.ml.indexedAssets")}</div>
-                  <div className="mt-1 font-semibold">{indexedCount}</div>
-                </div>
-                <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">{t("monitor.ml.remainingAssets")}</div>
-                  <div className="mt-1 font-semibold">{remaining}</div>
-                </div>
-                <div className="rounded-lg border border-base-300 px-3 py-2">
-                  <div className="text-base-content/60">{t("monitor.ml.queuedJobs")}</div>
-                  <div className="mt-1 font-semibold">{queuedJobs}</div>
-                </div>
-              </div>
-
-              <p className="text-xs text-base-content/60">{t("monitor.ml.bioAlbumHint")}</p>
-            </section>
-          );
-        })()}
       </div>
-
       {reindexModal && (
         <div className="modal modal-open z-modal">
           <div className="modal-box max-w-sm">
@@ -300,28 +173,36 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
               </button>
               <button
                 className="btn btn-primary btn-sm"
+                disabled={rebuildMutation.isPending}
                 onClick={async () => {
-                  const result = await rebuildMutation.mutateAsync({
-                    body: {
-                      repository_id: localRepoId || undefined,
-                      tasks: [reindexModal.taskKey],
-                      missing_only: !reindexAll,
-                    },
-                  });
-                  setReindexModal(null);
-                  setReindexAll(false);
+                  try {
+                    const result = await rebuildMutation.mutateAsync({
+                      body: {
+                        repository_id: localRepoId || undefined,
+                        tasks: [reindexModal.taskKey],
+                        missing_only: !reindexAll,
+                      },
+                    });
+                    setReindexModal(null);
+                    setReindexAll(false);
 
-                  const data = extractRebuildResponseData(result);
-                  const disabled = data?.disabled_tasks;
-                  if (disabled && disabled.length > 0) {
-                    const taskNames = disabled
-                      .map((key) => getTaskLabel(t, key as MLTaskKey))
-                      .join(", ");
+                    const data = extractRebuildResponseData(result);
+                    const disabled = data?.disabled_tasks;
+                    if (disabled && disabled.length > 0) {
+                      const taskNames = disabled
+                        .map((key) => getTaskLabel(t, key as MLTaskKey))
+                        .join(", ");
+                      showMessage(
+                        "info",
+                        t("monitor.ml.reindexModal.disabledTasksWarning", {
+                          tasks: taskNames,
+                        }),
+                      );
+                    }
+                  } catch {
                     showMessage(
-                      "info",
-                      t("monitor.ml.reindexModal.disabledTasksWarning", {
-                        tasks: taskNames,
-                      }),
+                      "error",
+                      t("monitor.ml.rebuildFailed", "Rebuild could not be started. Try again."),
                     );
                   }
                 }}
@@ -332,6 +213,6 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
           </div>
         </div>
       )}
-    </div>
+    </MonitorFrame>
   );
 }

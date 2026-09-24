@@ -42,7 +42,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/river/queue-summary": {
+    "/api/v1/admin/processing": {
         parameters: {
             query?: never;
             header?: never;
@@ -50,24 +50,17 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get queue summaries
-         * @description Get aggregated processing activity per queue, including recent error samples
+         * Get processing stages
+         * @description One card per processing stage in a declared unit, plus overall totals. Catalog facts, with River supplying only running and retryable deliveries; not an atomic cross-database snapshot.
          */
         get: {
             parameters: {
-                query?: {
-                    /** @description Recent error samples per queue (default: 5, max: 20) */
-                    error_limit?: number;
-                };
+                query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
+            requestBody?: never;
             responses: {
                 /** @description OK */
                 200: {
@@ -75,7 +68,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["handler.QueueSummaryResponse"];
+                        "application/json": components["schemas"]["processing.Summary"];
                     };
                 };
             };
@@ -88,7 +81,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/river/stats": {
+    "/api/v1/admin/processing/diagnostics": {
         parameters: {
             query?: never;
             header?: never;
@@ -96,21 +89,20 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get job statistics
-         * @description Get aggregated statistics about jobs by state
+         * Get processing delivery diagnostics
+         * @description Disposable River delivery totals and per-queue summaries with recent error samples. Delivery records are not file progress.
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Recent error samples per queue (default: 5, max: 20) */
+                    error_limit?: number;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
+            requestBody?: never;
             responses: {
                 /** @description OK */
                 200: {
@@ -118,13 +110,104 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["handler.JobStatsResponse"];
+                        "application/json": components["schemas"]["handler.DeliveryStatsDTO"];
                     };
                 };
             };
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/processing/stages/{stage}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a processing stage's items
+         * @description One bounded page of a stage's failed (newest first) or queued (oldest first) subjects. Failures carry reason codes, never raw errors.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Item state */
+                    state: "failed" | "queued";
+                    /** @description Page size (max 50) */
+                    limit?: number;
+                    /** @description Cursor from the previous page */
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Stage ID */
+                    stage: "import" | "scan" | "metadata" | "thumbnails" | "video" | "analysis" | "events" | "places" | "text_search" | "backup";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["processing.ItemsPage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/processing/stages/{stage}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a processing stage's failures
+         * @description Re-requests at most 500 failed subjects of a stage through the Catalog. Import, Scan, and Backup are not retryable here.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Stage ID */
+                    stage: "metadata" | "thumbnails" | "video" | "analysis" | "events" | "places" | "text_search";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["processing.RetryResult"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1098,6 +1181,57 @@ export interface paths {
                     };
                 };
                 /** @description Ref not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/refs/{id}/music": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hydrate music selection */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Thread ID */
+                    thread_id: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Ref ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.AgentMusicRefDTO"];
+                    };
+                };
+                /** @description Not Found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2263,7 +2397,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /**
@@ -2284,6 +2421,13 @@ export interface paths {
                     content: {
                         "audio/mpeg": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Invalid asset ID */
                 400: {
@@ -3459,7 +3603,7 @@ export interface paths {
             parameters: {
                 query?: {
                     /** @description Thumbnail size */
-                    size?: "small" | "medium" | "large";
+                    size?: "small" | "medium" | "large" | "waveform";
                 };
                 header?: never;
                 path: {
@@ -3532,7 +3676,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /**
@@ -3553,6 +3700,13 @@ export interface paths {
                     content: {
                         "video/mp4": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Invalid asset ID */
                 400: {
@@ -4273,7 +4427,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/assets/indexing/repositories": {
+    "/api/v1/assets/indexing/rebuild/{receipt_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4281,29 +4435,46 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List repositories for scope selection
-         * @description Return the shared repository registry for browse-scope/upload selectors and indexing filters. Paths are only included for admins.
+         * Get asset index rebuild status
+         * @description Report whether a rebuild receipt is pending, completed, or failed. A receipt completes only after every page was requested and every enrichment stage it requested was applied.
          */
         get: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    /** @description Rebuild receipt ID */
+                    receipt_id: string;
+                };
                 cookie?: never;
             };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
+            requestBody?: never;
             responses: {
-                /** @description Repository options retrieved successfully */
+                /** @description OK */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["dto.IndexingRepositoryListResponseDTO"];
+                        "application/json": components["schemas"]["dto.AssetIndexingRebuildStatusDTO"];
+                    };
+                };
+                /** @description Invalid receipt ID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Rebuild receipt not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
                     };
                 };
                 /** @description Internal server error */
@@ -8451,269 +8622,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/host-actions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List unfinished native host actions */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.HostActionDTO"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Request a native host storage action
-         * @description Creates a persistent, expiring task. Filesystem paths and approval nonces never enter this HTTP request or response.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Stable request identifier */
-                    "Idempotency-Key"?: string;
-                };
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Native host action */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.CreateHostActionRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.HostActionDTO"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/host-actions/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get native host action */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Host action ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.HostActionDTO"];
-                    };
-                };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        /** Cancel native host action */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Host action ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.HostActionDTO"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/host-actions/{id}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resolve native host action conflict */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Host action ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Recovery decision */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.ResolveHostActionRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.HostActionDTO"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/host-actions/native-capability": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get native host capability */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.NativeHostCapabilityDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/locations/clusters": {
         parameters: {
             query?: never;
@@ -8836,6 +8744,1062 @@ export interface paths {
                     };
                     content: {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music albums */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Search album title */
+                    query?: string;
+                    /** @description Only favorite albums */
+                    favorites_only?: boolean;
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create music album */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Album data */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicAlbumCreateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/albums/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music album */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Album UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update music album */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Album UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Album changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicAlbumPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicAlbumDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music artists */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only favorite artists */
+                    favorites_only?: boolean;
+                    /** @description Search artist name */
+                    query?: string;
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicArtistPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/artists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music artist */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Artist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicArtistDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update music artist */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Artist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Artist changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicArtistPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicArtistDTO"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/playback-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create music playback session */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Playback source */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaybackSourceRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaybackSessionDTO"];
+                    };
+                };
+                /** @description Request Entity Too Large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playback-sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Expire playback session */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Session UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playback-sessions/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List playback entries */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Session UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaybackPageDTO"];
+                    };
+                };
+                /** @description Gone */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music playlists */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistPageDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create music playlist */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Playlist data */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistCreateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music playlist */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete music playlist */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update music playlist */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Playlist changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistDTO"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music playlist entries */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistEntriesResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add music playlist entry */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Entry data */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistEntryCreateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicPlaylistEntryDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}/entries/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove music playlist entry */
+        delete: {
+            parameters: {
+                query?: {
+                    /** @description Expected playlist revision */
+                    revision?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                    /** @description Entry UUID */
+                    entryId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/playlists/{id}/entries/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder music playlist */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Playlist UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Entry positions */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicPlaylistReorderRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List music tracks */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Search title, artist, album, or filename */
+                    query?: string;
+                    /** @description Sort by title, artist, album, or track */
+                    sort?: string;
+                    /** @description Only liked tracks */
+                    liked_only?: boolean;
+                    /** @description Filter by artist identity */
+                    artist_id?: string;
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackPageDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get music track */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update music track */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Track changes */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicTrackPatchRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/album": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign music album to track */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Album assignment */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicAlbumAssignmentRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/designation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set music track designation */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Designation change */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicDesignationRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/lyrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get local track lyrics */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicLyricsDTO"];
+                    };
+                };
+            };
+        };
+        /** Save local track lyrics */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Local lyrics and expected revision */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.MusicLyricsDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicLyricsDTO"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/tracks/{id}/reset-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset music track overrides */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Track UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.MusicTrackDTO"];
                     };
                 };
             };
@@ -10050,7 +11014,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /** @description Share token */
@@ -10070,6 +11037,13 @@ export interface paths {
                     content: {
                         "audio/mpeg": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Not found */
                 404: {
@@ -10103,7 +11077,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Pinned representation; omitted, the request redirects to the currently available one */
+                    variant?: "web" | "original";
+                };
                 header?: never;
                 path: {
                     /** @description Share token */
@@ -10123,6 +11100,13 @@ export interface paths {
                     content: {
                         "video/mp4": Record<string, never>;
                     };
+                };
+                /** @description Temporary Redirect */
+                307: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Not found */
                 404: {
@@ -10268,227 +11252,6 @@ export interface paths {
             };
         };
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List repositories
-         * @description Return all registered repositories.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repositories retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.ListRepositoriesResponseDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Create repository
-         * @description Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty root_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Repository name */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.CreateRepositoryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository created successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.CreateRepositoryResponseDTO"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Repository identity conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get repository
-         * @description Return a single repository.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        /**
-         * Remove repository registration
-         * @description Remove a non-primary repository and its catalog/index/task state after an exact repository-name confirmation. Original media, marker, and private files remain on disk.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Exact repository-name confirmation */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.RemoveRepositoryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository registration removed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
-                    };
-                };
-                /** @description Invalid confirmation */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Primary or busy repository */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -10684,400 +11447,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/repositories/{id}/removal-impact": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Preview repository removal
-         * @description Return the catalog, album, queued-work, and private-state impact of removing a non-primary repository registration. Files on disk are always preserved.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository removal impact */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryRemovalImpactDTO"];
-                    };
-                };
-                /** @description Repository not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/rename": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rename repository
-         * @description Change the display name without changing identity, path, storage strategy, duplicate handling, owner, role, or root.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description New display name */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.RenameRepositoryRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Queue repository scan
-         * @description Queue a manual scan for a repository free workspace.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description Scan request */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RepositoryScanRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Repository scan queued successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryScanQueuedDTO"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List repository scans
-         * @description List recent scan runs for a repository.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Limit */
-                    limit?: number;
-                    /** @description Offset */
-                    offset?: number;
-                };
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository scan runs retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryScanRunListDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scans/{operation_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get repository scan operation
-         * @description Return one durable Repository scan operation by immutable operation ID.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                    /** @description Scan operation UUID */
-                    operation_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository scan operation retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
-                    };
-                };
-                /** @description Scan operation not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scans/{operation_id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Cancel repository scan operation
-         * @description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                    /** @description Scan operation UUID */
-                    operation_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Repository scan cancellation requested */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
-                    };
-                };
-                /** @description Scan operation not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/{id}/scans/latest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get latest repository scan
-         * @description Return the latest scan run for a repository.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Repository UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Latest repository scan retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
-                    };
-                };
-                /** @description No scan run found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/repositories/{id}/stacks/detect": {
         parameters: {
             query?: never;
@@ -11115,387 +11484,6 @@ export interface paths {
             };
         };
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/lifecycle-audit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List repository lifecycle audit events */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Maximum events (1-200) */
-                    limit?: number;
-                    /** @description Pagination offset */
-                    offset?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.ListLifecycleAuditEventsResponseDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/storage-diagnostics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Storage Location and repository diagnostics */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.StorageDiagnosticsResponseDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repositories/storage-support-bundle": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download a path-redacted storage support bundle */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.StorageSupportBundleDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repository-candidates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List repository candidates
-         * @description Returns bounded direct-child facts for standalone and Docker workflows without accepting arbitrary filesystem paths.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.ListRepositoryCandidatesResponseDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repository-candidates/open": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Open repository candidate
-         * @description Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Stable request identifier */
-                    "Idempotency-Key"?: string;
-                };
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Repository candidate */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.OpenRepositoryCandidateRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repository-candidates/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Resolve repository candidate identity
-         * @description Resolves a same-identity direct child using user-facing decisions; no arbitrary filesystem path is accepted.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Stable request identifier */
-                    "Idempotency-Key"?: string;
-                };
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Repository candidate decision */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["dto.ResolveRepositoryCandidateRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.RepositoryDTO"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repository-roots": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Storage Locations
-         * @description Return registered repository roots with their current reachability. Filesystem paths are admin-only through this route.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Storage Locations retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["dto.ListRepositoryRootsResponseDTO"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/repository-roots/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove Storage Location registration
-         * @description Remove an empty, idle external Storage Location from Lumilio. The directory, .lumilioroot marker, and every disk file are preserved.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Storage Location UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Storage Location registration removed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.SuccessResponse"];
-                    };
-                };
-                /** @description Storage Location not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-                /** @description Default, non-empty, or busy Storage Location */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
-                    };
-                };
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -12166,6 +12154,59 @@ export interface paths {
                     };
                     content: {
                         "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/primary-repository": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create primary repository during setup
+         * @description Create the single primary repository when first-run setup has not completed. Returns 409 once setup is complete.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Primary repository */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.SetupPrimaryRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.CreateRepositoryResponseDTO"];
+                    };
+                };
+                /** @description Setup already completed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
                     };
                 };
             };
@@ -12956,6 +12997,1255 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/storage/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List repository lifecycle audit events */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum events (1-200) */
+                    limit?: number;
+                    /** @description Pagination offset */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ListLifecycleAuditEventsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List repository candidates
+         * @description Returns bounded direct-child facts for standalone and Docker workflows without accepting arbitrary filesystem paths.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.ListRepositoryCandidatesResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/candidates/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open repository candidate
+         * @description Opens a valid .lumiliorepo by portable directory name. Prior repository-private state is isolated before an authoritative initial scan.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Stable request identifier */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository candidate */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.OpenRepositoryCandidateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/candidates/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve repository candidate identity
+         * @description Resolves a same-identity direct child using user-facing decisions; no arbitrary filesystem path is accepted.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Stable request identifier */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository candidate decision */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.ResolveRepositoryCandidateRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Storage Location and repository diagnostics */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageDiagnosticsResponseDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/locations/{id}/detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detach Storage Location registration
+         * @description Remove an empty, idle external Storage Location from Lumilio. Original files are preserved.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Storage Location UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/locations/{id}/detach-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Storage Location detach impact */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Storage Location UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageLocationRemovalImpactDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/native-capability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get native host capability */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.NativeHostCapabilityDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/native-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List unfinished native host actions */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Request a native host storage action
+         * @description Creates a persistent, expiring task. Filesystem paths and approval nonces never enter this HTTP request or response.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Stable request identifier */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Native host action */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.CreateHostActionRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/native-tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get native host action */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Host action ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/native-tasks/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel native host action */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Host action ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/native-tasks/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve native host action conflict */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Host action ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Recovery decision */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.ResolveHostActionRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.HostActionDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create repository
+         * @description Create a repository in an explicit direct-child storage folder below a registered Storage Location. Empty storage_location_id selects the configured default. Existing .lumiliorepo targets are returned as structured recovery facts and are never opened implicitly.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository name */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.CreateRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Repository created successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.CreateRepositoryResponseDTO"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Repository identity conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.RepositoryConflictProblemResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detach repository registration
+         * @description Remove a non-primary repository registration after an exact repository-name confirmation. Original media remains on disk.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Exact repository-name confirmation */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.RemoveRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.SuccessResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/detach-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview repository detach impact */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryRemovalImpactDTO"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename repository
+         * @description Change the display name without changing identity, path, storage strategy, duplicate handling, owner, role, or root.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description New display name */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["dto.RenameRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryDTO"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List repository scans
+         * @description List recent scan runs for a repository.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Limit */
+                    limit?: number;
+                    /** @description Offset */
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan runs retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunListDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Queue repository scan
+         * @description Queue a manual scan for a repository free workspace.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Scan request */
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.RepositoryScanRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Repository scan queued successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanQueuedDTO"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/verifications/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get repository scan operation
+         * @description Return one durable Repository scan operation by immutable operation ID.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan operation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/verifications/{operation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel repository scan operation
+         * @description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                    /** @description Scan operation UUID */
+                    operation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan cancellation requested */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description Scan operation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/repositories/{id}/verifications/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get latest repository scan
+         * @description Return the latest scan run for a repository.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Latest repository scan retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.RepositoryScanRunDTO"];
+                    };
+                };
+                /** @description No scan run found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/support-bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a path-redacted storage support bundle */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageSupportBundleDTO"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List storage targets
+         * @description Return repository selectors with read and upload admission. Omits paths, Storage Locations, capacity, and verification.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageTargetsResponseDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storage/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get admin storage view
+         * @description Return Storage Locations, repositories, and capacity groups for administration.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["dto.StorageViewResponseDTO"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -13394,6 +14684,7 @@ export interface components {
             count?: number;
             effect_id?: string;
             message?: string;
+            playlist_id?: string;
             status?: string;
             tool_name?: string;
         };
@@ -13403,21 +14694,40 @@ export interface components {
             /** @example Album Title */
             album?: string;
             /** @example John Doe */
+            album_artist?: string;
+            album_artist_ids?: string[];
+            album_artists?: string[];
+            /** @example John Doe */
             artist?: string;
+            artist_ids?: string[];
+            /**
+             * @description Ordered credits and identifiers are kept as extracted evidence. They are
+             *     deliberately not inferred by splitting punctuation in a display name.
+             */
+            artists?: string[];
             /** @example 128000 */
             bitrate?: number;
             /** @example 2 */
             channels?: number;
             /** @example AAC */
             codec?: string;
+            compilation?: boolean;
             /** @example Song Description */
             description?: string;
+            disc_number?: number;
+            disc_total?: number;
+            edition?: string;
             /** @example Pop */
             genre?: string;
+            release_date?: string;
+            release_id?: string;
+            release_precision?: string;
             /** @example 44100 */
             sample_rate?: number;
             /** @example Song Title */
             title?: string;
+            track_number?: number;
+            track_total?: number;
             /** @example 2023 */
             year?: number;
         };
@@ -13477,6 +14787,17 @@ export interface components {
             /** @example alex */
             username?: string;
         };
+        "dto.AdmissionDecisionDTO": {
+            /** @example true */
+            allowed?: boolean;
+            /**
+             * @example [
+             *       "offline",
+             *       "paused"
+             *     ]
+             */
+            reasons?: string[];
+        };
         "dto.AgentDateRangeDTO": {
             from?: string;
             to?: string;
@@ -13486,6 +14807,11 @@ export interface components {
             bucket?: string;
             /** @example 12 */
             count?: number;
+        };
+        "dto.AgentMusicRefDTO": {
+            total?: number;
+            tracks?: components["schemas"]["dto.MusicTrackDTO"][];
+            truncated?: boolean;
         };
         "dto.AgentNameCountDTO": {
             /** @example 42 */
@@ -13778,6 +15104,17 @@ export interface components {
              *     ]
              */
             types?: string[];
+        };
+        "dto.AssetIndexingRebuildStatusDTO": {
+            /** @example 21a0a629-7329-4623-9f0c-a53b99878edc */
+            receipt_id?: string;
+            /**
+             * @example pending
+             * @enum {string}
+             */
+            state?: "pending" | "completed" | "failed";
+            /** @example attempts_exhausted */
+            terminal_error?: string;
         };
         "dto.AssetIndexingStatsResponseDTO": {
             /** @example 2400 */
@@ -14187,10 +15524,10 @@ export interface components {
             purpose?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            root_id?: string;
             /** @example web-session-4d4d */
             session_id?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            storage_location_id?: string;
         };
         "dto.CreateManualStackRequestDTO": {
             /**
@@ -14222,11 +15559,11 @@ export interface components {
              */
             role?: "primary" | "regular";
             /**
-             * @description RootID identifies a registered Storage Location. Empty selects the
+             * @description StorageLocationID identifies a registered Storage Location. Empty selects the
              *     configured default location. Clients never submit an arbitrary root path.
              * @example 550e8400-e29b-41d4-a716-446655440000
              */
-            root_id?: string;
+            storage_location_id?: string;
             /**
              * @example date
              * @enum {string}
@@ -14602,7 +15939,7 @@ export interface components {
             repository_id?: string;
             risk_warnings?: string[];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            root_id?: string;
+            storage_location_id?: string;
             /** @example repository_identity */
             type?: string;
         };
@@ -14627,10 +15964,10 @@ export interface components {
             /** @example web-host-action-4d4d */
             request_id?: string;
             result?: components["schemas"]["dto.HostActionResultDTO"];
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            root_id?: string;
             /** @example pending */
             status?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            storage_location_id?: string;
             updated_at?: string;
         };
         "dto.HostActionResultDTO": {
@@ -14640,43 +15977,7 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            root_id?: string;
-        };
-        "dto.IndexingRepositoryListResponseDTO": {
-            repositories?: components["schemas"]["dto.IndexingRepositoryOptionDTO"][];
-        };
-        "dto.IndexingRepositoryOptionDTO": {
-            /** @example idle */
-            activity?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            id?: string;
-            /** @example false */
-            is_primary?: boolean;
-            /** @example Family Repository */
-            name?: string;
-            /**
-             * @description Path is only populated for admin callers; repository filesystem
-             *     locations are never exposed to regular users.
-             * @example /Volumes/Media/Photos
-             */
-            path?: string;
-            /** @example low_space */
-            pause_reason?: string;
-            /**
-             * @description Reachability lets a selector keep an unreachable repository visible as a
-             *     browse filter while refusing it as an upload target. Activity is separate
-             *     so scanning never masks storage availability.
-             * @example active
-             */
-            reachability?: string;
-            /** @example regular */
-            role?: string;
-            /**
-             * @description RootID identifies the parent Storage Location so clients can derive an
-             *     effective state with parent reachability taking priority.
-             * @example 550e8400-e29b-41d4-a716-446655440000
-             */
-            root_id?: string;
+            storage_location_id?: string;
         };
         "dto.LLMCapabilitiesDTO": {
             agent_enabled?: boolean;
@@ -14763,14 +16064,8 @@ export interface components {
             offset?: number;
             total?: number;
         };
-        "dto.ListRepositoriesResponseDTO": {
-            repositories?: components["schemas"]["dto.RepositoryDTO"][];
-        };
         "dto.ListRepositoryCandidatesResponseDTO": {
             candidates?: components["schemas"]["dto.RepositoryCandidateDTO"][];
-        };
-        "dto.ListRepositoryRootsResponseDTO": {
-            roots?: components["schemas"]["dto.RepositoryRootDTO"][];
         };
         "dto.ListShareLinksResponseDTO": {
             items?: components["schemas"]["dto.ShareLinkDTO"][];
@@ -15080,6 +16375,261 @@ export interface components {
         };
         "dto.MoveFaceRequestDTO": {
             target_person_id: number;
+        };
+        "dto.MusicAlbumAssignmentRequestDTO": {
+            /** Format: uuid */
+            album_id?: string;
+            revision?: number;
+        };
+        "dto.MusicAlbumCreateRequestDTO": {
+            artist_names?: string[];
+            /** Format: uuid */
+            cover_asset_id?: string;
+            edition?: string;
+            release_date?: string;
+            release_precision?: string;
+            title: string;
+        };
+        "dto.MusicAlbumDTO": {
+            /** Format: uuid */
+            album_id?: string;
+            artists?: components["schemas"]["dto.MusicCreditDTO"][];
+            /** Format: uuid */
+            cover_asset_id?: string;
+            edition?: string;
+            favorite?: boolean;
+            owner_id?: number;
+            release_date?: string;
+            release_identifier?: string;
+            /** @enum {string} */
+            release_precision?: "unknown" | "year" | "month" | "day";
+            revision?: number;
+            title?: string;
+            track_count?: number;
+            tracks?: components["schemas"]["dto.MusicTrackDTO"][];
+        };
+        "dto.MusicAlbumPageDTO": {
+            items?: components["schemas"]["dto.MusicAlbumDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicAlbumPatchRequestDTO": {
+            artist_names?: string[];
+            /** Format: uuid */
+            cover_asset_id?: string;
+            edition?: string;
+            favorite?: boolean;
+            release_date?: string;
+            release_precision?: string;
+            revision?: number;
+            title?: string;
+        };
+        "dto.MusicArtistDTO": {
+            album_count?: number;
+            /** Format: uuid */
+            artist_id?: string;
+            display_name?: string;
+            favorite?: boolean;
+            owner_id?: number;
+            revision?: number;
+            track_count?: number;
+        };
+        "dto.MusicArtistPageDTO": {
+            items?: components["schemas"]["dto.MusicArtistDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicArtistPatchRequestDTO": {
+            display_name?: string;
+            favorite?: boolean;
+            revision?: number;
+        };
+        "dto.MusicCreditDTO": {
+            /** Format: uuid */
+            artist_id?: string;
+            display_name?: string;
+            position?: number;
+            role?: string;
+        };
+        "dto.MusicDesignationRequestDTO": {
+            /** @enum {string} */
+            designation: "music" | "other";
+            revision?: number;
+        };
+        "dto.MusicLyricsDTO": {
+            content?: string;
+            revision?: number;
+        };
+        "dto.MusicOverrideDTO": {
+            field?: string;
+            present?: boolean;
+            value?: string;
+        };
+        "dto.MusicPlaybackEntryDTO": {
+            available?: boolean;
+            duration?: number;
+            /** Format: uuid */
+            entry_id?: string;
+            mime_type?: string;
+            saved_title?: string;
+            sequence?: number;
+            /** Format: uuid */
+            source_entry_id?: string;
+            track_album?: string;
+            track_artist?: string;
+            /** Format: uuid */
+            track_id?: string;
+            track_title?: string;
+        };
+        "dto.MusicPlaybackPageDTO": {
+            items?: components["schemas"]["dto.MusicPlaybackEntryDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicPlaybackSessionDTO": {
+            expires_at?: string;
+            owner_id?: number;
+            /** Format: uuid */
+            session_id?: string;
+            source_id?: string;
+            source_kind?: string;
+            source_revision?: number;
+            status?: string;
+            total_entries?: number;
+        };
+        "dto.MusicPlaybackSourceRequestDTO": {
+            artist_id?: string;
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            kind: "query" | "album" | "playlist" | "liked";
+            liked_only?: boolean;
+            query?: string;
+            /** @enum {string} */
+            sort?: "title" | "artist" | "album" | "track";
+        };
+        "dto.MusicPlaylistCreateRequestDTO": {
+            description?: string;
+            title: string;
+        };
+        "dto.MusicPlaylistDTO": {
+            cover_asset_id?: string;
+            description?: string;
+            entry_count?: number;
+            owner_id?: number;
+            /** Format: uuid */
+            playlist_id?: string;
+            revision?: number;
+            title?: string;
+        };
+        "dto.MusicPlaylistEntriesResponseDTO": {
+            items?: components["schemas"]["dto.MusicPlaylistEntryDTO"][];
+            revision?: number;
+        };
+        "dto.MusicPlaylistEntryCreateRequestDTO": {
+            idempotency_key?: string;
+            revision?: number;
+            saved_title?: string;
+            /** Format: uuid */
+            track_id: string;
+        };
+        "dto.MusicPlaylistEntryDTO": {
+            available?: boolean;
+            /** Format: uuid */
+            entry_id?: string;
+            idempotency_key?: string;
+            /** Format: uuid */
+            playlist_id?: string;
+            position?: number;
+            saved_title?: string;
+            track?: components["schemas"]["dto.MusicTrackDTO"];
+            /** Format: uuid */
+            track_id?: string;
+        };
+        "dto.MusicPlaylistEntryPositionDTO": {
+            /** Format: uuid */
+            entry_id: string;
+            position?: number;
+        };
+        "dto.MusicPlaylistPageDTO": {
+            items?: components["schemas"]["dto.MusicPlaylistDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicPlaylistPatchRequestDTO": {
+            description?: string;
+            revision?: number;
+            title: string;
+        };
+        "dto.MusicPlaylistReorderRequestDTO": {
+            entries: components["schemas"]["dto.MusicPlaylistEntryPositionDTO"][];
+            revision?: number;
+        };
+        "dto.MusicTrackDTO": {
+            album_artist_name?: string;
+            /** Format: uuid */
+            album_id?: string;
+            album_title?: string;
+            artist_name?: string;
+            artists?: components["schemas"]["dto.MusicCreditDTO"][];
+            compilation?: boolean;
+            /** @enum {string} */
+            designation?: "music" | "other";
+            disc_number?: number;
+            disc_total?: number;
+            duration?: number;
+            edition?: string;
+            extracted_source_revision?: number;
+            genre?: string;
+            is_deleted?: boolean;
+            liked?: boolean;
+            mime_type?: string;
+            original_filename?: string;
+            overrides?: components["schemas"]["dto.MusicOverrideDTO"][];
+            owner_id?: number;
+            rating?: number;
+            release_date?: string;
+            release_identifier?: string;
+            /** @enum {string} */
+            release_precision?: "unknown" | "year" | "month" | "day";
+            revision?: number;
+            taken_at?: string;
+            title?: string;
+            /** Format: uuid */
+            track_id?: string;
+            track_number?: number;
+            track_total?: number;
+        };
+        "dto.MusicTrackPageDTO": {
+            items?: components["schemas"]["dto.MusicTrackDTO"][];
+            limit?: number;
+            offset?: number;
+            total?: number;
+        };
+        "dto.MusicTrackPatchRequestDTO": {
+            album_artist_name?: string;
+            album_artist_names?: string[];
+            /** Format: uuid */
+            album_id?: string;
+            album_title?: string;
+            artist_name?: string;
+            artist_names?: string[];
+            compilation?: boolean;
+            designation?: string;
+            disc_number?: number;
+            disc_total?: number;
+            edition?: string;
+            genre?: string;
+            release_date?: string;
+            release_precision?: string;
+            revision?: number;
+            title?: string;
+            track_number?: number;
+            track_total?: number;
         };
         "dto.NativeHostCapabilityDTO": {
             available?: boolean;
@@ -15408,16 +16958,16 @@ export interface components {
             /** @example regular */
             role?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            root_id?: string;
+            storage_location_id?: string;
             /** @example date */
             storage_strategy?: string;
         };
         "dto.RepositoryDefaultsDTO": {
-            /** @example /data/storage */
-            default_root?: string;
             /** @example rename */
             duplicate_handling?: string;
             risk_warnings?: string[];
+            /** @example /data/storage */
+            storage_location?: string;
             /** @example date */
             strategy?: string;
         };
@@ -15446,38 +16996,6 @@ export interface components {
             repository_id?: string;
             /** @example Family Photos */
             repository_name?: string;
-        };
-        "dto.RepositoryRootDTO": {
-            /** @example 0 */
-            active_operation_count?: number;
-            /** @example 500000000000 */
-            available_bytes?: number;
-            can_remove?: boolean;
-            capacity_known?: boolean;
-            files_preserved?: boolean;
-            /** @example apfs */
-            filesystem?: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            id?: string;
-            /** @example external */
-            kind?: string;
-            mount_fingerprint?: string;
-            mount_fingerprint_changed?: boolean;
-            /** @example External Archive */
-            name?: string;
-            /** @example /Volumes/Photos */
-            path?: string;
-            registered_mount_fingerprint?: string;
-            /** @example registered_repositories */
-            removal_blocked_by?: string;
-            /** @example 2 */
-            repository_count?: number;
-            risk_warnings?: string[];
-            /** @example active */
-            status?: string;
-            /** @example 1000000000000 */
-            total_bytes?: number;
-            writable?: boolean;
         };
         "dto.RepositoryScanQueuedDTO": {
             /** @example false */
@@ -15618,7 +17136,7 @@ export interface components {
             /** @example 0.0.0.0:6680 */
             server_listen?: string;
             /** @example /data/storage */
-            storage_root?: string;
+            storage_location?: string;
             /** @example off */
             tls_mode?: string;
         };
@@ -15725,6 +17243,16 @@ export interface components {
         };
         "dto.SetPersonHiddenRequestDTO": {
             hidden?: boolean;
+        };
+        "dto.SetupPrimaryRepositoryRequestDTO": {
+            /** @example Primary Repository */
+            name: string;
+            risk_confirmation?: boolean;
+            /**
+             * @example date
+             * @enum {string}
+             */
+            storage_strategy?: "date" | "flat" | "cas";
         };
         "dto.SetupStatusDTO": {
             admin_initialized?: boolean;
@@ -15851,6 +17379,18 @@ export interface components {
         "dto.StartRepositoryCloudImportRequest": {
             credential_id?: string;
         };
+        "dto.StorageCapacityGroupDTO": {
+            /** @example 500000000000 */
+            available_bytes?: number;
+            /** @example true */
+            capacity_known?: boolean;
+            /** @example true */
+            grouping_known?: boolean;
+            /** @example 0 */
+            id?: string;
+            /** @example 1000000000000 */
+            total_bytes?: number;
+        };
         "dto.StorageDiagnosticDTO": {
             available_bytes?: number;
             canonical_path?: string;
@@ -15899,11 +17439,119 @@ export interface components {
             generated_at?: string;
             items?: components["schemas"]["dto.StorageDiagnosticDTO"][];
         };
+        "dto.StorageLocationRemovalImpactDTO": {
+            /** @example 0 */
+            active_operation_count?: number;
+            /** @example registered_repositories */
+            blocking_reason?: string;
+            can_remove?: boolean;
+            /** @example true */
+            files_preserved?: boolean;
+            /**
+             * @example external
+             * @enum {string}
+             */
+            kind?: "default" | "external";
+            /** @example 0 */
+            repository_count?: number;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            storage_location_id?: string;
+            /** @example External Archive */
+            storage_location_name?: string;
+        };
+        "dto.StorageLocationViewDTO": {
+            /** @example registered_repositories */
+            blocking_reason?: string;
+            can_remove?: boolean;
+            /** @example true */
+            files_preserved?: boolean;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /**
+             * @example default
+             * @enum {string}
+             */
+            kind?: "default" | "external";
+            /** @example Default Storage */
+            name?: string;
+            /** @example 2 */
+            repository_count?: number;
+        };
+        "dto.StorageRepositoryVerificationSummaryDTO": {
+            /** @example manual */
+            mode?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            operation_id?: string;
+            /** @example completed */
+            status?: string;
+        };
+        "dto.StorageRepositoryViewDTO": {
+            /** @example idle */
+            activity?: string;
+            /** @example 1240 */
+            asset_count?: number;
+            /** @example 0 */
+            capacity_group_id?: string;
+            /** @example ext4 */
+            filesystem?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /**
+             * @description MountPath is the directory where the backing filesystem is mounted on
+             *     the host running the Server: "/", "/Volumes/Backup", "/volume1", or a
+             *     Windows drive root such as "C:". It names the storage an operator
+             *     recognizes. It is raw host data and is never localized by the Server.
+             *     Empty when the mount could not be resolved.
+             * @example /data/storage
+             */
+            mount_path?: string;
+            /** @example Family Photos */
+            name?: string;
+            /** @example active */
+            reachability?: string;
+            /**
+             * @example regular
+             * @enum {string}
+             */
+            role?: "primary" | "regular";
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            storage_location_id?: string;
+            verification?: components["schemas"]["dto.StorageRepositoryVerificationSummaryDTO"];
+            write_policy?: components["schemas"]["dto.StorageRepositoryWritePolicyDTO"];
+        };
+        "dto.StorageRepositoryWritePolicyDTO": {
+            /** @example idle */
+            activity?: string;
+            /** @example manual */
+            pause_reason?: string;
+        };
         "dto.StorageSupportBundleDTO": {
             audit_events?: components["schemas"]["dto.LifecycleAuditEventDTO"][];
             diagnostics?: components["schemas"]["dto.StorageDiagnosticDTO"][];
             generated_at?: string;
             paths_redacted?: boolean;
+        };
+        "dto.StorageTargetDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example Family Photos */
+            name?: string;
+            read?: components["schemas"]["dto.AdmissionDecisionDTO"];
+            /**
+             * @example regular
+             * @enum {string}
+             */
+            role?: "primary" | "regular";
+            upload?: components["schemas"]["dto.AdmissionDecisionDTO"];
+        };
+        "dto.StorageTargetsResponseDTO": {
+            targets?: components["schemas"]["dto.StorageTargetDTO"][];
+        };
+        "dto.StorageViewResponseDTO": {
+            capacity_groups?: components["schemas"]["dto.StorageCapacityGroupDTO"][];
+            observed_at?: string;
+            repositories?: components["schemas"]["dto.StorageRepositoryViewDTO"][];
+            storage_locations?: components["schemas"]["dto.StorageLocationViewDTO"][];
         };
         "dto.StudioCanvasBackgroundDTO": {
             /** @example 180 */
@@ -16425,6 +18073,16 @@ export interface components {
             data?: components["schemas"]["handler.CameraLensCombination"][];
             total?: number;
         };
+        "handler.DeliveryStatsDTO": {
+            available?: number;
+            cancelled?: number;
+            completed?: number;
+            discarded?: number;
+            queues?: components["schemas"]["handler.QueueSummaryDTO"][];
+            retryable?: number;
+            running?: number;
+            scheduled?: number;
+        };
         "handler.FocalLengthBucket": {
             count?: number;
             focal_length?: number;
@@ -16443,15 +18101,6 @@ export interface components {
         "handler.HeatmapValue": {
             count?: number;
             date?: string;
-        };
-        "handler.JobStatsResponse": {
-            available?: number;
-            cancelled?: number;
-            completed?: number;
-            discarded?: number;
-            retryable?: number;
-            running?: number;
-            scheduled?: number;
         };
         "handler.QueueErrorSampleDTO": {
             attempt?: number;
@@ -16477,10 +18126,6 @@ export interface components {
             remaining_jobs?: number;
             running_jobs?: number;
             total_jobs?: number;
-        };
-        "handler.QueueSummaryResponse": {
-            generated_at?: string;
-            queues?: components["schemas"]["handler.QueueSummaryDTO"][];
         };
         "handler.TimeBucket": {
             count?: number;
@@ -16508,6 +18153,63 @@ export interface components {
             label?: string;
             type?: string;
         };
+        /** @enum {string} */
+        "processing.Group": "media" | "catalog";
+        "processing.Item": {
+            asset_id?: string;
+            attempts?: number;
+            label?: string;
+            /** @enum {string} */
+            reason_code?: "unsupported_media" | "processing_retry_exhausted" | "processing_failed";
+            subject_id?: string;
+            updated_at?: string;
+        };
+        "processing.ItemsPage": {
+            items?: components["schemas"]["processing.Item"][];
+            next_cursor?: string;
+        };
+        "processing.Overview": {
+            catalog_pending?: number;
+            failed_media?: number;
+            last_activity_at?: string;
+            media_in_progress?: number;
+            media_total?: number;
+            running?: number;
+        };
+        "processing.RetryResult": {
+            accepted?: number;
+            receipt_id?: string;
+            remaining?: number;
+        };
+        /** @enum {string} */
+        "processing.StageID": "import" | "scan" | "metadata" | "thumbnails" | "video" | "analysis" | "events" | "places" | "text_search" | "backup";
+        "processing.StageSummary": {
+            done?: number;
+            failed?: number;
+            group?: components["schemas"]["processing.Group"];
+            id?: components["schemas"]["processing.StageID"];
+            last_activity_at?: string;
+            oldest_queued_at?: string;
+            queued?: number;
+            remaining?: number;
+            retryable?: boolean;
+            retrying?: number;
+            running?: number;
+            sources?: {
+                [key: string]: number;
+            };
+            status?: components["schemas"]["processing.Status"];
+            unit?: components["schemas"]["processing.Unit"];
+        };
+        /** @enum {string} */
+        "processing.Status": "attention" | "working" | "retrying" | "waiting" | "idle";
+        "processing.Summary": {
+            generated_at?: string;
+            overview?: components["schemas"]["processing.Overview"];
+            stages?: components["schemas"]["processing.StageSummary"][];
+        };
+        /** @enum {string} */
+        "processing.Unit": "files" | "repositories" | "updates" | "runs";
         "api.AboutBlankProblem": {
             /** Format: uri */
             instance: string;

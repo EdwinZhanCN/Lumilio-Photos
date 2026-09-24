@@ -351,11 +351,6 @@ export interface StorageShortcut {
     "canRemove": boolean;
     "removalBlockedBy"?: string;
     "filesPreserved": boolean;
-    "writable": boolean;
-    "capacityKnown": boolean;
-    "totalBytes"?: number;
-    "availableBytes"?: number;
-    "filesystem"?: string;
 }
 
 export interface StorageSummary {

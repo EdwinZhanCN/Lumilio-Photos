@@ -1,24 +1,39 @@
 import { describe, expect, it } from "vite-plus/test";
-import { isRepositoryUnavailable, normalizeRepositoryOptions } from "./repositoryOptions";
+import type { RepositoryOption } from "../types";
+import {
+  getRepositoryEffectiveState,
+  isRepositoryUnavailable,
+  isUploadLowSpaceBlocked,
+  normalizeRepositoryOptions,
+} from "./repositoryOptions";
+
+const uploadReady: RepositoryOption = {
+  entityType: "repository",
+  id: "repo-1",
+  rawName: "Photos",
+  role: "regular",
+  read: { allowed: true, reasons: [] },
+  upload: { allowed: true, reasons: [] },
+};
 
 describe("normalizeRepositoryOptions", () => {
-  it("normalizes missing fields and both primary indicators", () => {
+  it("maps storage targets into the feature model", () => {
     expect(
       normalizeRepositoryOptions({
-        repositories: [
+        targets: [
           {
             id: "primary-by-role",
             name: "Primary",
-            path: "/photos/primary",
             role: "primary",
-            root_id: "root-1",
-            reachability: "offline",
-            activity: "scanning",
-            is_primary: false,
+            read: { allowed: true, reasons: [] },
+            upload: { allowed: false, reasons: ["offline"] },
           },
           {
-            id: "primary-by-flag",
-            is_primary: true,
+            id: "regular",
+            name: "Family",
+            role: "regular",
+            read: { allowed: true, reasons: [] },
+            upload: { allowed: true, reasons: [] },
           },
         ],
       }),
@@ -27,58 +42,75 @@ describe("normalizeRepositoryOptions", () => {
         entityType: "repository",
         id: "primary-by-role",
         rawName: "Primary",
-        path: "/photos/primary",
         role: "primary",
-        rootId: "root-1",
-        reachability: "offline",
-        activity: "scanning",
-        pauseReason: "",
+        read: { allowed: true, reasons: [] },
+        upload: { allowed: false, reasons: ["offline"] },
       },
       {
         entityType: "repository",
-        id: "primary-by-flag",
-        rawName: "",
-        path: "",
-        role: "primary",
-        rootId: "",
-        reachability: "recovery_required",
-        activity: "idle",
-        pauseReason: "",
+        id: "regular",
+        rawName: "Family",
+        role: "regular",
+        read: { allowed: true, reasons: [] },
+        upload: { allowed: true, reasons: [] },
       },
     ]);
   });
 
-  it("fails closed for a missing or unrecognized reachability", () => {
+  it("fails closed when upload admission is missing", () => {
     expect(
       normalizeRepositoryOptions({
-        repositories: [
-          { id: "no-status" },
-          { id: "bogus", reachability: "wat" as never, activity: "wat" as never },
-        ],
-      }).map((repository) => [repository.reachability, repository.activity]),
+        targets: [{ id: "no-admission", name: "Mystery" }],
+      }),
     ).toEqual([
-      ["recovery_required", "idle"],
-      ["recovery_required", "idle"],
+      {
+        entityType: "repository",
+        id: "no-admission",
+        rawName: "Mystery",
+        role: "regular",
+        read: { allowed: false, reasons: [] },
+        upload: { allowed: false, reasons: [] },
+      },
     ]);
   });
 
-  it("returns an empty list when the response has no repositories", () => {
+  it("returns an empty list when the response has no targets", () => {
     expect(normalizeRepositoryOptions()).toEqual([]);
     expect(normalizeRepositoryOptions({})).toEqual([]);
   });
 
-  it("rejects a paused Repository as an upload target", () => {
+  it("derives effective state from closed upload admission reasons", () => {
+    expect(getRepositoryEffectiveState(uploadReady)).toBe("active");
+    expect(
+      getRepositoryEffectiveState({
+        ...uploadReady,
+        upload: { allowed: false, reasons: ["offline"] },
+      }),
+    ).toBe("offline");
+    expect(
+      getRepositoryEffectiveState({
+        ...uploadReady,
+        upload: { allowed: false, reasons: ["paused", "low_space"] },
+      }),
+    ).toBe("paused");
+    expect(
+      getRepositoryEffectiveState({
+        ...uploadReady,
+        upload: { allowed: false, reasons: ["unknown_reason"] },
+      }),
+    ).toBe("blocked");
+  });
+
+  it("rejects upload when admission is denied", () => {
     const [repository] = normalizeRepositoryOptions({
-      repositories: [
+      targets: [
         {
           id: "paused",
-          reachability: "active",
-          activity: "paused",
-          pause_reason: "low_space",
+          upload: { allowed: false, reasons: ["paused", "low_space"] },
         },
       ],
     });
-    expect(repository?.pauseReason).toBe("low_space");
     expect(repository && isRepositoryUnavailable(repository)).toBe(true);
+    expect(repository && isUploadLowSpaceBlocked(repository)).toBe(true);
   });
 });

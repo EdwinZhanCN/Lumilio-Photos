@@ -23,16 +23,16 @@ func (reader nodeReader) GetRepositoryNode(_ context.Context, params repo.GetRep
 
 func TestProjectPathRejectsTombstonedAncestor(t *testing.T) {
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	directoryID := uuid.New()
 	fileID := uuid.New()
 	reader := nodeReader{
-		rootID: {
-			NodeID: rootID, RepositoryID: repositoryID, Name: "", Kind: "directory", Lifecycle: "active",
+		storageLocationID: {
+			NodeID: storageLocationID, RepositoryID: repositoryID, Name: "", Kind: "directory", Lifecycle: "active",
 		},
 		directoryID: {
 			NodeID: directoryID, RepositoryID: repositoryID,
-			ParentNodeID: uuid.NullUUID{UUID: rootID, Valid: true},
+			ParentNodeID: uuid.NullUUID{UUID: storageLocationID, Valid: true},
 			Name:         "gone", Kind: "directory", Lifecycle: "tombstoned",
 		},
 		fileID: {
@@ -48,16 +48,16 @@ func TestProjectPathRejectsTombstonedAncestor(t *testing.T) {
 
 func TestProjectPathProjectsOnlyActiveChain(t *testing.T) {
 	repositoryID := uuid.New()
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	directoryID := uuid.New()
 	fileID := uuid.New()
 	reader := nodeReader{
-		rootID: {
-			NodeID: rootID, RepositoryID: repositoryID, Name: "", Kind: "directory", Lifecycle: "active",
+		storageLocationID: {
+			NodeID: storageLocationID, RepositoryID: repositoryID, Name: "", Kind: "directory", Lifecycle: "active",
 		},
 		directoryID: {
 			NodeID: directoryID, RepositoryID: repositoryID,
-			ParentNodeID: uuid.NullUUID{UUID: rootID, Valid: true},
+			ParentNodeID: uuid.NullUUID{UUID: storageLocationID, Valid: true},
 			Name:         "album", Kind: "directory", Lifecycle: "active",
 		},
 		fileID: {

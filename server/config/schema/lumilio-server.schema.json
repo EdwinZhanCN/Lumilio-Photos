@@ -165,7 +165,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Portable media root holding the .lumilioroot marker and repository\ndirectories. This is the mount users back up and migrate."
+          "description": "Portable Default Storage Location holding the .lumilioroot marker and repository\ndirectories. This is the mount users back up and migrate."
         },
         "cloud_state_path": {
           "type": "string",

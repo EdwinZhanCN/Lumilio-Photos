@@ -33,7 +33,6 @@ export function CoverView({ data, size, source }: ViewBodyProps) {
       ) : cover ? (
         <WidgetAssetThumbnail
           asset={cover}
-          source={source}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
       ) : (

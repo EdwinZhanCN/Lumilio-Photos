@@ -259,7 +259,7 @@ func (s *Store) validateStoragePathChange(candidate string) error {
 	if currentPath == candidatePath {
 		return nil
 	}
-	newRootID, err := loadPortableMarkerID(filepath.Join(candidatePath, ".lumilioroot"))
+	newStorageLocationID, err := loadPortableMarkerID(filepath.Join(candidatePath, ".lumilioroot"))
 	if err != nil {
 		return fmt.Errorf("selected default storage location has no valid .lumilioroot marker: %w", err)
 	}
@@ -271,8 +271,8 @@ func (s *Store) validateStoragePathChange(candidate string) error {
 	// the selected directory is the same portable root and primary repository.
 	// A true move normally leaves the old path offline; the Server then performs
 	// the authoritative comparison against the catalog during controlled restart.
-	if oldRootID, loadErr := loadPortableMarkerID(filepath.Join(currentPath, ".lumilioroot")); loadErr == nil {
-		if oldRootID != newRootID {
+	if oldStorageLocationID, loadErr := loadPortableMarkerID(filepath.Join(currentPath, ".lumilioroot")); loadErr == nil {
+		if oldStorageLocationID != newStorageLocationID {
 			return errors.New("selected default storage location has a different .lumilioroot identity")
 		}
 		oldPrimaryID, primaryErr := loadPortableMarkerID(filepath.Join(currentPath, "primary", ".lumiliorepo"))

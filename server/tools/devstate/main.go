@@ -18,12 +18,12 @@ import (
 const markerMagic = "lumilio-dev-root-v1"
 
 type environment struct {
-	repositoryRoot string
-	localRoot      string
-	devRoot        string
-	marker         string
-	stateRoot      string
-	storageRoot    string
+	repositoryRoot  string
+	localRoot       string
+	devRoot         string
+	marker          string
+	stateRoot       string
+	storageLocation string
 }
 
 func main() {
@@ -31,7 +31,7 @@ func main() {
 		usage()
 	}
 
-	repositoryRoot, err := resolveRepositoryRoot(os.Args[2])
+	repositoryRoot, err := resolveStorageLocation(os.Args[2])
 	if err != nil {
 		fail(err)
 	}
@@ -65,7 +65,7 @@ func fail(err error) {
 	os.Exit(1)
 }
 
-func resolveRepositoryRoot(input string) (string, error) {
+func resolveStorageLocation(input string) (string, error) {
 	absolute, err := filepath.Abs(input)
 	if err != nil {
 		return "", fmt.Errorf("resolve repository root %q: %w", input, err)
@@ -85,12 +85,12 @@ func newEnvironment(repositoryRoot string) environment {
 	localRoot := filepath.Join(repositoryRoot, ".local")
 	devRoot := filepath.Join(localRoot, "dev")
 	return environment{
-		repositoryRoot: repositoryRoot,
-		localRoot:      localRoot,
-		devRoot:        devRoot,
-		marker:         filepath.Join(devRoot, ".lumilio-dev-root"),
-		stateRoot:      filepath.Join(devRoot, "state"),
-		storageRoot:    filepath.Join(devRoot, "storage"),
+		repositoryRoot:  repositoryRoot,
+		localRoot:       localRoot,
+		devRoot:         devRoot,
+		marker:          filepath.Join(devRoot, ".lumilio-dev-root"),
+		stateRoot:       filepath.Join(devRoot, "state"),
+		storageLocation: filepath.Join(devRoot, "storage"),
 	}
 }
 
@@ -206,7 +206,7 @@ func (env environment) prepareRuntimeDirectories() error {
 	directories := []string{
 		filepath.Join(env.devRoot, "config"),
 		env.stateRoot,
-		env.storageRoot,
+		env.storageLocation,
 	}
 	for _, directory := range directories {
 		if err := rejectSymlink(directory); err != nil {
@@ -379,7 +379,7 @@ func (env environment) purgeEnvironment() error {
 	if err := rejectSymlink(env.stateRoot); err != nil {
 		return err
 	}
-	if err := rejectSymlink(env.storageRoot); err != nil {
+	if err := rejectSymlink(env.storageLocation); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(env.devRoot); err != nil {

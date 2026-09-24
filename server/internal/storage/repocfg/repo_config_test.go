@@ -101,11 +101,11 @@ func TestRepositoryConfig_ValidateFailures(t *testing.T) {
 	})
 }
 
-func TestIsRepositoryRoot(t *testing.T) {
+func TestIsStorageLocation(t *testing.T) {
 	dir := t.TempDir()
-	assert.False(t, IsRepositoryRoot(dir))
+	assert.False(t, IsStorageLocation(dir))
 
 	cfg := NewRepositoryConfig("Root Test")
 	require.NoError(t, cfg.SaveConfigToFile(dir))
-	assert.True(t, IsRepositoryRoot(dir))
+	assert.True(t, IsStorageLocation(dir))
 }

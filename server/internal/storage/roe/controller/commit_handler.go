@@ -245,7 +245,7 @@ func (applier *commitApplier) startRun(ctx context.Context, queries *repo.Querie
 		return fmt.Errorf("persist repository change adapter: %w", err)
 	}
 	if payload.FullVerification {
-		rootNode, rootErr := queries.GetRepositoryRootNode(ctx, payload.RepositoryID)
+		rootNode, rootErr := queries.GetRepositoryTreeRootNode(ctx, payload.RepositoryID)
 		if errors.Is(rootErr, sql.ErrNoRows) {
 			revision, revisionErr := queries.AllocateRepositoryObservationRevision(ctx, repo.AllocateRepositoryObservationRevisionParams{
 				RepositoryID: payload.RepositoryID, UpdatedAt: payload.Now,
@@ -253,7 +253,7 @@ func (applier *commitApplier) startRun(ctx context.Context, queries *repo.Querie
 			if revisionErr != nil {
 				return revisionErr
 			}
-			rootNode, rootErr = queries.InsertRepositoryRootNode(ctx, repo.InsertRepositoryRootNodeParams{
+			rootNode, rootErr = queries.InsertRepositoryTreeRootNode(ctx, repo.InsertRepositoryTreeRootNodeParams{
 				NodeID: payload.RootNodeID, RepositoryID: payload.RepositoryID,
 				ObservationRevision: revision, CreatedAt: payload.Now,
 			})
@@ -270,7 +270,8 @@ func (applier *commitApplier) startRun(ctx context.Context, queries *repo.Querie
 	if _, err := queries.StartRepositoryScanRun(ctx, repo.StartRepositoryScanRunParams{
 		RunID: payload.RunID, Status: payload.InitialStatus, UpdatedAt: payload.Now,
 		CursorStart: payload.StartCheckpoint.Cursor, CursorTarget: payload.TargetCursor,
-		VolumeIdentity: optionalString(checkpoint.VolumeIdentity),
+		FullVerificationPerformed: boolInt(payload.FullVerification),
+		VolumeIdentity:            optionalString(checkpoint.VolumeIdentity),
 	}); err != nil {
 		return fmt.Errorf("start repository observation run: %w", err)
 	}
@@ -493,7 +494,7 @@ func resolveClosestDirectory(
 	relativePath string,
 	semantics pathsemantics.Semantics,
 ) (repo.RepositoryNode, error) {
-	current, err := queries.GetRepositoryRootNode(ctx, repositoryID)
+	current, err := queries.GetRepositoryTreeRootNode(ctx, repositoryID)
 	if err != nil {
 		return repo.RepositoryNode{}, err
 	}

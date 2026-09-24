@@ -76,9 +76,9 @@ const (
 	OperationRepositoryAssetActivate
 	OperationRepositoryRelocate
 	OperationRepositoryRemove
-	OperationRepositoryRootRelocateMaintenance
-	OperationRepositoryRootRelocate
-	OperationRepositoryRootDelete
+	OperationStorageLocationRelocateMaintenance
+	OperationStorageLocationRelocate
+	OperationStorageLocationDelete
 	OperationRepositoryLifecycleComplete
 	OperationRepositoryLifecycleFail
 	OperationRepositoryHostActionFinish
@@ -88,7 +88,9 @@ const (
 	OperationAssetStagingCommit
 	OperationAssetReprocess
 	OperationAssetReindexRequest
+	OperationProcessingStageRetry
 	OperationAssetUserStateMutate
+	OperationMusicMutation
 	OperationEventInitializeBackfill
 	OperationEventRebuildSnapshot
 	OperationEventPublishOwnerSnapshot
@@ -268,19 +270,19 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Name:      "repository.remove",
 		Role:      RoleWriter,
 	},
-	OperationRepositoryRootRelocateMaintenance: {
-		Operation: OperationRepositoryRootRelocateMaintenance,
-		Name:      "repository_root.relocate_maintenance",
+	OperationStorageLocationRelocateMaintenance: {
+		Operation: OperationStorageLocationRelocateMaintenance,
+		Name:      "storage_location.relocate_maintenance",
 		Role:      RoleWriter,
 	},
-	OperationRepositoryRootRelocate: {
-		Operation: OperationRepositoryRootRelocate,
-		Name:      "repository_root.relocate",
+	OperationStorageLocationRelocate: {
+		Operation: OperationStorageLocationRelocate,
+		Name:      "storage_location.relocate",
 		Role:      RoleWriter,
 	},
-	OperationRepositoryRootDelete: {
-		Operation: OperationRepositoryRootDelete,
-		Name:      "repository_root.delete",
+	OperationStorageLocationDelete: {
+		Operation: OperationStorageLocationDelete,
+		Name:      "storage_location.delete",
 		Role:      RoleWriter,
 	},
 	OperationRepositoryLifecycleComplete: {
@@ -328,9 +330,19 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Name:      "asset.reindex.request",
 		Role:      RoleWriter,
 	},
+	OperationProcessingStageRetry: {
+		Operation: OperationProcessingStageRetry,
+		Name:      "processing.stage_retry",
+		Role:      RoleWriter,
+	},
 	OperationAssetUserStateMutate: {
 		Operation: OperationAssetUserStateMutate,
 		Name:      "asset.user_state.mutate",
+		Role:      RoleWriter,
+	},
+	OperationMusicMutation: {
+		Operation: OperationMusicMutation,
+		Name:      "music.mutation",
 		Role:      RoleWriter,
 	},
 	OperationEventInitializeBackfill: {
@@ -574,7 +586,6 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Operation: OperationEventPatch,
 		Name:      "event.patch",
 		Role:      RoleWriter,
-		Kind:      OperationKindStatement,
 	},
 	OperationEventSchedulerLeaseCleanup: {
 		Operation: OperationEventSchedulerLeaseCleanup,

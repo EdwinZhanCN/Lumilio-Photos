@@ -20,7 +20,7 @@ func TestPrecheckFullAndQuickMembershipSets(t *testing.T) {
 	defer database.Close()
 	database.SetMaxOpenConns(1)
 	for _, stmt := range []string{
-		`CREATE TABLE repositories(repo_id TEXT, name TEXT, path TEXT, config TEXT, reachability TEXT, activity TEXT, pause_reason TEXT,last_sync INTEGER,created_at INTEGER,updated_at INTEGER,default_owner_id INTEGER,role TEXT,root_id TEXT)`,
+		`CREATE TABLE repositories(repo_id TEXT, name TEXT, path TEXT, config TEXT, reachability TEXT, activity TEXT, pause_reason TEXT,last_sync INTEGER,created_at INTEGER,updated_at INTEGER,default_owner_id INTEGER,role TEXT,storage_location_id TEXT)`,
 		`CREATE TABLE assets(asset_id TEXT,original_filename TEXT,content_id TEXT)`,
 		`CREATE TABLE content_objects(content_id TEXT,full_hash TEXT,file_size INTEGER)`,
 		`CREATE TABLE active_asset_occurrences(asset_id TEXT,repository_id TEXT,quick_fingerprint TEXT,file_size INTEGER)`,

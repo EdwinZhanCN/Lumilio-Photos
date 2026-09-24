@@ -51,6 +51,7 @@ func (r *Resolver) ProjectToRepository(ctx context.Context, ownerID int32, summa
 	const query = `
 WITH scoped_members AS (
   SELECT emi.media_item_id, emi.position,
+         mi.media_kind,
          COALESCE(
            CASE WHEN primary_asset.is_deleted = 0 THEN primary_asset.asset_id END,
            (
@@ -82,6 +83,7 @@ scoped_cover AS (
   SELECT sm.media_item_id, sm.representative_asset_id
   FROM scoped_members sm
   WHERE sm.representative_asset_id IS NOT NULL
+    AND sm.media_kind IN ('photo', 'video', 'live_photo')
   ORDER BY CASE WHEN sm.media_item_id = ? THEN 0 ELSE 1 END,
            sm.position, sm.media_item_id
   LIMIT 1
@@ -138,6 +140,7 @@ WITH resolved AS (
   WHERE e.event_id = ? AND e.owner_id = ?
 ), member_assets AS (
   SELECT emi.event_id, emi.owner_id, emi.media_item_id, emi.position,
+         mi.media_kind,
          COALESCE(
            CASE WHEN primary_asset.is_deleted = 0 THEN primary_asset.asset_id END,
            (
@@ -162,14 +165,29 @@ SELECT e.event_id, resolved.redirected_from, e.start_at, e.end_at, e.timezone,
        e.title_override,
        e.generated_cover_media_item_id,
        e.cover_override_media_item_id,
-       COALESCE(e.cover_override_media_item_id, e.generated_cover_media_item_id),
+       COALESCE(
+         (
+           SELECT media_item_id
+           FROM member_assets
+           WHERE representative_asset_id IS NOT NULL
+             AND media_kind IN ('photo', 'video', 'live_photo')
+           ORDER BY CASE WHEN media_item_id = e.cover_override_media_item_id THEN 0
+                         WHEN media_item_id = e.generated_cover_media_item_id THEN 1
+                         ELSE 2 END,
+                    position, media_item_id
+           LIMIT 1
+         ),
+         COALESCE(e.cover_override_media_item_id, e.generated_cover_media_item_id)
+       ),
        (
          SELECT representative_asset_id
          FROM member_assets
          WHERE representative_asset_id IS NOT NULL
-         ORDER BY CASE WHEN media_item_id=COALESCE(
-           e.cover_override_media_item_id,e.generated_cover_media_item_id
-         ) THEN 0 ELSE 1 END,position,media_item_id
+           AND media_kind IN ('photo', 'video', 'live_photo')
+         ORDER BY CASE WHEN media_item_id = e.cover_override_media_item_id THEN 0
+                       WHEN media_item_id = e.generated_cover_media_item_id THEN 1
+                       ELSE 2 END,
+                  position, media_item_id
          LIMIT 1
        ),
        e.is_hidden,
@@ -216,15 +234,14 @@ func OrderedAssetsTx(ctx context.Context, tx *sql.Tx, ownerID int32, eventID str
 }
 
 func orderedAssetsWith(ctx context.Context, db queryer, ownerID int32, eventID string, limit int) ([]ResolvedAsset, int, error) {
-	return orderedAssetsScopedWith(ctx, db, ownerID, eventID, "", limit)
-}
-
-func orderedAssetsScopedWith(ctx context.Context, db queryer, ownerID int32, eventID, repositoryID string, limit int) ([]ResolvedAsset, int, error) {
-	summary, err := resolveWith(ctx, db, ownerID, eventID)
-	if err != nil {
-		return nil, 0, err
-	}
 	const query = `
+WITH resolved AS (
+  SELECT CASE WHEN e.status = 'redirected' THEN er.new_event_id ELSE e.event_id END AS event_id
+  FROM events e
+  LEFT JOIN event_redirects er
+    ON er.old_event_id = e.event_id AND er.owner_id = e.owner_id
+  WHERE e.event_id = ? AND e.owner_id = ?
+)
 SELECT emi.position, emi.media_item_id,
        COALESCE(
          CASE WHEN primary_asset.is_deleted = 0 THEN primary_asset.asset_id END,
@@ -243,37 +260,77 @@ JOIN media_items mi
   ON mi.media_item_id = emi.media_item_id AND mi.owner_id = emi.owner_id
 LEFT JOIN assets primary_asset
   ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
-WHERE emi.event_id = ? AND emi.owner_id = ?
-  AND (? = '' OR EXISTS (
+WHERE emi.event_id = (SELECT event_id FROM resolved)
+  AND emi.owner_id = ?
+ORDER BY emi.position, emi.media_item_id`
+	return scanOrderedAssets(ctx, db, query, limit, eventID, ownerID, ownerID)
+}
+
+func orderedAssetsScopedWith(ctx context.Context, db queryer, ownerID int32, eventID, repositoryID string, limit int) ([]ResolvedAsset, int, error) {
+	const query = `
+WITH resolved AS (
+  SELECT CASE WHEN e.status = 'redirected' THEN er.new_event_id ELSE e.event_id END AS event_id
+  FROM events e
+  LEFT JOIN event_redirects er
+    ON er.old_event_id = e.event_id AND er.owner_id = e.owner_id
+  WHERE e.event_id = ? AND e.owner_id = ?
+)
+SELECT emi.position, emi.media_item_id,
+       COALESCE(
+         CASE WHEN primary_asset.is_deleted = 0 THEN primary_asset.asset_id END,
+         (
+           SELECT a.asset_id
+           FROM media_item_assets mia
+           JOIN assets a ON a.asset_id = mia.asset_id
+           WHERE mia.media_item_id = emi.media_item_id
+             AND a.owner_id = emi.owner_id AND a.is_deleted = 0
+           ORDER BY mia.position, mia.asset_id
+           LIMIT 1
+         )
+       ) AS asset_id
+FROM event_media_items emi
+JOIN media_items mi
+  ON mi.media_item_id = emi.media_item_id AND mi.owner_id = emi.owner_id
+LEFT JOIN assets primary_asset
+  ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
+WHERE emi.event_id = (SELECT event_id FROM resolved)
+  AND emi.owner_id = ?
+  AND EXISTS (
     SELECT 1
     FROM media_item_assets scoped_membership
     JOIN active_asset_occurrences occurrence
       ON occurrence.asset_id = scoped_membership.asset_id
     WHERE scoped_membership.media_item_id = mi.media_item_id
       AND occurrence.repository_id = ?
-  ))
+  )
 ORDER BY emi.position, emi.media_item_id`
-	rows, err := db.QueryContext(ctx, query, summary.EventID, ownerID, repositoryID, repositoryID)
+	return scanOrderedAssets(ctx, db, query, limit, eventID, ownerID, ownerID, repositoryID)
+}
+
+func scanOrderedAssets(ctx context.Context, db queryer, query string, limit int, args ...any) ([]ResolvedAsset, int, error) {
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("resolve Event assets: %w", err)
+		return nil, 0, fmt.Errorf("read ordered Event assets: %w", err)
 	}
 	defer rows.Close()
-	var result []ResolvedAsset
-	omitted := 0
+	var results []ResolvedAsset
+	total := 0
 	for rows.Next() {
-		var row ResolvedAsset
+		var pos int64
+		var mediaID string
 		var assetID sql.NullString
-		if err := rows.Scan(&row.Position, &row.MediaItemID, &assetID); err != nil {
+		if err := rows.Scan(&pos, &mediaID, &assetID); err != nil {
 			return nil, 0, err
 		}
 		if !assetID.Valid {
-			omitted++
 			continue
 		}
-		row.AssetID = assetID.String
-		if limit <= 0 || len(result) < limit {
-			result = append(result, row)
+		total++
+		if limit <= 0 || len(results) < limit {
+			results = append(results, ResolvedAsset{
+				Position: pos, MediaItemID: mediaID, AssetID: assetID.String,
+			})
 		}
 	}
-	return result, omitted, rows.Err()
+	return results, total, rows.Err()
 }
