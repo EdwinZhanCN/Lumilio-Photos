@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -97,24 +98,42 @@ func serveRepositoryFile(c *gin.Context, repositoryFS *storage.RepositoryFS, fil
 	http.ServeContent(c.Writer, c.Request, filename, info.ModTime(), file)
 }
 
-func openWebOrOriginal(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, directory, suffix string) (*storage.RepositoryFS, *os.File, error) {
-	repositoryFS, file, _, err := openWebOrOriginalWithFallback(ctx, resolver, asset, directory, suffix)
-	return repositoryFS, file, err
-}
+// webMediaVariantQuery pins which representation a web-media URL serves.
+//
+// A web-media endpoint answers with the transcoded derivative once it is
+// published and with the original before that. A media element fetches its
+// source in byte ranges over its whole lifetime and never revalidates the
+// entity between them, so a URL that changes representation mid-playback hands
+// the decoder bytes (or a 416) from a different file: a track that started as
+// its original FLAC/AAC hangs on its next range request once the MP3 lands. An
+// unpinned request therefore redirects to a URL naming the representation it
+// would serve now, and a pinned URL only ever serves that representation.
+const webMediaVariantQuery = "variant"
 
-func openWebOrOriginalWithFallback(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, _ string, suffix string) (*storage.RepositoryFS, *os.File, bool, error) {
+type webMediaVariant string
+
+const (
+	webMediaVariantWeb      webMediaVariant = "web"
+	webMediaVariantOriginal webMediaVariant = "original"
+)
+
+// openWebMediaVariant opens the requested representation. An empty variant
+// prefers the published derivative and falls back to the original; the
+// returned variant names the one opened. A pinned web variant whose derivative
+// does not exist reports fs.ErrNotExist.
+func openWebMediaVariant(ctx context.Context, resolver assetLocationResolver, asset *repo.Asset, suffix string, variant webMediaVariant) (*storage.RepositoryFS, *os.File, webMediaVariant, error) {
 	if resolver == nil || asset == nil {
-		return nil, nil, false, locations.ErrAssetUnavailable
+		return nil, nil, "", locations.ErrAssetUnavailable
 	}
 	opened, err := resolver.OpenAsset(ctx, asset.AssetID)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, "", err
 	}
-	if asset.ContentID != uuid.Nil {
+	if variant != webMediaVariantOriginal && asset.ContentID != uuid.Nil {
 		privatePath, parseErr := (artifact.Identity{SourceFence: asset.ContentID.String(), Stage: "transcode", PipelineVersion: pipeline.AssetPipelineVersion, Name: strings.TrimPrefix(suffix, "_")}).Path()
 		if parseErr != nil {
 			_ = opened.Close()
-			return nil, nil, false, parseErr
+			return nil, nil, "", parseErr
 		}
 		file, openErr := opened.Repository.OpenPrivate(privatePath)
 		if openErr == nil {
@@ -122,18 +141,61 @@ func openWebOrOriginalWithFallback(ctx context.Context, resolver assetLocationRe
 			opened.File = nil
 			repositoryFS := opened.Repository
 			opened.Repository = nil
-			return repositoryFS, file, true, nil
+			return repositoryFS, file, webMediaVariantWeb, nil
 		}
 		if !errors.Is(openErr, fs.ErrNotExist) {
 			_ = opened.Close()
-			return nil, nil, false, openErr
+			return nil, nil, "", openErr
 		}
+	}
+	if variant == webMediaVariantWeb {
+		_ = opened.Close()
+		return nil, nil, "", fs.ErrNotExist
 	}
 	repositoryFS := opened.Repository
 	file := opened.File
 	opened.Repository = nil
 	opened.File = nil
-	return repositoryFS, file, false, nil
+	return repositoryFS, file, webMediaVariantOriginal, nil
+}
+
+// servePinnedWebMedia serves an asset's web representation through a
+// representation-pinned URL (see webMediaVariantQuery). contentType picks the
+// Content-Type for the variant being served.
+func servePinnedWebMedia(c *gin.Context, resolver assetLocationResolver, asset *repo.Asset, suffix, cacheControl string, contentType func(webMediaVariant) string) {
+	requested := webMediaVariant(c.Query(webMediaVariantQuery))
+	switch requested {
+	case "", webMediaVariantWeb, webMediaVariantOriginal:
+	default:
+		api.WriteProblem(c, api.BadRequest(fmt.Errorf("unknown %s %q", webMediaVariantQuery, requested)))
+		return
+	}
+	repositoryFS, file, opened, err := openWebMediaVariant(c.Request.Context(), resolver, asset, suffix, requested)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			api.WriteProblem(c, api.NotFound(err))
+		} else {
+			api.WriteProblem(c, api.Internal(err))
+		}
+		return
+	}
+	if requested == "" {
+		_ = file.Close()
+		_ = repositoryFS.Close()
+		// Path-relative (http.Redirect would root it) so an API mounted under
+		// a proxy prefix still resolves; the rest of the query, such as the
+		// media token, is preserved.
+		query := c.Request.URL.Query()
+		query.Set(webMediaVariantQuery, string(opened))
+		c.Header("Cache-Control", "no-store")
+		c.Header("Location", path.Base(c.Request.URL.Path)+"?"+query.Encode())
+		c.AbortWithStatus(http.StatusTemporaryRedirect)
+		return
+	}
+	c.Header("Cache-Control", cacheControl)
+	c.Header("Content-Type", contentType(opened))
+	c.Header("Accept-Ranges", "bytes")
+	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
 }
 
 func assetAudioContentType(asset *repo.Asset) string {

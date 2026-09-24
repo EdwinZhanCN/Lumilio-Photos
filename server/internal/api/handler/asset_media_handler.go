@@ -480,14 +480,14 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 // @Tags assets
 // @Produce video/mp4
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param variant query string false "Pinned representation; omitted, the request redirects to the currently available one" Enums(web, original)
 // @Success 200 {file} file "Web-optimized video file"
+// @Success 307
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
 // @Failure 404 {object} api.ProblemResponse "Asset not found or not a video"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/video/web [get]
 func (h *AssetHandler) GetWebVideo(c *gin.Context) {
-	ctx := c.Request.Context()
-
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -508,22 +508,9 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 		return
 	}
 
-	repositoryFS, file, err := openWebOrOriginal(ctx, h.locationResolver, asset, "videos", "_web.mp4")
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			api.WriteProblem(c, api.NotFound(err))
-		} else {
-			api.WriteProblem(c, api.Internal(err))
-		}
-		return
-	}
-
-	// Set appropriate headers for video streaming
-	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
-	c.Header("Content-Type", "video/mp4")
-	c.Header("Accept-Ranges", "bytes") // Enable range requests for video seeking
-
-	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
+	servePinnedWebMedia(c, h.locationResolver, asset, "_web.mp4", "public, max-age=86400", func(webMediaVariant) string {
+		return "video/mp4"
+	})
 }
 
 // GetWebAudio serves the web-optimized audio version by asset ID
@@ -532,14 +519,14 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 // @Tags assets
 // @Produce audio/mpeg
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param variant query string false "Pinned representation; omitted, the request redirects to the currently available one" Enums(web, original)
 // @Success 200 {file} file "Web-optimized audio file"
+// @Success 307
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
 // @Failure 404 {object} api.ProblemResponse "Asset not found or not audio"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/audio/web [get]
 func (h *AssetHandler) GetWebAudio(c *gin.Context) {
-	ctx := c.Request.Context()
-
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -560,27 +547,12 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 		return
 	}
 
-	repositoryFS, file, optimized, err := openWebOrOriginalWithFallback(ctx, h.locationResolver, asset, "audios", "_web.mp3")
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			api.WriteProblem(c, api.NotFound(err))
-		} else {
-			api.WriteProblem(c, api.Internal(err))
+	servePinnedWebMedia(c, h.locationResolver, asset, "_web.mp3", "public, max-age=86400", func(variant webMediaVariant) string {
+		if variant == webMediaVariantWeb {
+			return "audio/mpeg"
 		}
-		return
-	}
-
-	// Set appropriate headers for audio streaming
-	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
-	if optimized {
-		c.Header("Content-Type", "audio/mpeg")
-	} else {
-		c.Header("Content-Type", assetAudioContentType(asset))
-	}
-	c.Header("Vary", "Accept-Encoding")
-	c.Header("Accept-Ranges", "bytes") // Enable range requests for audio seeking
-
-	serveRepositoryFile(c, repositoryFS, file, asset.OriginalFilename)
+		return assetAudioContentType(asset)
+	})
 }
 
 func (h *AssetHandler) sidecarSourceForAsset(ctx context.Context, asset *repo.Asset, projectedPath string) (dto.LumilioSidecarSourceDTO, error) {

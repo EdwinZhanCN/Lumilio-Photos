@@ -15160,6 +15160,18 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Pinned representation; omitted, the request redirects to the currently available one",
+                        "in": "query",
+                        "name": "variant",
+                        "schema": {
+                            "enum": [
+                                "web",
+                                "original"
+                            ],
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -15172,6 +15184,9 @@ const docTemplate = `{
                             }
                         },
                         "description": "Web-optimized audio file"
+                    },
+                    "307": {
+                        "description": "Temporary Redirect"
                     },
                     "400": {
                         "content": {
@@ -16468,6 +16483,18 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Pinned representation; omitted, the request redirects to the currently available one",
+                        "in": "query",
+                        "name": "variant",
+                        "schema": {
+                            "enum": [
+                                "web",
+                                "original"
+                            ],
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -16480,6 +16507,9 @@ const docTemplate = `{
                             }
                         },
                         "description": "Web-optimized video file"
+                    },
+                    "307": {
+                        "description": "Temporary Redirect"
                     },
                     "400": {
                         "content": {
@@ -22709,6 +22739,18 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Pinned representation; omitted, the request redirects to the currently available one",
+                        "in": "query",
+                        "name": "variant",
+                        "schema": {
+                            "enum": [
+                                "web",
+                                "original"
+                            ],
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -22721,6 +22763,9 @@ const docTemplate = `{
                             }
                         },
                         "description": "Web-optimized audio file"
+                    },
+                    "307": {
+                        "description": "Temporary Redirect"
                     },
                     "404": {
                         "content": {
@@ -22760,6 +22805,18 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Pinned representation; omitted, the request redirects to the currently available one",
+                        "in": "query",
+                        "name": "variant",
+                        "schema": {
+                            "enum": [
+                                "web",
+                                "original"
+                            ],
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -22772,6 +22829,9 @@ const docTemplate = `{
                             }
                         },
                         "description": "Web-optimized video file"
+                    },
+                    "307": {
+                        "description": "Temporary Redirect"
                     },
                     "404": {
                         "content": {
