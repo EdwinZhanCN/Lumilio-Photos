@@ -8,7 +8,10 @@ three child plans, each written to be picked up by a fresh session:
 [rc-upgrade-restore.md](rc-upgrade-restore.md) (Phase 6 upgrade/restore),
 [rc-smoke-checklist.md](rc-smoke-checklist.md) (Phase 3 manual smoke), and
 [rc-release.md](rc-release.md) (notes, release workflow, promotion, tag).
-Phase 4 verdicts below await the user.
+Phase 4 verdicts below await the user. **RC is gated on GitHub issues**: the
+milestone `v26.1.0-rc.1` lists every issue that blocks the tag (the user adds
+more over the coming days); nothing is promoted or tagged while it has open
+issues — see "RC blocker issues" below.
 
 Landed before this plan (`bdd1375..74526ae`): Processing two-pattern pass,
 Agent per-tab transcript and retry, Person Recognition relation decoding, UI
@@ -43,6 +46,22 @@ follow-up in the tech-debt tracker.
   backup/restore), or breaks install/upgrade. Everything else is deferrable.
 - No check is skipped, disabled, or quarantined to reach green.
 
+## RC blocker issues
+
+- Source of truth: `gh issue list --milestone v26.1.0-rc.1 --state open`
+  ([milestone](https://github.com/EdwinZhanCN/Lumilio-Photos/milestone/1)).
+  The user adds blockers there; do not add or remove issues from it without
+  the user.
+- Work each issue in its own fresh session: branch from the latest `dev`,
+  fix with a failing-first test where applicable, open a PR into `dev` whose
+  body says `Closes #<n>`, and keep the Status of this plan current. The
+  issue closes when the PR merges into `dev`.
+- An issue that turns out to need a design decision (not just a fix) goes
+  back to the user before code is written.
+- The gate is enforced in [rc-release.md](rc-release.md) (Fixed contracts):
+  no ready-for-review on #210, no merge, no tag while the milestone has open
+  issues.
+
 ## Handoff: how to resume
 
 - Start a fresh session in this repo, read this file, then the child plan you
@@ -51,7 +70,10 @@ follow-up in the tech-debt tracker.
   same PR that changes reality.
 - Run the child plans in this order: rc-release Phase 0 (release workflow
   de-risk) and rc-upgrade-restore can start in parallel; rc-smoke-checklist
-  Part A after an RC image exists on the radxa; rc-release Phases 1–4 last.
+  Part A after an RC image exists on the radxa; rc-release Phases 1–4 last,
+  and only once the RC blocker milestone is empty. Blocker issues can be
+  worked in parallel with all of these; rerun upgrade-restore and smoke
+  rows that a blocker fix touches.
 - Remote Docker host `radxa-x4` (Intel N100, 7.5 GiB, Fedora 44, fish shell):
   build images on the Mac for `linux/amd64`, ship with `docker save | gzip -1
   | ssh radxa-x4 'gunzip | docker load'`, run there. For the E2E stack, do not
@@ -197,4 +219,5 @@ follow-up in the tech-debt tracker.
 - The smoke checklist is recorded with a verdict for every flow.
 - No open blocker; each deferred item has a tracker entry naming its owner
   path and user impact.
+- Milestone `v26.1.0-rc.1` has no open issues.
 - An upgraded catalog and a restored backup both open and browse correctly.

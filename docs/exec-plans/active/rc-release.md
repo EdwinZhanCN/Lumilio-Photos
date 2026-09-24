@@ -27,6 +27,16 @@ the promotion commit, with bilingual release notes, smoked once.
   and [rc-smoke-checklist.md](rc-smoke-checklist.md) are closed.
 - Tags and releases are outward-facing: the user confirms before any tag is
   pushed.
+- **RC blocker gate (hard stop).** The GitHub milestone
+  [`v26.1.0-rc.1`](https://github.com/EdwinZhanCN/Lumilio-Photos/milestone/1)
+  holds every issue that blocks the RC; the user keeps adding to it. Before
+  marking #210 ready, before merging it, and again immediately before
+  tagging, run:
+  `gh issue list --milestone v26.1.0-rc.1 --state open`
+  If it lists **anything**, stop: do not mark ready, merge, or tag. Report the
+  open issues to the user and end the session. An empty list is necessary
+  but not sufficient; the user still confirms the tag explicitly, because
+  new blockers may arrive after the check.
 
 ## Execution phases
 
@@ -64,11 +74,14 @@ the promotion commit, with bilingual release notes, smoked once.
   first; what the migration does).
 
 ### Phase 2 — Promote
+- [ ] Run the RC blocker gate (Fixed contracts). Stop if anything is open.
 - [ ] Update #210's body with the final list; mark it ready for review; CI
   must be green on its final head with no skipped/quarantined checks.
 - [ ] User reviews and merges #210.
 
 ### Phase 3 — Tag and publish (user confirms first)
+- [ ] Run the RC blocker gate again right before tagging; stop if anything is
+  open, and ask the user to confirm there is nothing new to add.
 - [ ] Tag `v26.1.0-rc.1` on the merged `main` commit and push the tag; watch
   the release workflow to completion (`gh run watch`).
 - [ ] Verify outputs: GitHub pre-release created with notes; Server image
@@ -87,6 +100,8 @@ the promotion commit, with bilingual release notes, smoked once.
 
 ## Validation boundaries
 
+- Milestone `v26.1.0-rc.1` has zero open issues at tag time, and the user
+  confirmed the tag.
 - Release workflow green for `v26.1.0-rc.1`; every Desktop and Server
   artifact present.
 - Published image digest recorded and smoke-tested from the registry.
