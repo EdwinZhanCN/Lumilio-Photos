@@ -6,11 +6,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
+
+// CurrentVersion is the .lumiliorepo format since the v26.1.0-rc.1
+// compatibility baseline; pre-release markers have the same shape and are read
+// as-is. The marker lives inside user media folders, so a later format must
+// keep reading every earlier version rather than rejecting it.
+const CurrentVersion = "1.0"
 
 // RepositoryConfig represents the complete .lumiliorepo configuration file structure
 type RepositoryConfig struct {
@@ -65,7 +72,7 @@ type LocalSettings struct {
 // Note: This does not include ID, Name, or CreatedAt as these should be unique per repository
 func DefaultRepositoryConfig() *RepositoryConfig {
 	return &RepositoryConfig{
-		Version:         "1.0",
+		Version:         CurrentVersion,
 		StorageStrategy: "date",
 		LocalSettings: LocalSettings{
 			HandleDuplicateFilenames: "uuid",
@@ -95,7 +102,7 @@ func WithLocalSettings(duplicateHandling string) RepositoryConfigOption {
 // System-managed fields (always auto-generated):
 //   - ID: Unique UUID generated automatically
 //   - CreatedAt: Current timestamp when config is created
-//   - Version: Set to current version ("1.0")
+//   - Version: Set to CurrentVersion
 //
 // User-configurable fields via options:
 //   - StorageStrategy: How files are organized ("date", "cas", "flat")
@@ -170,8 +177,8 @@ func (rc *RepositoryConfig) SaveConfigToFile(repoPath string) error {
 
 // Validate checks if the repository configuration is valid
 func (rc *RepositoryConfig) Validate() error {
-	if rc.Version == "" {
-		return fmt.Errorf("version is required")
+	if version := strings.TrimSpace(rc.Version); version != CurrentVersion {
+		return fmt.Errorf("version must be %s, found %q: a newer Lumilio Photos may have written this marker", CurrentVersion, version)
 	}
 
 	if rc.ID == "" {

@@ -26,6 +26,7 @@ stamped values that the new sequence will reuse:
 | Server TOML `schema_version` | 6 (internal history 1–6) | 6 | 1 |
 | Backup `manifestFormatVersion` | 2 | 3 | 1 |
 | `.lumilioroot` marker `version` | `"1.0"`, same shape as today | `"1.0"` | `"1.0"` |
+| `.lumiliorepo` marker `version` | `"1.0"`, same shape as today | `"1.0"` | `"1.0"` |
 | Desktop state files | 1 | 1 | 1 |
 
 (`v1.0.0-beta.*` was the PostgreSQL server; it has no SQLite catalog, TOML
@@ -100,14 +101,18 @@ installed unchanged and upgraded by the same catalog steps on the next start;
 an older config schema version in its manifest is accepted too. A backup
 newer than the build is rejected.
 
-**Storage Location marker (`.lumilioroot`).** It lives inside user media
-folders and is the longest-lived file Lumilio writes. Its rc.1 baseline stays
-the string `"1.0"`, and it is not treated as pre-release: the pre-release
-marker is byte-for-byte the same shape, and rejecting it would force users to
+**Storage Location and Repository markers (`.lumilioroot`,
+`.lumiliorepo`).** They live inside user media folders and are the
+longest-lived files Lumilio writes. Both follow the rules below; the
+Repository's private `.lumilio/` workspace holds derived artifacts and
+staging, which are re-derived rather than migrated. The rc.1 baseline of each stays
+the string `"1.0"`, and neither is treated as pre-release: the pre-release
+markers are the same shape, and rejecting it would force users to
 edit hidden files in their media folders to start fresh. A later marker format
 must keep reading `"1.0"`; today an unknown version is refused with a message
-naming a newer build as the likely writer. Lumilio rewrites a marker only when
-an existing Storage Location operation already writes it.
+naming a newer build as the likely writer (`.lumiliorepo` previously only
+required a non-empty version). Lumilio rewrites a marker only when an existing
+Storage Location or Repository operation already writes it.
 
 **Desktop state files** (settings, runtime pointer and apply journal,
 resource and Lumen install records, update staging pointer, storage shortcut

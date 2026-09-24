@@ -100,12 +100,13 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   (`~/Pictures/Lumilio`, `.local/dev/storage`). Local OrbStack was stopped and
   not inspected; run `docker compose -p lumilio-photos-e2e down -v` before a
   local E2E run.
-- [ ] `.lumiliorepo` (repository marker, `server/internal/storage/repocfg`) was
+- [x] `.lumiliorepo` (repository marker, `server/internal/storage/repocfg`) was
   missed by the decision: unchanged since `v26.1.0-beta.2` (`"1.0"`, so
   pre-release repositories are accepted like `.lumilioroot`), but `Validate`
   only requires a non-empty version, so a newer marker would be read
-  silently. Give it the same `"1.0"` check as `.lumilioroot` and add it to
-  the decision before rc.1.
+  silently. Fixed: `repocfg.CurrentVersion` with the same exact check and
+  message as `.lumilioroot`; tests read the beta marker as-is and reject
+  unknown versions; the decision covers both markers.
 
 ### Phase 2 — Forward paths
 - [x] Catalog step runner (`server/internal/db/migration.go`): embedded
