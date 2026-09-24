@@ -89,8 +89,10 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   (beta stamp 8 + ledger, stamp 9, colliding stamp 1),
   `TestValidateSnapshotAttributesManifestFormatMismatch` (v2/v3 pre-release,
   newer, missing), `TestLoadAppConfigRejectsNewerOrPreReleaseSchemaVersion`.
-- [ ] `task server:test`, `task verify:generated`, `task desktop:test`; wipe
-  local/radxa E2E and Desktop state before any manual testing.
+- [x] `task server:test`, `task verify:generated`, `task desktop:test` green
+  on 2026-09-24 (commit `8b1482fb`).
+- [ ] Wipe local/radxa E2E and Desktop state before any manual testing: every
+  existing catalog is now rejected as pre-release.
 
 ### Phase 2 — Forward paths
 - [ ] Catalog step runner: embedded `server/migrations/steps/NNNN_<name>.sql`
