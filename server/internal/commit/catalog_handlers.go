@@ -821,6 +821,13 @@ func settleAssetPipelineReceipts(ctx context.Context, tx *sql.Tx, assetID uuid.U
 			  ON stage.asset_id=link.asset_id AND stage.stage=link.stage
 			WHERE link.receipt_id=receipt.receipt_id
 			  AND stage.applied_version<link.desired_version
+		  )
+		  -- A paged reindex is complete only after its last page was requested;
+		  -- completing earlier would stop the scheduler from continuing it.
+		  AND NOT EXISTS (
+			SELECT 1 FROM asset_reindex_requests request
+			WHERE request.receipt_id=receipt.receipt_id
+			  AND request.requested_revision>request.applied_revision
 		  )`, now, assetID.String())
 	return err
 }

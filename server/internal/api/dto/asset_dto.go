@@ -57,6 +57,15 @@ type RebuildAssetIndexesResponseDTO struct {
 	RepositoryID   *string  `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
+// AssetIndexingRebuildStatusDTO reports one rebuild receipt. "completed" means
+// every page was requested and every enrichment stage it requested applied;
+// index coverage alone cannot distinguish that from an earlier rebuild.
+type AssetIndexingRebuildStatusDTO struct {
+	ReceiptID     string `json:"receipt_id" example:"21a0a629-7329-4623-9f0c-a53b99878edc"`
+	State         string `json:"state" enums:"pending,completed,failed" example:"pending"`
+	TerminalError string `json:"terminal_error,omitempty" example:"attempts_exhausted"`
+}
+
 type AssetIndexingTaskStatsDTO struct {
 	IndexedCount int `json:"indexed_count" example:"1200"`
 	QueuedJobs   int `json:"queued_jobs" example:"12"`

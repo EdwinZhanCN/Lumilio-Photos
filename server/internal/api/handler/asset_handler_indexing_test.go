@@ -20,6 +20,11 @@ type stubAssetIndexingService struct {
 	service.AssetIndexingService
 	getIndexingStatsFn   func(ctx context.Context, repositoryID *string) (service.AssetIndexingStats, error)
 	enqueueReindexAssets func(ctx context.Context, input service.ReindexAssetsInput) (service.ReindexAssetsJobResult, error)
+	getReindexReceipt    func(ctx context.Context, receiptID uuid.UUID) (service.ReindexReceiptStatus, error)
+}
+
+func (s stubAssetIndexingService) GetReindexReceipt(ctx context.Context, receiptID uuid.UUID) (service.ReindexReceiptStatus, error) {
+	return s.getReindexReceipt(ctx, receiptID)
 }
 
 func (s stubAssetIndexingService) GetIndexingStats(ctx context.Context, repositoryID *string) (service.AssetIndexingStats, error) {
@@ -278,4 +283,35 @@ func TestAssetHandlerRebuildAssetIndexes_RejectsRepositoryScopedSemanticReset(t 
 
 func boolPtr(value bool) *bool {
 	return &value
+}
+
+func TestAssetHandlerGetAssetIndexRebuild_ReportsReceiptState(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	receiptID := uuid.New()
+	handler := &AssetHandler{indexingService: stubAssetIndexingService{
+		getReindexReceipt: func(_ context.Context, requested uuid.UUID) (service.ReindexReceiptStatus, error) {
+			if requested != receiptID {
+				return service.ReindexReceiptStatus{}, service.ErrReindexReceiptNotFound
+			}
+			return service.ReindexReceiptStatus{ReceiptID: receiptID, State: "completed"}, nil
+		},
+	}}
+	get := func(id string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Params = gin.Params{{Key: "receipt_id", Value: id}}
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assets/indexing/rebuild/"+id, nil)
+		handler.GetAssetIndexRebuild(ctx)
+		return recorder
+	}
+
+	recorder := get(receiptID.String())
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response dto.AssetIndexingRebuildStatusDTO
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, receiptID.String(), response.ReceiptID)
+	require.Equal(t, "completed", response.State)
+
+	require.Equal(t, http.StatusNotFound, get(uuid.NewString()).Code)
+	require.Equal(t, http.StatusBadRequest, get("not-a-uuid").Code)
 }
