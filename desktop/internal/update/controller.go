@@ -380,6 +380,12 @@ func (c *Controller) start(requestID string, expectedVersion uint64, phase strin
 	c.commit(func(update *dto.UpdateSnapshot) { update.Phase = phase; update.Version++ })
 	go func() {
 		result, workErr := work(context.Background())
+		// Publish the result before the operation turns terminal, so anyone
+		// who observes the finished operation also observes its snapshot.
+		c.commit(func(update *dto.UpdateSnapshot) {
+			*update = result
+			update.Version++
+		})
 		if workErr != nil {
 			failure := workErr
 			if result.Error.Code != "" {
@@ -389,10 +395,6 @@ func (c *Controller) start(requestID string, expectedVersion uint64, phase strin
 		} else {
 			_ = c.operations.Succeed(receipt.OperationID)
 		}
-		c.commit(func(update *dto.UpdateSnapshot) {
-			*update = result
-			update.Version++
-		})
 		c.syncOperations()
 	}()
 	return receipt, nil
