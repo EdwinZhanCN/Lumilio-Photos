@@ -30,9 +30,14 @@ follow-up in the tech-debt tracker.
 ## Execution phases
 
 ### Phase 0 — Green baseline
-- [ ] Full CI green on `dev`, including Desktop native and the E2E slices
-  CI runs.
-- [ ] Confirm `internal/llm` `ark` conformance passes in CI. It fails in the
+- [x] Full CI green on `dev`, including Desktop native and the E2E slices
+  CI runs: draft promotion PR #210 (2026-09-23, `dev` at `169ddc9b`) passed
+  every job — server, web, Desktop macOS and Windows, site, producer pins —
+  and all seven E2E slices. Getting there fixed two `dev` failures its first
+  full run exposed (#206 commit-metric race, #207 scan settle race) and the
+  Storage asset-count blocker (#209).
+- [x] Confirm `internal/llm` `ark` conformance passes in CI (server job green
+  on #210). It fails in the
   agent sandbox identically on untouched `dev`, so it is believed to be
   environment-specific; if CI also fails, it is a blocker. (2026-09-22: passes
   on a macOS host, supporting the sandbox theory.)
