@@ -92,8 +92,20 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   newer, missing), `TestLoadAppConfigRejectsNewerOrPreReleaseSchemaVersion`.
 - [x] `task server:test`, `task verify:generated`, `task desktop:test` green
   on 2026-09-24 (commit `8b1482fb`).
-- [ ] Wipe local/radxa E2E and Desktop state before any manual testing: every
-  existing catalog is now rejected as pre-release.
+- [x] Wipe local/radxa E2E and Desktop state before any manual testing: every
+  existing catalog is now rejected as pre-release. Done 2026-09-24 with owner
+  approval: radxa `lumilio-photos-e2e` containers and both volumes; macOS
+  Desktop `state/` and `runtime/` intents/pointers (settings, secrets, logs,
+  Lumen kept); `.local/dev/state` and `.local/dev/config`. Media untouched
+  (`~/Pictures/Lumilio`, `.local/dev/storage`). Local OrbStack was stopped and
+  not inspected; run `docker compose -p lumilio-photos-e2e down -v` before a
+  local E2E run.
+- [ ] `.lumiliorepo` (repository marker, `server/internal/storage/repocfg`) was
+  missed by the decision: unchanged since `v26.1.0-beta.2` (`"1.0"`, so
+  pre-release repositories are accepted like `.lumilioroot`), but `Validate`
+  only requires a non-empty version, so a newer marker would be read
+  silently. Give it the same `"1.0"` check as `.lumilioroot` and add it to
+  the decision before rc.1.
 
 ### Phase 2 — Forward paths
 - [x] Catalog step runner (`server/internal/db/migration.go`): embedded
