@@ -210,6 +210,39 @@ func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
 	})
 }
 
+// GetAssetIndexRebuild reports the state of one queued index rebuild.
+// @Summary Get asset index rebuild status
+// @Description Report whether a rebuild receipt is pending, completed, or failed. A receipt completes only after every page was requested and every enrichment stage it requested was applied.
+// @Tags assets
+// @Produce json
+// @Param receipt_id path string true "Rebuild receipt ID"
+// @Success 200 {object} dto.AssetIndexingRebuildStatusDTO
+// @Failure 400 {object} api.ProblemResponse "Invalid receipt ID"
+// @Failure 404 {object} api.ProblemResponse "Rebuild receipt not found"
+// @Failure 500 {object} api.ProblemResponse "Internal server error"
+// @Router /api/v1/assets/indexing/rebuild/{receipt_id} [get]
+func (h *AssetHandler) GetAssetIndexRebuild(c *gin.Context) {
+	receiptID, err := uuid.Parse(c.Param("receipt_id"))
+	if err != nil {
+		api.WriteProblem(c, api.BadRequest(err))
+		return
+	}
+	status, err := h.indexingService.GetReindexReceipt(c.Request.Context(), receiptID)
+	if errors.Is(err, service.ErrReindexReceiptNotFound) {
+		api.WriteProblem(c, api.NotFound(err))
+		return
+	}
+	if err != nil {
+		api.WriteProblem(c, api.Internal(err))
+		return
+	}
+	api.JSONOK(c, dto.AssetIndexingRebuildStatusDTO{
+		ReceiptID:     status.ReceiptID.String(),
+		State:         status.State,
+		TerminalError: status.TerminalError,
+	})
+}
+
 // ReprocessAsset requests a new fenced asset-pipeline generation.
 // @Summary Reprocess asset
 // @Description Request catalog-owned analysis, derivative, transcode, and enrichment stages for an asset. Progress is reported from the receipt and desired/applied catalog state.

@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { AlertCircle, Info, KeyRound, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { localizeProblem } from "@/lib/http-commons/problem";
-import { useAuth } from "../../state/useAuth.ts";
+import { useSignOut } from "../sign-out/useSignOut.ts";
 import { useChangeMyPassword } from "@/features/users";
 import { usePasswordConfirmation } from "../../hooks/usePasswordConfirmation.ts";
 import {
@@ -23,9 +23,8 @@ type ReturnState = {
 
 export default function ChangePasswordFlow(): React.ReactNode {
   const { t } = useI18n();
-  const { logout } = useAuth();
+  const signOut = useSignOut();
   const location = useLocation();
-  const navigate = useNavigate();
   const changePasswordMutation = useChangeMyPassword();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -66,9 +65,6 @@ export default function ChangePasswordFlow(): React.ReactNode {
           new_password: newPassword,
         },
       });
-
-      void logout();
-      void navigate("/login", { replace: true });
     } catch (error) {
       setErrorMessage(
         localizeProblem(
@@ -79,7 +75,10 @@ export default function ChangePasswordFlow(): React.ReactNode {
           }),
         ),
       );
+      return;
     }
+
+    await signOut();
   };
 
   return (

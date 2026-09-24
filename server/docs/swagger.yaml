@@ -916,6 +916,22 @@ components:
                     type: array
                     uniqueItems: false
             type: object
+        dto.AssetIndexingRebuildStatusDTO:
+            properties:
+                receipt_id:
+                    example: 21a0a629-7329-4623-9f0c-a53b99878edc
+                    type: string
+                state:
+                    enum:
+                        - pending
+                        - completed
+                        - failed
+                    example: pending
+                    type: string
+                terminal_error:
+                    example: attempts_exhausted
+                    type: string
+            type: object
         dto.AssetIndexingStatsResponseDTO:
             properties:
                 photo_total:
@@ -10484,6 +10500,44 @@ paths:
                                 $ref: '#/components/schemas/api.ProblemResponse'
                     description: Internal server error
             summary: Queue asset index rebuild
+            tags:
+                - assets
+    /api/v1/assets/indexing/rebuild/{receipt_id}:
+        get:
+            description: Report whether a rebuild receipt is pending, completed, or failed. A receipt completes only after every page was requested and every enrichment stage it requested was applied.
+            parameters:
+                - description: Rebuild receipt ID
+                  in: path
+                  name: receipt_id
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/dto.AssetIndexingRebuildStatusDTO'
+                    description: OK
+                "400":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Invalid receipt ID
+                "404":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Rebuild receipt not found
+                "500":
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/api.ProblemResponse'
+                    description: Internal server error
+            summary: Get asset index rebuild status
             tags:
                 - assets
     /api/v1/assets/indexing/stats:

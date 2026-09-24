@@ -586,7 +586,6 @@ var operationCatalog = [operationCount]OperationDescriptor{
 		Operation: OperationEventPatch,
 		Name:      "event.patch",
 		Role:      RoleWriter,
-		Kind:      OperationKindStatement,
 	},
 	OperationEventSchedulerLeaseCleanup: {
 		Operation: OperationEventSchedulerLeaseCleanup,

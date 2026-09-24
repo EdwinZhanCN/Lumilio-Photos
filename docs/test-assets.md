@@ -23,7 +23,11 @@ The source repo holds `assets.json` (catalog: `id`, `media/...` path, `sha256`,
 `demo` (full media pool), and `e2e` (the deterministic test set).
 
 Sync materializes into `.cache/lumilio-assets/<revision>/<profile>/`. The cache
-is validated (revision+profile+manifest) and reused.
+is validated (revision+profile+manifest+synced IDs) and reused. Repeated
+`--asset <id>` flags fetch only those profile members (same manifest and
+sha256 checks) into `<profile>+selection/`, which specs read through
+`selectedProfileAsset`; the `@people` slice uses this to pull five `demo`
+portraits (~1.9 MB of LFS) instead of the whole profile.
 
 ## Seed contract
 

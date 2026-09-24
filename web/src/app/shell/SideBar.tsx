@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Activity,
   ChevronUp,
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
-import { useAuth } from "@/features/auth";
+import { useAuth, useSignOut } from "@/features/auth";
 import { useResolvedThemeMode, useThemePreference } from "@/lib/theme";
 import UserAvatar from "@/components/ui/UserAvatar";
 
@@ -32,9 +32,9 @@ function closeMobileDrawer() {
 
 function SideBar() {
   const { online: isOnline } = useGlobal();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const signOut = useSignOut();
   const location = useLocation();
-  const navigate = useNavigate();
   const { t } = useI18n();
   const [theme, setTheme] = useThemePreference();
   const resolvedThemeMode = useResolvedThemeMode();
@@ -267,8 +267,7 @@ function SideBar() {
                   onClick={() => {
                     setAccountOpen(false);
                     closeMobileDrawer();
-                    void logout();
-                    void navigate("/login", { replace: true });
+                    void signOut();
                   }}
                 >
                   <LogOut className="size-4" />

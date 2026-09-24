@@ -30,9 +30,14 @@ follow-up in the tech-debt tracker.
 ## Execution phases
 
 ### Phase 0 — Green baseline
-- [ ] Full CI green on `dev`, including Desktop native and the E2E slices
-  CI runs.
-- [ ] Confirm `internal/llm` `ark` conformance passes in CI. It fails in the
+- [x] Full CI green on `dev`, including Desktop native and the E2E slices
+  CI runs: draft promotion PR #210 (2026-09-23, `dev` at `169ddc9b`) passed
+  every job — server, web, Desktop macOS and Windows, site, producer pins —
+  and all seven E2E slices. Getting there fixed two `dev` failures its first
+  full run exposed (#206 commit-metric race, #207 scan settle race) and the
+  Storage asset-count blocker (#209).
+- [x] Confirm `internal/llm` `ark` conformance passes in CI (server job green
+  on #210). It fails in the
   agent sandbox identically on untouched `dev`, so it is believed to be
   environment-specific; if CI also fails, it is a blocker. (2026-09-22: passes
   on a macOS host, supporting the sandbox theory.)
@@ -72,7 +77,7 @@ follow-up in the tech-debt tracker.
 - [ ] Manual smoke checklist on a fresh Docker Compose install and on Desktop
   (macOS or Windows): People, Albums/Collections, Share links, Studio,
   Settings/Users, Storage admin, Map. Record results here.
-- [ ] Playwright specs for the three highest-risk untested flows: Share link
+- [x] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
   - [x] Share link create/open/revoke: `web/e2e/specs/share-links.spec.ts`
     (`@smoke`, `task web:test:browser`; the `browser_smoke` CI filter follows
@@ -90,6 +95,19 @@ follow-up in the tech-debt tracker.
     matching the removal-impact dialog), and a count failure is a Problem
     instead of a silent omission. Verified end to end on the N100 with all
     release-hardening branches combined (every slice green, no retries).
+  - [x] People merge: `web/e2e/specs/people-merge.spec.ts` (`@people`, new
+    slice `task web:test:people`, CI filter `people_e2e`). It uploads five
+    `demo`-profile portraits (plus one duplicate: clustering needs three
+    faces per person), enables face recognition for the test, waits for two
+    people, merges them in the edit dialog, and asserts one survivor owning
+    all six faces/assets and a 404 for the merged id. Face results are real
+    Hub recordings (antelopev2, five payloads) replayed by fakelumen;
+    fakelumen now overlays recorded capabilities per service so recording
+    face does not change SigLIP/BioCLIP/OCR for other slices. The slice
+    fetches only its five portraits (`assets:sync --profile demo --asset …`,
+    about 1.9 MB of LFS objects) instead of the whole demo profile. Later
+    cleanup: move the portraits into the `e2e` profile in the next assets
+    release and drop the selection.
 - [ ] Every smoke failure is fixed or filed with a blocker/deferred verdict.
 
 ### Phase 4 — Debt triage

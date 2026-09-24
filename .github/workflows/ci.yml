@@ -27,12 +27,13 @@ jobs:
         outputs:
             server: ${{ steps.filter.outputs.server }}
             web: ${{ steps.filter.outputs.web }}
-            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
-            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            web_job: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
+            e2e: ${{ steps.filter.outputs.browser_smoke == 'true' || steps.filter.outputs.auth_e2e == 'true' || steps.filter.outputs.agent_e2e == 'true' || steps.filter.outputs.video_e2e == 'true' || steps.filter.outputs.people_e2e == 'true' || steps.filter.outputs.recovery_e2e == 'true' }}
             browser_smoke: ${{ steps.filter.outputs.browser_smoke }}
             auth_e2e: ${{ steps.filter.outputs.auth_e2e }}
             agent_e2e: ${{ steps.filter.outputs.agent_e2e }}
             video_e2e: ${{ steps.filter.outputs.video_e2e }}
+            people_e2e: ${{ steps.filter.outputs.people_e2e }}
             recovery_e2e: ${{ steps.filter.outputs.recovery_e2e }}
             desktop: ${{ steps.filter.outputs.desktop }}
             site: ${{ steps.filter.outputs.site }}
@@ -177,6 +178,38 @@ jobs:
                           - 'web/src/features/assets/model/browseItems.ts'
                           - 'web/src/features/monitor/api/useAssetIndexing.ts'
                           - 'web/src/features/settings/flows/ai/**'
+                      # Replays recorded Hub face recognition for the demo
+                      # profile portraits; the slice also syncs that profile.
+                      people_e2e:
+                          - '.github/workflows/ci.yml'
+                          - 'taskfile.yml'
+                          - 'web/taskfile.yml'
+                          - 'assets.lock.json'
+                          - 'server/Dockerfile'
+                          - 'server/go.mod'
+                          - 'server/go.sum'
+                          - 'server/migrations/**'
+                          - 'server/tools/fakelumen/**'
+                          - 'server/internal/api/handler/people_handler*.go'
+                          - 'server/internal/api/dto/people_dto*.go'
+                          - 'server/internal/db/repo/queries/face*.sql'
+                          - 'server/internal/queue/enrichment_*.go'
+                          - 'server/internal/service/face_*.go'
+                          - 'server/internal/service/lumen_service.go'
+                          - 'web/playwright.config.ts'
+                          - 'web/package.json'
+                          - 'web/pnpm-lock.yaml'
+                          - 'web/scripts/assets-sync.ts'
+                          - 'web/e2e/compose*.yml'
+                          - 'web/e2e/fixtures/**'
+                          - 'web/e2e/pages/**'
+                          - 'web/e2e/support/**'
+                          - 'web/e2e/specs/people-*.spec.ts'
+                          - 'web/src/components/collection/**'
+                          - 'web/src/components/ui/Modal.tsx'
+                          - 'web/src/features/people/**'
+                          - 'web/src/lib/http-commons/**'
+                          - 'web/src/locales/**'
                       recovery_e2e:
                           - '.github/workflows/ci.yml'
                           - 'taskfile.yml'
@@ -404,6 +437,10 @@ jobs:
             - name: Run video semantic regression
               if: needs.changes.outputs.video_e2e == 'true'
               run: task web:test:video-semantic
+
+            - name: Run People merge regression
+              if: needs.changes.outputs.people_e2e == 'true'
+              run: task web:test:people
 
             - name: Run database backup and recovery regression
               if: needs.changes.outputs.recovery_e2e == 'true'

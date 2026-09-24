@@ -4,7 +4,7 @@ Keep this list short. Each item must describe current behavior, name a concrete
 owner path, and explain the user or release impact. Completed history belongs in
 the relevant exec plan, not in this file.
 
-Last aligned with the codebase: 2026-09-22.
+Last aligned with the codebase: 2026-09-23.
 
 ## Product paths
 
@@ -14,6 +14,16 @@ Last aligned with the codebase: 2026-09-22.
   creates a real `MS_BIND` mount and asserts one statfs-derived capacity group;
   it skips without `CAP_SYS_ADMIN`. Darwin/Windows CI never compile it, and
   Docker Desktop virtiofs/osxfs bind topologies are not this fixture.
+
+- **A manual scan right after a file lands can skip it until the next
+  periodic verification.** Owner: `server/internal/storage/repository_fs.go`
+  (the `settling` skip) and the Repository verification scheduler. The
+  verifier deliberately skips files modified within
+  `repository_scan.settle_seconds` and ends the run `partial` with a retryable
+  `repository/scan-incomplete` problem, but nothing schedules a follow-up, so
+  a user who drops a file and clicks Scan within the window must rescan by
+  hand or wait for the next interval. Fix: queue one delayed verification when
+  a crawl reports settling skips. Found by #207.
 
 - **Music embedded covers are not materialized as thumbnails.** Owner:
   `server/internal/processors/audio_helpers.go` and
@@ -29,9 +39,13 @@ Last aligned with the codebase: 2026-09-22.
   collisions. A late EXIF update can still miss an end-to-end proof that one
   Event publishes seven projected members; catalogs with leftover dirty-range
   claims can remain operator work rather than a gated recovery.
-- **Video semantic E2E does not prove operation-scoped completion or persisted
+- **Video semantic E2E does not prove reprocess completion or persisted
   per-video frame counts.** Owner: `web/e2e/specs/video-semantic-regression.spec.ts`
-  and the indexing `queued_jobs` field. Backfill/reprocess currently assert
-  request acceptance. `queued_jobs` remains a global backlog even when queried
-  with a repository filter, so a slice cannot treat queue-idle or that counter
-  as proof that this repository's video finished.
+  and the indexing `queued_jobs` field. Rebuilds (backfill and semantic reset)
+  now wait on their own receipt via `GET /api/v1/assets/indexing/rebuild/{receipt_id}`
+  before reading coverage, because coverage read earlier still counts the
+  previous run's vectors (the reset deletes them only when the scheduler
+  applies its first page). Per-asset reprocess receipts have no read endpoint,
+  so that step still asserts acceptance only. `queued_jobs` remains a global
+  backlog even when queried with a repository filter, so a slice cannot treat
+  queue-idle or that counter as proof that this repository's video finished.
