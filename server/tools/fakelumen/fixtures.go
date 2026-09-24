@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +22,7 @@ import (
 // Fixture layout (committed under server/tools/fakelumen/fixtures/):
 //
 //	manifest.json                 schema version, recording provenance, and the
-//	                              protojson capability set advertised on replay
+//	                              upstream capability of every recorded service
 //	records/<task>/<sha256>.json  one recorded inference: request identity by
 //	                              payload hash, response bytes verbatim
 //
@@ -80,12 +81,22 @@ func recordKey(task, digest string) string { return task + "\x00" + digest }
 
 // fixtureStore indexes recorded inferences and the recorded capability set.
 // It is read-only in replay mode; record mode writes through to dir.
+//
+// The manifest persists an upstream capability only once at least one of its
+// tasks has a recorded fixture. Replay overrides the builtin capability of
+// exactly those services, so recording one service (say, face) never swaps
+// the model identity or tensor contract of services whose requests still
+// fall back to builtin responses.
 type fixtureStore struct {
 	mu       sync.Mutex
 	manifest fixtureManifest
 	caps     []*pb.Capability
 	records  map[string]*fixtureRecord
 	dir      string // non-empty only when opened writable for recording
+	// upstream is the latest capability set streamed by the recording hub,
+	// including services that have no recorded fixture yet.
+	upstream     []*pb.Capability
+	upstreamAddr string
 }
 
 // loadFixtureStore reads a fixture tree from any fs.FS (the embedded default
@@ -200,24 +211,54 @@ func (s *fixtureStore) put(record *fixtureRecord) error {
 	if err := os.WriteFile(target, append(raw, '\n'), 0o644); err != nil {
 		return fmt.Errorf("write fixture: %w", err)
 	}
+	// The first fixture of a service persists that service's capability.
+	if capabilityForTask(s.caps, record.Task) == nil && capabilityForTask(s.upstream, record.Task) != nil {
+		return s.writeManifestLocked()
+	}
 	return nil
 }
 
-// setCapabilities persists the upstream capability set into the manifest so a
-// later replay run advertises exactly what the recording hub advertised.
+// setCapabilities remembers the upstream capability set and persists the
+// capabilities of services that have recorded fixtures, so a later replay
+// advertises exactly what the recording hub advertised for those services.
 func (s *fixtureStore) setCapabilities(caps []*pb.Capability, upstream string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.dir == "" {
 		return fmt.Errorf("fixture store is read-only; recording requires -fixtures <dir>")
 	}
-	s.caps = append([]*pb.Capability(nil), caps...)
+	s.upstream = append([]*pb.Capability(nil), caps...)
+	s.upstreamAddr = upstream
+	return s.writeManifestLocked()
+}
+
+// writeManifestLocked recomputes the recorded capability set — the upstream
+// capability of every service with a recorded task, plus previously persisted
+// capabilities of recorded services this upstream does not advertise — and
+// writes the manifest.
+func (s *fixtureStore) writeManifestLocked() error {
+	recorded := make([]*pb.Capability, 0, len(s.upstream))
+	for _, capability := range s.upstream {
+		if s.hasRecordLocked(capability) {
+			recorded = append(recorded, capability)
+		}
+	}
+	for _, capability := range s.caps {
+		upstreamHasService := slices.ContainsFunc(s.upstream, func(candidate *pb.Capability) bool {
+			return candidate.GetServiceName() == capability.GetServiceName()
+		})
+		if !upstreamHasService && s.hasRecordLocked(capability) {
+			recorded = append(recorded, capability)
+		}
+	}
+
+	s.caps = recorded
 	s.manifest.SchemaVersion = fixtureSchemaVersion
-	s.manifest.RecordedFrom = upstream
+	s.manifest.RecordedFrom = s.upstreamAddr
 	s.manifest.RecordedAt = time.Now().UTC().Format(time.RFC3339)
 	s.manifest.Capabilities = s.manifest.Capabilities[:0]
 	marshal := protojson.MarshalOptions{UseProtoNames: true}
-	for _, capability := range caps {
+	for _, capability := range recorded {
 		raw, err := marshal.Marshal(capability)
 		if err != nil {
 			return fmt.Errorf("encode capability: %w", err)
@@ -230,6 +271,27 @@ func (s *fixtureStore) setCapabilities(caps []*pb.Capability, upstream string) e
 	}
 	if err := os.WriteFile(filepath.Join(s.dir, manifestFilename), append(raw, '\n'), 0o644); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
+	}
+	return nil
+}
+
+func (s *fixtureStore) hasRecordLocked(capability *pb.Capability) bool {
+	for _, record := range s.records {
+		if capabilityForTask([]*pb.Capability{capability}, record.Task) != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// capabilityForTask returns the capability in caps that serves task, if any.
+func capabilityForTask(caps []*pb.Capability, task string) *pb.Capability {
+	for _, capability := range caps {
+		for _, candidate := range capability.GetTasks() {
+			if candidate.GetName() == task {
+				return capability
+			}
+		}
 	}
 	return nil
 }

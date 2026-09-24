@@ -12,12 +12,38 @@ const lock: { revision: string; profile: string } = JSON.parse(
 // materialises the ids the profile references. Resolving through the profile
 // keeps this to files that are actually on disk.
 export function profileAsset(profileName: string, id: string): string {
-  const profileRoot = path.join(
-    repositoryRoot,
-    ".cache/lumilio-assets",
-    lock.revision,
-    profileName,
+  return resolveAsset(profileName, profileName, id);
+}
+
+/**
+ * Absolute path of one asset synced by an explicit selection
+ * (`assets:sync -- --profile <name> --asset <id> …`). The selection lives in
+ * its own `<profile>+selection` cache directory, and the id must be one the
+ * sync actually materialised, so a partial copy never stands in for the full
+ * profile that other slices resolve through `profileAsset`.
+ */
+export function selectedProfileAsset(profileName: string, id: string): string {
+  const directory = `${profileName}+selection`;
+  const sync: { assets?: string[] } = JSON.parse(
+    readFileSync(
+      path.join(
+        repositoryRoot,
+        ".cache/lumilio-assets",
+        lock.revision,
+        directory,
+        ".lumilio-assets-sync.json",
+      ),
+      "utf8",
+    ),
   );
+  if (!sync.assets?.includes(id)) {
+    throw new Error(`asset ${id} was not synced by the ${profileName} selection`);
+  }
+  return resolveAsset(directory, profileName, id);
+}
+
+function resolveAsset(directory: string, profileName: string, id: string): string {
+  const profileRoot = path.join(repositoryRoot, ".cache/lumilio-assets", lock.revision, directory);
   const profile: { assets: string[] } = JSON.parse(
     readFileSync(path.join(profileRoot, "profiles", `${profileName}.json`), "utf8"),
   );
@@ -56,6 +82,23 @@ export const VIDEO_REGRESSION_ASSETS = [
   "commons-video-ocean-waves",
   "commons-video-chameleon-flowers",
   "commons-video-mountain-landscape",
+] as const;
+
+/**
+ * Portraits of two different people for the People merge regression. Only the
+ * `demo` profile carries more than one of them, so the `@people` slice syncs
+ * just these ids from it (`--asset`). Face recognition answers for these exact pixels are recorded
+ * under `server/tools/fakelumen/fixtures/records/face_recognition/`.
+ */
+export const PEOPLE_PROFILE = "demo";
+export const PEOPLE_PERSON_A_ASSETS = [
+  "landing-07-portrait-a",
+  "landing-19-portrait-a-close",
+  "landing-20-portrait-a-warm",
+] as const;
+export const PEOPLE_PERSON_B_ASSETS = [
+  "landing-08-portrait-b",
+  "landing-21-portrait-b-close",
 ] as const;
 
 /**
