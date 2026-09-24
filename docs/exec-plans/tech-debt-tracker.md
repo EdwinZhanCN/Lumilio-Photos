@@ -23,7 +23,9 @@ Last aligned with the codebase: 2026-09-23.
   `repository/scan-incomplete` problem, but nothing schedules a follow-up, so
   a user who drops a file and clicks Scan within the window must rescan by
   hand or wait for the next interval. Fix: queue one delayed verification when
-  a crawl reports settling skips. Found by #207.
+  a crawl reports settling skips. Found by #207. Folded into RC blocker #222 on
+  2026-09-24 (the replacement scan schedules a delayed follow-up for deferred
+  subtrees); delete this entry when #222 lands.
 
 - **Music embedded covers are not materialized as thumbnails.** Owner:
   `server/internal/processors/audio_helpers.go` and

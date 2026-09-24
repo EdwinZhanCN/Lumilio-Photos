@@ -2,7 +2,10 @@
 
 Status: active, created 2026-09-24. Not started. Child of
 [release-hardening.md](release-hardening.md) (Phase 3, "Manual smoke
-checklist"); must finish before the rc.1 tag (target 2026-09-29).
+checklist"); must finish before the rc.1 tag (date TBD, owner decision
+2026-09-24). Part A starts only after the last PR of
+[repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md)
+(#222, #223) merges; those PRs replace scanning, Storage counts, and delete.
 
 Goal: every flow below has a recorded verdict (pass / fail + PR / deferred +
 tracker entry) on **a fresh Docker Compose install** and on **Desktop**. This
@@ -12,7 +15,7 @@ copy, i18n, keyboard and error paths), not a replacement for the E2E slices.
 ## Non-goals
 
 - Re-testing what E2E already proves on every PR: sign-in/TOTP, upload,
-  scan, Storage admin add/scan, share link create/open/revoke, People merge,
+  Storage admin add, share link create/open/revoke, People merge,
   Agent runtime, video semantic search, backup/restore (restore is covered by
   [rc-compat-baseline.md](rc-compat-baseline.md)). Spot-check them only.
 - Fixing cosmetic issues during the run. File them; fix only blockers.
@@ -73,6 +76,9 @@ in-place upgrade from the installed v26.1.0-beta.1 Desktop if available.
 | Map | Photos with GPS appear; empty state without GPS |
 | Settings / Users | Appearance/theme, language switch, create a second user, change password → sign out → sign in (regression area of #214), MFA page |
 | Storage admin | Storage Locations and Repositories, asset counts non-zero (#209), scan now, verification badge |
+| Scanning (#222) | Full test, not a spot-check: copy a folder in and see it appear without a manual scan; move and rename a folder and check that albums survive; unplug an external disk (or stop the share) and check that nothing goes Missing and the Repository shows offline |
+| Trash (#223) | Delete a photo and see the file under `<repo>/.lumilio/trash`; restore it with album, rating, and people intact; delete permanently and see it gone from disk; delete on an offline Repository is refused with a reason; resolve a duplicate group and see the duplicates in Trash |
+| Missing and edits (#223) | Delete a file outside Lumilio: it leaves the library and appears in the Missing view on the Storage page, and Remove missing items clears it; edit a photo in another app (save over the file): album, rating, and people are kept |
 | Processing / Monitor | Stage grid settles to idle; retry on a failed item |
 | Agent (Lumilio) | Plain chat with a configured provider if available; otherwise note "not configured" |
 

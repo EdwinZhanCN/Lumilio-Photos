@@ -31,6 +31,18 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   sets `PRAGMA user_version`. Fresh installs run baseline + all steps (one
   code path). No checksum ledger; `user_version` stays the only
   discriminator.
+- **Ordering with the RC blockers #222 and #223**
+  ([repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md)).
+  - They edit the baseline in place, replacing the ROE tables and
+    `assets.is_deleted`. Phases 0–2 here may run in parallel with them.
+  - Phase 1's version resets must include their schema and their new TOML
+    field `repository_trash.retention_days`.
+  - Phases 3–4 run only after their last PR merges, so the fixture never
+    locks the old schema.
+- **The repository trash info sidecar is an app-owned format in user
+  folders** (`<repo>/.lumilio/trash/info/<trash_id>.json`, #223). It carries
+  `"format": 1` and gets the same treatment as the repository root config:
+  later builds must read every older supported version.
 - **Automatic backup before any catalog upgrade**, through the existing backup
   subsystem; a failed step rolls back and the server refuses to start naming
   the step, leaving the catalog untouched.
@@ -75,6 +87,8 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   `server/config/examples/**` with the repo's config-examples task; update any
   docs showing it (`site/docs/en` and `site/docs/zh-cn`).
 - [ ] Backup `manifestFormatVersion` 3 → 1 (`server/internal/db/backup`).
+- [ ] Trash info sidecar (#223) is born at `"format": 1`; add a reader test
+  that rejects an unknown newer format clearly.
 - [ ] Repository root config: decide `"1.0"` stays or becomes integer `1`
   (record in the decision); either way it is the rc.1 baseline.
 - [ ] Pre-release rejection with clear messages for catalog, config, backup,
@@ -107,8 +121,10 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   parent plan's resume section): fresh install stamps version 1 everywhere;
   a pre-release catalog and config are rejected with the intended messages;
   backup → restore round-trip on the RC build keeps counts, user edits
-  (album cover, Event rename, person rename, share link), and original-file
-  checksums.
+  (album cover, Event rename, person rename, share link), original-file
+  checksums, and the Trash view: a trashed item survives the round-trip, and
+  can be rebuilt from its info sidecars when the catalog is restored from a
+  backup taken before the delete.
 
 ### Phase 4 — Lock the rc.1 fixture (at tag time, with rc-release)
 - [ ] Right after tagging, generate a small rc.1 catalog (plus its config,

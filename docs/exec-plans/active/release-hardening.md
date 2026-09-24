@@ -1,10 +1,13 @@
 # Release hardening week
 
-Status: active, created 2026-09-22 for a release candidate on 2026-09-29.
+Status: active, created 2026-09-22 for a release candidate originally
+targeted at 2026-09-29. On 2026-09-24 the owner made the rc.1 date **TBD**
+until the RC blockers #222 and #223 land.
 As of 2026-09-24: Phases 0–2 done; Phase 3 E2E specs done; `dev` at
 `f598310a` is fully green in CI on draft promotion PR #210 (every job and all
 eight E2E slices, including the new `@people`). Remaining work is split into
-three child plans, each written to be picked up by a fresh session:
+four child plans, each written to be picked up by a fresh session:
+[repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md) (blockers #222 and #223: scan index, trash, missing, purge),
 [rc-compat-baseline.md](rc-compat-baseline.md) (versioned-format baseline and upgrade paths from rc.1),
 [rc-smoke-checklist.md](rc-smoke-checklist.md) (Phase 3 manual smoke), and
 [rc-release.md](rc-release.md) (notes, release workflow, promotion, tag).
@@ -33,9 +36,16 @@ follow-up in the tech-debt tracker.
 
 ## Non-goals
 
-- New product features beyond the Processing stage grid.
+- New product features beyond the Processing stage grid, and beyond the
+  repository trash and Missing view required by #223.
 - Durable Agent chat history (needs a retention and privacy decision).
-- Changing the pipeline, River, or the Catalog model.
+- Changing the pipeline, River, or the Catalog model. **Exception (owner
+  decision, 2026-09-24):** the repository scan index (#222) and the Asset
+  lifecycle (#223) replace the Repository Observation Engine tables and
+  `assets.is_deleted` before rc.1. A quadratic scan cost holds the single
+  writer, and ghost, swallowed, and orphaned Assets are data-integrity
+  defects. The work is owned by
+  [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md).
 
 ## Fixed contracts
 
@@ -68,13 +78,18 @@ follow-up in the tech-debt tracker.
   are working on. Each child plan lists its own environment, phases, and
   validation boundaries; keep its `Status:` and checkboxes current in the
   same PR that changes reality.
-- Run the child plans in this order: rc-release Phase 0 (release workflow
-  de-risk) and rc-compat-baseline (Phase 0 decision first) can start in
-  parallel; rc-smoke-checklist
-  Part A after an RC image exists on the radxa; rc-release Phases 1–4 last,
-  and only once the RC blocker milestone is empty. Blocker issues can be
-  worked in parallel with all of these; rerun upgrade-restore and smoke
-  rows that a blocker fix touches.
+- Run the child plans in this order:
+  - repository-index-and-asset-lifecycle first, because it changes the
+    catalog baseline, scanning, Storage, and delete. rc-release Phase 0
+    (release workflow de-risk) and rc-compat-baseline Phases 0–2 can run in
+    parallel with it.
+  - rc-compat-baseline Phases 3–4 and rc-smoke-checklist Part A only after
+    its last PR merges and an RC image built from that `dev` exists on the
+    radxa.
+  - rc-release Phases 1–4 last, and only once the RC blocker milestone is
+    empty.
+  - Other blocker issues can be worked in parallel with all of these; rerun
+    the upgrade-restore and smoke rows that a blocker fix touches.
 - Remote Docker host `radxa-x4` (Intel N100, 7.5 GiB, Fedora 44, fish shell):
   build images on the Mac for `linux/amd64`, ship with `docker save | gzip -1
   | ssh radxa-x4 'gunzip | docker load'`, run there. For the E2E stack, do not
@@ -186,7 +201,10 @@ follow-up in the tech-debt tracker.
   - Linux bind-mount capacity test — **defer**; privileged-test gap, no known
     user impact.
   - Manual scan within the settle window — **deferred** (user decision
-    2026-09-23, tracker entry from #211); Known issue in the release notes.
+    2026-09-23, tracker entry from #211). Superseded 2026-09-24: folded into
+    #222 as a requirement (a scan that defers settling files schedules a
+    delayed follow-up for that subtree). The tracker entry is deleted when
+    that lands, and it is no longer a release-notes Known issue.
   - Follow-ups found this week (tracker entries added 2026-09-24):
     `LoginPage.signIn` 5s wait, share UI accessible names, pre-commit hook on
     `doc.md`-only commits, `useMergePeople` cast, unexplained idle
@@ -200,6 +218,8 @@ follow-up in the tech-debt tracker.
 - [ ] Agent: per-tool progress and duration in tool chips; copy-answer action.
 
 ### Phase 6 — Release candidate
+- [ ] RC blockers #222 (scan index) and #223 (Asset lifecycle) —
+  [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md).
 - [ ] Release notes (user-facing, bilingual per the terminology registry) —
   [rc-release.md](rc-release.md) Phase 1.
 - [ ] Compatibility baseline: every app-owned persisted format reset to
