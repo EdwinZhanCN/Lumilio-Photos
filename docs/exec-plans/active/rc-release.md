@@ -2,7 +2,8 @@
 
 Status: active, created 2026-09-24. Not started. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Target: `rc.1` tag on
-`main` by 2026-09-29. Draft promotion PR **#210** (`dev` → `main`) is open and
+`main`, date **TBD** (owner decision 2026-09-24; originally 2026-09-29) until
+the RC blockers #222 and #223 land. Draft promotion PR **#210** (`dev` → `main`) is open and
 its CI was fully green at `dev` `f598310a` (all jobs, all 8 E2E slices).
 
 Goal: a published `rc.1` whose Server image and Desktop artifacts built from
@@ -64,7 +65,16 @@ the promotion commit, with bilingual release notes, smoked once.
 - [ ] Write notes for users, not developers: grouped (New, Fixed, Known
   issues), no internal names. Known issues come from
   `docs/exec-plans/tech-debt-tracker.md` items the user deferred (e.g. music
-  embedded covers placeholder; manual scan right after a file lands).
+  embedded covers placeholder). "Manual scan right after a file lands" is no
+  longer a Known issue once #222 lands, because it is folded into that
+  blocker.
+- [ ] Behaviour changes from #222 and #223 that users must read:
+  - Delete now moves files out of your folder into that Repository's trash,
+    and they can be restored for 30 days (configurable).
+  - Photos whose files disappeared are hidden from the library and listed
+    under Missing on the Storage page.
+  - Editing a file in another app keeps its albums, rating, and people.
+  Use the registry terms for Trash and Missing.
 - [ ] English and Simplified Chinese, using the canonical terms in the
   `lumilio-frontend-i18n` skill's terminology registry. Put them where the
   release workflow reads them (check `release.yml`; otherwise the GitHub
