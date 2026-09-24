@@ -411,7 +411,7 @@ func LoadAppConfigBytes(manifestPath string, data []byte) (AppConfig, error) {
 		return AppConfig{}, fmt.Errorf("resolve config path %q: %w", manifestPath, err)
 	}
 	absPath = filepath.Clean(absPath)
-	if err := checkManifestVersion(data); err != nil {
+	if err := checkManifestVersion(data, SchemaVersion); err != nil {
 		return AppConfig{}, fmt.Errorf("runtime manifest %s: %w", absPath, err)
 	}
 	var raw manifest
@@ -555,27 +555,6 @@ func requiredSection[T any](p *[]string, name string, value *T) {
 	if value == nil {
 		*p = append(*p, "["+name+"] is required")
 	}
-}
-
-// checkManifestVersion reads only schema_version, before the strict decode,
-// so a manifest from a newer build or a pre-release build is reported as such
-// instead of as a list of unknown or missing fields. A missing version is left
-// to the strict decode and presence checks.
-func checkManifestVersion(data []byte) error {
-	var probe struct {
-		SchemaVersion *int `toml:"schema_version"`
-	}
-	if err := toml.Unmarshal(data, &probe); err != nil || probe.SchemaVersion == nil {
-		return nil
-	}
-	if *probe.SchemaVersion > SchemaVersion {
-		return fmt.Errorf(
-			"schema_version = %d is newer than this build supports (%d): the file was written for a newer Lumilio Photos, or by a pre-release build whose configuration is not migrated (create a new one from the current examples)",
-			*probe.SchemaVersion,
-			SchemaVersion,
-		)
-	}
-	return nil
 }
 
 func resolveManifest(m manifest, base string) (AppConfig, []string) {

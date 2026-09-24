@@ -65,9 +65,10 @@ type Snapshot struct {
 }
 
 // Compatibility constrains which snapshot may be staged over the active
-// runtime. Restore never performs application migrations, so the snapshot
-// schema version must equal the runtime schema version exactly. SchemaVersion
-// is required: a zero value is a configuration error, never a wildcard.
+// runtime. A snapshot at an older supported schema or config version is
+// restored and then upgraded by the runtime's normal startup; a newer one is
+// rejected. SchemaVersion is required: a zero value is a configuration error,
+// never a wildcard.
 type Compatibility struct {
 	LibraryID           string
 	ConfigSchemaVersion int
@@ -346,9 +347,9 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 	if compatibility.LibraryID != "" && info.LibraryID != compatibility.LibraryID {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot belongs to library %s, active library is %s", info.LibraryID, compatibility.LibraryID)
 	}
-	if compatibility.ConfigSchemaVersion != 0 && manifest.ConfigSchemaVersion != compatibility.ConfigSchemaVersion {
+	if compatibility.ConfigSchemaVersion != 0 && manifest.ConfigSchemaVersion > compatibility.ConfigSchemaVersion {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf(
-			"snapshot config schema %d is incompatible with runtime schema %d",
+			"snapshot config schema %d is newer than runtime schema %d",
 			manifest.ConfigSchemaVersion,
 			compatibility.ConfigSchemaVersion,
 		)
@@ -356,9 +357,9 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 	if compatibility.SchemaVersion == 0 {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot compatibility is missing the runtime schema version")
 	}
-	if info.SchemaVersion != compatibility.SchemaVersion {
+	if info.SchemaVersion > compatibility.SchemaVersion {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf(
-			"snapshot schema version %d is incompatible with runtime schema version %d; restore does not migrate a catalog",
+			"snapshot schema version %d is newer than runtime schema version %d",
 			info.SchemaVersion,
 			compatibility.SchemaVersion,
 		)

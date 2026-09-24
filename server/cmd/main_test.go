@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,5 +125,42 @@ func TestConfigInitDevProfileUsesRequestedLocalRoots(t *testing.T) {
 	}
 	if cfg.StorageConfig.Path != filepath.Join(root, "storage") {
 		t.Errorf("storage path = %q", cfg.StorageConfig.Path)
+	}
+}
+
+// TestConfigUpgradeLeavesCurrentAndRefusesPreReleaseManifests covers the
+// command paths reachable at the rc.1 baseline, where no older supported
+// schema_version exists yet; the step path is covered in package config.
+func TestConfigUpgradeLeavesCurrentAndRefusesPreReleaseManifests(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "server.toml")
+	var stdout, stderr bytes.Buffer
+	if err := runConfigCLI([]string{"init", "--profile", "docker-http", "--output", path}, &stdout, &stderr); err != nil {
+		t.Fatalf("config init: %v\n%s", err, stderr.String())
+	}
+	current, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	if err := runConfigCLI([]string{"upgrade", "--config", path}, &stdout, &stderr); err != nil {
+		t.Fatalf("config upgrade of a current manifest: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "nothing to upgrade") {
+		t.Fatalf("upgrade report = %q", stdout.String())
+	}
+
+	preRelease := strings.Replace(string(current), fmt.Sprintf("schema_version = %d", config.SchemaVersion), "schema_version = 6", 1)
+	if err := os.WriteFile(path, []byte(preRelease), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := runConfigCLI([]string{"upgrade", "--config", path}, &stdout, &stderr); err == nil || !strings.Contains(err.Error(), "pre-release build") {
+		t.Fatalf("pre-release upgrade error = %v", err)
+	}
+	if after, _ := os.ReadFile(path); string(after) != preRelease {
+		t.Fatal("a refused upgrade must leave the file unchanged")
+	}
+	if _, err := os.Stat(path + ".bak"); !os.IsNotExist(err) {
+		t.Fatalf("a refused upgrade must not write a .bak: %v", err)
 	}
 }

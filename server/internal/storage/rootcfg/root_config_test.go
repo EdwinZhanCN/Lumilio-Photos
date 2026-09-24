@@ -44,4 +44,21 @@ func TestRootConfigRequiresCurrentVersion(t *testing.T) {
 	err := config.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "version must be 1.0")
+	assert.Contains(t, err.Error(), "newer Lumilio Photos")
+}
+
+// TestRootConfigReadsPreReleaseMarker proves a marker written by a pre-release
+// build (same shape as the rc.1 baseline) is read without rewriting the file.
+func TestRootConfigReadsPreReleaseMarker(t *testing.T) {
+	root := t.TempDir()
+	marker := []byte("version: \"1.0\"\nid: 7f2b0c1e-4a52-4d2e-9a8f-3c7d1e5b9a10\nname: Archive\ncreated_at: 2026-08-01T10:00:00Z\n")
+	path := filepath.Join(root, FileName)
+	require.NoError(t, os.WriteFile(path, marker, 0o644))
+
+	config, err := Load(root)
+	require.NoError(t, err)
+	assert.Equal(t, "7f2b0c1e-4a52-4d2e-9a8f-3c7d1e5b9a10", config.ID)
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, marker, after)
 }

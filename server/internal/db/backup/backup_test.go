@@ -141,7 +141,7 @@ func TestCatalogSnapshotExcludesIndependentQueueDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := catalog.MigrateCatalog(ctx); err != nil {
+	if err := catalog.MigrateCatalog(ctx, nil); err != nil {
 		_ = catalog.Close(ctx)
 		t.Fatal(err)
 	}
@@ -571,7 +571,8 @@ func TestPruneKeepsNewestSnapshotPairsAndRestorePoints(t *testing.T) {
 	middle := FileName(time.Date(2026, 7, 9, 2, 0, 0, 0, time.UTC))
 	newest := FileName(time.Date(2026, 7, 10, 2, 0, 0, 0, time.UTC))
 	restorePoint := RestorePointPrefix + newest
-	for _, name := range []string{oldest, middle, newest, restorePoint} {
+	preUpgrade := PreUpgradePrefix + oldest
+	for _, name := range []string{oldest, middle, newest, restorePoint, preUpgrade} {
 		touchPair(t, dir, name, time.Time{})
 	}
 
@@ -582,7 +583,7 @@ func TestPruneKeepsNewestSnapshotPairsAndRestorePoints(t *testing.T) {
 	if len(removed) != 1 || removed[0] != oldest {
 		t.Fatalf("removed = %v", removed)
 	}
-	for _, name := range []string{middle, newest, restorePoint} {
+	for _, name := range []string{middle, newest, restorePoint, preUpgrade} {
 		for _, artifact := range []string{name, ManifestName(name)} {
 			if _, err := os.Stat(filepath.Join(dir, artifact)); err != nil {
 				t.Errorf("%s should remain: %v", artifact, err)
@@ -665,9 +666,84 @@ func TestInspectCatalogUsesUserVersionWithoutMigrationLedger(t *testing.T) {
 	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, missingVersion); err == nil || !strings.Contains(err.Error(), "missing the runtime schema version") {
 		t.Fatalf("ValidateSnapshot with SchemaVersion=0 error = %v", err)
 	}
-	staleRuntime := Compatibility{LibraryID: info.LibraryID, SchemaVersion: db.SchemaVersion + 1}
-	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, staleRuntime); err == nil || !strings.Contains(err.Error(), "incompatible with runtime schema version") {
-		t.Fatalf("ValidateSnapshot with stale runtime schema error = %v", err)
+	// A runtime newer than the snapshot restores it and upgrades it on start.
+	newerRuntime := Compatibility{LibraryID: info.LibraryID, SchemaVersion: db.SchemaVersion + 1, ConfigSchemaVersion: 3}
+	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, newerRuntime); err != nil {
+		t.Fatalf("ValidateSnapshot of an older snapshot for restore-then-upgrade: %v", err)
+	}
+}
+
+// TestStageRestoreInstallsOlderSnapshotForUpgrade proves restore-then-upgrade
+// reaches the installed state: a snapshot older than the runtime (schema and
+// config) is staged and activated unchanged, leaving the steps to the
+// runtime's MigrateCatalog on the next start.
+func TestStageRestoreInstallsOlderSnapshotForUpgrade(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	activePath := filepath.Join(root, "app-state", "library.sqlite3")
+	catalog := openTestCatalog(t, activePath)
+	metadata := SnapshotMetadata{AppVersion: "test", ConfigSchemaVersion: 1}
+	snapshot, err := CreateSnapshot(ctx, catalog.SQL, filepath.Join(root, "backups"), "", metadata, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newerRuntime := compatibilityFor(t, catalog, 2)
+	newerRuntime.SchemaVersion = db.SchemaVersion + 1
+	if err := StageRestore(ctx, activePath, snapshot.Path, metadata, newerRuntime); err != nil {
+		t.Fatalf("stage older snapshot: %v", err)
+	}
+	closeTestCatalog(t, catalog)
+	installed, err := ApplyPendingRestore(ctx, activePath, t.Logf)
+	if err != nil || !installed {
+		t.Fatalf("ApplyPendingRestore = %t, %v", installed, err)
+	}
+	info, err := db.InspectCatalog(ctx, activePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.SchemaVersion != int64(db.SchemaVersion) {
+		t.Fatalf("installed schema version = %d, want the snapshot's %d awaiting upgrade", info.SchemaVersion, db.SchemaVersion)
+	}
+}
+
+// TestValidateSnapshotRejectsNewerSnapshot proves a snapshot written by a
+// newer build (schema or config) is rejected rather than restored.
+func TestValidateSnapshotRejectsNewerSnapshot(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	catalog := openTestCatalog(t, filepath.Join(root, "app-state", "library.sqlite3"))
+	defer closeTestCatalog(t, catalog)
+	snapshot, err := CreateSnapshot(ctx, catalog.SQL, filepath.Join(root, "backups"), "", SnapshotMetadata{
+		AppVersion: "test", ConfigSchemaVersion: 2,
+	}, t.Logf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, compatibilityFor(t, catalog, 1)); err == nil || !strings.Contains(err.Error(), "config schema 2 is newer than runtime schema 1") {
+		t.Fatalf("newer config snapshot error = %v", err)
+	}
+
+	database, err := sql.Open("sqlite3", snapshot.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(fmt.Sprintf("PRAGMA user_version = %d", db.SchemaVersion+1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	checksum, err := fileSHA256(snapshot.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewriteManifest(t, ManifestPath(snapshot.Path), func(payload map[string]any) {
+		payload["sha256"] = checksum
+		payload["schema_version"] = db.SchemaVersion + 1
+	})
+	if _, _, err := ValidateSnapshot(ctx, snapshot.Path, compatibilityFor(t, catalog, 2)); err == nil || !strings.Contains(err.Error(), "newer than this build supports") {
+		t.Fatalf("newer schema snapshot error = %v", err)
 	}
 }
 

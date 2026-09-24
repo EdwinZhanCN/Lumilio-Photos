@@ -1,8 +1,8 @@
 # Decision: rc.1 is the compatibility baseline for every app-owned persisted format
 
-Status: accepted, 2026-09-24 by the owner (issue #221, plan
-[rc-compat-baseline.md](../../docs/exec-plans/active/rc-compat-baseline.md));
-implementation in progress. Supersedes
+Status: implemented, 2026-09-24 (issue #221, plan
+[rc-compat-baseline.md](../../docs/exec-plans/active/rc-compat-baseline.md)
+Phases 0–2); the rc.1 fixture upgrade test lands with the tag. Supersedes
 [the generation-9 baseline decision](2026-09-19-catalog-generation-9-baseline.md).
 
 ## Problem
@@ -64,10 +64,13 @@ zero values) and is never a real version.
      "LUMC" → reject as not a Lumilio catalog. This check runs before any
      version is read, so reused numbers can never be misread.
   3. `user_version` > current → reject: written by a newer Lumilio Photos.
-  4. 1 ≤ `user_version` < current → automatic backup through the existing
-     backup subsystem, then apply the remaining steps. A failed step rolls
-     back, the catalog is untouched, and the server refuses to start naming
-     the step and the backup.
+  4. 1 ≤ `user_version` < current → automatic `pre-upgrade-` snapshot
+     through the existing backup subsystem (protected from retention like a
+     restore point), then apply the remaining steps. A failed step rolls back
+     its own transaction, the catalog stays at the last completed version,
+     and the server refuses to start naming the step and the snapshot. The
+     db package receives the snapshot as a callback from `server/app`
+     because the backup package depends on it.
   5. `user_version` = current → start.
 - Every rejection says what the file is, that original media and
   Repositories are untouched, and what to do (start a fresh catalog, or use a
@@ -77,31 +80,42 @@ zero values) and is never a real version.
 `schema_version` is 1. An older supported version fails startup with a message
 pointing at an explicit `config upgrade` server command (also runnable through
 `docker compose run --rm`), which saves `<file>.bak` and writes the current
-version. A version newer than the build is rejected. The complete-manifest,
+version. Config steps transform the parsed TOML tree; the result must pass
+the strict load and is re-rendered with the generated per-key comments, so an
+operator's own comments survive only in the `.bak`. A version newer than the build is rejected. The complete-manifest,
 no-code-defaults rule in `CLAUDE.md` still applies to the upgraded file:
 `config upgrade` writes every new field explicitly. Pre-release configs are
 identified by the strict decoder (unknown or missing fields), and the message
-names pre-release configs as a possible cause; Desktop regenerates its own
-config and is not affected.
+names pre-release configs as a possible cause. Desktop owns its stored
+runtime intents (content-addressed server TOML that carries the user's
+network and storage choices), so it upgrades an older intent in memory
+through the same config steps and never asks its user to run the command;
+the next applied change stores a current intent.
 
 **Backups.** The manifest format restarts at 1. Restore inspects the
 snapshot catalog's identity (the gate above) before trusting the manifest's
 version fields, so a pre-release backup is rejected as pre-release even where
 its manifest number collides. A backup from any supported older version is
-restored and then upgraded by the same catalog steps; a backup newer than the
-build is rejected.
+installed unchanged and upgraded by the same catalog steps on the next start;
+an older config schema version in its manifest is accepted too. A backup
+newer than the build is rejected.
 
 **Storage Location marker (`.lumilioroot`).** It lives inside user media
 folders and is the longest-lived file Lumilio writes. Its rc.1 baseline stays
 the string `"1.0"`, and it is not treated as pre-release: the pre-release
 marker is byte-for-byte the same shape, and rejecting it would force users to
-edit hidden files in their media folders to start fresh. The reader dispatches
-on version so later builds read `"1.0"` forward; Lumilio rewrites a marker only
-when an existing Storage Location operation already writes it.
+edit hidden files in their media folders to start fresh. A later marker format
+must keep reading `"1.0"`; today an unknown version is refused with a message
+naming a newer build as the likely writer. Lumilio rewrites a marker only when
+an existing Storage Location operation already writes it.
 
-**Desktop state files** (settings, pointer, install, staging, and cache
-manifests; all version 1 today) keep version 1 at rc.1, and their readers
-dispatch on version so later builds read older versions forward.
+**Desktop state files** (settings, runtime pointer and apply journal,
+resource and Lumen install records, update staging pointer, storage shortcut
+cache; all version 1 today) keep version 1 at rc.1. Their readers check the
+version through `desktop/internal/platform/stateversion`, which names a file
+from a newer Desktop as such; a build that bumps a version handles each older
+one before that check. The signed update manifest and build-embedded resource
+manifest are contracts, not local state, and keep their own checks.
 
 **Out of scope.** Shared contracts owned elsewhere (Lumen protocol,
 `assets.lock.json`, `lumen.lock.json` schema versions). Derived artifacts

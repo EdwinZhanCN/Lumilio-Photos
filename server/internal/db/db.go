@@ -158,7 +158,7 @@ func Open(ctx context.Context, cfg config.DatabaseConfig, suppliedOptions ...Ope
 	if err := claimOrVerifyCatalog(ctx, database); err != nil {
 		return closeOnError("verify identity of", err)
 	}
-	if err := assertSchemaVersion(ctx, database); err != nil {
+	if err := assertSchemaVersion(ctx, database, SchemaVersion); err != nil {
 		return closeOnError("verify schema version of", err)
 	}
 	if err := validateIntegrity(ctx, database); err != nil {
@@ -400,7 +400,9 @@ func (d *DB) Check(ctx context.Context) error {
 
 // InspectCatalog opens a catalog through an independent read-only connection
 // and verifies that it is a healthy Lumilio SQLite database. Backup validation
-// deliberately does not reuse the live application handle.
+// deliberately does not reuse the live application handle. Any supported
+// schema version (1..SchemaVersion) passes, so an older backup can be restored
+// and then upgraded; callers compare SchemaVersion when they need an exact one.
 func InspectCatalog(ctx context.Context, path string) (CatalogInfo, error) {
 	return inspectCatalog(ctx, path, false)
 }
@@ -491,12 +493,8 @@ func inspectCatalog(ctx context.Context, path string, immutable bool) (CatalogIn
 			SchemaVersion,
 		)
 	}
-	if info.SchemaVersion != SchemaVersion {
-		return CatalogInfo{}, fmt.Errorf(
-			"SQLite catalog schema version = %d, want %d",
-			info.SchemaVersion,
-			SchemaVersion,
-		)
+	if info.SchemaVersion < 1 {
+		return CatalogInfo{}, fmt.Errorf("SQLite catalog schema version = %d, want 1..%d", info.SchemaVersion, SchemaVersion)
 	}
 	// River lives in QueueDB for production catalogs. Keep this field as an
 	// optional compatibility observation for historical snapshots and tests;

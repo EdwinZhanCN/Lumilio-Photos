@@ -287,9 +287,22 @@ func run(
 		}
 	}()
 
-	// Schema generation 8 is intentionally fresh-only. Pre-production catalogs
-	// from earlier generations are rejected and recreated instead of translated.
-	if err := database.MigrateCatalog(ctx); err != nil {
+	// An empty catalog gets the baseline and every forward step. An older
+	// catalog (including one just installed by a restore) is snapshotted into
+	// a protected pre-upgrade backup first; pre-release and newer catalogs were
+	// already rejected by db.Open.
+	preUpgradeBackup := func(ctx context.Context, source *sql.DB, from, to int) (string, error) {
+		snapshot, err := dbbackup.CreateSnapshot(
+			ctx,
+			source,
+			appConfig.StorageConfig.BackupsDir(),
+			dbbackup.PreUpgradePrefix,
+			dbbackup.SnapshotMetadata{AppVersion: version.Version, ConfigSchemaVersion: appConfig.SchemaVersion},
+			appLogger.Named("db_backup").Sugar().Infof,
+		)
+		return snapshot.Path, err
+	}
+	if err := database.MigrateCatalog(ctx, preUpgradeBackup); err != nil {
 		appLogger.Error("failed to run migrations automatically",
 			zap.String("operation", "database.migrate"),
 			zap.Error(err),

@@ -512,10 +512,10 @@ func TestMigrateCatalogBaselineIsIdempotentAndLedgerFree(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close(context.Background())
-	if err := database.MigrateCatalog(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatalf("first baseline: %v", err)
 	}
-	if err := database.MigrateCatalog(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatalf("idempotent restart: %v", err)
 	}
 
@@ -559,7 +559,7 @@ func TestMigrateCatalogRejectsIncompatibleSchemaVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close(context.Background())
-	if err := database.MigrateCatalog(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -567,7 +567,7 @@ func TestMigrateCatalogRejectsIncompatibleSchemaVersion(t *testing.T) {
 		if _, err := database.SQL.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", newer)); err != nil {
 			t.Fatal(err)
 		}
-		err = database.MigrateCatalog(ctx)
+		err = database.MigrateCatalog(ctx, nil)
 		if err == nil || !strings.Contains(err.Error(), "newer than this build supports") {
 			t.Fatalf("newer schema version %d error = %v", newer, err)
 		}

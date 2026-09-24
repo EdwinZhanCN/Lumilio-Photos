@@ -1,6 +1,6 @@
 # RC compatibility baseline and upgrade paths
 
-Status: active, created 2026-09-24. Phases 0–1 done; Phase 2 next. Child of
+Status: active, created 2026-09-24. Phases 0–2 done; Phase 3 (radxa proof) next. Child of
 [release-hardening.md](release-hardening.md); tracked by issue #221 in the
 `v26.1.0-rc.1` milestone, so it blocks the tag. Supersedes the beta.1 upgrade
 test that was planned here earlier (pre-release data is not migrated).
@@ -41,7 +41,8 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
 - **Server TOML config:** the server never rewrites a user's file. An older
   `schema_version` fails with a message pointing at an explicit
   `config upgrade` command that rewrites the file after saving a `.bak`.
-  Desktop regenerates its own config. The "no code defaults / complete
+  Desktop upgrades its own stored intents in memory (it does not regenerate
+  them: they carry user choices). The "no code defaults / complete
   manifest" rule in `CLAUDE.md` still holds for the upgraded file.
 - **Backups:** a build restores backups from any supported older version,
   then applies catalog steps; a backup newer than the build is rejected.
@@ -95,23 +96,37 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   existing catalog is now rejected as pre-release.
 
 ### Phase 2 — Forward paths
-- [ ] Catalog step runner: embedded `server/migrations/steps/NNNN_<name>.sql`
-  (or Go steps where SQL cannot express it), applied in order, each in one
-  transaction setting `user_version`; the startup gate above; automatic
-  pre-upgrade backup; restore-then-upgrade for older backups. Tests use a
-  test-only step registry (no fake production step): in-order application,
-  failed step rolls back and blocks startup, newer rejected, pre-release
-  rejected, backup taken before the first step, restore of an older backup
-  upgrades.
-- [ ] `config upgrade` command (server CLI; also runnable as
-  `docker compose run --rm lumilio …` — document it in upgrade.md, en +
-  zh-cn): reads an older supported `schema_version`, writes the current one
-  after saving `<file>.bak`; refuses pre-release versions. Tests.
-- [ ] Root config and Desktop state readers accept older supported versions
-  (only version 1 exists at rc.1, so this is the dispatch shape + tests, not
-  real conversions).
-- [ ] Document the contributor rule (how to add a step, never edit the
-  baseline after rc.1) in `docs/BACKEND.md` and the relevant skill.
+- [x] Catalog step runner (`server/internal/db/migration.go`): embedded
+  `server/migrations/steps/NNNN_<name>.sql`, contiguous 2..`SchemaVersion`
+  (checked at load and by `TestEmbeddedCatalogStepsMatchSchemaVersion`); a
+  step is a `func(ctx, tx)`, so a Go step is one more slice entry when SQL
+  cannot express a change. Each step runs in one transaction with its
+  `user_version` stamp. `MigrateCatalog(ctx, backup)` takes the pre-upgrade
+  backup as a callback from `server/app`, which writes a protected
+  `pre-upgrade-` snapshot (retention never prunes it; the backup list shows it
+  as a restore point). Restore accepts older schema/config versions and
+  installs them unchanged; the next start upgrades them. Tests
+  (`migration_steps_test.go`, test-only registry): fresh install without
+  backup, backup before the first step then in-order steps, failed step rolls
+  back and names step + snapshot then resumes, no backup refuses, newer
+  rejected, loader naming/gap/stamp rules; backup package: older snapshot
+  staged and installed, newer schema and config snapshots rejected,
+  `pre-upgrade-` protected from pruning.
+- [x] `server config upgrade --config <file>` (`server/cmd/config_cli.go`,
+  `server/config/upgrade.go`): config steps transform the parsed tree, the
+  result must pass the strict load, the original goes to `<file>.bak`
+  (refuses to overwrite an existing `.bak`), and the new file is re-rendered
+  with generated comments. Startup points an older version at the command;
+  pre-release/newer versions are refused. Documented in en
+  `introduction/upgrade.md` and zh-cn `admin/upgrade.md`. Tests: test-only
+  1→2 step, refusals, current file untouched, CLI current/pre-release paths.
+- [x] Root marker: stays `"1.0"`, pre-release markers read as-is (test), an
+  unknown version names a newer build. Desktop runtime intents are upgraded
+  in memory through `config.UpgradeManifest` in `Store.Validate` and
+  `LoadCurrentConfig`. Desktop: persisted readers go through
+  `desktop/internal/platform/stateversion` (newer → `ErrNewer`); settings test.
+- [x] Contributor rule in `server/migrations/steps/README.md`,
+  `docs/BACKEND.md`, and the `lumilio-api-contract-change` skill.
 
 ### Phase 3 — Prove it on the RC build
 - [ ] On the radxa (build on the Mac for linux/amd64, ship, run — see the

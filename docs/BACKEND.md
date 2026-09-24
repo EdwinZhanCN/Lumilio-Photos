@@ -364,10 +364,25 @@ without holding a filesystem operation inside a database transaction.
   `PRAGMA user_version` is the only version discriminator; a newer version is
   rejected as written by a newer build. There is no checksum ledger. The
   baseline is edited in place only until the rc.1 tag; after it, schema
-  changes are numbered forward steps and shipped files are never edited
+  changes are numbered forward steps in `server/migrations/steps/`
+  (contributor rules in its `README.md`) and shipped files are never edited
   ([the rc.1 compatibility decision](../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
-  The server TOML `schema_version` and the backup manifest format also start
-  at 1. QueueDB River migrations remain independent and disposable.
+- `MigrateCatalog` runs the baseline and then every step on an empty catalog.
+  On an older catalog it first takes a protected `pre-upgrade-` snapshot
+  through the backup subsystem (retention never prunes it), then applies each
+  step in one transaction with its `user_version` stamp. A failed step rolls
+  back its own transaction, leaves the catalog at the last completed version,
+  and stops startup naming the step and the snapshot. Restore accepts a
+  snapshot at an older supported schema or config version and installs it
+  unchanged; the next start upgrades it through the same path. A newer
+  snapshot is rejected.
+- The server TOML `schema_version` starts at 1. The server never rewrites
+  it: an older supported version fails startup pointing at
+  `server config upgrade --config <file>`, which applies the config steps,
+  requires the result to pass the strict load, saves the original as
+  `<file>.bak`, and writes a freshly rendered, fully commented manifest. The
+  backup manifest format also starts at 1. QueueDB River migrations remain
+  independent and disposable.
 - The current schema deliberately has no catalog-to-QueueDB cutover journal or
   task-state compatibility layer. A fresh QueueDB is disposable: startup and
   periodic reconciliation rebuild its macro jobs from catalog desired/applied

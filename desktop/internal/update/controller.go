@@ -16,6 +16,7 @@ import (
 	"desktop/internal/control/dto"
 	"desktop/internal/operation"
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 	"desktop/internal/state"
 )
 
@@ -305,7 +306,10 @@ func (c *Controller) loadStaged() (*verifiedArtifact, error) {
 	if err := decoder.Decode(&pointer); err != nil {
 		return nil, err
 	}
-	if pointer.SchemaVersion != stagingSchemaVersion || pointer.Channel == "" || pointer.Version == "" || pointer.SHA256 == "" {
+	if err := stateversion.Check("update staging pointer", pointer.SchemaVersion, stagingSchemaVersion); err != nil {
+		return nil, err
+	}
+	if pointer.Channel == "" || pointer.Version == "" || pointer.SHA256 == "" {
 		return nil, errors.New("invalid update staging pointer")
 	}
 	directory, err := safeJoin(c.stagingDir, pointer.Directory)
