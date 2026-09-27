@@ -5,7 +5,7 @@ As of 2026-09-24: Phases 0–2 done; Phase 3 E2E specs done; `dev` at
 `f598310a` is fully green in CI on draft promotion PR #210 (every job and all
 eight E2E slices, including the new `@people`). Remaining work is split into
 three child plans, each written to be picked up by a fresh session:
-the compatibility baseline (done 2026-09-24, PR #225; [decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)),
+the compatibility baseline (done 2026-09-24, PR #225; [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)),
 [rc-smoke-checklist.md](rc-smoke-checklist.md) (Phase 3 manual smoke), and
 [rc-release.md](rc-release.md) (notes, release workflow, promotion, tag).
 Phase 4 verdicts below await the user. **RC is gated on GitHub issues**: the
@@ -202,7 +202,7 @@ follow-up in the tech-debt tracker.
   [rc-release.md](rc-release.md) Phase 1.
 - [x] Compatibility baseline: every app-owned persisted format reset to
   version 1, pre-release data rejected clearly, forward upgrade paths tested
-  and proven on an RC build — PR #225, [decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md). The rc.1 fixture is
+  and proven on an RC build — PR #225, [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md). The rc.1 fixture is
   locked at tag time in [rc-release.md](rc-release.md) Phase 3.
   (Upgrading from beta.1 is out of scope: pre-release data is not migrated,
   user decision 2026-09-24.)

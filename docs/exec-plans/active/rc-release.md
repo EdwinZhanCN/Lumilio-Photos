@@ -24,7 +24,7 @@ the promotion commit, with bilingual release notes, smoked once.
 - `main` changes only via the single promotion PR #210; never push to `main`
   directly. Merge only when [release-hardening.md](release-hardening.md)
   validation boundaries hold and [rc-smoke-checklist.md](rc-smoke-checklist.md)
-  is closed (the compatibility baseline is done: PR #225, [decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
+  is closed (the compatibility baseline is done: PR #225, [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
 - Tags and releases are outward-facing: the user confirms before any tag is
   pushed.
 - **RC blocker gate (hard stop).** The GitHub milestone
@@ -77,7 +77,7 @@ the promotion commit, with bilingual release notes, smoked once.
 - [ ] Upgrade guidance: rc.1 is the first supported release; data from
   pre-release builds (`v1.0.0-beta.*`, `v26.1.0-beta.*`) is not migrated —
   start fresh. From rc.1 on, updates upgrade in place and take an automatic
-  backup first ([decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
+  backup first ([decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
 
 ### Phase 2 — Promote
 - [ ] Run the RC blocker gate (Fixed contracts). Stop if anything is open.
@@ -102,7 +102,7 @@ the promotion commit, with bilingual release notes, smoked once.
   upgrades them with the current build on every run and checks counts, user
   state, and untouched originals. Each later release adds its own fixture.
   From the tag on, the baseline and every released step are frozen
-  (`server/migrations/steps/README.md`; [decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)). This is the last
+  (`server/migrations/steps/README.md`; [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)). This is the last
   item of issue #221's scope.
 
 ### Phase 4 — Smoke the published artifacts
