@@ -5,7 +5,7 @@ As of 2026-09-24: Phases 0–2 done; Phase 3 E2E specs done; `dev` at
 `f598310a` is fully green in CI on draft promotion PR #210 (every job and all
 eight E2E slices, including the new `@people`). Remaining work is split into
 three child plans, each written to be picked up by a fresh session:
-[rc-compat-baseline.md](rc-compat-baseline.md) (versioned-format baseline and upgrade paths from rc.1),
+the compatibility baseline (done 2026-09-24, PR #225; [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)),
 [rc-smoke-checklist.md](rc-smoke-checklist.md) (Phase 3 manual smoke), and
 [rc-release.md](rc-release.md) (notes, release workflow, promotion, tag).
 Phase 4 verdicts below await the user. **RC is gated on GitHub issues**: the
@@ -69,8 +69,7 @@ follow-up in the tech-debt tracker.
   validation boundaries; keep its `Status:` and checkboxes current in the
   same PR that changes reality.
 - Run the child plans in this order: rc-release Phase 0 (release workflow
-  de-risk) and rc-compat-baseline (Phase 0 decision first) can start in
-  parallel; rc-smoke-checklist
+  de-risk) first (the compatibility baseline is done); rc-smoke-checklist
   Part A after an RC image exists on the radxa; rc-release Phases 1–4 last,
   and only once the RC blocker milestone is empty. Blocker issues can be
   worked in parallel with all of these; rerun upgrade-restore and smoke
@@ -178,9 +177,8 @@ follow-up in the tech-debt tracker.
     **defer**, list under Known issues in the release notes.
   - Event late-EXIF fixture and legacy recovery — **defer the fixture**; the
     user-visible half (edits reverted by rebuilds) was fixed in #213. The
-    legacy-claims risk is checked by rc-compat-baseline Phase 1 (Events
-    present and stable after upgrading a beta.1 catalog); promote to blocker
-    only if that fails.
+    legacy-claims risk is moot for rc.1: pre-release catalogs are not
+    migrated (compatibility decision, 2026-09-24).
   - Video semantic reprocess completion proof — **defer**; narrowed by #212
     (rebuild receipts are now observable), remaining gap is test-only.
   - Linux bind-mount capacity test — **defer**; privileged-test gap, no known
@@ -202,9 +200,10 @@ follow-up in the tech-debt tracker.
 ### Phase 6 — Release candidate
 - [ ] Release notes (user-facing, bilingual per the terminology registry) —
   [rc-release.md](rc-release.md) Phase 1.
-- [ ] Compatibility baseline: every app-owned persisted format reset to
-  version 1, pre-release data rejected clearly, forward upgrade paths tested,
-  rc.1 fixture locked at tag time — [rc-compat-baseline.md](rc-compat-baseline.md).
+- [x] Compatibility baseline: every app-owned persisted format reset to
+  version 1, pre-release data rejected clearly, forward upgrade paths tested
+  and proven on an RC build — PR #225, [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md). The rc.1 fixture is
+  locked at tag time in [rc-release.md](rc-release.md) Phase 3.
   (Upgrading from beta.1 is out of scope: pre-release data is not migrated,
   user decision 2026-09-24.)
 - [ ] Release workflow proven on current `dev` (the v26.1.0-beta.2 release run

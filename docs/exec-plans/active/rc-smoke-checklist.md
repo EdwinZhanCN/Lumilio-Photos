@@ -14,7 +14,7 @@ copy, i18n, keyboard and error paths), not a replacement for the E2E slices.
 - Re-testing what E2E already proves on every PR: sign-in/TOTP, upload,
   scan, Storage admin add/scan, share link create/open/revoke, People merge,
   Agent runtime, video semantic search, backup/restore (restore is covered by
-  [rc-compat-baseline.md](rc-compat-baseline.md)). Spot-check them only.
+  the compatibility baseline's RC-build proof, PR #225). Spot-check them only.
 - Fixing cosmetic issues during the run. File them; fix only blockers.
 
 ## Fixed contracts
