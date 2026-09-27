@@ -101,20 +101,23 @@ through the wired runtime, they pass only once the new code is wired in:
 | `InPlaceOverwriteKeepsAlbumMembership` | Phase 3 | both the pixel edit and the metadata-only write left two Assets in browse and the album on the old one |
 | `MissingFileLeavesLibraryBrowse` | Phase 4 | the deleted file is still listed after a completed scan |
 | `ReuploadOfTrashedPhotoIsVisible` | Phase 4 | the re-uploaded photo never appears in browse |
-| `RepositoryRemovalPurgesMissingOnlyAssets` | Phase 4 | its precondition fails: after a completed scan the deleted file's Asset still counts as active in the repository, so `dev` never reaches the missing-only state that defect 2 needs |
+| `RepositoryRemovalPurgesMissingOnlyAssets` | Phase 4 | on CI (Linux, macOS, Windows) the missing-only Asset survives removal (`GET` 200); on the developer Mac its precondition fails instead (see below) |
 
 Notes for the fixing phases:
-- On macOS `dev`, a deleted file's Asset still counted as active seven
-  minutes after a completed forced verification with `files_observed: 0`
-  (recorded in the scan index decision). Removal then collects it as an
-  active occurrence, which is why the defect-2 test must wait for the missing
-  state first.
+- On one developer Mac, with the repository on an external APFS volume, a
+  deleted file's Asset still counted as active seven minutes after a
+  completed forced verification with `files_observed: 0`. The CI runners
+  recognised the deletion. Without the missing state, removal collects the
+  Asset as an active occurrence, which is why the defect-2 test waits for
+  that state first.
+- On Windows CI the harness's server shutdown took longer than 90 s; fix the
+  harness before the tests land.
+- The Linux job has no `exiftool` or `ffmpeg`, but the tests still reached
+  their assertions there, so ingest produces browsable Assets without them.
 - Upload admission rejects a volume with less than 5% free space, which makes
   the harness fail with a 409 on a nearly full disk. Run locally with
   `TMPDIR` on a volume with room.
-- The Linux Server CI job installs libvips but not `exiftool` or `ffmpeg`.
-  Confirm in Phase 3 that ingest still produces browsable Assets there, or
-  install the tools in the workflow.
+
 
 ### Phase 1 — Decisions
 - [x] `.agents/decisions/2026-09-24-repository-scan-index.md` supersedes

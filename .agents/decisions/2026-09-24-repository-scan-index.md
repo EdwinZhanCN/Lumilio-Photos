@@ -23,14 +23,15 @@ returns:
   33 s, 40k in 131 s; writer transactions held 130–160 ms against a 25 ms
   budget. Through the API on 2026-09-27, a real 10k-file tree was still
   crawling after 60 s with 942 files observed.
-- **Absence that is not proven in practice.** On 2026-09-27 (`dev` @
-  `a3fb469d`, macOS, in-process Server), a file was deleted from a repository
-  and a forced full verification then completed with `files_observed: 0`.
-  For the next seven minutes the Storage page still counted its Asset as
-  active (`active_asset_occurrences`), and no further verification ran. The
-  design fails closed, so when a run cannot prove absence the catalog stays
-  wrong until some later run can. The cause was not isolated, and Linux was
-  not checked.
+- **Absence that depends on the environment.** On 2026-09-27 (`dev` @
+  `a3fb469d`), a file was deleted from a repository and a forced full
+  verification completed with `files_observed: 0`. On the Linux, macOS, and
+  Windows CI runners the deletion was then recognised. On a developer Mac,
+  with the repository on an external APFS volume, the Storage page still
+  counted the Asset as active seven minutes later, and no further
+  verification ran. The cause was not isolated. The design fails closed, so
+  whenever a run cannot prove absence the catalog stays wrong until some
+  later run can.
 - **Complexity.** About 6.2k lines of production Go and 3.8k of tests, 68
   queries over 7 tables, three native journal adapters (about 1.7k lines),
   and a reference reducer that production code does not use. The superseded
