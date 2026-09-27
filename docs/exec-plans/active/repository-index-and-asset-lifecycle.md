@@ -1,6 +1,10 @@
 # Repository scan index and Asset lifecycle
 
-Status: active, created 2026-09-24. Not started. Child of
+Status: active, created 2026-09-24. Phase 0 tests are written and fail on
+`dev` @ `a3fb469d` (2026-09-27); they wait on branch
+`test/lifecycle-regressions` and ride into the phases that fix them. Phase 1
+decision records are written and await owner approval; Phase 2 (schema) does
+not start until they are approved. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
 (replace the Repository Observation Engine with a scan index) and
@@ -71,7 +75,7 @@ PR that fixes them. Run the narrowest checks per
 own boxes.
 
 ### Phase 0 — Lock the failures (written per fixing phase)
-- [ ] Black-box regression tests at the service or API level, which survive
+- [x] Black-box regression tests at the service or API level, which survive
   the rewrite and fail on current `dev`:
   - scan cost is linear, comparing 10k and 40k generated entries;
   - re-uploading a trashed photo shows it in the library (#223 defect 3);
@@ -83,14 +87,47 @@ own boxes.
   failing output is recorded in that PR's description. It then lands in the
   same PR as the fix.
 
+Where they are (2026-09-27): `server/app/blackbox_harness_test.go` boots a
+complete in-process Server from the generated `dev-vite` manifest, the way
+Desktop embeds it, and drives it only through HTTP and the repository
+directory. Each test is its own `server/app/*_regression_test.go` file and
+its own commit on `test/lifecycle-regressions`, after one harness commit, so
+each fixing PR cherry-picks the harness and the tests it turns green. Because they go
+through the wired runtime, they pass only once the new code is wired in:
+
+| Test | Lands with | Failure on `dev` @ `a3fb469d` |
+| --- | --- | --- |
+| `ScanCostIsLinear` | Phase 3 | the 10k-file scan was still crawling at 60 s with 942 files observed |
+| `InPlaceOverwriteKeepsAlbumMembership` | Phase 3 | both the pixel edit and the metadata-only write left two Assets in browse and the album on the old one |
+| `MissingFileLeavesLibraryBrowse` | Phase 4 | the deleted file is still listed after a completed scan |
+| `ReuploadOfTrashedPhotoIsVisible` | Phase 4 | the re-uploaded photo never appears in browse |
+| `RepositoryRemovalPurgesMissingOnlyAssets` | Phase 4 | on CI (Linux, macOS, Windows) the missing-only Asset survives removal (`GET` 200); on the developer Mac its precondition fails instead (see below) |
+
+Notes for the fixing phases:
+- On one developer Mac, with the repository on an external APFS volume, a
+  deleted file's Asset still counted as active seven minutes after a
+  completed forced verification with `files_observed: 0`. The CI runners
+  recognised the deletion. Without the missing state, removal collects the
+  Asset as an active occurrence, which is why the defect-2 test waits for
+  that state first.
+- On Windows CI the harness's server shutdown took longer than 90 s; fix the
+  harness before the tests land.
+- The Linux job has no `exiftool` or `ffmpeg`, but the tests still reached
+  their assertions there, so ingest produces browsable Assets without them.
+- Upload admission rejects a volume with less than 5% free space, which makes
+  the harness fail with a 409 on a nearly full disk. Run locally with
+  `TMPDIR` on a volume with room.
+
+
 ### Phase 1 — Decisions
-- [ ] `.agents/decisions/2026-09-2x-repository-scan-index.md` supersedes
+- [x] `.agents/decisions/2026-09-24-repository-scan-index.md` supersedes
   `2026-08-22-repository-observation-engine.md`. Record Syncthing, Git, and
-  Watchman as the references, and the rejected alternatives: keeping ROE,
-  path-proven absence via journals, and the OS trash for delete.
-- [ ] `.agents/decisions/2026-09-2x-asset-lifecycle.md` replaces the implicit
+  Watchman as the references, and the rejected alternatives: keeping ROE and
+  path-proven absence via journals.
+- [x] `.agents/decisions/2026-09-24-asset-lifecycle.md` replaces the implicit
   "no hard delete" rule with the core rule, the invariants, the repository
-  trash, and the in-place carry-over rule.
+  trash, and the in-place carry-over rule, and rejects the OS trash for
+  delete.
 - [ ] Get the owner's approval of both records before Phase 2 merges.
 
 ### Phase 2 — Schema and scan core (#222)
