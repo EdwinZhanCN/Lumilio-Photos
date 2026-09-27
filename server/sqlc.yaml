@@ -45,6 +45,16 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_observations.mapped_node_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_entries.entry_id"
+                    go_type: { import: "github.com/google/uuid", type: "UUID" }
+                  - column: "repository_entries.content_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_entries.asset_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_entries.missing_since"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "repository_scans.not_before"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
                   - column: "repository_staging_commits.node_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_staging_commits.asset_id"
