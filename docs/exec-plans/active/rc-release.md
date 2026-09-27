@@ -1,6 +1,6 @@
 # RC release: notes, pipeline, promotion, tag
 
-Status: active, created 2026-09-24. Phase 0: cause found and fixed, awaiting a green release dispatch. Child of
+Status: active, created 2026-09-24. Phase 0 done (release workflow green on `dev` `c397cf38`); Phase 1 (release notes) next, best written once the milestone blockers land. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Target: `rc.1` tag on
 `main` by 2026-09-29. Draft promotion PR **#210** (`dev` → `main`) is open and
 its CI was fully green at `dev` `f598310a` (all jobs, all 8 E2E slices).
@@ -51,9 +51,11 @@ the promotion commit, with bilingual release notes, smoked once.
   passed metadata, SPA, both Server image arches, the manifest, and the macOS
   DMG; the Windows job failed with the same error. Reproduced locally (exit 1)
   and fixed with `-macfilename ""` (exit 0, `.ico` only).
-- [ ] The fix lands in `dev` (PR `fix/windows-icon-generation`); then dispatch
-  the release workflow once more and require every job green, including the
-  Windows installer and portable app.
+- [x] The fix landed in `dev` (#227). Dispatch run 36334077943 (2026-09-27,
+  `dev` `c397cf38`) passed every job: metadata, SPA, Server image amd64 and
+  arm64 plus manifest (`edge`), macOS DMG (arm64), and the Windows installer
+  and portable app; the GitHub Release job was skipped as designed for a
+  dispatch. Artifacts: `windows-amd64-setup`, `windows-amd64`, `dmg-arm64`.
 
 ### Phase 1 — Release notes (bilingual)
 - [ ] Collect user-facing changes since `v26.1.0-beta.1`:
