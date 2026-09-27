@@ -20,6 +20,7 @@ import (
 	"desktop/internal/control/dto"
 	"desktop/internal/operation"
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 	"desktop/internal/runtime"
 	"desktop/internal/state"
 )
@@ -336,7 +337,7 @@ func (c *Controller) loadCache() (cacheFile, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var cache cacheFile
-	if err := decoder.Decode(&cache); err != nil || cache.SchemaVersion != cacheSchemaVersion {
+	if err := decoder.Decode(&cache); err != nil || stateversion.Check("storage shortcut cache", cache.SchemaVersion, cacheSchemaVersion) != nil {
 		_ = os.Rename(c.paths.ShortcutsFile, c.paths.ShortcutsFile+fmt.Sprintf(".corrupt.%d", time.Now().UnixNano()))
 		return cacheFile{SchemaVersion: cacheSchemaVersion}, fmt.Errorf("storage shortcut cache is invalid")
 	}

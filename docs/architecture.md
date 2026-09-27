@@ -46,7 +46,7 @@ useful; implementation plans belong in `exec-plans/`.
 - `server/internal/api/handler`: HTTP request/response layer.
 - `server/internal/service`: business logic, auth, settings, indexing, search, cloud import, and ML/classifier adapters.
 - The Music domain is a first-class owner-scoped projection in
-  `server/internal/service/music_service.go` with tables in the generation-9
+  `server/internal/service/music_service.go` with tables in the
   catalog baseline. It uses Asset identity and media delivery, but owns track/release/artist
   meaning, field-level corrections, playlists, and bounded playback snapshots
   without changing legacy mixed-media Albums.
@@ -72,7 +72,7 @@ useful; implementation plans belong in `exec-plans/`.
   `C0 → crawl → fixed C1 → dirty verification → finalize` protocol never
   treats a watcher hint as absence authority.
 - The catalog schema is one standalone baseline (`000001_storage_baseline.up.sql`,
-  `PRAGMA user_version = 9`) that establishes desired/applied pipeline state and
+  `PRAGMA user_version = 1`, the rc.1 compatibility baseline) that establishes desired/applied pipeline state and
   typed execution ledgers. QueueDB River migrations are independent and may be
   recreated without touching the catalog.
 - `server/internal/sourcing`: recoverable staged materialization for upload and

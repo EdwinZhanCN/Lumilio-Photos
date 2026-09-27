@@ -1,6 +1,9 @@
 # Decision: Replace the catalog migration chain with a generation-9 baseline
 
-Status: implemented
+Status: superseded on 2026-09-24 by
+[the rc.1 compatibility baseline decision](2026-09-24-rc-compatibility-baseline.md).
+Originally implemented 2026-09-19. Its rejection of a migration chain rested on
+"no instance exists to upgrade", which stops being true at the rc.1 tag.
 
 ## Problem
 

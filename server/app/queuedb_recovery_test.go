@@ -37,7 +37,7 @@ func TestCatalogReceiptSurvivesQueueDBReplacementAndCompletesAfterRedelivery(t *
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
-	if err := catalog.MigrateCatalog(ctx); err != nil {
+	if err := catalog.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lumilio.org/schema/lumilio-server-v6.schema.json",
+  "$id": "https://lumilio.org/schema/lumilio-server-v1.schema.json",
   "properties": {
     "schema_version": {
       "type": "integer",
@@ -488,6 +488,6 @@
     "tools",
     "execution"
   ],
-  "title": "Lumilio Photos runtime manifest (schema v6)",
+  "title": "Lumilio Photos runtime manifest (schema v1)",
   "description": "Complete runtime configuration. There are no code defaults, no configuration file search, and no environment-variable overrides: every key below must be present in the file."
 }

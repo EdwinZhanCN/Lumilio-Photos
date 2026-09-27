@@ -44,7 +44,7 @@ func newFailureFixture(t *testing.T) failureFixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close(context.Background()) })
-	if err := database.MigrateCatalog(ctx); err != nil {
+	if err := database.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 	assetID, fence, receiptID := uuid.New(), uuid.New(), uuid.New()

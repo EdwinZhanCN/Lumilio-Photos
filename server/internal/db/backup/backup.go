@@ -22,10 +22,11 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
-// manifestFormatVersion is bumped whenever the manifest contract changes.
-// Snapshots written by an earlier format are rejected outright; restore never
-// translates a manifest.
-const manifestFormatVersion = 3
+// manifestFormatVersion is the snapshot manifest contract. Format 1 is the
+// v26.1.0-rc.1 compatibility baseline. Pre-release manifests reused higher
+// numbers, so a mismatch is attributed only after the snapshot catalog's
+// identity has been inspected.
+const manifestFormatVersion = 1
 
 // Logf matches the supervisor-style logging callback used across the app.
 type Logf func(format string, args ...any)
@@ -64,9 +65,10 @@ type Snapshot struct {
 }
 
 // Compatibility constrains which snapshot may be staged over the active
-// runtime. Restore never performs application migrations, so the snapshot
-// schema version must equal the runtime schema version exactly. SchemaVersion
-// is required: a zero value is a configuration error, never a wildcard.
+// runtime. A snapshot at an older supported schema or config version is
+// restored and then upgraded by the runtime's normal startup; a newer one is
+// rejected. SchemaVersion is required: a zero value is a configuration error,
+// never a wildcard.
 type Compatibility struct {
 	LibraryID           string
 	ConfigSchemaVersion int
@@ -308,6 +310,12 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 		return Manifest{}, db.CatalogInfo{}, err
 	}
 	if manifest.FormatVersion != manifestFormatVersion {
+		if _, inspectErr := db.InspectStandaloneCatalog(ctx, snapshotPath); errors.Is(inspectErr, db.ErrPreReleaseCatalog) {
+			return Manifest{}, db.CatalogInfo{}, fmt.Errorf("inspect SQLite snapshot: %w", inspectErr)
+		}
+		if manifest.FormatVersion > manifestFormatVersion {
+			return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot manifest format %d is newer than this build supports (%d): it was written by a newer Lumilio Photos", manifest.FormatVersion, manifestFormatVersion)
+		}
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot manifest format %d is unsupported", manifest.FormatVersion)
 	}
 	fileInfo, err := os.Stat(snapshotPath)
@@ -339,9 +347,9 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 	if compatibility.LibraryID != "" && info.LibraryID != compatibility.LibraryID {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot belongs to library %s, active library is %s", info.LibraryID, compatibility.LibraryID)
 	}
-	if compatibility.ConfigSchemaVersion != 0 && manifest.ConfigSchemaVersion != compatibility.ConfigSchemaVersion {
+	if compatibility.ConfigSchemaVersion != 0 && manifest.ConfigSchemaVersion > compatibility.ConfigSchemaVersion {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf(
-			"snapshot config schema %d is incompatible with runtime schema %d",
+			"snapshot config schema %d is newer than runtime schema %d",
 			manifest.ConfigSchemaVersion,
 			compatibility.ConfigSchemaVersion,
 		)
@@ -349,9 +357,9 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 	if compatibility.SchemaVersion == 0 {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot compatibility is missing the runtime schema version")
 	}
-	if info.SchemaVersion != compatibility.SchemaVersion {
+	if info.SchemaVersion > compatibility.SchemaVersion {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf(
-			"snapshot schema version %d is incompatible with runtime schema version %d; restore does not migrate a catalog",
+			"snapshot schema version %d is newer than runtime schema version %d",
 			info.SchemaVersion,
 			compatibility.SchemaVersion,
 		)

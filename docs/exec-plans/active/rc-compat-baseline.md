@@ -1,6 +1,6 @@
 # RC compatibility baseline and upgrade paths
 
-Status: active, created 2026-09-24. Not started. Child of
+Status: active, created 2026-09-24. Phases 0–3 done; Phase 4 (rc.1 fixture) waits for the tag. Child of
 [release-hardening.md](release-hardening.md); tracked by issue #221 in the
 `v26.1.0-rc.1` milestone, so it blocks the tag. Supersedes the beta.1 upgrade
 test that was planned here earlier (pre-release data is not migrated).
@@ -41,7 +41,8 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
 - **Server TOML config:** the server never rewrites a user's file. An older
   `schema_version` fails with a message pointing at an explicit
   `config upgrade` command that rewrites the file after saving a `.bak`.
-  Desktop regenerates its own config. The "no code defaults / complete
+  Desktop upgrades its own stored intents in memory (it does not regenerate
+  them: they carry user choices). The "no code defaults / complete
   manifest" rule in `CLAUDE.md` still holds for the upgraded file.
 - **Backups:** a build restores backups from any supported older version,
   then applies catalog steps; a backup newer than the build is rejected.
@@ -58,7 +59,7 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
 ## Execution phases
 
 ### Phase 0 — Decision record
-- [ ] Write `.agents/decisions/2026-09-2x-rc-compatibility-baseline.md`
+- [x] Write `.agents/decisions/2026-09-24-rc-compatibility-baseline.md`
   recording the contracts above, with alternatives and why they lost
   (edit-in-place forever; wipe per RC; baseline-kept-current + equivalence
   test; checksum ledger). Mark
@@ -66,49 +67,112 @@ from rc.1 on, nothing a user has on disk may be wiped or broken by an update.
   of a chain rested on "no instance exists to upgrade", which ends at rc.1).
   Update `docs/BACKEND.md` and the `migration.go` doc comments to match.
   Get the user's approval of the record before Phase 2.
+  (Approved 2026-09-24 with three refinements: catalog identity via
+  `PRAGMA application_id` "LUMC" checked before any version; `.lumilioroot`
+  stays `"1.0"` and pre-release markers are accepted; pre-release server
+  configs are caught by the strict decoder. `docs/BACKEND.md` and the
+  `migration.go` comments change with the Phase 1 code they describe.)
 
 ### Phase 1 — Reset to version 1 (internal era, last edit-in-place)
-- [ ] Catalog `SchemaVersion` 9 → 1 (`server/internal/db/migration.go`) and
+- [x] Catalog `SchemaVersion` 9 → 1 (`server/internal/db/migration.go`) and
   the baseline's `PRAGMA user_version` stamp together; backup inspection
-  (`InspectStandaloneCatalog`) follows.
-- [ ] Server TOML `schema_version` 6 → 1 (`server/config/config.go`); regenerate
+  (`InspectStandaloneCatalog`) follows. Catalog `application_id` "LUMI" →
+  "LUMC"; "LUMI" is rejected as `ErrPreReleaseCatalog` before any version.
+- [x] Server TOML `schema_version` 6 → 1 (`server/config/config.go`); regenerate
   `server/config/examples/**` with the repo's config-examples task; update any
-  docs showing it (`site/docs/en` and `site/docs/zh-cn`).
-- [ ] Backup `manifestFormatVersion` 3 → 1 (`server/internal/db/backup`).
-- [ ] Repository root config: decide `"1.0"` stays or becomes integer `1`
-  (record in the decision); either way it is the rc.1 baseline.
-- [ ] Pre-release rejection with clear messages for catalog, config, backup,
-  root config; unit tests for each (a catalog stamped 9, one with the legacy
-  ledger table, a config with `schema_version = 6`, a v3 backup manifest).
-- [ ] `task server:test`, `task verify:generated`, `task desktop:test`; wipe
-  local/radxa E2E and Desktop state before any manual testing.
+  docs showing it (`site/docs/en` and `site/docs/zh-cn`; none do). The
+  schema id is now `lumilio-server-v1.schema.json`.
+- [x] Backup `manifestFormatVersion` 3 → 1 (`server/internal/db/backup`).
+- [x] Repository root config: `"1.0"` stays (decision record); pre-release
+  markers are the same shape and are accepted, so no code change.
+- [x] Pre-release rejection with clear messages for catalog, config, backup
+  (root config is accepted, above); unit tests: `TestOpenRejectsPreReleaseCatalog`
+  (beta stamp 8 + ledger, stamp 9, colliding stamp 1),
+  `TestValidateSnapshotAttributesManifestFormatMismatch` (v2/v3 pre-release,
+  newer, missing), `TestLoadAppConfigRejectsNewerOrPreReleaseSchemaVersion`.
+- [x] `task server:test`, `task verify:generated`, `task desktop:test` green
+  on 2026-09-24 (commit `8b1482fb`).
+- [x] Wipe local/radxa E2E and Desktop state before any manual testing: every
+  existing catalog is now rejected as pre-release. Done 2026-09-24 with owner
+  approval: radxa `lumilio-photos-e2e` containers and both volumes; macOS
+  Desktop `state/` and `runtime/` intents/pointers (settings, secrets, logs,
+  Lumen kept); `.local/dev/state` and `.local/dev/config`. Media untouched
+  (`~/Pictures/Lumilio`, `.local/dev/storage`). Local OrbStack was stopped and
+  not inspected; run `docker compose -p lumilio-photos-e2e down -v` before a
+  local E2E run.
+- [x] `.lumiliorepo` (repository marker, `server/internal/storage/repocfg`) was
+  missed by the decision: unchanged since `v26.1.0-beta.2` (`"1.0"`, so
+  pre-release repositories are accepted like `.lumilioroot`), but `Validate`
+  only requires a non-empty version, so a newer marker would be read
+  silently. Fixed: `repocfg.CurrentVersion` with the same exact check and
+  message as `.lumilioroot`; tests read the beta marker as-is and reject
+  unknown versions; the decision covers both markers.
 
 ### Phase 2 — Forward paths
-- [ ] Catalog step runner: embedded `server/migrations/steps/NNNN_<name>.sql`
-  (or Go steps where SQL cannot express it), applied in order, each in one
-  transaction setting `user_version`; the startup gate above; automatic
-  pre-upgrade backup; restore-then-upgrade for older backups. Tests use a
-  test-only step registry (no fake production step): in-order application,
-  failed step rolls back and blocks startup, newer rejected, pre-release
-  rejected, backup taken before the first step, restore of an older backup
-  upgrades.
-- [ ] `config upgrade` command (server CLI; also runnable as
-  `docker compose run --rm lumilio …` — document it in upgrade.md, en +
-  zh-cn): reads an older supported `schema_version`, writes the current one
-  after saving `<file>.bak`; refuses pre-release versions. Tests.
-- [ ] Root config and Desktop state readers accept older supported versions
-  (only version 1 exists at rc.1, so this is the dispatch shape + tests, not
-  real conversions).
-- [ ] Document the contributor rule (how to add a step, never edit the
-  baseline after rc.1) in `docs/BACKEND.md` and the relevant skill.
+- [x] Catalog step runner (`server/internal/db/migration.go`): embedded
+  `server/migrations/steps/NNNN_<name>.sql`, contiguous 2..`SchemaVersion`
+  (checked at load and by `TestEmbeddedCatalogStepsMatchSchemaVersion`); a
+  step is a `func(ctx, tx)`, so a Go step is one more slice entry when SQL
+  cannot express a change. Each step runs in one transaction with its
+  `user_version` stamp. `MigrateCatalog(ctx, backup)` takes the pre-upgrade
+  backup as a callback from `server/app`, which writes a protected
+  `pre-upgrade-` snapshot (retention never prunes it; the backup list shows it
+  as a restore point). Restore accepts older schema/config versions and
+  installs them unchanged; the next start upgrades them. Tests
+  (`migration_steps_test.go`, test-only registry): fresh install without
+  backup, backup before the first step then in-order steps, failed step rolls
+  back and names step + snapshot then resumes, no backup refuses, newer
+  rejected, loader naming/gap/stamp rules; backup package: older snapshot
+  staged and installed, newer schema and config snapshots rejected,
+  `pre-upgrade-` protected from pruning.
+- [x] `server config upgrade --config <file>` (`server/cmd/config_cli.go`,
+  `server/config/upgrade.go`): config steps transform the parsed tree, the
+  result must pass the strict load, the original goes to `<file>.bak`
+  (refuses to overwrite an existing `.bak`), and the new file is re-rendered
+  with generated comments. Startup points an older version at the command;
+  pre-release/newer versions are refused. Documented in en
+  `introduction/upgrade.md` and zh-cn `admin/upgrade.md`. Tests: test-only
+  1→2 step, refusals, current file untouched, CLI current/pre-release paths.
+- [x] Root marker: stays `"1.0"`, pre-release markers read as-is (test), an
+  unknown version names a newer build. Desktop runtime intents are upgraded
+  in memory through `config.UpgradeManifest` in `Store.Validate` and
+  `LoadCurrentConfig`. Desktop: persisted readers go through
+  `desktop/internal/platform/stateversion` (newer → `ErrNewer`); settings test.
+- [x] Contributor rule in `server/migrations/steps/README.md`,
+  `docs/BACKEND.md`, and the `lumilio-api-contract-change` skill.
 
 ### Phase 3 — Prove it on the RC build
-- [ ] On the radxa (build on the Mac for linux/amd64, ship, run — see the
+- [x] On the radxa (build on the Mac for linux/amd64, ship, run — see the
   parent plan's resume section): fresh install stamps version 1 everywhere;
   a pre-release catalog and config are rejected with the intended messages;
   backup → restore round-trip on the RC build keeps counts, user edits
   (album cover, Event rename, person rename, share link), and original-file
   checksums.
+  Done 2026-09-24 with image `lumilio-server:rc-compat-deb8f32a` (built on the
+  Mac for linux/amd64 from `deb8f32a`, `VERSION=26.1.0-rc.1`), installed with
+  `deploy/compose/compose.yml` as project `rc-compat` in `~/rc-compat/`:
+  - Pre-release catalog: the published `ghcr.io/edwinzhancn/lumilio-server:26.1.0-beta.2`
+    created one (`application_id` 0x4c554d49, `user_version` 8, ledger
+    table). The RC image refused to start with "catalog was created by a
+    pre-release build of Lumilio Photos, whose data is not migrated: move the
+    SQLite catalog aside …"; the catalog was left unchanged.
+  - Pre-release config: beta.2's built-in `docker-http.toml`
+    (`schema_version = 6`) fails `server config validate` and
+    `server config upgrade` with the newer-or-pre-release message; the file is
+    unchanged and no `.bak` is written.
+  - Fresh install: backup manifest `format_version` 1,
+    `config_schema_version` 1, `schema_version` 1; catalog `application_id`
+    0x4c554d43 ("LUMC"), `user_version` 1; image config `schema_version = 1`;
+    `.lumilioroot` and `.lumiliorepo` `"1.0"`.
+  - Round trip: 25 demo JPEGs uploaded; the real Lumen Hub clustered one
+    person (3 faces); 18 Events. Edits: person renamed, Event
+    `title_override`, album with explicit cover and 3 assets, asset-snapshot
+    share link. Backup, then every edit changed and the share revoked, then
+    restore (`completed`, restore point taken): the captured state (file
+    counts, person name, Event title, album name/cover/count, share status,
+    public share HTTP 200) is identical to the pre-backup capture, and all 25
+    stored originals are byte-identical (SHA-256) to the sources.
+
 
 ### Phase 4 — Lock the rc.1 fixture (at tag time, with rc-release)
 - [ ] Right after tagging, generate a small rc.1 catalog (plus its config,

@@ -1,6 +1,7 @@
 package repocfg
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -108,4 +109,30 @@ func TestIsStorageLocation(t *testing.T) {
 	cfg := NewRepositoryConfig("Root Test")
 	require.NoError(t, cfg.SaveConfigToFile(dir))
 	assert.True(t, IsStorageLocation(dir))
+}
+
+// preReleaseMarker is the shape v26.1.0-beta builds wrote; rc.1 reads it as-is.
+const preReleaseMarker = `version: "1.0"
+id: a8ab5217-3015-4137-a338-9f215c136097
+name: Primary Storage
+created_at: 2026-09-04T20:10:45.33243-04:00
+storage_strategy: date
+local_settings:
+    handle_duplicate_filenames: rename
+`
+
+func TestParseConfigReadsPreReleaseMarker(t *testing.T) {
+	cfg, err := ParseConfig([]byte(preReleaseMarker))
+	require.NoError(t, err)
+	assert.Equal(t, "a8ab5217-3015-4137-a338-9f215c136097", cfg.ID)
+	assert.Equal(t, CurrentVersion, cfg.Version)
+}
+
+func TestParseConfigRejectsUnknownVersion(t *testing.T) {
+	for _, version := range []string{"2.0", ""} {
+		marker := strings.Replace(preReleaseMarker, `version: "1.0"`, `version: "`+version+`"`, 1)
+		_, err := ParseConfig([]byte(marker))
+		require.Error(t, err, "version %q", version)
+		assert.Contains(t, err.Error(), "version must be 1.0")
+	}
 }

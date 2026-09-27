@@ -134,7 +134,7 @@ func TestCatalogProductionPathContainsNoRiverSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
-	if err := catalog.MigrateCatalog(ctx); err != nil {
+	if err := catalog.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 	var riverTables int
@@ -166,7 +166,7 @@ func TestCatalogAndQueueSharePragmaPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
-	if err := catalog.MigrateCatalog(ctx); err != nil {
+	if err := catalog.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 	queueDB, err := OpenQueue(ctx, config.DatabaseConfig{
@@ -215,7 +215,7 @@ func TestQueueDatabaseIsDisposableAndRebuildsIndependently(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = catalog.Close(context.Background()) })
-	if err := catalog.MigrateCatalog(ctx); err != nil {
+	if err := catalog.MigrateCatalog(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := catalog.SQL.ExecContext(ctx, `

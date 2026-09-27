@@ -14,7 +14,11 @@ import (
 )
 
 const (
-	FileName       = ".lumilioroot"
+	FileName = ".lumilioroot"
+	// CurrentVersion is the marker format since the v26.1.0-rc.1
+	// compatibility baseline; pre-release markers have the same shape and are
+	// read as-is. The marker lives inside user media folders, so a later format
+	// must keep reading every earlier version rather than rejecting it.
 	CurrentVersion = "1.0"
 )
 
@@ -74,8 +78,8 @@ func (c *RootConfig) Validate() error {
 	if c == nil {
 		return fmt.Errorf("configuration is required")
 	}
-	if strings.TrimSpace(c.Version) != CurrentVersion {
-		return fmt.Errorf("version must be %s", CurrentVersion)
+	if version := strings.TrimSpace(c.Version); version != CurrentVersion {
+		return fmt.Errorf("version must be %s, found %q: a newer Lumilio Photos may have written this marker", CurrentVersion, version)
 	}
 	if _, err := uuid.Parse(strings.TrimSpace(c.ID)); err != nil {
 		return fmt.Errorf("id must be a UUID: %w", err)

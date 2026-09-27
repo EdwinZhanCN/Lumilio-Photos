@@ -2,10 +2,13 @@ package runtimeconfig
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"desktop/internal/platform/stateversion"
 )
 
 func TestSettingsLumenPresetDefaultsAndPersists(t *testing.T) {
@@ -83,5 +86,18 @@ func TestLumenSetupStorePersistsPresetAndCacheTogether(t *testing.T) {
 	}
 	if loaded.LumenPreset != "minimal" || loaded.LumenCacheDir != cacheDir {
 		t.Fatalf("persisted setup = %+v", loaded)
+	}
+}
+
+// TestLoadSettingsRejectsNewerSchemaVersion proves user settings from a newer
+// Desktop are refused with a named cause rather than misread or reset.
+func TestLoadSettingsRejectsNewerSchemaVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(path, []byte(`{"schemaVersion": 2, "locale": "en"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadSettings(path)
+	if !errors.Is(err, stateversion.ErrNewer) {
+		t.Fatalf("newer settings error = %v, want stateversion.ErrNewer", err)
 	}
 }
