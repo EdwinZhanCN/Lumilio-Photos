@@ -1,8 +1,11 @@
 # Decision: rc.1 is the compatibility baseline for every app-owned persisted format
 
-Status: implemented, 2026-09-24 (issue #221, plan
-[rc-compat-baseline.md](../../docs/exec-plans/active/rc-compat-baseline.md)
-Phases 0–2); the rc.1 fixture upgrade test lands with the tag. Supersedes
+Status: implemented, 2026-09-24 (issue #221, PR #225), and proven on an RC
+build on the Intel N100 host: a real `26.1.0-beta.2` catalog and config are
+refused as pre-release, a fresh install stamps version 1 everywhere, and a
+backup → change → restore round trip keeps every user edit and byte-identical
+originals. The rc.1 fixture upgrade test lands after the tag
+(`docs/exec-plans/active/rc-release.md` Phase 3). Supersedes
 [the generation-9 baseline decision](2026-09-19-catalog-generation-9-baseline.md).
 
 ## Problem

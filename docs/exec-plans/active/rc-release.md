@@ -23,8 +23,8 @@ the promotion commit, with bilingual release notes, smoked once.
   run failed).
 - `main` changes only via the single promotion PR #210; never push to `main`
   directly. Merge only when [release-hardening.md](release-hardening.md)
-  validation boundaries hold and [rc-compat-baseline.md](rc-compat-baseline.md)
-  and [rc-smoke-checklist.md](rc-smoke-checklist.md) are closed.
+  validation boundaries hold and [rc-smoke-checklist.md](rc-smoke-checklist.md)
+  is closed (the compatibility baseline is done: PR #225, [decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
 - Tags and releases are outward-facing: the user confirms before any tag is
   pushed.
 - **RC blocker gate (hard stop).** The GitHub milestone
@@ -77,7 +77,7 @@ the promotion commit, with bilingual release notes, smoked once.
 - [ ] Upgrade guidance: rc.1 is the first supported release; data from
   pre-release builds (`v1.0.0-beta.*`, `v26.1.0-beta.*`) is not migrated —
   start fresh. From rc.1 on, updates upgrade in place and take an automatic
-  backup first (see rc-compat-baseline.md).
+  backup first ([decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
 
 ### Phase 2 — Promote
 - [ ] Run the RC blocker gate (Fixed contracts). Stop if anything is open.
@@ -94,10 +94,16 @@ the promotion commit, with bilingual release notes, smoked once.
   `ghcr.io/edwinzhancn/lumilio-server` with the expected tags and a recorded
   digest; Desktop macOS DMG and Windows installer/portable attached.
 
-- [ ] Lock the rc.1 compatibility fixture from the published image
-  ([rc-compat-baseline.md](rc-compat-baseline.md) Phase 4) and land it via a
-  PR into `dev`. From here on, no shipped migration or format is edited in
-  place.
+- [ ] Lock the rc.1 compatibility fixture from the published image and land
+  it via a PR into `dev`: with the published rc.1 image, create a small
+  catalog with user state (album with a cover, renamed Event and person,
+  share link), its config, one backup, and the Storage Location and
+  Repository markers; commit them under a testdata path; add a CI test that
+  upgrades them with the current build on every run and checks counts, user
+  state, and untouched originals. Each later release adds its own fixture.
+  From the tag on, the baseline and every released step are frozen
+  (`server/migrations/steps/README.md`; [decision](../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)). This is the last
+  item of issue #221's scope.
 
 ### Phase 4 — Smoke the published artifacts
 - [ ] Docker: on the radxa, pull the published image **by digest**, fresh
