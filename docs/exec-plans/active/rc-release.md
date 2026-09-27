@@ -1,6 +1,6 @@
 # RC release: notes, pipeline, promotion, tag
 
-Status: active, created 2026-09-24. Not started. Child of
+Status: active, created 2026-09-24. Phase 0: cause found and fixed, awaiting a green release dispatch. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Target: `rc.1` tag on
 `main` by 2026-09-29. Draft promotion PR **#210** (`dev` → `main`) is open and
 its CI was fully green at `dev` `f598310a` (all jobs, all 8 E2E slices).
@@ -41,17 +41,19 @@ the promotion commit, with bilingual release notes, smoked once.
 ## Execution phases
 
 ### Phase 0 — De-risk the release workflow (do first)
-- [ ] Find why `v26.1.0-beta.2` failed: release run on 2026-09-05, job
-  "Windows installer and portable app", step "Build portable app"
-  (`gh run list --workflow release.yml`, `gh run view <id> --log-failed`).
-  Check whether a later commit fixed it (`git log v26.1.0-beta.2..origin/dev
-  -- .github/workflows/release.yml desktop/`; e.g. `36a22ea0 ci: stop
-  setup-vp running an implicit root vp install`).
-- [ ] Prove the release workflow on the current `dev` without publishing:
-  use its `workflow_dispatch` path if it builds without publishing, or read
-  the workflow and reproduce the failing Windows portable build step locally
-  / in a throwaway branch. Do not create a real `v*` tag for this.
-- [ ] Any fix lands as a PR into `dev` (and therefore #210).
+- [x] Find why `v26.1.0-beta.2` failed: its Windows job's `desktop:common:generate:icons:windows`
+  ran `wails3 generate icons` without `-macfilename`, whose default
+  `build/darwin/icon.icns` resolves under the task's `build/` dir to a path
+  that does not exist ("open build/darwin/icon.icns"). `36a22ea0` fixed an
+  unrelated CI setup problem; PR CI never runs this packaging task.
+- [x] Prove it on current `dev` without publishing a release: dispatch run
+  36292509609 (2026-09-27, `dev` `5fba7f44`, moved only the `edge` image tag)
+  passed metadata, SPA, both Server image arches, the manifest, and the macOS
+  DMG; the Windows job failed with the same error. Reproduced locally (exit 1)
+  and fixed with `-macfilename ""` (exit 0, `.ico` only).
+- [ ] The fix lands in `dev` (PR `fix/windows-icon-generation`); then dispatch
+  the release workflow once more and require every job green, including the
+  Windows installer and portable app.
 
 ### Phase 1 — Release notes (bilingual)
 - [ ] Collect user-facing changes since `v26.1.0-beta.1`:

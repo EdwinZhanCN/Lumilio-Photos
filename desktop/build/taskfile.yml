@@ -108,7 +108,10 @@ tasks:
     generates:
       - "windows/icon.ico"
     cmds:
-      - wails3 generate icons -input appicon.png -windowsfilename windows/icon.ico
+      # -macfilename defaults to build/darwin/icon.icns, which does not exist
+      # relative to this task's dir; the macOS icons come from
+      # generate:icons:macos, so write only the .ico here.
+      - wails3 generate icons -input appicon.png -windowsfilename windows/icon.ico -macfilename ""
 
   generate:resources:
     summary: Generates the signed-resource manifest from the payload directory
