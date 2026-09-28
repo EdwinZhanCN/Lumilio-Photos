@@ -47,22 +47,19 @@ const (
 	OperationKindCatalogAssetMetadata
 	OperationKindCatalogAssetDerivatives
 	OperationKindCatalogAssetStack
-	OperationKindCatalogRepositoryAsset
-	OperationKindCatalogRepositoryKnownContent
-	OperationKindCatalogRepositoryHash
 	OperationKindCatalogVideoFrameEmbeddings
 	OperationKindCatalogEnrichment
 	OperationKindCatalogIngestReceipt
 	OperationKindCatalogOperationReceipt
 	OperationKindCatalogProjection
-	OperationKindCatalogRepositoryEpoch
-	OperationKindRepositoryObservation
+	OperationKindRepositoryScan
 	OperationKindRepositoryStaging
 )
 
 // Operation is the coordinator's private transport representation. Callers
 // normally use one of Coordinator's typed Apply methods. The operation escape
-// hatch is only for package-owned commit boundaries (ROE and staging) whose
+// hatch is only for package-owned commit boundaries (the scan index and
+// staging) whose
 // typed payloads live outside package commit; it carries no product identity
 // or generic payload.
 type Operation struct {

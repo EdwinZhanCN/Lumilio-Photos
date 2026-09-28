@@ -12,7 +12,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
-	roelocations "server/internal/storage/roe/locations"
+	roelocations "server/internal/storage/locations"
 	"server/internal/utils/memory"
 	"server/internal/utils/upload"
 	"strconv"

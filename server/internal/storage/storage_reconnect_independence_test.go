@@ -15,7 +15,6 @@ import (
 
 	"server/internal/db"
 	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
 )
 
@@ -28,73 +27,28 @@ func sha256FileHex(path string) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-func seedRepositoryObservationFenceInputs(
-	t *testing.T,
-	catalog *db.DB,
-	repositoryID uuid.UUID,
-) (fileNodeID uuid.UUID, staleRevision int64) {
+// seedRelocationScanState gives a repository a running scan and one present
+// entry whose change time and file ID were recorded on the old volume.
+func seedRelocationScanState(t *testing.T, catalog *db.DB, repositoryID uuid.UUID) (entryID, runningScanID uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
 	now := dbtypes.NewTimestamp(time.Now().UTC())
-	if _, err := catalog.Queries.EnsureRepositoryObservationState(ctx, repo.EnsureRepositoryObservationStateParams{
-		RepositoryID: repositoryID, AdapterKind: "periodic", VolumeKind: "local",
-		PathCaseMode: "sensitive", PathNormalization: "nfc",
-		CursorHealth: "healthy", FullVerificationRequired: 0, UpdatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	state, err := catalog.Queries.GetRepositoryObservationState(ctx, repositoryID)
-	if err != nil {
+	entryID, runningScanID = uuid.New(), uuid.New()
+	if _, err := catalog.SQL.ExecContext(ctx, `
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			ctime_ns, file_id, stat_checked_ns, state, revision, updated_at
+		) VALUES (?, ?, 'tracked.jpg', 'tracked.jpg', '', 'file', 10, 1, 2, 'old-volume:7', 3, 'pending_hash', 1, ?)
+	`, entryID, repositoryID, now); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_change_cursors (
-			repository_id, adapter_kind, cursor, volume_identity, journal_identity,
-			status, applied_revision, updated_at
-		) VALUES (?, 'periodic', X'01', 'old-volume', 'old-journal', 'healthy', 3, ?)
-	`, repositoryID, now); err != nil {
+		INSERT INTO repository_scans (scan_id, repository_id, trigger, scope_path, status, created_at, started_at, updated_at)
+		VALUES (?, ?, 'manual', '', 'walking', ?, ?, ?)
+	`, runningScanID, repositoryID, now, now, now); err != nil {
 		t.Fatal(err)
 	}
-	rootNodeID := uuid.New()
-	fileNodeID = uuid.New()
-	staleRevision = state.NextRevision - 1
-	if staleRevision < 1 {
-		staleRevision = 1
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, file_size, created_at, updated_at
-		) VALUES (?, ?, NULL, '', '', 'directory', ?, NULL, ?, ?)
-	`, rootNodeID, repositoryID, staleRevision, now, now); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, file_size, created_at, updated_at
-		) VALUES (?, ?, ?, 'tracked.jpg', 'tracked.jpg', 'file', ?, 10, ?, ?)
-	`, fileNodeID, repositoryID, rootNodeID, staleRevision, now, now); err != nil {
-		t.Fatal(err)
-	}
-	runID := uuid.New()
-	if _, err := catalog.Queries.CreateRepositoryScanRun(ctx, repo.CreateRepositoryScanRunParams{
-		RunID: runID, RepositoryID: repositoryID, RequestedEpoch: 1,
-		Mode: "manual", ForceFullVerification: 0, CreatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := catalog.Queries.SetActiveRepositoryObservationRun(ctx, repo.SetActiveRepositoryObservationRunParams{
-		RepositoryID: repositoryID, ActiveRunID: uuid.NullUUID{UUID: runID, Valid: true}, UpdatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		UPDATE repository_scan_runs SET status = 'crawling', started_at = ? WHERE run_id = ?
-	`, now, runID); err != nil {
-		t.Fatal(err)
-	}
-	return fileNodeID, staleRevision
+	return entryID, runningScanID
 }
 
 func TestRelocateRepositorySucceedsWhenOriginalPathIsMissing(t *testing.T) {
@@ -246,7 +200,7 @@ func TestRelocateRepositoryClearsStaleActivityWhenOriginalPathIsMissing(t *testi
 	}
 }
 
-func TestRelocateRepositoryFencesStaleObservationPublications(t *testing.T) {
+func TestRelocateRepositoryRescansAndForgetsVolumeFileIdentity(t *testing.T) {
 	catalog, manager := newCatalogRepositoryManager(t)
 	ctx := context.Background()
 	base := t.TempDir()
@@ -274,7 +228,7 @@ func TestRelocateRepositoryFencesStaleObservationPublications(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fileNodeID, staleRevision := seedRepositoryObservationFenceInputs(t, catalog, created.Repository.RepoID)
+	entryID, runningScanID := seedRelocationScanState(t, catalog, created.Repository.RepoID)
 
 	newPath := filepath.Join(secondRoot.Path, "fence")
 	if err := os.MkdirAll(newPath, 0o755); err != nil {
@@ -300,53 +254,24 @@ func TestRelocateRepositoryFencesStaleObservationPublications(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var status string
+	if err := catalog.SQL.QueryRowContext(ctx, `SELECT status FROM repository_scans WHERE scan_id = ?`, runningScanID).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != "cancelled" {
+		t.Fatalf("running scan after relocate = %s, want cancelled", status)
+	}
 	assertStorageCount(t, catalog.SQL, `
-		SELECT count(*) FROM repository_change_cursors WHERE repository_id = ?
-	`, 0, created.Repository.RepoID.String())
-
-	state, err := catalog.Queries.GetRepositoryObservationState(ctx, created.Repository.RepoID)
-	if err != nil {
+		SELECT count(*) FROM repository_scans
+		WHERE repository_id = ? AND status = 'queued' AND scope_path = ''
+	`, 1, created.Repository.RepoID.String())
+	var ctime sql.NullInt64
+	var fileID sql.NullString
+	if err := catalog.SQL.QueryRowContext(ctx, `SELECT ctime_ns, file_id FROM repository_entries WHERE entry_id = ?`, entryID).Scan(&ctime, &fileID); err != nil {
 		t.Fatal(err)
 	}
-	if state.CursorHealth != "unavailable" || state.FullVerificationRequired != 1 {
-		t.Fatalf("observation state after relocate = %+v", state)
-	}
-	var cancelled int
-	if err := catalog.SQL.QueryRowContext(ctx, `
-		SELECT count(*) FROM repository_scan_runs
-		WHERE repository_id = ? AND status = 'cancelled'
-	`, created.Repository.RepoID).Scan(&cancelled); err != nil {
-		t.Fatal(err)
-	}
-	if cancelled != 1 {
-		t.Fatalf("cancelled scan runs = %d, want 1", cancelled)
-	}
-
-	nodeBefore, err := catalog.Queries.GetRepositoryNode(ctx, repo.GetRepositoryNodeParams{
-		RepositoryID: created.Repository.RepoID, NodeID: fileNodeID,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	now := dbtypes.NewTimestamp(time.Now().UTC())
-	size := int64(99)
-	_, err = catalog.Queries.UpsertRepositoryNodeObservation(ctx, repo.UpsertRepositoryNodeObservationParams{
-		NodeID: fileNodeID, RepositoryID: created.Repository.RepoID,
-		ParentNodeID: uuid.NullUUID{Valid: false},
-		Name:         "stale.jpg", NameKey: "stale.jpg", Kind: "file",
-		ObservationRevision: staleRevision, FileSize: &size, CreatedAt: now,
-	})
-	if !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("stale observation upsert error = %v, want sql.ErrNoRows", err)
-	}
-	nodeAfter, err := catalog.Queries.GetRepositoryNode(ctx, repo.GetRepositoryNodeParams{
-		RepositoryID: created.Repository.RepoID, NodeID: fileNodeID,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if nodeAfter.Name != nodeBefore.Name || nodeAfter.ObservationRevision < nodeBefore.ObservationRevision {
-		t.Fatalf("stale observation changed node: before=%+v after=%+v staleRevision=%d", nodeBefore, nodeAfter, staleRevision)
+	if ctime.Valid || fileID.Valid {
+		t.Fatalf("relocated entry kept its old volume identity: ctime=%v file_id=%v", ctime, fileID)
 	}
 }
 

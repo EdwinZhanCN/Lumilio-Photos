@@ -16,7 +16,6 @@ import (
 	"server/internal/event"
 	"server/internal/pipeline"
 	"server/internal/service"
-	roematerializer "server/internal/storage/roe/materializer"
 )
 
 type AssetStageApplied struct {
@@ -63,29 +62,6 @@ type AssetStackApplied struct {
 	AssetID, SourceFence uuid.UUID
 	PipelineVersion      string
 	DesiredVersion       uint64
-}
-
-// RepositoryAssetApplied activates a repository observation's immutable asset
-// through the same coordinator used by asset-stage commits.
-type RepositoryAssetApplied struct {
-	RepositoryID, NodeID, AssetID, ContentID uuid.UUID
-	// ObservationRevision is the immutable ROE revision that was inspected and
-	// bound. The coordinator rechecks it before activation so a result that
-	// races a newer observation cannot publish an old occurrence.
-	ObservationRevision int64
-}
-
-// RepositoryKnownContentApplied is a fully hashed, immutable source fact.
-// The coordinator alone turns it into nodes, content, an Asset, and its
-// Location; upload and cloud macros hold no catalog write capability.
-type RepositoryKnownContentApplied struct {
-	Fact roematerializer.KnownContent
-}
-
-// RepositoryHashApplied carries the immutable filesystem observation prepared
-// outside the catalog transaction for one ROE node revision.
-type RepositoryHashApplied struct {
-	Prepared roematerializer.HashPreparation
 }
 
 type VideoFrameEmbedding struct {
@@ -199,11 +175,6 @@ type ReindexProjectionApplied struct {
 	Prepared          service.PreparedReindex
 	ProjectionVersion uint64
 }
-type RepositoryEpochApplied struct {
-	RepositoryID   uuid.UUID
-	RequestedEpoch uint64
-	TerminalError  string
-}
 
 // ProjectionTerminalFailure is the terminal counterpart of a bounded
 // projection macro. It records only a stable code, never a worker error or a
@@ -218,52 +189,10 @@ type ProjectionTerminalFailure struct {
 // They are captured once during runtime composition; processors never receive
 // these write-side capabilities.
 type CatalogDependencies struct {
-	Face         service.FaceService
-	Event        *event.Service
-	Location     service.LocationService
-	Indexing     service.AssetIndexingService
-	Materializer *roematerializer.HashApplier
-}
-
-func applyRepositoryAssets(ctx context.Context, tx *sql.Tx, payload RepositoryAssetApplied) (Outcome, error) {
-	queries := repo.New(tx)
-	if payload.RepositoryID == uuid.Nil || payload.NodeID == uuid.Nil || payload.AssetID == uuid.Nil || payload.ContentID == uuid.Nil || payload.ObservationRevision <= 0 {
-		return 0, errors.New("invalid repository asset result")
-	}
-	asset, err := queries.GetAssetByIDAny(ctx, payload.AssetID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return OutcomeStale, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	if asset.IsDeleted || asset.ContentID != payload.ContentID {
-		return OutcomeStale, nil
-	}
-	node, err := queries.GetRepositoryNode(ctx, repo.GetRepositoryNodeParams{RepositoryID: payload.RepositoryID, NodeID: payload.NodeID})
-	if errors.Is(err, sql.ErrNoRows) {
-		return OutcomeStale, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	if node.Lifecycle != "active" || node.ObservationRevision != payload.ObservationRevision {
-		return OutcomeStale, nil
-	}
-	location, err := queries.GetActiveAssetLocationByNode(ctx, payload.NodeID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return OutcomeStale, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	if location.AssetID != payload.AssetID || location.BoundObservationRevision != payload.ObservationRevision {
-		return OutcomeStale, nil
-	}
-	if err := service.ApplyAssetActivationTx(ctx, tx, queries, payload.RepositoryID, payload.NodeID, payload.AssetID, payload.ContentID); err != nil {
-		return 0, err
-	}
-	return OutcomeApplied, nil
+	Face     service.FaceService
+	Event    *event.Service
+	Location service.LocationService
+	Indexing service.AssetIndexingService
 }
 
 func applyAssetStack(ctx context.Context, tx *sql.Tx, payload AssetStackApplied) (Outcome, error) {
@@ -446,38 +375,6 @@ func applyAssetMetadata(ctx context.Context, tx *sql.Tx, payload AssetMetadataAp
 	}
 	if err := service.ApplyAssetExtractedMetadataTx(ctx, tx, repo.New(tx), payload.AssetID, payload.Metadata, payload.Common, json.RawMessage(payload.ExifRaw), payload.ComponentRelation); err != nil {
 		return 0, err
-	}
-	return OutcomeApplied, nil
-}
-
-func applyRepositoryEpochs(ctx context.Context, tx *sql.Tx, payload RepositoryEpochApplied) (Outcome, error) {
-	if payload.RepositoryID == uuid.Nil || payload.RequestedEpoch == 0 {
-		return 0, errors.New("invalid repository epoch result")
-	}
-	var desired, applied uint64
-	err := tx.QueryRowContext(ctx, `SELECT desired_epoch,applied_epoch FROM repository_observation_state WHERE repository_id=?`, payload.RepositoryID.String()).Scan(&desired, &applied)
-	if errors.Is(err, sql.ErrNoRows) {
-		return OutcomeStale, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	if desired != payload.RequestedEpoch {
-		return OutcomeStale, nil
-	}
-	if payload.TerminalError != "" {
-		result, err := tx.ExecContext(ctx, `UPDATE repository_observation_state SET terminal_error=?,updated_at=? WHERE repository_id=? AND desired_epoch=? AND applied_epoch<?`, payload.TerminalError, time.Now().UTC().UnixMicro(), payload.RepositoryID.String(), payload.RequestedEpoch, payload.RequestedEpoch)
-		if err != nil {
-			return 0, err
-		}
-		changed, _ := result.RowsAffected()
-		if changed == 0 {
-			return OutcomeDuplicate, nil
-		}
-		return OutcomeApplied, nil
-	}
-	if applied < payload.RequestedEpoch {
-		return OutcomeStale, nil
 	}
 	return OutcomeApplied, nil
 }

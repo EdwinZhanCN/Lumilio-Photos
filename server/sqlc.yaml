@@ -33,18 +33,6 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "music_track_overrides.track_id"
                     go_type: { type: string }
-                  - column: "repository_observation_state.active_run_id"
-                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_nodes.parent_node_id"
-                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_nodes.last_seen_run_id"
-                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_observations.run_id"
-                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_observations.parent_node_id"
-                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
-                  - column: "repository_observations.mapped_node_id"
-                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_entries.entry_id"
                     go_type: { import: "github.com/google/uuid", type: "UUID" }
                   - column: "repository_entries.content_id"
@@ -55,7 +43,7 @@ sql:
                     go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
                   - column: "repository_scans.not_before"
                     go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
-                  - column: "repository_staging_commits.node_id"
+                  - column: "repository_staging_commits.entry_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_staging_commits.asset_id"
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }

@@ -4436,6 +4436,13 @@ components:
                     example: true
                     type: boolean
                 mode:
+                    description: 'Mode is the scan trigger: manual, periodic, watcher, startup, or settle.'
+                    enum:
+                        - manual
+                        - periodic
+                        - watcher
+                        - startup
+                        - settle
                     example: manual
                     type: string
                 operation_id:
@@ -4448,54 +4455,52 @@ components:
                     example: queued
                     type: string
             type: object
-        dto.RepositoryScanRequestDTO:
-            properties:
-                force:
-                    example: false
-                    type: boolean
-            type: object
         dto.RepositoryScanRunDTO:
             properties:
-                authoritative_directories:
-                    example: 8
-                    type: integer
                 bytes_hashed:
                     example: 524288
-                    type: integer
-                bytes_queued:
-                    example: 1048576
                     type: integer
                 cancellation_requested:
                     example: false
                     type: boolean
-                coalesced_count:
-                    example: 1
+                changed:
+                    example: 3
                     type: integer
                 created_at:
                     type: string
-                directories_observed:
-                    example: 10
+                deferred:
+                    example: 0
                     type: integer
-                error_directories:
-                    example: 1
-                    type: integer
-                files_observed:
-                    example: 120
+                errors:
+                    example: 0
                     type: integer
                 finished_at:
                     type: string
+                hashed:
+                    example: 15
+                    type: integer
+                missing:
+                    example: 1
+                    type: integer
                 mode:
+                    description: 'Mode is the scan trigger: manual, periodic, watcher, startup, or settle.'
+                    enum:
+                        - manual
+                        - periodic
+                        - watcher
+                        - startup
+                        - settle
                     example: manual
                     type: string
+                moved:
+                    example: 2
+                    type: integer
+                new_entries:
+                    example: 12
+                    type: integer
                 operation_id:
                     example: 550e8400-e29b-41d4-a716-446655440000
                     type: string
-                outbox_depth:
-                    example: 12
-                    type: integer
-                partial_coverage:
-                    example: true
-                    type: boolean
                 problem:
                     $ref: '#/components/schemas/api.ProblemReference'
                 repository_id:
@@ -4504,12 +4509,27 @@ components:
                 requested_by:
                     example: edwin
                     type: string
-                requested_epoch:
-                    example: 2
+                restored:
+                    example: 0
+                    type: integer
+                scope_path:
+                    description: ScopePath is the scanned subtree; empty means the whole repository.
+                    example: ""
+                    type: string
+                seen:
+                    example: 1200
                     type: integer
                 started_at:
                     type: string
                 status:
+                    enum:
+                        - queued
+                        - walking
+                        - sweeping
+                        - completed
+                        - offline
+                        - failed
+                        - cancelled
                     example: completed
                     type: string
             type: object
@@ -16434,7 +16454,7 @@ paths:
             tags:
                 - repositories
         post:
-            description: Queue a manual scan for a repository free workspace.
+            description: Queue a full scan of a repository. A request joins a scan that is already queued.
             parameters:
                 - description: Repository UUID
                   in: path
@@ -16446,12 +16466,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            oneOf:
-                                - type: object
-                                - $ref: '#/components/schemas/dto.RepositoryScanRequestDTO'
-                                  description: Scan request
-                                  summary: request
-                description: Scan request
+                            type: object
             responses:
                 "200":
                     content:
@@ -16518,7 +16533,7 @@ paths:
                 - repositories
     /api/v1/storage/repositories/{id}/verifications/{operation_id}/cancel:
         post:
-            description: Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+            description: Request cancellation of one exact Repository scan. A queued scan ends at once; a running scan stops at its next turn and marks nothing further missing.
             parameters:
                 - description: Repository UUID
                   in: path

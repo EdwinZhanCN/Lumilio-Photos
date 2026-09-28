@@ -19,7 +19,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/pipeline"
 	"server/internal/storage"
-	"server/internal/storage/roe/locations"
+	"server/internal/storage/locations"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

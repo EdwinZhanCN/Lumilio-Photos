@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"sync"
 	"testing"
@@ -19,8 +18,8 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/pathsemantics"
 	"server/internal/storage/repocfg"
-	"server/internal/storage/roe/pathsemantics"
 	"server/internal/storage/rootcfg"
 	hashutil "server/internal/utils/hash"
 )
@@ -94,12 +93,7 @@ type fixture struct {
 	primary  repo.Repository
 }
 
-func hostSemantics() pathsemantics.Semantics {
-	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
-		return pathsemantics.Semantics{Case: pathsemantics.CaseInsensitive, Normalization: pathsemantics.NormalizationNFC}
-	}
-	return pathsemantics.Semantics{Case: pathsemantics.CaseSensitive, Normalization: pathsemantics.NormalizationNFC}
-}
+func hostSemantics() pathsemantics.Semantics { return pathsemantics.HostDefault() }
 
 func newFixture(tb testing.TB, settle time.Duration) *fixture {
 	tb.Helper()

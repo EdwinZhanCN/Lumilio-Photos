@@ -16,21 +16,20 @@ import (
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/storage"
-	roematerializer "server/internal/storage/roe/materializer"
+	"server/internal/storage/scan"
 	fileutil "server/internal/utils/file"
 	"server/internal/utils/hash"
 )
 
-// SourceMaterializer owns the recoverable private-staging to ROE commit
-// boundary for upload and cloud sources. Asset processing is activated from
-// the immutable ROE publication result; this type never inserts processing
-// jobs directly.
+// SourceMaterializer owns the recoverable private-staging to scan-index
+// commit boundary for upload and cloud sources. Asset processing is activated
+// by the entry binding; this type never inserts processing jobs directly.
 type SourceMaterializer struct {
 	reader         SourceReader
 	journal        StagingJournal
 	stagingManager storage.StagingManager
 	files          *storage.RepositoryFSFactory
-	activate       func(context.Context, roematerializer.KnownContent) (roematerializer.Result, error)
+	activate       func(context.Context, scan.KnownContent) (scan.KnownBinding, error)
 	logger         *zap.Logger
 	auditProvider  logging.RepositoryAuditProvider
 	capacityGuard  interface {
@@ -72,7 +71,7 @@ func (m *SourceMaterializer) SetCapacityGuard(guard interface {
 // SetActivation installs the sole catalog publication boundary for immutable
 // source facts. Production wires it to the commit coordinator; this type never
 // receives a catalog writer or a materializer with a write method.
-func (m *SourceMaterializer) SetActivation(activate func(context.Context, roematerializer.KnownContent) (roematerializer.Result, error)) {
+func (m *SourceMaterializer) SetActivation(activate func(context.Context, scan.KnownContent) (scan.KnownBinding, error)) {
 	m.activate = activate
 }
 
@@ -246,15 +245,12 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 	if err != nil || !finalExists || finalObservation.Size != record.FileSize {
 		return nil, fmt.Errorf("verify committed source stability: %w", err)
 	}
-	fact := roematerializer.KnownContent{
-		RepositoryID: record.RepositoryID, OwnerID: record.OwnerID,
-		Source: record.SourceKind, SourceEventKey: "staging:" + commitID.String(),
-		RelativePath: target, OriginalFilename: record.OriginalFilename,
+	finalObservation.QuickFingerprint = record.QuickFingerprint
+	finalObservation.QuickFingerprintVer = record.QuickFingerprintVersion
+	fact := scan.KnownContent{
+		RepositoryID: record.RepositoryID, OwnerID: record.OwnerID, RelativePath: target,
 		MimeType: record.MimeType, AssetType: string(validation.AssetType),
-		FullHash: record.FullHash, FileSize: record.FileSize,
-		QuickFingerprint:        record.QuickFingerprint,
-		QuickFingerprintVersion: record.QuickFingerprintVersion,
-		Observation:             finalObservation,
+		FullHash: record.FullHash, Observation: finalObservation,
 	}
 	if m.activate == nil {
 		return nil, errors.New("source activation boundary is not configured")
@@ -266,7 +262,7 @@ func (m *SourceMaterializer) materializeCommit(ctx context.Context, commitID uui
 	completedAt := dbtypes.NewTimestamp(time.Now().UTC())
 	completedAtMicros := completedAt.Time.UnixMicro()
 	if err := m.journal.Complete(ctx, repo.CompleteRepositoryStagingCommitParams{
-		CommitID: commitID, NodeID: uuid.NullUUID{UUID: result.NodeID, Valid: true},
+		CommitID: commitID, EntryID: uuid.NullUUID{UUID: result.EntryID, Valid: true},
 		AssetID: uuid.NullUUID{UUID: result.AssetID, Valid: true}, CompletedAt: &completedAtMicros,
 	}); err != nil {
 		return nil, err

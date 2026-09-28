@@ -104,25 +104,29 @@ SET state = 'present',
     mtime_ns = ?4,
     ctime_ns = ?5,
     file_id = ?6,
-    stat_checked_ns = ?7,
+    quick_fingerprint = ?7,
+    quick_fingerprint_version = ?8,
+    stat_checked_ns = ?9,
     revision = revision + 1,
-    updated_at = ?8
-WHERE entry_id = ?9
-  AND revision = ?10
+    updated_at = ?10
+WHERE entry_id = ?11
+  AND revision = ?12
   AND state = 'pending_hash'
 `
 
 type BindRepositoryEntryCASParams struct {
-	ContentID        uuid.NullUUID     `db:"content_id" json:"content_id"`
-	AssetID          uuid.NullUUID     `db:"asset_id" json:"asset_id"`
-	Size             int64             `db:"size" json:"size"`
-	MtimeNs          int64             `db:"mtime_ns" json:"mtime_ns"`
-	CtimeNs          *int64            `db:"ctime_ns" json:"ctime_ns"`
-	FileID           *string           `db:"file_id" json:"file_id"`
-	StatCheckedNs    int64             `db:"stat_checked_ns" json:"stat_checked_ns"`
-	UpdatedAt        dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
-	EntryID          uuid.UUID         `db:"entry_id" json:"entry_id"`
-	ExpectedRevision int64             `db:"expected_revision" json:"expected_revision"`
+	ContentID               uuid.NullUUID     `db:"content_id" json:"content_id"`
+	AssetID                 uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+	Size                    int64             `db:"size" json:"size"`
+	MtimeNs                 int64             `db:"mtime_ns" json:"mtime_ns"`
+	CtimeNs                 *int64            `db:"ctime_ns" json:"ctime_ns"`
+	FileID                  *string           `db:"file_id" json:"file_id"`
+	QuickFingerprint        *string           `db:"quick_fingerprint" json:"quick_fingerprint"`
+	QuickFingerprintVersion *string           `db:"quick_fingerprint_version" json:"quick_fingerprint_version"`
+	StatCheckedNs           int64             `db:"stat_checked_ns" json:"stat_checked_ns"`
+	UpdatedAt               dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EntryID                 uuid.UUID         `db:"entry_id" json:"entry_id"`
+	ExpectedRevision        int64             `db:"expected_revision" json:"expected_revision"`
 }
 
 // The hash commit. The stat tuple is the one the content was hashed under,
@@ -135,6 +139,8 @@ func (q *Queries) BindRepositoryEntryCAS(ctx context.Context, arg BindRepository
 		arg.MtimeNs,
 		arg.CtimeNs,
 		arg.FileID,
+		arg.QuickFingerprint,
+		arg.QuickFingerprintVersion,
 		arg.StatCheckedNs,
 		arg.UpdatedAt,
 		arg.EntryID,
@@ -328,6 +334,45 @@ func (q *Queries) FinishRepositoryScan(ctx context.Context, arg FinishRepository
 	return result.RowsAffected()
 }
 
+const getLatestRepositoryScan = `-- name: GetLatestRepositoryScan :one
+SELECT scan_id, repository_id, "trigger", scope_path, status, resume_after_path, not_before, requested_by, seen, new_entries, changed, hashed, bytes_hashed, missing, restored, moved, "deferred", errors, error_code, cancellation_requested, created_at, started_at, finished_at, updated_at FROM repository_scans
+WHERE repository_id = ?1
+ORDER BY created_at DESC, scan_id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestRepositoryScan(ctx context.Context, repositoryID uuid.UUID) (RepositoryScan, error) {
+	row := q.db.QueryRowContext(ctx, getLatestRepositoryScan, repositoryID)
+	var i RepositoryScan
+	err := row.Scan(
+		&i.ScanID,
+		&i.RepositoryID,
+		&i.Trigger,
+		&i.ScopePath,
+		&i.Status,
+		&i.ResumeAfterPath,
+		&i.NotBefore,
+		&i.RequestedBy,
+		&i.Seen,
+		&i.NewEntries,
+		&i.Changed,
+		&i.Hashed,
+		&i.BytesHashed,
+		&i.Missing,
+		&i.Restored,
+		&i.Moved,
+		&i.Deferred,
+		&i.Errors,
+		&i.ErrorCode,
+		&i.CancellationRequested,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getLatestStartedRepositoryScanID = `-- name: GetLatestStartedRepositoryScanID :one
 SELECT scan_id FROM repository_scans
 WHERE repository_id = ?1 AND status <> 'queued'
@@ -345,7 +390,7 @@ func (q *Queries) GetLatestStartedRepositoryScanID(ctx context.Context, reposito
 }
 
 const getLiveRepositoryEntryByKey = `-- name: GetLiveRepositoryEntryByKey :one
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND path_key = ?2
   AND state IN ('pending_hash', 'present')
@@ -373,6 +418,8 @@ func (q *Queries) GetLiveRepositoryEntryByKey(ctx context.Context, arg GetLiveRe
 		&i.StatCheckedNs,
 		&i.State,
 		&i.ContentID,
+		&i.QuickFingerprint,
+		&i.QuickFingerprintVersion,
 		&i.AssetID,
 		&i.Revision,
 		&i.MissingSince,
@@ -419,7 +466,7 @@ func (q *Queries) GetQueuedRepositoryScan(ctx context.Context, repositoryID uuid
 }
 
 const getRepositoryEntry = `-- name: GetRepositoryEntry :one
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
 WHERE entry_id = ?1
 `
 
@@ -440,6 +487,8 @@ func (q *Queries) GetRepositoryEntry(ctx context.Context, entryID uuid.UUID) (Re
 		&i.StatCheckedNs,
 		&i.State,
 		&i.ContentID,
+		&i.QuickFingerprint,
+		&i.QuickFingerprintVersion,
 		&i.AssetID,
 		&i.Revision,
 		&i.MissingSince,
@@ -554,7 +603,7 @@ INSERT INTO repository_entries (
     ?9, ?10, ?11, ?12,
     ?13, ?14, 1, ?15, ?16
 )
-RETURNING entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, asset_id, revision, missing_since, updated_at
+RETURNING entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at
 `
 
 type InsertRepositoryEntryParams struct {
@@ -610,6 +659,8 @@ func (q *Queries) InsertRepositoryEntry(ctx context.Context, arg InsertRepositor
 		&i.StatCheckedNs,
 		&i.State,
 		&i.ContentID,
+		&i.QuickFingerprint,
+		&i.QuickFingerprintVersion,
 		&i.AssetID,
 		&i.Revision,
 		&i.MissingSince,
@@ -680,7 +731,7 @@ func (q *Queries) InsertRepositoryScan(ctx context.Context, arg InsertRepository
 }
 
 const listLiveRepositoryEntriesUnder = `-- name: ListLiveRepositoryEntriesUnder :many
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND (path = ?2 OR (path > ?2 || '/' AND path < ?2 || '0'))
   AND path > ?3
@@ -725,6 +776,8 @@ func (q *Queries) ListLiveRepositoryEntriesUnder(ctx context.Context, arg ListLi
 			&i.StatCheckedNs,
 			&i.State,
 			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
 			&i.AssetID,
 			&i.Revision,
 			&i.MissingSince,
@@ -744,7 +797,7 @@ func (q *Queries) ListLiveRepositoryEntriesUnder(ctx context.Context, arg ListLi
 }
 
 const listPendingHashRepositoryEntries = `-- name: ListPendingHashRepositoryEntries :many
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND state = 'pending_hash'
 ORDER BY entry_id
@@ -779,6 +832,60 @@ func (q *Queries) ListPendingHashRepositoryEntries(ctx context.Context, arg List
 			&i.StatCheckedNs,
 			&i.State,
 			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.AssetID,
+			&i.Revision,
+			&i.MissingSince,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPresentRepositoryEntriesForAsset = `-- name: ListPresentRepositoryEntriesForAsset :many
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
+WHERE asset_id = ?1
+  AND state = 'present'
+  AND kind = 'file'
+ORDER BY repository_id, path
+`
+
+// The occurrences media I/O may open, in a stable preference order.
+func (q *Queries) ListPresentRepositoryEntriesForAsset(ctx context.Context, assetID uuid.NullUUID) ([]RepositoryEntry, error) {
+	rows, err := q.db.QueryContext(ctx, listPresentRepositoryEntriesForAsset, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RepositoryEntry
+	for rows.Next() {
+		var i RepositoryEntry
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.RepositoryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.Size,
+			&i.MtimeNs,
+			&i.CtimeNs,
+			&i.FileID,
+			&i.StatCheckedNs,
+			&i.State,
+			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
 			&i.AssetID,
 			&i.Revision,
 			&i.MissingSince,
@@ -799,7 +906,7 @@ func (q *Queries) ListPendingHashRepositoryEntries(ctx context.Context, arg List
 
 const listRepositoryEntryChildren = `-- name: ListRepositoryEntryChildren :many
 
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND parent_key = ?2
   AND state <> 'trashed'
@@ -839,6 +946,8 @@ func (q *Queries) ListRepositoryEntryChildren(ctx context.Context, arg ListRepos
 			&i.StatCheckedNs,
 			&i.State,
 			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
 			&i.AssetID,
 			&i.Revision,
 			&i.MissingSince,
@@ -977,6 +1086,53 @@ func (q *Queries) RepointAssetContent(ctx context.Context, arg RepointAssetConte
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const requestRepositoryScanCancellation = `-- name: RequestRepositoryScanCancellation :one
+UPDATE repository_scans
+SET cancellation_requested = 1,
+    updated_at = ?1
+WHERE scan_id = ?2
+  AND repository_id = ?3
+RETURNING scan_id, repository_id, "trigger", scope_path, status, resume_after_path, not_before, requested_by, seen, new_entries, changed, hashed, bytes_hashed, missing, restored, moved, "deferred", errors, error_code, cancellation_requested, created_at, started_at, finished_at, updated_at
+`
+
+type RequestRepositoryScanCancellationParams struct {
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	ScanID       uuid.UUID         `db:"scan_id" json:"scan_id"`
+	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+}
+
+func (q *Queries) RequestRepositoryScanCancellation(ctx context.Context, arg RequestRepositoryScanCancellationParams) (RepositoryScan, error) {
+	row := q.db.QueryRowContext(ctx, requestRepositoryScanCancellation, arg.UpdatedAt, arg.ScanID, arg.RepositoryID)
+	var i RepositoryScan
+	err := row.Scan(
+		&i.ScanID,
+		&i.RepositoryID,
+		&i.Trigger,
+		&i.ScopePath,
+		&i.Status,
+		&i.ResumeAfterPath,
+		&i.NotBefore,
+		&i.RequestedBy,
+		&i.Seen,
+		&i.NewEntries,
+		&i.Changed,
+		&i.Hashed,
+		&i.BytesHashed,
+		&i.Missing,
+		&i.Restored,
+		&i.Moved,
+		&i.Deferred,
+		&i.Errors,
+		&i.ErrorCode,
+		&i.CancellationRequested,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const setRepositoryEntryStateCAS = `-- name: SetRepositoryEntryStateCAS :execrows

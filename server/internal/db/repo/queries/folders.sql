@@ -1,49 +1,26 @@
--- Folder collection views are graph projections. Repository-relative paths
--- are assembled by traversing repository_nodes and are never stored on Asset.
+-- Folder collection views are projections of present repository entries.
+-- Repository-relative paths belong to entries and are never stored on Asset.
 
 -- name: GetFolderChildSummaries :many
 -- Lists immediate child folders of parent_path and computes recursive
 -- descendant counts/covers from active Locations.
-WITH RECURSIVE node_paths (repository_id, node_id, relative_path) AS (
-  SELECT repository_id, node_id, CAST('' AS TEXT)
-  FROM repository_nodes
-  WHERE parent_node_id IS NULL AND lifecycle = 'active'
-
-  UNION ALL
-
-  SELECT
-    child.repository_id,
-    child.node_id,
-    CASE
-      WHEN parent.relative_path = '' THEN child.name
-      ELSE parent.relative_path || '/' || child.name
-    END
-  FROM repository_nodes child
-  JOIN node_paths parent
-    ON parent.repository_id = child.repository_id
-   AND parent.node_id = child.parent_node_id
-  WHERE child.lifecycle = 'active'
-),
-scoped AS (
+WITH scoped AS (
   SELECT
     asset.asset_id,
     asset.type,
     asset.taken_time,
     asset.upload_time,
-    occurrence.repository_id,
+    node_path.repository_id,
     CASE
       WHEN sqlc.arg('parent_path') = '' THEN node_path.relative_path
       ELSE substr(node_path.relative_path, length(sqlc.arg('parent_path')) + 2)
     END AS remainder
   FROM assets asset
-  JOIN active_asset_occurrences occurrence
-    ON occurrence.asset_id = asset.asset_id
-  JOIN node_paths node_path
-    ON node_path.repository_id = occurrence.repository_id
-   AND node_path.node_id = occurrence.node_id
+  JOIN active_asset_occurrence_paths node_path
+    ON node_path.asset_id = asset.asset_id
   WHERE asset.is_deleted = false
     AND (sqlc.narg('owner_id') IS NULL OR asset.owner_id = sqlc.narg('owner_id'))
-    AND (sqlc.narg('repository_id') IS NULL OR occurrence.repository_id = sqlc.narg('repository_id'))
+    AND (sqlc.narg('repository_id') IS NULL OR node_path.repository_id = sqlc.narg('repository_id'))
     AND node_path.relative_path NOT LIKE '.lumilio/%'
     AND node_path.relative_path NOT LIKE 'inbox/%'
     AND (
@@ -87,27 +64,7 @@ ORDER BY child_name ASC;
 
 -- name: GetFolderSummary :one
 -- Aggregate stats for one graph-derived folder path and all descendants.
-WITH RECURSIVE node_paths (repository_id, node_id, relative_path) AS (
-  SELECT repository_id, node_id, CAST('' AS TEXT)
-  FROM repository_nodes
-  WHERE parent_node_id IS NULL AND lifecycle = 'active'
-
-  UNION ALL
-
-  SELECT
-    child.repository_id,
-    child.node_id,
-    CASE
-      WHEN parent.relative_path = '' THEN child.name
-      ELSE parent.relative_path || '/' || child.name
-    END
-  FROM repository_nodes child
-  JOIN node_paths parent
-    ON parent.repository_id = child.repository_id
-   AND parent.node_id = child.parent_node_id
-  WHERE child.lifecycle = 'active'
-),
-scoped AS (
+WITH scoped AS (
   SELECT
     asset.asset_id,
     asset.type,
@@ -117,12 +74,9 @@ scoped AS (
       ORDER BY COALESCE(asset.taken_time, asset.upload_time) DESC, asset.asset_id DESC
     ) AS cover_rank
   FROM assets asset
-  JOIN active_asset_occurrences occurrence
-    ON occurrence.asset_id = asset.asset_id
-   AND occurrence.repository_id = sqlc.arg('repository_id')
-  JOIN node_paths node_path
-    ON node_path.repository_id = occurrence.repository_id
-   AND node_path.node_id = occurrence.node_id
+  JOIN active_asset_occurrence_paths node_path
+    ON node_path.asset_id = asset.asset_id
+   AND node_path.repository_id = sqlc.arg('repository_id')
   WHERE asset.is_deleted = false
     AND (sqlc.narg('owner_id') IS NULL OR asset.owner_id = sqlc.narg('owner_id'))
     AND node_path.relative_path NOT LIKE '.lumilio/%'

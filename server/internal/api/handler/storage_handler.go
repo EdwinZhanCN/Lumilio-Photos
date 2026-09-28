@@ -25,7 +25,7 @@ type StorageViewAssetCounter interface {
 
 // StorageViewScanReader loads latest verification summaries when available.
 type StorageViewScanReader interface {
-	GetLatestScanRun(ctx context.Context, repositoryID string) (repo.RepositoryScanRun, error)
+	GetLatestScan(ctx context.Context, repositoryID string) (repo.RepositoryScan, error)
 }
 
 // StorageHandler serves authenticated storage selectors and the admin read model.
@@ -166,11 +166,11 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 			view.AssetCount = &count
 		}
 		if h.scanReader != nil {
-			if scanRun, scanErr := h.scanReader.GetLatestScanRun(ctx, repository.RepoID.String()); scanErr == nil {
+			if scanRun, scanErr := h.scanReader.GetLatestScan(ctx, repository.RepoID.String()); scanErr == nil {
 				view.Verification = &dto.StorageRepositoryVerificationSummaryDTO{
-					OperationID: scanRun.RunID.String(),
+					OperationID: scanRun.ScanID.String(),
 					Status:      scanRun.Status,
-					Mode:        scanRun.Mode,
+					Mode:        scanRun.Trigger,
 				}
 			} else if !errors.Is(scanErr, sql.ErrNoRows) {
 				api.WriteProblem(c, api.Internal(fmt.Errorf("load verification summary: %w", scanErr)))

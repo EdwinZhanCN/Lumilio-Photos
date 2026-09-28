@@ -1,10 +1,11 @@
 // Package pathsemantics turns filesystem-specific name comparison rules into
-// durable repository name keys. Paths remain projections of the node graph;
-// this package only owns one path component at a time.
+// durable repository name keys. It owns one path component at a time; the
+// scan index joins components into path keys.
 package pathsemantics
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 
 	"golang.org/x/text/unicode/norm"
@@ -29,6 +30,18 @@ const (
 type Semantics struct {
 	Case          CaseMode
 	Normalization Normalization
+}
+
+// HostDefault is the comparison rule of the host's default filesystem:
+// case-insensitive on macOS and Windows, case-sensitive elsewhere, NFC on all.
+// It is not a probe of any particular volume.
+func HostDefault() Semantics {
+	switch runtime.GOOS {
+	case "windows", "darwin":
+		return Semantics{Case: CaseInsensitive, Normalization: NormalizationNFC}
+	default:
+		return Semantics{Case: CaseSensitive, Normalization: NormalizationNFC}
+	}
 }
 
 func (s Semantics) Validate() error {

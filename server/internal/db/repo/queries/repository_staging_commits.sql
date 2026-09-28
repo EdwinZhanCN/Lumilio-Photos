@@ -43,7 +43,7 @@ RETURNING *;
 
 -- name: CompleteRepositoryStagingCommit :one
 UPDATE repository_staging_commits
-SET status = 'completed', node_id = ?2, asset_id = ?3,
+SET status = 'completed', entry_id = ?2, asset_id = ?3,
     failure_code = NULL, failure_detail = NULL,
     completed_at = ?4, updated_at = ?4
 WHERE commit_id = ?1

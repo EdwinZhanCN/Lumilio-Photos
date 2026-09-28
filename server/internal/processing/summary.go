@@ -260,9 +260,9 @@ func (r *Reader) catalogCounts(ctx context.Context, now time.Time) (map[StageID]
 		{StageImport, `SELECT COALESCE(SUM(state='pending'),0), COALESCE(SUM(state='failed' AND updated_at>?),0),
 		  MIN(CASE WHEN state='pending' THEN created_at END)
 		  FROM catalog_operation_receipts WHERE kind='ingest'`, []any{now.Add(-ImportFailureWindow).UnixMicro()}},
-		{StageScan, `SELECT COALESCE(SUM(desired_epoch>applied_epoch AND terminal_error IS NULL),0), COALESCE(SUM(terminal_error IS NOT NULL),0),
-		  MIN(CASE WHEN desired_epoch>applied_epoch AND terminal_error IS NULL THEN updated_at END)
-		  FROM repository_observation_state`, nil},
+		{StageScan, `SELECT COALESCE(SUM(pending),0), COALESCE(SUM(terminal_error IS NOT NULL AND NOT pending),0),
+		  MIN(pending_since)
+		  FROM repository_scan_state`, nil},
 		{StageEvents, `SELECT COALESCE(SUM(source_revision>applied_revision AND terminal_error IS NULL),0), COALESCE(SUM(terminal_error IS NOT NULL),0),
 		  MIN(CASE WHEN source_revision>applied_revision AND terminal_error IS NULL THEN updated_at END)
 		  FROM event_projection_pipeline_state`, nil},

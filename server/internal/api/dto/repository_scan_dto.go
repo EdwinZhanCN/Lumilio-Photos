@@ -181,40 +181,44 @@ type ResolveRepositoryCandidateRequestDTO struct {
 	RiskConfirmation bool   `json:"risk_confirmation,omitempty"`
 }
 
-type RepositoryScanRequestDTO struct {
-	Force bool `json:"force" example:"false"`
-}
-
 type RepositoryScanQueuedDTO struct {
 	OperationID  string `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	RepositoryID string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Mode         string `json:"mode" example:"manual"`
-	Status       string `json:"status" example:"queued"`
-	Inserted     bool   `json:"inserted" example:"true"`
-	Coalesced    bool   `json:"coalesced" example:"false"`
+	// Mode is the scan trigger: manual, periodic, watcher, startup, or settle.
+	Mode      string `json:"mode" example:"manual" enums:"manual,periodic,watcher,startup,settle"`
+	Status    string `json:"status" example:"queued"`
+	Inserted  bool   `json:"inserted" example:"true"`
+	Coalesced bool   `json:"coalesced" example:"false"`
 }
 
+// RepositoryScanRunDTO is one scan of the repository index. Counters are
+// incremental: seen entries, new and changed entries, hashed files, entries
+// marked missing, restored, removed as moves, deferred inside the settle
+// window, and read errors.
 type RepositoryScanRunDTO struct {
-	OperationID              string             `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RepositoryID             string             `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	RequestedEpoch           int64              `json:"requested_epoch" example:"2"`
-	Mode                     string             `json:"mode" example:"manual"`
-	RequestedBy              *string            `json:"requested_by,omitempty" example:"edwin"`
-	CoalescedCount           int64              `json:"coalesced_count" example:"1"`
-	Status                   string             `json:"status" example:"completed"`
-	CreatedAt                time.Time          `json:"created_at"`
-	StartedAt                *time.Time         `json:"started_at,omitempty"`
-	FinishedAt               *time.Time         `json:"finished_at,omitempty"`
-	DirectoriesObserved      int64              `json:"directories_observed" example:"10"`
-	FilesObserved            int64              `json:"files_observed" example:"120"`
-	BytesQueued              int64              `json:"bytes_queued" example:"1048576"`
-	BytesHashed              int64              `json:"bytes_hashed" example:"524288"`
-	AuthoritativeDirectories int64              `json:"authoritative_directories" example:"8"`
-	ErrorDirectories         int64              `json:"error_directories" example:"1"`
-	OutboxDepth              int64              `json:"outbox_depth" example:"12"`
-	PartialCoverage          bool               `json:"partial_coverage" example:"true"`
-	CancellationRequested    bool               `json:"cancellation_requested" example:"false"`
-	Problem                  *problem.Reference `json:"problem,omitempty"`
+	OperationID  string `json:"operation_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RepositoryID string `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// Mode is the scan trigger: manual, periodic, watcher, startup, or settle.
+	Mode        string  `json:"mode" example:"manual" enums:"manual,periodic,watcher,startup,settle"`
+	RequestedBy *string `json:"requested_by,omitempty" example:"edwin"`
+	// ScopePath is the scanned subtree; empty means the whole repository.
+	ScopePath             string             `json:"scope_path" example:""`
+	Status                string             `json:"status" example:"completed" enums:"queued,walking,sweeping,completed,offline,failed,cancelled"`
+	CreatedAt             time.Time          `json:"created_at"`
+	StartedAt             *time.Time         `json:"started_at,omitempty"`
+	FinishedAt            *time.Time         `json:"finished_at,omitempty"`
+	Seen                  int64              `json:"seen" example:"1200"`
+	NewEntries            int64              `json:"new_entries" example:"12"`
+	Changed               int64              `json:"changed" example:"3"`
+	Hashed                int64              `json:"hashed" example:"15"`
+	BytesHashed           int64              `json:"bytes_hashed" example:"524288"`
+	Missing               int64              `json:"missing" example:"1"`
+	Restored              int64              `json:"restored" example:"0"`
+	Moved                 int64              `json:"moved" example:"2"`
+	Deferred              int64              `json:"deferred" example:"0"`
+	Errors                int64              `json:"errors" example:"0"`
+	CancellationRequested bool               `json:"cancellation_requested" example:"false"`
+	Problem               *problem.Reference `json:"problem,omitempty"`
 }
 
 type RepositoryScanRunListDTO struct {

@@ -16,8 +16,8 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"server/internal/storage/locations"
 	"server/internal/storage/repocfg"
-	"server/internal/storage/roe/locations"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

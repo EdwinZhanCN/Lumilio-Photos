@@ -15,7 +15,7 @@ import (
 	"server/internal/logging"
 	"server/internal/settings"
 	"server/internal/storage"
-	"server/internal/storage/roe/locations"
+	"server/internal/storage/locations"
 	"server/internal/utils/imagesource"
 
 	"go.uber.org/zap"

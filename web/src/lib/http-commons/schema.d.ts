@@ -13885,7 +13885,7 @@ export interface paths {
         put?: never;
         /**
          * Queue repository scan
-         * @description Queue a manual scan for a repository free workspace.
+         * @description Queue a full scan of a repository. A request joins a scan that is already queued.
          */
         post: {
             parameters: {
@@ -13897,10 +13897,9 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description Scan request */
             requestBody?: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.RepositoryScanRequestDTO"];
+                    "application/json": Record<string, never>;
                 };
             };
             responses: {
@@ -14012,7 +14011,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel repository scan operation
-         * @description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+         * @description Request cancellation of one exact Repository scan. A queued scan ends at once; a running scan stops at its next turn and marks nothing further missing.
          */
         post: {
             parameters: {
@@ -17002,8 +17001,12 @@ export interface components {
             coalesced?: boolean;
             /** @example true */
             inserted?: boolean;
-            /** @example manual */
-            mode?: string;
+            /**
+             * @description Mode is the scan trigger: manual, periodic, watcher, startup, or settle.
+             * @example manual
+             * @enum {string}
+             */
+            mode?: "manual" | "periodic" | "watcher" | "startup" | "settle";
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             operation_id?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -17011,47 +17014,55 @@ export interface components {
             /** @example queued */
             status?: string;
         };
-        "dto.RepositoryScanRequestDTO": {
-            /** @example false */
-            force?: boolean;
-        };
         "dto.RepositoryScanRunDTO": {
-            /** @example 8 */
-            authoritative_directories?: number;
             /** @example 524288 */
             bytes_hashed?: number;
-            /** @example 1048576 */
-            bytes_queued?: number;
             /** @example false */
             cancellation_requested?: boolean;
-            /** @example 1 */
-            coalesced_count?: number;
+            /** @example 3 */
+            changed?: number;
             created_at?: string;
-            /** @example 10 */
-            directories_observed?: number;
-            /** @example 1 */
-            error_directories?: number;
-            /** @example 120 */
-            files_observed?: number;
+            /** @example 0 */
+            deferred?: number;
+            /** @example 0 */
+            errors?: number;
             finished_at?: string;
-            /** @example manual */
-            mode?: string;
+            /** @example 15 */
+            hashed?: number;
+            /** @example 1 */
+            missing?: number;
+            /**
+             * @description Mode is the scan trigger: manual, periodic, watcher, startup, or settle.
+             * @example manual
+             * @enum {string}
+             */
+            mode?: "manual" | "periodic" | "watcher" | "startup" | "settle";
+            /** @example 2 */
+            moved?: number;
+            /** @example 12 */
+            new_entries?: number;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             operation_id?: string;
-            /** @example 12 */
-            outbox_depth?: number;
-            /** @example true */
-            partial_coverage?: boolean;
             problem?: components["schemas"]["api.ProblemReference"];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             /** @example edwin */
             requested_by?: string;
-            /** @example 2 */
-            requested_epoch?: number;
+            /** @example 0 */
+            restored?: number;
+            /**
+             * @description ScopePath is the scanned subtree; empty means the whole repository.
+             * @example
+             */
+            scope_path?: string;
+            /** @example 1200 */
+            seen?: number;
             started_at?: string;
-            /** @example completed */
-            status?: string;
+            /**
+             * @example completed
+             * @enum {string}
+             */
+            status?: "queued" | "walking" | "sweeping" | "completed" | "offline" | "failed" | "cancelled";
         };
         "dto.RepositoryScanRunListDTO": {
             scans?: components["schemas"]["dto.RepositoryScanRunDTO"][];

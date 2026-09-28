@@ -710,33 +710,16 @@ func seedRepositoryAssetOccurrence(
 			t.Fatal(err)
 		}
 	}
-	rootNodeID := uuid.New()
-	fileNodeID := uuid.New()
+	entryID := uuid.New()
 	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, created_at, updated_at
-		) VALUES (?, ?, NULL, '', '', 'directory', 1, 1, 1)
-	`, rootNodeID, repositoryID); err != nil {
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, content_id, asset_id, revision, updated_at
+		) VALUES (?, ?, ?, lower(?), '', 'file', ?, 1, 1, 'present', ?, ?, 1, 1)
+	`, entryID, repositoryID, filename, filename, fileSize, contentID, assetID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, file_size, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, 'file', 2, ?, 1, 1)
-	`, fileNodeID, repositoryID, rootNodeID, filename, filename, fileSize); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := catalog.SQL.ExecContext(ctx, `
-		INSERT INTO asset_locations (
-			location_id, node_id, asset_id, bound_observation_revision,
-			created_at, updated_at
-		) VALUES (?, ?, ?, 2, 1, 1)
-	`, uuid.New(), fileNodeID, assetID); err != nil {
-		t.Fatal(err)
-	}
-	return fileNodeID
+	return entryID
 }
 
 func assertStorageCount(t *testing.T, database *sql.DB, query string, want int, args ...any) {

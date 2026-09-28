@@ -21,7 +21,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-	roecontroller "server/internal/storage/roe/controller"
+	"server/internal/storage/scan"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -243,11 +243,11 @@ func redactSupportPath(path string) string {
 }
 
 type RepositoryScanService interface {
-	EnqueueManualScan(ctx context.Context, repositoryID string, requestedBy string, force bool) (roecontroller.Receipt, error)
-	GetScanRun(ctx context.Context, repositoryID string, operationID string) (repo.RepositoryScanRun, error)
-	GetLatestScanRun(ctx context.Context, repositoryID string) (repo.RepositoryScanRun, error)
-	ListScanRuns(ctx context.Context, repositoryID string, limit, offset int32) ([]repo.RepositoryScanRun, error)
-	CancelScanRun(ctx context.Context, repositoryID string, operationID string) (repo.RepositoryScanRun, error)
+	RequestScan(ctx context.Context, repositoryID, trigger, requestedBy string) (scan.Receipt, error)
+	GetScan(ctx context.Context, repositoryID, scanID string) (repo.RepositoryScan, error)
+	GetLatestScan(ctx context.Context, repositoryID string) (repo.RepositoryScan, error)
+	ListScans(ctx context.Context, repositoryID string, limit, offset int32) ([]repo.RepositoryScan, error)
+	CancelScan(ctx context.Context, repositoryID, scanID string) (repo.RepositoryScan, error)
 }
 
 type RepositoryScanHandler struct {
@@ -654,13 +654,12 @@ func writeRepositoryConflict(c *gin.Context, cause error, conflictType string) {
 
 // QueueRepositoryScan queues a manual repository scan.
 // @Summary Queue repository scan
-// @Description Queue a manual scan for a repository free workspace.
+// @Description Queue a full scan of a repository. A request joins a scan that is already queued.
 // @Tags repositories
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Repository UUID"
-// @Param request body dto.RepositoryScanRequestDTO false "Scan request"
 // @Success 200 {object} dto.RepositoryScanQueuedDTO "Repository scan queued successfully"
 // @Failure 400 {object} api.ProblemResponse "Invalid request"
 // @Failure 401 {object} api.ProblemResponse "Unauthorized"
@@ -672,14 +671,6 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 		return
 	}
 
-	var req dto.RepositoryScanRequestDTO
-	if c.Request.Body != nil && c.Request.ContentLength != 0 {
-		if err := c.ShouldBindJSON(&req); err != nil {
-			api.WriteProblem(c, api.BadRequest(err))
-			return
-		}
-	}
-
 	user, ok := requireCurrentUser(c)
 	if !ok {
 		return
@@ -689,16 +680,16 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 		requestedBy = strconv.Itoa(user.UserID)
 	}
 
-	result, err := h.scanService.EnqueueManualScan(c.Request.Context(), strings.TrimSpace(c.Param("id")), requestedBy, req.Force)
+	result, err := h.scanService.RequestScan(c.Request.Context(), strings.TrimSpace(c.Param("id")), scan.TriggerManual, requestedBy)
 	if err != nil {
 		api.WriteProblem(c, api.BadRequest(err))
 		return
 	}
 
 	api.JSONOK(c, dto.RepositoryScanQueuedDTO{
-		OperationID:  result.OperationID.String(),
+		OperationID:  result.ScanID.String(),
 		RepositoryID: result.RepositoryID.String(),
-		Mode:         result.Mode,
+		Mode:         result.Trigger,
 		Status:       result.Status,
 		Inserted:     result.Inserted,
 		Coalesced:    result.Coalesced,
@@ -717,7 +708,7 @@ func (h *RepositoryScanHandler) QueueRepositoryScan(c *gin.Context) {
 // @Failure 404 {object} api.ProblemResponse "Scan operation not found"
 // @Router /api/v1/storage/repositories/{id}/verifications/{operation_id} [get]
 func (h *RepositoryScanHandler) GetRepositoryScan(c *gin.Context) {
-	scanRun, err := h.scanService.GetScanRun(
+	scanRun, err := h.scanService.GetScan(
 		c.Request.Context(),
 		strings.TrimSpace(c.Param("id")),
 		strings.TrimSpace(c.Param("operation_id")),
@@ -735,7 +726,7 @@ func (h *RepositoryScanHandler) GetRepositoryScan(c *gin.Context) {
 
 // CancelRepositoryScan durably requests cancellation of one exact operation.
 // @Summary Cancel repository scan operation
-// @Description Request cancellation of one exact Repository scan. Previously valid files remain available until a later authoritative verification proves absence.
+// @Description Request cancellation of one exact Repository scan. A queued scan ends at once; a running scan stops at its next turn and marks nothing further missing.
 // @Tags repositories
 // @Produce json
 // @Security BearerAuth
@@ -745,7 +736,7 @@ func (h *RepositoryScanHandler) GetRepositoryScan(c *gin.Context) {
 // @Failure 404 {object} api.ProblemResponse "Scan operation not found"
 // @Router /api/v1/storage/repositories/{id}/verifications/{operation_id}/cancel [post]
 func (h *RepositoryScanHandler) CancelRepositoryScan(c *gin.Context) {
-	scanRun, err := h.scanService.CancelScanRun(
+	scanRun, err := h.scanService.CancelScan(
 		c.Request.Context(),
 		strings.TrimSpace(c.Param("id")),
 		strings.TrimSpace(c.Param("operation_id")),
@@ -772,7 +763,7 @@ func (h *RepositoryScanHandler) CancelRepositoryScan(c *gin.Context) {
 // @Failure 404 {object} api.ProblemResponse "No scan run found"
 // @Router /api/v1/storage/repositories/{id}/verifications/latest [get]
 func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
-	scanRun, err := h.scanService.GetLatestScanRun(c.Request.Context(), strings.TrimSpace(c.Param("id")))
+	scanRun, err := h.scanService.GetLatestScan(c.Request.Context(), strings.TrimSpace(c.Param("id")))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			api.WriteProblem(c, api.NotFound(err))
@@ -798,7 +789,7 @@ func (h *RepositoryScanHandler) GetLatestRepositoryScan(c *gin.Context) {
 func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 	limit := parseInt32Query(c, "limit", 20)
 	offset := parseInt32Query(c, "offset", 0)
-	scans, err := h.scanService.ListScanRuns(c.Request.Context(), strings.TrimSpace(c.Param("id")), limit, offset)
+	scans, err := h.scanService.ListScans(c.Request.Context(), strings.TrimSpace(c.Param("id")), limit, offset)
 	if err != nil {
 		api.WriteProblem(c, api.BadRequest(err))
 		return
@@ -1063,8 +1054,7 @@ func parseInt32Query(c *gin.Context, key string, fallback int32) int32 {
 	return int32(value)
 }
 
-func toRepositoryScanRunDTO(scanRun repo.RepositoryScanRun) dto.RepositoryScanRunDTO {
-	createdAt := scanRun.CreatedAt.Time
+func toRepositoryScanRunDTO(scanRun repo.RepositoryScan) dto.RepositoryScanRunDTO {
 	var startedAt *time.Time
 	if scanRun.StartedAt.Valid {
 		t := scanRun.StartedAt.Time
@@ -1076,24 +1066,21 @@ func toRepositoryScanRunDTO(scanRun repo.RepositoryScanRun) dto.RepositoryScanRu
 		finishedAt = &t
 	}
 	var operationProblem *problem.Reference
-	switch {
-	case scanRun.Status == "failed":
-		value := problem.ReferenceFor(problem.RepositoryScanFailed, scanRun.RunID.String(), true)
+	switch scanRun.Status {
+	case scan.StatusFailed:
+		value := problem.ReferenceFor(problem.RepositoryScanFailed, scanRun.ScanID.String(), true)
 		operationProblem = &value
-	case scanRun.Status == "partial":
-		value := problem.ReferenceFor(problem.RepositoryScanIncomplete, scanRun.RunID.String(), true)
+	case scan.StatusOffline:
+		value := problem.ReferenceFor(problem.RepositoryScanIncomplete, scanRun.ScanID.String(), true)
 		operationProblem = &value
 	}
 	return dto.RepositoryScanRunDTO{
-		OperationID: scanRun.RunID.String(), RepositoryID: scanRun.RepositoryID.String(),
-		RequestedEpoch: scanRun.RequestedEpoch, Mode: scanRun.Mode, RequestedBy: scanRun.RequestedBy,
-		CoalescedCount: scanRun.CoalescedCount, Status: scanRun.Status,
-		CreatedAt: createdAt, StartedAt: startedAt, FinishedAt: finishedAt,
-		DirectoriesObserved: scanRun.DirectoriesObserved, FilesObserved: scanRun.FilesObserved,
-		BytesQueued: scanRun.BytesQueued, BytesHashed: scanRun.BytesHashed,
-		AuthoritativeDirectories: scanRun.AuthoritativeDirectories,
-		ErrorDirectories:         scanRun.ErrorDirectories, OutboxDepth: scanRun.OutboxDepth,
-		PartialCoverage:       scanRun.PartialCoverage != 0,
+		OperationID: scanRun.ScanID.String(), RepositoryID: scanRun.RepositoryID.String(),
+		Mode: scanRun.Trigger, RequestedBy: scanRun.RequestedBy, ScopePath: scanRun.ScopePath,
+		Status: scanRun.Status, CreatedAt: scanRun.CreatedAt.Time, StartedAt: startedAt, FinishedAt: finishedAt,
+		Seen: scanRun.Seen, NewEntries: scanRun.NewEntries, Changed: scanRun.Changed,
+		Hashed: scanRun.Hashed, BytesHashed: scanRun.BytesHashed, Missing: scanRun.Missing,
+		Restored: scanRun.Restored, Moved: scanRun.Moved, Deferred: scanRun.Deferred, Errors: scanRun.Errors,
 		CancellationRequested: scanRun.CancellationRequested != 0,
 		Problem:               operationProblem,
 	}

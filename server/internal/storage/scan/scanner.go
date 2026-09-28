@@ -29,7 +29,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-	"server/internal/storage/roe/pathsemantics"
+	"server/internal/storage/pathsemantics"
 )
 
 // MaxBatchRows bounds every writer transaction. The walk also bounds each

@@ -56,6 +56,10 @@ func (s *Scanner) HashTurn(ctx context.Context, repositoryID uuid.UUID, limit in
 	owner := *repository.DefaultOwnerID
 	fsys, err := s.files.OpenContext(ctx, repository)
 	if err != nil {
+		if isOffline(err) {
+			// Pending rows wait for the repository to come back.
+			return HashResult{}, nil
+		}
 		return result, err
 	}
 	defer fsys.Close()
@@ -69,7 +73,7 @@ func (s *Scanner) HashTurn(ctx context.Context, repositoryID uuid.UUID, limit in
 			continue
 		}
 		checked := s.config.Now()
-		observation, err := fsys.InspectMedia(ctx, repositoryPath, storage.HashFull)
+		observation, err := fsys.InspectMedia(ctx, repositoryPath, storage.HashQuickAndFull)
 		switch {
 		case errors.Is(err, storage.ErrRepositoryFileUnstable):
 			// Changed while hashing: the row stays pending for the next pass.
@@ -103,7 +107,8 @@ func (s *Scanner) HashTurn(ctx context.Context, repositoryID uuid.UUID, limit in
 			assetType: string(validation.AssetType), mimeType: validation.MimeType,
 		}
 		err = s.writer.WithTx(ctx, catalogtx.OperationRepositoryScanHashCommit, func(tx *sql.Tx, queries *repo.Queries) error {
-			return s.commitHashTx(ctx, tx, queries, commit)
+			_, err := s.commitHashTx(ctx, tx, queries, commit)
+			return err
 		})
 		switch {
 		case errors.Is(err, errStale):
@@ -138,6 +143,18 @@ type hashCommit struct {
 	checked     time.Time
 	assetType   string
 	mimeType    string
+	// trusted marks a file Lumilio wrote itself (upload or cloud import):
+	// no other writer can race its mtime, so it is recorded as checked past
+	// the racy window and the next scan does not rehash it.
+	trusted bool
+}
+
+func (commit hashCommit) checkedNs() int64 {
+	checked := commit.checked.UnixNano()
+	if commit.trusted {
+		return max(checked, commit.observation.ModTimeNS+RacyGranularity.Nanoseconds()+1)
+	}
+	return checked
 }
 
 // commitHashTx binds a hashed entry to its Asset. When the path was bound to
@@ -152,17 +169,17 @@ type hashCommit struct {
 //     present entry.
 //
 // In every branch the scan leaves no Asset without an entry.
-func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Queries, commit hashCommit) error {
+func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Queries, commit hashCommit) (uuid.UUID, error) {
 	row := commit.row
 	current, err := queries.GetRepositoryEntry(ctx, row.EntryID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return errStale
+		return uuid.Nil, errStale
 	}
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	if current.Revision != row.Revision || current.State != StatePendingHash {
-		return errStale
+		return uuid.Nil, errStale
 	}
 	now := dbtypes.NewTimestamp(commit.checked)
 	content, err := queries.InsertContentObject(ctx, repo.InsertContentObjectParams{
@@ -170,12 +187,12 @@ func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Qu
 		FileSize: commit.observation.Size, CreatedAt: now,
 	})
 	if err != nil {
-		return fmt.Errorf("insert content identity: %w", err)
+		return uuid.Nil, fmt.Errorf("insert content identity: %w", err)
 	}
 	existing, err := queries.GetOwnerContentAsset(ctx, repo.GetOwnerContentAssetParams{OwnerID: &commit.owner, ContentID: content.ContentID})
 	hasExisting := err == nil
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return err
+		return uuid.Nil, err
 	}
 	newAsset := func() (uuid.UUID, error) {
 		asset, err := queries.InsertOwnerContentAsset(ctx, repo.InsertOwnerContentAssetParams{
@@ -194,7 +211,7 @@ func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Qu
 	if bound {
 		previous, err = queries.GetAssetByIDAny(ctx, row.AssetID.UUID)
 		if err != nil {
-			return fmt.Errorf("load bound asset: %w", err)
+			return uuid.Nil, fmt.Errorf("load bound asset: %w", err)
 		}
 	}
 	switch {
@@ -204,7 +221,7 @@ func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Qu
 		target = existing.AssetID
 		if bound {
 			if err := keepAsMissingTx(ctx, queries, row, previous, now); err != nil {
-				return err
+				return uuid.Nil, err
 			}
 		}
 	case bound:
@@ -212,7 +229,7 @@ func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Qu
 			AssetID: row.AssetID, EntryID: row.EntryID,
 		})
 		if err != nil {
-			return err
+			return uuid.Nil, err
 		}
 		if elsewhere == 0 {
 			rows, err := queries.RepointAssetContent(ctx, repo.RepointAssetContentParams{
@@ -220,23 +237,23 @@ func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Qu
 				AssetID: previous.AssetID, ExpectedContentID: previous.ContentID,
 			})
 			if err != nil {
-				return fmt.Errorf("re-point asset content: %w", err)
+				return uuid.Nil, fmt.Errorf("re-point asset content: %w", err)
 			}
 			if rows != 1 {
-				return errStale
+				return uuid.Nil, errStale
 			}
 			target = previous.AssetID
 			break
 		}
 		if target, err = newAsset(); err != nil {
-			return err
+			return uuid.Nil, err
 		}
 		if err := copyUserMetadataTx(ctx, queries, previous.AssetID, target); err != nil {
-			return err
+			return uuid.Nil, err
 		}
 	default:
 		if target, err = newAsset(); err != nil {
-			return err
+			return uuid.Nil, err
 		}
 	}
 
@@ -245,32 +262,33 @@ func (s *Scanner) commitHashTx(ctx context.Context, tx *sql.Tx, queries *repo.Qu
 		AssetID:   uuid.NullUUID{UUID: target, Valid: true},
 		Size:      commit.observation.Size, MtimeNs: commit.observation.ModTimeNS,
 		CtimeNs: commit.observation.ChangeTimeNS, FileID: commit.observation.FileIdentity,
-		StatCheckedNs: commit.checked.UnixNano(), UpdatedAt: now,
+		QuickFingerprint: commit.observation.QuickFingerprint, QuickFingerprintVersion: commit.observation.QuickFingerprintVer,
+		StatCheckedNs: commit.checkedNs(), UpdatedAt: now,
 		EntryID: row.EntryID, ExpectedRevision: row.Revision,
 	})
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	if rows != 1 {
-		return errStale
+		return uuid.Nil, errStale
 	}
 	moved, err := queries.DeleteMissingRepositoryEntriesForAsset(ctx, uuid.NullUUID{UUID: target, Valid: true})
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	if s.config.Activate != nil {
 		if err := s.config.Activate(ctx, tx, queries, row.RepositoryID, row.EntryID, target, content.ContentID); err != nil {
-			return err
+			return uuid.Nil, err
 		}
 	}
 	scanID, err := queries.GetLatestStartedRepositoryScanID(ctx, row.RepositoryID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil
+		return target, nil
 	}
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
-	return queries.AddRepositoryScanHashProgress(ctx, repo.AddRepositoryScanHashProgressParams{
+	return target, queries.AddRepositoryScanHashProgress(ctx, repo.AddRepositoryScanHashProgressParams{
 		HashedBytes: commit.observation.Size, MovedEntries: moved, UpdatedAt: now, ScanID: scanID,
 	})
 }

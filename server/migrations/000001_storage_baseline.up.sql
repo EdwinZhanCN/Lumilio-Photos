@@ -66,44 +66,6 @@ CREATE TABLE "events" (
     UNIQUE (event_id, owner_id)
 ) STRICT;
 
-CREATE TABLE "repository_scan_runs" (
-    run_id TEXT PRIMARY KEY
-        CHECK (run_id = lower(run_id) AND length(run_id) = 36),
-    repository_id TEXT NOT NULL
-        REFERENCES repositories(repo_id) ON DELETE CASCADE,
-    requested_epoch INTEGER NOT NULL CHECK (requested_epoch > 0),
-    mode TEXT NOT NULL
-        CHECK (mode IN ('manual', 'periodic', 'watcher', 'recovery', 'migration')),
-    requested_by TEXT,
-    coalesced_count INTEGER NOT NULL DEFAULT 0 CHECK (coalesced_count >= 0),
-    status TEXT NOT NULL
-        CHECK (status IN (
-            'queued', 'crawling', 'catching_up', 'finalizing',
-            'completed', 'partial', 'failed', 'cancelled'
-        )),
-    created_at INTEGER NOT NULL,
-    started_at INTEGER,
-    finished_at INTEGER,
-    cursor_start BLOB,
-    cursor_end BLOB,
-    cursor_target BLOB NOT NULL DEFAULT X'',
-    volume_identity TEXT,
-    directories_observed INTEGER NOT NULL DEFAULT 0 CHECK (directories_observed >= 0),
-    files_observed INTEGER NOT NULL DEFAULT 0 CHECK (files_observed >= 0),
-    bytes_queued INTEGER NOT NULL DEFAULT 0 CHECK (bytes_queued >= 0),
-    bytes_hashed INTEGER NOT NULL DEFAULT 0 CHECK (bytes_hashed >= 0),
-    authoritative_directories INTEGER NOT NULL DEFAULT 0 CHECK (authoritative_directories >= 0),
-    error_directories INTEGER NOT NULL DEFAULT 0 CHECK (error_directories >= 0),
-    outbox_depth INTEGER NOT NULL DEFAULT 0 CHECK (outbox_depth >= 0),
-    partial_coverage INTEGER NOT NULL DEFAULT 0 CHECK (partial_coverage IN (0, 1)),
-    cancellation_requested INTEGER NOT NULL DEFAULT 0 CHECK (cancellation_requested IN (0, 1)),
-    force_full_verification INTEGER NOT NULL DEFAULT 0
-        CHECK (force_full_verification IN (0, 1)),
-    failure_code TEXT,
-    failure_problem_type TEXT,
-    updated_at INTEGER NOT NULL
-, full_verification_performed INTEGER NOT NULL DEFAULT 0 CHECK (full_verification_performed IN (0,1))) STRICT;
-
 CREATE TABLE agent_checkpoints (
     id TEXT PRIMARY KEY,
     data BLOB NOT NULL,
@@ -216,20 +178,6 @@ CREATE TABLE albums (
     description TEXT,
     cover_asset_id TEXT REFERENCES assets(asset_id) ON DELETE SET NULL,
     album_type TEXT NOT NULL DEFAULT 'default' CHECK (album_type IN ('default', 'smart', 'bio'))
-) STRICT;
-
-CREATE TABLE asset_locations (
-    location_id TEXT PRIMARY KEY
-        CHECK (location_id = lower(location_id) AND length(location_id) = 36),
-    node_id TEXT NOT NULL
-        REFERENCES repository_nodes(node_id) ON DELETE CASCADE,
-    asset_id TEXT NOT NULL
-        REFERENCES "assets"(asset_id) ON DELETE CASCADE,
-    bound_observation_revision INTEGER NOT NULL CHECK (bound_observation_revision > 0),
-    unbound_observation_revision INTEGER
-        CHECK (unbound_observation_revision IS NULL OR unbound_observation_revision > bound_observation_revision),
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
 ) STRICT;
 
 CREATE TABLE asset_pipeline_failures (
@@ -1088,21 +1036,6 @@ CREATE TABLE repositories (
     storage_location_id TEXT NOT NULL REFERENCES storage_locations(storage_location_id) ON DELETE RESTRICT
 ) STRICT;
 
-CREATE TABLE repository_change_cursors (
-    repository_id TEXT NOT NULL
-        REFERENCES repositories(repo_id) ON DELETE CASCADE,
-    adapter_kind TEXT NOT NULL
-        CHECK (adapter_kind IN ('usn', 'rdcw', 'fsevents', 'inotify', 'periodic')),
-    cursor BLOB,
-    volume_identity TEXT,
-    journal_identity TEXT,
-    status TEXT NOT NULL
-        CHECK (status IN ('healthy', 'gap', 'overflow', 'unavailable')),
-    applied_revision INTEGER NOT NULL DEFAULT 0 CHECK (applied_revision >= 0),
-    updated_at INTEGER NOT NULL,
-    PRIMARY KEY (repository_id, adapter_kind)
-) STRICT;
-
 CREATE TABLE repository_cloud_bindings (
     repository_id TEXT NOT NULL REFERENCES repositories(repo_id) ON DELETE CASCADE,
     credential_id TEXT NOT NULL REFERENCES cloud_credentials(credential_id) ON DELETE RESTRICT,
@@ -1122,133 +1055,6 @@ CREATE TABLE repository_defaults (
     duplicate_handling TEXT NOT NULL DEFAULT 'rename'
         CHECK (duplicate_handling IN ('rename', 'uuid')),
     updated_at INTEGER NOT NULL
-) STRICT;
-
-CREATE TABLE repository_nodes (
-    node_id TEXT PRIMARY KEY
-        CHECK (node_id = lower(node_id) AND length(node_id) = 36),
-    repository_id TEXT NOT NULL
-        REFERENCES repositories(repo_id) ON DELETE CASCADE,
-    parent_node_id TEXT,
-    name TEXT NOT NULL,
-    name_key TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK (kind IN ('directory', 'file', 'symlink')),
-    lifecycle TEXT NOT NULL DEFAULT 'active'
-        CHECK (lifecycle IN ('active', 'tombstoned')),
-    native_identity_kind TEXT,
-    native_identity_value TEXT,
-    volume_identity TEXT,
-    observation_revision INTEGER NOT NULL CHECK (observation_revision >= 0),
-    stability_token TEXT,
-    file_size INTEGER CHECK (file_size IS NULL OR file_size >= 0),
-    modified_at_ns INTEGER,
-    changed_at_ns INTEGER,
-    last_seen_run_id TEXT
-        REFERENCES "repository_scan_runs"(run_id) ON DELETE SET NULL,
-    last_authoritative_coverage_revision INTEGER NOT NULL DEFAULT 0
-        CHECK (last_authoritative_coverage_revision >= 0),
-    absence_first_observed_at INTEGER,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    UNIQUE (repository_id, node_id),
-    FOREIGN KEY (repository_id, parent_node_id)
-        REFERENCES repository_nodes(repository_id, node_id)
-        DEFERRABLE INITIALLY DEFERRED
-) STRICT;
-
-CREATE TABLE repository_observation_state (
-    repository_id TEXT PRIMARY KEY
-        REFERENCES repositories(repo_id) ON DELETE CASCADE,
-    desired_epoch INTEGER NOT NULL DEFAULT 0 CHECK (desired_epoch >= 0),
-    applied_epoch INTEGER NOT NULL DEFAULT 0
-        CHECK (applied_epoch >= 0 AND applied_epoch <= desired_epoch),
-    next_revision INTEGER NOT NULL DEFAULT 1 CHECK (next_revision > 0),
-    active_run_id TEXT
-        REFERENCES "repository_scan_runs"(run_id) ON DELETE SET NULL,
-    controller_lease_id TEXT,
-    controller_lease_expires_at INTEGER,
-    adapter_kind TEXT NOT NULL DEFAULT 'periodic'
-        CHECK (adapter_kind IN ('usn', 'rdcw', 'fsevents', 'inotify', 'periodic')),
-    adapter_identity TEXT,
-    volume_identity TEXT,
-    volume_kind TEXT NOT NULL DEFAULT 'unknown'
-        CHECK (volume_kind IN ('local', 'network', 'removable', 'unsupported', 'unknown')),
-    path_case_mode TEXT NOT NULL DEFAULT 'sensitive'
-        CHECK (path_case_mode IN ('sensitive', 'insensitive')),
-    path_normalization TEXT NOT NULL DEFAULT 'unknown'
-        CHECK (path_normalization IN ('none', 'nfc', 'nfd', 'unknown')),
-    cursor_health TEXT NOT NULL DEFAULT 'unavailable'
-        CHECK (cursor_health IN ('healthy', 'gap', 'overflow', 'unavailable')),
-    full_verification_required INTEGER NOT NULL DEFAULT 1
-        CHECK (full_verification_required IN (0, 1)),
-    updated_at INTEGER NOT NULL
-, terminal_error TEXT, full_verification_requested_epoch INTEGER NOT NULL DEFAULT 0) STRICT;
-
-CREATE TABLE repository_observations (
-    observation_id TEXT PRIMARY KEY
-        CHECK (observation_id = lower(observation_id) AND length(observation_id) = 36),
-    repository_id TEXT NOT NULL
-        REFERENCES repositories(repo_id) ON DELETE CASCADE,
-    revision INTEGER NOT NULL CHECK (revision > 0),
-    run_id TEXT
-        REFERENCES "repository_scan_runs"(run_id) ON DELETE SET NULL,
-    source TEXT NOT NULL
-        CHECK (source IN ('crawl', 'verifier', 'journal', 'watcher', 'upload', 'cloud', 'recovery')),
-    source_event_key TEXT,
-    source_cursor BLOB,
-    path_hint TEXT,
-    parent_node_id TEXT,
-    name TEXT,
-    name_key TEXT,
-    entry_kind TEXT CHECK (entry_kind IS NULL OR entry_kind IN ('directory', 'file', 'symlink')),
-    file_size INTEGER CHECK (file_size IS NULL OR file_size >= 0),
-    modified_at_ns INTEGER,
-    changed_at_ns INTEGER,
-    native_identity_kind TEXT,
-    native_identity_value TEXT,
-    stability_token_before TEXT,
-    stability_token_after TEXT,
-    quick_fingerprint TEXT,
-    quick_fingerprint_version TEXT,
-    resolved_owner_id INTEGER REFERENCES users(user_id),
-    mapped_node_id TEXT,
-    processing_state TEXT NOT NULL DEFAULT 'pending'
-        CHECK (processing_state IN ('pending', 'applied', 'superseded', 'retryable_error', 'terminal_unsupported')),
-    failure_code TEXT,
-    authoritative_child_set INTEGER NOT NULL DEFAULT 0
-        CHECK (authoritative_child_set IN (0, 1)),
-    created_at INTEGER NOT NULL,
-    processed_at INTEGER,
-    UNIQUE (repository_id, revision),
-    FOREIGN KEY (repository_id, parent_node_id)
-        REFERENCES repository_nodes(repository_id, node_id),
-    FOREIGN KEY (repository_id, mapped_node_id)
-        REFERENCES repository_nodes(repository_id, node_id)
-) STRICT;
-
-CREATE TABLE repository_scan_frontier (
-    run_id TEXT NOT NULL
-        REFERENCES "repository_scan_runs"(run_id) ON DELETE CASCADE,
-    directory_node_id TEXT NOT NULL
-        REFERENCES repository_nodes(node_id) ON DELETE CASCADE,
-    state TEXT NOT NULL DEFAULT 'pending'
-        CHECK (state IN ('pending', 'leased', 'completed', 'error', 'absence')),
-    purpose TEXT NOT NULL DEFAULT 'crawl'
-        CHECK (purpose IN ('crawl', 'verify', 'absence')),
-    lease_id TEXT,
-    lease_expires_at INTEGER,
-    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
-    continuation_offset INTEGER NOT NULL DEFAULT 0 CHECK (continuation_offset >= 0),
-    coverage_safe INTEGER NOT NULL DEFAULT 1 CHECK (coverage_safe IN (0, 1)),
-    authoritative_child_set INTEGER NOT NULL DEFAULT 0
-        CHECK (authoritative_child_set IN (0, 1)),
-    absence_cursor TEXT NOT NULL DEFAULT '',
-    absence_finalized INTEGER NOT NULL DEFAULT 0
-        CHECK (absence_finalized IN (0, 1)),
-    error_code TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    PRIMARY KEY (run_id, directory_node_id)
 ) STRICT;
 
 CREATE TABLE repository_entries (
@@ -1276,6 +1082,10 @@ CREATE TABLE repository_entries (
     state TEXT NOT NULL
         CHECK (state IN ('pending_hash', 'present', 'missing', 'unsupported', 'trashed')),
     content_id TEXT REFERENCES content_objects(content_id),
+    -- First/last-chunk fingerprint of the bound content, recorded by the hash
+    -- pass so upload precheck can match large files without a full hash.
+    quick_fingerprint TEXT,
+    quick_fingerprint_version TEXT,
     -- An Asset exists only while it has an entry, so an entry blocks deleting
     -- its Asset; PurgeEntries removes entries first.
     asset_id TEXT REFERENCES assets(asset_id) ON DELETE RESTRICT,
@@ -1346,7 +1156,7 @@ CREATE TABLE repository_staging_commits (
     quick_fingerprint_version TEXT,
     status TEXT NOT NULL DEFAULT 'prepared'
         CHECK (status IN ('prepared', 'committing', 'committed', 'quarantined', 'completed')),
-    node_id TEXT REFERENCES repository_nodes(node_id) ON DELETE SET NULL,
+    entry_id TEXT REFERENCES repository_entries(entry_id) ON DELETE SET NULL,
     asset_id TEXT REFERENCES assets(asset_id) ON DELETE SET NULL,
     failure_code TEXT,
     failure_detail TEXT,
@@ -1634,68 +1444,60 @@ CREATE VIRTUAL TABLE species_search_fts USING fts5(
 
 -- ===== VIEWS (3) =====
 
+-- An active occurrence is a present file entry: the scan index proved the
+-- file is on disk with the Asset's content.
 CREATE VIEW active_asset_occurrences AS
-WITH RECURSIVE reachable_nodes AS (
-    SELECT repository_id, node_id
-    FROM repository_nodes
-    WHERE parent_node_id IS NULL AND lifecycle = 'active'
-    UNION ALL
-    SELECT child.repository_id, child.node_id
-    FROM repository_nodes child
-    JOIN reachable_nodes parent
-      ON parent.repository_id = child.repository_id
-     AND parent.node_id = child.parent_node_id
-    WHERE child.lifecycle = 'active'
-)
 SELECT
-    location.asset_id,
-    node.repository_id,
-    node.node_id,
-    location.location_id,
+    entry.asset_id,
+    entry.repository_id,
+    entry.entry_id,
     content.full_hash,
     content.file_size,
-    observation.quick_fingerprint,
-    observation.quick_fingerprint_version,
-    node.observation_revision
-FROM asset_locations location
-JOIN repository_nodes node
-  ON node.node_id = location.node_id
- AND node.lifecycle = 'active'
-JOIN reachable_nodes reachable
-  ON reachable.repository_id = node.repository_id
- AND reachable.node_id = node.node_id
-JOIN assets asset ON asset.asset_id = location.asset_id
-JOIN content_objects content ON content.content_id = asset.content_id
-LEFT JOIN repository_observations observation
-  ON observation.repository_id = node.repository_id
- AND observation.mapped_node_id = node.node_id
- AND observation.revision = node.observation_revision
-WHERE location.unbound_observation_revision IS NULL;
+    entry.quick_fingerprint,
+    entry.quick_fingerprint_version
+FROM repository_entries entry
+JOIN content_objects content ON content.content_id = entry.content_id
+WHERE entry.state = 'present'
+  AND entry.kind = 'file';
 
 CREATE VIEW active_asset_occurrence_paths AS
-WITH RECURSIVE node_paths AS (
-    SELECT repository_id, node_id, CAST('' AS TEXT) AS relative_path
-    FROM repository_nodes
-    WHERE parent_node_id IS NULL AND lifecycle = 'active'
-    UNION ALL
-    SELECT
-        child.repository_id,
-        child.node_id,
-        CASE
-          WHEN parent.relative_path = '' THEN child.name
-          ELSE parent.relative_path || '/' || child.name
-        END
-    FROM repository_nodes child
-    JOIN node_paths parent
-      ON parent.repository_id = child.repository_id
-     AND parent.node_id = child.parent_node_id
-    WHERE child.lifecycle = 'active'
-)
-SELECT occurrence.*, node_paths.relative_path
+SELECT occurrence.*, entry.path AS relative_path
 FROM active_asset_occurrences occurrence
-JOIN node_paths
-  ON node_paths.repository_id = occurrence.repository_id
- AND node_paths.node_id = occurrence.node_id;
+JOIN repository_entries entry ON entry.entry_id = occurrence.entry_id;
+
+-- One row per repository summarizing its scans for monitoring: whether a
+-- scan is queued or running, and the error of the latest finished scan when
+-- it failed.
+CREATE VIEW repository_scan_state AS
+SELECT
+    repository.repo_id AS repository_id,
+    EXISTS (
+        SELECT 1 FROM repository_scans scan
+        WHERE scan.repository_id = repository.repo_id
+          AND scan.status IN ('queued', 'walking', 'sweeping')
+    ) AS pending,
+    (
+        SELECT min(scan.created_at) FROM repository_scans scan
+        WHERE scan.repository_id = repository.repo_id
+          AND scan.status IN ('queued', 'walking', 'sweeping')
+    ) AS pending_since,
+    (
+        SELECT CASE WHEN scan.status = 'failed' THEN COALESCE(scan.error_code, 'repository_scan_failed') END
+        FROM repository_scans scan
+        WHERE scan.repository_id = repository.repo_id
+          AND scan.status NOT IN ('queued', 'walking', 'sweeping')
+        ORDER BY scan.created_at DESC, scan.scan_id DESC
+        LIMIT 1
+    ) AS terminal_error,
+    (
+        SELECT max(scan.finished_at) FROM repository_scans scan
+        WHERE scan.repository_id = repository.repo_id AND scan.status = 'completed'
+    ) AS completed_at,
+    COALESCE((
+        SELECT max(scan.updated_at) FROM repository_scans scan
+        WHERE scan.repository_id = repository.repo_id
+    ), repository.updated_at) AS updated_at
+FROM repositories repository;
 
 CREATE VIEW media_item_browse_facts AS
 SELECT
@@ -1804,10 +1606,6 @@ CREATE INDEX idx_albums_type ON albums (album_type);
 CREATE INDEX idx_albums_user_created_at ON albums (user_id, created_at DESC, album_id DESC);
 
 CREATE INDEX idx_albums_user_id ON albums (user_id);
-
-CREATE INDEX idx_asset_locations_active_asset
-    ON asset_locations (asset_id, node_id)
-    WHERE unbound_observation_revision IS NULL;
 
 CREATE INDEX idx_asset_pipeline_pending
     ON asset_pipeline_state (stage, updated_at, asset_id)
@@ -1951,39 +1749,6 @@ CREATE INDEX idx_repository_cloud_bindings_credential ON repository_cloud_bindin
 
 CREATE INDEX idx_repository_cloud_bindings_owner ON repository_cloud_bindings (owner_id, created_at DESC);
 
-CREATE INDEX idx_repository_nodes_children
-    ON repository_nodes (repository_id, parent_node_id, lifecycle, node_id);
-
-CREATE INDEX idx_repository_nodes_native_identity
-    ON repository_nodes (repository_id, volume_identity, native_identity_kind, native_identity_value)
-    WHERE lifecycle = 'active' AND native_identity_value IS NOT NULL;
-
-CREATE INDEX idx_repository_nodes_run_coverage
-    ON repository_nodes (repository_id, parent_node_id, last_seen_run_id)
-    WHERE lifecycle = 'active';
-
-CREATE INDEX idx_repository_observation_state_work
-    ON repository_observation_state (desired_epoch, applied_epoch, controller_lease_expires_at)
-    WHERE desired_epoch > applied_epoch OR full_verification_required = 1;
-
-CREATE INDEX idx_repository_observations_node_revision
-    ON repository_observations (repository_id, mapped_node_id, revision DESC)
-    WHERE mapped_node_id IS NOT NULL;
-
-CREATE INDEX idx_repository_observations_pending
-    ON repository_observations (repository_id, processing_state, revision)
-    WHERE processing_state IN ('pending', 'retryable_error');
-
-CREATE INDEX idx_repository_scan_frontier_claim
-    ON repository_scan_frontier (run_id, state, lease_expires_at, directory_node_id);
-
-CREATE INDEX idx_repository_scan_runs_full_verification
- ON repository_scan_runs(repository_id, finished_at DESC)
- WHERE status = 'completed' AND full_verification_performed = 1;
-
-CREATE INDEX idx_repository_scan_runs_history
-    ON repository_scan_runs (repository_id, created_at DESC, run_id);
-
 CREATE UNIQUE INDEX repository_entries_one_live_path
     ON repository_entries(repository_id, path_key)
     WHERE state IN ('pending_hash', 'present');
@@ -2064,10 +1829,6 @@ CREATE INDEX repositories_storage_location_id_idx ON repositories (storage_locat
 
 CREATE INDEX search_embeddings_asset_idx ON search_embeddings (asset_id);
 
-CREATE UNIQUE INDEX asset_locations_one_active_node
-    ON asset_locations (node_id)
-    WHERE unbound_observation_revision IS NULL;
-
 CREATE UNIQUE INDEX embedding_spaces_default_per_type_idx
     ON embedding_spaces (embedding_type) WHERE is_default_search = 1;
 
@@ -2119,23 +1880,7 @@ CREATE UNIQUE INDEX location_clusters_scope_key
 
 CREATE UNIQUE INDEX repositories_one_primary_idx ON repositories (role) WHERE role = 'primary';
 
-CREATE UNIQUE INDEX repository_nodes_one_active_child
-    ON repository_nodes (repository_id, parent_node_id, name_key)
-    WHERE lifecycle = 'active' AND parent_node_id IS NOT NULL;
-
-CREATE UNIQUE INDEX repository_nodes_one_active_root
-    ON repository_nodes (repository_id)
-    WHERE parent_node_id IS NULL AND lifecycle = 'active';
-
-CREATE UNIQUE INDEX repository_observations_source_delivery
-    ON repository_observations (repository_id, source, source_event_key)
-    WHERE source_event_key IS NOT NULL;
-
 CREATE UNIQUE INDEX storage_locations_one_default_idx ON storage_locations (kind) WHERE kind = 'default';
-
-CREATE UNIQUE INDEX repository_scan_runs_one_active
-    ON repository_scan_runs (repository_id)
-    WHERE status IN ('queued', 'crawling', 'catching_up', 'finalizing');
 
 CREATE UNIQUE INDEX search_embeddings_asset_frame_uniq
     ON search_embeddings (asset_id, frame_ts_ms) WHERE frame_ts_ms IS NOT NULL;
@@ -2296,9 +2041,8 @@ BEGIN
         1,
         0,
         CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-    FROM asset_locations location
-    JOIN repository_nodes node ON node.node_id = location.node_id
-    WHERE location.asset_id = old.asset_id
+    FROM repository_entries node
+    WHERE node.asset_id = old.asset_id
     ON CONFLICT (repository_id, owner_id) DO UPDATE SET
         source_revision = location_projection_state.source_revision + 1,
         updated_at = excluded.updated_at;
@@ -2324,14 +2068,12 @@ BEGIN
         CAST(unixepoch('subsec') * 1000000 AS INTEGER)
     FROM (
         SELECT node.repository_id, old.owner_id AS owner_id
-        FROM asset_locations location
-        JOIN repository_nodes node ON node.node_id = location.node_id
-        WHERE location.asset_id = old.asset_id
+        FROM repository_entries node
+        WHERE node.asset_id = old.asset_id
         UNION
         SELECT node.repository_id, new.owner_id AS owner_id
-        FROM asset_locations location
-        JOIN repository_nodes node ON node.node_id = location.node_id
-        WHERE location.asset_id = new.asset_id
+        FROM repository_entries node
+        WHERE node.asset_id = new.asset_id
     ) scope
     WHERE scope.owner_id IS NOT NULL
     ON CONFLICT (repository_id, owner_id) DO UPDATE SET
@@ -2350,106 +2092,58 @@ BEGIN
       AND owner_id = NEW.owner_id;
 END;
 
-CREATE TRIGGER location_projection_location_delete
-BEFORE DELETE ON asset_locations
+-- A located Asset appears in or leaves a repository's location projection
+-- only when one of its file entries starts or stops being present.
+CREATE TRIGGER location_projection_entry_delete
+BEFORE DELETE ON repository_entries
+WHEN old.state = 'present' AND old.asset_id IS NOT NULL
 BEGIN
     INSERT INTO location_projection_state (
         repository_id, owner_id, source_revision, published_revision, updated_at
     )
-    SELECT
-        node.repository_id,
-        asset.owner_id,
-        1,
-        0,
-        CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-    FROM repository_nodes node
-    JOIN assets asset ON asset.asset_id = old.asset_id
-    WHERE node.node_id = old.node_id
+    SELECT old.repository_id, asset.owner_id, 1, 0, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+    FROM assets asset
+    WHERE asset.asset_id = old.asset_id AND asset.owner_id IS NOT NULL
     ON CONFLICT (repository_id, owner_id) DO UPDATE SET
         source_revision = location_projection_state.source_revision + 1,
         updated_at = excluded.updated_at;
 END;
 
-CREATE TRIGGER location_projection_location_insert
-AFTER INSERT ON asset_locations
+CREATE TRIGGER location_projection_entry_insert
+AFTER INSERT ON repository_entries
+WHEN new.state = 'present' AND new.asset_id IS NOT NULL
 BEGIN
     INSERT INTO location_projection_state (
         repository_id, owner_id, source_revision, published_revision, updated_at
     )
-    SELECT
-        node.repository_id,
-        asset.owner_id,
-        1,
-        0,
-        CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-    FROM repository_nodes node
-    JOIN assets asset ON asset.asset_id = new.asset_id
-    WHERE node.node_id = new.node_id
+    SELECT new.repository_id, asset.owner_id, 1, 0, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+    FROM assets asset
+    WHERE asset.asset_id = new.asset_id AND asset.owner_id IS NOT NULL
     ON CONFLICT (repository_id, owner_id) DO UPDATE SET
         source_revision = location_projection_state.source_revision + 1,
         updated_at = excluded.updated_at;
 END;
 
-CREATE TRIGGER location_projection_location_update
-AFTER UPDATE OF node_id, asset_id, unbound_observation_revision ON asset_locations
-WHEN old.node_id IS NOT new.node_id
-  OR old.asset_id IS NOT new.asset_id
-  OR old.unbound_observation_revision IS NOT new.unbound_observation_revision
+CREATE TRIGGER location_projection_entry_update
+AFTER UPDATE OF state, asset_id ON repository_entries
+WHEN (old.state = 'present' OR new.state = 'present')
+  AND (old.state IS NOT new.state OR old.asset_id IS NOT new.asset_id)
 BEGIN
     INSERT INTO location_projection_state (
         repository_id, owner_id, source_revision, published_revision, updated_at
     )
-    SELECT DISTINCT
-        scope.repository_id,
-        scope.owner_id,
-        1,
-        0,
-        CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+    SELECT DISTINCT scope.repository_id, scope.owner_id, 1, 0, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
     FROM (
-        SELECT node.repository_id, asset.owner_id
-        FROM repository_nodes node
-        JOIN assets asset ON asset.asset_id = old.asset_id
-        WHERE node.node_id = old.node_id
+        SELECT old.repository_id AS repository_id, asset.owner_id AS owner_id
+        FROM assets asset WHERE asset.asset_id = old.asset_id AND old.state = 'present'
         UNION
-        SELECT node.repository_id, asset.owner_id
-        FROM repository_nodes node
-        JOIN assets asset ON asset.asset_id = new.asset_id
-        WHERE node.node_id = new.node_id
+        SELECT new.repository_id, asset.owner_id
+        FROM assets asset WHERE asset.asset_id = new.asset_id AND new.state = 'present'
     ) scope
-    WHERE 1 = 1
+    WHERE scope.owner_id IS NOT NULL
     ON CONFLICT (repository_id, owner_id) DO UPDATE SET
         source_revision = location_projection_state.source_revision + 1,
         updated_at = excluded.updated_at;
-END;
-
-CREATE TRIGGER location_projection_node_delete
-BEFORE DELETE ON repository_nodes
-BEGIN
-    UPDATE location_projection_state
-    SET source_revision = source_revision + 1,
-        updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-    WHERE repository_id = old.repository_id;
-END;
-
-CREATE TRIGGER location_projection_node_insert
-AFTER INSERT ON repository_nodes
-BEGIN
-    UPDATE location_projection_state
-    SET source_revision = source_revision + 1,
-        updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-    WHERE repository_id = new.repository_id;
-END;
-
-CREATE TRIGGER location_projection_node_update
-AFTER UPDATE OF repository_id, parent_node_id, lifecycle ON repository_nodes
-WHEN old.repository_id IS NOT new.repository_id
-  OR old.parent_node_id IS NOT new.parent_node_id
-  OR old.lifecycle IS NOT new.lifecycle
-BEGIN
-    UPDATE location_projection_state
-    SET source_revision = source_revision + 1,
-        updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-    WHERE repository_id IN (old.repository_id, new.repository_id);
 END;
 
 CREATE TRIGGER location_search_fts_delete AFTER DELETE ON location_clusters BEGIN

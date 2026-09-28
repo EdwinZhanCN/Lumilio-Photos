@@ -761,11 +761,9 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 
 	repositoryID := uuid.New()
 	storageLocationID := uuid.New()
-	repositoryRootNodeID := uuid.New()
-	fileNodeID := uuid.New()
+	fileEntryID := uuid.New()
 	contentID := uuid.New()
 	assetID := uuid.New()
-	locationID := uuid.New()
 	mediaItemID := uuid.New()
 	fullHash := strings.Repeat("a", 64)
 	if _, err := database.SQL.ExecContext(ctx, `
@@ -780,16 +778,6 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		) VALUES (?, 'Test', '/test', 'regular', 'active', 'idle', 1, 1, ?)
 	`, repositoryID, storageLocationID); err != nil {
 		t.Fatalf("insert repository: %v", err)
-	}
-	if _, err := database.SQL.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, created_at, updated_at
-		) VALUES
-			(?, ?, NULL, '', '', 'directory', 1, 1, 1),
-			(?, ?, ?, 'IMG_0001.jpg', 'IMG_0001.jpg', 'file', 1, 1, 1)
-	`, repositoryRootNodeID, repositoryID, fileNodeID, repositoryID, repositoryRootNodeID); err != nil {
-		t.Fatalf("insert repository nodes: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO content_objects (content_id, hash_algorithm, full_hash, file_size, created_at)
@@ -807,11 +795,12 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 		t.Fatalf("insert asset: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
-		INSERT INTO asset_locations (
-			location_id, node_id, asset_id, bound_observation_revision, created_at, updated_at
-		) VALUES (?, ?, ?, 1, 1, 1)
-	`, locationID, fileNodeID, assetID); err != nil {
-		t.Fatalf("insert asset location: %v", err)
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, content_id, asset_id, revision, updated_at
+		) VALUES (?, ?, 'IMG_0001.jpg', 'img_0001.jpg', '', 'file', 1, 1, 1, 'present', ?, ?, 1, 1)
+	`, fileEntryID, repositoryID, contentID, assetID); err != nil {
+		t.Fatalf("insert repository entry: %v", err)
 	}
 	if _, err := database.SQL.ExecContext(ctx, `
 		INSERT INTO media_items (
