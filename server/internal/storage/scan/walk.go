@@ -599,8 +599,8 @@ func (t *walkTurn) apply(ctx context.Context, directory string, writes []write) 
 		return t.markCursor(directory)
 	}
 	now := t.scanner.config.Now()
-	for start := 0; start < len(rest); start += MaxBatchRows {
-		batch := rest[start:min(start+MaxBatchRows, len(rest))]
+	for start := 0; start < len(rest); {
+		batch := rest[start:min(start+t.scanner.batch.size(), len(rest))]
 		removes := false
 		for _, w := range batch {
 			removes = removes || w.vanished != nil
@@ -616,6 +616,7 @@ func (t *walkTurn) apply(ctx context.Context, directory string, writes []write) 
 			}
 		}
 		last := start+len(batch) == len(rest)
+		started := time.Now()
 		var progress counters
 		err := t.scanner.writer.WithTx(ctx, catalogtx.OperationRepositoryScanApplyDirectory, func(_ *sql.Tx, queries *repo.Queries) error {
 			progress = counters{}
@@ -648,6 +649,8 @@ func (t *walkTurn) apply(ctx context.Context, directory string, writes []write) 
 		if err != nil {
 			return err
 		}
+		t.scanner.batch.observe(len(batch), time.Since(started))
+		start += len(batch)
 		if last {
 			t.pending = counters{}
 		}
@@ -678,7 +681,7 @@ func (t *walkTurn) sweep(ctx context.Context, directory repo.RepositoryEntry) er
 	after := ""
 	for {
 		page, err := s.reader.ListLiveRepositoryEntriesUnder(ctx, repo.ListLiveRepositoryEntriesUnderParams{
-			RepositoryID: t.scan.RepositoryID, Directory: directory.Path, AfterPath: after, PageLimit: MaxBatchRows,
+			RepositoryID: t.scan.RepositoryID, Directory: directory.Path, AfterPath: after, PageLimit: int64(s.batch.size()),
 		})
 		if err != nil {
 			return err
@@ -693,6 +696,7 @@ func (t *walkTurn) sweep(ctx context.Context, directory repo.RepositoryEntry) er
 			return errOffline
 		}
 		now := s.config.Now()
+		started := time.Now()
 		err = s.writer.WithTx(ctx, catalogtx.OperationRepositoryScanMarkMissing, func(_ *sql.Tx, queries *repo.Queries) error {
 			var progress counters
 			for _, row := range page {
@@ -707,6 +711,7 @@ func (t *walkTurn) sweep(ctx context.Context, directory repo.RepositoryEntry) er
 		if err != nil {
 			return err
 		}
+		s.batch.observe(len(page), time.Since(started))
 		after = page[len(page)-1].Path
 	}
 }

@@ -10,7 +10,8 @@
 // pending_hash rows that commits by compare-and-swap on the row's revision.
 //
 // Nothing here performs filesystem I/O, hashing, or sleeping inside a catalog
-// transaction; every write batch is at most MaxBatchRows rows.
+// transaction; every write batch is at most MaxBatchRows rows and is sized
+// to stay well inside the writer-hold budget.
 package scan
 
 import (
@@ -19,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,8 +32,45 @@ import (
 	"server/internal/storage/roe/pathsemantics"
 )
 
-// MaxBatchRows bounds every writer transaction.
-const MaxBatchRows = 256
+// MaxBatchRows bounds every writer transaction. The walk also bounds each
+// batch in time: batchSizer keeps it near batchTarget, so a slow disk gets
+// smaller batches instead of longer writer holds (the budget is 25 ms).
+const (
+	MaxBatchRows = 256
+	minBatchRows = 16
+	batchTarget  = 10 * time.Millisecond
+)
+
+// batchSizer adapts the walk's write batch to the measured cost per row:
+// it halves after a transaction slower than the target and doubles after
+// one well under it.
+type batchSizer struct {
+	mu   sync.Mutex
+	rows int
+}
+
+func (b *batchSizer) size() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.rows == 0 {
+		b.rows = 64
+	}
+	return b.rows
+}
+
+func (b *batchSizer) observe(rows int, took time.Duration) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.rows == 0 {
+		b.rows = 64
+	}
+	switch {
+	case took > batchTarget:
+		b.rows = max(minBatchRows, b.rows/2)
+	case took < batchTarget/2 && rows >= b.rows:
+		b.rows = min(MaxBatchRows, b.rows*2)
+	}
+}
 
 // RacyGranularity is the mtime resolution assumed when deciding whether an
 // unchanged stat tuple can be trusted (Git's "racily clean" rule). Two
@@ -97,6 +136,7 @@ type Scanner struct {
 	writer Writer
 	files  *storage.RepositoryFSFactory
 	config Config
+	batch  batchSizer
 }
 
 func New(reader *repo.Queries, writer Writer, files *storage.RepositoryFSFactory, config Config) (*Scanner, error) {
