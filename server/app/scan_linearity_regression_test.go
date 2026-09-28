@@ -12,8 +12,14 @@ import (
 // 40k-file tree stays within 1.5x of a 10k-file tree, and the whole check
 // stays well inside the server test budget.
 func TestLifecycleRegressionScanCostIsLinear(t *testing.T) {
-	small := blackboxTimedFullScan(t, 10_000, time.Minute)
-	large := blackboxTimedFullScan(t, 40_000, 90*time.Second)
+	// Each size gets its own server in a subtest, so the first server has
+	// shut down, with its import processing, before the second is measured.
+	var small, large time.Duration
+	t.Run("10k", func(t *testing.T) { small = blackboxTimedFullScan(t, 10_000, time.Minute) })
+	t.Run("40k", func(t *testing.T) { large = blackboxTimedFullScan(t, 40_000, 90*time.Second) })
+	if t.Failed() {
+		return
+	}
 	smallPerEntry := small / 10_000
 	largePerEntry := large / 40_000
 	t.Logf("full scan: 10k files %s (%s/file), 40k files %s (%s/file)", small, smallPerEntry, large, largePerEntry)
