@@ -16,7 +16,7 @@ type ScanAccepted = components["schemas"]["dto.RepositoryScanQueuedDTO"];
 type ScanRun = components["schemas"]["dto.RepositoryScanRunDTO"];
 type AssetList = components["schemas"]["dto.QueryAssetsResponseDTO"];
 
-const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "crawling", "catching_up", "finalizing"]);
+const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "walking", "sweeping"]);
 
 // Scan and ingestion run on the server's River workers. On a low-power E2E
 // host (Intel N100) a lifecycle scan plus a manual scan of one file can take
@@ -201,8 +201,8 @@ test("@smoke administrator adds a Repository and scans it from Storage", async (
     requested_by: workspace.username,
     status: "completed",
   });
-  expect(run.files_observed ?? 0).toBeGreaterThanOrEqual(1);
-  expect(run.error_directories ?? 0).toBe(0);
+  expect(run.seen ?? 0).toBeGreaterThanOrEqual(1);
+  expect(run.errors ?? 0).toBe(0);
 
   // The scan ingested exactly the copied file into this Repository.
   await expect(async () => {

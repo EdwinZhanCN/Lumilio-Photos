@@ -43,15 +43,20 @@ function RunDetail({ run }: { run: RepositoryScanRunDTO }) {
         value={formatDateTime(run.finished_at, locale)}
       />
       <Fact
-        term={t("storagePanel.verificationHistory.fieldPartialCoverage", "Partial coverage")}
-        value={run.partial_coverage ? t("common.yes", "Yes") : t("common.no", "No")}
+        term={t("storagePanel.verificationHistory.fieldSeen", "Items seen")}
+        value={String(run.seen ?? 0)}
       />
       <Fact
-        term={t(
-          "storagePanel.verificationHistory.fieldErrorDirectories",
-          "Directories with errors",
-        )}
-        value={String(run.error_directories ?? 0)}
+        term={t("storagePanel.verificationHistory.fieldNew", "New")}
+        value={String(run.new_entries ?? 0)}
+      />
+      <Fact
+        term={t("storagePanel.verificationHistory.fieldChanged", "Changed")}
+        value={String(run.changed ?? 0)}
+      />
+      <Fact
+        term={t("storagePanel.verificationHistory.fieldErrors", "Read errors")}
+        value={String(run.errors ?? 0)}
       />
       {run.operation_id ? (
         <Fact

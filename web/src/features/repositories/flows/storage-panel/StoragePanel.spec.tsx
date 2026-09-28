@@ -94,7 +94,7 @@ const storageViewFixture = {
       reachability: "active",
       activity: "idle",
       asset_count: 24_910,
-      verification: { status: "partial" },
+      verification: { status: "offline" },
     },
     {
       id: "repo-offline",
