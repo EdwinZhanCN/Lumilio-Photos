@@ -984,6 +984,26 @@ type RepositoryDefault struct {
 	UpdatedAt         dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
+type RepositoryEntry struct {
+	EntryID       uuid.UUID         `db:"entry_id" json:"entry_id"`
+	RepositoryID  uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Path          string            `db:"path" json:"path"`
+	PathKey       string            `db:"path_key" json:"path_key"`
+	ParentKey     string            `db:"parent_key" json:"parent_key"`
+	Kind          string            `db:"kind" json:"kind"`
+	Size          int64             `db:"size" json:"size"`
+	MtimeNs       int64             `db:"mtime_ns" json:"mtime_ns"`
+	CtimeNs       *int64            `db:"ctime_ns" json:"ctime_ns"`
+	FileID        *string           `db:"file_id" json:"file_id"`
+	StatCheckedNs int64             `db:"stat_checked_ns" json:"stat_checked_ns"`
+	State         string            `db:"state" json:"state"`
+	ContentID     uuid.NullUUID     `db:"content_id" json:"content_id"`
+	AssetID       uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+	Revision      int64             `db:"revision" json:"revision"`
+	MissingSince  dbtypes.Timestamp `db:"missing_since" json:"missing_since"`
+	UpdatedAt     dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type RepositoryNode struct {
 	NodeID                            uuid.UUID         `db:"node_id" json:"node_id"`
 	RepositoryID                      uuid.UUID         `db:"repository_id" json:"repository_id"`
@@ -1057,6 +1077,33 @@ type RepositoryObservationState struct {
 	UpdatedAt                      dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 	TerminalError                  *string           `db:"terminal_error" json:"terminal_error"`
 	FullVerificationRequestedEpoch int64             `db:"full_verification_requested_epoch" json:"full_verification_requested_epoch"`
+}
+
+type RepositoryScan struct {
+	ScanID                uuid.UUID         `db:"scan_id" json:"scan_id"`
+	RepositoryID          uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Trigger               string            `db:"trigger" json:"trigger"`
+	ScopePath             string            `db:"scope_path" json:"scope_path"`
+	Status                string            `db:"status" json:"status"`
+	ResumeAfterPath       *string           `db:"resume_after_path" json:"resume_after_path"`
+	NotBefore             dbtypes.Timestamp `db:"not_before" json:"not_before"`
+	RequestedBy           *string           `db:"requested_by" json:"requested_by"`
+	Seen                  int64             `db:"seen" json:"seen"`
+	NewEntries            int64             `db:"new_entries" json:"new_entries"`
+	Changed               int64             `db:"changed" json:"changed"`
+	Hashed                int64             `db:"hashed" json:"hashed"`
+	BytesHashed           int64             `db:"bytes_hashed" json:"bytes_hashed"`
+	Missing               int64             `db:"missing" json:"missing"`
+	Restored              int64             `db:"restored" json:"restored"`
+	Moved                 int64             `db:"moved" json:"moved"`
+	Deferred              int64             `db:"deferred" json:"deferred"`
+	Errors                int64             `db:"errors" json:"errors"`
+	ErrorCode             *string           `db:"error_code" json:"error_code"`
+	CancellationRequested int64             `db:"cancellation_requested" json:"cancellation_requested"`
+	CreatedAt             dbtypes.Timestamp `db:"created_at" json:"created_at"`
+	StartedAt             dbtypes.Timestamp `db:"started_at" json:"started_at"`
+	FinishedAt            dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
+	UpdatedAt             dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryScanFrontier struct {

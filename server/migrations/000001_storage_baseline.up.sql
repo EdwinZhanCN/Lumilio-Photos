@@ -1251,6 +1251,83 @@ CREATE TABLE repository_scan_frontier (
     PRIMARY KEY (run_id, directory_node_id)
 ) STRICT;
 
+CREATE TABLE repository_entries (
+    -- One row per physical file or directory in a repository, the scan
+    -- index's mirror of the tree. The disk is the truth; a full scan is
+    -- idempotent and a scan with no disk change writes no row here.
+    entry_id TEXT PRIMARY KEY
+        CHECK (entry_id = lower(entry_id) AND length(entry_id) = 36),
+    repository_id TEXT NOT NULL
+        REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    -- Relative, '/'-separated user path as last seen on disk. path_key is
+    -- the same path under the volume's case and normalization rules, and
+    -- parent_key is the parent directory's path_key ('' at the root), so a
+    -- case-only rename of a directory keeps its children attached.
+    path TEXT NOT NULL CHECK (length(path) > 0 AND substr(path, 1, 1) <> '/'),
+    path_key TEXT NOT NULL CHECK (length(path_key) > 0),
+    parent_key TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('file', 'directory')),
+    -- Stat tuple. file_id is a change detector, never identity.
+    size INTEGER NOT NULL CHECK (size >= 0),
+    mtime_ns INTEGER NOT NULL,
+    ctime_ns INTEGER,
+    file_id TEXT,
+    stat_checked_ns INTEGER NOT NULL,
+    state TEXT NOT NULL
+        CHECK (state IN ('pending_hash', 'present', 'missing', 'unsupported', 'trashed')),
+    content_id TEXT REFERENCES content_objects(content_id),
+    -- An Asset exists only while it has an entry, so an entry blocks deleting
+    -- its Asset; PurgeEntries removes entries first.
+    asset_id TEXT REFERENCES assets(asset_id) ON DELETE RESTRICT,
+    -- Bumped on every change; every scan write is a compare-and-swap on it.
+    revision INTEGER NOT NULL CHECK (revision > 0),
+    missing_since INTEGER,
+    updated_at INTEGER NOT NULL,
+    CHECK (kind = 'file' OR (content_id IS NULL AND asset_id IS NULL)),
+    CHECK (kind = 'file' OR state IN ('present', 'missing')),
+    CHECK ((content_id IS NULL) = (asset_id IS NULL)),
+    CHECK (kind = 'directory' OR state NOT IN ('present', 'trashed') OR asset_id IS NOT NULL),
+    CHECK ((state = 'missing') = (missing_since IS NOT NULL))
+) STRICT;
+
+CREATE TABLE repository_scans (
+    scan_id TEXT PRIMARY KEY
+        CHECK (scan_id = lower(scan_id) AND length(scan_id) = 36),
+    repository_id TEXT NOT NULL
+        REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    trigger TEXT NOT NULL
+        CHECK (trigger IN ('manual', 'periodic', 'watcher', 'startup', 'settle')),
+    -- '' means the whole repository; otherwise a relative directory path.
+    scope_path TEXT NOT NULL CHECK (substr(scope_path, 1, 1) <> '/'),
+    status TEXT NOT NULL
+        CHECK (status IN (
+            'queued', 'walking', 'sweeping',
+            'completed', 'offline', 'failed', 'cancelled'
+        )),
+    -- The last directory whose diff is committed; the walk resumes after it.
+    resume_after_path TEXT,
+    -- A settle follow-up is not runnable before this time.
+    not_before INTEGER,
+    requested_by TEXT,
+    seen INTEGER NOT NULL DEFAULT 0 CHECK (seen >= 0),
+    new_entries INTEGER NOT NULL DEFAULT 0 CHECK (new_entries >= 0),
+    changed INTEGER NOT NULL DEFAULT 0 CHECK (changed >= 0),
+    hashed INTEGER NOT NULL DEFAULT 0 CHECK (hashed >= 0),
+    bytes_hashed INTEGER NOT NULL DEFAULT 0 CHECK (bytes_hashed >= 0),
+    missing INTEGER NOT NULL DEFAULT 0 CHECK (missing >= 0),
+    restored INTEGER NOT NULL DEFAULT 0 CHECK (restored >= 0),
+    moved INTEGER NOT NULL DEFAULT 0 CHECK (moved >= 0),
+    deferred INTEGER NOT NULL DEFAULT 0 CHECK (deferred >= 0),
+    errors INTEGER NOT NULL DEFAULT 0 CHECK (errors >= 0),
+    error_code TEXT,
+    cancellation_requested INTEGER NOT NULL DEFAULT 0
+        CHECK (cancellation_requested IN (0, 1)),
+    created_at INTEGER NOT NULL,
+    started_at INTEGER,
+    finished_at INTEGER,
+    updated_at INTEGER NOT NULL
+) STRICT;
+
 CREATE TABLE repository_staging_commits (
     commit_id TEXT PRIMARY KEY
         CHECK (commit_id = lower(commit_id) AND length(commit_id) = 36),
@@ -1907,6 +1984,27 @@ CREATE INDEX idx_repository_scan_runs_full_verification
 CREATE INDEX idx_repository_scan_runs_history
     ON repository_scan_runs (repository_id, created_at DESC, run_id);
 
+CREATE UNIQUE INDEX repository_entries_one_live_path
+    ON repository_entries(repository_id, path_key)
+    WHERE state IN ('pending_hash', 'present');
+CREATE INDEX idx_repository_entries_children
+    ON repository_entries(repository_id, parent_key, path_key);
+CREATE INDEX idx_repository_entries_path
+    ON repository_entries(repository_id, path);
+CREATE INDEX idx_repository_entries_pending_hash
+    ON repository_entries(repository_id, entry_id)
+    WHERE state = 'pending_hash';
+CREATE INDEX idx_repository_entries_asset
+    ON repository_entries(asset_id)
+    WHERE asset_id IS NOT NULL;
+CREATE UNIQUE INDEX repository_scans_one_queued
+    ON repository_scans(repository_id)
+    WHERE status = 'queued';
+CREATE UNIQUE INDEX repository_scans_one_running
+    ON repository_scans(repository_id)
+    WHERE status IN ('walking', 'sweeping');
+CREATE INDEX idx_repository_scans_history
+    ON repository_scans(repository_id, created_at DESC);
 CREATE INDEX idx_repository_staging_commits_recovery
     ON repository_staging_commits (status, updated_at, commit_id)
     WHERE status IN ('prepared', 'committing', 'committed');

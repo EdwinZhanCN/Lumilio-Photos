@@ -151,6 +151,12 @@ const (
 	OperationBackgroundCommitBatch
 	OperationCatalogWorkStateRepair
 	OperationBackupRequest
+	OperationRepositoryScanRequest
+	OperationRepositoryScanStart
+	OperationRepositoryScanApplyDirectory
+	OperationRepositoryScanMarkMissing
+	OperationRepositoryScanFinish
+	OperationRepositoryScanHashCommit
 	OperationCatalogGeneratedWriterExec
 	OperationCatalogGeneratedWriterReturning
 	OperationCatalogGeneratedReaderRows
@@ -188,6 +194,36 @@ var operationCatalog = [operationCount]OperationDescriptor{
 	OperationBackupRequest: {
 		Operation: OperationBackupRequest,
 		Name:      "backup.request",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryScanRequest: {
+		Operation: OperationRepositoryScanRequest,
+		Name:      "repository.scan.request",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryScanStart: {
+		Operation: OperationRepositoryScanStart,
+		Name:      "repository.scan.start",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryScanApplyDirectory: {
+		Operation: OperationRepositoryScanApplyDirectory,
+		Name:      "repository.scan.apply_directory",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryScanMarkMissing: {
+		Operation: OperationRepositoryScanMarkMissing,
+		Name:      "repository.scan.mark_missing",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryScanFinish: {
+		Operation: OperationRepositoryScanFinish,
+		Name:      "repository.scan.finish",
+		Role:      RoleWriter,
+	},
+	OperationRepositoryScanHashCommit: {
+		Operation: OperationRepositoryScanHashCommit,
+		Name:      "repository.scan.hash_commit",
 		Role:      RoleWriter,
 	},
 	OperationRepositoryObservationClaim: {

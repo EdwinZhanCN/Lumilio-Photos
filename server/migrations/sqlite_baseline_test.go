@@ -23,12 +23,12 @@ import (
 // inventory of the current schema; a future schema change edits the baseline
 // in place and updates them deliberately.
 const (
-	baselineOrdinaryTables = 96
+	baselineOrdinaryTables = 98
 	baselineVirtualTables  = 5
 	baselineViews          = 3
 	baselineShadowTables   = 17
 	baselineVec1Internals  = 5
-	baselineIndexes        = 155
+	baselineIndexes        = 163
 	baselineTriggers       = 41
 )
 

@@ -50,8 +50,10 @@ Git's index do, and nothing needs a journal to be correct.
 
 **Data.** `repository_entries` replaces `repository_nodes`,
 `repository_observations`, and `asset_locations`: repository, relative path,
-`path_key` (case and NFC per volume, from `pathsemantics`), `parent_path`,
-kind, a stat tuple (size, mtime, ctime, `file_id`, checked-at), a state
+`path_key` (case and NFC per volume, from `pathsemantics`), `parent_key` (the
+parent's `path_key`, so a case-only directory rename keeps its children),
+kind, a stat tuple (size, mtime, ctime, `file_id`, checked-at), a `revision`
+that every write compares and swaps, a state
 (`pending_hash`, `present`, `missing`, `unsupported`, `trashed`), and the bound
 content and Asset. Path uniqueness is a partial unique index over
 `pending_hash` and `present`, so a missing or trashed row never blocks a live
@@ -61,20 +63,32 @@ and cursor tables with one row per scan: trigger, scope, status
 `cancelled`), a resume path, and incremental counters. `content_objects` and
 the one-Asset-per-owner-and-content rule are unchanged.
 
-**Scan.**
-- *Walk.* A sorted traversal compares each stat tuple with its row. An equal
-  tuple costs one `stat` and no hash, unless the row is racily clean (Git's
-  rule: modified within the timestamp granularity of its last check, or
-  younger than the settle window). New and changed files become
-  `pending_hash`.
+**Scan.** Amended 2026-09-27 (owner, #222): the sweep is folded into the
+walk as a per-directory diff, Syncthing-style, instead of a separate pass
+over rows the walk did not mark as seen. A rescan with no change therefore
+writes no entry at all.
+- *Walk.* A depth-first traversal in sorted name order. Each directory is one
+  unit: list it completely and diff it against the rows whose `parent_key`
+  is that directory. An equal stat tuple costs one `stat` and no write,
+  unless the row is racily clean (Git's rule: its mtime is within the
+  timestamp granularity of its last check). New and changed files become
+  `pending_hash`; a file younger than the settle window is deferred. Only a
+  directory whose own row is live is walked, so every entry has an indexed
+  parent; a directory that appears behind its parent's diff waits for the
+  next scan.
 - *Hash.* Outside any transaction: stat, BLAKE3 from the open handle, stat
-  again. The commit is a compare-and-swap on the stat tuple and binds content
-  and Asset, applying the in-place carry-over rule of the lifecycle decision.
-- *Sweep.* Rows under the scope that this scan did not see are re-checked
-  with `lstat` in pages of 256. Only `ENOENT`, `ENOTDIR`, or a parent that now
-  crosses a symlink marks a row `missing`; any other error leaves it present
-  and counts a scan error. The repository marker is re-checked before each
-  page commits, so an unmounted volume never produces `missing` rows.
+  again; a file that changed meanwhile stays pending. The commit is a
+  compare-and-swap on the row's `revision`, records the stat tuple the
+  content was hashed under, and binds content and Asset, applying the
+  in-place carry-over rule of the lifecycle decision.
+- *Absence.* A row with no disk entry in its directory's listing is probed
+  with `lstat`. Only `ENOENT`, `ENOTDIR`, or an ancestor that is no longer a
+  real directory marks a row `missing`; any other error leaves it present
+  and counts a scan error, and an unreadable directory leaves all of its rows
+  alone. A vanished directory takes its subtree with it, in path-ordered
+  pages of 256 (the `sweeping` status). The repository marker is re-checked
+  before every commit that removes anything, so an unmounted volume never
+  produces `missing` rows.
 - *Moves.* A missing row whose Asset has another present row is removed,
   which is Syncthing's content-based `findRename` expressed through Assets.
   Asset IDs never change on a move or a copy.
