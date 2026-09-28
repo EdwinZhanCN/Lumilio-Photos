@@ -107,8 +107,8 @@ func (r *Reader) Items(ctx context.Context, id StageID, state ItemState, limit i
 		}
 	case id == StageScan:
 		source = `SELECT o.repository_id AS subject, NULL AS asset, COALESCE(r.name, o.repository_id) AS label, o.terminal_error AS terminal, NULL AS attempts, o.updated_at AS updated
-		 FROM repository_observation_state o LEFT JOIN repositories r ON r.repo_id=o.repository_id
-		 WHERE ` + pick(failed, `o.terminal_error IS NOT NULL`, `o.desired_epoch>o.applied_epoch AND o.terminal_error IS NULL`)
+		 FROM repository_scan_state o LEFT JOIN repositories r ON r.repo_id=o.repository_id
+		 WHERE ` + pick(failed, `o.terminal_error IS NOT NULL AND NOT o.pending`, `o.pending`)
 	case id == StageEvents:
 		source = `SELECT CAST(e.owner_id AS TEXT) AS subject, NULL AS asset, COALESCE(u.username, CAST(e.owner_id AS TEXT)) AS label, e.terminal_error AS terminal, NULL AS attempts, e.updated_at AS updated
 		 FROM event_projection_pipeline_state e LEFT JOIN users u ON u.user_id=e.owner_id

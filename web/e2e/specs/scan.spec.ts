@@ -9,7 +9,7 @@ type ScanAccepted = components["schemas"]["dto.RepositoryScanQueuedDTO"];
 type ScanRun = components["schemas"]["dto.RepositoryScanRunDTO"];
 type AssetList = components["schemas"]["dto.QueryAssetsResponseDTO"];
 
-const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "crawling", "catching_up", "finalizing"]);
+const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "walking", "sweeping"]);
 
 test("@smoke administrator scans a real repository file and sees it", async ({
   page,
@@ -26,7 +26,6 @@ test("@smoke administrator scans a real repository file and sees it", async ({
     api<ScanAccepted>(`/api/v1/storage/repositories/${workspace.repositoryId}/verifications`, {
       method: "POST",
       token: workspace.token,
-      body: JSON.stringify({ force: true }),
     });
   const waitForTerminalScan = async (operationID: string) => {
     let run: ScanRun = {};
@@ -55,7 +54,7 @@ test("@smoke administrator scans a real repository file and sees it", async ({
   // the copy must cover it fully. A partial run (for example a file skipped as
   // still settling) would never surface the asset; fail on it here.
   expect(run.status).toBe("completed");
-  expect(run.files_observed ?? 0).toBeGreaterThan(0);
+  expect(run.seen ?? 0).toBeGreaterThan(0);
   await expect(async () => {
     const assets = await api<AssetList>("/api/v1/assets/list", {
       method: "POST",

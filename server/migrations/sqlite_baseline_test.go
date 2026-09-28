@@ -23,13 +23,13 @@ import (
 // inventory of the current schema; a future schema change edits the baseline
 // in place and updates them deliberately.
 const (
-	baselineOrdinaryTables = 98
+	baselineOrdinaryTables = 91
 	baselineVirtualTables  = 5
-	baselineViews          = 3
+	baselineViews          = 4
 	baselineShadowTables   = 17
 	baselineVec1Internals  = 5
-	baselineIndexes        = 163
-	baselineTriggers       = 41
+	baselineIndexes        = 148
+	baselineTriggers       = 38
 )
 
 // baselineVec1InternalTables are owned by the Vec1 virtual table module.
@@ -243,10 +243,9 @@ func assertBaselineInventory(t *testing.T, database *sql.DB) {
 		"users", "refresh_tokens", "pending_totp_enrollments", "user_mfa_totp_credentials",
 		"user_mfa_recovery_codes", "user_webauthn_credentials", "auth_security_verifications",
 		"share_links", "agent_pins", "agent_threads", "agent_runs", "agent_refs", "agent_pending_effects",
-		// Repository observation engine and exact-content identity.
-		"content_objects", "assets", "asset_locations", "repository_nodes",
-		"repository_observations", "repository_change_cursors", "repository_scan_runs",
-		"repository_scan_frontier", "repository_observation_state", "repository_staging_commits",
+		// Repository scan index and exact-content identity.
+		"content_objects", "assets", "repository_entries", "repository_scans",
+		"repository_staging_commits",
 		"location_projection_state", "location_projection_receipt_scopes",
 		// Async processing and pipeline state.
 		"asset_pipeline_state", "asset_pipeline_receipt_stages", "asset_pipeline_failures",
@@ -272,6 +271,7 @@ func assertBaselineInventory(t *testing.T, database *sql.DB) {
 	for _, name := range []string{
 		"asset_search_fts", "location_search_fts", "music_search_fts", "species_search_fts",
 		"active_asset_occurrences", "active_asset_occurrence_paths", "media_item_browse_facts",
+		"repository_scan_state",
 	} {
 		if _, ok := inventory[name]; !ok {
 			t.Errorf("required view or virtual table %s is missing", name)
@@ -291,6 +291,10 @@ func assertBaselineIsLedgerFree(t *testing.T, database *sql.DB) {
 		"events_converged",
 		"assets_v2",
 		"repository_scan_runs_v2",
+		// The Repository Observation Engine, replaced by the scan index (#222).
+		"repository_nodes", "repository_observations", "asset_locations",
+		"repository_scan_runs", "repository_observation_state",
+		"repository_scan_frontier", "repository_change_cursors",
 		"thumbnails_before_music",
 		"ocr_search_fts",
 	} {
@@ -421,32 +425,26 @@ func insertROEFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 			'00000000-0000-0000-0000-000000000010', 'PHOTO',
 			'quiet sunrise.jpg', 'image/jpeg', 1, 1
 		);
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, created_at, updated_at
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, revision, updated_at
 		) VALUES (
 			'00000000-0000-0000-0000-000000000020',
-			'00000000-0000-0000-0000-000000000002', NULL,
-			'photos', 'photos', 'directory', 1, 1, 1
+			'00000000-0000-0000-0000-000000000002',
+			'photos', 'photos', '', 'directory', 0, 1, 1, 'present', 1, 1
 		);
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, created_at, updated_at
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, content_id, asset_id, revision, updated_at
 		) VALUES (
 			'00000000-0000-0000-0000-000000000021',
 			'00000000-0000-0000-0000-000000000002',
-			'00000000-0000-0000-0000-000000000020',
-			'quiet sunrise.jpg', 'quiet sunrise.jpg', 'file', 1, 1, 1
-		);
-		INSERT INTO asset_locations (
-			location_id, node_id, asset_id, bound_observation_revision, created_at, updated_at
-		) VALUES (
-			'00000000-0000-0000-0000-000000000022',
-			'00000000-0000-0000-0000-000000000021',
-			'00000000-0000-0000-0000-000000000003', 1, 1, 1
+			'photos/quiet sunrise.jpg', 'photos/quiet sunrise.jpg', 'photos', 'file', 1024, 1, 1,
+			'present', '00000000-0000-0000-0000-000000000010',
+			'00000000-0000-0000-0000-000000000003', 1, 1
 		);
 	`); err != nil {
-		t.Fatalf("insert ROE fixtures: %v", err)
+		t.Fatalf("insert scan index fixtures: %v", err)
 	}
 
 	var occurrences int
@@ -455,7 +453,7 @@ func insertROEFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 		FROM active_asset_occurrences
 		WHERE asset_id = '00000000-0000-0000-0000-000000000003'
 		  AND repository_id = '00000000-0000-0000-0000-000000000002'
-		  AND node_id = '00000000-0000-0000-0000-000000000021'
+		  AND entry_id = '00000000-0000-0000-0000-000000000021'
 	`).Scan(&occurrences); err != nil {
 		t.Fatalf("query active_asset_occurrences: %v", err)
 	}
@@ -470,8 +468,8 @@ func insertROEFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 	`).Scan(&relativePath); err != nil {
 		t.Fatalf("query active_asset_occurrence_paths: %v", err)
 	}
-	if relativePath != "quiet sunrise.jpg" {
-		t.Fatalf("relative_path = %q, want quiet sunrise.jpg", relativePath)
+	if relativePath != "photos/quiet sunrise.jpg" {
+		t.Fatalf("relative_path = %q, want photos/quiet sunrise.jpg", relativePath)
 	}
 
 	assertRejected(t, database, `

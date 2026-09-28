@@ -989,7 +989,6 @@
     "loadMore": "加载更多",
     "na": "无",
     "next": "下一个",
-    "no": "否",
     "notAvailable": "不可用",
     "open": "打开",
     "or": "或",
@@ -1005,8 +1004,7 @@
     "undo": "撤销",
     "unknown": "未知",
     "uploaded": "上传于",
-    "viewAll": "查看全部",
-    "yes": "是"
+    "viewAll": "查看全部"
   },
   "delete": {
     "confirm": "移入回收站",
@@ -2732,11 +2730,13 @@
     },
     "verificationHistory": {
       "empty": "尚无扫描记录。",
-      "fieldErrorDirectories": "出错目录",
+      "fieldChanged": "已变更",
+      "fieldErrors": "读取错误",
       "fieldFinished": "结束",
       "fieldMode": "模式",
+      "fieldNew": "新增",
       "fieldOperation": "操作 ID",
-      "fieldPartialCoverage": "部分覆盖",
+      "fieldSeen": "已检查项目",
       "fieldStarted": "开始",
       "fieldStatus": "状态",
       "loadFailed": "无法加载扫描历史。",

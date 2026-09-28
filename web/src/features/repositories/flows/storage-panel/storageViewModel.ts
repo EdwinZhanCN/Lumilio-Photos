@@ -89,7 +89,9 @@ function mapVerification(
       return "never";
     case "failed":
       return "failed";
-    case "partial":
+    // An offline or cancelled scan did not cover the whole repository.
+    case "offline":
+    case "cancelled":
       return "partial";
     default:
       return "verified";

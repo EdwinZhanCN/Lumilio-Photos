@@ -305,23 +305,28 @@ func TestLocationProjectionRevisionTracksSourceFacts(t *testing.T) {
 	require.Greater(t, newOwnerRevision, int64(0), "the new owner scope must be created")
 
 	_, err = catalog.SQL.ExecContext(ctx, `
-		UPDATE asset_locations
-		SET unbound_observation_revision = bound_observation_revision + 1
+		UPDATE repository_entries
+		SET state = 'missing', missing_since = 1, revision = revision + 1
 		WHERE asset_id = ?
 	`, assetID)
 	require.NoError(t, err)
-	require.Greater(t, revision(2), newOwnerRevision, "unbinding a Location must invalidate its scope")
+	require.Greater(t, revision(2), newOwnerRevision, "a file going missing must invalidate its scope")
 
-	oldOwnerBeforeNodeChange := revision(1)
-	newOwnerBeforeNodeChange := revision(2)
+	beforeRestore := revision(2)
 	_, err = catalog.SQL.ExecContext(ctx, `
-		UPDATE repository_nodes
-		SET lifecycle = 'tombstoned'
-		WHERE node_id IN (SELECT node_id FROM asset_locations WHERE asset_id = ?)
+		UPDATE repository_entries
+		SET state = 'present', missing_since = NULL, revision = revision + 1
+		WHERE asset_id = ?
 	`, assetID)
 	require.NoError(t, err)
-	require.Greater(t, revision(1), oldOwnerBeforeNodeChange)
-	require.Greater(t, revision(2), newOwnerBeforeNodeChange)
+	require.Greater(t, revision(2), beforeRestore, "a file coming back must invalidate its scope")
+
+	beforeUnrelated := revision(2)
+	_, err = catalog.SQL.ExecContext(ctx, `
+		UPDATE repository_entries SET stat_checked_ns = stat_checked_ns + 1 WHERE asset_id = ?
+	`, assetID)
+	require.NoError(t, err)
+	require.Equal(t, beforeUnrelated, revision(2), "a stat recheck must not manufacture projection work")
 }
 
 func TestNextLocationMembershipBatchIsStrictlyBounded(t *testing.T) {

@@ -215,15 +215,30 @@ func (s *Scheduler) derive(ctx context.Context) ([]derivedWork, error) {
 		return work, nil
 	}
 
-	repositoryRows, err := db.QueryContext(ctx, `SELECT state.repository_id,active.requested_epoch,active.mode FROM repository_observation_state AS state JOIN repository_scan_runs AS active ON active.run_id=state.active_run_id AND active.repository_id=state.repository_id AND active.status IN ('queued','crawling','catching_up','finalizing') WHERE (state.desired_epoch>state.applied_epoch OR state.full_verification_required=1) AND state.terminal_error IS NULL ORDER BY state.updated_at,state.repository_id LIMIT ?`, s.batchSize-len(work))
+	// A repository has scan work while it has a running scan, a due queued
+	// scan, or entries waiting for a hash (the scan index is the authority).
+	repositoryRows, err := db.QueryContext(ctx, `
+		SELECT repository.repo_id,
+		       COALESCE((SELECT scan.trigger FROM repository_scans scan
+		                 WHERE scan.repository_id = repository.repo_id
+		                   AND scan.status IN ('queued','walking','sweeping')
+		                 ORDER BY scan.created_at LIMIT 1), 'periodic')
+		FROM repositories repository
+		WHERE EXISTS (SELECT 1 FROM repository_scans scan
+		              WHERE scan.repository_id = repository.repo_id
+		                AND (scan.status IN ('walking','sweeping')
+		                     OR (scan.status = 'queued' AND (scan.not_before IS NULL OR scan.not_before <= ?))))
+		   OR (repository.reachability = 'active' AND EXISTS (
+		              SELECT 1 FROM repository_entries entry
+		              WHERE entry.repository_id = repository.repo_id AND entry.state = 'pending_hash'))
+		ORDER BY repository.repo_id
+		LIMIT ?`, time.Now().UTC().UnixMicro(), s.batchSize-len(work))
 	if err != nil {
 		return nil, err
 	}
 	for repositoryRows.Next() {
-		var repositoryRaw string
-		var mode string
-		var epoch uint64
-		if err := repositoryRows.Scan(&repositoryRaw, &epoch, &mode); err != nil {
+		var repositoryRaw, trigger string
+		if err := repositoryRows.Scan(&repositoryRaw, &trigger); err != nil {
 			_ = repositoryRows.Close()
 			return nil, err
 		}
@@ -233,10 +248,10 @@ func (s *Scheduler) derive(ctx context.Context) ([]derivedWork, error) {
 			return nil, err
 		}
 		qos := workqos.Background
-		if mode == "manual" {
+		if trigger == "manual" {
 			qos = workqos.Interactive
 		}
-		work = append(work, derivedWork{args: jobs.ScanRepositoryBatchArgs{RepositoryID: repositoryID, RequestedEpoch: epoch, DesiredVersion: epoch}, qos: qos})
+		work = append(work, derivedWork{args: jobs.ScanRepositoryBatchArgs{RepositoryID: repositoryID}, qos: qos})
 	}
 	if err := repositoryRows.Err(); err != nil {
 		_ = repositoryRows.Close()

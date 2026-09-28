@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { $api, client } from "@/lib/http-commons/queryClient";
 import { storageViewQueryKey } from "./useStorageView";
 
-const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "crawling", "catching_up", "finalizing"]);
+const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "walking", "sweeping"]);
 
 export function isActiveVerificationStatus(status?: string): boolean {
   return status != null && ACTIVE_VERIFICATION_STATUSES.has(status);

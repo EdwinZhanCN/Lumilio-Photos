@@ -996,7 +996,6 @@
     "loadMore": "Load More",
     "na": "N/A",
     "next": "Next",
-    "no": "No",
     "notAvailable": "N/A",
     "open": "Open",
     "or": "OR",
@@ -1012,8 +1011,7 @@
     "undo": "Undo",
     "unknown": "Unknown",
     "uploaded": "Uploaded",
-    "viewAll": "View All",
-    "yes": "Yes"
+    "viewAll": "View All"
   },
   "delete": {
     "confirm": "Move to Trash",
@@ -2772,11 +2770,13 @@
     },
     "verificationHistory": {
       "empty": "No scans yet.",
-      "fieldErrorDirectories": "Directories with errors",
+      "fieldChanged": "Changed",
+      "fieldErrors": "Read errors",
       "fieldFinished": "Finished",
       "fieldMode": "Mode",
+      "fieldNew": "New",
       "fieldOperation": "Operation",
-      "fieldPartialCoverage": "Partial coverage",
+      "fieldSeen": "Items seen",
       "fieldStarted": "Started",
       "fieldStatus": "Status",
       "loadFailed": "Scan history could not be loaded.",

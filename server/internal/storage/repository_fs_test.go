@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,16 +59,13 @@ func TestRepositoryFSWalkIncludesInboxAndProtectsPrivateTree(t *testing.T) {
 	writeRepositoryFSTestFile(t, repository.Path, "notes.txt", []byte("unsupported"))
 
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{ScanID: uuid.New()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !summary.Authoritative {
-		t.Fatalf("walk unexpectedly partial: %s", summary.PartialReason)
+	observations, issues := listAllUserMedia(t, repositoryFS)
+	if len(issues) != 0 {
+		t.Fatalf("walk reported issues: %+v", issues)
 	}
 	paths := make(map[string]bool)
-	for _, observation := range summary.Observations {
-		paths[observation.Path.String()] = true
+	for path := range observations {
+		paths[path] = true
 	}
 	for _, want := range []string{"inbox/2026/08/upload.jpg", "Trips/photo.jpg", ".hidden/secret.png"} {
 		if !paths[want] {
@@ -97,56 +95,34 @@ func TestRepositoryFSWalkStopsAtNestedRepositoryBoundary(t *testing.T) {
 	writeRepositoryFSTestFile(t, repository.Path, "nested/must-not-scan.jpg", []byte("nested"))
 
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{ScanID: uuid.New()})
-	if err != nil {
-		t.Fatal(err)
+	observations, issues := listAllUserMedia(t, repositoryFS)
+	if len(issues) != 1 || !errors.Is(issues[0].Err, ErrNestedRepository) {
+		t.Fatalf("issues = %#v, want one nested-repository boundary", issues)
 	}
-	if summary.Authoritative || !errors.Is(summary.Issues[0].Err, ErrNestedRepository) {
-		t.Fatalf("summary = %#v, want nested-repository topology failure", summary)
-	}
-	for _, observation := range summary.Observations {
-		if observation.Path.String() == "nested/must-not-scan.jpg" {
-			t.Fatal("walk crossed nested .lumiliorepo boundary")
-		}
+	if _, ok := observations["nested/must-not-scan.jpg"]; ok {
+		t.Fatal("walk crossed nested .lumiliorepo boundary")
 	}
 }
 
-func TestRepositoryFSReadDirectoryResumesInBoundedPages(t *testing.T) {
+func TestRepositoryFSListsAWholeDirectoryInNameOrder(t *testing.T) {
 	t.Parallel()
 
 	repository := createRepositoryFSTestRoot(t)
-	for _, name := range []string{"a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg", "f.jpg", "g.jpg"} {
+	for _, name := range []string{"g.jpg", "b.jpg", "e.jpg", "a.jpg", "d.jpg", "c.jpg", "f.jpg"} {
 		writeRepositoryFSTestFile(t, repository.Path, filepath.Join("wide", name), []byte(name))
 	}
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	offset := int64(0)
-	observed := make(map[string]bool)
-	for turns := 0; ; turns++ {
-		if turns > 8 {
-			t.Fatal("bounded directory reader did not reach EOF")
-		}
-		batch, err := repositoryFS.ReadUserMediaDirectory(context.Background(), DirectoryReadOptions{
-			Directory: "wide", Offset: offset, Limit: 2, ScanID: uuid.New(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(batch.Entries) > 2 {
-			t.Fatalf("batch entries = %d, want at most 2", len(batch.Entries))
-		}
-		for _, entry := range batch.Entries {
-			observed[entry.Observation.Path.String()] = true
-		}
-		if batch.Done {
-			break
-		}
-		if batch.NextOffset <= offset {
-			t.Fatalf("offset did not advance: %d -> %d", offset, batch.NextOffset)
-		}
-		offset = batch.NextOffset
+	listing, err := repositoryFS.ListUserMediaDirectory(context.Background(), "wide")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(observed) != 7 {
-		t.Fatalf("observed entries = %d, want 7: %#v", len(observed), observed)
+	var names []string
+	for _, observation := range listing.Files {
+		names = append(names, observation.Path.String())
+	}
+	want := []string{"wide/a.jpg", "wide/b.jpg", "wide/c.jpg", "wide/d.jpg", "wide/e.jpg", "wide/f.jpg", "wide/g.jpg"}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
+		t.Fatalf("listing = %v, want %v", names, want)
 	}
 }
 
@@ -179,14 +155,7 @@ func TestRepositoryFSSymlinkPolicyAndHardLinkIdentity(t *testing.T) {
 	}
 
 	repositoryFS := openRepositoryFSTestFS(t, repository)
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	observations := make(map[string]FileObservation)
-	for _, observation := range summary.Observations {
-		observations[observation.Path.String()] = observation
-	}
+	observations, _ := listAllUserMedia(t, repositoryFS)
 	if observations["inside.jpg"].EntryKind != EntryKindSymlink {
 		t.Fatalf("inside symlink kind = %q", observations["inside.jpg"].EntryKind)
 	}
@@ -236,7 +205,7 @@ func TestRepositoryFSInspectHashesOpenedStableFile(t *testing.T) {
 	}
 }
 
-func TestRepositoryFSSettleAndLifecycleLease(t *testing.T) {
+func TestRepositoryFSHoldsTheLifecycleLeaseUntilClose(t *testing.T) {
 	t.Parallel()
 
 	repository := createRepositoryFSTestRoot(t)
@@ -246,14 +215,6 @@ func TestRepositoryFSSettleAndLifecycleLease(t *testing.T) {
 	repositoryFS, err := factory.Open(repository)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	summary, err := repositoryFS.WalkUserMedia(context.Background(), WalkOptions{Settle: time.Hour})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(summary.Observations) != 0 || len(summary.DeferredPaths) != 1 {
-		t.Fatalf("settle observations=%d deferred=%d", len(summary.Observations), len(summary.DeferredPaths))
 	}
 
 	acquired := make(chan struct{})
@@ -431,4 +392,29 @@ func mustUserMediaPath(t *testing.T, value string) RepositoryPath {
 		t.Fatal(err)
 	}
 	return parsed
+}
+
+// listAllUserMedia walks a repository the way the scan index does, one whole
+// directory listing at a time, and returns every observation by path.
+func listAllUserMedia(t *testing.T, repositoryFS *RepositoryFS) (map[string]FileObservation, []WalkIssue) {
+	t.Helper()
+	observations := make(map[string]FileObservation)
+	var issues []WalkIssue
+	pending := []string{""}
+	for len(pending) > 0 {
+		directory := pending[0]
+		pending = pending[1:]
+		listing, err := repositoryFS.ListUserMediaDirectory(context.Background(), directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issues = append(issues, listing.Issues...)
+		for _, observation := range listing.Files {
+			observations[observation.Path.String()] = observation
+		}
+		for _, observation := range listing.Directories {
+			pending = append(pending, observation.Path.String())
+		}
+	}
+	return observations, issues
 }

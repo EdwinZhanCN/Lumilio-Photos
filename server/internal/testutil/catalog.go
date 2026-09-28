@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -36,16 +35,13 @@ type AssetOccurrenceParams struct {
 }
 
 type AssetOccurrence struct {
-	ContentID  uuid.UUID
-	RootNodeID uuid.UUID
-	NodeID     uuid.UUID
-	LocationID uuid.UUID
+	ContentID uuid.UUID
+	EntryID   uuid.UUID
 }
 
-// InsertAssetOccurrence seeds the normalized owner/content/Asset/node/
-// Location contract. It intentionally does not create repository observations:
-// the active occurrence projection requires the current node and binding, while
-// observation history belongs only in tests that exercise reconciliation.
+// InsertAssetOccurrence seeds the owner/content/Asset contract with one present
+// file entry at the repository root, which is what the active occurrence
+// projection reads.
 func InsertAssetOccurrence(
 	ctx context.Context,
 	database SQLExecutor,
@@ -101,46 +97,15 @@ func InsertAssetOccurrence(
 		return AssetOccurrence{}, fmt.Errorf("insert fixture asset: %w", err)
 	}
 
-	var rootNodeID uuid.UUID
-	err := database.QueryRowContext(ctx, `
-		SELECT node_id FROM repository_nodes
-		WHERE repository_id = ? AND parent_node_id IS NULL AND lifecycle = 'active'
-	`, params.RepositoryID).Scan(&rootNodeID)
-	if errors.Is(err, sql.ErrNoRows) {
-		rootNodeID = uuid.New()
-		if _, err := database.ExecContext(ctx, `
-			INSERT INTO repository_nodes (
-				node_id, repository_id, parent_node_id, name, name_key, kind,
-				observation_revision, created_at, updated_at
-			) VALUES (?, ?, NULL, '', '', 'directory', 1, 1, 1)
-		`, rootNodeID, params.RepositoryID); err != nil {
-			return AssetOccurrence{}, fmt.Errorf("insert fixture repository root node: %w", err)
-		}
-	} else if err != nil {
-		return AssetOccurrence{}, fmt.Errorf("load fixture repository root node: %w", err)
-	}
-
-	nodeID := uuid.New()
+	entryID := uuid.New()
 	if _, err := database.ExecContext(ctx, `
-		INSERT INTO repository_nodes (
-			node_id, repository_id, parent_node_id, name, name_key, kind,
-			observation_revision, file_size, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, 'file', 2, ?, 1, 1)
-	`, nodeID, params.RepositoryID, rootNodeID, params.NodeName,
-		params.NodeName, params.FileSize); err != nil {
-		return AssetOccurrence{}, fmt.Errorf("insert fixture repository file node: %w", err)
+		INSERT INTO repository_entries (
+			entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns,
+			stat_checked_ns, state, content_id, asset_id, revision, updated_at
+		) VALUES (?, ?, ?, lower(?), '', 'file', ?, 1, 1, 'present', ?, ?, 1, 1)
+	`, entryID, params.RepositoryID, params.NodeName, params.NodeName, params.FileSize,
+		params.ContentID, params.AssetID); err != nil {
+		return AssetOccurrence{}, fmt.Errorf("insert fixture repository entry: %w", err)
 	}
-	locationID := uuid.New()
-	if _, err := database.ExecContext(ctx, `
-		INSERT INTO asset_locations (
-			location_id, node_id, asset_id, bound_observation_revision,
-			created_at, updated_at
-		) VALUES (?, ?, ?, 2, 1, 1)
-	`, locationID, nodeID, params.AssetID); err != nil {
-		return AssetOccurrence{}, fmt.Errorf("insert fixture asset Location: %w", err)
-	}
-	return AssetOccurrence{
-		ContentID: params.ContentID, RootNodeID: rootNodeID,
-		NodeID: nodeID, LocationID: locationID,
-	}, nil
+	return AssetOccurrence{ContentID: params.ContentID, EntryID: entryID}, nil
 }

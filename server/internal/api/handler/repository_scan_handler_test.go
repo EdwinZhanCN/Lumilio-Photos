@@ -15,7 +15,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
-	roecontroller "server/internal/storage/roe/controller"
+	"server/internal/storage/scan"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -108,29 +108,29 @@ type storageDiagnosticsManagerStub struct {
 }
 
 type repositoryScanServiceStub struct {
-	cancelled    repo.RepositoryScanRun
+	cancelled    repo.RepositoryScan
 	cancelErr    error
 	repositoryID string
 	operationID  string
 }
 
-func (*repositoryScanServiceStub) EnqueueManualScan(context.Context, string, string, bool) (roecontroller.Receipt, error) {
-	return roecontroller.Receipt{}, nil
+func (*repositoryScanServiceStub) RequestScan(context.Context, string, string, string) (scan.Receipt, error) {
+	return scan.Receipt{}, nil
 }
 
-func (*repositoryScanServiceStub) GetScanRun(context.Context, string, string) (repo.RepositoryScanRun, error) {
-	return repo.RepositoryScanRun{}, nil
+func (*repositoryScanServiceStub) GetScan(context.Context, string, string) (repo.RepositoryScan, error) {
+	return repo.RepositoryScan{}, nil
 }
 
-func (*repositoryScanServiceStub) GetLatestScanRun(context.Context, string) (repo.RepositoryScanRun, error) {
-	return repo.RepositoryScanRun{}, nil
+func (*repositoryScanServiceStub) GetLatestScan(context.Context, string) (repo.RepositoryScan, error) {
+	return repo.RepositoryScan{}, nil
 }
 
-func (*repositoryScanServiceStub) ListScanRuns(context.Context, string, int32, int32) ([]repo.RepositoryScanRun, error) {
+func (*repositoryScanServiceStub) ListScans(context.Context, string, int32, int32) ([]repo.RepositoryScan, error) {
 	return nil, nil
 }
 
-func (stub *repositoryScanServiceStub) CancelScanRun(_ context.Context, repositoryID, operationID string) (repo.RepositoryScanRun, error) {
+func (stub *repositoryScanServiceStub) CancelScan(_ context.Context, repositoryID, operationID string) (repo.RepositoryScan, error) {
 	stub.repositoryID = repositoryID
 	stub.operationID = operationID
 	return stub.cancelled, stub.cancelErr
@@ -140,9 +140,9 @@ func TestCancelRepositoryScanReturnsDurableCancellationState(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repositoryID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	operationID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
-	stub := &repositoryScanServiceStub{cancelled: repo.RepositoryScanRun{
-		RunID: operationID, RepositoryID: repositoryID, RequestedEpoch: 2,
-		Mode: "manual", Status: roecontroller.StatusCrawling,
+	stub := &repositoryScanServiceStub{cancelled: repo.RepositoryScan{
+		ScanID: operationID, RepositoryID: repositoryID,
+		Trigger: scan.TriggerManual, Status: scan.StatusWalking,
 		CancellationRequested: 1, CreatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
 	}}
 	handler := NewRepositoryScanHandler(stub, nil)

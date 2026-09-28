@@ -91,6 +91,8 @@ SET state = 'present',
     mtime_ns = sqlc.arg(mtime_ns),
     ctime_ns = sqlc.narg(ctime_ns),
     file_id = sqlc.narg(file_id),
+    quick_fingerprint = sqlc.narg(quick_fingerprint),
+    quick_fingerprint_version = sqlc.narg(quick_fingerprint_version),
     stat_checked_ns = sqlc.arg(stat_checked_ns),
     revision = revision + 1,
     updated_at = sqlc.arg(updated_at)
@@ -257,3 +259,26 @@ SELECT * FROM repository_entries
 WHERE repository_id = ?1
   AND path_key = ?2
   AND state IN ('pending_hash', 'present');
+
+-- name: ListPresentRepositoryEntriesForAsset :many
+-- The occurrences media I/O may open, in a stable preference order.
+SELECT * FROM repository_entries
+WHERE asset_id = ?1
+  AND state = 'present'
+  AND kind = 'file'
+ORDER BY repository_id, path;
+
+-- name: GetLatestRepositoryScan :one
+SELECT * FROM repository_scans
+WHERE repository_id = ?1
+ORDER BY created_at DESC, scan_id DESC
+LIMIT 1;
+
+-- name: RequestRepositoryScanCancellation :one
+UPDATE repository_scans
+SET cancellation_requested = 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE scan_id = sqlc.arg(scan_id)
+  AND repository_id = sqlc.arg(repository_id)
+RETURNING *;
+

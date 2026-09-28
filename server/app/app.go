@@ -49,12 +49,13 @@ import (
 	"server/internal/settings"
 	"server/internal/sourcing"
 	"server/internal/storage"
-	roecontroller "server/internal/storage/roe/controller"
-	roelocations "server/internal/storage/roe/locations"
-	roematerializer "server/internal/storage/roe/materializer"
+	"server/internal/storage/locations"
+	"server/internal/storage/pathsemantics"
+	"server/internal/storage/scan"
 	"server/internal/utils/imaging"
 	"server/internal/version"
 
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -562,10 +563,6 @@ func run(
 	tools.RegisterAll()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	// Upload/cloud staging and filesystem observation converge at the same ROE
-	// content/Asset/Location commit boundary.
-	repositoryHashPreparer := roematerializer.NewHashPreparer(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
-	repositoryHashApplier := roematerializer.NewHashApplier()
 	artifactCleaner, err := artifact.NewCleaner(database, repositoryFiles, 24*time.Hour)
 	if err != nil {
 		return fmt.Errorf("initialize artifact cleaner: %w", err)
@@ -579,13 +576,9 @@ func run(
 		return fmt.Errorf("initialize execution governor: %w", err)
 	}
 	executionEngine := execution.NewEngine(governor)
-	repositoryObservationConfig := roecontroller.Config{
-		VerificationInterval: time.Duration(appConfig.RepositoryScan.IntervalSeconds) * time.Second,
-		Settle:               time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
-	}
 	commitCoordinator, err := commit.New(database.Writer, commit.Config{Capacity: 256, MaxBatch: 32, OldestWait: 10 * time.Millisecond}, commit.CatalogDependencies{
 		Face: faceService, Event: eventService, Location: locationService,
-		Indexing: indexingService, Materializer: repositoryHashApplier,
+		Indexing: indexingService,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize commit coordinator: %w", err)
@@ -622,25 +615,6 @@ func run(
 		repoAuditProvider,
 		repositoryFiles,
 	)
-	sourceMaterializer.SetActivation(func(ctx context.Context, fact roematerializer.KnownContent) (roematerializer.Result, error) {
-		_, err := commitCoordinator.ApplyRepositoryKnownContent(ctx, commit.RepositoryKnownContentApplied{Fact: fact})
-		if err != nil {
-			return roematerializer.Result{}, err
-		}
-		observation, err := database.ReaderQueries.GetRepositoryObservationBySourceEvent(ctx, repo.GetRepositoryObservationBySourceEventParams{RepositoryID: fact.RepositoryID, Source: fact.Source, SourceEventKey: &fact.SourceEventKey})
-		if err != nil || !observation.MappedNodeID.Valid {
-			return roematerializer.Result{}, fmt.Errorf("load committed source observation: %w", err)
-		}
-		location, err := database.ReaderQueries.GetActiveAssetLocationByNode(ctx, observation.MappedNodeID.UUID)
-		if err != nil {
-			return roematerializer.Result{}, fmt.Errorf("load committed source asset: %w", err)
-		}
-		asset, err := database.ReaderQueries.GetAssetByIDAny(ctx, location.AssetID)
-		if err != nil {
-			return roematerializer.Result{}, fmt.Errorf("load committed source content: %w", err)
-		}
-		return roematerializer.Result{Code: roematerializer.ResultBound, RepositoryID: fact.RepositoryID, NodeID: observation.MappedNodeID.UUID, AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: observation.Revision}, nil
-	})
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -648,45 +622,34 @@ func run(
 			runErr = errors.Join(runErr, err)
 		}
 	}()
-	assetLocationResolver := roelocations.NewResolver(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
-	assetProcessor.SetLocationResolver(assetLocationResolver)
-	repositoryObserver := roecontroller.New(database.ReaderQueries, commitCoordinator, repositoryFiles, repositoryObservationConfig, observationLogger)
-	repositoryScanCommands := roecontroller.NewCommands(database, repositoryObservationConfig, observationLogger)
-	defer func() {
-		if err := repositoryObserver.Close(); err != nil {
-			runErr = errors.Join(runErr, fmt.Errorf("close repository change feed: %w", err))
-		}
-	}()
-	if notifications := repositoryObserver.Notifications(); notifications != nil {
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case repositoryID, ok := <-notifications:
-					if !ok {
-						return
-					}
-					if _, err := repositoryScanCommands.Request(ctx, repositoryID, "watcher", "native_change", false); err != nil && ctx.Err() == nil {
-						observationLogger.Warn("enqueue native repository observation",
-							zap.String("repository_id", repositoryID.String()), zap.Error(err))
-					}
-				}
-			}
-		}()
+	// Upload/cloud staging and filesystem scans converge on the same scan
+	// index binding, written through the commit coordinator.
+	repositoryScanner, err := scan.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, scan.Config{
+		Settle:    time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
+		Semantics: pathsemantics.HostDefault(),
+		Activate: func(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, entryID, assetID, contentID uuid.UUID) error {
+			return service.ApplyAssetActivationTx(ctx, tx, queries, repositoryID, entryID, assetID, contentID)
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("initialize repository scanner: %w", err)
 	}
+	sourceMaterializer.SetActivation(repositoryScanner.BindKnownContent)
+	assetLocationResolver := locations.NewResolver(database.ReaderQueries, repositoryFiles)
+	assetProcessor.SetLocationResolver(assetLocationResolver)
 	repoManager.SetInitialScanEnqueuer(func(ctx context.Context, repositoryID string) error {
-		_, err := repositoryScanCommands.EnqueueManualScan(ctx, repositoryID, "storage_lifecycle", true)
+		_, err := repositoryScanner.RequestScan(ctx, repositoryID, scan.TriggerManual, "storage_lifecycle")
 		return err
 	})
 	if err := repoManager.RetryPendingInitialRepositoryScans(ctx); err != nil {
 		return fmt.Errorf("resume pending initial repository scans: %w", err)
 	}
-	go func() {
-		ticker := time.NewTicker(time.Duration(appConfig.RepositoryScan.IntervalSeconds) * time.Second)
-		defer ticker.Stop()
-		runRepositoryVerifierLoop(ctx, ticker.C, repositoryScanCommands.EnqueueAllPeriodicScans, observationLogger)
-	}()
+	go runRepositoryVerifierLoop(ctx,
+		jitteredTicks(ctx, time.Duration(appConfig.RepositoryScan.IntervalSeconds)*time.Second),
+		repositoryScanner.RequestAllPeriodic, observationLogger)
+	// Filesystem events only shorten latency; the periodic full scan above is
+	// the authority when events are lost.
+	go scan.NewWatcher(database.ReaderQueries, repositoryScanner, observationLogger, scan.WatchConfig{}).Run(ctx)
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
@@ -712,9 +675,8 @@ func run(
 		logger:         appLogger.Named("pipeline"),
 		pipelineReader: database.ReaderSQL,
 		engine:         executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
-		repository: repositoryObserver, repositoryHasher: repositoryHashPreparer,
-		repositoryReader: database.ReaderQueries,
-		eventProjection:  eventService, locationProjection: locationService,
+		scanner:         repositoryScanner,
+		eventProjection: eventService, locationProjection: locationService,
 		ocrProjection: ocrIndexWriter, reindexProjection: indexingService,
 		enrichmentReader: database.ReaderQueries, settings: settingsService,
 		lumen: lumenService, classifier: classifierService, files: repositoryFiles,
@@ -845,9 +807,9 @@ func run(
 		appLogger.Warn("failed to recover interrupted cloud import runs", zap.Error(err))
 	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanCommands, repoManager)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
 	repositoryScanController.SetBootstrapService(bootstrapService)
-	storageController := handler.NewStorageHandler(repoManager, queries, repositoryScanCommands)
+	storageController := handler.NewStorageHandler(repoManager, queries, repositoryScanner)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)

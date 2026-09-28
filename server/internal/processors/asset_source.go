@@ -8,7 +8,7 @@ import (
 
 	"server/internal/db/repo"
 	"server/internal/storage"
-	"server/internal/storage/roe/locations"
+	"server/internal/storage/locations"
 
 	"github.com/google/uuid"
 )
@@ -87,8 +87,8 @@ func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID
 		_ = opened.Close()
 		return nil, err
 	}
-	if observation.Size != content.FileSize || opened.Node.StabilityToken == nil ||
-		observation.ObservationToken != *opened.Node.StabilityToken {
+	// The file must still be the one the scan index bound to this content.
+	if observation.Size != content.FileSize || !opened.MatchesCatalog(observation) {
 		_ = opened.Close()
 		return nil, ErrAssetSourceStale
 	}

@@ -36,9 +36,7 @@ export function useRepositoryScan() {
               id: repositoryId,
             },
           },
-          body: {
-            force: false,
-          },
+          body: {},
         });
         await invalidateRepositoryAwareQueries(queryClient);
         return result;
@@ -97,9 +95,7 @@ export function useRepositoryScan() {
                   id: repositoryId,
                 },
               },
-              body: {
-                force: false,
-              },
+              body: {},
             });
           }),
         );

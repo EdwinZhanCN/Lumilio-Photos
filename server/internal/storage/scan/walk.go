@@ -300,9 +300,17 @@ type write struct {
 	vanished *repo.RepositoryEntry
 }
 
+// sameTuple compares a row's stat tuple with a fresh observation. A change
+// time or file ID the catalog does not know (after a relocation) is not
+// compared; unrecorded reports that the row should record the fresh ones.
 func sameTuple(row repo.RepositoryEntry, observation storage.FileObservation) bool {
 	return row.Size == observation.Size && row.MtimeNs == observation.ModTimeNS &&
-		equalInt64(row.CtimeNs, observation.ChangeTimeNS) && equalString(row.FileID, observation.FileIdentity)
+		(row.CtimeNs == nil || equalInt64(row.CtimeNs, observation.ChangeTimeNS)) &&
+		(row.FileID == nil || equalString(row.FileID, observation.FileIdentity))
+}
+
+func unrecorded(row repo.RepositoryEntry, observation storage.FileObservation) bool {
+	return (row.CtimeNs == nil && observation.ChangeTimeNS != nil) || (row.FileID == nil && observation.FileIdentity != nil)
 }
 
 func equalInt64(left, right *int64) bool {
@@ -431,9 +439,10 @@ func (t *walkTurn) processDirectory(ctx context.Context, directory string) error
 			} else {
 				unchanged := sameTuple(row, observation) && (kind == KindDirectory || !racilyClean(row))
 				switch {
-				case unchanged && row.Path == relative:
+				case unchanged && row.Path == relative && !unrecorded(row, observation):
 				case unchanged:
-					// A case-only rename keeps the row and its binding.
+					// A case-only rename, or a tuple to re-record after a
+					// relocation, keeps the row, its state, and its binding.
 					writes = append(writes, write{observe: observed(row, row.State)})
 				case settling:
 					c.deferred++

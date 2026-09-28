@@ -54,7 +54,7 @@ func TestLowLoadShortSnoozeWakesAfterCommitAndDeadline(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	_, err = client.Insert(ctx, jobs.ScanRepositoryBatchArgs{RepositoryID: uuid.New(), RequestedEpoch: 1, DesiredVersion: 1}, nil)
+	_, err = client.Insert(ctx, jobs.ScanRepositoryBatchArgs{RepositoryID: uuid.New()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

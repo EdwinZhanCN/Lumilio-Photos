@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -16,76 +15,51 @@ type catalogSQLExec interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-// invalidateRepositoryObservationAfterRelocation fences stale directory observation
-// and scan work after a repository's registered path changes. It must run in the
-// same catalog transaction as UpdateRepositoryPath.
+// invalidateRepositoryObservationAfterRelocation re-anchors the scan index
+// after a repository's registered path changes. It must run in the same
+// catalog transaction as UpdateRepositoryPath. Entries are relative, so they
+// stay; a relocated tree usually sits on another volume, where every file has
+// a new change time and file ID, so those are forgotten and the next scan
+// re-records them from an equal size and mtime instead of rehashing. Running
+// scans stop, and one full scan is queued.
 func invalidateRepositoryObservationAfterRelocation(
 	ctx context.Context,
 	db catalogSQLExec,
 	repoID uuid.UUID,
-	newRepositoryPath string,
+	_ string,
 	now dbtypes.Timestamp,
 ) error {
 	repoIDStr := repoID.String()
-	if _, err := db.ExecContext(ctx, `DELETE FROM repository_change_cursors WHERE repository_id = ?`, repoIDStr); err != nil {
-		return fmt.Errorf("clear repository change cursors: %w", err)
-	}
-
-	var nextRevision int64
-	err := db.QueryRowContext(ctx, `
-		SELECT next_revision FROM repository_observation_state WHERE repository_id = ?
-	`, repoIDStr).Scan(&nextRevision)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read observation revision fence: %w", err)
-	}
-
 	if _, err := db.ExecContext(ctx, `
-		UPDATE repository_nodes
-		SET observation_revision = CASE
-			WHEN observation_revision < ? THEN ?
-			ELSE observation_revision
-		END,
-		updated_at = ?
+		UPDATE repository_entries
+		SET ctime_ns = NULL, file_id = NULL
 		WHERE repository_id = ?
-	`, nextRevision, nextRevision, now, repoIDStr); err != nil {
-		return fmt.Errorf("bump repository node observation revisions: %w", err)
+	`, repoIDStr); err != nil {
+		return fmt.Errorf("forget relocated file identities: %w", err)
 	}
-
 	if _, err := db.ExecContext(ctx, `
-		UPDATE repository_scan_runs
-		SET status = 'cancelled',
-		    cancellation_requested = 1,
-		    finished_at = ?,
-		    updated_at = ?
-		WHERE repository_id = ?
-		  AND status IN ('queued', 'crawling', 'catching_up', 'finalizing')
+		UPDATE repository_scans
+		SET status = 'cancelled', cancellation_requested = 1, finished_at = ?, updated_at = ?
+		WHERE repository_id = ? AND status IN ('walking', 'sweeping')
 	`, now, now, repoIDStr); err != nil {
-		return fmt.Errorf("cancel active repository scan runs: %w", err)
+		return fmt.Errorf("cancel running repository scans: %w", err)
 	}
-
-	pathInfo := InspectStoragePathReadOnly(newRepositoryPath)
-	var volumeIdentity any
-	if pathInfo.MountID != "" {
-		volumeIdentity = pathInfo.MountID
+	result, err := db.ExecContext(ctx, `
+		UPDATE repository_scans
+		SET scope_path = '', not_before = NULL, updated_at = ?
+		WHERE repository_id = ? AND status = 'queued'
+	`, now, repoIDStr)
+	if err != nil {
+		return fmt.Errorf("widen queued repository scan: %w", err)
 	}
-	fencedNextRevision := nextRevision + 1
+	if rows, err := result.RowsAffected(); err != nil || rows > 0 {
+		return err
+	}
 	if _, err := db.ExecContext(ctx, `
-		UPDATE repository_observation_state
-		SET cursor_health = 'unavailable',
-		    full_verification_required = 1,
-		    adapter_identity = NULL,
-		    volume_identity = ?,
-		    next_revision = ?,
-		    active_run_id = NULL,
-		    controller_lease_id = NULL,
-		    controller_lease_expires_at = NULL,
-		    updated_at = ?
-		WHERE repository_id = ?
-	`, volumeIdentity, fencedNextRevision, now, repoIDStr); err != nil {
-		return fmt.Errorf("fence repository observation state: %w", err)
+		INSERT INTO repository_scans (scan_id, repository_id, trigger, scope_path, status, requested_by, created_at, updated_at)
+		VALUES (?, ?, 'manual', '', 'queued', 'storage_lifecycle', ?, ?)
+	`, uuid.NewString(), repoIDStr, now, now); err != nil {
+		return fmt.Errorf("queue relocated repository scan: %w", err)
 	}
 	return nil
 }

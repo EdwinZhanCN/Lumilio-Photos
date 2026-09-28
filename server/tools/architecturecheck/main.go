@@ -414,7 +414,7 @@ func checkAsyncPipelineArchitecture(root string) error {
 		return fmt.Errorf("queue worker inserts child River work:\n%s", strings.Join(childInserts, "\n"))
 	}
 
-	controllerWrites, err := scanROEControllerWriteCapabilities(root)
+	controllerWrites, err := scanScanIndexWriteCapabilities(root)
 	if err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ func checkAsyncPipelineArchitecture(root string) error {
 	}
 	if len(controllerWrites) > 0 {
 		return fmt.Errorf(
-			"asynchronous ROE controller retains direct catalog-write capability:\n%s\nOnly foreground commands and the registered coordinator commit handler may own catalog writes",
+			"scan index retains direct catalog-write capability:\n%s\nThe scan index writes only through its Writer, which the commit coordinator backs",
 			strings.Join(controllerWrites, "\n"),
 		)
 	}
@@ -471,14 +471,13 @@ func checkAsyncPipelineArchitecture(root string) error {
 
 func scanAsyncProducerCapabilities(root string) ([]string, error) {
 	targets := map[string]bool{
-		"server/internal/sourcing/materializer.go":          true,
-		"server/internal/storage/roe/materializer/hash.go":  true,
-		"server/internal/storage/roe/locations/resolver.go": true,
-		"server/internal/processors/asset_processor.go":     true,
-		"server/internal/queue/asset_work_fence.go":         true,
-		"server/internal/queue/enrichment_runner.go":        true,
-		"server/internal/queue/ml_image_loader.go":          true,
-		"server/internal/queue/projection_preparer.go":      true,
+		"server/internal/sourcing/materializer.go":      true,
+		"server/internal/storage/locations/resolver.go": true,
+		"server/internal/processors/asset_processor.go": true,
+		"server/internal/queue/asset_work_fence.go":     true,
+		"server/internal/queue/enrichment_runner.go":    true,
+		"server/internal/queue/ml_image_loader.go":      true,
+		"server/internal/queue/projection_preparer.go":  true,
 	}
 	forbiddenServiceTypes := map[string]bool{
 		"SettingsService":      true,
@@ -559,15 +558,13 @@ func scanAsyncProducerCapabilities(root string) ([]string, error) {
 	return violations, nil
 }
 
-func scanROEControllerWriteCapabilities(root string) ([]string, error) {
-	const controllerDirectory = "server/internal/storage/roe/controller"
-	allowed := map[string]bool{
-		controllerDirectory + "/commands.go":              true,
-		controllerDirectory + "/commit_handler.go":        true,
-		controllerDirectory + "/directory_publication.go": true,
-	}
+// scanScanIndexWriteCapabilities keeps the scan index writing only through
+// its Writer, which production backs with the commit coordinator: no file
+// may import the catalog writer or build its own query set.
+func scanScanIndexWriteCapabilities(root string) ([]string, error) {
+	const scanDirectory = "server/internal/storage/scan"
 	var violations []string
-	err := filepath.WalkDir(filepath.Join(root, controllerDirectory), func(path string, entry os.DirEntry, walkErr error) error {
+	err := filepath.WalkDir(filepath.Join(root, scanDirectory), func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -579,10 +576,6 @@ func scanROEControllerWriteCapabilities(root string) ([]string, error) {
 			return err
 		}
 		relative = filepath.ToSlash(relative)
-		if allowed[relative] {
-			return nil
-		}
-
 		files := token.NewFileSet()
 		parsed, err := parser.ParseFile(files, path, nil, 0)
 		if err != nil {
@@ -593,7 +586,7 @@ func scanROEControllerWriteCapabilities(root string) ([]string, error) {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			position := files.Position(imported.Pos())
 			switch importPath {
-			case "server/internal/db", "server/internal/db/catalogtx":
+			case "server/internal/db":
 				violations = append(violations, fmt.Sprintf("%s:%d:imports catalog write capability %s", relative, position.Line, importPath))
 			case "server/internal/db/repo":
 				alias := "repo"
@@ -607,33 +600,21 @@ func scanROEControllerWriteCapabilities(root string) ([]string, error) {
 				}
 			}
 		}
-
-		seen := map[token.Pos]bool{}
 		ast.Inspect(parsed, func(node ast.Node) bool {
 			selector, ok := node.(*ast.SelectorExpr)
-			if !ok || seen[selector.Pos()] {
+			if !ok {
 				return true
 			}
-			capability := ""
-			switch selector.Sel.Name {
-			case "WithTx", "Writer", "Queries":
-				capability = selector.Sel.Name
-			}
-			if qualifier, ok := selector.X.(*ast.Ident); ok && repoAliases[qualifier.Name] &&
-				(selector.Sel.Name == "New" || selector.Sel.Name == "Queries") {
-				capability = qualifier.Name + "." + selector.Sel.Name
-			}
-			if capability != "" {
-				seen[selector.Pos()] = true
+			if qualifier, ok := selector.X.(*ast.Ident); ok && repoAliases[qualifier.Name] && selector.Sel.Name == "New" {
 				position := files.Position(selector.Pos())
-				violations = append(violations, fmt.Sprintf("%s:%d:references catalog write capability %s", relative, position.Line, capability))
+				violations = append(violations, fmt.Sprintf("%s:%d:builds its own catalog query set with %s.New", relative, position.Line, qualifier.Name))
 			}
 			return true
 		})
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("scan asynchronous ROE controller capabilities: %w", err)
+		return nil, fmt.Errorf("scan scan-index write capabilities: %w", err)
 	}
 	return violations, nil
 }

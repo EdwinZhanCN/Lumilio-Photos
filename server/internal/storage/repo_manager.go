@@ -843,8 +843,8 @@ func (rm *DefaultRepositoryManager) PreviewRepositoryRemoval(ctx context.Context
 		return RepositoryRemovalImpact{}, fmt.Errorf("count affected albums: %w", err)
 	}
 	if err := rm.readerDatabase.QueryRowContext(ctx, `
-		SELECT count(*) FROM repository_observation_state
-		WHERE repository_id=? AND desired_epoch>applied_epoch
+		SELECT count(*) FROM repository_scans
+		WHERE repository_id=? AND status IN ('queued','walking','sweeping')
 	`, repoUUID).Scan(&impact.ActiveTaskCount); err != nil {
 		return RepositoryRemovalImpact{}, fmt.Errorf("count repository catalog work: %w", err)
 	}
@@ -952,10 +952,10 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		DELETE FROM share_links
 		WHERE EXISTS (
 			SELECT 1 FROM json_each(share_links.asset_ids) selected
-			JOIN active_asset_occurrences target ON target.asset_id = selected.value
+			JOIN repository_entries target ON target.asset_id = selected.value
 			WHERE target.repository_id = ?
 			  AND NOT EXISTS (
-				SELECT 1 FROM active_asset_occurrences survivor
+				SELECT 1 FROM repository_entries survivor
 				WHERE survivor.asset_id = target.asset_id
 				  AND survivor.repository_id <> ?
 			  )
@@ -967,10 +967,10 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 		DELETE FROM agent_pins
 		WHERE EXISTS (
 			SELECT 1 FROM json_each(agent_pins.asset_ids) selected
-			JOIN active_asset_occurrences target ON target.asset_id = selected.value
+			JOIN repository_entries target ON target.asset_id = selected.value
 			WHERE target.repository_id = ?
 			  AND NOT EXISTS (
-				SELECT 1 FROM active_asset_occurrences survivor
+				SELECT 1 FROM repository_entries survivor
 				WHERE survivor.asset_id = target.asset_id
 				  AND survivor.repository_id <> ?
 			  )
@@ -1039,22 +1039,26 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 	`, repoUUID, repoUUID, repoUUID); err != nil {
 		return fmt.Errorf("rehome repository asset stacks: %w", err)
 	}
-	// Repository removal is the explicit catalog-GC boundary. Delete an Asset
-	// only when every active physical occurrence belongs to this repository.
-	// Assets with an exact-copy Location elsewhere survive the node cascade.
+	// Repository removal purges the repository's entries and then every Asset
+	// left with no entry anywhere, together with its metadata: the Asset
+	// lifecycle's single purge rule. Assets with an entry elsewhere survive;
+	// Assets whose files here were already missing are collected too.
+	var candidates string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(json_group_array(DISTINCT asset_id), '[]')
+		FROM repository_entries
+		WHERE repository_id = ? AND asset_id IS NOT NULL
+	`, repoUUID).Scan(&candidates); err != nil {
+		return fmt.Errorf("collect repository assets: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM repository_entries WHERE repository_id = ?`, repoUUID); err != nil {
+		return fmt.Errorf("purge repository entries: %w", err)
+	}
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM assets
-		WHERE EXISTS (
-			SELECT 1 FROM active_asset_occurrences target
-			WHERE target.asset_id = assets.asset_id
-			  AND target.repository_id = ?
-		)
-		  AND NOT EXISTS (
-			SELECT 1 FROM active_asset_occurrences survivor
-			WHERE survivor.asset_id = assets.asset_id
-			  AND survivor.repository_id <> ?
-		  )
-	`, repoUUID, repoUUID); err != nil {
+		WHERE asset_id IN (SELECT value FROM json_each(?))
+		  AND NOT EXISTS (SELECT 1 FROM repository_entries entry WHERE entry.asset_id = assets.asset_id)
+	`, candidates); err != nil {
 		return fmt.Errorf("garbage-collect repository assets: %w", err)
 	}
 	if err := queries.DeleteRepository(ctx, repoUUID); err != nil {
