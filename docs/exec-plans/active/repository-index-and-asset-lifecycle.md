@@ -4,9 +4,11 @@ Status: active, created 2026-09-24. Phase 0 tests are written and fail on
 `dev` @ `a3fb469d` (2026-09-27); they wait on branch
 `test/lifecycle-regressions` and ride into the phases that fix them. Phase 1
 is done: the decision records merged in #230 on 2026-09-27, which the owner
-took as approval. Phase 2 (scan core, additive and not yet wired) is in
-review on `feat/scan-index-core`. On 2026-09-27 the owner approved folding
-the sweep into a per-directory diff, and #222 was amended to match. Child of
+took as approval. Phase 2 (scan core) merged in #231 on 2026-09-27. On
+2026-09-27 the owner approved folding the sweep into a per-directory diff and
+renaming `parent_path` to `parent_key`; #222 was amended to match. Phase 3
+(wiring, ROE removal) is in review on `feat/scan-index-wiring`; it lands
+three Phase 0 tests. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
 (replace the Repository Observation Engine with a scan index) and
@@ -103,7 +105,7 @@ through the wired runtime, they pass only once the new code is wired in:
 | `InPlaceOverwriteKeepsAlbumMembership` | Phase 3 | both the pixel edit and the metadata-only write left two Assets in browse and the album on the old one |
 | `MissingFileLeavesLibraryBrowse` | Phase 4 | the deleted file is still listed after a completed scan |
 | `ReuploadOfTrashedPhotoIsVisible` | Phase 4 | the re-uploaded photo never appears in browse |
-| `RepositoryRemovalPurgesMissingOnlyAssets` | Phase 4 | on CI (Linux, macOS, Windows) the missing-only Asset survives removal (`GET` 200); on the developer Mac its precondition fails instead (see below) |
+| `RepositoryRemovalPurgesMissingOnlyAssets` | Phase 3 | on CI (Linux, macOS, Windows) the missing-only Asset survives removal (`GET` 200); on the developer Mac its precondition fails instead (see below) |
 
 Notes for the fixing phases:
 - On one developer Mac, with the repository on an external APFS volume, a
@@ -161,32 +163,52 @@ and `dev` keeps a working Trash throughout.
   whose own row is live.
 
 ### Phase 3 — Wiring and ROE removal (#222)
-- [ ] Scheduler, one unique River job per repository, and bounded turns
-  through the commit coordinator.
-- [ ] Upload and cloud known content bind entries without a rehash.
-- [ ] `locations.Resolver` reimplemented over entries; folder browse moved to
-  `parent_key`.
-- [ ] Watcher: `github.com/syncthing/notify` plus a Syncthing-style
-  aggregator, falling back to a full scan on error or overflow; periodic full
-  scan with jitter. `task desktop:test` for the cgo FSEvents build.
-- [ ] Delete `storage/roe` except `pathsemantics` (move it to
-  `storage/pathsemantics`). Simplify `repo_relocate_observation.go`. Run
-  `task architecture:check`.
-- [ ] Drop the seven ROE tables from the baseline and redefine
-  `active_asset_occurrences` (and `active_asset_occurrence_paths`) over
-  present entries, keeping their columns so their 65 readers do not change.
-  Move `InsertContentObject`, `InsertOwnerContentAsset`, and
-  `GetOwnerContentAsset` out of `repository_observation_engine.sql` before
-  deleting it. Retarget `repository_staging_commits.node_id` to `entry_id`.
-- [ ] Reimplement `service.ApplyAssetActivationTx` over entries and pass it
-  as `scan.Config.Activate`. Delete `RepositoryFS.ReadUserMediaDirectory`
-  and `WalkUserMedia`, which `ListUserMediaDirectory` replaces.
-- [ ] Upload and cloud binding write `stat_checked_ns` at least one
-  `scan.RacyGranularity` after the file's mtime. Lumilio wrote the file
-  itself, so it is not racily clean, and the next scan must not rehash it.
-- [ ] Decide where the volume's path semantics live. Phase 2 uses the host
-  default, as ROE does; a catalog moved between a case-insensitive and a
-  case-sensitive host would need its keys recomputed.
+- [x] Scheduler, one unique River job per repository, and bounded turns
+  through the commit coordinator (`commit.ScanWriter`, one transaction per
+  scan batch). Work is derived from `repository_scans` and `pending_hash`
+  entries. A delivery runs walk turns first, for up to 2 s, and hashes only
+  when no walk is due, so a first import is indexed before its Assets load
+  the writer with processing: a 40k-file walk inside the running Server
+  went from 23 s to 8 s.
+- [x] Upload and cloud known content bind entries without a rehash
+  (`scan.BindKnownContent`, which applies the same carry-over rules).
+- [x] `locations.Resolver` reimplemented over present entries in
+  `storage/locations`; folder browse reads `active_asset_occurrence_paths`.
+- [x] Watcher: `github.com/syncthing/notify` plus a Syncthing-style
+  aggregator (10 s batches, a full scan above 512 events or a full buffer,
+  a full scan and backoff retry when a watch fails to start); periodic full
+  scan with 3/4–5/4 jitter.
+- [x] Delete `storage/roe`; `pathsemantics` moved to `storage/pathsemantics`
+  with `HostDefault()`. `repo_relocate_observation.go` now cancels running
+  scans, queues one full scan, and forgets change times and file IDs, which
+  the next walk re-records from an equal size and mtime without rehashing.
+  `task architecture:check` guards the scan package's writes instead of the
+  ROE controller's.
+- [x] Drop the seven ROE tables and their triggers; `active_asset_occurrences`
+  and `active_asset_occurrence_paths` are views over present entries, and a
+  new `repository_scan_state` view feeds processing monitoring and
+  diagnostics. The location-projection triggers watch entries. Kept queries
+  moved to `content_assets.sql`. `repository_staging_commits.entry_id`
+  replaces `node_id`. Entries gained `quick_fingerprint` columns, recorded
+  by the hash pass, because upload precheck matches large files by them.
+- [x] `service.ApplyAssetActivationTx` works over entries and is
+  `scan.Config.Activate`. `ReadUserMediaDirectory` and `WalkUserMedia` are
+  deleted; their walk-policy tests now cover `ListUserMediaDirectory`.
+- [x] Upload and cloud binding record `stat_checked_ns` past
+  `scan.RacyGranularity` after the mtime, so the next scan does not rehash
+  a file Lumilio wrote.
+- [x] Path semantics stay the host default, as ROE had them. A catalog moved
+  between case-insensitive and case-sensitive hosts would need its keys
+  recomputed; recorded in the tech-debt tracker.
+- Pulled forward from Phase 4: repository removal already purges entries
+  first and then every Asset left with none, so missing-only Assets are
+  collected (defect 2). `ON DELETE RESTRICT` from entries to Assets made the
+  old Asset-first order impossible.
+- Pulled forward from Phase 5: `RepositoryScanRunDTO` carries the scan
+  index's statuses and counters (`task dto`), and the Web storage panel,
+  `useRepositoryVerifications`, `VerificationHistoryModal`, and the two
+  storage E2E specs read them. The Missing count and its terminology stay in
+  Phase 5.
 
 ### Phase 4 — Lifecycle core (#223)
 - [ ] Derived Asset states and `PurgeEntries` with its enforcement check.

@@ -15,18 +15,14 @@ Last aligned with the codebase: 2026-09-23.
   it skips without `CAP_SYS_ADMIN`. Darwin/Windows CI never compile it, and
   Docker Desktop virtiofs/osxfs bind topologies are not this fixture.
 
-- **A manual scan right after a file lands can skip it until the next
-  periodic verification.** Owner: `server/internal/storage/repository_fs.go`
-  (the `settling` skip) and the Repository verification scheduler. The
-  verifier deliberately skips files modified within
-  `repository_scan.settle_seconds` and ends the run `partial` with a retryable
-  `repository/scan-incomplete` problem, but nothing schedules a follow-up, so
-  a user who drops a file and clicks Scan within the window must rescan by
-  hand or wait for the next interval. Fix: queue one delayed verification when
-  a crawl reports settling skips. Found by #207. Folded into RC blocker #222 on
-  2026-09-24 (the replacement scan schedules a delayed follow-up for deferred
-  subtrees); delete this entry when #222 lands.
-
+- **The scan index compares paths under the host's default rules, not the
+  volume's.** Owner: `server/internal/storage/pathsemantics` (`HostDefault`)
+  and `server/internal/storage/scan`. macOS and Windows compare
+  case-insensitively and Linux case-sensitively, whatever the volume does. A
+  catalog restored onto a host of the other kind keeps keys built under the
+  old rule, so a case-only rename there could look like a new file. Fix:
+  probe each repository's volume once and store its rule with the
+  repository. Carried over from ROE, found while wiring #222 (2026-09-27).
 - **Music embedded covers are not materialized as thumbnails.** Owner:
   `server/internal/processors/audio_helpers.go` and
   `web/src/features/music/components/MusicArtwork.tsx`. Bandcamp audio retains
