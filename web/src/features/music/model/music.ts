@@ -90,7 +90,7 @@ export function playbackEntryToQueueItem(entry: MusicPlaybackEntry): MusicQueueI
       album_title: entry.track_album,
       mime_type: entry.mime_type,
       duration: entry.duration,
-      is_deleted: !entry.available,
+      lifecycle_state: entry.available ? "active" : "missing",
     },
     entryId: entry.source_entry_id ?? entry.entry_id,
     savedTitle: entry.saved_title,

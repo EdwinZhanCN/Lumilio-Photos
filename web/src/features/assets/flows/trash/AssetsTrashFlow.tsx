@@ -102,7 +102,7 @@ const AssetsTrashContent = () => {
         <AssetBrowser
           title={t("assets.trash.title")}
           icon={<Trash2 className="h-6 w-6 text-primary" strokeWidth={1.5} />}
-          constraint={{ is_deleted: true }}
+          constraint={{ lifecycle_state: "trashed" }}
           viewKey="assets:trash"
           bulkActions={bulkActions}
           hiddenBulkActions={HIDDEN_TRASH_BULK_ACTIONS}

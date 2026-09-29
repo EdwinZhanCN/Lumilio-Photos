@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"server/internal/agent/core"
 	"server/internal/agent/tools"
+	"server/internal/testutil"
 	"testing"
 )
 
@@ -77,7 +78,7 @@ func TestMusicAgentEffectAtomicOrderOwnershipAndReplay(t *testing.T) {
 	_, err = runtime.Commit(ctx, 1, thread, run, declined)
 	require.Error(t, err)
 	deleted := prepare([]uuid.UUID{b}, "deleted", uuid.Nil, 0, false)
-	_, err = catalog.SQL.ExecContext(ctx, `UPDATE assets SET is_deleted=1 WHERE asset_id=?`, b)
+	err = testutil.SetAssetEntriesState(ctx, catalog.SQL, b, "trashed")
 	require.NoError(t, err)
 	_, err = runtime.Commit(ctx, 1, thread, run, deleted)
 	require.Error(t, err)

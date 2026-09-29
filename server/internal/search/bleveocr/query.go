@@ -20,7 +20,8 @@ type BasicFilters struct {
 	RepositoryID *string
 	AssetType    *string
 	AssetTypes   []string
-	IsDeleted    bool
+	// LifecycleState selects Assets in one lifecycle state; empty means active.
+	LifecycleState string
 }
 
 func buildQuery(
@@ -44,9 +45,11 @@ func buildQuery(
 		return bleve.NewMatchNoneQuery(), false
 	}
 
-	deletedQuery := bleve.NewBoolFieldQuery(filters.IsDeleted)
-	deletedQuery.SetField("is_deleted")
-	must = append(must, deletedQuery)
+	lifecycleState := strings.TrimSpace(filters.LifecycleState)
+	if lifecycleState == "" {
+		lifecycleState = "active"
+	}
+	must = append(must, termQuery("lifecycle_state", lifecycleState))
 
 	if filters.OwnerID != nil {
 		owner := float64(*filters.OwnerID)

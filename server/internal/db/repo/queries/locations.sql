@@ -56,7 +56,7 @@ JOIN (
   WHERE repository_id = sqlc.arg('repository_id')
 ) active_occurrence ON active_occurrence.asset_id = a.asset_id
 WHERE a.owner_id = sqlc.arg('owner_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND a.type = 'PHOTO'
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL

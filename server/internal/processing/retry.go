@@ -73,7 +73,7 @@ func (r *Retrier) Retry(ctx context.Context, id StageID) (RetryResult, error) {
 func retryAssetStage(ctx context.Context, tx *sql.Tx, spec StageSpec) (RetryResult, error) {
 	rows, err := tx.QueryContext(ctx, `
  SELECT s.asset_id, a.content_id FROM asset_pipeline_state s
- JOIN assets a ON a.asset_id=s.asset_id AND a.is_deleted=0
+ JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
  WHERE s.stage=? AND s.terminal_error IS NOT NULL
  ORDER BY s.updated_at, s.asset_id LIMIT ?`, string(spec.AssetStage), MaxRetryBatch)
 	if err != nil {
@@ -121,7 +121,7 @@ func retryAssetStage(ctx context.Context, tx *sql.Tx, spec StageSpec) (RetryResu
 	}
 	var remaining int64
 	if err := tx.QueryRowContext(ctx, `
- SELECT count(*) FROM asset_pipeline_state s JOIN assets a ON a.asset_id=s.asset_id AND a.is_deleted=0
+ SELECT count(*) FROM asset_pipeline_state s JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
  WHERE s.stage=? AND s.terminal_error IS NOT NULL`, string(spec.AssetStage)).Scan(&remaining); err != nil {
 		return RetryResult{}, err
 	}

@@ -2138,9 +2138,6 @@ const docTemplate = `{
                     "content_id": {
                         "type": "string"
                     },
-                    "deleted_at": {
-                        "type": "string"
-                    },
                     "duration": {
                         "type": "number"
                     },
@@ -2159,8 +2156,14 @@ const docTemplate = `{
                     "height": {
                         "type": "integer"
                     },
-                    "is_deleted": {
-                        "type": "boolean"
+                    "lifecycle_state": {
+                        "description": "LifecycleState is derived from the Asset's files: active while any is\npresent, missing while any is missing, trashed when all are in the\nrepository trash.",
+                        "enum": [
+                            "active",
+                            "missing",
+                            "trashed"
+                        ],
+                        "type": "string"
                     },
                     "liked": {
                         "type": "boolean"
@@ -2331,9 +2334,6 @@ const docTemplate = `{
                     "content_id": {
                         "type": "string"
                     },
-                    "deleted_at": {
-                        "type": "string"
-                    },
                     "duration": {
                         "type": "number"
                     },
@@ -2352,8 +2352,14 @@ const docTemplate = `{
                     "height": {
                         "type": "integer"
                     },
-                    "is_deleted": {
-                        "type": "boolean"
+                    "lifecycle_state": {
+                        "description": "LifecycleState is derived from the Asset's files: active while any is\npresent, missing while any is missing, trashed when all are in the\nrepository trash.",
+                        "enum": [
+                            "active",
+                            "missing",
+                            "trashed"
+                        ],
+                        "type": "string"
                     },
                     "liked": {
                         "type": "boolean"
@@ -2434,9 +2440,6 @@ const docTemplate = `{
                     "content_id": {
                         "type": "string"
                     },
-                    "deleted_at": {
-                        "type": "string"
-                    },
                     "duration": {
                         "type": "number"
                     },
@@ -2458,8 +2461,14 @@ const docTemplate = `{
                     "height": {
                         "type": "integer"
                     },
-                    "is_deleted": {
-                        "type": "boolean"
+                    "lifecycle_state": {
+                        "description": "LifecycleState is derived from the Asset's files: active while any is\npresent, missing while any is missing, trashed when all are in the\nrepository trash.",
+                        "enum": [
+                            "active",
+                            "missing",
+                            "trashed"
+                        ],
+                        "type": "string"
                     },
                     "liked": {
                         "type": "boolean"
@@ -2645,12 +2654,18 @@ const docTemplate = `{
                         "example": true,
                         "type": "boolean"
                     },
-                    "is_deleted": {
-                        "example": false,
-                        "type": "boolean"
-                    },
                     "lens": {
                         "example": "EF 50mm f/1.8",
+                        "type": "string"
+                    },
+                    "lifecycle_state": {
+                        "description": "LifecycleState selects Assets in one lifecycle state; omitted means\nactive. The Trash lists \"trashed\" and the Missing view \"missing\".",
+                        "enum": [
+                            "active",
+                            "missing",
+                            "trashed"
+                        ],
+                        "example": "active",
                         "type": "string"
                     },
                     "liked": {
@@ -6693,8 +6708,13 @@ const docTemplate = `{
                     "genre": {
                         "type": "string"
                     },
-                    "is_deleted": {
-                        "type": "boolean"
+                    "lifecycle_state": {
+                        "enum": [
+                            "active",
+                            "missing",
+                            "trashed"
+                        ],
+                        "type": "string"
                     },
                     "liked": {
                         "type": "boolean"
@@ -14792,7 +14812,7 @@ const docTemplate = `{
         },
         "/api/v1/assets/{id}": {
             "delete": {
-                "description": "Soft delete an asset by marking it as deleted. The physical file is not removed.",
+                "description": "Move every file of the asset into its Repository's trash (.lumilio/trash). The asset is hidden from browsing with its metadata kept and can be restored until the trash retention expires. Nothing moves when a Repository is offline or a file changed since the last scan.",
                 "parameters": [
                     {
                         "description": "Asset ID (UUID format)",
@@ -14834,6 +14854,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Invalid asset ID format"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Nothing moved: conflict_type is repository_offline, file_changed, asset_missing, or move_failed"
                     },
                     "500": {
                         "content": {
@@ -15942,7 +15972,7 @@ const docTemplate = `{
         },
         "/api/v1/assets/{id}/restore": {
             "post": {
-                "description": "Restore a soft-deleted asset from Trash. The original file is not moved.",
+                "description": "Move the asset's trashed files back to their original paths and show it again with its metadata. A taken path is never overwritten; the file is restored under a free sibling name.",
                 "parameters": [
                     {
                         "description": "Asset ID (UUID format)",
@@ -15984,6 +16014,16 @@ const docTemplate = `{
                             }
                         },
                         "description": "Invalid asset ID format"
+                    },
+                    "409": {
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ProblemResponse"
+                                }
+                            }
+                        },
+                        "description": "Nothing moved: conflict_type is repository_offline, not_trashed, trash_file_missing, or move_failed"
                     },
                     "500": {
                         "content": {

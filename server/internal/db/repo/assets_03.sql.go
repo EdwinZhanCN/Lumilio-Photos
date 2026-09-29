@@ -21,7 +21,7 @@ matched_media AS (
   SELECT facts.media_item_id
   FROM media_item_browse_facts facts
   JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-  WHERE pa.is_deleted = COALESCE(?1, false)
+  WHERE pa.lifecycle_state = COALESCE(?1, 'active')
     AND (
       (SELECT asset_ids_json FROM filter_params) IS NULL
       OR EXISTS (
@@ -48,9 +48,15 @@ matched_media AS (
     )
     AND (?8 IS NULL OR facts.owner_id = ?8)
     AND (?9 IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = ?9
+      AND occurrence.state = CASE COALESCE(?1, 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(?1, 'active')
+      END
   ))
     AND (
       ?10 IS NULL
@@ -192,11 +198,11 @@ SELECT COUNT(*) AS count
 FROM matched_media mm
 JOIN media_item_assets mia ON mia.media_item_id = mm.media_item_id
 JOIN assets component ON component.asset_id = mia.asset_id
-WHERE component.is_deleted = COALESCE(?1, false)
+WHERE component.lifecycle_state = COALESCE(?1, 'active')
 `
 
 type CountMediaItemFilesUnifiedParams struct {
-	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
+	LifecycleState   *string     `db:"lifecycle_state" json:"lifecycle_state"`
 	AssetIds         *string     `db:"asset_ids" json:"asset_ids"`
 	AssetTypes       *string     `db:"asset_types" json:"asset_types"`
 	TagNames         *string     `db:"tag_names" json:"tag_names"`
@@ -229,10 +235,10 @@ type CountMediaItemFilesUnifiedParams struct {
 
 // Count of component files belonging to the media items matched by
 // CountMediaItemsUnified (total_files). Components share the browse
-// is_deleted state so list/count predicates stay identical.
+// lifecycle state so list/count predicates stay identical.
 func (q *Queries) CountMediaItemFilesUnified(ctx context.Context, arg CountMediaItemFilesUnifiedParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countMediaItemFilesUnified,
-		arg.IsDeleted,
+		arg.LifecycleState,
 		arg.AssetIds,
 		arg.AssetTypes,
 		arg.TagNames,
@@ -278,7 +284,7 @@ WITH filter_params AS (
 SELECT COUNT(*) AS count
 FROM media_item_browse_facts facts
 JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-WHERE pa.is_deleted = COALESCE(?1, false)
+WHERE pa.lifecycle_state = COALESCE(?1, 'active')
   AND (
     (SELECT asset_ids_json FROM filter_params) IS NULL
     OR EXISTS (
@@ -305,9 +311,15 @@ WHERE pa.is_deleted = COALESCE(?1, false)
   )
   AND (?4 IS NULL OR facts.owner_id = ?4)
   AND (?5 IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = ?5
+      AND occurrence.state = CASE COALESCE(?1, 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(?1, 'active')
+      END
   ))
   AND (
     ?6 IS NULL
@@ -447,7 +459,7 @@ WHERE pa.is_deleted = COALESCE(?1, false)
 `
 
 type CountMediaItemsUnifiedParams struct {
-	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
+	LifecycleState   *string     `db:"lifecycle_state" json:"lifecycle_state"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
 	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
@@ -482,7 +494,7 @@ type CountMediaItemsUnifiedParams struct {
 // Returns the number of matching logical media items (total_media_items).
 func (q *Queries) CountMediaItemsUnified(ctx context.Context, arg CountMediaItemsUnifiedParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countMediaItemsUnified,
-		arg.IsDeleted,
+		arg.LifecycleState,
 		arg.Query,
 		arg.AssetType,
 		arg.OwnerID,

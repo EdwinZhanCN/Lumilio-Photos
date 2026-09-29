@@ -52,6 +52,7 @@ import (
 	"server/internal/storage/locations"
 	"server/internal/storage/pathsemantics"
 	"server/internal/storage/scan"
+	"server/internal/storage/trash"
 	"server/internal/utils/imaging"
 	"server/internal/version"
 
@@ -635,6 +636,19 @@ func run(
 		return fmt.Errorf("initialize repository scanner: %w", err)
 	}
 	sourceMaterializer.SetActivation(repositoryScanner.BindKnownContent)
+	// Delete and Restore move files through the repository trash and commit
+	// through the scanner. A move a crash interrupted is reconciled before
+	// users act; one whose repository is offline waits for the next start.
+	assetTrash, err := trash.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, repositoryScanner, appLogger.Named("trash"))
+	if err != nil {
+		return fmt.Errorf("initialize repository trash: %w", err)
+	}
+	if err := assetTrash.Recover(ctx); err != nil {
+		appLogger.Warn("interrupted trash operations wait for their repositories", zap.Error(err))
+	}
+	if err := service.BindAssetTrash(assetService, assetTrash); err != nil {
+		return err
+	}
 	assetLocationResolver := locations.NewResolver(database.ReaderQueries, repositoryFiles)
 	assetProcessor.SetLocationResolver(assetLocationResolver)
 	repoManager.SetInitialScanEnqueuer(func(ctx context.Context, repositoryID string) error {

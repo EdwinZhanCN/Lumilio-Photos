@@ -22,7 +22,7 @@ WITH filter_params AS (
 SELECT facts.media_item_id, facts.primary_asset_id
 FROM media_item_browse_facts facts
 JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-WHERE pa.is_deleted = COALESCE(?1, false)
+WHERE pa.lifecycle_state = COALESCE(?1, 'active')
   AND (
     (SELECT asset_ids_json FROM filter_params) IS NULL
     OR EXISTS (
@@ -49,9 +49,15 @@ WHERE pa.is_deleted = COALESCE(?1, false)
   )
   AND (?4 IS NULL OR facts.owner_id = ?4)
   AND (?5 IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = ?5
+      AND occurrence.state = CASE COALESCE(?1, 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(?1, 'active')
+      END
   ))
   AND (
     ?6 IS NULL
@@ -182,7 +188,7 @@ LIMIT ?23
 `
 
 type GetMediaItemRefsUnifiedParams struct {
-	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
+	LifecycleState   *string     `db:"lifecycle_state" json:"lifecycle_state"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
 	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
@@ -222,7 +228,7 @@ type GetMediaItemRefsUnifiedRow struct {
 // truncation by requesting cap+1.
 func (q *Queries) GetMediaItemRefsUnified(ctx context.Context, arg GetMediaItemRefsUnifiedParams) ([]GetMediaItemRefsUnifiedRow, error) {
 	rows, err := q.db.QueryContext(ctx, getMediaItemRefsUnified,
-		arg.IsDeleted,
+		arg.LifecycleState,
 		arg.Query,
 		arg.AssetType,
 		arg.OwnerID,

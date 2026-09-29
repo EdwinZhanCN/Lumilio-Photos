@@ -33,7 +33,7 @@ func (q *Queries) GetContentObjectByID(ctx context.Context, contentID uuid.UUID)
 }
 
 const getOwnerContentAsset = `-- name: GetOwnerContentAsset :one
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE owner_id = ?1 AND content_id = ?2
 `
 
@@ -58,8 +58,7 @@ func (q *Queries) GetOwnerContentAsset(ctx context.Context, arg GetOwnerContentA
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
@@ -140,7 +139,7 @@ INSERT INTO assets (
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
 ON CONFLICT (owner_id, content_id) DO UPDATE SET
     updated_at = assets.updated_at
-RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
+RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
 `
 
 type InsertOwnerContentAssetParams struct {
@@ -185,8 +184,7 @@ func (q *Queries) InsertOwnerContentAsset(ctx context.Context, arg InsertOwnerCo
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,

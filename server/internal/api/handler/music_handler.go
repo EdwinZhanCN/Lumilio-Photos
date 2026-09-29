@@ -114,7 +114,7 @@ func toMusicTrackDTO(track service.MusicTrack) dto.MusicTrackDTO {
 		DiscNumber: track.DiscNumber, DiscTotal: track.DiscTotal, TrackNumber: track.TrackNumber,
 		TrackTotal: track.TrackTotal, Compilation: track.Compilation, ExtractedSourceRevision: track.ExtractedSourceRevision,
 		Revision: track.Revision, OriginalFilename: track.OriginalFilename, MimeType: track.MimeType,
-		Duration: track.Duration, TakenAt: track.TakenAt, IsDeleted: track.IsDeleted, Liked: track.Liked, Rating: track.Rating,
+		Duration: track.Duration, TakenAt: track.TakenAt, LifecycleState: track.LifecycleState, Liked: track.Liked, Rating: track.Rating,
 	}
 	if track.AlbumID != nil {
 		value := track.AlbumID.String()

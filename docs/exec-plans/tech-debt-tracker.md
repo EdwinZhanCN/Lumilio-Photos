@@ -75,3 +75,10 @@ Last aligned with the codebase: 2026-09-23.
   `doc.md`.** Owner: `web/` lint-staged/`vp staged` config. `vp fmt` ignores
   `doc.md`, so the Markdown task errors with "Expected at least one target
   file"; the only workaround today is `--no-verify`.
+- **Repository removal purges in one writer transaction.** Owner:
+  `server/internal/storage/repo_manager.go` (`RemoveRepository`) and
+  `lifecycle.PurgeRepositoryEntriesTx`. Removing a repository deletes all of
+  its entries and collected Assets in the transaction that deletes the
+  repository row, so a 100k-file repository holds the writer far past the
+  25 ms budget. It was the same before the scan index (a cascade); purging in
+  pages of 256 under a maintenance state would bound it.

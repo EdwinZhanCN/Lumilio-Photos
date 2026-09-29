@@ -36,7 +36,7 @@ func ReadAssetExecutionState(ctx context.Context, db Queryer, identity AssetExec
 	err := db.QueryRowContext(ctx, `
  SELECT COALESCE(f.failure_count,0),COALESCE(f.retry_after,0)
  FROM asset_pipeline_state s
- JOIN assets a ON a.asset_id=s.asset_id AND a.content_id=s.source_content_id AND a.is_deleted=0
+ JOIN assets a ON a.asset_id=s.asset_id AND a.content_id=s.source_content_id AND a.lifecycle_state = 'active'
  LEFT JOIN asset_pipeline_failures f ON f.asset_id=s.asset_id AND f.stage=s.stage
    AND f.source_content_id=s.source_content_id AND f.pipeline_version=s.pipeline_version AND f.desired_version=s.desired_version
  WHERE s.asset_id=? AND s.stage=? AND s.source_content_id=? AND s.pipeline_version=?

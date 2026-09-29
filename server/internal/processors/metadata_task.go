@@ -155,7 +155,7 @@ func (ap *AssetProcessor) loadAssetAndRepoForContent(
 		SELECT repository_id
 		FROM active_asset_occurrences
 		WHERE asset_id = ?
-		ORDER BY repository_id, node_id
+		ORDER BY repository_id, entry_id
 		LIMIT 1`, assetID).Scan(&repositoryID); errors.Is(err, sql.ErrNoRows) {
 		return nil, repo.Repository{}, ErrAssetSourceStale
 	} else if err != nil {

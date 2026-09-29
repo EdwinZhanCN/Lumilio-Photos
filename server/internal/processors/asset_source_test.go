@@ -170,6 +170,11 @@ func TestQueuedAssetSourceFallsThroughToCurrentExactLocation(t *testing.T) {
 	if err := source.Close(); err != nil {
 		t.Fatal(err)
 	}
+	// Video frames and metadata find the Asset's repository through its
+	// present entries.
+	if _, located, err := processor.loadAssetAndRepoForContent(ctx, first.AssetID, first.ContentID); err != nil || located.RepoID != repositoryID {
+		t.Fatalf("repository for content = %s, %v; want %s", located.RepoID, err, repositoryID)
+	}
 
 	work, err := processor.LoadThumbnailTask(ctx, ThumbnailArgs{
 		AssetID: first.AssetID, ExpectedContentID: first.ContentID, PipelineVersion: "lease-boundary-v1",

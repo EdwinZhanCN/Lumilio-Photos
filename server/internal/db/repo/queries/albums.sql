@@ -39,7 +39,7 @@ WHERE al.user_id = sqlc.arg('user_id')
       FROM album_assets aa
       JOIN assets a ON a.asset_id = aa.asset_id
       WHERE aa.album_id = al.album_id
-        AND a.is_deleted = false
+        AND a.lifecycle_state = 'active'
         AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
           WHERE occurrence.asset_id = a.asset_id
             AND occurrence.repository_id = sqlc.narg('repository_id'))
@@ -48,7 +48,7 @@ WHERE al.user_id = sqlc.arg('user_id')
       SELECT 1
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
-        AND a_cover.is_deleted = false
+        AND a_cover.lifecycle_state = 'active'
         AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
           WHERE occurrence.asset_id = a_cover.asset_id
             AND occurrence.repository_id = sqlc.narg('repository_id'))
@@ -69,7 +69,7 @@ WITH page_albums AS (
         FROM album_assets aa_exists
         JOIN assets a_exists ON a_exists.asset_id = aa_exists.asset_id
         WHERE aa_exists.album_id = al.album_id
-          AND a_exists.is_deleted = false
+          AND a_exists.lifecycle_state = 'active'
           AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
             WHERE occurrence.asset_id = a_exists.asset_id
               AND occurrence.repository_id = sqlc.narg('repository_id'))
@@ -78,7 +78,7 @@ WITH page_albums AS (
         SELECT 1
         FROM assets a_cover_exists
         WHERE a_cover_exists.asset_id = al.cover_asset_id
-          AND a_cover_exists.is_deleted = false
+          AND a_cover_exists.lifecycle_state = 'active'
           AND EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
             WHERE occurrence.asset_id = a_cover_exists.asset_id
               AND occurrence.repository_id = sqlc.narg('repository_id'))
@@ -101,7 +101,7 @@ SELECT
     FROM album_assets aa_count
     JOIN assets a_count ON a_count.asset_id = aa_count.asset_id
     WHERE aa_count.album_id = al.album_id
-      AND a_count.is_deleted = false
+      AND a_count.lifecycle_state = 'active'
       AND (
         sqlc.narg('repository_id') IS NULL
         OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -114,7 +114,7 @@ SELECT
       SELECT a_cover.asset_id
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
-        AND a_cover.is_deleted = false
+        AND a_cover.lifecycle_state = 'active'
         AND (
           sqlc.narg('repository_id') IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -128,7 +128,7 @@ SELECT
       FROM album_assets aa_cover
       JOIN assets a_scope ON a_scope.asset_id = aa_cover.asset_id
       WHERE aa_cover.album_id = al.album_id
-        AND a_scope.is_deleted = false
+        AND a_scope.lifecycle_state = 'active'
         AND (
           sqlc.narg('repository_id') IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -158,7 +158,7 @@ SELECT
     FROM album_assets aa_count
     JOIN assets a_count ON a_count.asset_id = aa_count.asset_id
     WHERE aa_count.album_id = al.album_id
-      AND a_count.is_deleted = false
+      AND a_count.lifecycle_state = 'active'
       AND (
         sqlc.narg('repository_id') IS NULL
         OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -171,7 +171,7 @@ SELECT
       SELECT a_cover.asset_id
       FROM assets a_cover
       WHERE a_cover.asset_id = al.cover_asset_id
-        AND a_cover.is_deleted = false
+        AND a_cover.lifecycle_state = 'active'
         AND (
           sqlc.narg('repository_id') IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -185,7 +185,7 @@ SELECT
       FROM album_assets aa_cover
       JOIN assets a_scope ON a_scope.asset_id = aa_cover.asset_id
       WHERE aa_cover.album_id = al.album_id
-        AND a_scope.is_deleted = false
+        AND a_scope.lifecycle_state = 'active'
         AND (
           sqlc.narg('repository_id') IS NULL
           OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -213,7 +213,7 @@ DELETE FROM albums WHERE album_id = ?1;
 SELECT a.*, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
-WHERE aa.album_id = ?1 AND a.is_deleted = false
+WHERE aa.album_id = ?1 AND a.lifecycle_state = 'active'
 ORDER BY aa.position ASC, aa.added_time ASC;
 
 -- name: GetAlbumAssetsScoped :many
@@ -221,7 +221,7 @@ SELECT a.*, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = sqlc.arg('album_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (
     sqlc.narg('repository_id') IS NULL
     OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -246,14 +246,14 @@ WHERE album_id = ?1 AND asset_id = ?2;
 SELECT COUNT(*) as count
 FROM album_assets aa
 JOIN assets a ON aa.asset_id = a.asset_id
-WHERE aa.album_id = ?1 AND a.is_deleted = false;
+WHERE aa.album_id = ?1 AND a.lifecycle_state = 'active';
 
 -- name: GetAlbumAssetCountScoped :one
 SELECT COUNT(*) as count
 FROM album_assets aa
 JOIN assets a ON aa.asset_id = a.asset_id
 WHERE aa.album_id = sqlc.arg('album_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (
     sqlc.narg('repository_id') IS NULL
     OR EXISTS (SELECT 1 FROM active_asset_occurrences occurrence
@@ -269,7 +269,7 @@ JOIN assets a ON a.asset_id = aa.asset_id
 WHERE aa.album_id = sqlc.arg('album_id')
   AND al.album_type = 'bio'
   AND a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND NOT EXISTS (
     SELECT 1
     FROM species_predictions sp

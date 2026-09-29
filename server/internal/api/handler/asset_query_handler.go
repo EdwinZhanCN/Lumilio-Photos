@@ -263,7 +263,7 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode
 		MediaComposition: mediaComposition,
 		StackMembership:  stackMembership,
 		StackKinds:       stackKinds,
-		IsDeleted:        filter.IsDeleted,
+		LifecycleState:   filter.LifecycleState,
 		Rating:           filter.Rating,
 		Liked:            filter.Liked,
 		CameraModel:      filter.CameraModel,

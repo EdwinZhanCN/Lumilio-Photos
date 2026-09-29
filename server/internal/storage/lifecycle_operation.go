@@ -30,6 +30,9 @@ const (
 	lifecycleKindSwitchDefaultStorage   = "switch_default_storage_location"
 	lifecycleKindRelocateStorage        = "relocate_storage_location"
 	lifecycleKindRenameRepository       = "rename_repository"
+	// Trash and restore journals are recovered by storage/trash.
+	LifecycleKindTrashAssets   = "trash_assets"
+	LifecycleKindRestoreAssets = "restore_assets"
 
 	lifecyclePhasePrepared          = "prepared"
 	lifecyclePhaseFilesystemApplied = "filesystem_applied"
@@ -500,6 +503,9 @@ func (rm *DefaultRepositoryManager) RecoverLifecycleOperations(ctx context.Conte
 		return fmt.Errorf("list incomplete lifecycle operations: %w", err)
 	}
 	for _, operation := range operations {
+		if operation.Kind == LifecycleKindTrashAssets || operation.Kind == LifecycleKindRestoreAssets {
+			continue
+		}
 		if err := rm.claimLifecycleRecoveryTargets(ctx, operation); err != nil {
 			return fmt.Errorf("claim lifecycle recovery target for %s: %w", operation.OperationID, err)
 		}

@@ -56,14 +56,19 @@ type assetRow struct {
 	content uuid.UUID
 }
 
-// asset inserts one photo; deleted assets must never be counted.
+// asset inserts one photo; trashed assets must never be counted. The fixture
+// has no repository, so it writes the lifecycle state entries would derive.
 func (f *fixture) asset(deleted bool) assetRow {
 	f.t.Helper()
 	f.next++
 	row := assetRow{id: uuid.New(), content: uuid.New()}
 	f.exec(`INSERT INTO content_objects(content_id,hash_algorithm,full_hash,file_size,created_at) VALUES(?,'blake3-v1',?,1,1)`, row.content.String(), fmt.Sprintf("%064x", f.next))
-	f.exec(`INSERT INTO assets(asset_id,owner_id,content_id,type,original_filename,mime_type,upload_time,updated_at,is_deleted) VALUES(?,1,?,'PHOTO',?,'image/jpeg',1,1,?)`,
-		row.id.String(), row.content.String(), fmt.Sprintf("IMG_%04d.jpg", f.next), deleted)
+	state := "active"
+	if deleted {
+		state = "trashed"
+	}
+	f.exec(`INSERT INTO assets(asset_id,owner_id,content_id,type,original_filename,mime_type,upload_time,updated_at,lifecycle_state) VALUES(?,1,?,'PHOTO',?,'image/jpeg',1,1,?)`,
+		row.id.String(), row.content.String(), fmt.Sprintf("IMG_%04d.jpg", f.next), state)
 	return row
 }
 

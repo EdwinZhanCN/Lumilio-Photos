@@ -79,7 +79,7 @@ INSERT INTO repositories (
 	} {
 		_, err := testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
 			AssetID: uuid.New(), RepositoryID: seed.repositoryID, OwnerID: 1,
-			MIMEType: "image/jpeg", FileSize: 1, Status: seed.status, IsDeleted: seed.deleted,
+			MIMEType: "image/jpeg", FileSize: 1, Status: seed.status, EntryState: testutil.EntryStateTrashedIf(seed.deleted),
 		})
 		require.NoError(t, err)
 	}

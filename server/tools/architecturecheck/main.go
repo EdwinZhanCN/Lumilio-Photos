@@ -436,6 +436,17 @@ func checkAsyncPipelineArchitecture(root string) error {
 		)
 	}
 
+	assetDeletes, err := scanAssetHardDeletes(root)
+	if err != nil {
+		return err
+	}
+	if len(assetDeletes) > 0 {
+		return fmt.Errorf(
+			"code outside lifecycle.PurgeEntries deletes Assets:\n%s\nAn Asset exists while it has an entry; purge entries through server/internal/lifecycle instead",
+			strings.Join(assetDeletes, "\n"),
+		)
+	}
+
 	if source, readErr := os.ReadFile(filepath.Join(root, "server/internal/db/migration.go")); readErr != nil {
 		return fmt.Errorf("read catalog migration boundary: %w", readErr)
 	} else if strings.Contains(string(source), "MigrateWithPreflight") || strings.Contains(string(source), "DestructiveMigrationPreflight") {
@@ -1268,4 +1279,47 @@ func scanGovernorConstructionSites(root string) ([]string, error) {
 
 func scanProcessorNakedFFmpegFlags(root string) ([]string, error) {
 	return scanGoLines(root, "server/internal/processors", isProcessorNakedFFmpegFlagViolation)
+}
+
+// assetHardDelete matches a DELETE on the assets table, across line breaks.
+var assetHardDelete = regexp.MustCompile(`(?i)\bdelete\s+from\s+["\x60]?assets["\x60]?(\s|;|$)`)
+
+// scanAssetHardDeletes enforces the Asset lifecycle's single purge path: no
+// server source or query other than lifecycle.PurgeEntries deletes from
+// assets. Tests may.
+func scanAssetHardDeletes(root string) ([]string, error) {
+	const allowed = "server/internal/lifecycle/purge.go"
+	var violations []string
+	err := filepath.WalkDir(filepath.Join(root, "server"), func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			if entry.Name() == "node_modules" || entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		extension := filepath.Ext(path)
+		if (extension != ".go" && extension != ".sql") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		if relative == allowed || strings.HasPrefix(relative, "server/tools/architecturecheck/") {
+			return nil
+		}
+		source, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if assetHardDelete.Match(source) {
+			violations = append(violations, relative)
+		}
+		return nil
+	})
+	return violations, err
 }

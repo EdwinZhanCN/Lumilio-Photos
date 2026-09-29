@@ -4,7 +4,7 @@ FROM face_items fi
 JOIN assets a ON a.asset_id = fi.asset_id
 LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
 WHERE fcm.face_id IS NULL
-  AND COALESCE(a.is_deleted, false) = false
+  AND COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id

@@ -131,7 +131,7 @@ type Querier interface {
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
 	// Count of component files belonging to the media items matched by
 	// CountMediaItemsUnified (total_files). Components share the browse
-	// is_deleted state so list/count predicates stay identical.
+	// lifecycle state so list/count predicates stay identical.
 	CountMediaItemFilesUnified(ctx context.Context, arg CountMediaItemFilesUnifiedParams) (int64, error)
 	// Count query matching GetMediaItemsUnified WHERE clause.
 	// Returns the number of matching logical media items (total_media_items).
@@ -201,7 +201,6 @@ type Querier interface {
 	DeleteAlbum(ctx context.Context, albumID int32) error
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteAllSearchEmbeddings(ctx context.Context) error
-	DeleteAsset(ctx context.Context, assetID uuid.UUID) error
 	DeleteCheckpoint(ctx context.Context, id string) error
 	DeleteClaimedEventDirtyRanges(ctx context.Context, arg DeleteClaimedEventDirtyRangesParams) (int64, error)
 	DeleteCloudCredential(ctx context.Context, credentialID uuid.UUID) error
@@ -252,6 +251,9 @@ type Querier interface {
 	DeleteStack(ctx context.Context, stackID uuid.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteTerminalPendingAgentEffects(ctx context.Context, arg DeleteTerminalPendingAgentEffectsParams) error
+	// A scan indexed the restored file before the restore commit; its live entry
+	// stands for the file.
+	DeleteTrashedRepositoryEntry(ctx context.Context, entryID uuid.UUID) (int64, error)
 	DeleteUser(ctx context.Context, userID int32) error
 	DeleteUserRecoveryCodes(ctx context.Context, userID int32) error
 	DeleteUserTOTPCredential(ctx context.Context, userID int32) error
@@ -562,6 +564,9 @@ type Querier interface {
 	// Dedicated fixed-dimension authoritative semantic search vectors.
 	// Photos have one row (frame_ts_ms IS NULL); videos have one row per frame.
 	InsertSearchEmbedding(ctx context.Context, arg InsertSearchEmbeddingParams) error
+	// The trashed file's entry was dropped by a scan before the trash commit (a
+	// move that found another copy); the trash keeps a row for it.
+	InsertTrashedRepositoryEntry(ctx context.Context, arg InsertTrashedRepositoryEntryParams) error
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAgentPins(ctx context.Context, userID int32) ([]AgentPin, error)
 	ListAgentRefs(ctx context.Context, arg ListAgentRefsParams) ([]AgentRef, error)
@@ -625,6 +630,8 @@ type Querier interface {
 	ListRecoverableRepositoryStagingCommits(ctx context.Context, limit int64) ([]RepositoryStagingCommit, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryCloudBindings(ctx context.Context, repositoryID uuid.UUID) ([]RepositoryCloudBinding, error)
+	// Every file entry of the selected Assets, for Delete's preflight.
+	ListRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error)
 	// Repository scan index (#222): entries mirror the tree, scans record runs.
 	// Every entry write is a compare-and-swap on revision, and nothing here
 	// counts a whole repository inside a writer transaction.
@@ -637,6 +644,7 @@ type Querier interface {
 	ListStoredLocationClusterAssetsForScope(ctx context.Context, arg ListStoredLocationClusterAssetsForScopeParams) ([]ListStoredLocationClusterAssetsForScopeRow, error)
 	ListStoredLocationClustersForScope(ctx context.Context, arg ListStoredLocationClustersForScopeParams) ([]LocationCluster, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
+	ListTrashedRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error)
 	ListUncatalogedAudioAssets(ctx context.Context, arg ListUncatalogedAudioAssetsParams) ([]Asset, error)
 	ListUserWebAuthnCredentialSummaries(ctx context.Context, userID int32) ([]ListUserWebAuthnCredentialSummariesRow, error)
 	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
@@ -709,7 +717,9 @@ type Querier interface {
 	ResetLocationClustersForGeocodingUserAgent(ctx context.Context) error
 	ResetRepositoriesByActivity(ctx context.Context, arg ResetRepositoriesByActivityParams) (int64, error)
 	ResetUserAccessPassword(ctx context.Context, arg ResetUserAccessPasswordParams) (User, error)
-	RestoreAsset(ctx context.Context, assetID uuid.UUID) error
+	// A trashed file was moved back into the tree, at its original path or a
+	// free sibling name.
+	RestoreRepositoryEntry(ctx context.Context, arg RestoreRepositoryEntryParams) (int64, error)
 	ResumeRepositoryAfterLowSpace(ctx context.Context, arg ResumeRepositoryAfterLowSpaceParams) (Repository, error)
 	RetireCloudCredential(ctx context.Context, credentialID uuid.UUID) (CloudCredential, error)
 	RevokeRefreshToken(ctx context.Context, tokenID int64) error
@@ -740,6 +750,10 @@ type Querier interface {
 	SetUnownedRepositoryHostOwner(ctx context.Context, defaultOwnerID *int32) error
 	StartRepositoryScan(ctx context.Context, arg StartRepositoryScanParams) (int64, error)
 	TouchAgentPinLiveRefresh(ctx context.Context, arg TouchAgentPinLiveRefreshParams) error
+	// A file of this entry was moved into the repository trash. A scan may have
+	// marked the entry missing after the move; the file is in the trash either
+	// way.
+	TrashRepositoryEntry(ctx context.Context, arg TrashRepositoryEntryParams) (int64, error)
 	TrimAgentThreadRefs(ctx context.Context, arg TrimAgentThreadRefsParams) ([]string, error)
 	UpdateAgentPinLayout(ctx context.Context, arg UpdateAgentPinLayoutParams) error
 	UpdateAgentPinTitle(ctx context.Context, arg UpdateAgentPinTitleParams) error

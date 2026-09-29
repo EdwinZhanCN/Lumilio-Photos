@@ -198,6 +198,10 @@ func commonAncestor(left, right string) string {
 	return strings.Join(shared, "/")
 }
 
+// ErrRepositoryGone reports a scan requested for a repository that was
+// removed, for example by a watcher batch that closed after the removal.
+var ErrRepositoryGone = errors.New("repository no longer exists")
+
 // Request queues a scan of scope (empty for the whole repository). At most one
 // scan per repository is queued: a new request joins it, widening its scope
 // and keeping the earlier start time. notBefore delays a settle follow-up.
@@ -242,6 +246,11 @@ func (s *Scanner) requestTx(ctx context.Context, queries *repo.Queries, reposito
 		})
 		return joined, true, joinErr
 	case !errors.Is(err, sql.ErrNoRows):
+		return repo.RepositoryScan{}, false, err
+	}
+	if _, err := queries.GetRepository(ctx, repositoryID); errors.Is(err, sql.ErrNoRows) {
+		return repo.RepositoryScan{}, false, ErrRepositoryGone
+	} else if err != nil {
 		return repo.RepositoryScan{}, false, err
 	}
 	var by *string
