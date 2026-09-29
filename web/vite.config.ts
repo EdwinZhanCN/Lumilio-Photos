@@ -102,10 +102,10 @@ const testProjects = [
       testTimeout: 300_000,
       // Same browser-mode reload constraint as the integration project (see there).
       fileParallelism: false,
+      api: {
+        host: "127.0.0.1",
+      },
       browser: {
-        api: {
-          host: "127.0.0.1",
-        },
         provider: playwright(),
         // Headed (STUDIO_GPU=true) uses the machine's real GPU, the only way the
         // Studio WebGL2 capability tests get a context on Apple Silicon. Headless
