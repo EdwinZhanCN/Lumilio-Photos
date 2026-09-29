@@ -18,7 +18,14 @@ const apiProxyTarget =
 
 const entryChunkBudget = 1300 * 1024;
 const lazyChunkBudget = 650 * 1024;
-const lazyChunkExceptions = [{ prefix: "emacs-lisp-", budget: 800 * 1024 }];
+const lazyChunkExceptions = [
+  { prefix: "emacs-lisp-", budget: 800 * 1024 },
+  // Vite+ 1.0 (Rolldown) folds the chat markdown/Mermaid renderer into this lazy
+  // chunk instead of emitting it as a separate shared chunk. Total bytes are
+  // unchanged (~493 KiB + ~476 KiB); only the chunk boundary moved. The entry chunk
+  // still loads it through a dynamic import, so first paint is unaffected.
+  { prefix: "ChatMessages-", budget: 1000 * 1024 },
+];
 
 const enforceChunkBudgets: Plugin = {
   name: "enforce-chunk-budgets",
