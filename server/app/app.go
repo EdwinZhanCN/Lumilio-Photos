@@ -646,6 +646,8 @@ func run(
 	if err := assetTrash.Recover(ctx); err != nil {
 		appLogger.Warn("interrupted trash operations wait for their repositories", zap.Error(err))
 	}
+	go runTrashMaintenanceLoop(ctx, assetTrash,
+		time.Duration(appConfig.RepositoryTrash.RetentionDays)*24*time.Hour, appLogger.Named("trash"))
 	if err := service.BindAssetTrash(assetService, assetTrash); err != nil {
 		return err
 	}

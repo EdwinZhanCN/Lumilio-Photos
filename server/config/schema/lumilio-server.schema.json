@@ -202,6 +202,19 @@
         "settle_seconds"
       ]
     },
+    "repository_trash": {
+      "properties": {
+        "retention_days": {
+          "type": "integer",
+          "description": "Days a deleted file stays in its repository's trash before it is\ndeleted permanently."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "retention_days"
+      ]
+    },
     "auth": {
       "properties": {
         "secret_key_file": {
@@ -482,6 +495,7 @@
     "logging",
     "storage",
     "repository_scan",
+    "repository_trash",
     "auth",
     "transcode",
     "lumen",
