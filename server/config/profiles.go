@@ -218,6 +218,9 @@ func baseManifest(environment string, deploymentID string, logLevel string, l la
 			IntervalSeconds: ptr(300),
 			SettleSeconds:   ptr(5),
 		},
+		RepositoryTrash: &repositoryTrashManifest{
+			RetentionDays: ptr(30),
+		},
 		Auth: &authManifest{
 			SecretKeyFile:   ptr(l.secretKey),
 			AccessTokenTTL:  ptr("15m"),

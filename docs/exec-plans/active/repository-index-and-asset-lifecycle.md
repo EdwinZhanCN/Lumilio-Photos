@@ -8,9 +8,11 @@ took as approval. Phase 2 (scan core) merged in #231 on 2026-09-27. On
 2026-09-27 the owner approved folding the sweep into a per-directory diff and
 renaming `parent_path` to `parent_key`; #222 was amended to match. Phase 3
 (wiring, ROE removal) merged in #232 on 2026-09-27 with three Phase 0
-tests. Phase 4 is split into three PRs; the first (lifecycle core, the
-repository trash, and the last two Phase 0 tests) is in review on
-`feat/asset-lifecycle-core`. Child of
+tests. Phase 4 is split into three PRs; 4a (lifecycle core, the repository
+trash, and the last two Phase 0 tests) merged in #233 on 2026-09-29, with
+a fix for the video enrich regression #232 left on `dev`. 4b (expiry,
+permanent delete, remove missing, Trash rebuild) is in review on
+`feat/trash-expiry-and-purge`. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
 (replace the Repository Observation Engine with a scan index) and
@@ -245,12 +247,20 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
 - [x] Phase 0 `MissingFileLeavesLibraryBrowse` and
   `ReuploadOfTrashedPhotoIsVisible` land and pass.
 
-4b — irreversible steps:
-- [ ] Expiry job with the required `repository_trash.retention_days`,
-  "Delete permanently", and "Remove missing items", all through
-  `PurgeEntries`.
-- [ ] Artifact cleaner keyed on Asset existence.
-- [ ] The Trash view can be rebuilt from the sidecars.
+4b — irreversible steps (`feat/trash-expiry-and-purge`):
+- [x] The required `[repository_trash].retention_days` (generated configs
+  write 30). An hourly maintenance pass retries deferred recovery, rebuilds
+  the Trash from sidecars, and expires files past retention: unlink, then
+  `PurgeEntries`, idempotent when the file is already gone.
+- [x] "Delete permanently" and "Remove missing items" (per Repository or
+  selection) through `PurgeEntries`, in batches of 256, each audited. Their
+  endpoints land in Phase 5.
+- [x] Artifact cleaner keyed on Asset existence: a transcode stays while its
+  Asset has any entry in the Repository.
+- [x] The Trash view can be rebuilt from the sidecars
+  (`scan.AdoptTrash`): an unknown trash ID binds to the owner's Asset for its
+  content, or to a new trashed Asset; a newer sidecar format is reported and
+  left alone. The rebuild waits while a trash journal is open.
 
 4c — carry-over follow-ups the scan core cannot do alone
 (`feat/carry-over-followups`):

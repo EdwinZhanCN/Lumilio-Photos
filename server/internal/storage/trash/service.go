@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 	"sync"
@@ -310,4 +311,8 @@ func nullIDs(ids []uuid.UUID) []uuid.NullUUID {
 		values = append(values, uuid.NullUUID{UUID: id, Valid: true})
 	}
 	return values
+}
+
+func isNotExist(err error) bool {
+	return errors.Is(err, fs.ErrNotExist)
 }

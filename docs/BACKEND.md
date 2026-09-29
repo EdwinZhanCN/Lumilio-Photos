@@ -91,6 +91,10 @@ authoritative verification sweep over every active Repository.
 or repository concurrency/batch knob because bounded ROE turns and global
 resource admission own those limits.
 
+`[repository_trash].retention_days` is how long a deleted file stays in its
+Repository's `.lumilio/trash` before an hourly pass deletes it permanently.
+It is required with no code default; generated configs write 30.
+
 Reverse-geocoding provider, endpoint, response language, and User-Agent are
 runtime-mutable administrator settings owned by the singleton SQLite `settings`
 row. They are read and updated through the system-settings API; they are not

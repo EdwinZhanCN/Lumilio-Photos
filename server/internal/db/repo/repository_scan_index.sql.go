@@ -270,6 +270,18 @@ func (q *Queries) CopyAssetUserTags(ctx context.Context, arg CopyAssetUserTagsPa
 	return err
 }
 
+const countRepositoryEntriesWithTrashID = `-- name: CountRepositoryEntriesWithTrashID :one
+SELECT count(*) FROM repository_entries
+WHERE trash_id = ?1
+`
+
+func (q *Queries) CountRepositoryEntriesWithTrashID(ctx context.Context, trashID uuid.NullUUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRepositoryEntriesWithTrashID, trashID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteMissingRepositoryEntriesForAsset = `-- name: DeleteMissingRepositoryEntriesForAsset :execrows
 DELETE FROM repository_entries
 WHERE asset_id = ?1
@@ -802,6 +814,67 @@ func (q *Queries) InsertTrashedRepositoryEntry(ctx context.Context, arg InsertTr
 	return err
 }
 
+const listExpiredTrashedRepositoryEntries = `-- name: ListExpiredTrashedRepositoryEntries :many
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
+WHERE repository_id = ?1
+  AND state = 'trashed'
+  AND trashed_at < ?2
+ORDER BY trashed_at, entry_id
+LIMIT ?3
+`
+
+type ListExpiredTrashedRepositoryEntriesParams struct {
+	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Cutoff       dbtypes.Timestamp `db:"cutoff" json:"cutoff"`
+	RowLimit     int64             `db:"row_limit" json:"row_limit"`
+}
+
+// Trashed files of one repository past their retention, oldest first.
+func (q *Queries) ListExpiredTrashedRepositoryEntries(ctx context.Context, arg ListExpiredTrashedRepositoryEntriesParams) ([]RepositoryEntry, error) {
+	rows, err := q.db.QueryContext(ctx, listExpiredTrashedRepositoryEntries, arg.RepositoryID, arg.Cutoff, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RepositoryEntry
+	for rows.Next() {
+		var i RepositoryEntry
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.RepositoryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.Size,
+			&i.MtimeNs,
+			&i.CtimeNs,
+			&i.FileID,
+			&i.StatCheckedNs,
+			&i.State,
+			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.AssetID,
+			&i.Revision,
+			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLiveRepositoryEntriesUnder = `-- name: ListLiveRepositoryEntriesUnder :many
 SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
 WHERE repository_id = ?1
@@ -827,6 +900,128 @@ func (q *Queries) ListLiveRepositoryEntriesUnder(ctx context.Context, arg ListLi
 		arg.AfterPath,
 		arg.PageLimit,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RepositoryEntry
+	for rows.Next() {
+		var i RepositoryEntry
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.RepositoryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.Size,
+			&i.MtimeNs,
+			&i.CtimeNs,
+			&i.FileID,
+			&i.StatCheckedNs,
+			&i.State,
+			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.AssetID,
+			&i.Revision,
+			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMissingRepositoryEntries = `-- name: ListMissingRepositoryEntries :many
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
+WHERE repository_id = ?1
+  AND state = 'missing'
+  AND kind = 'file'
+ORDER BY entry_id
+LIMIT ?2
+`
+
+type ListMissingRepositoryEntriesParams struct {
+	RepositoryID uuid.UUID `db:"repository_id" json:"repository_id"`
+	RowLimit     int64     `db:"row_limit" json:"row_limit"`
+}
+
+// Missing files of one repository, for "Remove missing items".
+func (q *Queries) ListMissingRepositoryEntries(ctx context.Context, arg ListMissingRepositoryEntriesParams) ([]RepositoryEntry, error) {
+	rows, err := q.db.QueryContext(ctx, listMissingRepositoryEntries, arg.RepositoryID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RepositoryEntry
+	for rows.Next() {
+		var i RepositoryEntry
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.RepositoryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.Size,
+			&i.MtimeNs,
+			&i.CtimeNs,
+			&i.FileID,
+			&i.StatCheckedNs,
+			&i.State,
+			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.AssetID,
+			&i.Revision,
+			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMissingRepositoryEntriesForAssets = `-- name: ListMissingRepositoryEntriesForAssets :many
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
+WHERE asset_id IN (/*SLICE:asset_ids*/?)
+  AND state = 'missing'
+ORDER BY asset_id, repository_id, path
+`
+
+func (q *Queries) ListMissingRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error) {
+	query := listMissingRepositoryEntriesForAssets
+	var queryParams []interface{}
+	if len(assetIds) > 0 {
+		for _, v := range assetIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(assetIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}

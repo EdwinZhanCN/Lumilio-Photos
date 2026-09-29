@@ -153,6 +153,7 @@ type Querier interface {
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByReachability(ctx context.Context, reachability dbtypes.RepositoryReachability) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) (int64, error)
+	CountRepositoryEntriesWithTrashID(ctx context.Context, trashID uuid.NullUUID) (int64, error)
 	CountStackedMediaItems(ctx context.Context, mediaItemIds []uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CountVideoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error)
@@ -589,6 +590,8 @@ type Querier interface {
 	ListEventMembership(ctx context.Context, arg ListEventMembershipParams) ([]EventMediaItem, error)
 	ListEventMembershipPage(ctx context.Context, arg ListEventMembershipPageParams) ([]EventMediaItem, error)
 	ListEventsPage(ctx context.Context, arg ListEventsPageParams) ([]Event, error)
+	// Trashed files of one repository past their retention, oldest first.
+	ListExpiredTrashedRepositoryEntries(ctx context.Context, arg ListExpiredTrashedRepositoryEntriesParams) ([]RepositoryEntry, error)
 	ListIncompleteLifecycleOperations(ctx context.Context) ([]LifecycleOperation, error)
 	ListLifecycleAuditEvents(ctx context.Context, arg ListLifecycleAuditEventsParams) ([]LifecycleAuditEvent, error)
 	ListLifecycleAuditEventsForTarget(ctx context.Context, arg ListLifecycleAuditEventsForTargetParams) ([]LifecycleAuditEvent, error)
@@ -599,6 +602,9 @@ type Querier interface {
 	// A user's manual person assignments on an Asset's faces, with the face box,
 	// captured before a re-detection replaces the faces.
 	ListManualFaceAssignmentsForAsset(ctx context.Context, assetID uuid.UUID) ([]ListManualFaceAssignmentsForAssetRow, error)
+	// Missing files of one repository, for "Remove missing items".
+	ListMissingRepositoryEntries(ctx context.Context, arg ListMissingRepositoryEntriesParams) ([]RepositoryEntry, error)
+	ListMissingRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error)
 	ListMusicAlbumArtists(ctx context.Context, arg ListMusicAlbumArtistsParams) ([]ListMusicAlbumArtistsRow, error)
 	ListMusicAlbumTracks(ctx context.Context, arg ListMusicAlbumTracksParams) ([]ListMusicAlbumTracksRow, error)
 	ListMusicAlbums(ctx context.Context, arg ListMusicAlbumsParams) ([]ListMusicAlbumsRow, error)

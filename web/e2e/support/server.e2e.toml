@@ -36,6 +36,9 @@ backups_path = "/data/app-state/backups"
 interval_seconds = 3600
 settle_seconds = 1
 
+[repository_trash]
+retention_days = 30
+
 [auth]
 secret_key_file = "/data/app-state/secrets/lumilio_secret_key"
 access_token_ttl = "15m"
