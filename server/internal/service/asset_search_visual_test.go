@@ -236,23 +236,23 @@ func openVisualSearchCatalog(t *testing.T) *db.DB {
 	videoItem := "00000000-0000-0000-0000-000000000026"
 	earlyItem := "00000000-0000-0000-0000-000000000027"
 	repoID := "00000000-0000-0000-0000-000000000002"
-	rootID := "00000000-0000-0000-0000-000000000001"
+	storageLocationID := "00000000-0000-0000-0000-000000000001"
 
 	if _, err := catalog.SQL.ExecContext(ctx, `
 		INSERT INTO users (
 			user_id, username, password, created_at, updated_at, webauthn_user_handle
 		) VALUES (1, 'owner-one', 'hash', 1, 1, x'01');
-		INSERT INTO repository_roots (
-			root_id, name, path, kind, created_at, updated_at
+		INSERT INTO storage_locations (
+			storage_location_id, name, path, kind, created_at, updated_at
 		) VALUES (?, 'root', '/media', 'default', 1, 1);
 		INSERT INTO repositories (
-			repo_id, name, path, created_at, updated_at, default_owner_id, root_id
+			repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
 		) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
 		INSERT INTO embedding_spaces (
 			id, embedding_type, model_id, dimensions, distance_metric,
 			search_enabled, is_default_search, created_at, updated_at
 		) VALUES (1, 'semantic', 'fixture', 768, 'l2', 1, 1, 1, 1);
-	`, rootID, repoID, rootID); err != nil {
+	`, storageLocationID, repoID, storageLocationID); err != nil {
 		t.Fatal(err)
 	}
 

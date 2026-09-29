@@ -314,7 +314,7 @@ WITH scored AS (
   FROM search_embeddings e
   JOIN assets a ON a.asset_id = e.asset_id
   WHERE e.space_id = ?
-    AND a.is_deleted = 0
+    AND a.lifecycle_state = 'active'
   GROUP BY a.asset_id
 )
 SELECT asset_id, score

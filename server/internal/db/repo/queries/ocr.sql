@@ -82,7 +82,7 @@ SELECT
     a.owner_id,
     COALESCE(CAST(occurrence.repository_id AS TEXT), '') AS repository_id,
     a.type AS asset_type,
-    a.is_deleted,
+    a.lifecycle_state,
     m.revision,
     ti.text_content
 FROM ocr_results r
@@ -112,7 +112,7 @@ SELECT
     a.owner_id,
     COALESCE(CAST(occurrence.repository_id AS TEXT), '') AS repository_id,
     a.type AS asset_type,
-    a.is_deleted,
+    a.lifecycle_state,
     m.revision,
     ti.text_content
 FROM batch_assets b

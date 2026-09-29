@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lumilio.org/schema/lumilio-server-v6.schema.json",
+  "$id": "https://lumilio.org/schema/lumilio-server-v1.schema.json",
   "properties": {
     "schema_version": {
       "type": "integer",
@@ -165,7 +165,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Portable media root holding the .lumilioroot marker and repository\ndirectories. This is the mount users back up and migrate."
+          "description": "Portable Default Storage Location holding the .lumilioroot marker and repository\ndirectories. This is the mount users back up and migrate."
         },
         "cloud_state_path": {
           "type": "string",
@@ -200,6 +200,19 @@
       "required": [
         "interval_seconds",
         "settle_seconds"
+      ]
+    },
+    "repository_trash": {
+      "properties": {
+        "retention_days": {
+          "type": "integer",
+          "description": "Days a deleted file stays in its repository's trash before it is\ndeleted permanently."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "retention_days"
       ]
     },
     "auth": {
@@ -482,12 +495,13 @@
     "logging",
     "storage",
     "repository_scan",
+    "repository_trash",
     "auth",
     "transcode",
     "lumen",
     "tools",
     "execution"
   ],
-  "title": "Lumilio Photos runtime manifest (schema v6)",
+  "title": "Lumilio Photos runtime manifest (schema v1)",
   "description": "Complete runtime configuration. There are no code defaults, no configuration file search, and no environment-variable overrides: every key below must be present in the file."
 }

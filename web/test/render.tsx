@@ -38,11 +38,7 @@ export function renderWithProviders(
   });
 
   const routed = router ? <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter> : ui;
-  const authed = auth ? (
-    <AuthProvider resetFeatureState={() => {}}>{routed}</AuthProvider>
-  ) : (
-    routed
-  );
+  const authed = auth ? <AuthProvider resetFeatureState={() => {}}>{routed}</AuthProvider> : routed;
 
   return render(
     <I18nProvider>

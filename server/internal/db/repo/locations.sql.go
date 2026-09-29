@@ -172,7 +172,7 @@ func (q *Queries) DisableUnresolvedLocationClusters(ctx context.Context) error {
 }
 
 const getLocationProjectionState = `-- name: GetLocationProjectionState :one
-SELECT repository_id, owner_id, source_revision, published_revision, updated_at
+SELECT repository_id, owner_id, source_revision, published_revision, updated_at, terminal_error
 FROM location_projection_state
 WHERE repository_id = ?1
   AND owner_id = ?2
@@ -192,6 +192,7 @@ func (q *Queries) GetLocationProjectionState(ctx context.Context, arg GetLocatio
 		&i.SourceRevision,
 		&i.PublishedRevision,
 		&i.UpdatedAt,
+		&i.TerminalError,
 	)
 	return i, err
 }
@@ -302,7 +303,7 @@ JOIN (
   WHERE repository_id = ?1
 ) active_occurrence ON active_occurrence.asset_id = a.asset_id
 WHERE a.owner_id = ?2
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND a.type = 'PHOTO'
   AND a.gps_latitude IS NOT NULL
   AND a.gps_longitude IS NOT NULL

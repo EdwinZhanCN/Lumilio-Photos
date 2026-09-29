@@ -43,7 +43,10 @@ export function useStartRepositoryCloudImport() {
         });
       }
       void queryClient.invalidateQueries({
-        queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+        queryKey: ["get", "/api/v1/storage/targets"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/storage/view"],
       });
     },
   });
@@ -57,7 +60,10 @@ export function useBindRepositoryCloudSource() {
         queryKey: ["get", "/api/v1/repositories/{id}/cloud"],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+        queryKey: ["get", "/api/v1/storage/targets"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/storage/view"],
       });
     },
   });
@@ -82,7 +88,10 @@ export function useResumeCloudImport() {
         queryKey: ["get", "/api/v1/repositories/{id}/cloud"],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["get", "/api/v1/assets/indexing/repositories"],
+        queryKey: ["get", "/api/v1/storage/targets"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/storage/view"],
       });
     },
   });

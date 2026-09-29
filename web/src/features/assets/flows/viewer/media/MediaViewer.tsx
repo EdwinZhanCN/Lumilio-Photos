@@ -3,14 +3,19 @@ import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from "@vidstack/
 import { useSearchParams } from "react-router-dom";
 
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { isVideo } from "../../../model/mediaTypes";
+import { announceMediaPlayback } from "@/lib/media/mediaCoordinator";
+import { isAudio, isVideo } from "../../../model/mediaTypes";
 import { Asset } from "@/lib/assets/types";
 import "@vidstack/react/player/styles/base.css";
 import "@vidstack/react/player/styles/default/theme.css";
 import "@vidstack/react/player/styles/default/layouts/video.css";
 import "@vidstack/react/player/styles/default/layouts/audio.css";
 
-import { defaultLayoutIcons, DefaultVideoLayout } from "@vidstack/react/player/layouts/default";
+import {
+  defaultLayoutIcons,
+  DefaultAudioLayout,
+  DefaultVideoLayout,
+} from "@vidstack/react/player/layouts/default";
 import { useI18n } from "@/lib/i18n";
 import { useAssetMediaItem } from "../../../api/useAssetMediaItem";
 import { useLivePhotoPlayback } from "../useLivePhotoPlayback";
@@ -65,6 +70,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
     videoPlayerRef.current.currentTime = videoStartTimeSeconds;
   }, [videoStartTimeSeconds]);
   const videoAsset = isVideo(asset);
+  const audioAsset = isAudio(asset);
   const mediaItemQuery = useAssetMediaItem(asset.asset_id, isActive);
   const mediaItem = mediaItemQuery.data?.media_item;
   const components = useMemo(() => mediaItem?.components ?? [], [mediaItem?.components]);
@@ -94,22 +100,58 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
   };
 
   const { videoRef, isPlaying, handlePlay, handleStop, handleEnded } = useLivePhotoPlayback();
+  const playLivePhoto = () => {
+    announceMediaPlayback("live-photo", true);
+    handlePlay();
+  };
+  const stopLivePhoto = () => {
+    announceMediaPlayback("live-photo", false);
+    handleStop();
+  };
 
   // Get media source URL
   const webVideoUrl =
     videoAsset && asset.asset_id ? assetUrls.getWebVideoUrl(asset.asset_id) : undefined;
+  const webAudioUrl =
+    audioAsset && asset.asset_id ? assetUrls.getWebAudioUrl(asset.asset_id) : undefined;
 
   // For photos, get large thumbnail as fallback to original
   const imageUrl =
-    !videoAsset && selectedAssetId
+    !videoAsset && !audioAsset && selectedAssetId
       ? assetUrls.getThumbnailUrl(selectedAssetId, "large")
       : undefined;
 
-  // ── Regular video player ──────────────────────────────────────────────────
+  // ── Regular audio player ───────────────────────────────────────────────────
+  if (audioAsset && webAudioUrl) {
+    return (
+      <div className={`flex h-screen w-screen items-center justify-center p-4 ${className}`}>
+        <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-black/35 p-4 shadow-2xl backdrop-blur-md sm:p-8 swiper-no-swiping">
+          <MediaPlayer
+            title={
+              asset.original_filename ||
+              t("assets.mediaViewer.audio_title", { defaultValue: "Audio" })
+            }
+            src={webAudioUrl}
+            load="visible"
+            crossOrigin
+            playsInline
+            onPlay={() => announceMediaPlayback("audio", true)}
+            onPause={() => announceMediaPlayback("audio", false)}
+            onError={(error) => console.error("Audio player error:", error)}
+          >
+            <MediaProvider />
+            <DefaultAudioLayout icons={defaultLayoutIcons} />
+          </MediaPlayer>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Regular video player ───────────────────────────────────────────────────
   if (videoAsset && webVideoUrl) {
     return (
       <div className={`h-screen w-screen flex items-center justify-center ${className}`}>
-        <div className="w-full max-w-6xl h-auto max-h-[90vh]">
+        <div className="w-full max-w-6xl h-auto max-h-[90vh] swiper-no-swiping">
           <MediaPlayer
             ref={videoPlayerRef}
             title={asset.original_filename || t("assets.mediaViewer.video_title")}
@@ -119,6 +161,8 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
             playsInline
             currentTime={videoStartTimeSeconds}
             onCanPlay={seekToSemanticMatch}
+            onPlay={() => announceMediaPlayback("video", true)}
+            onPause={() => announceMediaPlayback("video", false)}
             onError={(error) => console.error("Video player error:", error)}
           >
             <MediaProvider />
@@ -129,7 +173,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
     );
   }
 
-  // ── Photo display (with optional Live Photo overlay) ──────────────────────
+  // ── Photo display (with optional Live Photo overlay) ────────────────────────
   if (imageUrl) {
     return (
       <div className={`h-screen w-screen flex items-center justify-center p-4 ${className}`}>
@@ -213,10 +257,10 @@ const MediaViewer: React.FC<MediaViewerProps> = ({
           {isLivePhoto && (
             <button
               type="button"
-              onPointerEnter={handlePlay}
-              onPointerLeave={handleStop}
-              onPointerDown={handlePlay}
-              onPointerUp={handleStop}
+              onPointerEnter={playLivePhoto}
+              onPointerLeave={stopLivePhoto}
+              onPointerDown={playLivePhoto}
+              onPointerUp={stopLivePhoto}
               aria-label={t("assets.livePhoto.playButton", {
                 defaultValue: "Play Live Photo",
               })}

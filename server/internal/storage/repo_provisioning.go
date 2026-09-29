@@ -51,7 +51,7 @@ type CreateRepositorySpec struct {
 	DirectoryName     string
 	Role              dbtypes.RepoRole
 	Root              string
-	RootID            string
+	StorageLocationID string
 	OwnerID           *int32
 	StorageStrategy   string
 	DuplicateHandling string
@@ -108,17 +108,17 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		}
 	}
 
-	var rootIDs []uuid.UUID
-	if strings.TrimSpace(spec.RootID) != "" && strings.TrimSpace(spec.Root) != "" {
-		return nil, fmt.Errorf("%w: root_id and root path cannot both be supplied", ErrPathNotAllowed)
+	var storageLocationIDs []uuid.UUID
+	if strings.TrimSpace(spec.StorageLocationID) != "" && strings.TrimSpace(spec.Root) != "" {
+		return nil, fmt.Errorf("%w: storage_location_id and root path cannot both be supplied", ErrPathNotAllowed)
 	}
 	if strings.TrimSpace(spec.Root) == "" {
-		selectedRoot, err := rm.resolveRepositoryRootForCreate(ctx, spec.RootID, role)
+		selectedRoot, err := rm.resolveStorageLocationForCreate(ctx, spec.StorageLocationID, role)
 		if err != nil {
 			return nil, err
 		}
 		spec.Root = selectedRoot.Path
-		rootIDs = append(rootIDs, selectedRoot.RootID)
+		storageLocationIDs = append(storageLocationIDs, selectedRoot.StorageLocationID)
 	}
 
 	repoPath, err := resolveRepositoryCreatePath(spec.Root, spec.DirectoryName, role)
@@ -147,7 +147,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		repocfg.WithStorageStrategy(firstNonEmpty(spec.StorageStrategy, defaults.Strategy, "date")),
 		repocfg.WithLocalSettings(firstNonEmpty(spec.DuplicateHandling, defaults.DuplicateHandling, "rename")),
 	)
-	associatedRootID, err := rm.resolveRepositoryAssociation(ctx, repoPath, rootIDs)
+	associatedStorageLocationID, err := rm.resolveRepositoryAssociation(ctx, repoPath, storageLocationIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		RequestID: spec.RequestID,
 		Kind:      lifecycleKindCreateRepository,
 		Payload: createRepositoryOperationPayload{
-			Name: spec.Name, Path: repoPath, RootID: associatedRootID.String(), Role: role,
+			Name: spec.Name, Path: repoPath, StorageLocationID: associatedStorageLocationID.String(), Role: role,
 			OwnerID: spec.OwnerID, StorageStrategy: cfg.StorageStrategy,
 			DuplicateHandling: cfg.LocalSettings.HandleDuplicateFilenames,
 			RiskConfirmation:  spec.RiskConfirmation,
@@ -210,7 +210,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		return failPrepared(fmt.Errorf("look up repository create target: %w", lookupErr))
 	}
 
-	if repocfg.IsRepositoryRoot(repoPath) {
+	if repocfg.IsStorageLocation(repoPath) {
 		config, loadErr := repocfg.LoadConfigFromFile(repoPath)
 		if loadErr != nil {
 			return failPrepared(&RepositoryMarkerInvalidError{RequestedPath: repoPath, Cause: loadErr})
@@ -243,7 +243,7 @@ func (rm *DefaultRepositoryManager) CreateRepository(ctx context.Context, spec C
 		}
 	}
 
-	dbRepo, err := rm.initializeRepository(ctx, repoPath, *cfg, spec.OwnerID, role, &operation, associatedRootID)
+	dbRepo, err := rm.initializeRepository(ctx, repoPath, *cfg, spec.OwnerID, role, &operation, associatedStorageLocationID)
 	if err != nil {
 		if current, loadErr := rm.queries.GetLifecycleOperation(ctx, operation.OperationID); loadErr == nil && current.Phase == lifecyclePhasePrepared {
 			_ = rm.failLifecycleOperation(ctx, operation.OperationID, true, err, createRepositoryRollbackData{Path: repoPath})
@@ -300,17 +300,18 @@ func (rm *DefaultRepositoryManager) primaryRepositoryExists(ctx context.Context)
 }
 
 // resolveRepositoryCreatePath resolves the on-disk path for a new repository
-// under root. Primary repositories always live at <root>/primary; a regular
-// repository uses the explicit stable storage-folder segment independently of
-// its mutable display name. The result is a direct child of root.
+// under a Storage Location. Primary repositories always live at
+// <storage location>/primary; a regular repository uses the explicit stable
+// storage-folder segment independently of its mutable display name. The result
+// is a direct child of the Storage Location.
 func resolveRepositoryCreatePath(root, directoryName string, role dbtypes.RepoRole) (string, error) {
 	trimmed := strings.TrimSpace(root)
 	if trimmed == "" {
-		return "", errors.New("storage root is not configured")
+		return "", errors.New("storage location is not configured")
 	}
 	cleanRoot, err := CanonicalizeRepositoryPath(trimmed)
 	if err != nil {
-		return "", fmt.Errorf("invalid storage root: %w", err)
+		return "", fmt.Errorf("invalid storage location: %w", err)
 	}
 
 	folderName := directoryName
@@ -325,7 +326,7 @@ func resolveRepositoryCreatePath(root, directoryName string, role dbtypes.RepoRo
 		return "", fmt.Errorf("invalid repository path: %w", err)
 	}
 	if !pathIsDirectChild(cleanRoot, repoPath) {
-		return "", errors.New("repository path must be a direct child of storage root")
+		return "", errors.New("repository path must be a direct child of a Storage Location")
 	}
 	if err := rejectCaseInsensitiveRepositoryDirectoryConflict(cleanRoot, folderName); err != nil {
 		return "", err
@@ -379,7 +380,7 @@ func ValidateRepositoryDirectoryName(name string) error {
 func rejectCaseInsensitiveRepositoryDirectoryConflict(root, requestedName string) error {
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return fmt.Errorf("list storage root: %w", err)
+		return fmt.Errorf("list storage location: %w", err)
 	}
 	for _, entry := range entries {
 		existingName := entry.Name()

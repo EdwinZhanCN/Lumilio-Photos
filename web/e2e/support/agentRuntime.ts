@@ -18,7 +18,7 @@ const scenarioPrefix = "LUMILIO_E2E_SCENARIO:";
 const metricsURL =
   process.env.LUMILIO_E2E_AGENT_MODEL_METRICS_URL ?? "http://127.0.0.1:16659/metrics";
 type Scenario =
-  | { name: "plain" | "slow-stream" | "provider-error" | "read-ocr" }
+  | { name: "music" | "plain" | "slow-stream" | "provider-error" | "read-ocr" }
   | { name: "confirm-add-to-album"; filename: string; album_title: string };
 
 type BrowseResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];

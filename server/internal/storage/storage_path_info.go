@@ -18,14 +18,40 @@ var ErrUnavailableCloudPlaceholder = errors.New("repository contains an unavaila
 // Location. Capacity is inspected per path so Docker child mounts are never
 // presented as though they shared the parent filesystem's free space.
 type StoragePathInfo struct {
-	Writable          bool
-	CapacityKnown     bool
-	TotalBytes        uint64
-	AvailableBytes    uint64
-	Filesystem        string
-	CanonicalPath     string
-	MountID           string
-	MountSource       string
+	Writable       bool
+	CapacityKnown  bool
+	TotalBytes     uint64
+	AvailableBytes uint64
+	Filesystem     string
+	CanonicalPath  string
+	// CapacityGroupKey identifies the backing capacity pool shared by every
+	// path that reports the same key. It is sampled at CanonicalPath, the
+	// filesystem that actually backs the requested path:
+	//
+	//   - Linux and Darwin: a nonzero statfs filesystem ID plus the filesystem
+	//     type. Network and FUSE filesystems assign identities outside this
+	//     host's control, so they stay empty (unknown).
+	//   - Windows: the containing volume's GUID path plus serial number,
+	//     resolved through GetVolumePathName so a volume mounted into an NTFS
+	//     folder groups with its drive letter. Remote and unresolvable volumes
+	//     stay empty.
+	//
+	// Empty means grouping is not proven. Empty is independent of
+	// CapacityKnown: a proven group may have no figure, and a path with a
+	// figure may have no proven group. The key is never MountID, a mount
+	// fingerprint, a Storage Location id, or a user path. Callers must not
+	// invent an aggregate total for an empty key; see
+	// GroupCapacityByBackingStorage.
+	CapacityGroupKey string
+	MountID          string
+	MountSource      string
+	// MountPath is the directory where the backing filesystem is mounted, as
+	// this host sees it: "/", "/Volumes/Backup", "/volume1", or `C:\`. It is
+	// the human-facing storage identity an operator recognizes, and it is
+	// deliberately independent of CapacityGroupKey: two paths can share one
+	// mount path without a proof, and one proven pool can be reached through
+	// several mount points. Empty means the mount could not be resolved.
+	MountPath         string
 	Device            string
 	Inode             uint64
 	EffectiveUID      string
@@ -55,7 +81,15 @@ func inspectStoragePath(path string, probeMutability bool) StoragePathInfo {
 	if probeMutability {
 		info.Writable = directoryWritable(path)
 	}
-	total, available, filesystem, err := inspectVolume(path)
+	// Sample at the canonical path so capacity, mount classification, and the
+	// capacity group key all describe the filesystem that actually backs the
+	// requested path instead of a symlink that merely names it.
+	info.CanonicalPath = canonicalStoragePath(path)
+	samplePath := path
+	if info.CanonicalPath != "" {
+		samplePath = info.CanonicalPath
+	}
+	total, available, filesystem, err := inspectVolume(samplePath)
 	if err != nil {
 		return info
 	}
@@ -63,13 +97,10 @@ func inspectStoragePath(path string, probeMutability bool) StoragePathInfo {
 	info.TotalBytes = total
 	info.AvailableBytes = available
 	info.Filesystem = filesystem
-	info.CanonicalPath, _ = filepath.EvalSymlinks(path)
-	if info.CanonicalPath == "" {
-		info.CanonicalPath, _ = filepath.Abs(filepath.Clean(path))
-	}
-	platform := inspectPathPlatform(path)
+	platform := inspectPathPlatform(samplePath)
 	info.MountID = platform.MountID
 	info.MountSource = platform.MountSource
+	info.MountPath = platform.MountPath
 	info.Device = platform.Device
 	info.Inode = platform.Inode
 	info.EffectiveUID = platform.EffectiveUID
@@ -78,6 +109,7 @@ func inspectStoragePath(path string, probeMutability bool) StoragePathInfo {
 		info.CaseBehaviorKnown, info.CaseSensitive = inspectCaseBehavior(path)
 	}
 	info.NetworkFilesystem = isNetworkFilesystem(filesystem)
+	info.CapacityGroupKey = capacityGroupKeyForPath(samplePath, filesystem)
 	clean := strings.ToLower(strings.ReplaceAll(info.CanonicalPath, `\`, "/"))
 	info.RemovableLikely = strings.HasPrefix(clean, "/media/") || strings.HasPrefix(clean, "/run/media/") || strings.HasPrefix(clean, "/volumes/")
 	info.CloudSyncProvider = cloudSyncProvider(info.CanonicalPath)
@@ -95,13 +127,33 @@ func inspectStoragePath(path string, probeMutability bool) StoragePathInfo {
 	return info
 }
 
+// canonicalStoragePath resolves symlinks so every fact about a path describes
+// the filesystem that actually backs it. It falls back to a cleaned absolute
+// path when the path cannot be resolved.
+func canonicalStoragePath(path string) string {
+	if canonical, err := filepath.EvalSymlinks(path); err == nil && canonical != "" {
+		return canonical
+	}
+	canonical, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return ""
+	}
+	return canonical
+}
+
+// capacityGroupKeyForPath is implemented per platform (storage_path_info_*.go).
+// It returns the proven shared-backing-capacity key for path, or "" when
+// grouping is unknown. filesystem is the classification inspectVolume already
+// resolved for the same path so the key and the reported Filesystem fact never
+// disagree.
+
 // StoragePlacementWarnings returns the complete set of non-fatal placement
 // risks that require an administrator decision before a repository is created
 // at path. Keep setup/status and the create mutation on this shared contract so
 // first-run onboarding can present the same decision that Server enforces.
 func StoragePlacementWarnings(path string) []string {
 	info := InspectStoragePath(path)
-	warnings := append(RepositoryRootWarnings(path), info.RiskWarnings...)
+	warnings := append(StorageLocationWarnings(path), info.RiskWarnings...)
 	return uniqueStrings(warnings)
 }
 
@@ -147,6 +199,7 @@ func filesystemFromMountInfo(reader io.Reader, path string) (string, error) {
 type pathPlatformInfo struct {
 	MountID      string
 	MountSource  string
+	MountPath    string
 	Device       string
 	Inode        uint64
 	EffectiveUID string

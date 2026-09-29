@@ -8,6 +8,22 @@ import zhTranslation from "@/locales/zh/translation.json";
 export const SUPPORTED_LANGUAGES = ["en", "zh"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
+/**
+ * Collapse any detected tag (`en-US@posix`, `zh-Hans-CN`, a stale cached value)
+ * to a supported language. `i18n.language` feeds `Intl` and `toLocale*`
+ * formatting directly, and an invalid BCP 47 tag makes those throw
+ * `RangeError`, which previously blanked whole pages.
+ */
+export function toSupportedLanguage(detected: string | undefined | null): SupportedLanguage {
+  const base = (detected ?? "")
+    .trim()
+    .toLowerCase()
+    .split(/[-_@.]/)[0];
+  return (SUPPORTED_LANGUAGES as readonly string[]).includes(base)
+    ? (base as SupportedLanguage)
+    : "en";
+}
+
 function initI18n(instance: I18NextInstance) {
   if (instance.isInitialized) return instance;
 
@@ -43,6 +59,7 @@ function initI18n(instance: I18NextInstance) {
         order: ["querystring", "localStorage", "navigator", "htmlTag", "cookie"],
         lookupQuerystring: "lng",
         caches: ["localStorage"],
+        convertDetectedLanguage: toSupportedLanguage,
       },
 
       // React i18next config

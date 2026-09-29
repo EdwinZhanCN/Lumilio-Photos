@@ -47,22 +47,19 @@ const (
 	OperationKindCatalogAssetMetadata
 	OperationKindCatalogAssetDerivatives
 	OperationKindCatalogAssetStack
-	OperationKindCatalogRepositoryAsset
-	OperationKindCatalogRepositoryKnownContent
-	OperationKindCatalogRepositoryHash
 	OperationKindCatalogVideoFrameEmbeddings
 	OperationKindCatalogEnrichment
 	OperationKindCatalogIngestReceipt
 	OperationKindCatalogOperationReceipt
 	OperationKindCatalogProjection
-	OperationKindCatalogRepositoryEpoch
-	OperationKindRepositoryObservation
+	OperationKindRepositoryScan
 	OperationKindRepositoryStaging
 )
 
 // Operation is the coordinator's private transport representation. Callers
 // normally use one of Coordinator's typed Apply methods. The operation escape
-// hatch is only for package-owned commit boundaries (ROE and staging) whose
+// hatch is only for package-owned commit boundaries (the scan index and
+// staging) whose
 // typed payloads live outside package commit; it carries no product identity
 // or generic payload.
 type Operation struct {
@@ -327,15 +324,19 @@ func (c *Coordinator) run() {
 func (c *Coordinator) process(items []submission) {
 	oldestWait := time.Since(items[0].enqueued)
 	results := c.apply(items)
-	for index, result := range results {
-		items[index].ack <- result
-		c.incrementAck(result)
-	}
+	// Record every metric for this batch before releasing any submitter, so a
+	// Snapshot taken after SubmitOperation returns always includes it.
 	c.metricsMu.Lock()
 	c.metrics.operations += uint64(len(items))
 	c.metrics.uniqueOperations += uint64(len(items))
 	c.metrics.oldestWait.record(oldestWait)
 	c.metricsMu.Unlock()
+	for _, result := range results {
+		c.incrementAck(result)
+	}
+	for index, result := range results {
+		items[index].ack <- result
+	}
 }
 
 func (c *Coordinator) apply(items []submission) []submissionResult {

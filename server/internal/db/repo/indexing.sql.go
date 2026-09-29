@@ -16,7 +16,7 @@ JOIN albums al ON al.album_id = aa.album_id
 JOIN assets a ON a.asset_id = aa.asset_id
 WHERE al.album_type = 'bio'
   AND a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (?1 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -38,7 +38,7 @@ JOIN albums al ON al.album_id = aa.album_id
 JOIN assets a ON a.asset_id = aa.asset_id
 WHERE al.album_type = 'bio'
   AND a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM species_predictions sp
@@ -62,7 +62,7 @@ const countPhotoAssetsForIndexing = `-- name: CountPhotoAssetsForIndexing :one
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (?1 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -81,7 +81,7 @@ const countPhotoAssetsWithFaceResults = `-- name: CountPhotoAssetsWithFaceResult
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM face_results f
@@ -105,7 +105,7 @@ const countPhotoAssetsWithOCRResults = `-- name: CountPhotoAssetsWithOCRResults 
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM ocr_results o
@@ -129,7 +129,7 @@ const countPhotoAssetsWithSemanticEmbedding = `-- name: CountPhotoAssetsWithSema
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM search_embeddings se
@@ -154,7 +154,7 @@ const countVideoAssetsForIndexing = `-- name: CountVideoAssetsForIndexing :one
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'VIDEO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (?1 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -173,7 +173,7 @@ const countVideoAssetsWithSemanticFrames = `-- name: CountVideoAssetsWithSemanti
 SELECT COUNT(*) AS count
 FROM assets a
 WHERE a.type = 'VIDEO'
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1
     FROM search_embeddings se
@@ -201,7 +201,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND (?1 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -211,7 +211,7 @@ WITH page_ids AS (
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -245,8 +245,7 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -278,7 +277,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM face_results f
@@ -293,7 +292,7 @@ WITH page_ids AS (
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -327,8 +326,7 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -360,7 +358,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM ocr_results o
@@ -375,7 +373,7 @@ WITH page_ids AS (
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -409,8 +407,7 @@ func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg List
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -442,7 +439,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM search_embeddings se
@@ -458,7 +455,7 @@ WITH page_ids AS (
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -492,8 +489,7 @@ func (q *Queries) ListPhotoAssetsMissingSemanticEmbedding(ctx context.Context, a
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -525,7 +521,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'VIDEO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND (?1 IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = a.asset_id
@@ -535,7 +531,7 @@ WITH page_ids AS (
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -569,8 +565,7 @@ func (q *Queries) ListVideoAssetsForIndexingBatch(ctx context.Context, arg ListV
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -602,7 +597,7 @@ WITH page_ids AS (
     COALESCE(a.taken_time, a.upload_time) AS sort_time
   FROM assets a
   WHERE a.type = 'VIDEO'
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
     AND NOT EXISTS (
       SELECT 1
       FROM search_embeddings se
@@ -618,7 +613,7 @@ WITH page_ids AS (
   LIMIT ?3
   OFFSET ?2
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -652,8 +647,7 @@ func (q *Queries) ListVideoAssetsMissingSemanticFrames(ctx context.Context, arg 
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,

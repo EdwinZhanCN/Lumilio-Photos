@@ -153,7 +153,7 @@ func validDemandKey(step Step, media MediaType) bool {
 	case StepDerivativesComputeVideoFrame:
 		return media == MediaVideo || media == MediaAudio
 	case StepDerivativesComputeScale:
-		return media == MediaPhoto || media == MediaVideo
+		return media == MediaPhoto || media == MediaVideo || media == MediaAudio
 	case StepTranscodeCompute:
 		return media == MediaVideo || media == MediaAudio
 	case StepDerivativesPublish:

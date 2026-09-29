@@ -46,7 +46,7 @@ export const assetUrls = {
     return withMediaToken(`${baseURL}/api/v1/assets/${id}/export?${search.toString()}`);
   },
 
-  getThumbnailUrl(id: string, size: "small" | "medium" | "large" = "small"): string {
+  getThumbnailUrl(id: string, size: "small" | "medium" | "large" | "waveform" = "small"): string {
     return withMediaToken(`${baseURL}/api/v1/assets/${id}/thumbnail?size=${size}`);
   },
 

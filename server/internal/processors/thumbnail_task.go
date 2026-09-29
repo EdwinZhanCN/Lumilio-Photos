@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"server/internal/pipeline"
 
 	"github.com/google/uuid"
 
@@ -25,6 +26,7 @@ type PreparedThumbnail struct {
 	videoInfo       *VideoInfo
 	pipelineVersion string
 	frame           []byte
+	waveform        []byte
 	outputs         map[string][]byte
 }
 
@@ -60,7 +62,7 @@ func (ap *AssetProcessor) LoadThumbnailTask(ctx context.Context, args ThumbnailA
 }
 
 // ComputeThumbnailCodec performs the media-specific decode/extract operation.
-// Video scaling is intentionally deferred to ComputeThumbnailScale.
+// Video frames and audio artwork scale separately in ComputeThumbnailScale.
 func (ap *AssetProcessor) ComputeThumbnailCodec(ctx context.Context, work *PreparedThumbnail) error {
 	if work == nil {
 		return nil
@@ -91,17 +93,21 @@ func (ap *AssetProcessor) ComputeThumbnailCodec(ctx context.Context, work *Prepa
 		work.frame, err = os.ReadFile(framePath)
 		return err
 	case dbtypes.AssetTypeAudio:
-		work.frame, err = ap.computeWaveform(ctx, source.asset, source.localPath)
+		work.waveform, err = ap.computeWaveform(ctx, source.asset, source.localPath)
+		if err != nil {
+			return err
+		}
+		work.frame, err = ap.extractAudioArtwork(ctx, source.localPath)
 		return err
 	default:
-		return fmt.Errorf("unsupported asset type for thumbnails: %s", work.assetType)
+		return fmt.Errorf("%w for thumbnails: %s", pipeline.ErrUnsupportedMedia, work.assetType)
 	}
 }
 
-// ComputeThumbnailScale runs libvips for the extracted video frame under its
-// own ImageCodec reservation. Audio waveform and photo outputs are complete.
+// ComputeThumbnailScale runs libvips for video frames and audio artwork under
+// its own ImageCodec reservation. Waveforms remain separate PNG artifacts.
 func (ap *AssetProcessor) ComputeThumbnailScale(_ context.Context, work *PreparedThumbnail) error {
-	if work == nil || work.assetType != dbtypes.AssetTypeVideo {
+	if work == nil || len(work.frame) == 0 || (work.assetType != dbtypes.AssetTypeVideo && work.assetType != dbtypes.AssetTypeAudio) {
 		return nil
 	}
 	outputs, err := thumbnailBuffers(bytes.NewReader(work.frame))
@@ -145,8 +151,11 @@ func (ap *AssetProcessor) PublishThumbnailTask(ctx context.Context, work *Prepar
 		return DerivativeResult{}, err
 	}
 	defer source.Close()
-	if work.assetType == dbtypes.AssetTypeAudio && len(work.frame) > 0 {
-		work.outputs = map[string][]byte{"waveform": work.frame}
+	if work.assetType == dbtypes.AssetTypeAudio && len(work.waveform) > 0 {
+		if work.outputs == nil {
+			work.outputs = make(map[string][]byte)
+		}
+		work.outputs["waveform"] = work.waveform
 	}
 	artifacts := make([]DerivedArtifact, 0, len(work.outputs))
 	for name, output := range work.outputs {

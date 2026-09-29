@@ -56,9 +56,6 @@ func (rm *DefaultRepositoryManager) CheckRepositoryWriteCapacity(ctx context.Con
 	if err != nil {
 		return CapacityDecision{}, err
 	}
-	if err := rm.files.ValidateRepositoryParent(ctx, repository); err != nil {
-		return CapacityDecision{}, err
-	}
 	info := InspectStoragePath(repository.Path)
 	decision := capacityDecision(repository.RepoID.String(), repository.Path, info, expectedBytes)
 	if !decision.Writable {

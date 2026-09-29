@@ -32,7 +32,7 @@ func NewHostActionHandler(manager storage.RepositoryManager, nativeHostAvailable
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} dto.NativeHostCapabilityDTO
-// @Router /api/v1/host-actions/native-capability [get]
+// @Router /api/v1/storage/native-capability [get]
 func (h *HostActionHandler) GetNativeHostCapability(c *gin.Context) {
 	api.JSONOK(c, dto.NativeHostCapabilityDTO{Available: h != nil && h.nativeHostAvailable})
 }
@@ -49,7 +49,7 @@ func (h *HostActionHandler) GetNativeHostCapability(c *gin.Context) {
 // @Success 200 {object} dto.HostActionDTO
 // @Failure 400 {object} api.ProblemResponse
 // @Failure 409 {object} api.ProblemResponse
-// @Router /api/v1/host-actions [post]
+// @Router /api/v1/storage/native-tasks [post]
 func (h *HostActionHandler) CreateHostAction(c *gin.Context) {
 	if h == nil || h.manager == nil {
 		api.WriteProblem(c, api.Internal(errors.New("repository manager unavailable")))
@@ -83,7 +83,7 @@ func (h *HostActionHandler) CreateHostAction(c *gin.Context) {
 		SessionID:   strings.TrimSpace(req.SessionID),
 		Summary: storage.HostActionSummary{
 			Name: strings.TrimSpace(req.Name), Purpose: strings.TrimSpace(req.Purpose),
-			RootID: strings.TrimSpace(req.RootID), RepositoryID: strings.TrimSpace(req.RepositoryID),
+			StorageLocationID: strings.TrimSpace(req.StorageLocationID), RepositoryID: strings.TrimSpace(req.RepositoryID),
 		},
 		ExpectedVersion: req.ExpectedVersion,
 		TTL:             ttl,
@@ -107,7 +107,7 @@ func (h *HostActionHandler) CreateHostAction(c *gin.Context) {
 // @Param id path string true "Host action ID"
 // @Success 200 {object} dto.HostActionDTO
 // @Failure 404 {object} api.ProblemResponse
-// @Router /api/v1/host-actions/{id} [get]
+// @Router /api/v1/storage/native-tasks/{id} [get]
 func (h *HostActionHandler) GetHostAction(c *gin.Context) {
 	action, err := h.ownedHostAction(c)
 	if err != nil {
@@ -123,7 +123,7 @@ func (h *HostActionHandler) GetHostAction(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {array} dto.HostActionDTO
-// @Router /api/v1/host-actions [get]
+// @Router /api/v1/storage/native-tasks [get]
 func (h *HostActionHandler) ListHostActions(c *gin.Context) {
 	actorUserID := adminIDFromContext(c)
 	if actorUserID == nil {
@@ -153,7 +153,7 @@ func (h *HostActionHandler) ListHostActions(c *gin.Context) {
 // @Success 200 {object} dto.HostActionDTO
 // @Failure 400 {object} api.ProblemResponse
 // @Failure 409 {object} api.ProblemResponse
-// @Router /api/v1/host-actions/{id}/resolve [post]
+// @Router /api/v1/storage/native-tasks/{id}/resolve [post]
 func (h *HostActionHandler) ResolveHostAction(c *gin.Context) {
 	var req dto.ResolveHostActionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -184,7 +184,7 @@ func (h *HostActionHandler) ResolveHostAction(c *gin.Context) {
 // @Param id path string true "Host action ID"
 // @Success 200 {object} dto.HostActionDTO
 // @Failure 409 {object} api.ProblemResponse
-// @Router /api/v1/host-actions/{id} [delete]
+// @Router /api/v1/storage/native-tasks/{id}/cancel [post]
 func (h *HostActionHandler) CancelHostAction(c *gin.Context) {
 	if _, err := h.ownedHostAction(c); err != nil {
 		writeHostActionOwnershipError(c, err)
@@ -232,16 +232,16 @@ func toHostActionDTO(action storage.HostAction) dto.HostActionDTO {
 	result := (*dto.HostActionResultDTO)(nil)
 	if action.Result != nil {
 		result = &dto.HostActionResultDTO{
-			RepositoryID: action.Result.RepositoryID,
-			RootID:       action.Result.RootID,
-			Name:         action.Result.Name,
+			RepositoryID:      action.Result.RepositoryID,
+			StorageLocationID: action.Result.StorageLocationID,
+			Name:              action.Result.Name,
 		}
 		if action.Result.Conflict != nil {
 			conflict := action.Result.Conflict
 			result.Conflict = &dto.HostActionConflictDTO{
 				Type:               conflict.Type,
 				RepositoryID:       conflict.RepositoryID,
-				RootID:             conflict.RootID,
+				StorageLocationID:  conflict.StorageLocationID,
 				AllowedResolutions: hostActionResolutions(conflict.Actions),
 				RiskWarnings:       conflict.RiskWarnings,
 			}
@@ -259,7 +259,7 @@ func toHostActionDTO(action storage.HostAction) dto.HostActionDTO {
 	return dto.HostActionDTO{
 		ID: action.ActionID, RequestID: action.RequestID, Kind: string(action.Kind), Actor: action.Actor,
 		Purpose: action.Summary.Purpose, Name: action.Summary.Name, ExpectedVersion: action.ExpectedVersion,
-		RootID: action.Summary.RootID, RepositoryID: action.Summary.RepositoryID,
+		StorageLocationID: action.Summary.StorageLocationID, RepositoryID: action.Summary.RepositoryID,
 		Status: string(action.Status), Result: result, Problem: operationProblem,
 		ExpiresAt: action.ExpiresAt, CreatedAt: action.CreatedAt, UpdatedAt: action.UpdatedAt, CompletedAt: action.CompletedAt,
 	}

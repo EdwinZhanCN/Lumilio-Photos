@@ -11,6 +11,7 @@ import (
 
 	"desktop/internal/control/dto"
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 )
 
 const SettingsSchemaVersion = 1
@@ -54,8 +55,8 @@ func LoadSettings(path string) (Settings, error) {
 	if err := json.Unmarshal(data, &settings); err != nil {
 		return Settings{}, fmt.Errorf("decode settings: %w", err)
 	}
-	if settings.SchemaVersion != SettingsSchemaVersion {
-		return Settings{}, fmt.Errorf("unsupported settings schema version %d", settings.SchemaVersion)
+	if err := stateversion.Check("settings", settings.SchemaVersion, SettingsSchemaVersion); err != nil {
+		return Settings{}, err
 	}
 	if settings.RuntimeDesiredState == "" {
 		settings.RuntimeDesiredState = dto.DesiredStopped
@@ -103,8 +104,8 @@ func SaveSettings(path string, settings Settings) error {
 	if settings.SchemaVersion == 0 {
 		settings.SchemaVersion = SettingsSchemaVersion
 	}
-	if settings.SchemaVersion != SettingsSchemaVersion {
-		return fmt.Errorf("unsupported settings schema version %d", settings.SchemaVersion)
+	if err := stateversion.Check("settings", settings.SchemaVersion, SettingsSchemaVersion); err != nil {
+		return err
 	}
 	if settings.RuntimeDesiredState != dto.DesiredStopped && settings.RuntimeDesiredState != dto.DesiredRunning {
 		return fmt.Errorf("unsupported runtime desired state %q", settings.RuntimeDesiredState)

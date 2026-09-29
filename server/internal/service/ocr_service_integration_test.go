@@ -28,8 +28,6 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	writer := bleveocr.NewWriter(database.SQL, database.Writer, database.Queries, index)
 	notifier := &recordingOCRIndexNotifier{}
 	ocrService := NewOCRServiceWithNotifier(database.Queries, database.SQL, database.Writer, notifier)
-	assetService, err := NewAssetServiceWithNotifier(database.Queries, database.SQL, nil, nil, index, notifier)
-	require.NoError(t, err)
 
 	require.NoError(t, ocrService.SaveOCRResults(ctx, assetID, ocrFixture("Running invoice 2025", 0.95), 12))
 	require.Equal(t, int32(1), notifier.Count())
@@ -54,21 +52,21 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	require.Len(t, items, 1)
 	require.Equal(t, "Updated bicycle X-T5", items[0].TextContent)
 
-	require.NoError(t, assetService.DeleteAsset(ctx, assetID))
-	require.Equal(t, int32(3), notifier.Count())
+	// A lifecycle change re-publishes the OCR document from the catalog
+	// trigger, whichever path moved the Asset's files.
+	require.NoError(t, testutil.SetAssetEntriesState(ctx, database.SQL, assetID, "trashed"))
 	require.Equal(t, int64(3), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Empty(t, serviceSearchIDs(t, index, "bicycle", false))
 	require.Equal(t, []string{assetID.String()}, serviceSearchIDs(t, index, "bicycle", true))
 
-	require.NoError(t, assetService.RestoreAsset(ctx, assetID))
-	require.Equal(t, int32(4), notifier.Count())
+	require.NoError(t, testutil.SetAssetEntriesState(ctx, database.SQL, assetID, "present"))
 	require.Equal(t, int64(4), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Equal(t, []string{assetID.String()}, serviceSearchIDs(t, index, "bicycle", false))
 
 	require.NoError(t, ocrService.DeleteOCRResults(ctx, assetID))
-	require.Equal(t, int32(5), notifier.Count())
+	require.Equal(t, int32(3), notifier.Count())
 	require.Equal(t, int64(5), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Empty(t, serviceSearchIDs(t, index, "bicycle", false))
@@ -99,20 +97,20 @@ func openOCRServiceTestDatabase(t *testing.T) (*db.DB, uuid.UUID) {
 	require.NoError(t, database.Migrate(context.Background()))
 	t.Cleanup(func() { require.NoError(t, database.Close(context.Background())) })
 
-	rootID := uuid.New()
+	storageLocationID := uuid.New()
 	repositoryID := uuid.New()
 	assetID := uuid.New()
 	_, err = database.SQL.Exec(`
 INSERT INTO users (
     user_id, username, password, created_at, updated_at, webauthn_user_handle
 ) VALUES (1, 'ocr-owner', 'hash', 1, 1, x'01');
-INSERT INTO repository_roots (
-    root_id, name, path, kind, created_at, updated_at
+INSERT INTO storage_locations (
+    storage_location_id, name, path, kind, created_at, updated_at
 ) VALUES (?, 'root', '/media', 'default', 1, 1);
 INSERT INTO repositories (
-    repo_id, name, path, created_at, updated_at, default_owner_id, root_id
+    repo_id, name, path, created_at, updated_at, default_owner_id, storage_location_id
 ) VALUES (?, 'repo', '/media/repo', 1, 1, 1, ?);
-`, rootID, repositoryID, rootID)
+`, storageLocationID, repositoryID, storageLocationID)
 	require.NoError(t, err)
 	_, err = testutil.InsertAssetOccurrence(context.Background(), database.SQL, testutil.AssetOccurrenceParams{
 		AssetID: assetID, RepositoryID: repositoryID, OwnerID: 1,
@@ -158,10 +156,14 @@ func serviceOutboxCount(t *testing.T, database *db.DB) int {
 	return count
 }
 
-func serviceSearchIDs(t *testing.T, index *bleveocr.Index, text string, deleted bool) []string {
+func serviceSearchIDs(t *testing.T, index *bleveocr.Index, text string, trashed bool) []string {
 	t.Helper()
+	state := "active"
+	if trashed {
+		state = "trashed"
+	}
 	page, err := index.SearchPage(context.Background(), text, bleveocr.BasicFilters{
-		IsDeleted: deleted,
+		LifecycleState: state,
 	}, bleveocr.QueryStrict, 0, 10)
 	require.NoError(t, err)
 	ids := make([]string, 0, len(page.Hits))

@@ -4,7 +4,14 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { parseLock, selectProfile, validateMaterializedAssets } from "./assets-sync.ts";
+import {
+  cacheDirectoryName,
+  parseArguments,
+  parseLock,
+  selectAssets,
+  selectProfile,
+  validateMaterializedAssets,
+} from "./assets-sync.ts";
 
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -75,4 +82,33 @@ await test("validateMaterializedAssets detects altered bytes", async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+await test("parseArguments collects an explicit asset selection", () => {
+  assert.deepEqual(parseArguments(["--", "--profile", "e2e"], "smoke"), { profile: "e2e" });
+  assert.deepEqual(
+    parseArguments(["--profile=demo", "--asset", "image-a", "--asset=image-b"], "smoke"),
+    { profile: "demo", assetIds: ["image-a", "image-b"] },
+  );
+  assert.throws(() => parseArguments(["--asset"], "smoke"), /--asset requires a value/);
+  assert.throws(() => parseArguments(["--asset", "../escape"], "smoke"), /asset ID is invalid/);
+});
+
+await test("selectAssets narrows a profile to requested members only", () => {
+  const asset = (id: string) => ({
+    id,
+    path: `media/${id}.jpg`,
+    sha256: digest(id),
+    bytes: id.length,
+  });
+  const profile = [asset("image-a"), asset("image-b"), asset("image-c")];
+  assert.deepEqual(selectAssets(profile, ["image-c", "image-a"], "demo"), [
+    asset("image-c"),
+    asset("image-a"),
+  ]);
+  assert.throws(() => selectAssets(profile, ["image-z"], "demo"), /not in the demo profile/);
+  assert.throws(() => selectAssets(profile, ["image-a", "image-a"], "demo"), /duplicate/);
+  // A selection never occupies the full profile's cache directory.
+  assert.equal(cacheDirectoryName("demo"), "demo");
+  assert.equal(cacheDirectoryName("demo", ["image-a"]), "demo+selection");
 });

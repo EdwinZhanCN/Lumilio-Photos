@@ -91,6 +91,10 @@ authoritative verification sweep over every active Repository.
 or repository concurrency/batch knob because bounded ROE turns and global
 resource admission own those limits.
 
+`[repository_trash].retention_days` is how long a deleted file stays in its
+Repository's `.lumilio/trash` before an hourly pass deletes it permanently.
+It is required with no code default; generated configs write 30.
+
 Reverse-geocoding provider, endpoint, response language, and User-Agent are
 runtime-mutable administrator settings owned by the singleton SQLite `settings`
 row. They are read and updated through the system-settings API; they are not
@@ -135,6 +139,7 @@ the Settings WebView never calls the Server HTTP API.
 - `internal/event`: owner-scoped Event candidates, deterministic `events-v1`
   segmentation/reconciliation, correction transactions, resolution, and direct
   typed relations. Event membership atoms are always `media_item` rows.
+  `MarkEventFactsChangedTx` is the single factual invalidation boundary.
 - `internal/utils`: media, hashing, raw, exif, upload, imaging, and support utilities.
 
 ## Asset Metadata Projection
@@ -150,12 +155,18 @@ Metadata retries replace `specific_metadata` using the current type schema.
 They preserve an existing `description` key and never overwrite rating or
 embedded keyword relationships after the first successful raw extraction.
 
+Metadata subprocess success is the conjunction of valid output, process exit,
+and I/O provenance. An expected stdin EPIPE must not mask valid output.
+Genuine source read failures, invalid output, nonzero exit, and cancellation
+remain failures. Every started process is waited. The contract is
+[the processing-convergence decision](../.agents/decisions/2026-09-18-processing-convergence.md).
+
 ## Storage Model
 
 `storage.path` is the non-removable default Storage Location. Startup creates
-or validates its portable `.lumilioroot` marker and associates legacy child
-repositories, but does not create a repository. During authenticated first-run
-setup, the primary repository defaults to:
+or validates its portable `.lumilioroot` marker but does not create a repository.
+During authenticated first-run setup, the primary repository is created through
+`POST /api/v1/setup/primary-repository` and defaults to:
 
 ```text
 <storage.path>/primary
@@ -167,11 +178,34 @@ catalog is open, an admin exists, and exactly one active primary
 repository exists. Repository config lives in `.lumiliorepo` files and is handled
 by `internal/storage/repocfg`.
 
-Additional Storage Locations are rows in `repository_roots`, keyed by the UUID
-stored in `.lumilioroot`. The Web API accepts `root_id` for repository creation
-and never an arbitrary host path. External root grants, existing repository
-attachment, and explicit moved-vs-copied conflict resolution are Desktop-only
-operations performed through the native picker and in-process control plane.
+Additional Storage Locations are rows in `storage_locations`, keyed by the UUID
+stored in `.lumilioroot`. Storage Location summaries are catalog projections;
+they do not authorize or deny child Repository I/O. Operation admission is
+evaluated per Repository (`UploadAdmission` for upload and cloud
+materialization; lifecycle leases and identity checks for verify, rename,
+reconnect, and detach).
+
+The HTTP surface splits ordinary selectors from administration. Any
+authenticated user may call `GET /api/v1/storage/targets` for Repository
+identity, role, and closed read/upload eligibility codes without host paths,
+Storage Location metadata, capacity, or verification detail. Every other
+`/api/v1/storage/*` route requires an administrator, including
+`GET /api/v1/storage/view`, repository and Location lifecycle commands under
+`/api/v1/storage/repositories` and `/api/v1/storage/locations`, verification
+under `/api/v1/storage/repositories/{id}/verifications`, candidates and native
+authorization under `/api/v1/storage/candidates` and
+`/api/v1/storage/native-tasks`, and diagnostics at `/api/v1/storage/diagnostics`,
+`/api/v1/storage/support-bundle`, and `/api/v1/storage/audit`. Unregistration
+uses explicit `POST .../detach-impact` and `POST .../detach` commands; no
+storage endpoint deletes user media. Cloud account binding, import runs, and
+Repository cloud status remain on `/api/v1/repositories/{id}/cloud*`; stack
+detection remains on `POST /api/v1/repositories/{id}/stacks/detect`. Admin
+repository creation accepts a registered Storage Location `storage_location_id` and never
+an arbitrary host path. Desktop owns native directory grants and approval
+nonces for `/storage/native-tasks`. Standalone and Docker open existing
+Repositories through `/storage/candidates` by portable directory name, not a
+host path. Moved-versus-copied conflicts require an explicit Web resolution
+after that grant.
 
 The SQLite catalog, `storage.cloud_state_path`, `storage.backups_path`, auth
 secrets, and logs are machine-bound app state and must be outside
@@ -207,7 +241,11 @@ authoritatively covered child sets. Cursor gaps, watcher overflow, volume
 replacement, offline repositories, cancellation, and access errors fail closed:
 positive observations may publish, but unproven absence never closes a valid
 Location. Native USN/ReadDirectoryChangesW, FSEvents, and inotify adapters are
-hints backed by periodic authoritative verification.
+hints backed by periodic authoritative verification. Periodic full-verification
+timer requests coalesce onto an active run. `full_verification_requested_epoch`
+is distinct from the sticky requirement; `full_verification_performed` records
+completion so the next interval starts after the scan finishes. A newer
+explicit force request or cursor gap is not lost.
 
 Independent ROE directory frontiers are enumerated in bounded deterministic
 batches. Catalog desired/applied rows are authoritative for asset, repository,
@@ -259,11 +297,12 @@ without holding a filesystem operation inside a database transaction.
   turns with revision/CAS protection instead of monopolizing the writer.
 - Foreground GET/status paths never reconcile or persist cached projections.
   Before bootstrap reaches its terminal cached value, `Phase` derives the live
-  admin/primary gates through query-only readers. Repository and Storage
-  Location lists plus setup runtime status consume the latest catalog
-  projection; boot and the one-minute storage reconciler own filesystem probes
-  and projection writes. Host Action expiry is materialized during reads and
-  durably swept only at an explicit recovery boundary.
+  admin/primary gates through query-only readers. Storage targets, the admin
+  storage view, and setup runtime status consume the latest catalog projection;
+  boot and the periodic storage reconciler refresh Location and Repository
+  reachability without gating child I/O. Native storage-task expiry is
+  materialized during reads and durably swept only at an explicit recovery
+  boundary.
 - Application tables and River queues use separate files. Foreground commands
   and asynchronous result commits update desired/applied state in one short
   catalog transaction; a bounded Catalog scheduler derives only the closed
@@ -273,6 +312,9 @@ without holding a filesystem operation inside a database transaction.
   reading River state to infer product work. Discarded delivery rows do not
   retain uniqueness, so a still-runnable Catalog generation starts a fresh
   bounded delivery cycle.
+  `asset_pipeline_failures` is Catalog product state, fenced by
+  `source_content_id`, `pipeline_version`, and `desired_version`. River
+  delivery attempts never determine retry or terminal outcomes.
 - WAL auto-checkpointing is disabled on every connection so an arbitrary
   foreground commit is not charged an automatic checkpoint. Runtime monitoring
   samples writer pool wait count/duration and WAL size; once the WAL exceeds
@@ -285,18 +327,24 @@ without holding a filesystem operation inside a database transaction.
   host-side sampling; there is deliberately no private-data HTTP debug API.
   Slow named transactions remain logged against the write-transaction budget.
   Online Backup reads use a reader connection, never the writer semaphore.
-- Migration `000004_media_semantic_events` adds stable Events, membership,
-  correction constraints, one-hop redirects, factual dirty ranges, and
-  per-owner rebuild state. Migration `000006_event_convergence` adds the
-  owner-wide source/published revision pair, renewable rebuild leases, persisted
-  rebuild runs, and the terminal `retired` state. Event and other derived
-  projections are delivered through the closed `rebuild_projection_batch`
-  macro; River is not the lifecycle authority.
+- The catalog baseline includes stable Events, membership, correction
+  constraints, one-hop redirects, factual dirty ranges, per-owner rebuild state,
+  owner-wide source/published revision pairs, rebuild leases, persisted rebuild
+  runs, and the terminal `retired` state. Event and other derived projections
+  are delivered through the closed `rebuild_projection_batch` macro; River is
+  not the lifecycle authority. `source_revision > published_revision`
+  is pending rebuild work. `event_dirty_ranges` is a recovery ledger, not an
+  incremental computation window. `POST /api/v1/events/rebuild` enqueues work
+  and returns `202 Accepted`. Publish replaces the complete owner membership
+  set in delete-before-insert order inside one revision-checked transaction.
+  Manual corrections are exact logical-media assignments; `command → rebuild →
+  rebuild` is a fixed point.
 - Event reads, browse filters, shares, relations, and Agent refs resolve through
   the same owner-aware Event resolver. Repository filtering is a read-only
   Browse Scope projection over canonical logical-media membership. Event shares
   and Agent refs materialize immutable displayable-asset snapshots; automatic
-  membership uses no ML/AI signal.
+  membership uses no ML/AI signal. The topology contract is
+  [the Event owner-topology decision](../.agents/decisions/2026-08-10-event-owner-topology.md).
 - A running catalog must never be opened or copied through a host/container
   mount with another SQLite process. Host and container VFS locking is not a
   supported coordination boundary; use the application Online Backup flow, or
@@ -312,9 +360,33 @@ without holding a filesystem operation inside a database transaction.
   rebuilt through `rebuild_projection_batch`. Missing, corrupt,
   mapping-mismatched, and post-restore indexes are deleted and rebuilt before
   HTTP starts.
-- Migrations live in `server/migrations`. The application migration ledger
-  records SHA-256 for every applied SQL file; version, name, and checksum must
-  continue to match embedded history, so historical migrations are immutable.
+- The catalog schema is one standalone baseline in `server/migrations`
+  (`000001_storage_baseline.up.sql`), schema version 1: the `v26.1.0-rc.1`
+  compatibility baseline. `PRAGMA application_id` "LUMC" is the catalog's
+  identity and is checked before any version; a pre-release catalog ("LUMI")
+  is rejected as pre-release whatever `user_version` it carries.
+  `PRAGMA user_version` is the only version discriminator; a newer version is
+  rejected as written by a newer build. There is no checksum ledger. The
+  baseline is edited in place only until the rc.1 tag; after it, schema
+  changes are numbered forward steps in `server/migrations/steps/`
+  (contributor rules in its `README.md`) and shipped files are never edited
+  ([the rc.1 compatibility decision](../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)).
+- `MigrateCatalog` runs the baseline and then every step on an empty catalog.
+  On an older catalog it first takes a protected `pre-upgrade-` snapshot
+  through the backup subsystem (retention never prunes it), then applies each
+  step in one transaction with its `user_version` stamp. A failed step rolls
+  back its own transaction, leaves the catalog at the last completed version,
+  and stops startup naming the step and the snapshot. Restore accepts a
+  snapshot at an older supported schema or config version and installs it
+  unchanged; the next start upgrades it through the same path. A newer
+  snapshot is rejected.
+- The server TOML `schema_version` starts at 1. The server never rewrites
+  it: an older supported version fails startup pointing at
+  `server config upgrade --config <file>`, which applies the config steps,
+  requires the result to pass the strict load, saves the original as
+  `<file>.bak`, and writes a freshly rendered, fully commented manifest. The
+  backup manifest format also starts at 1. QueueDB River migrations remain
+  independent and disposable.
 - The current schema deliberately has no catalog-to-QueueDB cutover journal or
   task-state compatibility layer. A fresh QueueDB is disposable: startup and
   periodic reconciliation rebuild its macro jobs from catalog desired/applied
@@ -356,7 +428,7 @@ indirection without strengthening the closed writer contract.
 Failures after request acceptance use the generated transport-neutral Problem
 Reference union: `type`, opaque `instance`, optional retryability, and the same
 bounded subtype facts, but no HTTP `status`. Agent/upload streams and durable
-scan, restore, cloud, and native-host operation DTOs preserve these references
+scan, restore, cloud, and native storage-task operation DTOs preserve these references
 across polling and restart. Operator-only queue samples and support diagnostics
 remain separate and may retain sanitized technical detail; ordinary UI copy
 never comes from them.
@@ -442,8 +514,9 @@ Accepted uploads expose their user-scoped ingest lifecycle at
 `GET /api/v1/assets/batch/operations?receipt_ids=…`. Frontend upload completion
 means the catalog-owned receipt reached a terminal state, not merely that
 multipart transport returned 2xx. The receipt survives QueueDB replacement and
-never exposes River identity. Repository scans expose run lifecycle through the existing
-`/api/v1/repositories/{id}/scans/latest` endpoint. E2E seeding and readiness:
+never exposes River identity. Repository verification exposes run lifecycle
+through admin `/api/v1/storage/repositories/{id}/verifications` (including
+`latest`, history, detail, and cancel). E2E seeding and readiness:
 [lumilio-e2e-environment](../.agents/skills/lumilio-e2e-environment/SKILL.md).
 
 Materialization owns staging files. A commit error is always returned to River

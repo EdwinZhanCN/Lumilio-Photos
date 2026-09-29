@@ -163,10 +163,16 @@ var (
 
 	// Artist priority fields
 	artistFields = []string{
-		"Artist",      // Standard artist field
-		"AlbumArtist", // Album artist
-		"Performer",   // Performer
-		"Author",      // Author
+		"Artist",    // Standard track artist field
+		"Performer", // Performer
+		"Author",    // Author
+	}
+
+	// AlbumArtist is intentionally separate from the track artist. A release
+	// artist must never overwrite the credit shown for an individual track.
+	albumArtistFields = []string{
+		"AlbumArtist",
+		"AlbumArtistSort",
 	}
 
 	// Album priority fields
@@ -326,6 +332,14 @@ func parseCommonMetadata(rawData map[string]string, rawJSON json.RawMessage, ass
 			{TimeField: "CreateDate", OffsetFields: []string{"OffsetTimeDigitized", "OffsetTime", "TimeZoneOffset"}},
 			{TimeField: "MediaCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
 			{TimeField: "TrackCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
+		}, recordedTimeFields)
+	case dbtypes.AssetTypeAudio:
+		common.TakenTime, common.CaptureOffsetMinutes = parseCaptureTimestamp(rawData, []captureTimePair{
+			{TimeField: "CreationDate", OffsetFields: []string{"TimeZone", "TimeZoneOffset", "OffsetTime"}},
+			{TimeField: "CreateDate", OffsetFields: []string{"TimeZone", "TimeZoneOffset", "OffsetTime"}},
+			{TimeField: "DateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+			{TimeField: "MediaCreateDate", OffsetFields: []string{"TimeZone", "TimeZoneOffset", "OffsetTime"}},
+			{TimeField: "TrackCreateDate", OffsetFields: []string{"TimeZone", "TimeZoneOffset", "OffsetTime"}},
 		}, recordedTimeFields)
 	}
 
@@ -611,6 +625,10 @@ func extractContentIdentifier(rawData map[string]string) string {
 
 // parseAudioMetadata parses raw EXIF data into AudioSpecificMetadata
 func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadata {
+	return parseAudioMetadataWithRaw(rawData, nil)
+}
+
+func parseAudioMetadataWithRaw(rawData map[string]string, rawJSON json.RawMessage) *dbtypes.AudioSpecificMetadata {
 	metadata := &dbtypes.AudioSpecificMetadata{}
 
 	// Parse Codec using priority-based field list
@@ -668,6 +686,37 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 			}
 		}
 	}
+	metadata.Artists = orderedMetadataValues(rawJSON, "Artist", "Performer", "Author")
+	if len(metadata.Artists) == 0 && metadata.Artist != "" {
+		metadata.Artists = []string{metadata.Artist}
+	}
+	for _, field := range albumArtistFields {
+		if artist, exists := rawData[field]; exists {
+			normalized := normalizeString(artist)
+			if normalized != "" {
+				metadata.AlbumArtist = normalized
+				break
+			}
+		}
+	}
+	metadata.AlbumArtists = orderedMetadataValues(rawJSON, "AlbumArtist", "AlbumArtistSort")
+	if len(metadata.AlbumArtists) == 0 && metadata.AlbumArtist != "" {
+		metadata.AlbumArtists = []string{metadata.AlbumArtist}
+	}
+	metadata.ArtistIDs = orderedMetadataValues(rawJSON, "ArtistID", "MusicBrainzArtistID")
+	metadata.AlbumArtistIDs = orderedMetadataValues(rawJSON, "AlbumArtistID", "MusicBrainzAlbumArtistID")
+	metadata.ReleaseID = firstNormalizedString(rawData, []string{"MusicBrainzReleaseID", "AlbumID"})
+	metadata.ReleaseDate = firstNormalizedString(rawData, []string{"OriginalReleaseDate", "ReleaseDate", "Date", "RecordingDate"})
+	metadata.ReleasePrecision = releaseDatePrecision(metadata.ReleaseDate)
+	metadata.Edition = firstNormalizedString(rawData, []string{"Edition"})
+	metadata.DiscNumber = parseOptionalPositiveInt(rawData, []string{"DiscNumber", "Disc"})
+	metadata.DiscTotal = parseOptionalPositiveInt(rawData, []string{"DiscTotal", "DiscCount"})
+	metadata.TrackNumber = parseOptionalTrackNumber(rawData, []string{"TrackNumber", "Track"})
+	metadata.TrackTotal = parseOptionalPositiveInt(rawData, []string{"TrackTotal", "TrackCount"})
+	if compilation := firstNormalizedString(rawData, []string{"Compilation"}); compilation != "" {
+		value := strings.EqualFold(compilation, "1") || strings.EqualFold(compilation, "true") || strings.EqualFold(compilation, "yes")
+		metadata.Compilation = &value
+	}
 
 	// Parse Album using priority-based field list
 	for _, field := range albumFields {
@@ -724,6 +773,80 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 	}
 
 	return metadata
+}
+
+func orderedMetadataValues(rawJSON json.RawMessage, fields ...string) []string {
+	if len(rawJSON) == 0 {
+		return nil
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(rawJSON, &raw); err != nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	values := make([]string, 0)
+	for _, field := range fields {
+		for _, value := range metadataStringValues(raw[field]) {
+			value = normalizeString(value)
+			if value == "" {
+				continue
+			}
+			key := strings.ToLower(value)
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			values = append(values, value)
+		}
+	}
+	return values
+}
+
+func parseOptionalPositiveInt(rawData map[string]string, fields []string) *int {
+	for _, field := range fields {
+		value := strings.TrimSpace(rawData[field])
+		if value == "" {
+			continue
+		}
+		parts := strings.FieldsFunc(value, func(r rune) bool { return r == '/' || r == ' ' })
+		if len(parts) == 0 {
+			continue
+		}
+		if parsed, err := strconv.Atoi(parts[0]); err == nil && parsed > 0 {
+			return &parsed
+		}
+	}
+	return nil
+}
+
+func parseOptionalTrackNumber(rawData map[string]string, fields []string) *int {
+	for _, field := range fields {
+		value := strings.TrimSpace(rawData[field])
+		if value == "" {
+			continue
+		}
+		if number, _, ok := strings.Cut(value, "/"); ok {
+			value = number
+		}
+		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed > 0 {
+			return &parsed
+		}
+	}
+	return nil
+}
+
+func releaseDatePrecision(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) == 4 {
+		return "year"
+	}
+	if len(value) == 7 {
+		return "month"
+	}
+	if len(value) >= 10 {
+		return "day"
+	}
+	return "unknown"
 }
 
 type captureTimePair struct {

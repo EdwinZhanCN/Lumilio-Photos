@@ -286,7 +286,8 @@ SELECT mi.media_item_id,
        CASE WHEN capture.taken_time IS NOT NULL THEN capture.capture_offset_minutes END,
        COALESCE(primary_asset.gps_latitude, component.gps_latitude),
        COALESCE(primary_asset.gps_longitude, component.gps_longitude),
-       asm.stack_id
+       asm.stack_id,
+       mi.media_kind
 FROM media_items mi
 LEFT JOIN assets primary_asset ON primary_asset.asset_id = mi.primary_asset_id
 LEFT JOIN asset_stack_members asm ON asm.media_item_id = mi.media_item_id
@@ -312,15 +313,15 @@ WHERE mi.owner_id=? ORDER BY 2, mi.media_item_id`
 	defer rows.Close()
 	var result []Candidate
 	for rows.Next() {
-		var id, source string
+		var id, source, kind string
 		var micros int64
 		var offset sql.NullInt64
 		var lat, lon sql.NullFloat64
 		var stack sql.NullString
-		if err := rows.Scan(&id, &micros, &source, &offset, &lat, &lon, &stack); err != nil {
+		if err := rows.Scan(&id, &micros, &source, &offset, &lat, &lon, &stack, &kind); err != nil {
 			return nil, err
 		}
-		item := Candidate{MediaItemID: id, CapturedAt: time.UnixMicro(micros).UTC(), TimeSource: source}
+		item := Candidate{MediaItemID: id, CapturedAt: time.UnixMicro(micros).UTC(), TimeSource: source, MediaKind: kind}
 		if offset.Valid {
 			sign := "+"
 			value := offset.Int64
@@ -515,7 +516,9 @@ func (s *Service) publishTx(ctx context.Context, tx *sql.Tx, ownerID int32, segm
 		eventRows = append(eventRows, eventRow)
 
 		coverRow := eventCoverRow{EventID: assignment.EventID}
-		if len(segment.MediaItemIDs) > 0 {
+		if segment.CoverCandidateID != "" {
+			coverRow.GeneratedCover = optionalString(segment.CoverCandidateID)
+		} else if len(segment.MediaItemIDs) > 0 {
 			coverRow.GeneratedCover = optionalString(segment.MediaItemIDs[0])
 		}
 		if retained && previous.CoverOverrideID != "" && contains(segment.MediaItemIDs, previous.CoverOverrideID) {
@@ -1087,21 +1090,34 @@ INSERT OR IGNORE INTO event_constraints(
 
 func repairEventTx(ctx context.Context, tx *sql.Tx, ownerID int32, eventID string, now int64) error {
 	var start, end int64
-	var cover string
+	var cover sql.NullString
 	err := tx.QueryRowContext(ctx, `
 SELECT min(COALESCE(a.taken_time,a.upload_time,mi.created_at)),
        max(COALESCE(a.taken_time,a.upload_time,mi.created_at)),
-       (SELECT media_item_id FROM event_media_items WHERE event_id=? AND owner_id=? ORDER BY position,media_item_id LIMIT 1)
+       COALESCE(
+         (SELECT emi_cover.media_item_id
+          FROM event_media_items emi_cover
+          JOIN media_items mi_cover ON mi_cover.media_item_id=emi_cover.media_item_id AND mi_cover.owner_id=emi_cover.owner_id
+          WHERE emi_cover.event_id=? AND emi_cover.owner_id=?
+            AND mi_cover.media_kind IN ('photo','video','live_photo')
+          ORDER BY emi_cover.position,emi_cover.media_item_id
+          LIMIT 1),
+         (SELECT media_item_id FROM event_media_items WHERE event_id=? AND owner_id=? ORDER BY position,media_item_id LIMIT 1)
+       )
 FROM event_media_items emi
 JOIN media_items mi ON mi.media_item_id=emi.media_item_id
 LEFT JOIN assets a ON a.asset_id=mi.primary_asset_id
-WHERE emi.event_id=? AND emi.owner_id=?`, eventID, ownerID, eventID, ownerID).Scan(&start, &end, &cover)
+WHERE emi.event_id=? AND emi.owner_id=?`, eventID, ownerID, eventID, ownerID, eventID, ownerID).Scan(&start, &end, &cover)
 	if err != nil {
 		return err
 	}
+	var coverVal *string
+	if cover.Valid {
+		coverVal = &cover.String
+	}
 	_, err = tx.ExecContext(ctx, `
 UPDATE events SET start_at=?,end_at=?,generated_cover_media_item_id=?,updated_at=?
-WHERE event_id=? AND owner_id=?`, start, end, cover, now, eventID, ownerID)
+WHERE event_id=? AND owner_id=?`, start, end, coverVal, now, eventID, ownerID)
 	return err
 }
 

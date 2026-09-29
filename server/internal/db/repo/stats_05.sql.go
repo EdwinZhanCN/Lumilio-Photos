@@ -14,7 +14,7 @@ SELECT DISTINCT
     CAST(strftime('%Y', COALESCE(a.taken_time, a.upload_time) / 1000000, 'unixepoch') AS INTEGER) AS year
 FROM assets a
 WHERE
-    a.is_deleted = false
+    a.lifecycle_state = 'active'
     AND (?1 IS NULL OR EXISTS (
       SELECT 1 FROM active_asset_occurrences occurrence
       WHERE occurrence.asset_id = a.asset_id

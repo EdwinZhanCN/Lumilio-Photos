@@ -14,14 +14,15 @@ still exercises discovery, gRPC streaming, image preprocessing, queues,
 SQLite vector storage, retrieval, and best-frame selection; only model
 inference is faked.
 
-Default mode is **replay**. Lookups are `(task, sha256(payload))`. Without a
-recorded capability set the fixture advertises the builtin deterministic
-SigLIP capability and answers every semantic request with one constant
-768-dimensional vector — that is the legacy behavior, and it is still what
-CI runs until real fixtures are committed. Misses fall back to that builtin
-response and increment `fixture_misses` on `GET :16658/metrics`. `-strict`
-turns a miss into an error; do not enable it in CI until the recorded set
-covers the slices that run.
+Default mode is **replay**. Lookups are `(task, sha256(payload))`.
+Capabilities are per service: a service with recorded fixtures advertises its
+recorded upstream capability, every other service keeps the builtin
+deterministic SigLIP/BioCLIP/OCR/Face capability. Misses fall back to builtin
+responses (one constant 768-dimensional vector for semantic requests, empty
+face/BioCLIP results, two fixed OCR lines) and increment `fixture_misses` on
+`GET :16658/metrics`. Only face recognition for the `@people` portraits is
+recorded today. `-strict` turns a miss into an error; do not enable it in CI
+until the recorded set covers the slices that run.
 
 Recording is explicit and never implicit in CI. Every fixture diff is
 reviewed.
@@ -45,10 +46,21 @@ container and runs fakelumen with `-record -upstream … -fixtures /record-out`.
 The recording container runs as root so it can write the bind mount; `chown`
 the resulting files if your umask leaves them root-owned.
 
+With a remote daemon (`DOCKER_HOST=ssh://…`) that relative bind mount
+resolves on the **remote** filesystem. Build locally
+(`--platform linux/amd64` from Apple Silicon), `docker save | ssh … docker
+load`, and start with `up --no-build` plus an untracked overlay that points
+`/record-out` at a remote directory seeded with the current fixture tree;
+copy the recorded tree back afterwards. Record only the capability the
+change needs: disable other ML settings for the recording run so they do
+not produce fixtures.
+
+
 What to review in the diff:
 
 - `fixtures/manifest.json` — `recordedFrom`, `recordedAt`, and the protojson
-  capability set. Replay will advertise exactly this set.
+  capability of each service that has a recorded fixture. Replay advertises
+  these in place of the builtin capability of the same service.
 - `fixtures/records/<task>/<sha256>.json` — payload hash, mime, optional
   inline text (small `text/*` only), and `resultJson`. Binary image/tensor
   payloads stay hash-only on purpose; do not paste them in.
@@ -85,5 +97,5 @@ task compose:test          # includes compose.record.yml
 ```
 
 Then run the E2E slice whose fixtures changed. A fixture-only change still
-needs `web:test:browser` or `web:test:video-semantic` according to which
-records moved.
+needs `web:test:browser`, `web:test:video-semantic`, or `web:test:people`
+according to which records moved.

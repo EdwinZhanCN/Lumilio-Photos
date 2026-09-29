@@ -38,8 +38,8 @@ func acquireRepositoryPathLock(ctx context.Context, repositoryPath string, exclu
 	return acquirePathLock(ctx, filepath.Join(repositoryPath, ".lumiliorepo.lock"), exclusive)
 }
 
-func acquireRootPathLock(ctx context.Context, rootPath string, exclusive bool) (func(), error) {
-	return acquirePathLock(ctx, filepath.Join(rootPath, ".lumilioroot.lock"), exclusive)
+func acquireStorageLocationPathLock(ctx context.Context, storageLocationPath string, exclusive bool) (func(), error) {
+	return acquirePathLock(ctx, filepath.Join(storageLocationPath, ".lumilioroot.lock"), exclusive)
 }
 
 func acquireRepositoryPathLocks(ctx context.Context, paths []string, exclusive bool) (func(), error) {
@@ -50,7 +50,7 @@ func acquireRepositoryPathLocks(ctx context.Context, paths []string, exclusive b
 	return acquirePathLocks(ctx, lockPaths, exclusive)
 }
 
-func acquireRootPathLocks(ctx context.Context, paths []string, exclusive bool) (func(), error) {
+func acquireStorageLocationPathLocks(ctx context.Context, paths []string, exclusive bool) (func(), error) {
 	lockPaths := make([]string, 0, len(paths))
 	for _, path := range paths {
 		lockPaths = append(lockPaths, filepath.Join(path, ".lumilioroot.lock"))
@@ -87,7 +87,7 @@ func acquirePathLock(ctx context.Context, lockPath string, exclusive bool) (func
 		return nil, fmt.Errorf("%w: context is required", ErrRepositoryLockUnavailable)
 	}
 	parent := filepath.Dir(lockPath)
-	info := InspectStoragePath(parent)
+	info := InspectStoragePathReadOnly(parent)
 	if networkFilesystem(info.Filesystem) {
 		return nil, fmt.Errorf("%w: %s", ErrRepositoryLockUnsupported, info.Filesystem)
 	}
@@ -158,18 +158,7 @@ func InspectRepositoryLock(path, targetType string) (RepositoryLockInfo, error) 
 	}
 	var metadata repositoryLockMetadata
 	if err := json.Unmarshal(data, &metadata); err != nil {
-		// Lock files written before metadata was moved away from the locked
-		// byte remain readable after an upgrade.
-		if _, seekErr := file.Seek(0, 0); seekErr != nil {
-			return RepositoryLockInfo{}, seekErr
-		}
-		legacyData, readErr := io.ReadAll(file)
-		if readErr != nil {
-			return RepositoryLockInfo{}, readErr
-		}
-		if legacyErr := json.Unmarshal(legacyData, &metadata); legacyErr != nil {
-			return RepositoryLockInfo{}, fmt.Errorf("decode repository lock metadata: %w", err)
-		}
+		return RepositoryLockInfo{}, fmt.Errorf("decode repository lock metadata: %w", err)
 	}
 	return RepositoryLockInfo{Holder: metadata.Holder, AcquiredAt: metadata.AcquiredAt}, nil
 }

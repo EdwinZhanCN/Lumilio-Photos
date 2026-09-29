@@ -53,10 +53,23 @@ func (rm *DefaultRepositoryManager) reconcileRepository(ctx context.Context, cur
 	if current.Reachability == dbtypes.RepositoryReachabilityMaintenance {
 		return nil
 	}
+	// Re-read after acquiring the lifecycle lease: a relocation may have
+	// committed while this pass waited for an earlier media handle.
+	current, err := rm.readerQueries.GetRepository(ctx, current.RepoID)
+	if err != nil {
+		return err
+	}
+	if current.Reachability == dbtypes.RepositoryReachabilityMaintenance {
+		return nil
+	}
 
 	reachability, config := rm.inspectRepositoryOnDisk(current)
 
 	if reachability == dbtypes.RepositoryReachabilityActive && config != nil {
+		claimed, err := rm.tryClaimRuntimeRepository(ctx, current)
+		if err != nil || !claimed {
+			return err
+		}
 		if _, err := rm.refreshRepositoryConfigCache(ctx, current, config); err != nil {
 			return fmt.Errorf("refresh config cache: %w", err)
 		}

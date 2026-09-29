@@ -238,6 +238,9 @@ const AssetViewer = ({
         virtual
         navigation
         pagination={{ clickable: true }}
+        noSwiping={true}
+        noSwipingClass="swiper-no-swiping"
+        noSwipingSelector="button, input, textarea, select, option, .swiper-no-swiping, [data-media-player], media-player, .vds-video-layout, .vds-audio-layout, .vds-controls, .vds-slider, [data-media-slider]"
         onSlideChange={onSlideChange}
         initialSlide={slideIndex !== undefined ? slideIndex : initialSlide}
         className="fullscreen-swiper"

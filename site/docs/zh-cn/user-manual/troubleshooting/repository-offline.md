@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/storage/repository_roots.go
+- server/internal/storage/storage_locations.go
 - server/internal/storage/repo_relocate.go
 - server/app/repository_control.go
 - desktop/internal/runtime/repository.go

@@ -11,7 +11,7 @@ WITH filter_params AS (
 SELECT COUNT(*) AS count
 FROM media_item_browse_facts facts
 JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-WHERE pa.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
+WHERE pa.lifecycle_state = COALESCE(sqlc.narg('lifecycle_state'), 'active')
   AND (
     (SELECT asset_ids_json FROM filter_params) IS NULL
     OR EXISTS (
@@ -38,9 +38,15 @@ WHERE pa.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
   )
   AND (sqlc.narg('owner_id') IS NULL OR facts.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = sqlc.narg('repository_id')
+      AND occurrence.state = CASE COALESCE(sqlc.narg('lifecycle_state'), 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(sqlc.narg('lifecycle_state'), 'active')
+      END
   ))
   AND (
     sqlc.narg('folder_path') IS NULL
@@ -181,7 +187,7 @@ WHERE pa.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
 -- name: CountMediaItemFilesUnified :one
 -- Count of component files belonging to the media items matched by
 -- CountMediaItemsUnified (total_files). Components share the browse
--- is_deleted state so list/count predicates stay identical.
+-- lifecycle state so list/count predicates stay identical.
 WITH filter_params AS (
   SELECT
     CAST(sqlc.narg('asset_ids') AS TEXT) AS asset_ids_json,
@@ -193,7 +199,7 @@ matched_media AS (
   SELECT facts.media_item_id
   FROM media_item_browse_facts facts
   JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-  WHERE pa.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
+  WHERE pa.lifecycle_state = COALESCE(sqlc.narg('lifecycle_state'), 'active')
     AND (
       (SELECT asset_ids_json FROM filter_params) IS NULL
       OR EXISTS (
@@ -220,9 +226,15 @@ matched_media AS (
     )
     AND (sqlc.narg('owner_id') IS NULL OR facts.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = sqlc.narg('repository_id')
+      AND occurrence.state = CASE COALESCE(sqlc.narg('lifecycle_state'), 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(sqlc.narg('lifecycle_state'), 'active')
+      END
   ))
     AND (
       sqlc.narg('folder_path') IS NULL
@@ -364,4 +376,4 @@ SELECT COUNT(*) AS count
 FROM matched_media mm
 JOIN media_item_assets mia ON mia.media_item_id = mm.media_item_id
 JOIN assets component ON component.asset_id = mia.asset_id
-WHERE component.is_deleted = COALESCE(sqlc.narg('is_deleted'), false);
+WHERE component.lifecycle_state = COALESCE(sqlc.narg('lifecycle_state'), 'active');

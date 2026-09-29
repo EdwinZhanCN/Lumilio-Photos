@@ -18,8 +18,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
-	"server/internal/storage/rootcfg"
-	fileutil "server/internal/utils/file"
 	hashutil "server/internal/utils/hash"
 
 	"github.com/google/uuid"
@@ -75,49 +73,6 @@ type WalkIssue struct {
 	Err    error
 }
 
-type WalkOptions struct {
-	ScanID uuid.UUID
-	Settle time.Duration
-	Now    time.Time
-}
-
-type WalkSummary struct {
-	Observations  []FileObservation
-	DeferredPaths []RepositoryPath
-	Issues        []WalkIssue
-	Skipped       int64
-	Authoritative bool
-	PartialReason string
-}
-
-// DirectoryReadOptions identifies one bounded verifier page. Offset counts raw
-// directory entries, including markers and unsupported files, so a resumed
-// frontier never depends on the number of catalog-worthy observations.
-type DirectoryReadOptions struct {
-	Directory string
-	Offset    int64
-	Limit     int
-	ScanID    uuid.UUID
-	Settle    time.Duration
-	Now       time.Time
-}
-
-// DirectoryReadBatch is bounded by DirectoryReadOptions.Limit. Entries are
-// positive observations only; Authoritative states whether the completed
-// child set may later finalize absences.
-type DirectoryReadBatch struct {
-	Entries       []DirectoryReadEntry
-	Issues        []WalkIssue
-	NextOffset    int64
-	Done          bool
-	Authoritative bool
-}
-
-type DirectoryReadEntry struct {
-	Observation FileObservation
-	NextOffset  int64
-}
-
 type RepositoryFSFactory struct {
 	access  *RepositoryAccessCoordinator
 	queries *repo.Queries
@@ -137,34 +92,10 @@ func (f *RepositoryFSFactory) AccessCoordinator() *RepositoryAccessCoordinator {
 	return f.access
 }
 
-// ValidateRepositoryParent is the common pre-I/O identity gate. Repository
-// reachability never overrides its parent Storage Location: an offline,
-// maintenance, missing, or replaced root fails before any repository handle or
-// staging writer is opened.
-func (f *RepositoryFSFactory) ValidateRepositoryParent(ctx context.Context, repository repo.Repository) error {
-	if f == nil || f.queries == nil {
-		return nil
-	}
-	root, err := f.queries.GetRepositoryRoot(ctx, repository.RootID)
-	if err != nil {
-		return fmt.Errorf("%w: load parent Storage Location: %v", ErrRepositoryUnavailable, err)
-	}
-	if root.Status != dbtypes.RepositoryRootStatusActive {
-		return fmt.Errorf("%w: parent Storage Location status=%s", ErrRepositoryUnavailable, root.Status)
-	}
-	marker, err := rootcfg.Load(root.Path)
-	if err != nil || marker.ID != root.RootID.String() {
-		_, _ = f.queries.UpdateRepositoryRootFromDisk(ctx, repo.UpdateRepositoryRootFromDiskParams{
-			RootID: root.RootID, Name: root.Name, Status: dbtypes.RepositoryRootStatusError,
-			UpdatedAt: dbtypes.NewTimestamp(time.Now().UTC()),
-		})
-		return fmt.Errorf("%w: parent Storage Location identity changed", ErrRepositoryUnavailable)
-	}
-	return nil
-}
-
 // Open verifies catalog reachability and the portable repository marker before
-// returning any media capability.
+// returning any media capability. A Storage Location is an authorization scope,
+// not an I/O health gate: the opened repository's own path and marker decide
+// access, and parent registration state never participates.
 func (f *RepositoryFSFactory) Open(repository repo.Repository) (*RepositoryFS, error) {
 	return f.OpenContext(context.Background(), repository)
 }
@@ -197,15 +128,11 @@ func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.R
 			release()
 			return nil, fmt.Errorf("%w: reachability=%s", ErrRepositoryUnavailable, repository.Reachability)
 		}
-		if err := f.ValidateRepositoryParent(ctx, repository); err != nil {
-			release()
-			return nil, err
-		}
 	}
 	root, err := os.OpenRoot(repository.Path)
 	if err != nil {
 		release()
-		return nil, classifyRepositoryRootError(repository.Path, err)
+		return nil, classifyStorageLocationError(repository.Path, err)
 	}
 	fail := func(err error) (*RepositoryFS, error) {
 		_ = root.Close()
@@ -217,7 +144,7 @@ func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.R
 		if errors.Is(err, fs.ErrNotExist) {
 			return fail(fmt.Errorf("%w: .lumiliorepo is missing", ErrRepositoryOffline))
 		}
-		return fail(classifyRepositoryRootError(".lumiliorepo", err))
+		return fail(classifyStorageLocationError(".lumiliorepo", err))
 	}
 	config, err := repocfg.ParseConfig(marker)
 	if err != nil {
@@ -237,7 +164,7 @@ func (f *RepositoryFSFactory) OpenContext(ctx context.Context, repository repo.R
 	}, nil
 }
 
-func classifyRepositoryRootError(name string, err error) error {
+func classifyStorageLocationError(name string, err error) error {
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return fmt.Errorf("%w: %s: %v", ErrRepositoryOffline, name, err)
@@ -308,7 +235,7 @@ func (r *RepositoryFS) VerifyIdentity() error {
 	defer done()
 	marker, err := root.ReadFile(".lumiliorepo")
 	if err != nil {
-		return classifyRepositoryRootError(".lumiliorepo", err)
+		return classifyStorageLocationError(".lumiliorepo", err)
 	}
 	config, err := repocfg.ParseConfig(marker)
 	if err != nil {
@@ -865,211 +792,6 @@ func (r *RepositoryFS) Revalidate(ctx context.Context, expected FileObservation)
 	return nil
 }
 
-func (r *RepositoryFS) WalkUserMedia(ctx context.Context, options WalkOptions) (WalkSummary, error) {
-	summary := WalkSummary{Authoritative: true}
-	if options.Now.IsZero() {
-		options.Now = time.Now().UTC()
-	}
-	root, done, err := r.withRoot()
-	if err != nil {
-		return summary, err
-	}
-	defer done()
-	walkErr := fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, walkErr error) error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if walkErr != nil {
-			summary.markPartial(name, "walk_error", walkErr)
-			return nil
-		}
-		if name == "." {
-			return nil
-		}
-		if entry.IsDir() {
-			if name == ".lumilio" {
-				return fs.SkipDir
-			}
-			if _, markerErr := root.Stat(path.Join(name, ".lumiliorepo")); markerErr == nil {
-				topologyErr := fmt.Errorf("%w: %s", ErrNestedRepository, name)
-				summary.markPartial(name, "nested_repository", topologyErr)
-				return fs.SkipDir
-			} else if !errors.Is(markerErr, fs.ErrNotExist) {
-				summary.markPartial(name, "nested_repository_check", markerErr)
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if name == ".lumiliorepo" || name == ".lumilioroot" {
-			return nil
-		}
-		repositoryPath, parseErr := ParseUserMediaPath(name)
-		if parseErr != nil {
-			summary.markPartial(name, "invalid_path", parseErr)
-			return nil
-		}
-		if !fileutil.IsSupportedExtension(path.Ext(repositoryPath.String())) {
-			summary.Skipped++
-			return nil
-		}
-		observation, inspectErr := r.observeMediaWithHeldRoot(ctx, root, repositoryPath)
-		if inspectErr != nil {
-			if errors.Is(inspectErr, ErrRepositoryEntryUnsupported) || entry.Type()&os.ModeSymlink != 0 {
-				summary.Skipped++
-				summary.Issues = append(summary.Issues, WalkIssue{Path: name, Reason: "unsupported_entry", Err: inspectErr})
-				return nil
-			}
-			summary.markPartial(name, "inspect_error", inspectErr)
-			return nil
-		}
-		observation.ScanID = options.ScanID
-		if options.Settle > 0 && options.Now.Sub(time.Unix(0, observation.ModTimeNS)) < options.Settle {
-			summary.Skipped++
-			summary.DeferredPaths = append(summary.DeferredPaths, repositoryPath)
-			summary.Issues = append(summary.Issues, WalkIssue{Path: name, Reason: "settling"})
-			return nil
-		}
-		summary.Observations = append(summary.Observations, observation)
-		return nil
-	})
-	if walkErr != nil {
-		summary.markPartial("", "walk_aborted", walkErr)
-		return summary, walkErr
-	}
-	return summary, nil
-}
-
-// ReadUserMediaDirectory enumerates one bounded page without recursively
-// walking or reading file contents. A resumed page reopens the directory and
-// discards Offset entries in bounded chunks; change capture and the final
-// verifier, rather than directory ordering, provide convergence across edits.
-func (r *RepositoryFS) ReadUserMediaDirectory(ctx context.Context, options DirectoryReadOptions) (DirectoryReadBatch, error) {
-	batch := DirectoryReadBatch{Authoritative: true, NextOffset: options.Offset}
-	if err := ctx.Err(); err != nil {
-		return batch, err
-	}
-	if options.Offset < 0 {
-		return batch, fmt.Errorf("directory offset must be non-negative")
-	}
-	if options.Limit <= 0 || options.Limit > 256 {
-		return batch, fmt.Errorf("directory limit must be between 1 and 256")
-	}
-	if options.Now.IsZero() {
-		options.Now = time.Now().UTC()
-	}
-	directory := "."
-	if options.Directory != "" {
-		parsed, err := ParseUserMediaPath(options.Directory)
-		if err != nil {
-			return batch, err
-		}
-		directory, err = parsed.local()
-		if err != nil {
-			return batch, err
-		}
-	}
-
-	root, done, err := r.withRoot()
-	if err != nil {
-		return batch, err
-	}
-	defer done()
-	opened, err := root.Open(directory)
-	if err != nil {
-		return batch, classifyRepositoryEntryError(options.Directory, err)
-	}
-	defer opened.Close()
-	info, err := opened.Stat()
-	if err != nil {
-		return batch, err
-	}
-	if !info.IsDir() {
-		return batch, fmt.Errorf("%w: %s is not a directory", ErrRepositoryEntryUnsupported, options.Directory)
-	}
-
-	remaining := options.Offset
-	for remaining > 0 {
-		if err := ctx.Err(); err != nil {
-			return batch, err
-		}
-		pageSize := options.Limit
-		if int64(pageSize) > remaining {
-			pageSize = int(remaining)
-		}
-		skipped, readErr := opened.ReadDir(pageSize)
-		remaining -= int64(len(skipped))
-		if readErr != nil && !errors.Is(readErr, io.EOF) {
-			return batch, readErr
-		}
-		if len(skipped) == 0 || errors.Is(readErr, io.EOF) {
-			batch.Done = true
-			return batch, nil
-		}
-	}
-
-	entries, readErr := opened.ReadDir(options.Limit)
-	if readErr != nil && !errors.Is(readErr, io.EOF) {
-		return batch, readErr
-	}
-	batch.NextOffset += int64(len(entries))
-	batch.Done = errors.Is(readErr, io.EOF) || len(entries) == 0
-	batch.Entries = make([]DirectoryReadEntry, 0, len(entries))
-	for index, entry := range entries {
-		if err := ctx.Err(); err != nil {
-			return batch, err
-		}
-		name := entry.Name()
-		child := name
-		if options.Directory != "" {
-			child = path.Join(options.Directory, name)
-		}
-		if child == ".lumilio" || child == ".lumiliorepo" || child == ".lumilioroot" {
-			continue
-		}
-		if entry.IsDir() {
-			if _, markerErr := root.Stat(path.Join(child, ".lumiliorepo")); markerErr == nil {
-				batch.Authoritative = false
-				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "nested_repository", Err: ErrNestedRepository})
-				continue
-			} else if !errors.Is(markerErr, fs.ErrNotExist) {
-				batch.Authoritative = false
-				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "nested_repository_check", Err: markerErr})
-				continue
-			}
-		}
-		repositoryPath, parseErr := ParseUserMediaPath(child)
-		if parseErr != nil {
-			batch.Authoritative = false
-			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "invalid_path", Err: parseErr})
-			continue
-		}
-		if !entry.IsDir() && !fileutil.IsSupportedExtension(path.Ext(repositoryPath.String())) {
-			continue
-		}
-		observation, observeErr := r.observeNodeWithHeldRoot(ctx, root, repositoryPath, entry.IsDir())
-		if observeErr != nil {
-			if errors.Is(observeErr, ErrRepositoryEntryUnsupported) {
-				batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "unsupported_entry", Err: observeErr})
-				continue
-			}
-			batch.Authoritative = false
-			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "inspect_error", Err: observeErr})
-			continue
-		}
-		observation.ScanID = options.ScanID
-		if !entry.IsDir() && options.Settle > 0 && options.Now.Sub(time.Unix(0, observation.ModTimeNS)) < options.Settle {
-			batch.Authoritative = false
-			batch.Issues = append(batch.Issues, WalkIssue{Path: child, Reason: "settling"})
-			continue
-		}
-		batch.Entries = append(batch.Entries, DirectoryReadEntry{
-			Observation: observation,
-			NextOffset:  options.Offset + int64(index) + 1,
-		})
-	}
-	return batch, nil
-}
-
 func (r *RepositoryFS) observeNodeWithHeldRoot(
 	ctx context.Context,
 	root *os.Root,
@@ -1129,19 +851,6 @@ func (r *RepositoryFS) observeMediaWithHeldRoot(ctx context.Context, root *os.Ro
 	}
 	identityKind, identity, changeTime := platformFileIdentity(opened, before)
 	return newFileObservation(r.repositoryID, repositoryPath, kind, before, identityKind, identity, changeTime), nil
-}
-
-func (s *WalkSummary) markPartial(repositoryPath, reason string, err error) {
-	s.Authoritative = false
-	s.Skipped++
-	s.Issues = append(s.Issues, WalkIssue{Path: repositoryPath, Reason: reason, Err: err})
-	if s.PartialReason == "" {
-		if err != nil {
-			s.PartialReason = err.Error()
-		} else {
-			s.PartialReason = reason
-		}
-	}
 }
 
 func newFileObservation(repositoryID uuid.UUID, repositoryPath RepositoryPath, kind EntryKind, info fs.FileInfo, identityKind, identity *string, changeTime *int64) FileObservation {

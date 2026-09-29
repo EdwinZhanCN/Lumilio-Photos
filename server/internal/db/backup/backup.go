@@ -22,7 +22,11 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
-const manifestFormatVersion = 2
+// manifestFormatVersion is the snapshot manifest contract. Format 1 is the
+// v26.1.0-rc.1 compatibility baseline. Pre-release manifests reused higher
+// numbers, so a mismatch is attributed only after the snapshot catalog's
+// identity has been inspected.
+const manifestFormatVersion = 1
 
 // Logf matches the supervisor-style logging callback used across the app.
 type Logf func(format string, args ...any)
@@ -35,12 +39,13 @@ type SnapshotMetadata struct {
 }
 
 // Manifest is the checksum and compatibility contract paired with every
-// SQLite snapshot.
+// SQLite snapshot. SchemaVersion is the catalog's PRAGMA user_version, the
+// single schema-identity fact shared by the live catalog and its snapshots.
 type Manifest struct {
 	FormatVersion        int       `json:"format_version"`
 	AppVersion           string    `json:"app_version"`
 	ConfigSchemaVersion  int       `json:"config_schema_version"`
-	ApplicationMigration int64     `json:"application_migration_version"`
+	SchemaVersion        int64     `json:"schema_version"`
 	RiverMigration       int64     `json:"river_migration_version"`
 	SQLiteVersion        string    `json:"sqlite_version"`
 	Vec1Version          string    `json:"vec1_version"`
@@ -60,12 +65,15 @@ type Snapshot struct {
 }
 
 // Compatibility constrains which snapshot may be staged over the active
-// runtime. Restore never performs application migrations.
+// runtime. A snapshot at an older supported schema or config version is
+// restored and then upgraded by the runtime's normal startup; a newer one is
+// rejected. SchemaVersion is required: a zero value is a configuration error,
+// never a wildcard.
 type Compatibility struct {
-	LibraryID               string
-	ConfigSchemaVersion     int
-	MaxApplicationMigration int64
-	MaxRiverMigration       int64
+	LibraryID           string
+	ConfigSchemaVersion int
+	SchemaVersion       int64
+	MaxRiverMigration   int64
 }
 
 // CreateSnapshot uses SQLite's Online Backup API to create a transactionally
@@ -136,7 +144,7 @@ func CreateSnapshot(
 		FormatVersion:        manifestFormatVersion,
 		AppVersion:           metadata.AppVersion,
 		ConfigSchemaVersion:  metadata.ConfigSchemaVersion,
-		ApplicationMigration: info.ApplicationMigration,
+		SchemaVersion:        info.SchemaVersion,
 		RiverMigration:       info.RiverMigration,
 		SQLiteVersion:        info.SQLiteVersion,
 		Vec1Version:          info.Vec1Version,
@@ -302,6 +310,12 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 		return Manifest{}, db.CatalogInfo{}, err
 	}
 	if manifest.FormatVersion != manifestFormatVersion {
+		if _, inspectErr := db.InspectStandaloneCatalog(ctx, snapshotPath); errors.Is(inspectErr, db.ErrPreReleaseCatalog) {
+			return Manifest{}, db.CatalogInfo{}, fmt.Errorf("inspect SQLite snapshot: %w", inspectErr)
+		}
+		if manifest.FormatVersion > manifestFormatVersion {
+			return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot manifest format %d is newer than this build supports (%d): it was written by a newer Lumilio Photos", manifest.FormatVersion, manifestFormatVersion)
+		}
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot manifest format %d is unsupported", manifest.FormatVersion)
 	}
 	fileInfo, err := os.Stat(snapshotPath)
@@ -324,7 +338,7 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("inspect SQLite snapshot: %w", err)
 	}
 	if info.LibraryID != manifest.LibraryID ||
-		info.ApplicationMigration != manifest.ApplicationMigration ||
+		info.SchemaVersion != manifest.SchemaVersion ||
 		info.RiverMigration != manifest.RiverMigration ||
 		info.Vec1Version != manifest.Vec1Version ||
 		info.SizeBytes != manifest.DatabaseSize {
@@ -333,15 +347,22 @@ func ValidateSnapshot(ctx context.Context, snapshotPath string, compatibility Co
 	if compatibility.LibraryID != "" && info.LibraryID != compatibility.LibraryID {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot belongs to library %s, active library is %s", info.LibraryID, compatibility.LibraryID)
 	}
-	if compatibility.ConfigSchemaVersion != 0 && manifest.ConfigSchemaVersion != compatibility.ConfigSchemaVersion {
+	if compatibility.ConfigSchemaVersion != 0 && manifest.ConfigSchemaVersion > compatibility.ConfigSchemaVersion {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf(
-			"snapshot config schema %d is incompatible with runtime schema %d",
+			"snapshot config schema %d is newer than runtime schema %d",
 			manifest.ConfigSchemaVersion,
 			compatibility.ConfigSchemaVersion,
 		)
 	}
-	if compatibility.MaxApplicationMigration != 0 && info.ApplicationMigration > compatibility.MaxApplicationMigration {
-		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot application migration %d is newer than runtime %d", info.ApplicationMigration, compatibility.MaxApplicationMigration)
+	if compatibility.SchemaVersion == 0 {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot compatibility is missing the runtime schema version")
+	}
+	if info.SchemaVersion > compatibility.SchemaVersion {
+		return Manifest{}, db.CatalogInfo{}, fmt.Errorf(
+			"snapshot schema version %d is newer than runtime schema version %d",
+			info.SchemaVersion,
+			compatibility.SchemaVersion,
+		)
 	}
 	if compatibility.MaxRiverMigration != 0 && info.RiverMigration > compatibility.MaxRiverMigration {
 		return Manifest{}, db.CatalogInfo{}, fmt.Errorf("snapshot River migration %d is newer than runtime %d", info.RiverMigration, compatibility.MaxRiverMigration)

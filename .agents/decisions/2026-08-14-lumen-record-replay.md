@@ -21,10 +21,17 @@ gRPC contract.
   deterministic builtin response and is counted on `/metrics`. `-strict`
   is reserved until a recorded set covers the slices that run.
 - **Record** (`task lumen:record`, overlay `web/e2e/compose.record.yml`):
-  proxy to a real Hub, persist each exchange, and store the upstream
-  capability set in `manifest.json` so replay advertises the same services.
-  Recording is explicit and never implicit in CI. Every fixture diff is
-  reviewed.
+  proxy to a real Hub, persist each exchange, and store in `manifest.json`
+  the upstream capability of every service that has at least one recorded
+  fixture. Recording is explicit and never implicit in CI. Every fixture
+  diff is reviewed.
+- **Capabilities are per service** (2026-09, first real recording: face for
+  the People merge slice). Replay overlays the recorded capabilities on the
+  builtin SigLIP/BioCLIP/OCR/Face set by service name. Persisting the whole
+  upstream set would have swapped the model id and tensor contract of
+  services whose requests still miss and get builtin answers, and dropped
+  services the recording Hub does not run (BioCLIP), silently changing every
+  other slice.
 
 Queue and service unit tests continue to stub `LumenService` in-process.
 The tensor conformance test stays opt-in against a real Hub. Procedure:

@@ -78,6 +78,13 @@ macOS). Direct `go test` is acceptable only when you preserve the same
 environment: `cd server && go test -tags=sqlite_fts5 ./...`. Run `gofmt` on
 changed Go files.
 
+Asynchronous tests wait for a state the operation owns: an entered hook, queue
+depth, receipt, repository fact, or a manually released gate. Do not sleep so
+another goroutine can reach a presumed state. Commit-coordinator backpressure
+cancels only after `BlockedSubmitters` shows the submission entered the
+full-queue wait. Race evidence uses `task server:test:concurrency:ci`, not
+`-race` on the whole module.
+
 Generated config examples are protected by a golden test — change
 `server/config/profiles.go` and run `task config:examples`, never hand-edit.
 Reproduce the CI Server gate with `task server:test:ci` (clean caches).

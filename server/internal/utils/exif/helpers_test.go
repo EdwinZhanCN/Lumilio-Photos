@@ -99,3 +99,24 @@ func TestParseCommonMetadataRejectsNonStarRatings(t *testing.T) {
 		require.Nil(t, metadata.Rating, rating)
 	}
 }
+
+func TestParseAudioMetadataKeepsAlbumArtistSeparateAndPreservesOrderedCredits(t *testing.T) {
+	raw, err := json.Marshal(map[string]any{
+		"Artist":      []string{"A & B", "Guest"},
+		"AlbumArtist": []string{"Release Artist"},
+	})
+	require.NoError(t, err)
+
+	metadata := parseAudioMetadataWithRaw(map[string]string{
+		"Artist":      "A & B",
+		"AlbumArtist": "Release Artist",
+		"Title":       "Track",
+		"DiscNumber":  "/",
+	}, raw)
+
+	require.Equal(t, "A & B", metadata.Artist)
+	require.Equal(t, "Release Artist", metadata.AlbumArtist)
+	require.Equal(t, []string{"A & B", "Guest"}, metadata.Artists)
+	require.Equal(t, []string{"Release Artist"}, metadata.AlbumArtists)
+	require.Nil(t, metadata.DiscNumber)
+}

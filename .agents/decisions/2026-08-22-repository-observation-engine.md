@@ -1,6 +1,12 @@
 # Decision: Observe repositories through resumable facts and content Locations
 
-Status: implemented
+Status: superseded on 2026-09-24 by
+[the repository scan index decision](2026-09-24-repository-scan-index.md)
+and [the Asset lifecycle decision](2026-09-24-asset-lifecycle.md). ROE remains
+the running code until Phase 3 of
+[the scan index and Asset lifecycle plan](../../docs/exec-plans/active/repository-index-and-asset-lifecycle.md)
+removes it. Originally implemented; this record already described a
+`repository_outbox` that no longer existed when it was superseded.
 
 ## Problem
 

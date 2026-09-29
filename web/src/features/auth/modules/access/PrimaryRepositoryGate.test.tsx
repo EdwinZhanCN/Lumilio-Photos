@@ -15,7 +15,7 @@ describe("PrimaryRepositoryGate", () => {
           runtime_state: "degraded",
           runtime_reason: "storage_recovery_required",
           repository_defaults: {
-            default_root: "/configured/storage",
+            storage_location: "/configured/storage",
             storage_strategy: "date",
             duplicate_handling: "rename",
           },
@@ -45,14 +45,14 @@ describe("PrimaryRepositoryGate", () => {
           admin_initialized: true,
           primary_repository_initialized: false,
           repository_defaults: {
-            default_root: "/storage",
+            storage_location: "/storage",
             storage_strategy: "date",
             duplicate_handling: "rename",
             risk_warnings: ["removable_storage"],
           },
         }),
       ),
-      http.post("*/api/v1/repositories", async ({ request }) => {
+      http.post("*/api/v1/setup/primary-repository", async ({ request }) => {
         requestBody = await request.json();
         return HttpResponse.json({
           repository: {
@@ -89,7 +89,6 @@ describe("PrimaryRepositoryGate", () => {
       .poll(() => requestBody)
       .toEqual({
         name: "Primary Storage",
-        role: "primary",
         storage_strategy: "cas",
         risk_confirmation: true,
       });

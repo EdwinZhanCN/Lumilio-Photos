@@ -49,12 +49,14 @@ import (
 	"server/internal/settings"
 	"server/internal/sourcing"
 	"server/internal/storage"
-	roecontroller "server/internal/storage/roe/controller"
-	roelocations "server/internal/storage/roe/locations"
-	roematerializer "server/internal/storage/roe/materializer"
+	"server/internal/storage/locations"
+	"server/internal/storage/pathsemantics"
+	"server/internal/storage/scan"
+	"server/internal/storage/trash"
 	"server/internal/utils/imaging"
 	"server/internal/version"
 
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -256,7 +258,7 @@ func run(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Ensure the default media root and explicitly separate private cloud/backup
+	// Ensure the default media storageLocation and explicitly separate private cloud/backup
 	// directories exist before any service reads them.
 	if err := storage.EnsureRootLayout(appConfig.StorageConfig); err != nil {
 		return fmt.Errorf("ensure storage layout: %w", err)
@@ -287,9 +289,22 @@ func run(
 		}
 	}()
 
-	// Schema generation 8 is intentionally fresh-only. Pre-production catalogs
-	// from earlier generations are rejected and recreated instead of translated.
-	if err := database.MigrateCatalog(ctx); err != nil {
+	// An empty catalog gets the baseline and every forward step. An older
+	// catalog (including one just installed by a restore) is snapshotted into
+	// a protected pre-upgrade backup first; pre-release and newer catalogs were
+	// already rejected by db.Open.
+	preUpgradeBackup := func(ctx context.Context, source *sql.DB, from, to int) (string, error) {
+		snapshot, err := dbbackup.CreateSnapshot(
+			ctx,
+			source,
+			appConfig.StorageConfig.BackupsDir(),
+			dbbackup.PreUpgradePrefix,
+			dbbackup.SnapshotMetadata{AppVersion: version.Version, ConfigSchemaVersion: appConfig.SchemaVersion},
+			appLogger.Named("db_backup").Sugar().Infof,
+		)
+		return snapshot.Path, err
+	}
+	if err := database.MigrateCatalog(ctx, preUpgradeBackup); err != nil {
 		appLogger.Error("failed to run migrations automatically",
 			zap.String("operation", "database.migrate"),
 			zap.Error(err),
@@ -421,18 +436,18 @@ func run(
 	if err := repoManager.RecoverHostActions(ctx); err != nil {
 		return fmt.Errorf("recover native host actions: %w", err)
 	}
-	defaultRoot, degradedStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
+	defaultStorageLocation, degradedStorage, err := ensureDefaultStorageForRuntime(ctx, repoManager, appConfig.StorageConfig.Path)
 	if err != nil {
 		return err
 	}
 	if degradedStorage {
 		appLogger.Warn("default Storage Location requires recovery; continuing in degraded mode",
-			zap.String("operation", "repository_root.recovery_required"),
+			zap.String("operation", "storage_location.recovery_required"),
 			zap.String("path", appConfig.StorageConfig.Path))
 	} else {
 		appLogger.Info("default storage location initialized",
-			zap.String("operation", "repository_root.init"),
-			zap.String("path", defaultRoot.Path),
+			zap.String("operation", "storage_location.init"),
+			zap.String("path", defaultStorageLocation.Path),
 		)
 	}
 	stagingManager := storage.NewStagingManager(repositoryFiles)
@@ -442,7 +457,7 @@ func run(
 	// Re-check every repository's recorded path before anything schedules work
 	// against it. Unreachable repositories become offline rather than failing
 	// mid-scan.
-	if err := repoManager.ReconcileRepositoryRoots(ctx); err != nil {
+	if err := repoManager.ReconcileStorageLocations(ctx); err != nil {
 		appLogger.Warn("failed to reconcile Storage Locations", zap.Error(err))
 	}
 	if err := repoManager.ReconcileAll(ctx); err != nil {
@@ -506,6 +521,12 @@ func run(
 		return fmt.Errorf("initialize auth rate limiter: %w", err)
 	}
 	albumService := service.NewAlbumService(queries)
+	musicService := service.NewMusicService(queries, database.ReaderQueries, database.Writer)
+	go func() {
+		if err := musicService.BackfillAll(ctx, 500); err != nil {
+			appLogger.Warn("music catalog backfill failed", zap.String("operation", "music.backfill"), zap.Error(err))
+		}
+	}()
 	userService := service.NewUserServiceWithWriter(queries, sqlDB, database.Writer)
 
 	// Break-glass recovery is an explicit single-run host control, separate from
@@ -527,23 +548,22 @@ func run(
 	go refStore.RunJanitor(ctx, 10*time.Minute)
 	conversations := core.NewConversationStore(core.DefaultConversationTTL)
 	go conversations.RunJanitor(ctx, 10*time.Minute)
-	agentService := core.NewAgentService(queries, sqlDB, database.Writer, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath)
+	agentService := core.NewAgentService(queries, sqlDB, database.Writer, settingsService, refStore, authorizedLibraries, conversations, controls.AgentAuditLogPath, musicService)
 	agentPins := pins.NewService(queries, refStore, authorizedLibraries)
 	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
 	// Share links reuse the same asset-set-source query path pins use
 	// (resolveSourceAssetIDs -> AssetService.QueryAssets / agentPins.AssetIDs),
 	// so it's constructed here once both dependencies exist.
-	shareLinkService := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyFile)
+	shareLinkService, err := service.NewShareLinkService(queries, assetService, agentPins, appConfig.Auth.SecretKeyFile)
+	if err != nil {
+		return fmt.Errorf("initialize share link service: %w", err)
+	}
 
 	// Register agent tools
 	tools.RegisterAll()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	// Upload/cloud staging and filesystem observation converge at the same ROE
-	// content/Asset/Location commit boundary.
-	repositoryHashPreparer := roematerializer.NewHashPreparer(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
-	repositoryHashApplier := roematerializer.NewHashApplier()
 	artifactCleaner, err := artifact.NewCleaner(database, repositoryFiles, 24*time.Hour)
 	if err != nil {
 		return fmt.Errorf("initialize artifact cleaner: %w", err)
@@ -557,12 +577,9 @@ func run(
 		return fmt.Errorf("initialize execution governor: %w", err)
 	}
 	executionEngine := execution.NewEngine(governor)
-	repositoryObservationConfig := roecontroller.Config{
-		Settle: time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
-	}
 	commitCoordinator, err := commit.New(database.Writer, commit.Config{Capacity: 256, MaxBatch: 32, OldestWait: 10 * time.Millisecond}, commit.CatalogDependencies{
 		Face: faceService, Event: eventService, Location: locationService,
-		Indexing: indexingService, Materializer: repositoryHashApplier,
+		Indexing: indexingService,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize commit coordinator: %w", err)
@@ -599,25 +616,6 @@ func run(
 		repoAuditProvider,
 		repositoryFiles,
 	)
-	sourceMaterializer.SetActivation(func(ctx context.Context, fact roematerializer.KnownContent) (roematerializer.Result, error) {
-		_, err := commitCoordinator.ApplyRepositoryKnownContent(ctx, commit.RepositoryKnownContentApplied{Fact: fact})
-		if err != nil {
-			return roematerializer.Result{}, err
-		}
-		observation, err := database.ReaderQueries.GetRepositoryObservationBySourceEvent(ctx, repo.GetRepositoryObservationBySourceEventParams{RepositoryID: fact.RepositoryID, Source: fact.Source, SourceEventKey: &fact.SourceEventKey})
-		if err != nil || !observation.MappedNodeID.Valid {
-			return roematerializer.Result{}, fmt.Errorf("load committed source observation: %w", err)
-		}
-		location, err := database.ReaderQueries.GetActiveAssetLocationByNode(ctx, observation.MappedNodeID.UUID)
-		if err != nil {
-			return roematerializer.Result{}, fmt.Errorf("load committed source asset: %w", err)
-		}
-		asset, err := database.ReaderQueries.GetAssetByIDAny(ctx, location.AssetID)
-		if err != nil {
-			return roematerializer.Result{}, fmt.Errorf("load committed source content: %w", err)
-		}
-		return roematerializer.Result{Code: roematerializer.ResultBound, RepositoryID: fact.RepositoryID, NodeID: observation.MappedNodeID.UUID, AssetID: asset.AssetID, ContentID: asset.ContentID, Revision: observation.Revision}, nil
-	})
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -625,45 +623,49 @@ func run(
 			runErr = errors.Join(runErr, err)
 		}
 	}()
-	assetLocationResolver := roelocations.NewResolver(database.ReaderQueries, database.ReaderSQL, repositoryFiles)
-	assetProcessor.SetLocationResolver(assetLocationResolver)
-	repositoryObserver := roecontroller.New(database.ReaderQueries, commitCoordinator, repositoryFiles, repositoryObservationConfig, observationLogger)
-	repositoryScanCommands := roecontroller.NewCommands(database, repositoryObservationConfig, observationLogger)
-	defer func() {
-		if err := repositoryObserver.Close(); err != nil {
-			runErr = errors.Join(runErr, fmt.Errorf("close repository change feed: %w", err))
-		}
-	}()
-	if notifications := repositoryObserver.Notifications(); notifications != nil {
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case repositoryID, ok := <-notifications:
-					if !ok {
-						return
-					}
-					if _, err := repositoryScanCommands.Request(ctx, repositoryID, "watcher", "native_change", false); err != nil && ctx.Err() == nil {
-						observationLogger.Warn("enqueue native repository observation",
-							zap.String("repository_id", repositoryID.String()), zap.Error(err))
-					}
-				}
-			}
-		}()
+	// Upload/cloud staging and filesystem scans converge on the same scan
+	// index binding, written through the commit coordinator.
+	repositoryScanner, err := scan.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, scan.Config{
+		Settle:    time.Duration(appConfig.RepositoryScan.SettleSeconds) * time.Second,
+		Semantics: pathsemantics.HostDefault(),
+		Activate: func(ctx context.Context, tx *sql.Tx, queries *repo.Queries, repositoryID, entryID, assetID, contentID uuid.UUID) error {
+			return service.ApplyAssetActivationTx(ctx, tx, queries, repositoryID, entryID, assetID, contentID)
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("initialize repository scanner: %w", err)
 	}
+	sourceMaterializer.SetActivation(repositoryScanner.BindKnownContent)
+	// Delete and Restore move files through the repository trash and commit
+	// through the scanner. A move a crash interrupted is reconciled before
+	// users act; one whose repository is offline waits for the next start.
+	assetTrash, err := trash.New(database.ReaderQueries, commitCoordinator.ScanWriter(), repositoryFiles, repositoryScanner, appLogger.Named("trash"))
+	if err != nil {
+		return fmt.Errorf("initialize repository trash: %w", err)
+	}
+	if err := assetTrash.Recover(ctx); err != nil {
+		appLogger.Warn("interrupted trash operations wait for their repositories", zap.Error(err))
+	}
+	go runTrashMaintenanceLoop(ctx, assetTrash,
+		time.Duration(appConfig.RepositoryTrash.RetentionDays)*24*time.Hour, appLogger.Named("trash"))
+	if err := service.BindAssetTrash(assetService, assetTrash); err != nil {
+		return err
+	}
+	assetLocationResolver := locations.NewResolver(database.ReaderQueries, repositoryFiles)
+	assetProcessor.SetLocationResolver(assetLocationResolver)
 	repoManager.SetInitialScanEnqueuer(func(ctx context.Context, repositoryID string) error {
-		_, err := repositoryScanCommands.EnqueueManualScan(ctx, repositoryID, "storage_lifecycle", true)
+		_, err := repositoryScanner.RequestScan(ctx, repositoryID, scan.TriggerManual, "storage_lifecycle")
 		return err
 	})
 	if err := repoManager.RetryPendingInitialRepositoryScans(ctx); err != nil {
 		return fmt.Errorf("resume pending initial repository scans: %w", err)
 	}
-	go func() {
-		ticker := time.NewTicker(time.Duration(appConfig.RepositoryScan.IntervalSeconds) * time.Second)
-		defer ticker.Stop()
-		runRepositoryVerifierLoop(ctx, ticker.C, repositoryScanCommands.EnqueueAllPeriodicScans, observationLogger)
-	}()
+	go runRepositoryVerifierLoop(ctx,
+		jitteredTicks(ctx, time.Duration(appConfig.RepositoryScan.IntervalSeconds)*time.Second),
+		repositoryScanner.RequestAllPeriodic, observationLogger)
+	// Filesystem events only shorten latency; the periodic full scan above is
+	// the authority when events are lost.
+	go scan.NewWatcher(database.ReaderQueries, repositoryScanner, observationLogger, scan.WatchConfig{}).Run(ctx)
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
@@ -686,10 +688,11 @@ func run(
 	// the commit coordinator own product progress; each bounded runtime step
 	// declares its own process-wide execution resources.
 	macroRuntime := &pipelineRuntime{
-		engine: executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
-		repository: repositoryObserver, repositoryHasher: repositoryHashPreparer,
-		repositoryReader: database.ReaderQueries,
-		eventProjection:  eventService, locationProjection: locationService,
+		logger:         appLogger.Named("pipeline"),
+		pipelineReader: database.ReaderSQL,
+		engine:         executionEngine, demand: budget.DemandCatalog(), commits: commitCoordinator, processor: assetProcessor,
+		scanner:         repositoryScanner,
+		eventProjection: eventService, locationProjection: locationService,
 		ocrProjection: ocrIndexWriter, reindexProjection: indexingService,
 		enrichmentReader: database.ReaderQueries, settings: settingsService,
 		lumen: lumenService, classifier: classifierService, files: repositoryFiles,
@@ -698,7 +701,7 @@ func run(
 		return fmt.Errorf("register pipeline runtime: %w", err)
 	}
 	// Automatic database backups use their explicit private destination rather
-	// than following any removable repository root. Policy
+	// than following any removable Storage Location. Policy
 	// (enabled/interval/retention) is read from runtime settings on every tick,
 	// so the periodic job below can stay a fixed hourly heartbeat.
 	backupLogger := appLogger.Named("db_backup").Sugar()
@@ -711,10 +714,10 @@ func run(
 		ConfigSchemaVersion: appConfig.SchemaVersion,
 	}
 	snapshotCompatibility := dbbackup.Compatibility{
-		LibraryID:               catalogInfo.LibraryID,
-		ConfigSchemaVersion:     appConfig.SchemaVersion,
-		MaxApplicationMigration: catalogInfo.ApplicationMigration,
-		MaxRiverMigration:       catalogInfo.RiverMigration,
+		LibraryID:           catalogInfo.LibraryID,
+		ConfigSchemaVersion: appConfig.SchemaVersion,
+		SchemaVersion:       catalogInfo.SchemaVersion,
+		MaxRiverMigration:   catalogInfo.RiverMigration,
 	}
 	backupScheduler := &dbbackup.Scheduler{
 		// Online Backup holds one source connection while it copies the
@@ -800,11 +803,13 @@ func run(
 	authController := handler.NewAuthHandler(authService, authRateLimiter, appConfig.Auth.RefreshTokenTTL, originPolicy)
 	setupController := handler.NewSetupHandler(service.NewSetupService(bootstrapService, repoManager, appConfig.StorageConfig.Path))
 	albumController := handler.NewAlbumHandler(&albumService, queries, database.Writer, settingsService, lumenService)
+	musicController := handler.NewMusicHandler(musicService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager, repositoryFiles)
 	locationController := handler.NewLocationHandler(locationService)
 	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService, securityLogger)
-	queueController := handler.NewQueueHandler(queueDatabase.ReaderSQL)
+	queueController := handler.NewQueueHandler(queueDatabase.ReaderSQL, database.ReaderSQL)
+	queueController.SetRetryWriter(database.Writer)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService, refStore, authorizedLibraries, agentPins, assetService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
@@ -818,7 +823,9 @@ func run(
 		appLogger.Warn("failed to recover interrupted cloud import runs", zap.Error(err))
 	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanCommands, repoManager)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
+	repositoryScanController.SetBootstrapService(bootstrapService)
+	storageController := handler.NewStorageHandler(repoManager, queries, repositoryScanner)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)
@@ -848,6 +855,7 @@ func run(
 		settingsController,
 		classifierController,
 		userController,
+		storageController,
 		repositoryScanController,
 		hostActionController,
 		duplicateController,
@@ -858,6 +866,7 @@ func run(
 		handler.RequireAppInitialized(bootstrapService),
 		originPolicy,
 		appLogger.Named("http"),
+		musicController,
 	)
 
 	// Add Swagger documentation endpoint
@@ -978,41 +987,41 @@ func run(
 }
 
 type defaultStorageRuntimeManager interface {
-	EnsureDefaultRepositoryRoot(context.Context, string, ...storage.LifecycleRequest) (*repo.RepositoryRoot, error)
-	ListRepositoryRoots(context.Context) ([]repo.RepositoryRoot, error)
+	EnsureDefaultStorageLocation(context.Context, string, ...storage.LifecycleRequest) (*repo.StorageLocation, error)
+	ListStorageLocations(context.Context) ([]repo.StorageLocation, error)
 }
 
 // ensureDefaultStorageForRuntime distinguishes a first-run initialization
 // failure from a previously registered portable identity that needs recovery.
 // The latter must not prevent the HTTP runtime and unrelated repositories from
 // starting in degraded mode.
-func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (*repo.RepositoryRoot, bool, error) {
+func ensureDefaultStorageForRuntime(ctx context.Context, manager defaultStorageRuntimeManager, path string) (*repo.StorageLocation, bool, error) {
 	hostInstanceID, _ := os.Hostname()
-	root, err := manager.EnsureDefaultRepositoryRoot(ctx, path, storage.LifecycleRequest{
+	storageLocation, err := manager.EnsureDefaultStorageLocation(ctx, path, storage.LifecycleRequest{
 		Actor: "server:config", HostInstanceID: hostInstanceID, ConfirmationType: "portable_identity_match",
 	})
 	if err == nil {
-		return root, false, nil
+		return storageLocation, false, nil
 	}
-	if !errors.Is(err, storage.ErrRepositoryRootOffline) && !errors.Is(err, storage.ErrRepositoryRootInvalid) {
+	if !errors.Is(err, storage.ErrStorageLocationOffline) && !errors.Is(err, storage.ErrStorageLocationInvalid) {
 		return nil, false, fmt.Errorf("initialize default storage location: %w", err)
 	}
-	roots, listErr := manager.ListRepositoryRoots(ctx)
+	storageLocations, listErr := manager.ListStorageLocations(ctx)
 	if listErr != nil {
 		return nil, false, fmt.Errorf("verify degraded default Storage Location: %w", listErr)
 	}
-	for i := range roots {
-		if roots[i].Kind == dbtypes.RepositoryRootKindDefault {
+	for i := range storageLocations {
+		if storageLocations[i].Kind == dbtypes.StorageLocationKindDefault {
 			// A registered default failing at its unchanged configured path is a
 			// recoverable offline/missing-marker condition. A different configured
 			// path is a migration attempt; failure to prove its portable identity
 			// must fail startup so Desktop rolls the runtime intent back.
-			registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(roots[i].Path)
+			registeredPath, registeredPathErr := storage.CanonicalizeRepositoryPath(storageLocations[i].Path)
 			configuredPath, configuredPathErr := storage.CanonicalizeRepositoryPath(path)
 			if registeredPathErr != nil || configuredPathErr != nil || registeredPath != configuredPath {
 				return nil, false, fmt.Errorf("validate default storage location migration: %w", err)
 			}
-			return &roots[i], true, nil
+			return &storageLocations[i], true, nil
 		}
 	}
 	return nil, false, fmt.Errorf("initialize default storage location: %w", err)

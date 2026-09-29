@@ -3,16 +3,19 @@
 // gRPC contract in two modes:
 //
 //   - replay (default): serve recorded fixtures looked up by
-//     (task, sha256(payload)). Without a recorded capability set it advertises
-//     the deterministic builtin SigLIP capability and answers every semantic
-//     request with one constant 768-dimensional vector — the legacy behavior.
-//     Misses fall back to deterministic builtin responses and are counted per
-//     task in the metrics endpoint; -strict turns a miss into an error.
+//     (task, sha256(payload)). Services without recorded fixtures advertise
+//     deterministic builtin capabilities (SigLIP, BioCLIP, OCR, Face); a
+//     recorded service advertises its recorded upstream capability instead.
+//     Misses fall back to deterministic builtin responses (one constant
+//     768-dimensional vector for semantic requests — the legacy behavior) and
+//     are counted per task in the metrics endpoint; -strict turns a miss into
+//     an error.
 //
 //   - record (-record -upstream <addr> -fixtures <dir>): proxy every inference
 //     to a real Lumen Hub, stream the answer back, and persist each exchange
-//     as a reviewed fixture. The upstream capability set is persisted so a
-//     later replay advertises exactly what the recording hub advertised.
+//     as a reviewed fixture. The upstream capability of every service with a
+//     recorded fixture is persisted so a later replay advertises exactly what
+//     the recording hub advertised for it.
 //
 // Product code exercises discovery, gRPC streaming, image preprocessing,
 // queues, SQLite vector storage, retrieval, and best-frame selection either

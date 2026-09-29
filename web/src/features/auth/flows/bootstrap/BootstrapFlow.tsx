@@ -86,7 +86,7 @@ const BootstrapFlow: React.FC = () => {
     repoName,
     setRepoName,
     repoNameError,
-    repoRoot,
+    defaultStorageLocation,
     storageStrategy,
     setStorageStrategy,
     placementRisks,
@@ -518,10 +518,10 @@ const BootstrapFlow: React.FC = () => {
                   </Field>
 
                   <Field
-                    label={t("auth.primaryRepository.root", {
+                    label={t("auth.primaryRepository.storageLocation", {
                       defaultValue: "Default Storage Location",
                     })}
-                    hint={t("auth.primaryRepository.rootHint", {
+                    hint={t("auth.primaryRepository.storageLocationHint", {
                       defaultValue:
                         "Set by server configuration. Lumilio creates the Primary Repository in this Default Storage Location's primary/ folder.",
                     })}
@@ -529,7 +529,7 @@ const BootstrapFlow: React.FC = () => {
                     <TextInput
                       icon={HardDrive}
                       type="text"
-                      value={repoRoot}
+                      value={defaultStorageLocation}
                       readOnly
                       tabIndex={-1}
                       className="bg-base-200 font-mono text-sm"

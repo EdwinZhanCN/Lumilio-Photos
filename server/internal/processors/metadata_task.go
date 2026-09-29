@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"server/internal/pipeline"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,7 +72,7 @@ func (ap *AssetProcessor) ComputeMetadataTask(ctx context.Context, args Metadata
 		}
 		return ap.extractAudioMetadata(ctx, asset, source.content.FileSize, original, info)
 	default:
-		return MetadataResult{}, fmt.Errorf("unsupported asset type for metadata: %s", assetType)
+		return MetadataResult{}, fmt.Errorf("%w for metadata: %s", pipeline.ErrUnsupportedMedia, assetType)
 	}
 }
 
@@ -154,7 +155,7 @@ func (ap *AssetProcessor) loadAssetAndRepoForContent(
 		SELECT repository_id
 		FROM active_asset_occurrences
 		WHERE asset_id = ?
-		ORDER BY repository_id, node_id
+		ORDER BY repository_id, entry_id
 		LIMIT 1`, assetID).Scan(&repositoryID); errors.Is(err, sql.ErrNoRows) {
 		return nil, repo.Repository{}, ErrAssetSourceStale
 	} else if err != nil {

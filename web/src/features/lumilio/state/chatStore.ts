@@ -25,14 +25,22 @@ import {
   confirmationEffectID,
   failConfirm,
   removeTrailingEmptyAssistant,
+  restorePersistedMessages,
   setConfirmSubmitting,
   userMessage,
 } from "./blocks";
+import { clearAgentSession, loadAgentSession, saveAgentSession } from "./chatSessionPersistence";
 
 interface PendingConfirmation {
   interruptId: string;
   effectId?: string;
   approved: boolean;
+}
+
+interface SendOptions {
+  context?: ContextContribution[];
+  mentions?: MentionPayload[];
+  mode?: AgentMode;
 }
 
 /** Feature-local interactive chat state (Zustand per project convention);
@@ -48,14 +56,14 @@ interface LumilioChatStore {
   connectionError: unknown;
   usage: TokenUsageInfo | null;
 
-  sendMessage: (
-    query: string,
-    options?: {
-      context?: ContextContribution[];
-      mentions?: MentionPayload[];
-      mode?: AgentMode;
-    },
-  ) => Promise<void>;
+  /** True when the last turn failed before any output and can be sent again. */
+  canRetry: boolean;
+
+  sendMessage: (query: string, options?: SendOptions) => Promise<void>;
+  /** Re-sends the last turn after a failure that produced no output. */
+  retryLastMessage: () => Promise<void>;
+  /** Resolves a confirmation whose outcome is unknown (lost receipt or reload). */
+  reconcilePendingConfirmation: () => Promise<boolean>;
   confirmInterrupt: (interruptId: string, approved: boolean) => Promise<void>;
   stopGeneration: () => Promise<void>;
   newConversation: () => Promise<void>;
@@ -64,6 +72,14 @@ interface LumilioChatStore {
 
 let activeStreamController: AbortController | null = null;
 let clearAfterStop = false;
+/** The last sent turn, kept in memory only so a failed send can be retried
+ * with the same media scope; asset ids are never persisted. */
+let lastRequest: { query: string; options?: SendOptions } | null = null;
+
+const restoredSession = loadAgentSession();
+const restoredMessages = restoredSession
+  ? restorePersistedMessages(restoredSession.messages)
+  : undefined;
 
 const confirmationFor = (messages: ChatMessage[], interruptId: string) => {
   for (const message of messages) {
@@ -97,6 +113,8 @@ const requestSnapshot = (
 export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
   const clearConversation = () => {
     clearAfterStop = false;
+    lastRequest = null;
+    clearAgentSession();
     set({
       threadId: null,
       activeRunId: null,
@@ -107,18 +125,21 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
       pendingConfirmation: null,
       connectionError: null,
       usage: null,
+      canRetry: false,
     });
   };
 
   const reconcilePendingConfirmation = async (): Promise<boolean> => {
     const pending = get().pendingConfirmation;
     const threadId = get().threadId;
-    if (!pending || !threadId || !pending.effectId) return false;
+    if (!pending || !threadId) return false;
 
-    for (const delayMs of [0, 150, 400]) {
+    // Without an effect identity there is nothing durable to ask about; fall
+    // through to the retryable failure rather than leaving the run "working".
+    for (const delayMs of pending.effectId ? [0, 150, 400] : []) {
       if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
       try {
-        const status = await getAgentEffectStatus(threadId, pending.effectId);
+        const status = await getAgentEffectStatus(threadId, pending.effectId!);
         if (status.receipt) {
           set((state) => ({
             messages: applyEffectReceipt(state.messages, status.receipt!),
@@ -257,31 +278,60 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
           });
           return;
         }
-        set({
-          activeRunId: null,
-          connectionError: problem,
-          awaitingConfirmation: false,
-          isGenerating: false,
-          isStopping: false,
+        set((state) => {
+          const last = state.messages[state.messages.length - 1];
+          const noOutput = last?.role === "assistant" && last.blocks.length === 0;
+          return {
+            activeRunId: null,
+            connectionError: problem,
+            awaitingConfirmation: false,
+            isGenerating: false,
+            isStopping: false,
+            canRetry: noOutput && lastRequest !== null,
+          };
         });
       },
     };
   };
 
   return {
-    threadId: null,
+    threadId: restoredSession?.threadId ?? null,
     activeRunId: null,
-    messages: [],
-    isGenerating: false,
+    messages: restoredMessages?.messages ?? [],
+    // A restored confirmation whose outcome is unknown is reconciled right
+    // after the store is created; until then the run reads as working.
+    isGenerating: Boolean(restoredSession?.pendingConfirmation),
     isStopping: false,
-    awaitingConfirmation: false,
-    pendingConfirmation: null,
+    awaitingConfirmation:
+      !restoredSession?.pendingConfirmation && Boolean(restoredMessages?.awaitingConfirmation),
+    pendingConfirmation: restoredSession?.pendingConfirmation ?? null,
     connectionError: null,
     usage: null,
+    canRetry: false,
+
+    reconcilePendingConfirmation,
+
+    retryLastMessage: async () => {
+      const state = get();
+      if (!state.canRetry || !lastRequest || state.isGenerating || state.awaitingConfirmation) {
+        return;
+      }
+      const request = lastRequest;
+      // Drop the failed user turn and its empty reply; sendMessage appends them again.
+      const messages = removeTrailingEmptyAssistant(state.messages);
+      const last = messages[messages.length - 1];
+      set({
+        messages: last?.role === "user" ? messages.slice(0, -1) : messages,
+        canRetry: false,
+        connectionError: null,
+      });
+      await get().sendMessage(request.query, request.options);
+    },
 
     sendMessage: async (query, options) => {
       const trimmed = query.trim();
       if (!trimmed || get().isGenerating || get().awaitingConfirmation) return;
+      lastRequest = { query: trimmed, options };
 
       const context = options?.context ?? [];
       const mentions = options?.mentions ?? [];
@@ -296,6 +346,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         isGenerating: true,
         isStopping: false,
         connectionError: null,
+        canRetry: false,
       }));
 
       const controller = new AbortController();
@@ -359,6 +410,7 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
         isGenerating: true,
         isStopping: false,
         connectionError: null,
+        canRetry: false,
       }));
 
       const controller = new AbortController();
@@ -436,3 +488,31 @@ export const useLumilioChatStore = create<LumilioChatStore>((set, get) => {
     },
   };
 });
+
+/** Persist the settled transcript per tab. Streaming chunks are skipped; the
+ * turn is written once it settles, and a pending confirmation is written as
+ * soon as it exists so a reload can reconcile it. */
+useLumilioChatStore.subscribe((state, previous) => {
+  if (
+    state.threadId === previous.threadId &&
+    state.messages === previous.messages &&
+    state.pendingConfirmation === previous.pendingConfirmation &&
+    state.isGenerating === previous.isGenerating
+  ) {
+    return;
+  }
+  if (!state.threadId) {
+    clearAgentSession();
+    return;
+  }
+  if (state.isGenerating && !state.pendingConfirmation) return;
+  saveAgentSession({
+    threadId: state.threadId,
+    messages: state.messages,
+    pendingConfirmation: state.pendingConfirmation,
+  });
+});
+
+if (restoredSession?.pendingConfirmation) {
+  void useLumilioChatStore.getState().reconcilePendingConfirmation();
+}

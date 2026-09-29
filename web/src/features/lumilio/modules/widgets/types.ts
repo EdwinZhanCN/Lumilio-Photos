@@ -10,8 +10,7 @@ export type AgentRefFacetsDTO = components["schemas"]["dto.AgentRefFacetsDTO"];
  * themselves through the hydration hooks (useWidgetData / useWidgetAssets). */
 export type WidgetSource =
   | { kind: "ref"; refId: string; threadId: string }
-  | { kind: "pin"; pinId: string }
-  | { kind: "mock"; mockId: string };
+  | { kind: "pin"; pinId: string };
 
 /** Discrete board size tier. Cells don't free-resize — every cell sits at one
  * of these tiers (chosen via the cell menu), and each view styles itself by

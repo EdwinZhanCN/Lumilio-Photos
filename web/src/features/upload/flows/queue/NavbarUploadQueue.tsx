@@ -141,7 +141,7 @@ export default function NavbarUploadQueue() {
       <button
         type="button"
         className="btn btn-sm sm:btn-md btn-ghost gap-1 sm:gap-2 rounded-full px-2 sm:px-3"
-        onClick={() => navigate("/manage")}
+        onClick={() => navigate("/upload")}
         aria-label={t("upload.NavbarQueue.openPage")}
         title={t("upload.NavbarQueue.openPage")}
       >
@@ -238,7 +238,7 @@ export default function NavbarUploadQueue() {
 
         <div className="space-y-3 border-t border-base-300 px-4 py-3">
           <p className="text-xs text-base-content/60">{t("upload.NavbarQueue.backgroundHint")}</p>
-          <Link to="/manage" className="btn btn-primary btn-sm w-full rounded-full">
+          <Link to="/upload" className="btn btn-primary btn-sm w-full rounded-full">
             {t("upload.NavbarQueue.openPage")}
           </Link>
         </div>

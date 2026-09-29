@@ -93,8 +93,21 @@ type AssetIndexingService interface {
 	ProcessReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (more bool, err error)
 	PrepareReindexReceipt(ctx context.Context, receiptID uuid.UUID, expectedRevision uint64) (PreparedReindex, error)
 	ApplyPreparedReindexTx(ctx context.Context, tx *sql.Tx, prepared PreparedReindex) error
+	// GetReindexReceipt reports one rebuild operation. A receipt completes only
+	// after every page was requested and every stage it bound was applied, so a
+	// caller can tell a finished rebuild from coverage left by an earlier one.
+	GetReindexReceipt(ctx context.Context, receiptID uuid.UUID) (ReindexReceiptStatus, error)
 }
 
+// ReindexReceiptStatus is the catalog-owned state of one rebuild request:
+// "pending", "completed", or "failed" (with TerminalError).
+type ReindexReceiptStatus struct {
+	ReceiptID     uuid.UUID
+	State         string
+	TerminalError string
+}
+
+var ErrReindexReceiptNotFound = errors.New("reindex receipt not found")
 var ErrReindexProjectionStale = errors.New("reindex projection source revision changed")
 var ErrSemanticResetRequiresGlobalScope = errors.New("semantic reset cannot be scoped to one repository")
 
@@ -384,6 +397,21 @@ func (s *assetIndexingService) EnqueueReindexAssets(ctx context.Context, input R
 		MissingOnly:  input.MissingOnly,
 		RepositoryID: input.RepositoryID,
 	}, nil
+}
+
+func (s *assetIndexingService) GetReindexReceipt(ctx context.Context, receiptID uuid.UUID) (ReindexReceiptStatus, error) {
+	if s.readerPool == nil {
+		return ReindexReceiptStatus{}, errors.New("catalog reader is not configured")
+	}
+	status := ReindexReceiptStatus{ReceiptID: receiptID}
+	err := s.readerPool.QueryRowContext(ctx, `SELECT state,COALESCE(terminal_error,'') FROM catalog_operation_receipts WHERE receipt_id=? AND kind='reindex'`, receiptID.String()).Scan(&status.State, &status.TerminalError)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ReindexReceiptStatus{}, ErrReindexReceiptNotFound
+	}
+	if err != nil {
+		return ReindexReceiptStatus{}, fmt.Errorf("read reindex receipt: %w", err)
+	}
+	return status, nil
 }
 
 // offset pagination would skip or reprocess assets.

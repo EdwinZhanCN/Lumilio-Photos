@@ -28,11 +28,12 @@ func TestSplitTextRoutesScriptsWithoutDuplicatingWholeText(t *testing.T) {
 func TestEnglishAnalyzerStemmingCaseAndStopWords(t *testing.T) {
 	index := newTestIndex(t)
 	document := BuildDocument(SourceDocument{
-		AssetID:   uuid.NewString(),
-		OwnerID:   1,
-		AssetType: "PHOTO",
-		Revision:  1,
-		TextItems: []string{"Running JUMPED over the cameras"},
+		AssetID:        uuid.NewString(),
+		LifecycleState: "active",
+		OwnerID:        1,
+		AssetType:      "PHOTO",
+		Revision:       1,
+		TextItems:      []string{"Running JUMPED over the cameras"},
 	})
 	require.NoError(t, index.Apply([]Mutation{{AssetID: document.AssetID, Document: &document}}))
 
@@ -48,11 +49,12 @@ func TestEnglishAnalyzerStemmingCaseAndStopWords(t *testing.T) {
 func TestMixedLanguageQueryIgnoresAnalyzerEmptyLanguage(t *testing.T) {
 	index := newTestIndex(t)
 	document := BuildDocument(SourceDocument{
-		AssetID:   uuid.NewString(),
-		OwnerID:   1,
-		AssetType: "PHOTO",
-		Revision:  1,
-		TextItems: []string{"北京"},
+		AssetID:        uuid.NewString(),
+		LifecycleState: "active",
+		OwnerID:        1,
+		AssetType:      "PHOTO",
+		Revision:       1,
+		TextItems:      []string{"北京"},
 	})
 	require.NoError(t, index.Apply([]Mutation{{AssetID: document.AssetID, Document: &document}}))
 
@@ -64,18 +66,20 @@ func TestMixedLanguageQueryIgnoresAnalyzerEmptyLanguage(t *testing.T) {
 func TestChineseBigramSimplifiedTraditionalAndSingleCharacterSuppression(t *testing.T) {
 	index := newTestIndex(t)
 	simplified := BuildDocument(SourceDocument{
-		AssetID:   uuid.NewString(),
-		OwnerID:   1,
-		AssetType: "PHOTO",
-		Revision:  1,
-		TextItems: []string{"北京星巴克"},
+		AssetID:        uuid.NewString(),
+		LifecycleState: "active",
+		OwnerID:        1,
+		AssetType:      "PHOTO",
+		Revision:       1,
+		TextItems:      []string{"北京星巴克"},
 	})
 	traditional := BuildDocument(SourceDocument{
-		AssetID:   uuid.NewString(),
-		OwnerID:   1,
-		AssetType: "PHOTO",
-		Revision:  1,
-		TextItems: []string{"臺北咖啡館"},
+		AssetID:        uuid.NewString(),
+		LifecycleState: "active",
+		OwnerID:        1,
+		AssetType:      "PHOTO",
+		Revision:       1,
+		TextItems:      []string{"臺北咖啡館"},
 	})
 	require.NoError(t, index.Apply([]Mutation{
 		{AssetID: simplified.AssetID, Document: &simplified},
@@ -95,11 +99,12 @@ func TestChineseBigramSimplifiedTraditionalAndSingleCharacterSuppression(t *test
 	require.Empty(t, page.Hits)
 
 	singleHan := BuildDocument(SourceDocument{
-		AssetID:   uuid.NewString(),
-		OwnerID:   1,
-		AssetType: "PHOTO",
-		Revision:  1,
-		TextItems: []string{"北"},
+		AssetID:        uuid.NewString(),
+		LifecycleState: "active",
+		OwnerID:        1,
+		AssetType:      "PHOTO",
+		Revision:       1,
+		TextItems:      []string{"北"},
 	})
 	require.False(t, singleHan.HasSearchableText())
 }
@@ -109,12 +114,13 @@ func TestMixedLanguageNumericModelAndBasicFilters(t *testing.T) {
 	repositoryA := uuid.NewString()
 	repositoryB := uuid.NewString()
 	live := BuildDocument(SourceDocument{
-		AssetID:      uuid.NewString(),
-		OwnerID:      7,
-		RepositoryID: repositoryA,
-		AssetType:    "PHOTO",
-		Revision:     1,
-		TextItems:    []string{"北京 Starbucks X-T5 2025"},
+		AssetID:        uuid.NewString(),
+		LifecycleState: "active",
+		OwnerID:        7,
+		RepositoryID:   repositoryA,
+		AssetType:      "PHOTO",
+		Revision:       1,
+		TextItems:      []string{"北京 Starbucks X-T5 2025"},
 	})
 	wrongOwner := live
 	wrongOwner.AssetID = uuid.NewString()
@@ -124,7 +130,7 @@ func TestMixedLanguageNumericModelAndBasicFilters(t *testing.T) {
 	wrongRepository.RepositoryID = repositoryB
 	deleted := live
 	deleted.AssetID = uuid.NewString()
-	deleted.IsDeleted = true
+	deleted.LifecycleState = "trashed"
 	require.NoError(t, index.Apply([]Mutation{
 		{AssetID: live.AssetID, Document: &live},
 		{AssetID: wrongOwner.AssetID, Document: &wrongOwner},
@@ -143,10 +149,10 @@ func TestMixedLanguageNumericModelAndBasicFilters(t *testing.T) {
 	require.Equal(t, []string{live.AssetID}, hitIDs(page.Hits))
 
 	page, err = index.SearchPage(context.Background(), "北京 Starbucks T5 2025", BasicFilters{
-		OwnerID:      &ownerID,
-		RepositoryID: &repositoryA,
-		AssetType:    &assetType,
-		IsDeleted:    true,
+		OwnerID:        &ownerID,
+		RepositoryID:   &repositoryA,
+		AssetType:      &assetType,
+		LifecycleState: "trashed",
 	}, QueryStrict, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, []string{deleted.AssetID}, hitIDs(page.Hits))

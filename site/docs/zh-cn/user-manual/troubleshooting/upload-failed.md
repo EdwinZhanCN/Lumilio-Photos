@@ -11,7 +11,7 @@ verification_status: "verified"
 
 <!--
 code-evidence:
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_upload_handler.go
 - server/internal/utils/file/validator.go
 - server/internal/storage/directory_manager.go
 - web/src/features/manage

@@ -215,11 +215,6 @@ type StorageShortcut struct {
 	CanRemove            bool   `json:"canRemove"`
 	RemovalBlockedBy     string `json:"removalBlockedBy,omitempty"`
 	FilesPreserved       bool   `json:"filesPreserved"`
-	Writable             bool   `json:"writable"`
-	CapacityKnown        bool   `json:"capacityKnown"`
-	TotalBytes           uint64 `json:"totalBytes,omitempty"`
-	AvailableBytes       uint64 `json:"availableBytes,omitempty"`
-	Filesystem           string `json:"filesystem,omitempty"`
 }
 
 type StorageSummary struct {

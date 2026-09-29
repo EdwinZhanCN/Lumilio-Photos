@@ -26,7 +26,7 @@ JOIN (
        OR repository_id = ?1
     GROUP BY asset_id
 ) occurrence ON occurrence.asset_id = a.asset_id
-WHERE COALESCE(a.is_deleted, false) = false
+WHERE COALESCE(a.lifecycle_state, 'active') = 'active'
   AND (?2 IS NULL OR a.owner_id = ?2)
   AND fi.embedding IS NOT NULL
   AND fi.confidence >= ?3

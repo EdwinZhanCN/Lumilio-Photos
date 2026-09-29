@@ -20,17 +20,19 @@ import (
 
 func runConfigCLI(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: server config <init|validate|healthcheck> [options]")
+		return errors.New("usage: server config <init|validate|upgrade|healthcheck> [options]")
 	}
 	switch args[0] {
 	case "init":
 		return runConfigInit(args[1:], stdout, stderr)
 	case "validate":
 		return runConfigValidate(args[1:], stdout, stderr)
+	case "upgrade":
+		return runConfigUpgrade(args[1:], stdout, stderr)
 	case "healthcheck":
 		return runConfigHealthcheck(args[1:], stdout, stderr)
 	default:
-		return fmt.Errorf("unknown config command %q (want init, validate, or healthcheck)", args[0])
+		return fmt.Errorf("unknown config command %q (want init, validate, upgrade, or healthcheck)", args[0])
 	}
 }
 
@@ -150,6 +152,83 @@ func runConfigValidate(args []string, stdout, stderr io.Writer) error {
 	fmt.Fprintln(stdout, "configuration valid")
 	writeConfigReport(stdout, cfg)
 	return nil
+}
+
+// runConfigUpgrade rewrites an older supported manifest to the current
+// schema_version. The server never does this on its own: the operator runs it,
+// the previous file is kept as <file>.bak, and the result must pass the same
+// strict load as a generated manifest before it replaces the original.
+func runConfigUpgrade(args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("server config upgrade", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	pathFlag := flags.String("config", "", "runtime TOML manifest to upgrade in place")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 || strings.TrimSpace(*pathFlag) == "" {
+		return errors.New("config upgrade requires --config <path>")
+	}
+	path, err := filepath.Abs(strings.TrimSpace(*pathFlag))
+	if err != nil {
+		return err
+	}
+	original, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read config: %w", err)
+	}
+	upgrade, err := config.UpgradeManifest(original)
+	if err != nil {
+		return fmt.Errorf("upgrade %s: %w", path, err)
+	}
+	if upgrade.Data == nil {
+		fmt.Fprintf(stdout, "%s is already at schema_version %d; nothing to upgrade\n", path, upgrade.To)
+		return nil
+	}
+
+	backupPath := path + ".bak"
+	if _, err := os.Stat(backupPath); err == nil {
+		return fmt.Errorf("refusing to overwrite existing %s; move it aside and run the upgrade again", backupPath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect %s: %w", backupPath, err)
+	}
+	candidate := path + ".upgrade"
+	if err := writeConfigAtomic(candidate, upgrade.Data); err != nil {
+		return err
+	}
+	defer os.Remove(candidate)
+	if _, err := config.LoadAppConfig(candidate); err != nil {
+		return fmt.Errorf("upgraded config failed strict validation; %s is unchanged: %w", path, err)
+	}
+	if err := writeNewFile(backupPath, original); err != nil {
+		return err
+	}
+	if err := os.Rename(candidate, path); err != nil {
+		return fmt.Errorf("install upgraded config %s (previous file saved as %s): %w", path, backupPath, err)
+	}
+	cfg, err := config.LoadAppConfig(path)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "upgraded %s from schema_version %d to %d; previous file saved as %s\n", path, upgrade.From, upgrade.To, backupPath)
+	writeConfigReport(stdout, cfg)
+	return nil
+}
+
+// writeNewFile writes data to a path that must not exist yet.
+func writeNewFile(path string, data []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", path, err)
+	}
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		return fmt.Errorf("sync %s: %w", path, err)
+	}
+	return file.Close()
 }
 
 func writeConfigReport(output io.Writer, cfg config.AppConfig) {

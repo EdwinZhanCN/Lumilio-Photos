@@ -152,8 +152,8 @@ func (h *embeddedRuntimeHarness) seedPrimaryRepository() {
 		h.t.Fatal(err)
 	}
 	defer database.Close()
-	var rootID, rootPath string
-	if err := database.QueryRow(`SELECT root_id, path FROM repository_roots WHERE kind = 'default'`).Scan(&rootID, &rootPath); err != nil {
+	var storageLocationID, rootPath string
+	if err := database.QueryRow(`SELECT storage_location_id, path FROM storage_locations WHERE kind = 'default'`).Scan(&storageLocationID, &rootPath); err != nil {
 		h.t.Fatalf("read default root: %v", err)
 	}
 	// The Server canonicalizes macOS' /var symlink before cataloging paths;
@@ -178,9 +178,9 @@ func (h *embeddedRuntimeHarness) seedPrimaryRepository() {
 	}
 	now := time.Now().UnixMilli()
 	_, err = database.Exec(`INSERT INTO repositories
-		(repo_id, name, path, config, reachability, activity, pause_reason, created_at, updated_at, role, root_id)
+		(repo_id, name, path, config, reachability, activity, pause_reason, created_at, updated_at, role, storage_location_id)
 		VALUES (?, ?, ?, ?, 'active', 'idle', '', ?, ?, 'primary', ?)`,
-		repositoryID, "Primary Storage", repositoryPath, string(configJSON), now, now, rootID)
+		repositoryID, "Primary Storage", repositoryPath, string(configJSON), now, now, storageLocationID)
 	if err != nil {
 		h.t.Fatalf("insert primary repository: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestEmbeddedRuntimeAppliesMovedDefaultStorageAndCommitsLKG(t *testing.T) {
 	}
 	defer database.Close()
 	var rootPath, repositoryPath string
-	if err := database.QueryRow(`SELECT path FROM repository_roots WHERE kind = 'default'`).Scan(&rootPath); err != nil {
+	if err := database.QueryRow(`SELECT path FROM storage_locations WHERE kind = 'default'`).Scan(&rootPath); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.QueryRow(`SELECT path FROM repositories WHERE role = 'primary'`).Scan(&repositoryPath); err != nil {

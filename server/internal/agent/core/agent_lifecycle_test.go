@@ -158,8 +158,8 @@ func TestADKLifecycleConfirmationCheckpointAndResume(t *testing.T) {
 	if len(interrupted.errs) > 0 {
 		t.Fatalf("initial runner errors = %v", interrupted.errs)
 	}
-	rootID := rootInterruptID(interrupted.interrupts)
-	if rootID == "" {
+	storageLocationID := rootInterruptID(interrupted.interrupts)
+	if storageLocationID == "" {
 		t.Fatalf("interrupt contexts = %#v, want root cause", interrupted.interrupts)
 	}
 	if data, exists, getErr := checkpointStore.Get(ctx, checkpointID); getErr != nil || !exists || len(data) == 0 {
@@ -167,7 +167,7 @@ func TestADKLifecycleConfirmationCheckpointAndResume(t *testing.T) {
 	}
 
 	resumed, err := runner.ResumeWithParams(ctx, checkpointID, &adk.ResumeParams{
-		Targets: map[string]any{rootID: "approved"},
+		Targets: map[string]any{storageLocationID: "approved"},
 	})
 	if err != nil {
 		t.Fatalf("ResumeWithParams() error = %v", err)
@@ -192,11 +192,11 @@ func TestADKLifecycleResumesEinoV096ConfirmationCheckpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read v0.9.6 checkpoint fixture: %v", err)
 	}
-	rootIDData, err := os.ReadFile(filepath.Join("testdata", "eino-v0.9.6-confirmation-checkpoint.bin.root-id"))
+	storageLocationIDData, err := os.ReadFile(filepath.Join("testdata", "eino-v0.9.6-confirmation-checkpoint.bin.root-id"))
 	if err != nil {
 		t.Fatalf("read v0.9.6 checkpoint root ID: %v", err)
 	}
-	rootID := strings.TrimSpace(string(rootIDData))
+	storageLocationID := strings.TrimSpace(string(storageLocationIDData))
 	const checkpointID = "u:7:t:pre-upgrade-confirm"
 	if err := checkpointStore.Set(ctx, checkpointID, checkpointData); err != nil {
 		t.Fatalf("install v0.9.6 checkpoint fixture: %v", err)
@@ -222,7 +222,7 @@ func TestADKLifecycleResumesEinoV096ConfirmationCheckpoint(t *testing.T) {
 		Agent: agent, EnableStreaming: true, CheckPointStore: checkpointStore,
 	})
 	resumed, err := runner.ResumeWithParams(ctx, checkpointID, &adk.ResumeParams{
-		Targets: map[string]any{rootID: "approved from v0.9.6"},
+		Targets: map[string]any{storageLocationID: "approved from v0.9.6"},
 	})
 	if err != nil {
 		t.Fatalf("ResumeWithParams(v0.9.6 fixture) error = %v", err)

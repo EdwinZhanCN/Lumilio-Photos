@@ -21,8 +21,11 @@ types), and `site/docs/public/redoc-static.html` — are never hand-edited.
    annotation (`@Success ... {data=dto.X}`), and behavior together. Do not
    add frontend work against a stale type.
 2. SQL schema or queries changed? `task server:sqlc` (generated repo layer
-   lives under `server/internal/db/repo`). Historical migrations in
-   `server/migrations` are immutable — checksums are recorded at apply time.
+   lives under `server/internal/db/repo`). Until the `v26.1.0-rc.1` tag the
+   catalog baseline `server/migrations/000001_storage_baseline.up.sql` is
+   edited in place. From the tag on it and every released step are frozen: a
+   schema change is a new forward step in `server/migrations/steps/` plus a
+   `SchemaVersion` bump, following `server/migrations/steps/README.md`.
 3. From the repository root: `task dto`. It runs `server:openapi` (swag v2),
    `web:openapi-types`, and `site:openapi-docs`.
 4. Inspect `git diff web/src/lib/http-commons/schema.d.ts` and confirm the

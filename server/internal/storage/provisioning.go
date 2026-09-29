@@ -8,21 +8,21 @@ import (
 	"server/config"
 )
 
-// EnsureRootLayout creates the default repository root and the explicitly
-// separate private cloud/backup directories. It is idempotent and is the
-// filesystem producer of the bootstrap "dirs_ready" gate.
+// EnsureRootLayout creates the Default Storage Location directory and the
+// explicitly separate private cloud/backup directories. It is idempotent and
+// is the filesystem producer of the bootstrap "dirs_ready" gate.
 //
 // It creates:
-//   - storage.path             default repository root
+//   - storage.path             Default Storage Location
 //   - storage.cloud_state_path cloud provider sessions/artifacts (owner-only)
 //   - storage.backups_path     database backups (owner-only)
 //
-// The primary repository directory (<root>/primary) is NOT created here; it is
+// The primary repository directory (<storage.path>/primary) is NOT created here; it is
 // built with its full repository structure when the primary repository is
 // initialized.
 func EnsureRootLayout(cfg config.StorageConfig) error {
 	if strings.TrimSpace(cfg.Path) == "" {
-		return fmt.Errorf("storage root path is empty")
+		return fmt.Errorf("storage location path is empty")
 	}
 
 	layout := []struct {

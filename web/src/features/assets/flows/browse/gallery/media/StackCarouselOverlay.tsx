@@ -13,7 +13,8 @@ interface StackCarouselOverlayProps {
   onClose: () => void;
 }
 
-const overlayMessageClasses = "fixed inset-0 z-lightbox isolate flex items-center justify-center bg-black/90";
+const overlayMessageClasses =
+  "fixed inset-0 z-lightbox isolate flex items-center justify-center bg-black/90";
 
 export default function StackCarouselOverlay({
   asset,

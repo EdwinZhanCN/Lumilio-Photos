@@ -137,13 +137,9 @@ func expandedEmbeddingKNNLimit(topK int) int {
 // predicates into Vec1. More relational filters are still checked against the
 // authoritative tables after candidate selection.
 func buildVec1FilterConditions(builder *sqlBuilder, filter Filter, spaceID int64) ([]string, error) {
-	isDeleted := false
-	if filter.IsDeleted != nil {
-		isDeleted = *filter.IsDeleted
-	}
 	conditions := []string{
 		fmt.Sprintf("v.space_id = %s", builder.addArg(spaceID)),
-		fmt.Sprintf("v.is_deleted = %s", builder.addArg(isDeleted)),
+		fmt.Sprintf("v.lifecycle_state = %s", builder.addArg(filter.lifecycleState())),
 	}
 	if filter.OwnerID != nil {
 		conditions = append(conditions, fmt.Sprintf("v.owner_id = %s", builder.addArg(*filter.OwnerID)))
@@ -283,10 +279,10 @@ func (r *BleveOCRRetriever) Retrieve(ctx context.Context, req Request) ([]Candid
 	}
 
 	filters := bleveocr.BasicFilters{
-		OwnerID:    req.Filter.OwnerID,
-		AssetType:  req.Filter.AssetType,
-		AssetTypes: req.Filter.AssetTypes,
-		IsDeleted:  req.Filter.IsDeleted != nil && *req.Filter.IsDeleted,
+		OwnerID:        req.Filter.OwnerID,
+		AssetType:      req.Filter.AssetType,
+		AssetTypes:     req.Filter.AssetTypes,
+		LifecycleState: req.Filter.lifecycleState(),
 	}
 	// One Asset may have Locations in several repositories, while the compact
 	// Bleve document stores only one representative repository. The SQLite
@@ -422,7 +418,9 @@ func collectCandidates(rows *sql.Rows, source string) ([]Candidate, error) {
 	return candidates, nil
 }
 
-func HydrateAssets(ctx context.Context, pool *sql.DB, rankedIDs []uuid.UUID, includeDeleted bool) ([]repo.Asset, error) {
+// HydrateAssets loads ranked Assets in rank order, keeping only those in
+// lifecycleState ("" means active).
+func HydrateAssets(ctx context.Context, pool *sql.DB, rankedIDs []uuid.UUID, lifecycleState string) ([]repo.Asset, error) {
 	if len(rankedIDs) == 0 {
 		return []repo.Asset{}, nil
 	}
@@ -440,10 +438,10 @@ func HydrateAssets(ctx context.Context, pool *sql.DB, rankedIDs []uuid.UUID, inc
 	queries := repo.New(pool)
 	var assets []repo.Asset
 	var err error
-	if includeDeleted {
-		assets, err = queries.GetAssetsByIDsAny(ctx, ids)
-	} else {
+	if lifecycleState == "" || lifecycleState == LifecycleActive {
 		assets, err = queries.GetAssetsByIDs(ctx, ids)
+	} else {
+		assets, err = queries.GetAssetsByIDsAny(ctx, ids)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("decode ranked assets: %w", err)
@@ -451,7 +449,9 @@ func HydrateAssets(ctx context.Context, pool *sql.DB, rankedIDs []uuid.UUID, inc
 
 	byID := make(map[uuid.UUID]repo.Asset, len(assets))
 	for _, asset := range assets {
-		byID[asset.AssetID] = asset
+		if lifecycleState == "" || asset.LifecycleState == lifecycleState {
+			byID[asset.AssetID] = asset
+		}
 	}
 
 	ordered := make([]repo.Asset, 0, len(rankedIDs))

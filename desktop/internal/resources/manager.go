@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"desktop/internal/platform"
+	"desktop/internal/platform/stateversion"
 )
 
 const installSchemaVersion = 1
@@ -120,7 +121,10 @@ func (m *Manager) Reconcile() error {
 	if err := decoder.Decode(&item); err != nil {
 		return fmt.Errorf("decode resource install journal: %w", err)
 	}
-	if item.SchemaVersion != installSchemaVersion || item.Version == "" || !validDigest(item.ManifestSHA256) || item.Directory == "" {
+	if err := stateversion.Check("resource install journal", item.SchemaVersion, installSchemaVersion); err != nil {
+		return err
+	}
+	if item.Version == "" || !validDigest(item.ManifestSHA256) || item.Directory == "" {
 		return errors.New("invalid resource install journal")
 	}
 	target, err := managerSafeJoin(m.paths.ResourcesVersions, item.Directory)
@@ -289,7 +293,10 @@ func (m *Manager) loadPointer() (Pointer, error) {
 	if err := decoder.Decode(&pointer); err != nil {
 		return Pointer{}, err
 	}
-	if pointer.SchemaVersion != installSchemaVersion || pointer.Version == "" || pointer.Platform == "" || pointer.Arch == "" || !validDigest(pointer.ManifestSHA256) || pointer.Directory == "" {
+	if err := stateversion.Check("resource current pointer", pointer.SchemaVersion, installSchemaVersion); err != nil {
+		return Pointer{}, err
+	}
+	if pointer.Version == "" || pointer.Platform == "" || pointer.Arch == "" || !validDigest(pointer.ManifestSHA256) || pointer.Directory == "" {
 		return Pointer{}, errors.New("invalid resource current pointer")
 	}
 	if _, err := managerSafeJoin(m.paths.ResourcesVersions, pointer.Directory); err != nil {

@@ -12,7 +12,7 @@ verification_status: "verified"
 <!--
 code-evidence:
 - web/src/features/manage
-- server/internal/api/handler/asset_handler.go
+- server/internal/api/handler/asset_upload_handler.go
 - server/internal/sourcing/materializer.go
 - server/internal/storage/roe/controller/controller.go
 - server/internal/cloud/icloud

@@ -39,6 +39,10 @@ type Repository = {
   name: string;
 };
 
+type CreateRepositoryResponse = components["schemas"]["dto.CreateRepositoryResponseDTO"];
+type RebuildResponse = components["schemas"]["dto.RebuildAssetIndexesResponseDTO"];
+type RebuildStatus = components["schemas"]["dto.AssetIndexingRebuildStatusDTO"];
+
 type IndexingTaskStats = {
   indexed_count: number;
   queued_jobs: number;
@@ -73,18 +77,19 @@ type SystemSettings = {
 const frameCap = 2;
 
 async function createRepository(token: string, name: string): Promise<Repository> {
-  const { repository } = await api<{ repository: Repository }>("/api/v1/repositories", {
+  const { repository } = await api<CreateRepositoryResponse>("/api/v1/storage/repositories", {
     method: "POST",
     token,
     body: JSON.stringify({
       name,
       directory_name: name,
-      role: "regular",
       storage_strategy: "flat",
-      duplicate_handling: "rename",
     }),
   });
-  return repository;
+  if (!repository?.id || !repository.name) {
+    throw new Error(`repository creation for ${name} did not return id and name`);
+  }
+  return { id: repository.id, name: repository.name };
 }
 
 async function removeRepository(token: string, repository: Repository) {
@@ -92,8 +97,8 @@ async function removeRepository(token: string, repository: Repository) {
     .poll(
       async () => {
         try {
-          await api(`/api/v1/repositories/${repository.id}`, {
-            method: "DELETE",
+          await api(`/api/v1/storage/repositories/${repository.id}/detach`, {
+            method: "POST",
             token,
             body: JSON.stringify({ confirmation_name: repository.name }),
           });
@@ -209,6 +214,42 @@ async function waitForIndexingCoverage(
       videoIndexed: expectedVideos,
       videoTotal: expectedVideos,
     });
+}
+
+/**
+ * Rebuilds are asynchronous: the POST only records a receipt, and a semantic
+ * reset deletes vectors later, when the scheduler applies the first page.
+ * Coverage read before that still counts the previous run's vectors, so it is
+ * not completion. The receipt completes only after every page was requested
+ * and every enrichment stage it requested was applied.
+ */
+async function queueRebuild(token: string, body: Record<string, unknown>) {
+  const response = await api<RebuildResponse>("/api/v1/assets/indexing/rebuild", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe("queued");
+  expect(response.receipt_id).toBeTruthy();
+  let receipt: RebuildStatus | undefined;
+  await expect
+    .poll(
+      async () => {
+        receipt = await api<RebuildStatus>(
+          `/api/v1/assets/indexing/rebuild/${encodeURIComponent(response.receipt_id ?? "")}`,
+          { token },
+        );
+        return receipt.state;
+      },
+      {
+        message: "the rebuild receipt should settle",
+        timeout: 180_000,
+        intervals: [500, 1_000, 2_000],
+      },
+    )
+    .not.toBe("pending");
+  expect(receipt).toMatchObject({ state: "completed" });
+  return response;
 }
 
 async function waitForDisabledVideoCoverage(token: string, repositoryID: string) {
@@ -341,43 +382,27 @@ test("@video-regression pinned videos cover semantic indexing lifecycle", async 
       ).toBe(true);
     });
 
-    // These requests currently expose acceptance, not queryable operation
-    // completion. Existing coverage must not be mistaken for a fresh run.
-    // Global inference counters cannot close that observability gap.
-    await test.step("video semantic backfill is accepted with repository coverage", async () => {
-      const response = await api<{ status: string; requested_tasks: string[] }>(
-        "/api/v1/assets/indexing/rebuild",
-        {
-          method: "POST",
-          token: workspace.token,
-          body: JSON.stringify({
-            repository_id: repository.id,
-            tasks: ["video_semantic"],
-            limit: 50,
-            missing_only: false,
-          }),
-        },
-      );
-      expect(response.status).toBe("queued");
+    // Coverage is read only after the rebuild's own receipt completes; before
+    // that, it can still count vectors from the previous run (a reset deletes
+    // them only when the scheduler applies its first page).
+    await test.step("video semantic backfill completes with repository coverage", async () => {
+      const response = await queueRebuild(workspace.token, {
+        repository_id: repository.id,
+        tasks: ["video_semantic"],
+        limit: 50,
+        missing_only: false,
+      });
       expect(response.requested_tasks).toContain("video_semantic");
       await waitForIndexingCoverage(workspace.token, repository.id, 1, videos.length);
     });
 
     await test.step("semantic reset refills photo and video indexes", async () => {
-      const response = await api<{ status: string; requested_tasks: string[] }>(
-        "/api/v1/assets/indexing/rebuild",
-        {
-          method: "POST",
-          token: workspace.token,
-          body: JSON.stringify({
-            tasks: ["semantic"],
-            limit: 50,
-            missing_only: false,
-            reset_semantic: true,
-          }),
-        },
-      );
-      expect(response.status).toBe("queued");
+      const response = await queueRebuild(workspace.token, {
+        tasks: ["semantic"],
+        limit: 50,
+        missing_only: false,
+        reset_semantic: true,
+      });
       expect(response.requested_tasks).toContain("semantic");
       await waitForIndexingCoverage(workspace.token, repository.id, 1, videos.length);
     });

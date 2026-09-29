@@ -11,9 +11,7 @@ export function usePasswordConfirmation(
     const input = confirmationRef.current;
     if (!input) return;
 
-    input.setCustomValidity(
-      confirmation && confirmation !== password ? mismatchMessage : "",
-    );
+    input.setCustomValidity(confirmation && confirmation !== password ? mismatchMessage : "");
   }, [confirmation, mismatchMessage, password]);
 
   return confirmationRef;
