@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -423,5 +424,12 @@ func (f *fixture) requireAlbumMember(album int64, asset uuid.UUID) {
 	}
 	if count != 1 {
 		f.t.Fatalf("Asset %v is not in album %d", asset, album)
+	}
+}
+
+func TestScanRequestForARemovedRepositoryReportsItGone(t *testing.T) {
+	f := newFixture(t, 0)
+	if _, _, err := f.scanner.Request(f.ctx, uuid.New(), TriggerWatcher, "", "", time.Time{}); !errors.Is(err, ErrRepositoryGone) {
+		t.Fatalf("request for an unknown repository = %v, want ErrRepositoryGone", err)
 	}
 }

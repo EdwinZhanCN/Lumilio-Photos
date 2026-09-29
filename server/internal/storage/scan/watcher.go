@@ -240,7 +240,10 @@ func (w *Watcher) aggregate(ctx context.Context, repositoryID uuid.UUID, root st
 }
 
 func (w *Watcher) requestScan(ctx context.Context, repositoryID uuid.UUID, scope string) {
-	if err := w.request(ctx, repositoryID, TriggerWatcher, scope); err != nil && !errors.Is(err, context.Canceled) {
+	// A batch can close just after its repository was removed; the next
+	// reconcile drops the watch.
+	if err := w.request(ctx, repositoryID, TriggerWatcher, scope); err != nil &&
+		!errors.Is(err, context.Canceled) && !errors.Is(err, ErrRepositoryGone) {
 		w.logger.Warn("request watcher scan", zap.String("repository_id", repositoryID.String()), zap.Error(err))
 	}
 }
