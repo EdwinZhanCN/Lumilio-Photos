@@ -661,25 +661,32 @@ func ApplyAssetExtractedMetadataTx(
 	return nil
 }
 
+// preserveSpecificMetadataDescription keeps a user-edited description, even
+// an empty one, across re-extraction; an extracted description follows the
+// file, so a caption rewritten by another tool shows up after an in-place
+// edit.
 func preserveSpecificMetadataDescription(existing, incoming dbtypes.SpecificMetadata) (dbtypes.SpecificMetadata, error) {
 	var existingObject map[string]json.RawMessage
 	if len(existing) == 0 || json.Unmarshal(existing, &existingObject) != nil {
+		return incoming, nil
+	}
+	var edited bool
+	if raw, ok := existingObject["description_edited"]; !ok || json.Unmarshal(raw, &edited) != nil || !edited {
 		return incoming, nil
 	}
 	description, exists := existingObject["description"]
 	if !exists {
 		return incoming, nil
 	}
-	var descriptionText string
-	if err := json.Unmarshal(description, &descriptionText); err != nil {
-		return incoming, nil
-	}
-
 	var incomingObject map[string]json.RawMessage
 	if err := json.Unmarshal(incoming, &incomingObject); err != nil {
 		return nil, err
 	}
+	if incomingObject == nil {
+		incomingObject = map[string]json.RawMessage{}
+	}
 	incomingObject["description"] = description
+	incomingObject["description_edited"] = json.RawMessage("true")
 	encoded, err := json.Marshal(incomingObject)
 	return dbtypes.SpecificMetadata(encoded), err
 }

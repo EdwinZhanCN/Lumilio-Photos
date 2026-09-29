@@ -596,6 +596,9 @@ type Querier interface {
 	ListLiveRepositoryEntriesUnder(ctx context.Context, arg ListLiveRepositoryEntriesUnderParams) ([]RepositoryEntry, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
 	ListLocationProjectionScopes(ctx context.Context, repositoryID interface{}) ([]ListLocationProjectionScopesRow, error)
+	// A user's manual person assignments on an Asset's faces, with the face box,
+	// captured before a re-detection replaces the faces.
+	ListManualFaceAssignmentsForAsset(ctx context.Context, assetID uuid.UUID) ([]ListManualFaceAssignmentsForAssetRow, error)
 	ListMusicAlbumArtists(ctx context.Context, arg ListMusicAlbumArtistsParams) ([]ListMusicAlbumArtistsRow, error)
 	ListMusicAlbumTracks(ctx context.Context, arg ListMusicAlbumTracksParams) ([]ListMusicAlbumTracksRow, error)
 	ListMusicAlbums(ctx context.Context, arg ListMusicAlbumsParams) ([]ListMusicAlbumsRow, error)
@@ -760,6 +763,8 @@ type Querier interface {
 	UpdateAgentPinWidget(ctx context.Context, arg UpdateAgentPinWidgetParams) error
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
+	// A user edit marks the description, so re-extracted metadata never
+	// overwrites it while an extracted caption keeps following the file.
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
 	UpdateAssetDimensions(ctx context.Context, arg UpdateAssetDimensionsParams) error
 	UpdateAssetDuration(ctx context.Context, arg UpdateAssetDurationParams) error

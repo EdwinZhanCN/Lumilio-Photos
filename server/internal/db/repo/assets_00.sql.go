@@ -2558,7 +2558,9 @@ UPDATE assets
 SET specific_metadata = json_set(
     COALESCE(specific_metadata, '{}'),
     char(36) || '.description',
-    ?1
+    ?1,
+    char(36) || '.description_edited',
+    json('true')
 )
 WHERE asset_id = ?2
 `
@@ -2568,6 +2570,8 @@ type UpdateAssetDescriptionParams struct {
 	AssetID     uuid.UUID   `db:"asset_id" json:"asset_id"`
 }
 
+// A user edit marks the description, so re-extracted metadata never
+// overwrites it while an extracted caption keeps following the file.
 func (q *Queries) UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error {
 	_, err := q.db.ExecContext(ctx, updateAssetDescription, arg.Description, arg.AssetID)
 	return err

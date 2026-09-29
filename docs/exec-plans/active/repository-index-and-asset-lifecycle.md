@@ -252,10 +252,18 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
 - [ ] Artifact cleaner keyed on Asset existence.
 - [ ] The Trash view can be rebuilt from the sidecars.
 
-4c — carry-over follow-ups the scan core cannot do alone:
-- [ ] Re-extracted metadata never overwrites the user-edited description.
-- [ ] Manual face assignments are re-applied to the re-detected face with
-  IoU ≥ 0.5, or surfaced as unconfirmed.
+4c — carry-over follow-ups the scan core cannot do alone
+(`feat/carry-over-followups`):
+- [x] Re-extracted metadata never overwrites the user-edited description. A
+  user edit sets `specific_metadata.description_edited`; re-extraction keeps
+  an edited description (even an empty one) and otherwise follows the file's
+  caption, so a caption rewritten by another tool shows up. Carry-over
+  branch 2 copies only an edited description.
+- [x] Manual face assignments are re-applied on re-detection: captured before
+  the old faces go, each goes to the new face it overlaps most (IoU ≥ 0.5
+  stays manual; any smaller overlap joins the person as an unconfirmed,
+  automatic member), and emptied people are dissolved only afterwards. It
+  applies to any re-detection, including a model upgrade.
 
 ### Phase 5 — API and Web (#222, #223)
 - [ ] DTOs and endpoints for the scan status and counters, trash, the Missing

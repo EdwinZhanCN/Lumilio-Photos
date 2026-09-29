@@ -8,13 +8,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPreserveSpecificMetadataDescriptionKeepsExistingEmptyValue(t *testing.T) {
-	existing := dbtypes.SpecificMetadata(`{"description":"","exposure":1}`)
+func TestPreserveSpecificMetadataDescriptionKeepsAUserEditEvenWhenEmpty(t *testing.T) {
+	existing := dbtypes.SpecificMetadata(`{"description":"","description_edited":true,"exposure":1}`)
 	incoming := dbtypes.SpecificMetadata(`{"description":"embedded","camera_model":"X-T5"}`)
 
 	merged, err := preserveSpecificMetadataDescription(existing, incoming)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"description":"","camera_model":"X-T5"}`, string(merged))
+	require.JSONEq(t, `{"description":"","description_edited":true,"camera_model":"X-T5"}`, string(merged))
+}
+
+func TestPreserveSpecificMetadataDescriptionFollowsAnExtractedCaption(t *testing.T) {
+	existing := dbtypes.SpecificMetadata(`{"description":"old caption","camera_model":"X-T5"}`)
+	incoming := dbtypes.SpecificMetadata(`{"description":"caption rewritten by another tool","camera_model":"X-T5"}`)
+
+	merged, err := preserveSpecificMetadataDescription(existing, incoming)
+	require.NoError(t, err)
+	require.JSONEq(t, string(incoming), string(merged))
 }
 
 func TestPreserveSpecificMetadataDescriptionImportsWhenMissing(t *testing.T) {

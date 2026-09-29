@@ -135,6 +135,13 @@ Amended 2026-09-28 while landing Phase 4a.
   `repository_offline`, `file_changed`, `asset_missing`, `not_trashed`,
   `trash_file_missing`, or `move_failed`, until Phase 5 adds dedicated asset
   Problems.
+- **User edits are marked, not inferred** (amended 2026-09-29, Phase 4c). A
+  description edit sets `specific_metadata.description_edited`; only a marked
+  description survives re-extraction, and an extracted caption follows the
+  file. A manual face assignment is re-applied to the re-detected face with
+  the greatest overlap: IoU ≥ 0.5 keeps it manual, a smaller overlap makes the
+  face an unconfirmed automatic member of the person, and no overlap drops it
+  because no face is left to carry it.
 - **Duplicate resolution deletes first.** The non-kept duplicates go to the
   trash as one Delete; a refused Delete leaves the group pending and nothing
   merged.

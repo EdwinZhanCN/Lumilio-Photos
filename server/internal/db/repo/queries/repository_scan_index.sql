@@ -146,11 +146,12 @@ UPDATE assets
 SET rating = (SELECT source.rating FROM assets source WHERE source.asset_id = sqlc.arg(source_asset_id)),
     liked = (SELECT source.liked FROM assets source WHERE source.asset_id = sqlc.arg(source_asset_id)),
     specific_metadata = COALESCE((
-        SELECT json_set(COALESCE(assets.specific_metadata, '{}'), '$.description',
-                        json_extract(source.specific_metadata, '$.description'))
+        SELECT json_set(COALESCE(assets.specific_metadata, '{}'),
+                        '$.description', json_extract(source.specific_metadata, '$.description'),
+                        '$.description_edited', json('true'))
         FROM assets source
         WHERE source.asset_id = sqlc.arg(source_asset_id)
-          AND json_extract(source.specific_metadata, '$.description') IS NOT NULL
+          AND json_extract(source.specific_metadata, '$.description_edited') = 1
     ), specific_metadata)
 WHERE assets.asset_id = sqlc.arg(target_asset_id);
 
