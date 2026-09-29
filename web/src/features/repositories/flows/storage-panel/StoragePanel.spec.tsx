@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { page, userEvent } from "vitest/browser";
+import { page, userEvent } from "vite-plus/test/browser";
 import { http, HttpResponse, worker } from "@test/msw";
 import { renderWithProviders } from "@test/render";
 import { t } from "@test/i18n";

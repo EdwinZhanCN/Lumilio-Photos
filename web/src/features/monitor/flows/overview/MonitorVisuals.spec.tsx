@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vite-plus/test";
-import { cdp, page } from "vitest/browser";
+import { cdp, page } from "vite-plus/test/browser";
 import { renderWithProviders } from "@test/render";
 import { http, HttpResponse, worker } from "@test/msw";
 import { t } from "@test/i18n";
@@ -247,7 +247,7 @@ test("the center selects discovery and reopens the inspector after viewing a nod
     .toHaveAttribute("aria-pressed", "true");
   await screen.getByText(t("monitor.capabilities.nodeDetails"), { exact: true }).click();
   const details = screen.getByRole("region", { name: t("monitor.snapshot.selection") });
-  await expect.element(details).toHaveTextContent("ocr / ocr");
+  await expect.element(details).toMatchTextContent("ocr / ocr");
   await expect.element(details.getByText("192.0.2.6:5866", { exact: true })).toBeVisible();
   await screen
     .getByRole("complementary")

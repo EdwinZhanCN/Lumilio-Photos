@@ -5,3 +5,4 @@
 # Self-hosted Studio depth model and ONNX Runtime WASM
 /public/models/
 /public/ort/
+.vitest/

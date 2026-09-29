@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import en from "@/locales/en/translation.json";
 import zh from "@/locales/zh/translation.json";
 

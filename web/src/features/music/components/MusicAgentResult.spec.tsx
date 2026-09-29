@@ -45,7 +45,7 @@ describe("music Agent selection", () => {
       .toBeVisible();
     await expect
       .element(screen.getByLabelText("Preview queue", { exact: true }))
-      .toHaveTextContent("");
+      .toMatchTextContent("");
     await screen
       .getByRole("checkbox", { name: t("music.agent.selectTrack", { title: "Beta" }), exact: true })
       .click();
@@ -58,7 +58,7 @@ describe("music Agent selection", () => {
     await screen.getByRole("button", { name: t("music.agent.audition"), exact: true }).click();
     await expect
       .element(screen.getByLabelText("Preview queue", { exact: true }))
-      .toHaveTextContent("c,a");
+      .toMatchTextContent("c,a");
     await screen
       .getByRole("textbox", { name: t("music.agent.playlistTitle"), exact: true })
       .fill("My mix");

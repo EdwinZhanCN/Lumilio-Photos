@@ -98,7 +98,7 @@ test("every stage is a card, and failures never read as idle even with nothing r
   await expect.element(metadata).not.toHaveTextContent(t("monitor.processing.status.idle"));
   await expect
     .element(card(screen, "monitor.processing.stages.thumbnails"))
-    .toHaveTextContent("117");
+    .toMatchTextContent("117");
   expect(screen.container.querySelectorAll("[aria-pressed]")).toHaveLength(10);
 
   // Nothing selected: the panel is the overview, with the tray and totals.
