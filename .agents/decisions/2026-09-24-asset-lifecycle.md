@@ -135,6 +135,14 @@ Amended 2026-09-28 while landing Phase 4a.
   `repository_offline`, `file_changed`, `asset_missing`, `not_trashed`,
   `trash_file_missing`, or `move_failed`, until Phase 5 adds dedicated asset
   Problems.
+- **Irreversible steps are unlink-then-purge and need no journal**
+  (amended 2026-09-29, Phase 4b). Expiry and "Delete permanently" unlink the
+  trashed file, its trash directory, and its sidecar, then purge; a crash in
+  between leaves a trashed entry without its file, which the next pass
+  purges. An hourly maintenance pass retries deferred recovery, rebuilds the
+  Trash from sidecars (`scan.AdoptTrash`), and expires files past
+  `repository_trash.retention_days`. A sidecar in a newer format is reported
+  and never guessed at.
 - **Duplicate resolution deletes first.** The non-kept duplicates go to the
   trash as one Delete; a refused Delete leaves the group pending and nothing
   merged.

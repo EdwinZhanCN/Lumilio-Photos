@@ -351,3 +351,31 @@ SELECT * FROM repository_entries
 WHERE asset_id IN (sqlc.slice('asset_ids'))
   AND state = 'trashed'
 ORDER BY asset_id, repository_id, path;
+
+-- name: ListExpiredTrashedRepositoryEntries :many
+-- Trashed files of one repository past their retention, oldest first.
+SELECT * FROM repository_entries
+WHERE repository_id = sqlc.arg(repository_id)
+  AND state = 'trashed'
+  AND trashed_at < sqlc.arg(cutoff)
+ORDER BY trashed_at, entry_id
+LIMIT sqlc.arg(row_limit);
+
+-- name: ListMissingRepositoryEntriesForAssets :many
+SELECT * FROM repository_entries
+WHERE asset_id IN (sqlc.slice('asset_ids'))
+  AND state = 'missing'
+ORDER BY asset_id, repository_id, path;
+
+-- name: ListMissingRepositoryEntries :many
+-- Missing files of one repository, for "Remove missing items".
+SELECT * FROM repository_entries
+WHERE repository_id = sqlc.arg(repository_id)
+  AND state = 'missing'
+  AND kind = 'file'
+ORDER BY entry_id
+LIMIT sqlc.arg(row_limit);
+
+-- name: CountRepositoryEntriesWithTrashID :one
+SELECT count(*) FROM repository_entries
+WHERE trash_id = sqlc.arg(trash_id);
