@@ -42,9 +42,15 @@ eligible AS (
     )
     AND (sqlc.narg('owner_id') IS NULL OR facts.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = sqlc.narg('repository_id')
+      AND occurrence.state = CASE COALESCE(sqlc.narg('lifecycle_state'), 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(sqlc.narg('lifecycle_state'), 'active')
+      END
   ))
     AND (
       sqlc.narg('folder_path') IS NULL

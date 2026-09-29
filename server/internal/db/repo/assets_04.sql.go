@@ -55,9 +55,15 @@ eligible AS (
     )
     AND (?8 IS NULL OR facts.owner_id = ?8)
     AND (?9 IS NULL OR EXISTS (
-    SELECT 1 FROM active_asset_occurrences occurrence
+    -- An active Asset belongs to a repository through a present file there;
+    -- a missing or trashed one through its missing or trashed entries.
+    SELECT 1 FROM repository_entries occurrence
     WHERE occurrence.asset_id = pa.asset_id
       AND occurrence.repository_id = ?9
+      AND occurrence.state = CASE COALESCE(?5, 'active')
+        WHEN 'active' THEN 'present'
+        ELSE COALESCE(?5, 'active')
+      END
   ))
     AND (
       ?10 IS NULL
