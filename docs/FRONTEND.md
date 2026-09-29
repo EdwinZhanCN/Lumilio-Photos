@@ -22,7 +22,7 @@ The app mounts `I18nProvider`, then `PreferencesEffects`, `GlobalProvider`, `Que
 The frontend uses Vite+ as the command surface.
 
 Core stack: React 19, TypeScript, React Router 7, TanStack Query 5, Zustand 5
-with immer, Tailwind CSS 4 and DaisyUI 5, Vitest 4 through Vite+, Web Workers
+with immer, Tailwind CSS 4 and DaisyUI 5, Vitest 5 through Vite+, Web Workers
 and WASM modules for compute-heavy paths.
 
 Daily commands: `task web:dev`, `task web:test`. Direct `vp` commands from

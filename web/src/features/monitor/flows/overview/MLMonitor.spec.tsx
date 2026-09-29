@@ -87,7 +87,7 @@ test("retains successful coverage and marks a failed refresh stale", async () =>
   await screen
     .getByRole("button", { name: t("settings.serverSettings.refresh"), exact: true })
     .click();
-  await expect.element(screen.getByRole("alert")).toHaveTextContent(t("monitor.snapshot.stale"));
+  await expect.element(screen.getByRole("alert")).toMatchTextContent(t("monitor.snapshot.stale"));
   await expect.element(screen.getByText("60%", { exact: true })).toBeVisible();
   await expect
     .element(
