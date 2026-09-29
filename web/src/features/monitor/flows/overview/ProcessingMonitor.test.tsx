@@ -91,11 +91,11 @@ test("every stage is a card, and failures never read as idle even with nothing r
   const screen = await renderWithProviders(<ProcessingMonitor />);
 
   const metadata = card(screen, "monitor.processing.stages.metadata");
-  await expect.element(metadata).toHaveTextContent(t("monitor.processing.status.attention"));
+  await expect.element(metadata).toMatchTextContent(t("monitor.processing.status.attention"));
   await expect
     .element(metadata)
-    .toHaveTextContent(t("monitor.processing.line.failed", { count: 2 }));
-  await expect.element(metadata).not.toHaveTextContent(t("monitor.processing.status.idle"));
+    .toMatchTextContent(t("monitor.processing.line.failed", { count: 2 }));
+  await expect.element(metadata).not.toMatchTextContent(t("monitor.processing.status.idle"));
   await expect
     .element(card(screen, "monitor.processing.stages.thumbnails"))
     .toMatchTextContent("117");
@@ -209,7 +209,7 @@ test("a failed refresh keeps the last snapshot and says it is stale", async () =
   await screen
     .getByRole("button", { name: t("settings.serverSettings.refresh"), exact: true })
     .click();
-  await expect.element(screen.getByRole("alert")).toHaveTextContent(t("monitor.snapshot.stale"));
+  await expect.element(screen.getByRole("alert")).toMatchTextContent(t("monitor.snapshot.stale"));
   await expect.element(screen.getByText("248", { exact: true })).toBeVisible();
 });
 

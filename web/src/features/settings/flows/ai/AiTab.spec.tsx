@@ -72,7 +72,7 @@ describe("AiTab provider contract", () => {
     ]) {
       await providerControl.click();
       await screen.getByRole("button", { name: label }).click();
-      await expect.element(providerControl).toHaveTextContent(label);
+      await expect.element(providerControl).toMatchTextContent(label);
     }
     await providerControl.click();
     await expect

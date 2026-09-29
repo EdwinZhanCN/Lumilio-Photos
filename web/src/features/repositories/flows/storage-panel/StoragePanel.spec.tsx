@@ -154,8 +154,12 @@ async function renderPanel(width = 1280) {
 test("lists Repositories grouped by Storage Location with capacity as a row column", async () => {
   const screen = await renderPanel();
 
-  await expect.element(screen.getByRole("heading", { name: "Default Storage" })).toBeVisible();
-  await expect.element(screen.getByRole("heading", { name: "Archive Disk" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("heading", { name: "Default Storage", exact: false }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("heading", { name: "Archive Disk", exact: false }))
+    .toBeVisible();
 
   // The storage label names where each figure was measured; two Repositories on
   // one storage repeat it so the column reads as one storage.
