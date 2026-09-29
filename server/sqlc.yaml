@@ -41,6 +41,10 @@ sql:
                     go_type: { import: "github.com/google/uuid", type: "NullUUID" }
                   - column: "repository_entries.missing_since"
                     go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
+                  - column: "repository_entries.trash_id"
+                    go_type: { import: "github.com/google/uuid", type: "NullUUID" }
+                  - column: "repository_entries.trashed_at"
+                    go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
                   - column: "repository_scans.not_before"
                     go_type: { import: "server/internal/db/dbtypes", type: "Timestamp" }
                   - column: "repository_staging_commits.entry_id"

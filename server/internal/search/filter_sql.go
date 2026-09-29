@@ -25,11 +25,7 @@ func (b *sqlBuilder) addJSONArg(value any) (string, error) {
 
 func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias string) ([]string, error) {
 	a := assetAlias
-	isDeleted := false
-	if filter.IsDeleted != nil {
-		isDeleted = *filter.IsDeleted
-	}
-	conditions := []string{fmt.Sprintf("%s.is_deleted = %s", a, builder.addArg(isDeleted))}
+	conditions := []string{fmt.Sprintf("%s.lifecycle_state = %s", a, builder.addArg(filter.lifecycleState()))}
 
 	if filter.AssetIDs != nil {
 		placeholder, err := builder.addJSONArg(filter.AssetIDs)
@@ -53,12 +49,18 @@ func buildAssetFilterConditions(builder *sqlBuilder, filter Filter, assetAlias s
 	}
 	if filter.RepositoryID != nil {
 		repositoryPlaceholder := builder.addArg(*filter.RepositoryID)
+		// A missing or trashed Asset has no active occurrence; it belongs to a
+		// repository through its missing or trashed entries there.
+		occurrences := "active_asset_occurrences"
+		if filter.lifecycleState() != LifecycleActive {
+			occurrences = "repository_entries"
+		}
 		conditions = append(conditions, fmt.Sprintf(`EXISTS (
 			SELECT 1
-			FROM active_asset_occurrences repository_occurrence
+			FROM %s repository_occurrence
 			WHERE repository_occurrence.asset_id = %s.asset_id
 			  AND repository_occurrence.repository_id = %s
-		)`, a, repositoryPlaceholder))
+		)`, occurrences, a, repositoryPlaceholder))
 	}
 	if filter.PersonID != nil {
 		personPlaceholder := builder.addArg(*filter.PersonID)

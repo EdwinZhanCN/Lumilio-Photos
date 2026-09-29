@@ -148,8 +148,7 @@ type Asset struct {
 	UploadTime           dbtypes.Timestamp        `db:"upload_time" json:"upload_time"`
 	TakenTime            dbtypes.Timestamp        `db:"taken_time" json:"taken_time"`
 	CaptureOffsetMinutes *int64                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted            bool                     `db:"is_deleted" json:"is_deleted"`
-	DeletedAt            dbtypes.Timestamp        `db:"deleted_at" json:"deleted_at"`
+	LifecycleState       string                   `db:"lifecycle_state" json:"lifecycle_state"`
 	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating               *int64                   `db:"rating" json:"rating"`
 	Liked                bool                     `db:"liked" json:"liked"`
@@ -978,6 +977,8 @@ type RepositoryEntry struct {
 	AssetID                 uuid.NullUUID     `db:"asset_id" json:"asset_id"`
 	Revision                int64             `db:"revision" json:"revision"`
 	MissingSince            dbtypes.Timestamp `db:"missing_since" json:"missing_since"`
+	TrashID                 uuid.NullUUID     `db:"trash_id" json:"trash_id"`
+	TrashedAt               dbtypes.Timestamp `db:"trashed_at" json:"trashed_at"`
 	UpdatedAt               dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
@@ -1006,6 +1007,15 @@ type RepositoryScan struct {
 	StartedAt             dbtypes.Timestamp `db:"started_at" json:"started_at"`
 	FinishedAt            dbtypes.Timestamp `db:"finished_at" json:"finished_at"`
 	UpdatedAt             dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type RepositoryScanState struct {
+	RepositoryID  uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Pending       int64             `db:"pending" json:"pending"`
+	PendingSince  interface{}       `db:"pending_since" json:"pending_since"`
+	TerminalError interface{}       `db:"terminal_error" json:"terminal_error"`
+	CompletedAt   interface{}       `db:"completed_at" json:"completed_at"`
+	UpdatedAt     dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryStagingCommit struct {

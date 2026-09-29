@@ -7,8 +7,10 @@ is done: the decision records merged in #230 on 2026-09-27, which the owner
 took as approval. Phase 2 (scan core) merged in #231 on 2026-09-27. On
 2026-09-27 the owner approved folding the sweep into a per-directory diff and
 renaming `parent_path` to `parent_key`; #222 was amended to match. Phase 3
-(wiring, ROE removal) is in review on `feat/scan-index-wiring`; it lands
-three Phase 0 tests. Child of
+(wiring, ROE removal) merged in #232 on 2026-09-27 with three Phase 0
+tests. Phase 4 is split into three PRs; the first (lifecycle core, the
+repository trash, and the last two Phase 0 tests) is in review on
+`feat/asset-lifecycle-core`. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
 (replace the Repository Observation Engine with a scan index) and
@@ -211,23 +213,49 @@ and `dev` keeps a working Trash throughout.
   Phase 5.
 
 ### Phase 4 — Lifecycle core (#223)
-- [ ] Derived Asset states and `PurgeEntries` with its enforcement check.
-  Drop `assets.is_deleted` / `deleted_at` here, with their last readers.
-  Add the trash path column to `repository_entries`.
-- [ ] Carry-over follow-ups the scan core cannot do alone: re-extracted
-  metadata never overwrites the user-edited description; manual face
-  assignments are re-applied to the re-detected face with IoU ≥ 0.5, or
-  surfaced as unconfirmed.
-- [ ] Delete to the repository trash: a preflight that fails the whole batch
-  when a repository is offline or a stat tuple differs; journaled renames;
-  info sidecars in format 1. Restore never overwrites. A new present entry
-  reactivates a trashed Asset.
-- [ ] Expiry job, "Delete permanently", "Remove missing items", and
-  repository removal, all through `PurgeEntries`.
-- [ ] Duplicate resolution routed through Delete.
+Split 2026-09-28 into three PRs, because dropping `is_deleted` already
+touches every browse and search query: 4a is the lifecycle core and the
+trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
+
+4a — lifecycle core (`feat/asset-lifecycle-core`):
+- [x] Derived Asset states. `assets.is_deleted` / `deleted_at` are dropped
+  with their last readers; `assets.lifecycle_state` (active, missing,
+  trashed) is written only by triggers on `repository_entries`, so it cannot
+  drift from the entries and the vector index, the OCR index, and media-item
+  primaries can follow it. Offline stays a display state. The asset DTO and
+  filter carry `lifecycle_state` (`task dto`); the Trash view filters
+  `trashed`.
+- [x] `lifecycle.PurgeEntriesTx`, the only Asset delete, enforced by
+  `task architecture:check` (`scanAssetHardDeletes`). Repository removal
+  purges through it.
+- [x] Entries gained `trash_id` and `trashed_at` (the trash path is
+  `.lumilio/trash/files/<trash_id>/<name>`).
+- [x] Delete to the repository trash (`storage/trash`): a preflight that
+  refuses the whole request when a repository is offline, a file's stat tuple
+  differs, or an Asset has no file; journaled moves that link and unlink and
+  never replace; info sidecars in format 1; rollback of a failed move.
+  Refusals are `repository/conflict` Problems whose `conflict_type` names the
+  reason; Phase 5 adds the dedicated asset Problems.
+- [x] Restore never overwrites (a taken path gets `name (restored).ext`);
+  a new present entry reactivates a trashed Asset (re-upload test passes).
+- [x] Duplicate resolution trashes the non-kept files first, as one Delete,
+  and merges metadata only when that succeeded.
+- [x] A crash between a move and its commit is reconciled on startup from
+  `lifecycle_operations` (tests inject the crash).
+- [x] Phase 0 `MissingFileLeavesLibraryBrowse` and
+  `ReuploadOfTrashedPhotoIsVisible` land and pass.
+
+4b — irreversible steps:
+- [ ] Expiry job with the required `repository_trash.retention_days`,
+  "Delete permanently", and "Remove missing items", all through
+  `PurgeEntries`.
 - [ ] Artifact cleaner keyed on Asset existence.
-- [ ] A crash between rename and commit is reconciled on startup.
 - [ ] The Trash view can be rebuilt from the sidecars.
+
+4c — carry-over follow-ups the scan core cannot do alone:
+- [ ] Re-extracted metadata never overwrites the user-edited description.
+- [ ] Manual face assignments are re-applied to the re-detected face with
+  IoU ≥ 0.5, or surfaced as unconfirmed.
 
 ### Phase 5 — API and Web (#222, #223)
 - [ ] DTOs and endpoints for the scan status and counters, trash, the Missing

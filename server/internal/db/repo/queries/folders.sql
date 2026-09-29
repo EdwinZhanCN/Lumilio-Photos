@@ -18,7 +18,7 @@ WITH scoped AS (
   FROM assets asset
   JOIN active_asset_occurrence_paths node_path
     ON node_path.asset_id = asset.asset_id
-  WHERE asset.is_deleted = false
+  WHERE asset.lifecycle_state = 'active'
     AND (sqlc.narg('owner_id') IS NULL OR asset.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id') IS NULL OR node_path.repository_id = sqlc.narg('repository_id'))
     AND node_path.relative_path NOT LIKE '.lumilio/%'
@@ -77,7 +77,7 @@ WITH scoped AS (
   JOIN active_asset_occurrence_paths node_path
     ON node_path.asset_id = asset.asset_id
    AND node_path.repository_id = sqlc.arg('repository_id')
-  WHERE asset.is_deleted = false
+  WHERE asset.lifecycle_state = 'active'
     AND (sqlc.narg('owner_id') IS NULL OR asset.owner_id = sqlc.narg('owner_id'))
     AND node_path.relative_path NOT LIKE '.lumilio/%'
     AND node_path.relative_path NOT LIKE 'inbox/%'

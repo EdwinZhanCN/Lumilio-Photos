@@ -828,7 +828,6 @@ func TestGeneratedSQLiteQueriesExecuteJSONFiltersAndNullMetadata(t *testing.T) {
 	}
 
 	count, err := database.Queries.CountMediaItemsUnified(ctx, repo.CountMediaItemsUnifiedParams{
-		IsDeleted:    false,
 		RepositoryID: uuid.NullUUID{UUID: repositoryID, Valid: true},
 		AssetIds:     dbtypes.UUIDsJSONParam([]uuid.UUID{assetID}),
 		AssetTypes:   dbtypes.StringsJSONParam([]string{"PHOTO"}),

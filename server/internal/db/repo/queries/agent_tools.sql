@@ -9,7 +9,7 @@ WITH filter_params AS (
 )
 SELECT a.asset_id
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND a.owner_id = sqlc.arg('user_id')
   AND EXISTS (
     SELECT 1
@@ -37,7 +37,7 @@ JOIN assets a ON a.asset_id = fi.asset_id
 WHERE fc.cluster_name IS NOT NULL
   AND fc.owner_id = sqlc.arg('user_id')
   AND a.owner_id = sqlc.arg('user_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND fc.cluster_name <> ''
   AND (sqlc.narg('name_query') IS NULL OR fc.cluster_name LIKE '%' || sqlc.narg('name_query') || '%')
 GROUP BY fc.cluster_id, fc.cluster_name
@@ -60,7 +60,7 @@ SELECT asset_id
 FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 ORDER BY COALESCE(taken_time, upload_time) ASC, asset_id ASC;
 
 -- name: RankAssetIDsByQuality :many
@@ -75,7 +75,7 @@ FROM assets a
 LEFT JOIN asset_quality_scores aqs ON aqs.asset_id = a.asset_id
 WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = sqlc.arg('user_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 ORDER BY COALESCE(
     aqs.score,
     1.0 + 0.45 * COALESCE(a.rating, 0) / 5.0
@@ -93,7 +93,7 @@ FROM albums al
 LEFT JOIN album_assets aa ON aa.album_id = al.album_id
 LEFT JOIN assets a ON a.asset_id = aa.asset_id
     AND a.owner_id = sqlc.arg('user_id')
-    AND a.is_deleted = false
+    AND a.lifecycle_state = 'active'
 WHERE al.user_id = sqlc.arg('user_id')
   AND (sqlc.narg('title_query') IS NULL OR al.album_name LIKE '%' || sqlc.narg('title_query') || '%')
 GROUP BY al.album_id, al.album_name
@@ -109,7 +109,7 @@ SELECT asset_id, type, specific_metadata
 FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: AgentReadOCRDocuments :many
 -- read_ocr observer: authoritative OCR result and ordered text rows for a
@@ -129,7 +129,7 @@ LEFT JOIN ocr_results ocr ON ocr.asset_id = a.asset_id
 LEFT JOIN ocr_text_items ti ON ti.asset_id = ocr.asset_id
 WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = sqlc.arg('user_id')
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 ORDER BY a.asset_id, ti.id ASC;
 
 -- name: AgentPeekAssets :many
@@ -167,7 +167,7 @@ SELECT
 FROM assets a
 WHERE a.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = sqlc.arg('user_id')
-  AND a.is_deleted = false;
+  AND a.lifecycle_state = 'active';
 
 -- name: AgentCapturedTimes :many
 -- Capture times for a set of assets, for the sample tool's distribution
@@ -179,7 +179,7 @@ SELECT COALESCE(taken_time, upload_time) AS captured_at
 FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
-  AND is_deleted = false;
+  AND lifecycle_state = 'active';
 
 -- name: RankAssetIDsByUploadTime :many
 -- "recently added" presentation order, ascending; callers reverse for newest first.
@@ -197,7 +197,7 @@ SELECT asset_id
 FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = sqlc.arg('user_id')
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 ORDER BY upload_time ASC, asset_id ASC;
 
 -- name: AgentAssetAestheticScores :many
@@ -211,4 +211,4 @@ FROM asset_quality_scores aqs
 JOIN assets a USING (asset_id)
 WHERE aqs.asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND a.owner_id = sqlc.arg('user_id')
-  AND a.is_deleted = false;
+  AND a.lifecycle_state = 'active';

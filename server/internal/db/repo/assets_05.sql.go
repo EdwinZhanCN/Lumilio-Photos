@@ -23,7 +23,7 @@ eligible AS (
     facts.stack_id
   FROM media_item_browse_facts facts
   JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-  WHERE pa.is_deleted = COALESCE(?5, false)
+  WHERE pa.lifecycle_state = COALESCE(?5, 'active')
     AND (
       (SELECT asset_ids_json FROM filter_params) IS NULL
       OR EXISTS (
@@ -203,7 +203,7 @@ type CountCollapsedBrowseItemsUnifiedParams struct {
 	AssetTypes       *string     `db:"asset_types" json:"asset_types"`
 	TagNames         *string     `db:"tag_names" json:"tag_names"`
 	StackKinds       *string     `db:"stack_kinds" json:"stack_kinds"`
-	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
+	LifecycleState   *string     `db:"lifecycle_state" json:"lifecycle_state"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
 	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
@@ -239,7 +239,7 @@ func (q *Queries) CountCollapsedBrowseItemsUnified(ctx context.Context, arg Coun
 		arg.AssetTypes,
 		arg.TagNames,
 		arg.StackKinds,
-		arg.IsDeleted,
+		arg.LifecycleState,
 		arg.Query,
 		arg.AssetType,
 		arg.OwnerID,

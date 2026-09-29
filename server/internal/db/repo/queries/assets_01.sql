@@ -13,7 +13,7 @@ WITH filter_params AS (
 SELECT facts.media_item_id, facts.primary_asset_id
 FROM media_item_browse_facts facts
 JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-WHERE pa.is_deleted = COALESCE(sqlc.narg('is_deleted'), false)
+WHERE pa.lifecycle_state = COALESCE(sqlc.narg('lifecycle_state'), 'active')
   AND (
     (SELECT asset_ids_json FROM filter_params) IS NULL
     OR EXISTS (

@@ -42,7 +42,7 @@ type MusicTrackDTO struct {
 	MimeType                string             `json:"mime_type"`
 	Duration                *float64           `json:"duration,omitempty"`
 	TakenAt                 *time.Time         `json:"taken_at,omitempty"`
-	IsDeleted               bool               `json:"is_deleted"`
+	LifecycleState          string             `json:"lifecycle_state" enums:"active,missing,trashed"`
 	Liked                   bool               `json:"liked"`
 	Artists                 []MusicCreditDTO   `json:"artists,omitempty"`
 	Overrides               []MusicOverrideDTO `json:"overrides,omitempty"`

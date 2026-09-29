@@ -137,10 +137,10 @@ func (r *Reader) Summary(ctx context.Context) (Summary, error) {
   SELECT s.asset_id, MAX(s.terminal_error IS NOT NULL) AS failed
   FROM asset_pipeline_state s INDEXED BY idx_asset_pipeline_pending
   JOIN assets a ON a.asset_id=s.asset_id
-  WHERE s.desired_version>s.applied_version AND a.is_deleted=0
+  WHERE s.desired_version>s.applied_version AND a.lifecycle_state = 'active'
   GROUP BY s.asset_id
  )
- SELECT (SELECT count(*) FROM assets WHERE is_deleted=0),
+ SELECT (SELECT count(*) FROM assets WHERE lifecycle_state = 'active'),
   COALESCE(SUM(failed=0),0), COALESCE(SUM(failed=1),0) FROM asset_work`).Scan(
 		&summary.Overview.MediaTotal, &summary.Overview.MediaInProgress, &summary.Overview.FailedMedia); err != nil {
 		return Summary{}, fmt.Errorf("read media overview: %w", err)
@@ -184,7 +184,7 @@ func (r *Reader) catalogCounts(ctx context.Context, now time.Time) (map[StageID]
   COALESCE(SUM(s.terminal_error IS NULL AND f.retry_after>?),0),
   MIN(CASE WHEN s.terminal_error IS NULL THEN s.updated_at END)
  FROM asset_pipeline_state s
- JOIN assets a ON a.asset_id=s.asset_id AND a.is_deleted=0
+ JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
  LEFT JOIN asset_pipeline_failures f ON f.asset_id=s.asset_id AND f.stage=s.stage
   AND f.source_content_id=s.source_content_id AND f.pipeline_version=s.pipeline_version
   AND f.desired_version=s.desired_version
@@ -223,7 +223,7 @@ func (r *Reader) catalogCounts(ctx context.Context, now time.Time) (map[StageID]
 	sourceRows, err := r.catalog.QueryContext(ctx, `
  SELECT s.stage, r.kind, count(DISTINCT s.asset_id)
  FROM asset_pipeline_state s
- JOIN assets a ON a.asset_id=s.asset_id AND a.is_deleted=0
+ JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
  JOIN asset_pipeline_receipt_stages rs ON rs.asset_id=s.asset_id AND rs.stage=s.stage AND rs.desired_version=s.desired_version
  JOIN catalog_operation_receipts r ON r.receipt_id=rs.receipt_id
  WHERE s.desired_version>s.applied_version AND s.terminal_error IS NULL
@@ -301,7 +301,7 @@ func (r *Reader) doneCounts(ctx context.Context, now time.Time) (map[string]int6
 	}
 	rows, err := r.catalog.QueryContext(ctx, `
  SELECT s.stage, count(*) FROM asset_pipeline_state s
- JOIN assets a ON a.asset_id=s.asset_id AND a.is_deleted=0
+ JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
  WHERE s.desired_version=s.applied_version AND s.terminal_error IS NULL
  GROUP BY s.stage`)
 	if err != nil {

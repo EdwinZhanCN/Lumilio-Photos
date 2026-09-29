@@ -8,7 +8,7 @@ SELECT
   a.gps_latitude AS gps_latitude,
   a.gps_longitude AS gps_longitude
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND a.type = 'PHOTO'
   AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence

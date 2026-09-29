@@ -16,6 +16,7 @@ import (
 	"server/internal/db/catalogtx"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/lifecycle"
 	"server/internal/logging"
 	"server/internal/storage/repocfg"
 
@@ -948,36 +949,6 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 	// The repository mutation lock prevents new or running repository compute
 	// from crossing this transaction. Catalog cascades remove its durable
 	// desired state; the disposable River projection is not part of removal.
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM share_links
-		WHERE EXISTS (
-			SELECT 1 FROM json_each(share_links.asset_ids) selected
-			JOIN repository_entries target ON target.asset_id = selected.value
-			WHERE target.repository_id = ?
-			  AND NOT EXISTS (
-				SELECT 1 FROM repository_entries survivor
-				WHERE survivor.asset_id = target.asset_id
-				  AND survivor.repository_id <> ?
-			  )
-		)
-	`, repoUUID, repoUUID); err != nil {
-		return fmt.Errorf("remove repository share links: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM agent_pins
-		WHERE EXISTS (
-			SELECT 1 FROM json_each(agent_pins.asset_ids) selected
-			JOIN repository_entries target ON target.asset_id = selected.value
-			WHERE target.repository_id = ?
-			  AND NOT EXISTS (
-				SELECT 1 FROM repository_entries survivor
-				WHERE survivor.asset_id = target.asset_id
-				  AND survivor.repository_id <> ?
-			  )
-		)
-	`, repoUUID, repoUUID); err != nil {
-		return fmt.Errorf("remove repository agent pins: %w", err)
-	}
 	// Logical media and stacks are projections of Assets, not repository-owned
 	// filesystem entries. Rehome them before deleting the repository whenever a
 	// member still has an active Location elsewhere; otherwise the repository
@@ -1039,27 +1010,12 @@ func (rm *DefaultRepositoryManager) RemoveRepository(ctx context.Context, id str
 	`, repoUUID, repoUUID, repoUUID); err != nil {
 		return fmt.Errorf("rehome repository asset stacks: %w", err)
 	}
-	// Repository removal purges the repository's entries and then every Asset
-	// left with no entry anywhere, together with its metadata: the Asset
-	// lifecycle's single purge rule. Assets with an entry elsewhere survive;
-	// Assets whose files here were already missing are collected too.
-	var candidates string
-	if err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(json_group_array(DISTINCT asset_id), '[]')
-		FROM repository_entries
-		WHERE repository_id = ? AND asset_id IS NOT NULL
-	`, repoUUID).Scan(&candidates); err != nil {
-		return fmt.Errorf("collect repository assets: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM repository_entries WHERE repository_id = ?`, repoUUID); err != nil {
-		return fmt.Errorf("purge repository entries: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM assets
-		WHERE asset_id IN (SELECT value FROM json_each(?))
-		  AND NOT EXISTS (SELECT 1 FROM repository_entries entry WHERE entry.asset_id = assets.asset_id)
-	`, candidates); err != nil {
-		return fmt.Errorf("garbage-collect repository assets: %w", err)
+	// Repository removal leaves the files in place and purges the
+	// repository's entries through the lifecycle's single purge path: Assets
+	// with an entry elsewhere survive, and Assets whose files here were
+	// already missing are collected too.
+	if _, err := lifecycle.PurgeRepositoryEntriesTx(ctx, tx.Raw(), repoUUID); err != nil {
+		return err
 	}
 	if err := queries.DeleteRepository(ctx, repoUUID); err != nil {
 		return fmt.Errorf("delete repository catalog: %w", err)

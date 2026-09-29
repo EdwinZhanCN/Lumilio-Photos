@@ -73,14 +73,14 @@ VALUES (1, ?, 0, 1);
 	require.NoError(t, err)
 	require.Equal(t, []uuid.UUID{relaxedBicycle}, candidateUUIDs(candidates))
 
-	isDeleted := true
+	trashed := "trashed"
 	candidates, err = retriever.Retrieve(ctx, Request{
 		Query: "red bicycle",
 		TopK:  10,
 		Filter: Filter{
-			OwnerID:      &ownerID,
-			RepositoryID: &repositoryA,
-			IsDeleted:    &isDeleted,
+			OwnerID:        &ownerID,
+			RepositoryID:   &repositoryA,
+			LifecycleState: &trashed,
 		},
 	})
 	require.NoError(t, err)
@@ -137,7 +137,7 @@ func insertRetrieverOCRAsset(
 	_, err := testutil.InsertAssetOccurrence(context.Background(), database.SQL, testutil.AssetOccurrenceParams{
 		AssetID: assetID, RepositoryID: repositoryID, OwnerID: ownerID,
 		AssetType: "PHOTO", Filename: assetID.String() + ".jpg", MIMEType: "image/jpeg",
-		FileSize: 1, IsDeleted: isDeleted,
+		FileSize: 1, EntryState: testutil.EntryStateTrashedIf(isDeleted),
 	})
 	require.NoError(t, err)
 	_, err = database.SQL.Exec(`

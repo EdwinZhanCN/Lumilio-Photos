@@ -46,7 +46,7 @@ func (ap *AssetProcessor) resolveCurrentAssetSource(ctx context.Context, assetID
 		}
 		return nil, err
 	}
-	if asset.IsDeleted || (expectedContentID != uuid.Nil && asset.ContentID != expectedContentID) {
+	if asset.LifecycleState != "active" || (expectedContentID != uuid.Nil && asset.ContentID != expectedContentID) {
 		return nil, ErrAssetSourceStale
 	}
 	content, err := ap.reader.GetContentObjectByID(ctx, asset.ContentID)

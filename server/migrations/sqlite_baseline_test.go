@@ -28,8 +28,8 @@ const (
 	baselineViews          = 4
 	baselineShadowTables   = 17
 	baselineVec1Internals  = 5
-	baselineIndexes        = 148
-	baselineTriggers       = 38
+	baselineIndexes        = 149
+	baselineTriggers       = 42
 )
 
 // baselineVec1InternalTables are owned by the Vec1 virtual table module.
@@ -111,7 +111,7 @@ func TestSQLiteBaselineCreatesCompleteStrictSchema(t *testing.T) {
 	assertBaselineFileInventory(t, readEmbeddedBaseline(t))
 	assertBaselineIsLedgerFree(t, database)
 	assertBaselineSeedsAndRejections(t, ctx, database)
-	insertROEFixtures(t, ctx, database)
+	insertScanIndexFixtures(t, ctx, database)
 	insertVectorFixtures(t, ctx, database)
 	insertFTSFixture(t, ctx, database)
 	insertMusicFixtures(t, ctx, database)
@@ -395,7 +395,7 @@ func assertBaselineSeedsAndRejections(t *testing.T, ctx context.Context, databas
 	`)
 }
 
-func insertROEFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
+func insertScanIndexFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 	t.Helper()
 
 	if _, err := database.ExecContext(ctx, `
@@ -519,7 +519,7 @@ func insertVectorFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 		FROM search_embeddings_vec(?, '{"k":1}')
 		WHERE space_id = 1
 		  AND owner_id = 1
-		  AND is_deleted = 0
+		  AND lifecycle_state = 'active'
 		  AND asset_type = 'PHOTO'
 	`, vector).Scan(&nearestRowID); err != nil {
 		t.Fatalf("query Vec1 fixture: %v", err)
@@ -528,23 +528,61 @@ func insertVectorFixtures(t *testing.T, ctx context.Context, database *sql.DB) {
 		t.Fatalf("nearest Vec1 rowid = %d", nearestRowID)
 	}
 
+	// The Asset's lifecycle state follows its entry, and Vec1 follows it.
 	if _, err := database.ExecContext(ctx, `
-		UPDATE assets
-		SET is_deleted = 1
-		WHERE asset_id = '00000000-0000-0000-0000-000000000003'
+		UPDATE repository_entries
+		SET state = 'missing', missing_since = 2, revision = revision + 1
+		WHERE entry_id = '00000000-0000-0000-0000-000000000021'
 	`); err != nil {
-		t.Fatalf("update Vec1 metadata source: %v", err)
+		t.Fatalf("mark fixture entry missing: %v", err)
 	}
+	assertLifecycleState(t, ctx, database, "missing")
 	var visibleRows int
 	if err := database.QueryRowContext(ctx, `
 		SELECT count(*)
 		FROM search_embeddings_vec(?, '{"k":1}')
-		WHERE is_deleted = 0
+		WHERE lifecycle_state = 'active'
 	`, vector).Scan(&visibleRows); err != nil {
 		t.Fatalf("query updated Vec1 metadata: %v", err)
 	}
 	if visibleRows != 0 {
-		t.Fatalf("visible Vec1 rows after soft delete = %d, want 0", visibleRows)
+		t.Fatalf("visible Vec1 rows for a missing Asset = %d, want 0", visibleRows)
+	}
+	if _, err := database.ExecContext(ctx, `
+		UPDATE repository_entries
+		SET state = 'trashed', missing_since = NULL,
+		    trash_id = '00000000-0000-0000-0000-000000000030', trashed_at = 3,
+		    revision = revision + 1
+		WHERE entry_id = '00000000-0000-0000-0000-000000000021'
+	`); err != nil {
+		t.Fatalf("trash fixture entry: %v", err)
+	}
+	assertLifecycleState(t, ctx, database, "trashed")
+	if _, err := database.ExecContext(ctx, `
+		UPDATE repository_entries
+		SET state = 'present', trash_id = NULL, trashed_at = NULL, revision = revision + 1
+		WHERE entry_id = '00000000-0000-0000-0000-000000000021'
+	`); err != nil {
+		t.Fatalf("restore fixture entry: %v", err)
+	}
+	assertLifecycleState(t, ctx, database, "active")
+	// An entry is what keeps its Asset in existence.
+	assertRejected(t, database, `
+		DELETE FROM assets WHERE asset_id = '00000000-0000-0000-0000-000000000003'
+	`)
+}
+
+func assertLifecycleState(t *testing.T, ctx context.Context, database *sql.DB, want string) {
+	t.Helper()
+	var state string
+	if err := database.QueryRowContext(ctx, `
+		SELECT lifecycle_state FROM assets
+		WHERE asset_id = '00000000-0000-0000-0000-000000000003'
+	`).Scan(&state); err != nil {
+		t.Fatalf("read lifecycle state: %v", err)
+	}
+	if state != want {
+		t.Fatalf("lifecycle_state = %q, want %q", state, want)
 	}
 }
 

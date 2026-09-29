@@ -55,7 +55,7 @@ WITH ranked AS (
   FROM asset_tags at
   JOIN tags t ON t.tag_id = at.tag_id
   JOIN assets a ON a.asset_id = at.asset_id
-  WHERE a.is_deleted = false
+  WHERE a.lifecycle_state = 'active'
     AND (sqlc.narg('owner_id') IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id') IS NULL OR EXISTS (
       SELECT 1 FROM active_asset_occurrences occurrence

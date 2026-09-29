@@ -253,13 +253,14 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 
 // DeleteAsset deletes an asset
 // @Summary Delete asset
-// @Description Soft delete an asset by marking it as deleted. The physical file is not removed.
+// @Description Move every file of the asset into its Repository's trash (.lumilio/trash). The asset is hidden from browsing with its metadata kept and can be restored until the trash retention expires. Nothing moves when a Repository is offline or a file changed since the last scan.
 // @Tags assets
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.MessageResponseDTO "Asset deleted successfully"
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID format"
+// @Failure 409 {object} api.RepositoryConflictProblemResponse "Nothing moved: conflict_type is repository_offline, file_changed, asset_missing, or move_failed"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id} [delete]
 func (h *AssetHandler) DeleteAsset(c *gin.Context) {
@@ -274,10 +275,8 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 		return
 	}
 
-	err = h.assetService.DeleteAsset(c.Request.Context(), id)
-	if err != nil {
-		log.Printf("Failed to delete asset: %v", err)
-		api.WriteProblem(c, api.Internal(err))
+	if _, err := h.assetService.DeleteAssets(c.Request.Context(), trashRequestFrom(c, id)); err != nil {
+		writeTrashProblem(c, err)
 		return
 	}
 
@@ -286,13 +285,14 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 
 // RestoreAsset restores an asset from Trash
 // @Summary Restore asset
-// @Description Restore a soft-deleted asset from Trash. The original file is not moved.
+// @Description Move the asset's trashed files back to their original paths and show it again with its metadata. A taken path is never overwritten; the file is restored under a free sibling name.
 // @Tags assets
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.MessageResponseDTO "Asset restored successfully"
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID format"
+// @Failure 409 {object} api.RepositoryConflictProblemResponse "Nothing moved: conflict_type is repository_offline, not_trashed, trash_file_missing, or move_failed"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/restore [post]
 func (h *AssetHandler) RestoreAsset(c *gin.Context) {
@@ -307,10 +307,8 @@ func (h *AssetHandler) RestoreAsset(c *gin.Context) {
 		return
 	}
 
-	err = h.assetService.RestoreAsset(c.Request.Context(), id)
-	if err != nil {
-		log.Printf("Failed to restore asset: %v", err)
-		api.WriteProblem(c, api.Internal(err))
+	if _, err := h.assetService.RestoreAssets(c.Request.Context(), trashRequestFrom(c, id)); err != nil {
+		writeTrashProblem(c, err)
 		return
 	}
 

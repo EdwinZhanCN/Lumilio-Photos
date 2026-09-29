@@ -14,13 +14,13 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked, a.rating
+    a.lifecycle_state, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 CROSS JOIN sort_params
 WHERE mt.owner_id = sqlc.arg('owner_id')
   AND a.type = 'AUDIO'
-  AND a.is_deleted = 0
+  AND a.lifecycle_state = 'active'
   AND (
     sqlc.arg('query') = ''
     OR mt.title LIKE '%' || sqlc.arg('query') || '%'
@@ -51,7 +51,7 @@ FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.owner_id = sqlc.arg('owner_id')
   AND a.type = 'AUDIO'
-  AND a.is_deleted = 0
+  AND a.lifecycle_state = 'active'
   AND (
     sqlc.arg('query') = ''
     OR mt.title LIKE '%' || sqlc.arg('query') || '%'
@@ -75,7 +75,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked, a.rating
+    a.lifecycle_state, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.track_id = sqlc.arg('track_id')
@@ -208,7 +208,7 @@ SELECT ma.album_id, ma.owner_id, ma.title, ma.release_date, ma.release_precision
        COUNT(DISTINCT a.asset_id) AS track_count
 FROM music_albums ma
 LEFT JOIN music_tracks mt ON mt.album_id = ma.album_id
-LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 WHERE ma.owner_id = sqlc.arg('owner_id')
   AND (sqlc.arg('favorites_only') = 0 OR ma.favorite = 1)
   AND (sqlc.arg('query') = '' OR ma.title LIKE '%' || sqlc.arg('query') || '%')
@@ -230,7 +230,7 @@ SELECT ma.album_id, ma.owner_id, ma.title, ma.release_date, ma.release_precision
        COUNT(DISTINCT a.asset_id) AS track_count
 FROM music_albums ma
 LEFT JOIN music_tracks mt ON mt.album_id = ma.album_id
-LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 WHERE ma.album_id = sqlc.arg('album_id') AND ma.owner_id = sqlc.arg('owner_id')
 GROUP BY ma.album_id;
 
@@ -283,11 +283,11 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked, a.rating
+    a.lifecycle_state, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.album_id = sqlc.arg('album_id') AND mt.owner_id = sqlc.arg('owner_id')
-  AND a.type = 'AUDIO' AND a.is_deleted = 0
+  AND a.type = 'AUDIO' AND a.lifecycle_state = 'active'
 ORDER BY mt.disc_number IS NULL, mt.disc_number, mt.track_number IS NULL,
          mt.track_number, mt.track_id;
 
@@ -333,7 +333,7 @@ SELECT ar.artist_id, ar.owner_id, ar.display_name, ar.normalized_name,
        COUNT(DISTINCT aa.album_id) AS album_count
 FROM music_artists ar
 LEFT JOIN music_track_artists ta ON ta.artist_id = ar.artist_id
-LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.is_deleted = 0
+LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.lifecycle_state = 'active'
 LEFT JOIN music_album_artists aa ON aa.artist_id = ar.artist_id
 WHERE ar.owner_id = sqlc.arg('owner_id')
   AND (sqlc.arg('favorites_only') = 0 OR ar.favorite = 1)
@@ -355,7 +355,7 @@ SELECT ar.artist_id, ar.owner_id, ar.display_name, ar.normalized_name,
        COUNT(DISTINCT aa.album_id) AS album_count
 FROM music_artists ar
 LEFT JOIN music_track_artists ta ON ta.artist_id = ar.artist_id
-LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.is_deleted = 0
+LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.lifecycle_state = 'active'
 LEFT JOIN music_album_artists aa ON aa.artist_id = ar.artist_id
 WHERE ar.artist_id = sqlc.arg('artist_id') AND ar.owner_id = sqlc.arg('owner_id')
 GROUP BY ar.artist_id;
@@ -387,7 +387,7 @@ RETURNING *;
 SELECT pe.entry_id, pe.playlist_id, pe.track_id, pe.saved_title, pe.position,
        pe.idempotency_key, pe.created_at, pe.updated_at,
        mt.title AS track_title, mt.artist_name AS track_artist,
-       mt.album_title AS track_album, a.duration, a.mime_type, a.is_deleted
+       mt.album_title AS track_album, a.duration, a.mime_type, a.lifecycle_state
 FROM music_playlist_entries pe
 JOIN music_playlists p ON p.playlist_id = pe.playlist_id
 LEFT JOIN music_tracks mt ON mt.track_id = pe.track_id AND mt.owner_id = p.owner_id
@@ -400,7 +400,7 @@ SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
        p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
        CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
          JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
-         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.lifecycle_state = 'active'
            AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
          WHERE ce.playlist_id = p.playlist_id AND EXISTS (
            SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
@@ -420,7 +420,7 @@ SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
        p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
        CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
          JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
-         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.lifecycle_state = 'active'
            AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
          WHERE ce.playlist_id = p.playlist_id AND EXISTS (
            SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
@@ -500,7 +500,7 @@ WHERE playlist_id = sqlc.arg('playlist_id') AND owner_id = sqlc.arg('owner_id')
 -- name: ListUncatalogedAudioAssets :many
 SELECT a.* FROM assets a
 LEFT JOIN music_tracks mt ON mt.track_id = a.asset_id
-WHERE a.type = 'AUDIO' AND a.is_deleted = 0
+WHERE a.type = 'AUDIO' AND a.lifecycle_state = 'active'
   AND a.owner_id = sqlc.arg('owner_id') AND mt.track_id IS NULL
 ORDER BY a.asset_id
 LIMIT sqlc.arg('limit');
@@ -536,7 +536,7 @@ WHERE session_id = sqlc.arg('session_id') AND owner_id = sqlc.arg('owner_id');
 SELECT pe.entry_id, pe.session_id, pe.sequence, pe.track_id,
        pe.source_entry_id, pe.saved_title,
        mt.title AS track_title, mt.artist_name AS track_artist,
-       mt.album_title AS track_album, a.mime_type, a.duration, a.is_deleted
+       mt.album_title AS track_album, a.mime_type, a.duration, a.lifecycle_state
 FROM music_playback_entries pe
 JOIN music_playback_sessions ps ON ps.session_id = pe.session_id
 LEFT JOIN music_tracks mt ON mt.track_id = pe.track_id AND mt.owner_id = ps.owner_id
@@ -558,7 +558,7 @@ WHERE session_id = sqlc.arg('session_id') AND owner_id = sqlc.arg('owner_id');
 -- name: GetMusicAlbumAutomaticCover :one
 SELECT a.asset_id
 FROM music_tracks mt
-JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 JOIN thumbnails thumb ON thumb.asset_id = a.asset_id AND thumb.size = 'medium'
 WHERE mt.album_id = sqlc.arg('album_id') AND mt.owner_id = sqlc.arg('owner_id')
   AND a.owner_id = sqlc.arg('owner_id')
@@ -569,7 +569,7 @@ LIMIT 1;
 SELECT COALESCE(l.content, '') AS content, COALESCE(l.revision, 0) AS revision
 FROM music_tracks mt
 LEFT JOIN music_track_lyrics l ON l.track_id = mt.track_id
-JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 WHERE mt.track_id = sqlc.arg('track_id') AND mt.owner_id = sqlc.arg('owner_id');
 
 -- name: UpsertMusicTrackLyrics :exec
@@ -583,7 +583,7 @@ SELECT mt.track_id, mt.title, mt.artist_name, mt.album_title, mt.genre,
        a.duration, a.rating, a.liked, a.original_filename, a.mime_type
 FROM music_tracks mt JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.owner_id = sqlc.arg('owner_id') AND a.owner_id = sqlc.arg('owner_id')
- AND a.type = 'AUDIO' AND a.is_deleted = 0
+ AND a.type = 'AUDIO' AND a.lifecycle_state = 'active'
  AND (sqlc.arg('query') = '' OR mt.title LIKE '%' || sqlc.arg('query') || '%'
       OR mt.artist_name LIKE '%' || sqlc.arg('query') || '%' OR mt.album_title LIKE '%' || sqlc.arg('query') || '%')
  AND (sqlc.arg('artist') = '' OR mt.artist_name LIKE '%' || sqlc.arg('artist') || '%')

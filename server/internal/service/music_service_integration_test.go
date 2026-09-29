@@ -145,7 +145,7 @@ func TestMusicAutomaticCoverRemainsDerivedWhenEditingAlbum(t *testing.T) {
 	var manualCover sql.NullString
 	require.NoError(t, catalog.SQL.QueryRowContext(ctx, `SELECT cover_asset_id FROM music_albums WHERE album_id = ?`, album.AlbumID).Scan(&manualCover))
 	require.False(t, manualCover.Valid, "editing a title must not pin the automatically selected cover")
-	_, err = catalog.SQL.ExecContext(ctx, `UPDATE assets SET is_deleted = 1 WHERE asset_id = ?`, id)
+	err = testutil.SetAssetEntriesState(ctx, catalog.SQL, id, "trashed")
 	require.NoError(t, err)
 	album, err = service.GetAlbum(ctx, 1, album.AlbumID)
 	require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestMusicRatingsAndPlaylistCoverProjection(t *testing.T) {
 	others, err := service.ListPlaylists(ctx, 2, 50, 0)
 	require.NoError(t, err)
 	require.Empty(t, others.Items)
-	_, err = catalog.SQL.ExecContext(ctx, `UPDATE assets SET is_deleted = 1 WHERE asset_id = ?`, second)
+	err = testutil.SetAssetEntriesState(ctx, catalog.SQL, second, "trashed")
 	require.NoError(t, err)
 	playlist, err = service.GetPlaylist(ctx, 1, playlist.PlaylistID)
 	require.NoError(t, err)

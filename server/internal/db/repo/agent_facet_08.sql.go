@@ -16,7 +16,7 @@ const agentFacetRatingDist = `-- name: AgentFacetRatingDist :many
 SELECT COALESCE(a.rating, 0) AS rating, COUNT(*) AS count
 FROM assets a
 WHERE a.asset_id IN (/*SLICE:asset_ids*/?)
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 GROUP BY 1
 ORDER BY 1
 `

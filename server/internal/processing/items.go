@@ -94,7 +94,7 @@ func (r *Reader) Items(ctx context.Context, id StageID, state ItemState, limit i
 	switch {
 	case spec.AssetStage != "":
 		source = `SELECT s.asset_id AS subject, s.asset_id AS asset, a.original_filename AS label, s.terminal_error AS terminal, f.failure_count AS attempts, s.updated_at AS updated
-		 FROM asset_pipeline_state s JOIN assets a ON a.asset_id=s.asset_id AND a.is_deleted=0
+		 FROM asset_pipeline_state s JOIN assets a ON a.asset_id=s.asset_id AND a.lifecycle_state = 'active'
 		 LEFT JOIN asset_pipeline_failures f ON f.asset_id=s.asset_id AND f.stage=s.stage
 		  AND f.source_content_id=s.source_content_id AND f.pipeline_version=s.pipeline_version AND f.desired_version=s.desired_version
 		 WHERE s.stage=? AND ` + pick(failed, `s.terminal_error IS NOT NULL`, `s.desired_version>s.applied_version AND s.terminal_error IS NULL`)

@@ -28,7 +28,7 @@ eligible AS (
     facts.stack_kind
   FROM media_item_browse_facts facts
   JOIN assets pa ON pa.asset_id = facts.primary_asset_id
-  WHERE pa.is_deleted = COALESCE(?5, false)
+  WHERE pa.lifecycle_state = COALESCE(?5, 'active')
     AND (
       (SELECT asset_ids_json FROM filter_params) IS NULL
       OR EXISTS (
@@ -213,7 +213,7 @@ stack_covers AS (
     JOIN asset_stacks s ON s.stack_id = asm.stack_id
     JOIN media_items mi ON mi.media_item_id = asm.media_item_id
     JOIN assets a ON a.asset_id = mi.primary_asset_id
-    WHERE a.is_deleted = COALESCE(?5, false)
+    WHERE a.lifecycle_state = COALESCE(?5, 'active')
   ) ranked
   WHERE ranked.cover_rank = 1
 ),
@@ -229,7 +229,7 @@ stack_members_all AS (
     FROM asset_stack_members asm
     JOIN media_items mi ON mi.media_item_id = asm.media_item_id
     JOIN assets a ON a.asset_id = mi.primary_asset_id
-    WHERE a.is_deleted = COALESCE(?5, false)
+    WHERE a.lifecycle_state = COALESCE(?5, 'active')
     ORDER BY asm.stack_id, asm.position IS NULL, asm.position, asm.media_item_id
   ) AS ordered
   GROUP BY ordered.stack_id
@@ -310,7 +310,7 @@ SELECT
   CAST(p.cover_has_live_motion AS INTEGER) AS cover_has_live_motion,
   p.member_items,
   p.matched_items,
-  cover_pa.asset_id, cover_pa.owner_id, cover_pa.content_id, cover_pa.type, cover_pa.original_filename, cover_pa.mime_type, cover_pa.width, cover_pa.height, cover_pa.duration, cover_pa.upload_time, cover_pa.taken_time, cover_pa.capture_offset_minutes, cover_pa.is_deleted, cover_pa.deleted_at, cover_pa.specific_metadata, cover_pa.rating, cover_pa.liked, cover_pa.status, cover_pa.updated_at, cover_pa.gps_latitude, cover_pa.gps_longitude, cover_pa.gps_geohash_5, cover_pa.gps_geohash_7, cover_pa.exif_raw
+  cover_pa.asset_id, cover_pa.owner_id, cover_pa.content_id, cover_pa.type, cover_pa.original_filename, cover_pa.mime_type, cover_pa.width, cover_pa.height, cover_pa.duration, cover_pa.upload_time, cover_pa.taken_time, cover_pa.capture_offset_minutes, cover_pa.lifecycle_state, cover_pa.specific_metadata, cover_pa.rating, cover_pa.liked, cover_pa.status, cover_pa.updated_at, cover_pa.gps_latitude, cover_pa.gps_longitude, cover_pa.gps_geohash_5, cover_pa.gps_geohash_7, cover_pa.exif_raw
 FROM paged p
 JOIN assets cover_pa ON cover_pa.asset_id = p.cover_primary_asset_id
 ORDER BY p.sort_time DESC, p.cover_media_item_id DESC
@@ -321,7 +321,7 @@ type GetCollapsedBrowseItemsUnifiedParams struct {
 	AssetTypes       *string     `db:"asset_types" json:"asset_types"`
 	TagNames         *string     `db:"tag_names" json:"tag_names"`
 	StackKinds       *string     `db:"stack_kinds" json:"stack_kinds"`
-	IsDeleted        bool        `db:"is_deleted" json:"is_deleted"`
+	LifecycleState   *string     `db:"lifecycle_state" json:"lifecycle_state"`
 	Query            interface{} `db:"query" json:"query"`
 	AssetType        interface{} `db:"asset_type" json:"asset_type"`
 	OwnerID          interface{} `db:"owner_id" json:"owner_id"`
@@ -377,7 +377,7 @@ func (q *Queries) GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCol
 		arg.AssetTypes,
 		arg.TagNames,
 		arg.StackKinds,
-		arg.IsDeleted,
+		arg.LifecycleState,
 		arg.Query,
 		arg.AssetType,
 		arg.OwnerID,
@@ -438,8 +438,7 @@ func (q *Queries) GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCol
 			&i.Asset.UploadTime,
 			&i.Asset.TakenTime,
 			&i.Asset.CaptureOffsetMinutes,
-			&i.Asset.IsDeleted,
-			&i.Asset.DeletedAt,
+			&i.Asset.LifecycleState,
 			&i.Asset.SpecificMetadata,
 			&i.Asset.Rating,
 			&i.Asset.Liked,

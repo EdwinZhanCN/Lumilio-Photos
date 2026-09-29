@@ -282,3 +282,72 @@ WHERE scan_id = sqlc.arg(scan_id)
   AND repository_id = sqlc.arg(repository_id)
 RETURNING *;
 
+
+-- name: TrashRepositoryEntry :execrows
+-- A file of this entry was moved into the repository trash. A scan may have
+-- marked the entry missing after the move; the file is in the trash either
+-- way.
+UPDATE repository_entries
+SET state = 'trashed',
+    missing_since = NULL,
+    trash_id = sqlc.arg(trash_id),
+    trashed_at = sqlc.arg(trashed_at),
+    revision = revision + 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE entry_id = sqlc.arg(entry_id)
+  AND asset_id = sqlc.arg(asset_id)
+  AND state IN ('present', 'missing');
+
+-- name: InsertTrashedRepositoryEntry :exec
+-- The trashed file's entry was dropped by a scan before the trash commit (a
+-- move that found another copy); the trash keeps a row for it.
+INSERT INTO repository_entries (
+    entry_id, repository_id, path, path_key, parent_key, kind,
+    size, mtime_ns, stat_checked_ns, state, content_id, asset_id,
+    trash_id, trashed_at, revision, updated_at
+) VALUES (
+    sqlc.arg(entry_id), sqlc.arg(repository_id), sqlc.arg(path), sqlc.arg(path_key),
+    sqlc.arg(parent_key), 'file', sqlc.arg(size), sqlc.arg(mtime_ns), sqlc.arg(mtime_ns),
+    'trashed', sqlc.arg(content_id), sqlc.arg(asset_id),
+    sqlc.arg(trash_id), sqlc.arg(trashed_at), 1, sqlc.arg(updated_at)
+);
+
+-- name: RestoreRepositoryEntry :execrows
+-- A trashed file was moved back into the tree, at its original path or a
+-- free sibling name.
+UPDATE repository_entries
+SET state = 'present',
+    path = sqlc.arg(path),
+    path_key = sqlc.arg(path_key),
+    parent_key = sqlc.arg(parent_key),
+    size = sqlc.arg(size),
+    mtime_ns = sqlc.arg(mtime_ns),
+    ctime_ns = sqlc.narg(ctime_ns),
+    file_id = sqlc.narg(file_id),
+    stat_checked_ns = sqlc.arg(stat_checked_ns),
+    trash_id = NULL,
+    trashed_at = NULL,
+    revision = revision + 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE entry_id = sqlc.arg(entry_id)
+  AND state = 'trashed';
+
+-- name: DeleteTrashedRepositoryEntry :execrows
+-- A scan indexed the restored file before the restore commit; its live entry
+-- stands for the file.
+DELETE FROM repository_entries
+WHERE entry_id = sqlc.arg(entry_id)
+  AND state = 'trashed';
+
+-- name: ListRepositoryEntriesForAssets :many
+-- Every file entry of the selected Assets, for Delete's preflight.
+SELECT * FROM repository_entries
+WHERE asset_id IN (sqlc.slice('asset_ids'))
+  AND kind = 'file'
+ORDER BY asset_id, repository_id, path;
+
+-- name: ListTrashedRepositoryEntriesForAssets :many
+SELECT * FROM repository_entries
+WHERE asset_id IN (sqlc.slice('asset_ids'))
+  AND state = 'trashed'
+ORDER BY asset_id, repository_id, path;

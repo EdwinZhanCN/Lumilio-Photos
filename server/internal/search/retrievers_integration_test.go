@@ -81,7 +81,7 @@ func TestEmbeddingRetrieverUsesVec1FiltersAndExactReranking(t *testing.T) {
 		if _, err := testutil.InsertAssetOccurrence(ctx, catalog.SQL, testutil.AssetOccurrenceParams{
 			AssetID: uuid.MustParse(fixture.id), RepositoryID: repositoryID, OwnerID: fixture.ownerID,
 			AssetType: fixture.assetType, Filename: fixture.filename, MIMEType: fixture.mime,
-			FileSize: 1, IsDeleted: fixture.deleted,
+			FileSize: 1, EntryState: testutil.EntryStateTrashedIf(fixture.deleted),
 		}); err != nil {
 			t.Fatal(err)
 		}

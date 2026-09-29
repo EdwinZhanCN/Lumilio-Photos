@@ -183,7 +183,7 @@ FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.owner_id = ?1
   AND a.type = 'AUDIO'
-  AND a.is_deleted = 0
+  AND a.lifecycle_state = 'active'
   AND (
     ?2 = ''
     OR mt.title LIKE '%' || ?2 || '%'
@@ -624,7 +624,7 @@ SELECT ma.album_id, ma.owner_id, ma.title, ma.release_date, ma.release_precision
        COUNT(DISTINCT a.asset_id) AS track_count
 FROM music_albums ma
 LEFT JOIN music_tracks mt ON mt.album_id = ma.album_id
-LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 WHERE ma.album_id = ?1 AND ma.owner_id = ?2
 GROUP BY ma.album_id
 `
@@ -678,7 +678,7 @@ func (q *Queries) GetMusicAlbum(ctx context.Context, arg GetMusicAlbumParams) (G
 const getMusicAlbumAutomaticCover = `-- name: GetMusicAlbumAutomaticCover :one
 SELECT a.asset_id
 FROM music_tracks mt
-JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 JOIN thumbnails thumb ON thumb.asset_id = a.asset_id AND thumb.size = 'medium'
 WHERE mt.album_id = ?1 AND mt.owner_id = ?2
   AND a.owner_id = ?2
@@ -741,7 +741,7 @@ SELECT ar.artist_id, ar.owner_id, ar.display_name, ar.normalized_name,
        COUNT(DISTINCT aa.album_id) AS album_count
 FROM music_artists ar
 LEFT JOIN music_track_artists ta ON ta.artist_id = ar.artist_id
-LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.is_deleted = 0
+LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.lifecycle_state = 'active'
 LEFT JOIN music_album_artists aa ON aa.artist_id = ar.artist_id
 WHERE ar.artist_id = ?1 AND ar.owner_id = ?2
 GROUP BY ar.artist_id
@@ -817,7 +817,7 @@ SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
        p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
        CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
          JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
-         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.lifecycle_state = 'active'
            AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
          WHERE ce.playlist_id = p.playlist_id AND EXISTS (
            SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
@@ -901,7 +901,7 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked, a.rating
+    a.lifecycle_state, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.track_id = ?1
@@ -941,7 +941,7 @@ type GetMusicTrackRow struct {
 	MimeType                string            `db:"mime_type" json:"mime_type"`
 	Duration                *float64          `db:"duration" json:"duration"`
 	TakenTime               dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
-	IsDeleted               bool              `db:"is_deleted" json:"is_deleted"`
+	LifecycleState          string            `db:"lifecycle_state" json:"lifecycle_state"`
 	Liked                   bool              `db:"liked" json:"liked"`
 	Rating                  *int64            `db:"rating" json:"rating"`
 }
@@ -976,7 +976,7 @@ func (q *Queries) GetMusicTrack(ctx context.Context, arg GetMusicTrackParams) (G
 		&i.MimeType,
 		&i.Duration,
 		&i.TakenTime,
-		&i.IsDeleted,
+		&i.LifecycleState,
 		&i.Liked,
 		&i.Rating,
 	)
@@ -987,7 +987,7 @@ const getMusicTrackLyrics = `-- name: GetMusicTrackLyrics :one
 SELECT COALESCE(l.content, '') AS content, COALESCE(l.revision, 0) AS revision
 FROM music_tracks mt
 LEFT JOIN music_track_lyrics l ON l.track_id = mt.track_id
-JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 WHERE mt.track_id = ?1 AND mt.owner_id = ?2
 `
 
@@ -1117,11 +1117,11 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked, a.rating
+    a.lifecycle_state, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.album_id = ?1 AND mt.owner_id = ?2
-  AND a.type = 'AUDIO' AND a.is_deleted = 0
+  AND a.type = 'AUDIO' AND a.lifecycle_state = 'active'
 ORDER BY mt.disc_number IS NULL, mt.disc_number, mt.track_number IS NULL,
          mt.track_number, mt.track_id
 `
@@ -1158,7 +1158,7 @@ type ListMusicAlbumTracksRow struct {
 	MimeType                string            `db:"mime_type" json:"mime_type"`
 	Duration                *float64          `db:"duration" json:"duration"`
 	TakenTime               dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
-	IsDeleted               bool              `db:"is_deleted" json:"is_deleted"`
+	LifecycleState          string            `db:"lifecycle_state" json:"lifecycle_state"`
 	Liked                   bool              `db:"liked" json:"liked"`
 	Rating                  *int64            `db:"rating" json:"rating"`
 }
@@ -1199,7 +1199,7 @@ func (q *Queries) ListMusicAlbumTracks(ctx context.Context, arg ListMusicAlbumTr
 			&i.MimeType,
 			&i.Duration,
 			&i.TakenTime,
-			&i.IsDeleted,
+			&i.LifecycleState,
 			&i.Liked,
 			&i.Rating,
 		); err != nil {
@@ -1224,7 +1224,7 @@ SELECT ma.album_id, ma.owner_id, ma.title, ma.release_date, ma.release_precision
        COUNT(DISTINCT a.asset_id) AS track_count
 FROM music_albums ma
 LEFT JOIN music_tracks mt ON mt.album_id = ma.album_id
-LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.is_deleted = 0
+LEFT JOIN assets a ON a.asset_id = mt.track_id AND a.lifecycle_state = 'active'
 WHERE ma.owner_id = ?1
   AND (?2 = 0 OR ma.favorite = 1)
   AND (?3 = '' OR ma.title LIKE '%' || ?3 || '%')
@@ -1311,7 +1311,7 @@ SELECT ar.artist_id, ar.owner_id, ar.display_name, ar.normalized_name,
        COUNT(DISTINCT aa.album_id) AS album_count
 FROM music_artists ar
 LEFT JOIN music_track_artists ta ON ta.artist_id = ar.artist_id
-LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.is_deleted = 0
+LEFT JOIN assets ta_asset ON ta_asset.asset_id = ta.track_id AND ta_asset.lifecycle_state = 'active'
 LEFT JOIN music_album_artists aa ON aa.artist_id = ar.artist_id
 WHERE ar.owner_id = ?1
   AND (?2 = 0 OR ar.favorite = 1)
@@ -1415,7 +1415,7 @@ const listMusicPlaybackEntries = `-- name: ListMusicPlaybackEntries :many
 SELECT pe.entry_id, pe.session_id, pe.sequence, pe.track_id,
        pe.source_entry_id, pe.saved_title,
        mt.title AS track_title, mt.artist_name AS track_artist,
-       mt.album_title AS track_album, a.mime_type, a.duration, a.is_deleted
+       mt.album_title AS track_album, a.mime_type, a.duration, a.lifecycle_state
 FROM music_playback_entries pe
 JOIN music_playback_sessions ps ON ps.session_id = pe.session_id
 LEFT JOIN music_tracks mt ON mt.track_id = pe.track_id AND mt.owner_id = ps.owner_id
@@ -1433,18 +1433,18 @@ type ListMusicPlaybackEntriesParams struct {
 }
 
 type ListMusicPlaybackEntriesRow struct {
-	EntryID       string        `db:"entry_id" json:"entry_id"`
-	SessionID     uuid.UUID     `db:"session_id" json:"session_id"`
-	Sequence      int64         `db:"sequence" json:"sequence"`
-	TrackID       uuid.NullUUID `db:"track_id" json:"track_id"`
-	SourceEntryID *string       `db:"source_entry_id" json:"source_entry_id"`
-	SavedTitle    string        `db:"saved_title" json:"saved_title"`
-	TrackTitle    *string       `db:"track_title" json:"track_title"`
-	TrackArtist   *string       `db:"track_artist" json:"track_artist"`
-	TrackAlbum    *string       `db:"track_album" json:"track_album"`
-	MimeType      *string       `db:"mime_type" json:"mime_type"`
-	Duration      *float64      `db:"duration" json:"duration"`
-	IsDeleted     bool          `db:"is_deleted" json:"is_deleted"`
+	EntryID        string        `db:"entry_id" json:"entry_id"`
+	SessionID      uuid.UUID     `db:"session_id" json:"session_id"`
+	Sequence       int64         `db:"sequence" json:"sequence"`
+	TrackID        uuid.NullUUID `db:"track_id" json:"track_id"`
+	SourceEntryID  *string       `db:"source_entry_id" json:"source_entry_id"`
+	SavedTitle     string        `db:"saved_title" json:"saved_title"`
+	TrackTitle     *string       `db:"track_title" json:"track_title"`
+	TrackArtist    *string       `db:"track_artist" json:"track_artist"`
+	TrackAlbum     *string       `db:"track_album" json:"track_album"`
+	MimeType       *string       `db:"mime_type" json:"mime_type"`
+	Duration       *float64      `db:"duration" json:"duration"`
+	LifecycleState *string       `db:"lifecycle_state" json:"lifecycle_state"`
 }
 
 func (q *Queries) ListMusicPlaybackEntries(ctx context.Context, arg ListMusicPlaybackEntriesParams) ([]ListMusicPlaybackEntriesRow, error) {
@@ -1473,7 +1473,7 @@ func (q *Queries) ListMusicPlaybackEntries(ctx context.Context, arg ListMusicPla
 			&i.TrackAlbum,
 			&i.MimeType,
 			&i.Duration,
-			&i.IsDeleted,
+			&i.LifecycleState,
 		); err != nil {
 			return nil, err
 		}
@@ -1492,7 +1492,7 @@ const listMusicPlaylistEntries = `-- name: ListMusicPlaylistEntries :many
 SELECT pe.entry_id, pe.playlist_id, pe.track_id, pe.saved_title, pe.position,
        pe.idempotency_key, pe.created_at, pe.updated_at,
        mt.title AS track_title, mt.artist_name AS track_artist,
-       mt.album_title AS track_album, a.duration, a.mime_type, a.is_deleted
+       mt.album_title AS track_album, a.duration, a.mime_type, a.lifecycle_state
 FROM music_playlist_entries pe
 JOIN music_playlists p ON p.playlist_id = pe.playlist_id
 LEFT JOIN music_tracks mt ON mt.track_id = pe.track_id AND mt.owner_id = p.owner_id
@@ -1520,7 +1520,7 @@ type ListMusicPlaylistEntriesRow struct {
 	TrackAlbum     *string           `db:"track_album" json:"track_album"`
 	Duration       *float64          `db:"duration" json:"duration"`
 	MimeType       *string           `db:"mime_type" json:"mime_type"`
-	IsDeleted      bool              `db:"is_deleted" json:"is_deleted"`
+	LifecycleState *string           `db:"lifecycle_state" json:"lifecycle_state"`
 }
 
 func (q *Queries) ListMusicPlaylistEntries(ctx context.Context, arg ListMusicPlaylistEntriesParams) ([]ListMusicPlaylistEntriesRow, error) {
@@ -1546,7 +1546,7 @@ func (q *Queries) ListMusicPlaylistEntries(ctx context.Context, arg ListMusicPla
 			&i.TrackAlbum,
 			&i.Duration,
 			&i.MimeType,
-			&i.IsDeleted,
+			&i.LifecycleState,
 		); err != nil {
 			return nil, err
 		}
@@ -1566,7 +1566,7 @@ SELECT p.playlist_id, p.owner_id, p.title, p.description, p.revision,
        p.created_at, p.updated_at, COUNT(pe.entry_id) AS entry_count,
        CAST(COALESCE((SELECT ce.track_id FROM music_playlist_entries ce
          JOIN music_tracks ct ON ct.track_id = ce.track_id AND ct.owner_id = p.owner_id
-         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.is_deleted = 0
+         JOIN assets ca ON ca.asset_id = ct.track_id AND ca.lifecycle_state = 'active'
            AND ca.owner_id = p.owner_id AND ca.type = 'AUDIO'
          WHERE ce.playlist_id = p.playlist_id AND EXISTS (
            SELECT 1 FROM thumbnails th WHERE th.asset_id = ce.track_id AND th.size = 'medium'
@@ -1734,13 +1734,13 @@ SELECT
     mt.is_compilation, mt.extracted_source_revision, mt.revision,
     mt.created_at, mt.updated_at,
     a.original_filename, a.mime_type, a.duration, a.taken_time,
-    a.is_deleted, a.liked, a.rating
+    a.lifecycle_state, a.liked, a.rating
 FROM music_tracks mt
 JOIN assets a ON a.asset_id = mt.track_id
 CROSS JOIN sort_params
 WHERE mt.owner_id = ?1
   AND a.type = 'AUDIO'
-  AND a.is_deleted = 0
+  AND a.lifecycle_state = 'active'
   AND (
     ?2 = ''
     OR mt.title LIKE '%' || ?2 || '%'
@@ -1803,7 +1803,7 @@ type ListMusicTracksRow struct {
 	MimeType                string            `db:"mime_type" json:"mime_type"`
 	Duration                *float64          `db:"duration" json:"duration"`
 	TakenTime               dbtypes.Timestamp `db:"taken_time" json:"taken_time"`
-	IsDeleted               bool              `db:"is_deleted" json:"is_deleted"`
+	LifecycleState          string            `db:"lifecycle_state" json:"lifecycle_state"`
 	Liked                   bool              `db:"liked" json:"liked"`
 	Rating                  *int64            `db:"rating" json:"rating"`
 }
@@ -1855,7 +1855,7 @@ func (q *Queries) ListMusicTracks(ctx context.Context, arg ListMusicTracksParams
 			&i.MimeType,
 			&i.Duration,
 			&i.TakenTime,
-			&i.IsDeleted,
+			&i.LifecycleState,
 			&i.Liked,
 			&i.Rating,
 		); err != nil {
@@ -1873,9 +1873,9 @@ func (q *Queries) ListMusicTracks(ctx context.Context, arg ListMusicTracksParams
 }
 
 const listUncatalogedAudioAssets = `-- name: ListUncatalogedAudioAssets :many
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 LEFT JOIN music_tracks mt ON mt.track_id = a.asset_id
-WHERE a.type = 'AUDIO' AND a.is_deleted = 0
+WHERE a.type = 'AUDIO' AND a.lifecycle_state = 'active'
   AND a.owner_id = ?1 AND mt.track_id IS NULL
 ORDER BY a.asset_id
 LIMIT ?2
@@ -1908,8 +1908,7 @@ func (q *Queries) ListUncatalogedAudioAssets(ctx context.Context, arg ListUncata
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1980,7 +1979,7 @@ SELECT mt.track_id, mt.title, mt.artist_name, mt.album_title, mt.genre,
        a.duration, a.rating, a.liked, a.original_filename, a.mime_type
 FROM music_tracks mt JOIN assets a ON a.asset_id = mt.track_id
 WHERE mt.owner_id = ?1 AND a.owner_id = ?1
- AND a.type = 'AUDIO' AND a.is_deleted = 0
+ AND a.type = 'AUDIO' AND a.lifecycle_state = 'active'
  AND (?2 = '' OR mt.title LIKE '%' || ?2 || '%'
       OR mt.artist_name LIKE '%' || ?2 || '%' OR mt.album_title LIKE '%' || ?2 || '%')
  AND (?3 = '' OR mt.artist_name LIKE '%' || ?3 || '%')

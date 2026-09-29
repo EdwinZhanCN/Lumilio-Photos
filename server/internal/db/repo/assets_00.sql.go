@@ -114,7 +114,7 @@ const bulkToggleAssetLiked = `-- name: BulkToggleAssetLiked :exec
 UPDATE assets
 SET liked = NOT liked
 WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 func (q *Queries) BulkToggleAssetLiked(ctx context.Context, assetIds []uuid.UUID) error {
@@ -136,7 +136,7 @@ const bulkUpdateAssetLiked = `-- name: BulkUpdateAssetLiked :exec
 UPDATE assets
 SET liked = ?1
 WHERE CAST(?2 AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 type BulkUpdateAssetLikedParams struct {
@@ -153,7 +153,7 @@ const bulkUpdateAssetRating = `-- name: BulkUpdateAssetRating :exec
 UPDATE assets
 SET rating = ?1
 WHERE CAST(?2 AS TEXT) LIKE '%"' || asset_id || '"%'
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 type BulkUpdateAssetRatingParams struct {
@@ -169,7 +169,7 @@ func (q *Queries) BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAsset
 const countActiveAssetsByRepository = `-- name: CountActiveAssetsByRepository :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
@@ -189,7 +189,7 @@ func (q *Queries) CountActiveAssetsByRepository(ctx context.Context, repositoryI
 const countAssetsByRating = `-- name: CountAssetsByRating :many
 SELECT rating, COUNT(*) as count
 FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND rating IS NOT NULL
   AND (?1 IS NULL OR owner_id = ?1)
 GROUP BY rating
@@ -227,7 +227,7 @@ func (q *Queries) CountAssetsByRating(ctx context.Context, ownerID interface{}) 
 const countAssetsByStatus = `-- name: CountAssetsByStatus :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND lifecycle_state = 'active'
 `
 
 func (q *Queries) CountAssetsByStatus(ctx context.Context, state string) (int64, error) {
@@ -240,7 +240,7 @@ func (q *Queries) CountAssetsByStatus(ctx context.Context, state string) (int64,
 const countAssetsByStatusAndOwner = `-- name: CountAssetsByStatusAndOwner :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND owner_id = ?2 AND is_deleted = false
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND owner_id = ?2 AND lifecycle_state = 'active'
 `
 
 type CountAssetsByStatusAndOwnerParams struct {
@@ -259,7 +259,7 @@ const countAssetsByStatusAndRepository = `-- name: CountAssetsByStatusAndReposit
 SELECT COUNT(*) as count
 FROM assets
 WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT)
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
@@ -282,7 +282,7 @@ func (q *Queries) CountAssetsByStatusAndRepository(ctx context.Context, arg Coun
 const countLikedAssets = `-- name: CountLikedAssets :one
 SELECT COUNT(*) as count
 FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND (?1 IS NULL OR owner_id = ?1)
 `
@@ -304,7 +304,7 @@ INSERT INTO assets (
     CAST(unixepoch('subsec') * 1000000 AS INTEGER),
     CAST(unixepoch('subsec') * 1000000 AS INTEGER)
 )
-RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
+RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
 `
 
 type CreateAssetParams struct {
@@ -355,8 +355,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
@@ -452,25 +451,14 @@ func (q *Queries) CreateThumbnail(ctx context.Context, arg CreateThumbnailParams
 	return i, err
 }
 
-const deleteAsset = `-- name: DeleteAsset :exec
-UPDATE assets
-SET is_deleted = true, deleted_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
-WHERE asset_id = ?1
-`
-
-func (q *Queries) DeleteAsset(ctx context.Context, assetID uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteAsset, assetID)
-	return err
-}
-
 const getAssetByContentHashAndRepository = `-- name: GetAssetByContentHashAndRepository :one
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE content_id IN (
     SELECT content_objects.content_id
     FROM content_objects
     WHERE content_objects.full_hash = ?1
   )
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
@@ -500,8 +488,7 @@ func (q *Queries) GetAssetByContentHashAndRepository(ctx context.Context, arg Ge
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
@@ -517,8 +504,8 @@ func (q *Queries) GetAssetByContentHashAndRepository(ctx context.Context, arg Ge
 }
 
 const getAssetByID = `-- name: GetAssetByID :one
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE asset_id = ?1 AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE asset_id = ?1 AND lifecycle_state = 'active'
 `
 
 func (q *Queries) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, error) {
@@ -537,8 +524,7 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, e
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
@@ -554,7 +540,7 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID uuid.UUID) (Asset, e
 }
 
 const getAssetByIDAny = `-- name: GetAssetByIDAny :one
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id = ?1
 `
 
@@ -574,8 +560,7 @@ func (q *Queries) GetAssetByIDAny(ctx context.Context, assetID uuid.UUID) (Asset
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
@@ -613,7 +598,7 @@ SELECT
   MAX(rating) as max_rating,
   MIN(rating) as min_rating
 FROM assets
-WHERE is_deleted = false
+WHERE lifecycle_state = 'active'
   AND owner_id = ?1
 `
 
@@ -641,13 +626,13 @@ func (q *Queries) GetAssetStatsForOwner(ctx context.Context, ownerID *int32) (Ge
 }
 
 const getAssetsByContentHash = `-- name: GetAssetsByContentHash :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE content_id IN (
     SELECT content_objects.content_id
     FROM content_objects
     WHERE content_objects.full_hash = ?1
   )
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 func (q *Queries) GetAssetsByContentHash(ctx context.Context, fullHash string) ([]Asset, error) {
@@ -672,8 +657,7 @@ func (q *Queries) GetAssetsByContentHash(ctx context.Context, fullHash string) (
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -699,9 +683,9 @@ func (q *Queries) GetAssetsByContentHash(ctx context.Context, fullHash string) (
 }
 
 const getAssetsByIDs = `-- name: GetAssetsByIDs :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id IN (/*SLICE:asset_ids*/?)
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 func (q *Queries) GetAssetsByIDs(ctx context.Context, assetIds []uuid.UUID) ([]Asset, error) {
@@ -736,8 +720,7 @@ func (q *Queries) GetAssetsByIDs(ctx context.Context, assetIds []uuid.UUID) ([]A
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -763,7 +746,7 @@ func (q *Queries) GetAssetsByIDs(ctx context.Context, assetIds []uuid.UUID) ([]A
 }
 
 const getAssetsByIDsAny = `-- name: GetAssetsByIDsAny :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id IN (/*SLICE:asset_ids*/?)
 `
 
@@ -799,8 +782,7 @@ func (q *Queries) GetAssetsByIDsAny(ctx context.Context, assetIds []uuid.UUID) (
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -829,10 +811,10 @@ const getAssetsByIDsForOwner = `-- name: GetAssetsByIDsForOwner :many
 WITH filter_params AS (
   SELECT CAST(?2 AS TEXT) AS asset_ids_json
 )
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = ?1
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 type GetAssetsByIDsForOwnerParams struct {
@@ -862,8 +844,7 @@ func (q *Queries) GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDs
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -889,8 +870,8 @@ func (q *Queries) GetAssetsByIDsForOwner(ctx context.Context, arg GetAssetsByIDs
 }
 
 const getAssetsByOwner = `-- name: GetAssetsByOwner :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE owner_id = ?1 AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE owner_id = ?1 AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?2 OFFSET ?3
 `
@@ -923,8 +904,7 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -955,11 +935,11 @@ WITH filter_params AS (
     CAST(?4 AS TEXT) AS types_json,
     CAST(?5 AS TEXT) AS sort_order
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN filter_params
 WHERE a.owner_id = ?1
   AND a.type IN (SELECT value FROM json_each(filter_params.types_json))
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 ORDER BY
   CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
   CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
@@ -1002,8 +982,7 @@ func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAss
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1030,9 +1009,9 @@ func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAss
 
 const getAssetsByOwnerSorted = `-- name: GetAssetsByOwnerSorted :many
 WITH sort_params AS (SELECT CAST(?4 AS TEXT) AS sort_order)
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN sort_params
-WHERE a.owner_id = ?1 AND a.is_deleted = false
+WHERE a.owner_id = ?1 AND a.lifecycle_state = 'active'
 ORDER BY
   CASE WHEN sort_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
   CASE WHEN sort_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
@@ -1073,8 +1052,7 @@ func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwn
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1101,10 +1079,10 @@ func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwn
 
 const getAssetsByOwnerWithRatingLiked = `-- name: GetAssetsByOwnerWithRatingLiked :many
 WITH sort_params AS (SELECT CAST(?6 AS TEXT) AS sort_by)
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN sort_params
 WHERE a.owner_id = ?1
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
   AND (?2 IS NULL OR
        (?2 = true AND a.rating IS NOT NULL) OR
        (?2 = false AND a.rating IS NULL))
@@ -1154,8 +1132,7 @@ func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAs
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1181,8 +1158,8 @@ func (q *Queries) GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAs
 }
 
 const getAssetsByRating = `-- name: GetAssetsByRating :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
   AND rating = ?1
   AND (?2 IS NULL OR owner_id = ?2)
 ORDER BY upload_time DESC
@@ -1223,8 +1200,7 @@ func (q *Queries) GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingPa
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1250,8 +1226,8 @@ func (q *Queries) GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingPa
 }
 
 const getAssetsByRatingAndType = `-- name: GetAssetsByRatingAndType :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
   AND rating = ?1
   AND type = ?2
   AND (?3 IS NULL OR owner_id = ?3)
@@ -1295,8 +1271,7 @@ func (q *Queries) GetAssetsByRatingAndType(ctx context.Context, arg GetAssetsByR
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1322,8 +1297,8 @@ func (q *Queries) GetAssetsByRatingAndType(ctx context.Context, arg GetAssetsByR
 }
 
 const getAssetsByRatingRange = `-- name: GetAssetsByRatingRange :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
   AND rating IS NOT NULL
   AND rating >= ?1
   AND rating <= ?2
@@ -1368,8 +1343,7 @@ func (q *Queries) GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRat
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1395,8 +1369,8 @@ func (q *Queries) GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRat
 }
 
 const getAssetsByStatus = `-- name: GetAssetsByStatus :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?3 OFFSET ?2
 `
@@ -1429,8 +1403,7 @@ func (q *Queries) GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusPa
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1456,8 +1429,8 @@ func (q *Queries) GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusPa
 }
 
 const getAssetsByStatusAndOwner = `-- name: GetAssetsByStatusAndOwner :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND owner_id = ?2 AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT) AND owner_id = ?2 AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?4 OFFSET ?3
 `
@@ -1496,8 +1469,7 @@ func (q *Queries) GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsBy
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1523,9 +1495,9 @@ func (q *Queries) GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsBy
 }
 
 const getAssetsByStatusAndRepository = `-- name: GetAssetsByStatusAndRepository :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
 WHERE json_extract(status, char(36) || '.state') = CAST(?1 AS TEXT)
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
   AND EXISTS (
     SELECT 1 FROM active_asset_occurrences occurrence
     WHERE occurrence.asset_id = assets.asset_id
@@ -1569,8 +1541,7 @@ func (q *Queries) GetAssetsByStatusAndRepository(ctx context.Context, arg GetAss
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1596,8 +1567,8 @@ func (q *Queries) GetAssetsByStatusAndRepository(ctx context.Context, arg GetAss
 }
 
 const getAssetsByType = `-- name: GetAssetsByType :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE type = ?1 AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE type = ?1 AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?2 OFFSET ?3
 `
@@ -1630,8 +1601,7 @@ func (q *Queries) GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1662,10 +1632,10 @@ WITH filter_params AS (
     CAST(?3 AS TEXT) AS types_json,
     CAST(?4 AS TEXT) AS sort_order
 )
-SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
+SELECT a.asset_id, a.owner_id, a.content_id, a.type, a.original_filename, a.mime_type, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.lifecycle_state, a.specific_metadata, a.rating, a.liked, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw FROM assets a
 CROSS JOIN filter_params
 WHERE a.type IN (SELECT value FROM json_each(filter_params.types_json))
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 ORDER BY
   CASE WHEN filter_params.sort_order = 'asc' THEN COALESCE(a.taken_time, a.upload_time) END ASC,
   CASE WHEN filter_params.sort_order = 'desc' THEN COALESCE(a.taken_time, a.upload_time) END DESC
@@ -1706,8 +1676,7 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1733,8 +1702,8 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 }
 
 const getAssetsWithErrors = `-- name: GetAssetsWithErrors :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = 'failed' AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE json_extract(status, char(36) || '.state') = 'failed' AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?1 OFFSET ?2
 `
@@ -1766,8 +1735,7 @@ func (q *Queries) GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErro
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1793,8 +1761,8 @@ func (q *Queries) GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErro
 }
 
 const getAssetsWithWarnings = `-- name: GetAssetsWithWarnings :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE json_extract(status, char(36) || '.state') = 'warning' AND is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE json_extract(status, char(36) || '.state') = 'warning' AND lifecycle_state = 'active'
 ORDER BY upload_time DESC
 LIMIT ?1 OFFSET ?2
 `
@@ -1826,8 +1794,7 @@ func (q *Queries) GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWa
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -1859,7 +1826,7 @@ WITH filter_params AS (
 SELECT asset_id FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = ?1
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 type GetAuthorizedAssetIDsParams struct {
@@ -1893,7 +1860,7 @@ func (q *Queries) GetAuthorizedAssetIDs(ctx context.Context, arg GetAuthorizedAs
 const getDistinctCameraModels = `-- name: GetDistinctCameraModels :many
 SELECT DISTINCT json_extract(a.specific_metadata, char(36) || '.camera_model') as camera_model
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND json_extract(a.specific_metadata, char(36) || '.camera_model') IS NOT NULL
   AND json_extract(a.specific_metadata, char(36) || '.camera_model') != ''
 ORDER BY camera_model
@@ -1925,7 +1892,7 @@ func (q *Queries) GetDistinctCameraModels(ctx context.Context) ([]interface{}, e
 const getDistinctLenses = `-- name: GetDistinctLenses :many
 SELECT DISTINCT json_extract(a.specific_metadata, char(36) || '.lens_model') as lens_model
 FROM assets a
-WHERE a.is_deleted = false
+WHERE a.lifecycle_state = 'active'
   AND json_extract(a.specific_metadata, char(36) || '.lens_model') IS NOT NULL
   AND json_extract(a.specific_metadata, char(36) || '.lens_model') != ''
 ORDER BY lens_model
@@ -1955,8 +1922,8 @@ func (q *Queries) GetDistinctLenses(ctx context.Context) ([]interface{}, error) 
 }
 
 const getLikedAssets = `-- name: GetLikedAssets :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND (?1 IS NULL OR owner_id = ?1)
 ORDER BY upload_time DESC
@@ -1991,8 +1958,7 @@ func (q *Queries) GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) 
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -2018,8 +1984,8 @@ func (q *Queries) GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) 
 }
 
 const getLikedAssetsByOwner = `-- name: GetLikedAssetsByOwner :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND owner_id = ?1
 ORDER BY upload_time DESC
@@ -2054,8 +2020,7 @@ func (q *Queries) GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsB
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -2081,8 +2046,8 @@ func (q *Queries) GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsB
 }
 
 const getLikedAssetsByType = `-- name: GetLikedAssetsByType :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
   AND liked = true
   AND type = ?1
   AND (?2 IS NULL OR owner_id = ?2)
@@ -2124,8 +2089,7 @@ func (q *Queries) GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsBy
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -2162,7 +2126,7 @@ WITH scoped AS (
     occurrence.file_size
   FROM assets asset
   JOIN active_asset_occurrences occurrence ON occurrence.asset_id = asset.asset_id
-  WHERE asset.is_deleted = false
+  WHERE asset.lifecycle_state = 'active'
     AND occurrence.repository_id = ?1
     AND (?2 IS NULL OR asset.owner_id = ?2)
 )
@@ -2303,8 +2267,8 @@ func (q *Queries) GetThumbnailsByAsset(ctx context.Context, assetID uuid.UUID) (
 }
 
 const getTopRatedAssets = `-- name: GetTopRatedAssets :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
   AND rating IS NOT NULL
   AND rating >= ?1
   AND (?2 IS NULL OR owner_id = ?2)
@@ -2346,8 +2310,7 @@ func (q *Queries) GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsPa
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -2379,7 +2342,7 @@ WITH filter_params AS (
 SELECT asset_id FROM assets
 WHERE asset_id IN (SELECT value FROM json_each((SELECT asset_ids_json FROM filter_params)))
   AND owner_id = ?1
-  AND is_deleted = false
+  AND lifecycle_state = 'active'
 `
 
 type LockAuthorizedAssetIDsParams struct {
@@ -2478,20 +2441,9 @@ func (q *Queries) RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAsset
 	return err
 }
 
-const restoreAsset = `-- name: RestoreAsset :exec
-UPDATE assets
-SET is_deleted = false, deleted_at = NULL
-WHERE asset_id = ?1
-`
-
-func (q *Queries) RestoreAsset(ctx context.Context, assetID uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, restoreAsset, assetID)
-	return err
-}
-
 const searchAssets = `-- name: SearchAssets :many
-SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
-WHERE is_deleted = false
+SELECT asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE lifecycle_state = 'active'
 AND (?1 IS NULL OR original_filename LIKE '%' || ?1 || '%')
 AND (?2 IS NULL OR type = ?2)
 ORDER BY upload_time DESC
@@ -2532,8 +2484,7 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 			&i.UploadTime,
 			&i.TakenTime,
 			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
+			&i.LifecycleState,
 			&i.SpecificMetadata,
 			&i.Rating,
 			&i.Liked,
@@ -2562,7 +2513,7 @@ const updateAsset = `-- name: UpdateAsset :one
 UPDATE assets
 SET original_filename = ?2, specific_metadata = ?3
 WHERE asset_id = ?1
-RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
+RETURNING asset_id, owner_id, content_id, type, original_filename, mime_type, width, height, duration, upload_time, taken_time, capture_offset_minutes, lifecycle_state, specific_metadata, rating, liked, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw
 `
 
 type UpdateAssetParams struct {
@@ -2587,8 +2538,7 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 		&i.UploadTime,
 		&i.TakenTime,
 		&i.CaptureOffsetMinutes,
-		&i.IsDeleted,
-		&i.DeletedAt,
+		&i.LifecycleState,
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,

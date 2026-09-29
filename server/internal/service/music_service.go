@@ -73,7 +73,7 @@ type MusicTrack struct {
 	MimeType                string          `json:"mime_type"`
 	Duration                *float64        `json:"duration,omitempty"`
 	TakenAt                 *time.Time      `json:"taken_at,omitempty"`
-	IsDeleted               bool            `json:"is_deleted"`
+	LifecycleState          string          `json:"lifecycle_state"`
 	Rating                  *int64          `json:"rating,omitempty"`
 	Liked                   bool            `json:"liked"`
 	Artists                 []MusicCredit   `json:"artists,omitempty"`
@@ -346,7 +346,7 @@ func trackFromListRow(row repo.ListMusicTracksRow) MusicTrack {
 		TrackNumber: row.TrackNumber, TrackTotal: row.TrackTotal, Compilation: row.IsCompilation != 0,
 		ExtractedSourceRevision: row.ExtractedSourceRevision, Revision: row.Revision,
 		OriginalFilename: row.OriginalFilename, MimeType: row.MimeType, Duration: row.Duration,
-		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked, Rating: row.Rating,
+		TakenAt: timestampTime(row.TakenTime), LifecycleState: row.LifecycleState, Liked: row.Liked, Rating: row.Rating,
 	}
 }
 
@@ -360,7 +360,7 @@ func trackFromDetailRow(row repo.GetMusicTrackRow) MusicTrack {
 		TrackNumber: row.TrackNumber, TrackTotal: row.TrackTotal, Compilation: row.IsCompilation != 0,
 		ExtractedSourceRevision: row.ExtractedSourceRevision, Revision: row.Revision,
 		OriginalFilename: row.OriginalFilename, MimeType: row.MimeType, Duration: row.Duration,
-		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked, Rating: row.Rating,
+		TakenAt: timestampTime(row.TakenTime), LifecycleState: row.LifecycleState, Liked: row.Liked, Rating: row.Rating,
 	}
 }
 
@@ -1161,7 +1161,7 @@ func trackFromAlbumTrackRow(row repo.ListMusicAlbumTracksRow) MusicTrack {
 		TrackNumber: row.TrackNumber, TrackTotal: row.TrackTotal, Compilation: row.IsCompilation != 0,
 		ExtractedSourceRevision: row.ExtractedSourceRevision, Revision: row.Revision,
 		OriginalFilename: row.OriginalFilename, MimeType: row.MimeType, Duration: row.Duration,
-		TakenAt: timestampTime(row.TakenTime), IsDeleted: row.IsDeleted, Liked: row.Liked, Rating: row.Rating,
+		TakenAt: timestampTime(row.TakenTime), LifecycleState: row.LifecycleState, Liked: row.Liked, Rating: row.Rating,
 	}
 }
 
@@ -1231,7 +1231,7 @@ func (s *musicService) validateCoverAsset(ctx context.Context, ownerID int32, as
 	if err != nil {
 		return err
 	}
-	if asset.OwnerID == nil || *asset.OwnerID != ownerID || asset.IsDeleted {
+	if asset.OwnerID == nil || *asset.OwnerID != ownerID || asset.LifecycleState != "active" {
 		return fmt.Errorf("%w: cover asset is not owned by the current user", ErrMusicInvalid)
 	}
 	return nil
@@ -1449,7 +1449,7 @@ func playlistEntryFromRow(row repo.ListMusicPlaylistEntriesRow) MusicPlaylistEnt
 		EntryID: row.EntryID, PlaylistID: row.PlaylistID, TrackID: nullUUIDPointer(row.TrackID),
 		SavedTitle: row.SavedTitle, Position: row.Position, IdempotencyKey: row.IdempotencyKey,
 	}
-	entry.Available = row.TrackID.Valid && row.TrackTitle != nil && !row.IsDeleted
+	entry.Available = row.TrackID.Valid && row.TrackTitle != nil && isActiveLifecycle(row.LifecycleState)
 	return entry
 }
 
@@ -1894,7 +1894,7 @@ func playbackEntryFromRow(row repo.ListMusicPlaybackEntriesRow) MusicPlaybackEnt
 	return MusicPlaybackEntry{
 		EntryID: row.EntryID, Sequence: row.Sequence, TrackID: nullUUIDPointer(row.TrackID),
 		SourceEntryID: row.SourceEntryID, SavedTitle: row.SavedTitle,
-		Available:  row.TrackID.Valid && title != "" && !row.IsDeleted,
+		Available:  row.TrackID.Valid && title != "" && isActiveLifecycle(row.LifecycleState),
 		TrackTitle: title, TrackArtist: stringOrEmpty(row.TrackArtist), TrackAlbum: stringOrEmpty(row.TrackAlbum),
 		MimeType: stringOrEmpty(row.MimeType), Duration: row.Duration,
 	}
@@ -2066,7 +2066,7 @@ func (s *musicService) ApplyAgentPlaylistTx(ctx context.Context, tx *sql.Tx, own
 		}
 		seen[id] = true
 		track, err := q.GetMusicTrack(ctx, repo.GetMusicTrackParams{TrackID: id, OwnerID: ownerID})
-		if err != nil || track.IsDeleted {
+		if err != nil || track.LifecycleState != "active" {
 			return uuid.Nil, 0, sql.ErrNoRows
 		}
 	}
@@ -2108,7 +2108,7 @@ func (s *musicService) ApplyAgentPlaylistTx(ctx context.Context, tx *sql.Tx, own
  (SELECT COALESCE(MAX(position),-1)+1 FROM music_playlist_entries WHERE playlist_id=?) + CAST(e.key AS INTEGER), json_extract(e.value,'$.id'),
  CAST(unixepoch('subsec')*1000000 AS INTEGER), CAST(unixepoch('subsec')*1000000 AS INTEGER)
  FROM json_each(?) e JOIN music_tracks mt ON mt.track_id=json_extract(e.value,'$.track')
- JOIN assets a ON a.asset_id=mt.track_id AND a.owner_id=? AND a.is_deleted=0 AND a.type='AUDIO'
+ JOIN assets a ON a.asset_id=mt.track_id AND a.owner_id=? AND a.lifecycle_state = 'active' AND a.type='AUDIO'
  WHERE mt.owner_id=? AND (?=0 OR NOT EXISTS (SELECT 1 FROM music_playlist_entries pe WHERE pe.playlist_id=? AND pe.track_id=mt.track_id))`, target, target, data, ownerID, ownerID, skipExisting, target)
 	if err != nil {
 		return uuid.Nil, 0, err
@@ -2123,4 +2123,10 @@ func (s *musicService) ApplyAgentPlaylistTx(ctx context.Context, tx *sql.Tx, own
 		}
 	}
 	return target, int(count), nil
+}
+
+// isActiveLifecycle reports whether a left-joined Asset is present in the
+// library; a missing row is not.
+func isActiveLifecycle(state *string) bool {
+	return state != nil && *state == "active"
 }

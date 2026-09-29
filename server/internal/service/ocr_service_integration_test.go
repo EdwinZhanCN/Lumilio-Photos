@@ -28,8 +28,6 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	writer := bleveocr.NewWriter(database.SQL, database.Writer, database.Queries, index)
 	notifier := &recordingOCRIndexNotifier{}
 	ocrService := NewOCRServiceWithNotifier(database.Queries, database.SQL, database.Writer, notifier)
-	assetService, err := NewAssetServiceWithNotifier(database.Queries, database.SQL, nil, nil, index, notifier)
-	require.NoError(t, err)
 
 	require.NoError(t, ocrService.SaveOCRResults(ctx, assetID, ocrFixture("Running invoice 2025", 0.95), 12))
 	require.Equal(t, int32(1), notifier.Count())
@@ -54,21 +52,21 @@ func TestOCRSaveUpdateDeleteTrashRestoreAndAtomicRollback(t *testing.T) {
 	require.Len(t, items, 1)
 	require.Equal(t, "Updated bicycle X-T5", items[0].TextContent)
 
-	require.NoError(t, assetService.DeleteAsset(ctx, assetID))
-	require.Equal(t, int32(3), notifier.Count())
+	// A lifecycle change re-publishes the OCR document from the catalog
+	// trigger, whichever path moved the Asset's files.
+	require.NoError(t, testutil.SetAssetEntriesState(ctx, database.SQL, assetID, "trashed"))
 	require.Equal(t, int64(3), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Empty(t, serviceSearchIDs(t, index, "bicycle", false))
 	require.Equal(t, []string{assetID.String()}, serviceSearchIDs(t, index, "bicycle", true))
 
-	require.NoError(t, assetService.RestoreAsset(ctx, assetID))
-	require.Equal(t, int32(4), notifier.Count())
+	require.NoError(t, testutil.SetAssetEntriesState(ctx, database.SQL, assetID, "present"))
 	require.Equal(t, int64(4), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Equal(t, []string{assetID.String()}, serviceSearchIDs(t, index, "bicycle", false))
 
 	require.NoError(t, ocrService.DeleteOCRResults(ctx, assetID))
-	require.Equal(t, int32(5), notifier.Count())
+	require.Equal(t, int32(3), notifier.Count())
 	require.Equal(t, int64(5), ocrRevision(t, database, assetID))
 	drainOCRWriter(t, writer)
 	require.Empty(t, serviceSearchIDs(t, index, "bicycle", false))
@@ -158,10 +156,14 @@ func serviceOutboxCount(t *testing.T, database *db.DB) int {
 	return count
 }
 
-func serviceSearchIDs(t *testing.T, index *bleveocr.Index, text string, deleted bool) []string {
+func serviceSearchIDs(t *testing.T, index *bleveocr.Index, text string, trashed bool) []string {
 	t.Helper()
+	state := "active"
+	if trashed {
+		state = "trashed"
+	}
 	page, err := index.SearchPage(context.Background(), text, bleveocr.BasicFilters{
-		IsDeleted: deleted,
+		LifecycleState: state,
 	}, bleveocr.QueryStrict, 0, 10)
 	require.NoError(t, err)
 	ids := make([]string, 0, len(page.Hits))

@@ -7,6 +7,7 @@ package repo
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"server/internal/db/dbtypes"
@@ -305,6 +306,22 @@ func (q *Queries) DeleteRepositoryEntryCAS(ctx context.Context, arg DeleteReposi
 	return result.RowsAffected()
 }
 
+const deleteTrashedRepositoryEntry = `-- name: DeleteTrashedRepositoryEntry :execrows
+DELETE FROM repository_entries
+WHERE entry_id = ?1
+  AND state = 'trashed'
+`
+
+// A scan indexed the restored file before the restore commit; its live entry
+// stands for the file.
+func (q *Queries) DeleteTrashedRepositoryEntry(ctx context.Context, entryID uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteTrashedRepositoryEntry, entryID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const finishRepositoryScan = `-- name: FinishRepositoryScan :execrows
 UPDATE repository_scans
 SET status = ?1,
@@ -390,7 +407,7 @@ func (q *Queries) GetLatestStartedRepositoryScanID(ctx context.Context, reposito
 }
 
 const getLiveRepositoryEntryByKey = `-- name: GetLiveRepositoryEntryByKey :one
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND path_key = ?2
   AND state IN ('pending_hash', 'present')
@@ -423,6 +440,8 @@ func (q *Queries) GetLiveRepositoryEntryByKey(ctx context.Context, arg GetLiveRe
 		&i.AssetID,
 		&i.Revision,
 		&i.MissingSince,
+		&i.TrashID,
+		&i.TrashedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -466,7 +485,7 @@ func (q *Queries) GetQueuedRepositoryScan(ctx context.Context, repositoryID uuid
 }
 
 const getRepositoryEntry = `-- name: GetRepositoryEntry :one
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
 WHERE entry_id = ?1
 `
 
@@ -492,6 +511,8 @@ func (q *Queries) GetRepositoryEntry(ctx context.Context, entryID uuid.UUID) (Re
 		&i.AssetID,
 		&i.Revision,
 		&i.MissingSince,
+		&i.TrashID,
+		&i.TrashedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -603,7 +624,7 @@ INSERT INTO repository_entries (
     ?9, ?10, ?11, ?12,
     ?13, ?14, 1, ?15, ?16
 )
-RETURNING entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at
+RETURNING entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at
 `
 
 type InsertRepositoryEntryParams struct {
@@ -664,6 +685,8 @@ func (q *Queries) InsertRepositoryEntry(ctx context.Context, arg InsertRepositor
 		&i.AssetID,
 		&i.Revision,
 		&i.MissingSince,
+		&i.TrashID,
+		&i.TrashedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -730,8 +753,56 @@ func (q *Queries) InsertRepositoryScan(ctx context.Context, arg InsertRepository
 	return i, err
 }
 
+const insertTrashedRepositoryEntry = `-- name: InsertTrashedRepositoryEntry :exec
+INSERT INTO repository_entries (
+    entry_id, repository_id, path, path_key, parent_key, kind,
+    size, mtime_ns, stat_checked_ns, state, content_id, asset_id,
+    trash_id, trashed_at, revision, updated_at
+) VALUES (
+    ?1, ?2, ?3, ?4,
+    ?5, 'file', ?6, ?7, ?7,
+    'trashed', ?8, ?9,
+    ?10, ?11, 1, ?12
+)
+`
+
+type InsertTrashedRepositoryEntryParams struct {
+	EntryID      uuid.UUID         `db:"entry_id" json:"entry_id"`
+	RepositoryID uuid.UUID         `db:"repository_id" json:"repository_id"`
+	Path         string            `db:"path" json:"path"`
+	PathKey      string            `db:"path_key" json:"path_key"`
+	ParentKey    string            `db:"parent_key" json:"parent_key"`
+	Size         int64             `db:"size" json:"size"`
+	MtimeNs      int64             `db:"mtime_ns" json:"mtime_ns"`
+	ContentID    uuid.NullUUID     `db:"content_id" json:"content_id"`
+	AssetID      uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+	TrashID      uuid.NullUUID     `db:"trash_id" json:"trash_id"`
+	TrashedAt    dbtypes.Timestamp `db:"trashed_at" json:"trashed_at"`
+	UpdatedAt    dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+// The trashed file's entry was dropped by a scan before the trash commit (a
+// move that found another copy); the trash keeps a row for it.
+func (q *Queries) InsertTrashedRepositoryEntry(ctx context.Context, arg InsertTrashedRepositoryEntryParams) error {
+	_, err := q.db.ExecContext(ctx, insertTrashedRepositoryEntry,
+		arg.EntryID,
+		arg.RepositoryID,
+		arg.Path,
+		arg.PathKey,
+		arg.ParentKey,
+		arg.Size,
+		arg.MtimeNs,
+		arg.ContentID,
+		arg.AssetID,
+		arg.TrashID,
+		arg.TrashedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const listLiveRepositoryEntriesUnder = `-- name: ListLiveRepositoryEntriesUnder :many
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND (path = ?2 OR (path > ?2 || '/' AND path < ?2 || '0'))
   AND path > ?3
@@ -781,6 +852,8 @@ func (q *Queries) ListLiveRepositoryEntriesUnder(ctx context.Context, arg ListLi
 			&i.AssetID,
 			&i.Revision,
 			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -797,7 +870,7 @@ func (q *Queries) ListLiveRepositoryEntriesUnder(ctx context.Context, arg ListLi
 }
 
 const listPendingHashRepositoryEntries = `-- name: ListPendingHashRepositoryEntries :many
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND state = 'pending_hash'
 ORDER BY entry_id
@@ -837,6 +910,8 @@ func (q *Queries) ListPendingHashRepositoryEntries(ctx context.Context, arg List
 			&i.AssetID,
 			&i.Revision,
 			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -853,7 +928,7 @@ func (q *Queries) ListPendingHashRepositoryEntries(ctx context.Context, arg List
 }
 
 const listPresentRepositoryEntriesForAsset = `-- name: ListPresentRepositoryEntriesForAsset :many
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
 WHERE asset_id = ?1
   AND state = 'present'
   AND kind = 'file'
@@ -889,6 +964,71 @@ func (q *Queries) ListPresentRepositoryEntriesForAsset(ctx context.Context, asse
 			&i.AssetID,
 			&i.Revision,
 			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRepositoryEntriesForAssets = `-- name: ListRepositoryEntriesForAssets :many
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
+WHERE asset_id IN (/*SLICE:asset_ids*/?)
+  AND kind = 'file'
+ORDER BY asset_id, repository_id, path
+`
+
+// Every file entry of the selected Assets, for Delete's preflight.
+func (q *Queries) ListRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error) {
+	query := listRepositoryEntriesForAssets
+	var queryParams []interface{}
+	if len(assetIds) > 0 {
+		for _, v := range assetIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(assetIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RepositoryEntry
+	for rows.Next() {
+		var i RepositoryEntry
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.RepositoryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.Size,
+			&i.MtimeNs,
+			&i.CtimeNs,
+			&i.FileID,
+			&i.StatCheckedNs,
+			&i.State,
+			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.AssetID,
+			&i.Revision,
+			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -906,7 +1046,7 @@ func (q *Queries) ListPresentRepositoryEntriesForAsset(ctx context.Context, asse
 
 const listRepositoryEntryChildren = `-- name: ListRepositoryEntryChildren :many
 
-SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, updated_at FROM repository_entries
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
 WHERE repository_id = ?1
   AND parent_key = ?2
   AND state <> 'trashed'
@@ -951,6 +1091,8 @@ func (q *Queries) ListRepositoryEntryChildren(ctx context.Context, arg ListRepos
 			&i.AssetID,
 			&i.Revision,
 			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -1012,6 +1154,68 @@ func (q *Queries) ListRepositoryScans(ctx context.Context, arg ListRepositorySca
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTrashedRepositoryEntriesForAssets = `-- name: ListTrashedRepositoryEntriesForAssets :many
+SELECT entry_id, repository_id, path, path_key, parent_key, kind, size, mtime_ns, ctime_ns, file_id, stat_checked_ns, state, content_id, quick_fingerprint, quick_fingerprint_version, asset_id, revision, missing_since, trash_id, trashed_at, updated_at FROM repository_entries
+WHERE asset_id IN (/*SLICE:asset_ids*/?)
+  AND state = 'trashed'
+ORDER BY asset_id, repository_id, path
+`
+
+func (q *Queries) ListTrashedRepositoryEntriesForAssets(ctx context.Context, assetIds []uuid.NullUUID) ([]RepositoryEntry, error) {
+	query := listTrashedRepositoryEntriesForAssets
+	var queryParams []interface{}
+	if len(assetIds) > 0 {
+		for _, v := range assetIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", strings.Repeat(",?", len(assetIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:asset_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RepositoryEntry
+	for rows.Next() {
+		var i RepositoryEntry
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.RepositoryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.Size,
+			&i.MtimeNs,
+			&i.CtimeNs,
+			&i.FileID,
+			&i.StatCheckedNs,
+			&i.State,
+			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.AssetID,
+			&i.Revision,
+			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -1135,6 +1339,59 @@ func (q *Queries) RequestRepositoryScanCancellation(ctx context.Context, arg Req
 	return i, err
 }
 
+const restoreRepositoryEntry = `-- name: RestoreRepositoryEntry :execrows
+UPDATE repository_entries
+SET state = 'present',
+    path = ?1,
+    path_key = ?2,
+    parent_key = ?3,
+    size = ?4,
+    mtime_ns = ?5,
+    ctime_ns = ?6,
+    file_id = ?7,
+    stat_checked_ns = ?8,
+    trash_id = NULL,
+    trashed_at = NULL,
+    revision = revision + 1,
+    updated_at = ?9
+WHERE entry_id = ?10
+  AND state = 'trashed'
+`
+
+type RestoreRepositoryEntryParams struct {
+	Path          string            `db:"path" json:"path"`
+	PathKey       string            `db:"path_key" json:"path_key"`
+	ParentKey     string            `db:"parent_key" json:"parent_key"`
+	Size          int64             `db:"size" json:"size"`
+	MtimeNs       int64             `db:"mtime_ns" json:"mtime_ns"`
+	CtimeNs       *int64            `db:"ctime_ns" json:"ctime_ns"`
+	FileID        *string           `db:"file_id" json:"file_id"`
+	StatCheckedNs int64             `db:"stat_checked_ns" json:"stat_checked_ns"`
+	UpdatedAt     dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EntryID       uuid.UUID         `db:"entry_id" json:"entry_id"`
+}
+
+// A trashed file was moved back into the tree, at its original path or a
+// free sibling name.
+func (q *Queries) RestoreRepositoryEntry(ctx context.Context, arg RestoreRepositoryEntryParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, restoreRepositoryEntry,
+		arg.Path,
+		arg.PathKey,
+		arg.ParentKey,
+		arg.Size,
+		arg.MtimeNs,
+		arg.CtimeNs,
+		arg.FileID,
+		arg.StatCheckedNs,
+		arg.UpdatedAt,
+		arg.EntryID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const setRepositoryEntryStateCAS = `-- name: SetRepositoryEntryStateCAS :execrows
 UPDATE repository_entries
 SET state = ?1,
@@ -1196,6 +1453,44 @@ type StartRepositoryScanParams struct {
 
 func (q *Queries) StartRepositoryScan(ctx context.Context, arg StartRepositoryScanParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, startRepositoryScan, arg.StartedAt, arg.ScanID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const trashRepositoryEntry = `-- name: TrashRepositoryEntry :execrows
+UPDATE repository_entries
+SET state = 'trashed',
+    missing_since = NULL,
+    trash_id = ?1,
+    trashed_at = ?2,
+    revision = revision + 1,
+    updated_at = ?3
+WHERE entry_id = ?4
+  AND asset_id = ?5
+  AND state IN ('present', 'missing')
+`
+
+type TrashRepositoryEntryParams struct {
+	TrashID   uuid.NullUUID     `db:"trash_id" json:"trash_id"`
+	TrashedAt dbtypes.Timestamp `db:"trashed_at" json:"trashed_at"`
+	UpdatedAt dbtypes.Timestamp `db:"updated_at" json:"updated_at"`
+	EntryID   uuid.UUID         `db:"entry_id" json:"entry_id"`
+	AssetID   uuid.NullUUID     `db:"asset_id" json:"asset_id"`
+}
+
+// A file of this entry was moved into the repository trash. A scan may have
+// marked the entry missing after the move; the file is in the trash either
+// way.
+func (q *Queries) TrashRepositoryEntry(ctx context.Context, arg TrashRepositoryEntryParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, trashRepositoryEntry,
+		arg.TrashID,
+		arg.TrashedAt,
+		arg.UpdatedAt,
+		arg.EntryID,
+		arg.AssetID,
+	)
 	if err != nil {
 		return 0, err
 	}

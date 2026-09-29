@@ -2193,7 +2193,7 @@ export interface paths {
         post?: never;
         /**
          * Delete asset
-         * @description Soft delete an asset by marking it as deleted. The physical file is not removed.
+         * @description Move every file of the asset into its Repository's trash (.lumilio/trash). The asset is hidden from browsing with its metadata kept and can be restored until the trash retention expires. Nothing moves when a Repository is offline or a file changed since the last scan.
          */
         delete: {
             parameters: {
@@ -2225,6 +2225,15 @@ export interface paths {
                 };
                 /** @description Invalid asset ID format */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Nothing moved: conflict_type is repository_offline, file_changed, asset_missing, or move_failed */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3147,7 +3156,7 @@ export interface paths {
         put?: never;
         /**
          * Restore asset
-         * @description Restore a soft-deleted asset from Trash. The original file is not moved.
+         * @description Move the asset's trashed files back to their original paths and show it again with its metadata. A taken path is never overwritten; the file is restored under a free sibling name.
          */
         post: {
             parameters: {
@@ -3179,6 +3188,15 @@ export interface paths {
                 };
                 /** @description Invalid asset ID format */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["api.ProblemResponse"];
+                    };
+                };
+                /** @description Nothing moved: conflict_type is repository_offline, not_trashed, trash_file_missing, or move_failed */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -14916,14 +14934,19 @@ export interface components {
             asset_id?: string;
             capture_offset_minutes?: number;
             content_id?: string;
-            deleted_at?: string;
             duration?: number;
             file_size?: number;
             gps_latitude?: number;
             gps_longitude?: number;
             hash?: string;
             height?: number;
-            is_deleted?: boolean;
+            /**
+             * @description LifecycleState is derived from the Asset's files: active while any is
+             *     present, missing while any is missing, trashed when all are in the
+             *     repository trash.
+             * @enum {string}
+             */
+            lifecycle_state?: "active" | "missing" | "trashed";
             liked?: boolean;
             mime_type?: string;
             original_filename?: string;
@@ -14973,14 +14996,19 @@ export interface components {
             asset_id?: string;
             capture_offset_minutes?: number;
             content_id?: string;
-            deleted_at?: string;
             duration?: number;
             file_size?: number;
             gps_latitude?: number;
             gps_longitude?: number;
             hash?: string;
             height?: number;
-            is_deleted?: boolean;
+            /**
+             * @description LifecycleState is derived from the Asset's files: active while any is
+             *     present, missing while any is missing, trashed when all are in the
+             *     repository trash.
+             * @enum {string}
+             */
+            lifecycle_state?: "active" | "missing" | "trashed";
             liked?: boolean;
             mime_type?: string;
             original_filename?: string;
@@ -15000,7 +15028,6 @@ export interface components {
             asset_id?: string;
             capture_offset_minutes?: number;
             content_id?: string;
-            deleted_at?: string;
             duration?: number;
             face_result?: components["schemas"]["dto.AssetFaceResultDTO"];
             file_size?: number;
@@ -15008,7 +15035,13 @@ export interface components {
             gps_longitude?: number;
             hash?: string;
             height?: number;
-            is_deleted?: boolean;
+            /**
+             * @description LifecycleState is derived from the Asset's files: active while any is
+             *     present, missing while any is missing, trashed when all are in the
+             *     repository trash.
+             * @enum {string}
+             */
+            lifecycle_state?: "active" | "missing" | "trashed";
             liked?: boolean;
             mime_type?: string;
             ocr_result?: components["schemas"]["dto.AssetOCRResultDTO"];
@@ -15068,10 +15101,15 @@ export interface components {
              * @example true
              */
             folder_recursive?: boolean;
-            /** @example false */
-            is_deleted?: boolean;
             /** @example EF 50mm f/1.8 */
             lens?: string;
+            /**
+             * @description LifecycleState selects Assets in one lifecycle state; omitted means
+             *     active. The Trash lists "trashed" and the Missing view "missing".
+             * @example active
+             * @enum {string}
+             */
+            lifecycle_state?: "active" | "missing" | "trashed";
             /** @example true */
             liked?: boolean;
             location?: components["schemas"]["dto.LocationBBoxDTO"];
@@ -16584,7 +16622,8 @@ export interface components {
             edition?: string;
             extracted_source_revision?: number;
             genre?: string;
-            is_deleted?: boolean;
+            /** @enum {string} */
+            lifecycle_state?: "active" | "missing" | "trashed";
             liked?: boolean;
             mime_type?: string;
             original_filename?: string;

@@ -21,7 +21,7 @@ SELECT
     COALESCE(MIN(a.capture_offset_minutes), 0) AS capture_offset_minutes
 FROM assets a
 WHERE a.asset_id IN (/*SLICE:asset_ids*/?)
-  AND a.is_deleted = false
+  AND a.lifecycle_state = 'active'
 `
 
 type AgentFacetOverviewRow struct {

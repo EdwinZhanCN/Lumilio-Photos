@@ -27,8 +27,13 @@ CREATE TABLE "assets" (
     taken_time INTEGER,
     capture_offset_minutes INTEGER
         CHECK (capture_offset_minutes IS NULL OR capture_offset_minutes BETWEEN -840 AND 840),
-    is_deleted INTEGER NOT NULL DEFAULT 0 CHECK (is_deleted IN (0, 1)),
-    deleted_at INTEGER,
+    -- Derived from the Asset's entries by the repository_entries triggers and
+    -- never written by application code: 'active' while any entry is present
+    -- (or awaiting a rehash), else 'missing' while any entry is missing, else
+    -- 'trashed'. An Asset with no entry does not exist; PurgeEntries deletes
+    -- it in the transaction that removes its last entry.
+    lifecycle_state TEXT NOT NULL DEFAULT 'active'
+        CHECK (lifecycle_state IN ('active', 'missing', 'trashed')),
     specific_metadata TEXT CHECK (specific_metadata IS NULL OR json_valid(specific_metadata)),
     rating INTEGER,
     liked INTEGER NOT NULL DEFAULT 0 CHECK (liked IN (0, 1)),
@@ -660,7 +665,7 @@ CREATE TABLE lifecycle_audit_events (
     request_id TEXT NOT NULL DEFAULT '',
     operation_id TEXT,
     action TEXT NOT NULL CHECK (length(action) BETWEEN 1 AND 100),
-    target_type TEXT NOT NULL CHECK (target_type IN ('repository', 'storage_location', 'runtime_config')),
+    target_type TEXT NOT NULL CHECK (target_type IN ('repository', 'storage_location', 'runtime_config', 'asset')),
     target_id TEXT,
     source TEXT NOT NULL CHECK (source IN ('web', 'desktop_host', 'server', 'recovery', 'test')),
     confirmation_type TEXT NOT NULL DEFAULT 'none',
@@ -682,14 +687,16 @@ CREATE TABLE lifecycle_operations (
         'register_repository_copy',
         'switch_default_storage_location',
         'relocate_storage_location',
-        'rename_repository'
+        'rename_repository',
+        'trash_assets',
+        'restore_assets'
     )),
     payload_hash TEXT NOT NULL CHECK (length(payload_hash) = 64),
     payload TEXT NOT NULL CHECK (json_valid(payload)),
     actor TEXT NOT NULL CHECK (length(actor) BETWEEN 1 AND 200),
     actor_user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
     host_instance_id TEXT NOT NULL DEFAULT '',
-    target_type TEXT NOT NULL CHECK (target_type IN ('repository', 'storage_location', 'runtime_config')),
+    target_type TEXT NOT NULL CHECK (target_type IN ('repository', 'storage_location', 'runtime_config', 'asset')),
     target_id TEXT,
     phase TEXT NOT NULL CHECK (phase IN (
         'prepared',
@@ -1092,12 +1099,19 @@ CREATE TABLE repository_entries (
     -- Bumped on every change; every scan write is a compare-and-swap on it.
     revision INTEGER NOT NULL CHECK (revision > 0),
     missing_since INTEGER,
+    -- A trashed file lives at .lumilio/trash/files/<trash_id>/<name> with its
+    -- info sidecar at .lumilio/trash/info/<trash_id>.json; path keeps the
+    -- original location that Restore returns it to.
+    trash_id TEXT CHECK (trash_id IS NULL OR (trash_id = lower(trash_id) AND length(trash_id) = 36)),
+    trashed_at INTEGER,
     updated_at INTEGER NOT NULL,
     CHECK (kind = 'file' OR (content_id IS NULL AND asset_id IS NULL)),
     CHECK (kind = 'file' OR state IN ('present', 'missing')),
     CHECK ((content_id IS NULL) = (asset_id IS NULL)),
     CHECK (kind = 'directory' OR state NOT IN ('present', 'trashed') OR asset_id IS NOT NULL),
-    CHECK ((state = 'missing') = (missing_since IS NOT NULL))
+    CHECK ((state = 'missing') = (missing_since IS NOT NULL)),
+    CHECK ((state = 'trashed') = (trash_id IS NOT NULL)),
+    CHECK ((trash_id IS NULL) = (trashed_at IS NULL))
 ) STRICT;
 
 CREATE TABLE repository_scans (
@@ -1431,7 +1445,7 @@ CREATE VIRTUAL TABLE search_embeddings_vec USING vec1(
     embedding,
     space_id,
     owner_id,
-    is_deleted,
+    lifecycle_state,
     asset_type
 );
 
@@ -1535,7 +1549,7 @@ GROUP BY
     asm.position,
     s.stack_kind;
 
--- ===== INDEXES (155) =====
+-- ===== INDEXES (156) =====
 
 CREATE INDEX embeddings_asset_type_idx ON embeddings (asset_id, embedding_type);
 
@@ -1619,7 +1633,7 @@ CREATE INDEX idx_asset_stacks_kind ON asset_stacks (stack_kind, stack_id);
 
 CREATE INDEX idx_asset_tags_tag_source_asset ON asset_tags (tag_id, source, asset_id);
 
-CREATE INDEX idx_assets_owner_deleted ON assets (owner_id, is_deleted, asset_id);
+CREATE INDEX idx_assets_owner_lifecycle ON assets (owner_id, lifecycle_state, asset_id);
 
 CREATE INDEX idx_assets_taken_time ON assets (taken_time DESC, asset_id);
 
@@ -1762,6 +1776,9 @@ CREATE INDEX idx_repository_entries_pending_hash
 CREATE INDEX idx_repository_entries_asset
     ON repository_entries(asset_id)
     WHERE asset_id IS NOT NULL;
+CREATE INDEX idx_repository_entries_trashed
+    ON repository_entries(trashed_at, entry_id)
+    WHERE state = 'trashed';
 CREATE UNIQUE INDEX repository_scans_one_queued
     ON repository_scans(repository_id)
     WHERE status = 'queued';
@@ -1888,7 +1905,151 @@ CREATE UNIQUE INDEX search_embeddings_asset_frame_uniq
 CREATE UNIQUE INDEX search_embeddings_asset_primary_uniq
     ON search_embeddings (asset_id) WHERE frame_ts_ms IS NULL;
 
--- ===== TRIGGERS (41) =====
+-- ===== TRIGGERS (45) =====
+
+-- An Asset's lifecycle state is derived from its entries; a comparison with
+-- no entry left is NULL, so an Asset keeps its last state only until
+-- PurgeEntries deletes it in the same transaction.
+CREATE TRIGGER asset_lifecycle_entry_delete
+AFTER DELETE ON repository_entries
+WHEN old.asset_id IS NOT NULL
+BEGIN
+    UPDATE assets
+    SET lifecycle_state = (
+        SELECT CASE
+            WHEN max(entry.state IN ('present', 'pending_hash')) = 1 THEN 'active'
+            WHEN max(entry.state = 'missing') = 1 THEN 'missing'
+            WHEN max(entry.state = 'trashed') = 1 THEN 'trashed'
+        END
+        FROM repository_entries entry
+        WHERE entry.asset_id = assets.asset_id
+    )
+    WHERE asset_id IN (old.asset_id)
+      AND lifecycle_state <> (
+        SELECT CASE
+            WHEN max(entry.state IN ('present', 'pending_hash')) = 1 THEN 'active'
+            WHEN max(entry.state = 'missing') = 1 THEN 'missing'
+            WHEN max(entry.state = 'trashed') = 1 THEN 'trashed'
+        END
+        FROM repository_entries entry
+        WHERE entry.asset_id = assets.asset_id
+    );
+END;
+
+CREATE TRIGGER asset_lifecycle_entry_insert
+AFTER INSERT ON repository_entries
+WHEN new.asset_id IS NOT NULL
+BEGIN
+    UPDATE assets
+    SET lifecycle_state = (
+        SELECT CASE
+            WHEN max(entry.state IN ('present', 'pending_hash')) = 1 THEN 'active'
+            WHEN max(entry.state = 'missing') = 1 THEN 'missing'
+            WHEN max(entry.state = 'trashed') = 1 THEN 'trashed'
+        END
+        FROM repository_entries entry
+        WHERE entry.asset_id = assets.asset_id
+    )
+    WHERE asset_id IN (new.asset_id)
+      AND lifecycle_state <> (
+        SELECT CASE
+            WHEN max(entry.state IN ('present', 'pending_hash')) = 1 THEN 'active'
+            WHEN max(entry.state = 'missing') = 1 THEN 'missing'
+            WHEN max(entry.state = 'trashed') = 1 THEN 'trashed'
+        END
+        FROM repository_entries entry
+        WHERE entry.asset_id = assets.asset_id
+    );
+END;
+
+CREATE TRIGGER asset_lifecycle_entry_update
+AFTER UPDATE OF state, asset_id ON repository_entries
+WHEN old.state IS NOT new.state OR old.asset_id IS NOT new.asset_id
+BEGIN
+    UPDATE assets
+    SET lifecycle_state = (
+        SELECT CASE
+            WHEN max(entry.state IN ('present', 'pending_hash')) = 1 THEN 'active'
+            WHEN max(entry.state = 'missing') = 1 THEN 'missing'
+            WHEN max(entry.state = 'trashed') = 1 THEN 'trashed'
+        END
+        FROM repository_entries entry
+        WHERE entry.asset_id = assets.asset_id
+    )
+    WHERE asset_id IN (old.asset_id, new.asset_id)
+      AND lifecycle_state <> (
+        SELECT CASE
+            WHEN max(entry.state IN ('present', 'pending_hash')) = 1 THEN 'active'
+            WHEN max(entry.state = 'missing') = 1 THEN 'missing'
+            WHEN max(entry.state = 'trashed') = 1 THEN 'trashed'
+        END
+        FROM repository_entries entry
+        WHERE entry.asset_id = assets.asset_id
+    );
+END;
+
+-- A lifecycle change re-publishes the Asset's OCR document and lets its
+-- logical media item serve from an active component when one exists.
+CREATE TRIGGER asset_lifecycle_state_changed
+AFTER UPDATE OF lifecycle_state ON assets
+WHEN old.lifecycle_state IS NOT new.lifecycle_state
+BEGIN
+    INSERT INTO ocr_index_metadata (asset_id, revision, updated_at)
+    SELECT new.asset_id, 1, CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+    WHERE EXISTS (SELECT 1 FROM ocr_results WHERE asset_id = new.asset_id)
+    ON CONFLICT (asset_id) DO UPDATE SET
+        revision = ocr_index_metadata.revision + 1,
+        updated_at = excluded.updated_at;
+    INSERT INTO ocr_index_outbox (asset_id, revision, updated_at)
+    SELECT metadata.asset_id, metadata.revision, metadata.updated_at
+    FROM ocr_index_metadata metadata
+    WHERE metadata.asset_id = new.asset_id
+      AND EXISTS (SELECT 1 FROM ocr_results WHERE asset_id = new.asset_id)
+    ON CONFLICT (asset_id) DO UPDATE SET
+        revision = excluded.revision,
+        updated_at = excluded.updated_at;
+    UPDATE media_items
+    SET primary_asset_id = (
+            SELECT member.asset_id
+            FROM media_item_assets member
+            JOIN assets component ON component.asset_id = member.asset_id
+            WHERE member.media_item_id = media_items.media_item_id
+              AND component.lifecycle_state = 'active'
+            ORDER BY
+                CASE member.relation
+                    WHEN 'jpeg_original' THEN 0
+                    WHEN 'live_photo_still' THEN 1
+                    WHEN 'edited_version' THEN 2
+                    WHEN 'raw_original' THEN 3
+                    ELSE 4
+                END,
+                member.position ASC,
+                member.created_at ASC
+            LIMIT 1
+        ),
+        updated_at = CAST(unixepoch('subsec') * 1000000 AS INTEGER)
+    WHERE media_item_id = (
+            SELECT media_item_id FROM media_item_assets WHERE asset_id = new.asset_id
+        )
+      AND COALESCE((
+            SELECT member.asset_id
+            FROM media_item_assets member
+            JOIN assets component ON component.asset_id = member.asset_id
+            WHERE member.media_item_id = media_items.media_item_id
+              AND component.lifecycle_state = 'active'
+            ORDER BY
+                CASE member.relation
+                    WHEN 'jpeg_original' THEN 0
+                    WHEN 'live_photo_still' THEN 1
+                    WHEN 'edited_version' THEN 2
+                    WHEN 'raw_original' THEN 3
+                    ELSE 4
+                END,
+                member.position ASC,
+                member.created_at ASC
+            LIMIT 1
+        ), primary_asset_id) IS NOT primary_asset_id;
+END;
 
 CREATE TRIGGER asset_search_fts_delete AFTER DELETE ON assets BEGIN
     INSERT INTO asset_search_fts (asset_search_fts, rowid, original_filename)
@@ -2049,9 +2210,8 @@ BEGIN
 END;
 
 CREATE TRIGGER location_projection_asset_facts_update
-AFTER UPDATE OF owner_id, is_deleted, type, gps_latitude, gps_longitude, gps_geohash_7 ON assets
+AFTER UPDATE OF owner_id, type, gps_latitude, gps_longitude, gps_geohash_7 ON assets
 WHEN old.owner_id IS NOT new.owner_id
-  OR old.is_deleted IS NOT new.is_deleted
   OR old.type IS NOT new.type
   OR old.gps_latitude IS NOT new.gps_latitude
   OR old.gps_longitude IS NOT new.gps_longitude
@@ -2227,20 +2387,20 @@ CREATE TRIGGER ocr_text_items_count_insert AFTER INSERT ON ocr_text_items BEGIN
 END;
 
 CREATE TRIGGER search_embeddings_vec_asset_metadata_update
-AFTER UPDATE OF owner_id, is_deleted, type ON assets BEGIN
+AFTER UPDATE OF owner_id, lifecycle_state, type ON assets BEGIN
     DELETE FROM search_embeddings_vec
     WHERE rowid IN (
         SELECT id FROM search_embeddings WHERE asset_id = new.asset_id
     );
     INSERT INTO search_embeddings_vec (
-        rowid, embedding, space_id, owner_id, is_deleted, asset_type
+        rowid, embedding, space_id, owner_id, lifecycle_state, asset_type
     )
     SELECT
         embedding.id,
         embedding.vector,
         embedding.space_id,
         new.owner_id,
-        new.is_deleted,
+        new.lifecycle_state,
         new.type
     FROM search_embeddings embedding
     WHERE embedding.asset_id = new.asset_id;
@@ -2262,10 +2422,10 @@ END;
 
 CREATE TRIGGER search_embeddings_vec_insert AFTER INSERT ON search_embeddings BEGIN
     INSERT INTO search_embeddings_vec (
-        rowid, embedding, space_id, owner_id, is_deleted, asset_type
+        rowid, embedding, space_id, owner_id, lifecycle_state, asset_type
     )
     SELECT
-        new.id, new.vector, new.space_id, asset.owner_id, asset.is_deleted, asset.type
+        new.id, new.vector, new.space_id, asset.owner_id, asset.lifecycle_state, asset.type
     FROM assets asset
     WHERE asset.asset_id = new.asset_id;
     UPDATE semantic_vector_index_state
@@ -2284,10 +2444,10 @@ CREATE TRIGGER search_embeddings_vec_update
 AFTER UPDATE OF vector, space_id, asset_id ON search_embeddings BEGIN
     DELETE FROM search_embeddings_vec WHERE rowid = old.id;
     INSERT INTO search_embeddings_vec (
-        rowid, embedding, space_id, owner_id, is_deleted, asset_type
+        rowid, embedding, space_id, owner_id, lifecycle_state, asset_type
     )
     SELECT
-        new.id, new.vector, new.space_id, asset.owner_id, asset.is_deleted, asset.type
+        new.id, new.vector, new.space_id, asset.owner_id, asset.lifecycle_state, asset.type
     FROM assets asset
     WHERE asset.asset_id = new.asset_id;
 END;

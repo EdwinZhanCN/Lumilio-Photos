@@ -235,7 +235,6 @@ func (f *browseFixture) expandedNames(filter browseFilter, limit, offset int64) 
 	f.t.Helper()
 
 	rows, err := f.db.Queries.GetMediaItemsUnified(f.ctx, repo.GetMediaItemsUnifiedParams{
-		IsDeleted:       false,
 		OwnerID:         f.ownerID,
 		RepositoryID:    uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		SortBy:          "date_captured",
@@ -262,7 +261,6 @@ func (f *browseFixture) collapsedRows(filter browseFilter, limit, offset int64) 
 	f.t.Helper()
 
 	rows, err := f.db.Queries.GetCollapsedBrowseItemsUnified(f.ctx, repo.GetCollapsedBrowseItemsUnifiedParams{
-		IsDeleted:       false,
 		OwnerID:         f.ownerID,
 		RepositoryID:    uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		SortBy:          "date_captured",
@@ -301,7 +299,6 @@ func (f *browseFixture) counts(filter browseFilter) (mediaItems, files, collapse
 
 	var err error
 	mediaItems, err = f.db.Queries.CountMediaItemsUnified(f.ctx, repo.CountMediaItemsUnifiedParams{
-		IsDeleted:       false,
 		OwnerID:         f.ownerID,
 		RepositoryID:    uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		Composition:     nullableString(filter.composition),
@@ -313,7 +310,6 @@ func (f *browseFixture) counts(filter browseFilter) (mediaItems, files, collapse
 	}
 
 	files, err = f.db.Queries.CountMediaItemFilesUnified(f.ctx, repo.CountMediaItemFilesUnifiedParams{
-		IsDeleted:       false,
 		OwnerID:         f.ownerID,
 		RepositoryID:    uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		Composition:     nullableString(filter.composition),
@@ -325,7 +321,6 @@ func (f *browseFixture) counts(filter browseFilter) (mediaItems, files, collapse
 	}
 
 	collapsed, err = f.db.Queries.CountCollapsedBrowseItemsUnified(f.ctx, repo.CountCollapsedBrowseItemsUnifiedParams{
-		IsDeleted:       false,
 		OwnerID:         f.ownerID,
 		RepositoryID:    uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		Composition:     nullableString(filter.composition),
@@ -568,7 +563,6 @@ func TestBrowseMatrixCompositionFactsMatchComponents(t *testing.T) {
 	f := matrixFixture(t)
 
 	rows, err := f.db.Queries.GetMediaItemsUnified(f.ctx, repo.GetMediaItemsUnifiedParams{
-		IsDeleted:    false,
 		OwnerID:      f.ownerID,
 		RepositoryID: uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		SortBy:       "date_captured",
@@ -692,7 +686,6 @@ func TestBrowseMatrixInvariants(t *testing.T) {
 
 	// Every browse row a filter can produce resolves to a visible primary asset.
 	rows, err := f.db.Queries.GetMediaItemsUnified(f.ctx, repo.GetMediaItemsUnifiedParams{
-		IsDeleted:    false,
 		OwnerID:      f.ownerID,
 		RepositoryID: uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		SortBy:       "date_captured",
@@ -748,7 +741,6 @@ func TestBrowseMatrixPartiallyMatchedStackKeepsCoverAndNarrowsMatches(t *testing
 	})
 
 	rows, err := f.db.Queries.GetCollapsedBrowseItemsUnified(f.ctx, repo.GetCollapsedBrowseItemsUnifiedParams{
-		IsDeleted:    false,
 		OwnerID:      f.ownerID,
 		RepositoryID: uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		SortBy:       "date_captured",
@@ -783,10 +775,11 @@ func TestBrowseMatrixCollapsedCoverFallsBackWhenCoverIsDeleted(t *testing.T) {
 		{name: "member-b", relations: []string{"jpeg_original"}, stack: "burst", stackKind: "burst"},
 	})
 
-	f.exec(`UPDATE assets SET is_deleted = 1 WHERE asset_id = ?`, f.assetIDs["cover-jpeg"][0])
+	if err := testutil.SetAssetEntriesState(f.ctx, f.db.SQL, f.assetIDs["cover-jpeg"][0], "trashed"); err != nil {
+		t.Fatal(err)
+	}
 
 	rows, err := f.db.Queries.GetCollapsedBrowseItemsUnified(f.ctx, repo.GetCollapsedBrowseItemsUnifiedParams{
-		IsDeleted:    false,
 		OwnerID:      f.ownerID,
 		RepositoryID: uuid.NullUUID{UUID: f.repositoryID, Valid: true},
 		SortBy:       "date_captured",

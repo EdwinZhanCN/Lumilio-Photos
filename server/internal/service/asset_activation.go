@@ -24,7 +24,7 @@ func ApplyAssetActivationTx(ctx context.Context, tx *sql.Tx, queries *repo.Queri
 		return errors.New("asset activation transaction is incomplete")
 	}
 	asset, err := queries.GetAssetByIDAny(ctx, assetID)
-	if errors.Is(err, sql.ErrNoRows) || asset.IsDeleted {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {

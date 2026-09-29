@@ -109,6 +109,36 @@ Asset A (content C1), the hash commit:
 
 In every branch a scan leaves no Asset with zero entries.
 
+## Implementation notes
+
+Amended 2026-09-28 while landing Phase 4a.
+
+- **The derived state is a trigger-maintained column.** `assets.lifecycle_state`
+  is recomputed by triggers on `repository_entries` whenever an entry is
+  bound, unbound, changes state, or is removed, and no application code
+  writes it. Browse and search filter one indexed column instead of an
+  `EXISTS` over entries, and the vector index, the OCR index, and media-item
+  primaries follow it through their own triggers. A `pending_hash` entry
+  bound to an Asset counts as present, so an Asset does not flicker while an
+  in-place edit is rehashed.
+- **`PurgeEntriesTx` lives in `server/internal/lifecycle`.** It also removes
+  share links and agent pins that named a purged Asset and dissolves media
+  items and stacks left without members. `tools/architecturecheck` fails on
+  any other `DELETE FROM assets` in server source or queries.
+- **The trash lives in `server/internal/storage/trash`.** A move links the
+  destination and then unlinks the source, so it never replaces a file; on a
+  volume without hard links it checks and renames. Entry writes go through the
+  scanner (`CommitTrash`, `CommitRestore`), which tolerates a scan that saw the
+  file vanish or reappear first. Recovery trusts the disk: a file found at its
+  destination was moved.
+- **Refusals reuse the `repository/conflict` Problem** with `conflict_type`
+  `repository_offline`, `file_changed`, `asset_missing`, `not_trashed`,
+  `trash_file_missing`, or `move_failed`, until Phase 5 adds dedicated asset
+  Problems.
+- **Duplicate resolution deletes first.** The non-kept duplicates go to the
+  trash as one Delete; a refused Delete leaves the group pending and nothing
+  merged.
+
 ## Alternatives considered
 
 **Keep the soft-delete flag (`is_deleted`) beside physical state.** This was
