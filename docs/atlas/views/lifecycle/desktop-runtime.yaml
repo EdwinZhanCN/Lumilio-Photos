@@ -1,0 +1,110 @@
+id: desktop-runtime
+kind: lifecycle
+title: Desktop runtime phase
+summary: >-
+  The Desktop App hosts the complete Server in-process and reports one runtime
+  phase to the Settings window. Every mutation is a request-id idempotent
+  operation; configuration is saved only while stopped and applied by a
+  journaled quiesce-and-restart with a last-known-good fallback.
+enum: go:desktop/internal/control/dto.RuntimePhase
+direction: TB
+nodes:
+  - id: stopped
+    label: stopped
+    anchor: go:desktop/internal/control/dto.RuntimeStopped
+    note: No Server generation is held.
+  - id: starting
+    label: starting
+    anchor: go:desktop/internal/control/dto.RuntimeStarting
+    note: A new generation runs server/app.Run and waits for RuntimeReady.
+  - id: running
+    label: running
+    anchor: go:desktop/internal/control/dto.RuntimeRunning
+    note: The Server owns its listener and repositories.
+  - id: stopping
+    label: stopping
+    anchor: go:desktop/internal/control/dto.RuntimeStopping
+    note: Graceful shutdown of the held generation.
+  - id: restarting
+    label: restarting
+    anchor: go:desktop/internal/control/dto.RuntimeRestarting
+    note: Stop then start a new generation in one operation.
+  - id: saving
+    label: saving-config
+    anchor: go:desktop/internal/control/dto.RuntimeSavingConfig
+    note: Writing a validated runtime intent while stopped.
+  - id: applying
+    label: applying-config
+    anchor: go:desktop/internal/control/dto.RuntimeApplyingConfig
+    note: Journaled quiesce, candidate start, and commit or rollback.
+  - id: failed
+    label: failed
+    anchor: go:desktop/internal/control/dto.RuntimeFailed
+    note: Start or the running Server failed; the error is in the snapshot.
+transitions:
+  - from: "[*]"
+    to: stopped
+    anchor: go:desktop/internal/control/dto.InitialSnapshot
+  - from: stopped
+    to: starting
+    label: Start
+    anchor: go:desktop/internal/runtime.Controller.Start
+  - from: failed
+    to: starting
+    label: Start
+    anchor: go:desktop/internal/runtime.Controller.Start
+  - from: starting
+    to: running
+    label: Server reports RuntimeReady
+    anchor: go:desktop/internal/runtime.Controller.handleResult
+  - from: starting
+    to: failed
+    label: startup error
+  - from: running
+    to: stopping
+    label: Stop or Quiesce
+    anchor: go:desktop/internal/runtime.Controller.Stop
+  - from: stopping
+    to: stopped
+    label: generation released
+  - from: running
+    to: restarting
+    label: Restart
+    anchor: go:desktop/internal/runtime.Controller.Restart
+  - from: restarting
+    to: running
+    label: new generation ready
+  - from: running
+    to: failed
+    label: Server exited unexpectedly
+  - from: stopped
+    to: saving
+    label: Save configuration
+    anchor: go:runtimeconfig.TransactionController.Save
+  - from: failed
+    to: saving
+    label: Save configuration
+  - from: saving
+    to: stopped
+    label: intent written
+  - from: saving
+    to: failed
+    label: write failed
+  - from: running
+    to: applying
+    label: Apply configuration
+    anchor: go:runtimeconfig.TransactionController.Apply
+  - from: applying
+    to: running
+    label: candidate generation started and committed
+  - from: applying
+    to: failed
+    label: candidate failed (restore last known good)
+    anchor: go:runtimeconfig.TransactionController.RestoreLastKnownGood
+notes:
+  - title: Completeness is enforced
+    body: >-
+      This view declares `enum: RuntimePhase`, so the checker requires its
+      states to be exactly the enum's constants. Adding a phase in
+      control/dto fails `task atlas:check` until the diagram draws it.
+related: [system-context]

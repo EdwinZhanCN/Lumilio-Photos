@@ -45,6 +45,8 @@ point that links everything here.
 | --- | --- |
 | Standing orders for every session | root `AGENTS.md` |
 | Current-state contracts and maps | `docs/*.md`, `web/ARCHITECTURE.md` |
+| What a package is for and where it sits | its `doc.go` / `doc.ts`, gated by `task atlas:check` |
+| How flows, data, and lifecycles move through the code | anchored views in `docs/atlas/views/` ([Atlas](atlas/README.md)) |
 | Large prospective work | `exec-plans/active/`, deleted at completion |
 | How to run a recurring workflow | `.agents/skills/lumilio-<name>/SKILL.md` |
 | Why a project-coupled decision stands, and what it beat | `.agents/decisions/` |
@@ -78,6 +80,7 @@ known failure modes.
 | [lumilio-z-index](../.agents/skills/lumilio-z-index/SKILL.md) | three-rule stacking strategy and token scale |
 | [lumilio-add-task-target](../.agents/skills/lumilio-add-task-target/SKILL.md) | Taskfile placement, naming, when a `ci:*` orchestrator is earned |
 | [lumilio-feature-doc](../.agents/skills/lumilio-feature-doc/SKILL.md) | `doc.ts` authoring, `{@link}`/import pairing, `doc.md` regeneration |
+| [lumilio-atlas](../.agents/skills/lumilio-atlas/SKILL.md) | package `doc.go`, group dependency rules, authoring anchored views, re-verifying stale views |
 | [lumilio-pin-reconcile](../.agents/skills/lumilio-pin-reconcile/SKILL.md) | assets.lock / lumen.lock bump, verify, PR shape |
 | [lumilio-exec-plan](../.agents/skills/lumilio-exec-plan/SKILL.md) | plan creation criteria, skeleton, completion extraction |
 
@@ -152,6 +155,8 @@ asserts a clean tree (`git diff --exit-code`) in the `generated` CI job:
 | `web/src/lib/http-commons/schema.d.ts`, OpenAPI spec and docs | `task dto` | `verify:generated` |
 | `doc.md` siblings of feature `doc.ts` | `task web:docs` | `verify:generated` |
 | Server config schema and examples | `task config:examples` | `verify:generated` |
+| `docs/atlas/generated/**` | `task atlas:generate` | `verify:generated` (also fails on broken anchors, undeclared dependencies, and stale views) |
+| `docs/atlas/atlas.lock.json` | `task atlas:lock`, only after re-reading stale views | `atlas:check` inside `verify:generated` and `task test` |
 | `assets.lock.json`, `lumen.lock.json` | reconcile/sync tools | already gated: `assets:check`, `lumen:check` |
 | `web/src/wasm/*` bundles | `task wasm:blake3` | **exception**: Rust toolchain is not a CI baseline; PR review owns freshness |
 

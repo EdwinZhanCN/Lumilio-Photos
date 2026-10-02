@@ -1,4 +1,3 @@
-// Package commit is the sole catalog-write capability for asynchronous work.
 package commit
 
 import (

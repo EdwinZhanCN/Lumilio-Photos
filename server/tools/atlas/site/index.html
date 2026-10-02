@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumilio Atlas</title>
+    <link rel="stylesheet" href="atlas.css" />
+    <script>
+      try {
+        const theme = localStorage.getItem("atlas-theme");
+        if (theme) document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <button class="icon-button nav-toggle" id="nav-toggle" aria-label="Toggle navigation">☰</button>
+      <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"></span>Lumilio Atlas</a>
+      <div class="search">
+        <input id="search" type="search" placeholder="Search views, modules, symbols  ( / )" autocomplete="off" />
+        <div class="search-results" id="search-results" role="listbox"></div>
+      </div>
+      <a class="health-pill" id="health-pill" href="#/health"></a>
+      <label class="open-in">
+        Open in
+        <select id="open-in">
+          <option value="vscode">VS Code</option>
+          <option value="github">GitHub</option>
+        </select>
+      </label>
+      <button class="icon-button" id="theme-toggle" aria-label="Toggle theme">◐</button>
+    </header>
+    <div class="layout">
+      <nav class="sidebar" id="sidebar"></nav>
+      <main class="content" id="content"></main>
+    </div>
+    <script src="mermaid.min.js"></script>
+    <script src="atlas-data.js"></script>
+    <script src="atlas.js"></script>
+  </body>
+</html>

@@ -48,6 +48,7 @@ vars:
   GO_BUILD_TAGS: '{{.GO_BUILD_TAGS | default "sqlite_fts5"}}'
   API_URL: '{{.API_URL | default "http://127.0.0.1:6680"}}'
   WEB_DEV_PORT: '{{.WEB_DEV_PORT | default "6657"}}'
+  ATLAS_ADDR: '{{.ATLAS_ADDR | default "127.0.0.1:6690"}}'
   DEV_ROOT: '{{joinPath .ROOT_DIR ".local" "dev"}}'
   DEV_CONFIG: '{{joinPath .DEV_ROOT "config" "server.toml"}}'
 
@@ -87,9 +88,10 @@ tasks:
       - web:dev
 
   test:
-    desc: Run repository architecture, Server, and Web tests
+    desc: Run repository architecture, Atlas, Server, and Web tests
     cmds:
       - task: architecture:check
+      - task: atlas:check
       - task: test:modules
 
   test:modules:
@@ -110,6 +112,32 @@ tasks:
     desc: Check repository architecture constraints
     cmds:
       - go -C server run ./tools/architecturecheck
+
+  # The Atlas spans Server, Desktop, and Web, so its targets live here. The Web
+  # facts are extracted first; the Go tool joins them with the Go packages.
+  atlas:
+    desc: Build the Atlas site and serve it (default http://127.0.0.1:6690)
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas site --serve {{.ATLAS_ADDR}}
+
+  atlas:generate:
+    desc: Regenerate docs/atlas/generated; fails on broken anchors, undeclared dependencies, or stale views
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas generate
+
+  atlas:check:
+    desc: Fail if any Atlas anchor, dependency declaration, package doc, or generated file is out of sync
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas check
+
+  atlas:lock:
+    desc: Mark every Atlas view verified against the current code (only after re-reading stale views)
+    cmds:
+      - task: web:atlas:facts
+      - go -C server run ./tools/atlas lock
 
   compose:test:
     desc: Validate every Docker Compose configuration
@@ -276,7 +304,8 @@ tasks:
       - task: dto
       - task: config:examples
       - task: web:docs
-      - git diff --exit-code -- server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
+      - task: atlas:generate
+      - git diff --exit-code -- docs/atlas server/docs web/src/lib/http-commons/schema.d.ts web/src/features server/config/examples server/config/schema site/docs/public/redoc-static.html site/docs/public/problems
 
   # CI contracts exist only when they orchestrate more than one module target.
   # One-to-one wrappers are forbidden: workflows call the module target

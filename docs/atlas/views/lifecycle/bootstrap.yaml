@@ -1,0 +1,56 @@
+id: bootstrap
+kind: lifecycle
+title: First-run bootstrap
+summary: >-
+  The Server's first-run state machine. It is orthogonal to configuration:
+  the phase is computed from two setup gates (an admin user exists; exactly
+  one primary repository exists) in one place and cached only at startup.
+  Once ready, an instance never returns to setup, even if storage is offline.
+direction: LR
+nodes:
+  - id: fresh
+    label: fresh
+    anchor: go:service.BootstrapPhaseFresh
+    note: The catalog row exists but no reconciliation has run yet.
+  - id: catalog_ready
+    label: catalog_ready
+    anchor: go:service.BootstrapPhaseCatalogReady
+    note: SQLite is open and migrated; owner registration is pending.
+  - id: admin_created
+    label: admin_created
+    anchor: go:service.BootstrapPhaseAdminCreated
+    note: The owner account exists; the primary repository is not set up.
+  - id: ready
+    label: ready
+    anchor: go:service.BootstrapPhaseReady
+    note: Terminal and durable. Request paths trust the cached value.
+transitions:
+  - from: "[*]"
+    to: fresh
+    label: catalog baseline creates system_state
+    anchor: sql:system_state
+  - from: fresh
+    to: catalog_ready
+    label: startup Reconcile finds no admin
+    anchor: go:service.BootstrapService.Reconcile
+  - from: catalog_ready
+    to: admin_created
+    label: the owner registers (first account becomes admin)
+    anchor: api:POST /api/v1/auth/register/start
+  - from: admin_created
+    to: ready
+    label: POST /setup/primary-repository creates the primary
+    anchor: api:POST /api/v1/setup/primary-repository
+notes:
+  - title: Derived, never stored mid-setup
+    body: >-
+      While setting up, `BootstrapService.Phase` derives the phase from the
+      gates through the query-only reader on every request; foreground reads
+      never queue behind the sole catalog writer to persist it. Only startup
+      reconciliation writes the cached phase.
+  - title: Not a configuration source
+    body: >-
+      Bootstrap observes owner and primary-repository facts. It does not
+      replace or override the TOML manifest, runtime settings, or browser
+      preferences, which remain the three configuration owners.
+related: [system-context]

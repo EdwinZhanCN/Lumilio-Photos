@@ -1,0 +1,231 @@
+# Lumilio Atlas — the human-owned architecture declaration.
+#
+# Groups are the architecture vocabulary. A Go package joins a group with an
+# `//atlas:group <id>` directive in its doc.go; a Web module joins by `match`.
+# `uses` is the complete, reviewed list of groups a group may import. The
+# checker compares it with the import graph derived from source in BOTH
+# directions: an import without a declaration fails, and a declaration that
+# no import needs fails. Changing this file is an architecture decision —
+# review it as one. Authoring guide: docs/atlas/README.md.
+
+github: https://github.com/EdwinZhanCN/Lumilio-Photos
+branch: dev
+
+goModules:
+  - { dir: server, path: server, side: server }
+  - { dir: desktop, path: desktop, side: desktop }
+
+# Developer tooling and generated code are not part of the product map.
+exclude:
+  - server/tools/**
+  - server/docs
+  - desktop/cmd/**
+  - desktop/internal/resources/cmd/**
+  - server/internal/db/sqlitespike/sqlcfixture/**
+
+groups:
+  # ---------------------------------------------------------------- Server
+  - id: foundation
+    title: Foundation
+    side: server
+    summary: >-
+      Dependency-free primitives every layer may use: the strict TOML
+      configuration loader, runtime-mutable settings types, logging, version,
+      work QoS classes, catalog value types, secret sealing, and OS/SQLite
+      platform helpers. Nothing here knows about Assets, repositories, or HTTP.
+
+  - id: media
+    title: Media utilities
+    side: server
+    uses: [foundation]
+    summary: >-
+      Stateless file and media mechanics: content hashing, EXIF extraction,
+      libvips imaging, LibRaw decoding, perceptual hashes, geohash, and
+      process helpers. Pure functions over bytes and paths; no catalog access.
+
+  - id: catalog
+    title: Catalog
+    side: server
+    uses: [foundation, media]
+    summary: >-
+      The embedded SQLite catalog and its QueueDB sibling: the single-writer
+      runtime, named transactions, sqlc queries, the Vec1 vector index,
+      migrations, and verified backups. The catalog is product truth.
+
+  - id: work
+    title: Work contracts
+    side: server
+    uses: [foundation, catalog]
+    summary: >-
+      Catalog-owned asynchronous work vocabulary: desired/applied pipeline
+      contracts, the closed River macro-job catalog, the process-wide execution
+      governor, and the administrator processing read model.
+
+  - id: domain
+    title: Domain semantics
+    side: server
+    uses: [foundation, catalog, work]
+    summary: >-
+      Derived product meaning that is independent of storage and transport:
+      Event topology, the Asset lifecycle rules, search (FTS5, vectors, OCR
+      sidecar), zero-shot classification math, and the LLM provider adapter.
+
+  - id: storage
+    title: Storage
+    side: server
+    uses: [foundation, media, catalog, domain]
+    summary: >-
+      Storage Locations and Repositories on disk: repository lifecycle and
+      layout, the scan index that mirrors each repository tree in
+      repository_entries, the journaled repository trash, and immutable
+      derived artifacts.
+
+  - id: agent
+    title: Lumilio Agent
+    side: server
+    uses: [foundation, media, catalog, domain]
+    summary: >-
+      The in-app assistant: the agent run loop, typed references and facets,
+      pinned widgets, prompt injection of library context, and the tools the
+      model may call over the catalog.
+
+  - id: service
+    title: Services
+    side: server
+    uses: [foundation, media, catalog, work, domain, storage, agent]
+    summary: >-
+      Business logic behind the HTTP API: authentication and MFA, assets,
+      albums, people, music, settings, setup, search orchestration, cloud
+      import planning, and ML adapters.
+
+  - id: ingest
+    title: Ingest and execution
+    side: server
+    uses: [foundation, media, catalog, work, domain, storage, service]
+    summary: >-
+      Everything that moves bytes and background results into the catalog:
+      staged sourcing for upload and cloud import, the River workers and
+      scheduler, media processors, and the commit coordinator that is the only
+      writer of asynchronous results.
+
+  - id: http
+    title: HTTP API
+    side: server
+    uses: [foundation, media, catalog, work, domain, storage, agent, service, ingest]
+    summary: >-
+      The transport edge: router and auth boundaries, handlers, DTOs, RFC 9457
+      Problem responses, rate limiting, request-origin policy, and the
+      plaintext/ACME listeners.
+
+  - id: runtime
+    title: Server runtime
+    side: server
+    uses: [foundation, media, catalog, work, domain, storage, agent, service, ingest, http]
+    summary: >-
+      Process composition: the CLI entry point, the Docker entrypoint, and
+      server/app, the only place that wires every subsystem together and owns
+      startup and graceful shutdown. Desktop hosts the same runtime in-process.
+
+  # --------------------------------------------------------------- Desktop
+  - id: desktop-platform
+    title: Desktop platform
+    side: desktop
+    summary: >-
+      OS integration for the Desktop App: application-support paths, schema
+      versions for desktop state files, signed resource manifests, and build
+      metadata.
+
+  - id: desktop-control
+    title: Desktop control plane
+    side: desktop
+    summary: >-
+      The revisioned snapshot the control panel renders, its DTOs, and the
+      request-id idempotent operation gate that serializes every mutation.
+
+  - id: desktop-runtime
+    title: Desktop runtime
+    side: desktop
+    uses: [desktop-platform, desktop-control, foundation, runtime]
+    summary: >-
+      Hosts server/app in-process: the runtime generation supervisor, the
+      schema-versioned runtime configuration transaction, preferences, the
+      repository handoff, and coordinated shutdown.
+
+  - id: desktop-services
+    title: Desktop services
+    side: desktop
+    uses: [desktop-platform, desktop-control]
+    summary: >-
+      Optional supervised capabilities: the Lumen ML child process with signed
+      staged artifacts, and signed application updates.
+
+  - id: desktop-host
+    title: Desktop host
+    side: desktop
+    uses: [desktop-platform, desktop-control, desktop-runtime, desktop-services]
+    summary: >-
+      The Wails v3 tray application: window and tray adapters and the main
+      assembly. The product UI stays in the system browser.
+
+  # ------------------------------------------------------------------- Web
+  - id: web-lib
+    title: Web lib
+    side: web
+    match: [web/src/lib, web/src/lib/**, web/src/config]
+    summary: >-
+      Non-visual lower layer: the generated OpenAPI client, i18n, preferences,
+      theme, formatting, geo, and small cross-feature contracts. Never imports
+      a feature.
+
+  - id: web-workers
+    title: Web workers
+    side: web
+    match: [web/src/workers]
+    uses: [web-lib]
+    summary: >-
+      Browser worker entry points (hashing, justified layout, Studio tools)
+      and the shared worker client.
+
+  - id: web-components
+    title: Web components
+    side: web
+    match: [web/src/components/**]
+    uses: [web-lib]
+    summary: >-
+      Reusable presentational UI with no feature, API, or store dependency.
+
+  - id: web-contexts
+    title: Web contexts
+    side: web
+    match: [web/src/contexts]
+    uses: [web-lib, web-workers]
+    summary: >-
+      Truly application-wide React providers: global notifications and worker
+      access.
+
+  - id: web-features
+    title: Web features
+    side: web
+    match: [web/src/features/**]
+    uses: [web-lib, web-workers, web-components, web-contexts]
+    summary: >-
+      Product capabilities. Each feature owns its routes, flows, model, API
+      adapters, and state, and documents itself in doc.ts. Features import each
+      other only through narrow public entries, acyclically.
+
+  - id: web-app
+    title: Web app shell
+    side: web
+    match: [web/src/main.tsx, web/src/app]
+    uses: [web-lib, web-components, web-contexts, web-features]
+    summary: >-
+      Composition root: providers, router, shell, and fatal-error handling. No
+      domain behaviour.
+
+exceptions:
+  - from: server/internal/db/repo
+    to: server/internal/storage/repocfg
+    reason: >-
+      sqlc maps the repositories.config column to repocfg.RepositoryConfig so
+      the catalog stores a typed per-repository configuration. repocfg is
+      dependency-free, so this cannot create a cycle.

@@ -1,5 +1,3 @@
-// Package backup creates, validates, retains, and stages consistent SQLite
-// library snapshots. It never copies a live WAL database directly.
 package backup
 
 import (

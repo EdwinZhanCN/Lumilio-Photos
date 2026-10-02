@@ -88,7 +88,7 @@ generated desktop manifests, or logs.
 `[repository_scan].interval_seconds` controls a mandatory startup-and-periodic
 authoritative verification sweep over every active Repository.
 `settle_seconds` controls file-stability observation; there is no enable switch
-or repository concurrency/batch knob because bounded ROE turns and global
+or repository concurrency/batch knob because bounded scan turns and global
 resource admission own those limits.
 
 Reverse-geocoding provider, endpoint, response language, and User-Agent are
@@ -114,29 +114,11 @@ the Settings WebView never calls the Server HTTP API.
 
 ## Important Packages
 
-- `internal/api/router.go`: Gin route tree, CORS, auth boundaries.
-- `internal/api/handler`: HTTP handlers and request/response wiring.
-- `internal/api/dto`: API DTO types.
-- `internal/service`: business services for auth, assets, settings, search, locations, faces, species, indexing, duplicate detection, cloud import, and Lumen/LLM/classifier integration.
-- `internal/processors`: read/compute stages for ingest, metadata, derivatives,
-  transcode, and enrichment. Catalog activation is owned by the commit
-  coordinator.
-- `internal/queue`: River adapter, closed macro workers, and operational
-  diagnostics.
-- `internal/db`: database connection, migrations, generated sqlc repo layer.
-- `internal/storage`: RepositoryFS, repository/staging managers, repository config,
-  and the Repository Observation Engine under `internal/storage/roe`.
-- `internal/cloud`: cloud ingest and sync providers.
-- `internal/sourcing`: unified staged materialization for upload and cloud sync;
-  committed files publish the same node/Location facts used by repository observation.
-- `internal/classify`: classifier support code shared by API/service paths.
-- `internal/logging`: zap logger setup, stdlib bridge, and repository audit helpers.
-- `internal/agent`: agent service and tools.
-- `internal/event`: owner-scoped Event candidates, deterministic `events-v1`
-  segmentation/reconciliation, correction transactions, resolution, and direct
-  typed relations. Event membership atoms are always `media_item` rows.
-  `MarkEventFactsChangedTx` is the single factual invalidation boundary.
-- `internal/utils`: media, hashing, raw, exif, upload, imaging, and support utilities.
+Package purposes are not listed here; they live in each package's `doc.go`,
+which the Atlas gate keeps present and anchored. Read the derived
+[module catalog](atlas/generated/modules.md) for every package grouped by
+architectural layer, or browse it with `task atlas`. The group dependency rules
+are declared in [atlas.yaml](atlas/atlas.yaml).
 
 ## Asset Metadata Projection
 
@@ -222,43 +204,47 @@ Owner identity is instance-local database policy rather than portable
 All runtime access inside a registered repository goes through the shared
 `internal/storage.RepositoryFS` factory. It verifies the catalog UUID against
 `.lumiliorepo`, holds a lifecycle read lease, and owns canonical user/private
-path parsing. Assets do not own paths. `repository_nodes` stores the relative
-directory graph, while versioned `asset_locations` binds a physical node to an
-owner/content Asset. River payloads carry stable IDs and expected revisions;
-workers resolve an active Location immediately before opening media. Native
-media tools use the documented RepositoryFS local-path adapter only at that
+path parsing. Assets do not own paths: `repository_entries` mirrors each
+repository tree, one row per file or directory keyed by `path_key` and
+`parent_key`, and an entry binds a file to an owner/content Asset. River
+payloads carry stable IDs and expected revisions; workers resolve a present
+entry through `internal/storage/locations` immediately before opening media.
+Native media tools use the RepositoryFS local-path adapter only at that
 boundary.
 
-The Repository Observation Engine (ROE) streams the full user tree, including
-`inbox/`, in bounded directory pages and excludes only application-private
-`.lumilio/`. A run captures change cursor `C0`, crawls progressively, drains to
-a fixed `C1`, verifies dirty directories, and only then finalizes absences from
-authoritatively covered child sets. Cursor gaps, watcher overflow, volume
-replacement, offline repositories, cancellation, and access errors fail closed:
-positive observations may publish, but unproven absence never closes a valid
-Location. Native USN/ReadDirectoryChangesW, FSEvents, and inotify adapters are
-hints backed by periodic authoritative verification. Periodic full-verification
-timer requests coalesce onto an active run. `full_verification_requested_epoch`
-is distinct from the sticky requirement; `full_verification_performed` records
-completion so the next interval starts after the scan finishes. A newer
-explicit force request or cursor gap is not lost.
+The repository scan index (`internal/storage/scan`, decision
+[2026-09-24-repository-scan-index](../.agents/decisions/2026-09-24-repository-scan-index.md))
+walks each repository depth-first in sorted name order, including `inbox/` and
+excluding the application-private `.lumilio/`. Each directory is one unit:
+list it completely, diff the listing against the catalog rows whose
+`parent_key` is that directory, and write only what changed. A catalog-only
+row becomes missing only after a positive absence probe with the repository
+marker re-checked; an offline repository ends the scan as offline instead.
+Filesystem watcher events (aggregated in 10 s batches, a full scan above 512
+events) and the jittered periodic full scan only queue `repository_scans` rows.
+One unique River delivery per repository runs bounded walk turns first and
+hashes `pending_hash` entries only when no walk is due. Atlas:
+[repository scan](atlas/generated/sequence/repository-scan.md).
 
-Independent ROE directory frontiers are enumerated in bounded deterministic
-batches. Catalog desired/applied rows are authoritative for asset, repository,
-and projection work. A bounded Catalog scheduler derives closed macro work
+Catalog desired/applied rows are authoritative for asset, repository, and
+projection work. A bounded Catalog scheduler derives closed macro work
 identities directly into disposable QueueDB; rebuilding QueueDB therefore only
 delays execution. Catalog QoS is projected into River's native priority rather
 than carried in macro payloads. Committed catalog writes provide a coalesced
 low-latency wake hint and the periodic pass remains the crash-recovery path.
 Fine-grained compute is admitted by the process-wide resource governor and
-background results activate through the bounded commit coordinator.
+background results activate through the bounded commit coordinator. Atlas:
+[background work](atlas/generated/dataflow/background-work.md).
 
-Changed or unresolved nodes are hashed once with BLAKE3 from a stable open
-handle and committed only if their observation revision and before/after token
-still match. `content_objects` owns exact byte identity; one owner/content pair
-has one Asset and may have multiple active Locations. Catalog desired/applied
-state is the durable handoff; the bounded coordinator activates typed results
-without holding a filesystem operation inside a database transaction.
+New or changed files are hashed with BLAKE3 outside any transaction and
+committed by compare-and-swap on the entry's revision; upload and cloud
+sources bind their already-verified content through `scan.BindKnownContent`
+without a rehash. `content_objects` owns exact byte identity; one owner/content
+pair has one Asset, which may have several present entries. An Asset exists
+exactly while it has at least one entry. Its `lifecycle_state` (active,
+missing, trashed) is written only by catalog triggers on `repository_entries`,
+and `lifecycle.PurgeEntriesTx` is the only Asset delete. Atlas:
+[Asset lifecycle](atlas/generated/lifecycle/asset-lifecycle.md).
 
 ## Database And API Contracts
 

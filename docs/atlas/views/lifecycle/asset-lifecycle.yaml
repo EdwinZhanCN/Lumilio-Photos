@@ -1,0 +1,66 @@
+id: asset-lifecycle
+kind: lifecycle
+title: Asset lifecycle
+summary: >-
+  An Asset exists exactly while it has at least one repository entry. Its
+  state is never written by application code: catalog triggers on
+  repository_entries derive it from the entries, with present files winning
+  over missing ones and missing ones over trashed ones.
+direction: LR
+nodes:
+  - id: active
+    label: active
+    anchor: go:lifecycle.StateActive
+    note: At least one entry is present or pending_hash. Browse, search, and processing see it.
+  - id: missing
+    label: missing
+    anchor: go:lifecycle.StateMissing
+    note: No present entry, at least one missing. Metadata, albums, and faces are kept until the user removes it.
+  - id: trashed
+    label: trashed
+    anchor: go:lifecycle.StateTrashed
+    note: Every remaining entry is in a repository trash. Shown only in the Trash view.
+transitions:
+  - from: "[*]"
+    to: active
+    label: a hashed file or bound upload creates the Asset
+    anchor: go:scan.Scanner.BindKnownContent
+  - from: active
+    to: missing
+    label: scan proves the last present file vanished
+    anchor: go:scan.removeEntryTx
+  - from: missing
+    to: active
+    label: the file returns, or the same content is re-uploaded
+    anchor: go:scan.Scanner.RunTurn
+  - from: active
+    to: trashed
+    label: user Delete moves every file into the repository trash
+    anchor: go:trash.Service.Delete
+  - from: trashed
+    to: active
+    label: Restore, or a new present copy appears
+    anchor: go:trash.Service.Restore
+  - from: missing
+    to: "[*]"
+    label: purge (repository removal; "Remove missing items" is Phase 4b)
+    anchor: go:lifecycle.PurgeEntriesTx
+  - from: trashed
+    to: "[*]"
+    label: purge (repository removal; expiry and "Delete permanently" are Phase 4b)
+    anchor: go:lifecycle.PurgeRepositoryEntriesTx
+notes:
+  - title: Where the state is written
+    body: >-
+      Only the asset_lifecycle_entry_insert, _update, and _delete triggers in
+      the catalog baseline write assets.lifecycle_state, so the state cannot
+      drift from the entries. A lifecycle change re-publishes the OCR
+      document and lets the logical media item serve from an active
+      component.
+  - title: What never deletes an Asset
+    body: >-
+      A scan, a watcher, and a cloud sync never unlink a file, never move one
+      into the trash, and never purge. `lifecycle.PurgeEntriesTx` is the only
+      Asset delete, and `task architecture:check` rejects any other code that
+      deletes from assets.
+related: [upload-to-catalog, repository-scan]

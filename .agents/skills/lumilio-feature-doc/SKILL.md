@@ -40,6 +40,11 @@ pass through verbatim. Reference real code symbols with `{@link Symbol}`.
   (`./api/useAlbums.ts`), never the `@/` alias — `docts` preserves the
   specifier in `doc.md`, where the alias would not resolve on GitHub. A
   cross-feature reference points at that feature's exact relative `index.ts`.
+- Mermaid nodes are anchored too. A node label that reads like a code
+  identifier (`useUploadProcess`, `AssetPreviewGrid`) must be imported in the
+  same `doc.ts`, or relabelled in plain language (`"Batch or chunk
+  transport"`). `task atlas:check` (via `web/scripts/atlas-facts.ts`) fails
+  otherwise, so a renamed symbol cannot survive in the diagram.
 - `doc.ts` imports are documentation-only: tsc counts a `{@link}` as a use,
   the linter's `no-unused-vars` does not, so that rule is off for `doc.ts`
   in `web/vite.config.ts`. Do not "fix" unused imports by deleting them.
