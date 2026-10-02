@@ -3,6 +3,14 @@
     "agent": {
       "operationFailed": "The Agent operation could not be completed."
     },
+    "asset": {
+      "fileChanged": "A file changed since the last scan. Scan its Repository and try again; no files were moved.",
+      "missing": "The original file is missing. Return the file and scan its Repository to restore it.",
+      "moveFailed": "The files could not be moved. The catalog was left unchanged.",
+      "notTrashed": "The selected asset has no file in the Trash.",
+      "offline": "The Repository is unavailable. Reconnect it to open this asset.",
+      "trashed": "This asset is in the Trash. Restore it to open the original."
+    },
     "auth": {
       "authenticationRequired": "Sign in to continue.",
       "invalidCredentials": "The username or password is incorrect.",
@@ -364,6 +372,29 @@
       "item_count_other": "{{count}} items",
       "loading_more": "Loading more..."
     },
+    "lifecycle": {
+      "actionComplete": "Action completed.",
+      "actionFailed": "The lifecycle action could not be completed.",
+      "allRepositories": "All Repositories",
+      "deletePermanently": "Delete permanently",
+      "emptyTrash": "Empty trash",
+      "emptyWarning": "All trashed files in this scope will be permanently deleted, including trashed copies of active assets. Other copies are kept. Assets with no remaining entry and their metadata are removed. This cannot be undone.",
+      "impact": "{{assets}} assets · {{files}} files · {{bytes}}",
+      "missing": "Missing",
+      "missingEmpty": "No missing assets",
+      "missingEmptyHelp": "Files found again by a scan return automatically.",
+      "missingHelp": "Metadata is kept. Missing assets return automatically when their files are found by a scan.",
+      "missingWarning": "Missing entries will be removed. Assets with no remaining copy and their metadata will be removed. No files are deleted. If a file returns later, it is imported as new.",
+      "permanentWarning": "All trashed copies of the selected assets will be permanently deleted from disk. Assets with no remaining copy and their metadata will be removed. This cannot be undone.",
+      "previewFailed": "The deletion preview could not be loaded.",
+      "removeMissing": "Remove missing items",
+      "repositories": "Repositories: {{names}}",
+      "restore": "Restore",
+      "restoredNames": "Occupied paths were preserved. Restored files: {{paths}}",
+      "retention": "Files move to the Trash and can be restored for {{days}} days. After that they are permanently deleted.",
+      "trashHelp": "Restore files before their retention expires, or delete them permanently.",
+      "unavailable": "The original is unavailable."
+    },
     "livePhoto": {
       "playButton": "Play Live Photo"
     },
@@ -504,7 +535,6 @@
       "emptyDescription": "Items you move to Trash will appear here.",
       "emptyTitle": "Trash is empty",
       "messages": {
-        "restoreError": "Failed to restore selected assets.",
         "restoreSuccess_one": "Restored {{count}} asset.",
         "restoreSuccess_other": "Restored {{count}} assets."
       },
@@ -1019,7 +1049,6 @@
     "confirmTitle": "Move asset to Trash",
     "deleting": "Moving...",
     "error": "Failed to move asset to Trash",
-    "softDeleteNote": "This will move the photo to Trash. The file will not be permanently removed.",
     "success": "Asset moved to Trash",
     "thisAsset": "this photo"
   },
@@ -2758,6 +2787,7 @@
       "mount": "Mount"
     },
     "title": "Storage",
+    "trashSummary": "Files: {{files}} · {{bytes}}",
     "unlinked": {
       "description": "Their Storage Location is not registered here. Files are untouched; reconnecting or locating them restores access.",
       "title": "Repositories without a Storage Location"

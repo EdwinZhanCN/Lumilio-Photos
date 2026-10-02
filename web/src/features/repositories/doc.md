@@ -50,6 +50,10 @@ by Storage Location; [RepositoryTable](./flows/storage-panel/RepositoryTable.tsx
 column together with the storage label that names where the figure was
 measured. History is [LifecycleHistory](./flows/storage-panel/LifecycleHistory.tsx) as a flat audit list with no
 row expansion.
+Repository rows expose Missing Asset counts and Trash file counts/bytes as
+links to scoped galleries. Remove missing items and Empty trash require
+explicit confirmation, target only that Repository's entries, and refresh
+the Storage projection after success or partial failure.
 Row commands live in [RepositoryRowActions](./flows/storage-panel/RepositoryRowActions.tsx), one menu per row, so an
 action always names its Repository instead of relying on a page-level
 selection.

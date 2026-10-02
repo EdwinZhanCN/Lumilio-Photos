@@ -18,6 +18,7 @@ func TestLifecycleRegressionReuploadOfTrashedPhotoIsVisible(t *testing.T) {
 		t.Fatalf("uploaded photo never appeared in library browse: %+v", listed)
 	}
 
+	server.waitProcessingSettled()
 	server.mustJSON(http.MethodDelete, "/api/v1/assets/"+listed[0].AssetID, nil, nil)
 	if !waitFor(15*time.Second, func() bool { return len(server.listByFilename(filename)) == 0 }) {
 		t.Fatalf("deleted photo is still listed in library browse: %+v", server.listByFilename(filename))

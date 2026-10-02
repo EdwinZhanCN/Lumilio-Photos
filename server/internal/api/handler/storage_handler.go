@@ -23,6 +23,10 @@ type StorageViewAssetCounter interface {
 	CountActiveAssetsByRepository(ctx context.Context, repositoryID uuid.UUID) (int64, error)
 }
 
+type StorageLifecycleCounter interface {
+	CountRepositoryLifecycle(context.Context, uuid.UUID) (repo.CountRepositoryLifecycleRow, error)
+}
+
 // StorageViewScanReader loads latest verification summaries when available.
 type StorageViewScanReader interface {
 	GetLatestScan(ctx context.Context, repositoryID string) (repo.RepositoryScan, error)
@@ -164,6 +168,14 @@ func (h *StorageHandler) GetStorageView(c *gin.Context) {
 				return
 			}
 			view.AssetCount = &count
+		}
+		if counter, ok := h.assetCounter.(StorageLifecycleCounter); ok {
+			counts, err := counter.CountRepositoryLifecycle(ctx, repository.RepoID)
+			if err != nil {
+				api.WriteProblem(c, api.Internal(err))
+				return
+			}
+			view.MissingCount, view.TrashCount, view.TrashBytes = counts.MissingCount, counts.TrashCount, counts.TrashBytes
 		}
 		if h.scanReader != nil {
 			if scanRun, scanErr := h.scanReader.GetLatestScan(ctx, repository.RepoID.String()); scanErr == nil {

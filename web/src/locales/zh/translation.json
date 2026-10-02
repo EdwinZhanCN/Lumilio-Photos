@@ -3,6 +3,14 @@
     "agent": {
       "operationFailed": "智能助手操作未能完成。"
     },
+    "asset": {
+      "fileChanged": "文件自上次扫描后已发生变化。请扫描资源库后重试；未移动任何文件。",
+      "missing": "原文件缺失。请将文件放回资源库并扫描以恢复。",
+      "moveFailed": "无法移动文件，目录索引保持原状。",
+      "notTrashed": "所选资源在回收站中没有文件。",
+      "offline": "资源库当前不可用。请重新连接后打开此资源。",
+      "trashed": "此资源位于回收站。请先恢复再打开原文件。"
+    },
     "auth": {
       "authenticationRequired": "请先登录再继续。",
       "invalidCredentials": "用户名或密码不正确。",
@@ -362,6 +370,29 @@
       "item_count_other": "{{count}} 个",
       "loading_more": "正在加载更多..."
     },
+    "lifecycle": {
+      "actionComplete": "操作已完成。",
+      "actionFailed": "无法完成此操作。",
+      "allRepositories": "所有资源库",
+      "deletePermanently": "永久删除",
+      "emptyTrash": "清空回收站",
+      "emptyWarning": "此范围内的所有回收站文件将永久删除，包括活跃资源的回收站副本。其他副本将保留。没有剩余条目的资源及其元数据将被移除。此操作无法撤销。",
+      "impact": "{{assets}} 个资源 · {{files}} 个文件 · {{bytes}}",
+      "missing": "缺失",
+      "missingEmpty": "没有缺失资源",
+      "missingEmptyHelp": "扫描再次发现文件时，资源将自动恢复。",
+      "missingHelp": "元数据将保留。扫描再次发现文件时，缺失资源将自动恢复。",
+      "missingWarning": "将移除缺失条目。没有剩余副本的资源及其元数据也将被移除。不会删除文件。文件日后返回时将作为新资源导入。",
+      "permanentWarning": "所选资源的所有回收站副本将从磁盘永久删除。没有剩余副本的资源及其元数据也将被移除。此操作无法撤销。",
+      "previewFailed": "无法加载删除预览。",
+      "removeMissing": "移除缺失项",
+      "repositories": "资源库：{{names}}",
+      "restore": "恢复",
+      "restoredNames": "已保留被占用的路径。恢复后的文件：{{paths}}",
+      "retention": "文件将移入回收站，可在 {{days}} 天内恢复。期限过后将永久删除。",
+      "trashHelp": "请在保留期限内恢复文件，或将其永久删除。",
+      "unavailable": "原文件当前不可用。"
+    },
     "livePhoto": {
       "playButton": "播放实况照片"
     },
@@ -501,7 +532,6 @@
       "emptyDescription": "移入回收站的项目会显示在这里。",
       "emptyTitle": "回收站为空",
       "messages": {
-        "restoreError": "恢复所选资源失败。",
         "restoreSuccess_one": "已恢复 {{count}} 个资源。",
         "restoreSuccess_other": "已恢复 {{count}} 个资源。"
       },
@@ -1012,7 +1042,6 @@
     "confirmTitle": "将资源移入回收站",
     "deleting": "正在移动...",
     "error": "移入回收站失败",
-    "softDeleteNote": "这会将照片移出资源库。文件不会被永久删除。",
     "success": "资源已移入回收站",
     "thisAsset": "这张照片"
   },
@@ -2718,6 +2747,7 @@
       "mount": "挂载"
     },
     "title": "存储",
+    "trashSummary": "文件数：{{files}} · {{bytes}}",
     "unlinked": {
       "description": "它们的存储位置未在此注册。文件未被改动；重新连接或定位后即可恢复访问。",
       "title": "没有存储位置的资源库"

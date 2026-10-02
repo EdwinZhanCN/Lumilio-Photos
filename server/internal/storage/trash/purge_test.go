@@ -207,3 +207,45 @@ func TestTrashIsRebuiltFromSidecarsAndCanBeRestored(t *testing.T) {
 		t.Fatal("the rebuilt Trash entry did not restore")
 	}
 }
+
+func TestEmptyTrashPreservesCopiesOutsideRepositoryAndOwnerScope(t *testing.T) {
+	f := newFixture(t)
+	first, second := f.addRepository("first"), f.addRepository("second")
+	f.write(first, "a.jpg", "same content")
+	f.write(second, "a.jpg", "same content")
+	f.index(first)
+	f.index(second)
+	asset := f.assetAt(first, "a.jpg")
+	f.setRating(asset, 5)
+	if _, err := f.trash.Delete(f.ctx, f.request(asset)); err != nil {
+		t.Fatal(err)
+	}
+	// An unrelated owner cannot empty the first owner's files.
+	otherOwner := f.owner + 100
+	result, err := f.trash.Empty(f.ctx, f.request(), uuid.NullUUID{}, &otherOwner)
+	if err != nil || result.Entries != 0 {
+		t.Fatalf("other owner emptied files: %+v, %v", result, err)
+	}
+	result, err = f.trash.Empty(f.ctx, f.request(), uuid.NullUUID{UUID: first.RepoID, Valid: true}, &f.owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Files != 1 || result.Assets != 0 || !f.assetExists(asset) {
+		t.Fatalf("scoped empty removed other copy: %+v", result)
+	}
+	if files, _ := trashedFiles(t, first.Path); len(files) != 0 {
+		t.Fatalf("first trash not empty: %v", files)
+	}
+	if files, _ := trashedFiles(t, second.Path); len(files) != 1 {
+		t.Fatalf("second copy was lost: %v", files)
+	}
+	if rating, liked := f.rating(asset); rating != 5 || !liked {
+		t.Fatal("surviving copy lost metadata")
+	}
+	if _, err := f.trash.Restore(f.ctx, f.request(asset)); err != nil {
+		t.Fatal(err)
+	}
+	if !f.exists(second, "a.jpg") {
+		t.Fatal("surviving copy cannot be restored")
+	}
+}

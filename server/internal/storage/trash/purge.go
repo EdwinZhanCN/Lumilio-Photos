@@ -250,11 +250,59 @@ func (s *Service) purgeTx(ctx context.Context, entries []repo.RepositoryEntry, a
 		}
 		_, err = storage.RecordLifecycleAuditTx(ctx, queries, storage.LifecycleAuditInput{
 			Actor: actor, ActorUserID: request.ActorUserID, RequestID: request.RequestID,
-			Action: action, TargetType: "asset", ConfirmationType: "none", Result: storage.AuditResultSucceeded,
+			Action: action, TargetType: "asset", ConfirmationType: request.ConfirmationType, Result: storage.AuditResultSucceeded,
 			Details: map[string]any{
 				"entries": purged.Entries, "assets": len(purged.Assets), "files_unlinked": files, "bytes": bytes,
 			},
 		})
 		return err
 	})
+}
+
+// Empty removes only trashed entries in the authorized scope, preserving copies
+// in other Repositories. The caller supplies owner scope for ordinary users.
+func (s *Service) Empty(ctx context.Context, request Request, repositoryID uuid.NullUUID, ownerID *int32) (PurgeResult, error) {
+	var result PurgeResult
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Open every affected Repository before unlinking the first file.
+	repositories, err := s.reader.ListRepositories(ctx)
+	if err != nil {
+		return result, err
+	}
+	var ids []uuid.UUID
+	for _, repository := range repositories {
+		if repositoryID.Valid && repositoryID.UUID != repository.RepoID {
+			continue
+		}
+		entries, err := s.reader.ListScopedTrashedRepositoryEntries(ctx, repo.ListScopedTrashedRepositoryEntriesParams{RepositoryID: uuid.NullUUID{UUID: repository.RepoID, Valid: true}, OwnerID: ownerID, RowLimit: 1})
+		if err != nil {
+			return result, err
+		}
+		if len(entries) > 0 {
+			ids = append(ids, repository.RepoID)
+		}
+	}
+	opened, err := s.openRepositories(ctx, ids)
+	if err != nil {
+		return result, err
+	}
+	defer opened.close()
+	for {
+		entries, err := s.reader.ListScopedTrashedRepositoryEntries(ctx, repo.ListScopedTrashedRepositoryEntriesParams{RepositoryID: repositoryID, OwnerID: ownerID, RowLimit: purgeBatch})
+		if err != nil {
+			return result, err
+		}
+		if len(entries) == 0 {
+			return result, nil
+		}
+		batch, err := s.unlinkAndPurge(ctx, opened, entries, "empty_trash", request)
+		result.Files += batch.Files
+		result.Bytes += batch.Bytes
+		result.Entries += batch.Entries
+		result.Assets += batch.Assets
+		if err != nil {
+			return result, err
+		}
+	}
 }

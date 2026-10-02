@@ -26,16 +26,22 @@ func trashRequestFrom(c *gin.Context, assetIDs ...uuid.UUID) trash.Request {
 	return request
 }
 
-// writeTrashProblem reports a Delete or Restore failure. A rejected request
-// moved nothing and is a repository conflict whose conflict_type names the
-// reason: repository_offline, file_changed, asset_missing, not_trashed,
-// trash_file_missing, or move_failed.
+// writeTrashProblem reports lifecycle failures using typed Asset Problems for
+// unavailable files and repository/conflict for changed files or move refusals.
 func writeTrashProblem(c *gin.Context, err error) {
 	var rejection *trash.Rejection
 	if errors.As(err, &rejection) {
 		repositoryID := ""
 		if rejection.RepositoryID != uuid.Nil {
 			repositoryID = rejection.RepositoryID.String()
+		}
+		switch rejection.Reason {
+		case trash.ReasonRepositoryOffline:
+			api.WriteProblem(c, problem.New(problem.AssetOffline, err))
+			return
+		case trash.ReasonAssetMissing, trash.ReasonTrashFileMissing:
+			api.WriteProblem(c, problem.New(problem.AssetMissing, err))
+			return
 		}
 		actions := []string{}
 		switch rejection.Reason {

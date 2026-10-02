@@ -107,6 +107,9 @@ INSERT INTO repositories (
 	var response dto.StorageViewResponseDTO
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Len(t, response.Repositories, 1)
+	require.Equal(t, int64(1), response.Repositories[0].TrashCount)
+	require.Equal(t, int64(1), response.Repositories[0].TrashBytes)
+	require.Zero(t, response.Repositories[0].MissingCount)
 	require.NotNil(t, response.Repositories[0].AssetCount, "asset_count must be present")
 	require.Equal(t, int64(4), *response.Repositories[0].AssetCount)
 }

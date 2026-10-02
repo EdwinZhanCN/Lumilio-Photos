@@ -180,6 +180,36 @@ func (s *blackboxServer) waitNoActiveAssets(repository blackboxRepository) {
 	}
 }
 
+// waitProcessingSettled waits until no processing delivery is queued or
+// running. Windows refuses to move or remove a file that a processor still
+// holds open, so file lifecycle commands wait for this. A delivery waiting to
+// retry holds no file, and one without its tool (CI has no exiftool) may
+// retry for longer than the test runs.
+func (s *blackboxServer) waitProcessingSettled() {
+	s.t.Helper()
+	busy := ""
+	settled := waitFor(2*time.Minute, func() bool {
+		var summary struct {
+			Stages []struct {
+				ID      string `json:"id"`
+				Queued  int64  `json:"queued"`
+				Running int64  `json:"running"`
+			} `json:"stages"`
+		}
+		s.mustJSON(http.MethodGet, "/api/v1/admin/processing", nil, &summary)
+		busy = ""
+		for _, stage := range summary.Stages {
+			if stage.Queued > 0 || stage.Running > 0 {
+				busy += fmt.Sprintf(" %s(queued=%d running=%d)", stage.ID, stage.Queued, stage.Running)
+			}
+		}
+		return busy == ""
+	})
+	if !settled {
+		s.t.Fatalf("processing stages still busy:%s", busy)
+	}
+}
+
 // waitIdle waits until a repository's lifecycle activity is idle, which
 // upload admission requires.
 func (s *blackboxServer) waitIdle(repository blackboxRepository) {

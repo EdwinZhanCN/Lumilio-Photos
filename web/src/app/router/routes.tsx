@@ -1,6 +1,7 @@
 import { lazy, type ReactNode } from "react";
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
+import AssetsMissing from "@/features/assets/routes/AssetsMissing";
 import AssetsTrash from "@/features/assets/routes/AssetsTrash";
 import Manage from "@/features/manage/routes/Manage";
 import Collections from "@/features/collections/routes/Collections";
@@ -101,6 +102,18 @@ export const protectedStandaloneRoutes: RouteDefinition[] = [
 ];
 
 export const appRoutes: RouteDefinition[] = [
+  { path: "/storage/:repositoryId/missing", element: <AssetsMissing />, requiredRole: "admin" },
+  {
+    path: "/storage/:repositoryId/missing/:assetId",
+    element: <AssetsMissing />,
+    requiredRole: "admin",
+  },
+  { path: "/storage/:repositoryId/trash", element: <AssetsTrash />, requiredRole: "admin" },
+  {
+    path: "/storage/:repositoryId/trash/:assetId",
+    element: <AssetsTrash />,
+    requiredRole: "admin",
+  },
   {
     path: "/",
     element: <Home />,

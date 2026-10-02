@@ -59,6 +59,7 @@ func TestTrashListsADeletedPhotoAndRestoreReturnsIt(t *testing.T) {
 	if !waitFor(time.Minute, func() bool { listed = server.listByFilename(filename); return len(listed) == 1 }) {
 		t.Fatalf("uploaded photo never appeared in browse: %+v", listed)
 	}
+	server.waitProcessingSettled()
 	server.mustJSON(http.MethodDelete, "/api/v1/assets/"+listed[0].AssetID, nil, nil)
 	for _, mode := range []string{"", "expanded", "collapsed"} {
 		for _, repositoryID := range []string{"", server.primary.ID} {
