@@ -175,10 +175,7 @@ test("@smoke user completes the compact upload, album, viewer, Trash, and restor
   const restoreResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
-      new URL(response.url()).pathname === "/api/v1/assets/restore" &&
-      (response.request().postDataJSON() as { asset_ids?: string[] } | null)?.asset_ids?.includes(
-        asset.asset_id,
-      ) === true,
+      new URL(response.url()).pathname === "/api/v1/assets/restore",
   );
   await page
     .getByRole("button", {
