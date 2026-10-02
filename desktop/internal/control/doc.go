@@ -9,5 +9,12 @@
 // presentation (status dot, label, allowed actions) from a snapshot instead of
 // storing UI state.
 //
+// The Settings window never calls the Server HTTP API and never takes part in
+// product accounts, refresh cookies, CORS, or CSRF. It reads the typed Desktop
+// snapshot through these bindings and follows desktop:snapshot-changed
+// revision notices, so it can validate, apply, or restore runtime intent even
+// when the Server fails to start. The product UI runs in the user's browser at
+// http://localhost:6680, served by the in-process Server like any other.
+//
 //atlas:group desktop-control
 package control

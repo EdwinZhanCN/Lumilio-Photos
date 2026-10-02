@@ -15,7 +15,7 @@ Uses: `foundation`, `media`, `catalog`, `work`, `domain`, `storage`, `agent`, `s
 | Module | Purpose | Doc |
 | --- | --- | --- |
 | `server` | Command docker-entrypoint prepares Docker bind mounts for the app user, drops privileges, and then executes the requested Server command. | [`server/doc.go`](../../../server/doc.go) |
-| `server/app` | Package app contains the server bootstrap: it wires configuration, logging, storage, the job queue, ML services, and the HTTP router, then serves until the provided context is cancelled. | [`server/app/doc.go`](../../../server/app/doc.go) |
+| `server/app` | Package app is the only Server runtime: [Run] wires configuration, logging, libvips, the catalog and QueueDB, migrations, settings, repository storage, the River client and workers, ML services, processors, handlers, and the router, then serves until the context is cancelled. | [`server/app/doc.go`](../../../server/app/doc.go) |
 | `server/cmd` | Command server is the standalone Server entry point. | [`server/cmd/doc.go`](../../../server/cmd/doc.go) |
 
 ### HTTP API (`http`)
@@ -29,9 +29,9 @@ Uses: `foundation`, `media`, `catalog`, `work`, `domain`, `storage`, `agent`, `s
 | `server/internal/api` | Package api is the HTTP transport root. | [`server/internal/api/doc.go`](../../../server/internal/api/doc.go) |
 | `server/internal/api/dto` | Package dto defines the HTTP request and response shapes. | [`server/internal/api/dto/doc.go`](../../../server/internal/api/dto/doc.go) |
 | `server/internal/api/handler` | Package handler implements the HTTP controllers that server/internal/api.NewRouter mounts: one handler type per domain ([AssetHandler], [AuthHandler], [AlbumHandler], [StorageHandler], [SetupHandler], [AgentHandler], [MusicHandler], [CloudHandler], and others). | [`server/internal/api/handler/doc.go`](../../../server/internal/api/handler/doc.go) |
-| `server/internal/api/problem` | Package problem defines Lumilio's language-neutral RFC 9457 vocabulary. | [`server/internal/api/problem/doc.go`](../../../server/internal/api/problem/doc.go) |
+| `server/internal/api/problem` | Package problem is the closed RFC 9457 vocabulary of the API. | [`server/internal/api/problem/doc.go`](../../../server/internal/api/problem/doc.go) |
 | `server/internal/api/ratelimit` | Package ratelimit provides the bounded, in-memory fixed-window [Limiter] with lockout used for authentication endpoints. | [`server/internal/api/ratelimit/doc.go`](../../../server/internal/api/ratelimit/doc.go) |
-| `server/internal/httporigin` | Package httporigin resolves the request-facing browser origin without requiring operators to configure one canonical public URL. | [`server/internal/httporigin/doc.go`](../../../server/internal/httporigin/doc.go) |
+| `server/internal/httporigin` | Package httporigin derives the request-facing browser origin, so operators never configure one canonical public URL. | [`server/internal/httporigin/doc.go`](../../../server/internal/httporigin/doc.go) |
 | `server/internal/servertransport` | Package servertransport owns the HTTP/TLS listeners for one application runtime generation. | [`server/internal/servertransport/doc.go`](../../../server/internal/servertransport/doc.go) |
 
 ### Ingest and execution (`ingest`)
@@ -129,13 +129,13 @@ Uses: `foundation`, `media`
 | Module | Purpose | Doc |
 | --- | --- | --- |
 | `server/internal/db` | Package db owns the catalog and queue SQLite runtimes. | [`server/internal/db/doc.go`](../../../server/internal/db/doc.go) |
-| `server/internal/db/backup` | Package backup creates, validates, retains, and stages consistent SQLite library snapshots. | [`server/internal/db/backup/doc.go`](../../../server/internal/db/backup/doc.go) |
-| `server/internal/db/catalogtx` | Package catalogtx owns the closed, low-cardinality names and measured transaction capabilities for Lumilio's SQLite catalog. | [`server/internal/db/catalogtx/doc.go`](../../../server/internal/db/catalogtx/doc.go) |
+| `server/internal/db/backup` | Package backup creates, validates, retains, and restores consistent SQLite catalog snapshots. | [`server/internal/db/backup/doc.go`](../../../server/internal/db/backup/doc.go) |
+| `server/internal/db/catalogtx` | Package catalogtx is the closed application transaction capability for the catalog. | [`server/internal/db/catalogtx/doc.go`](../../../server/internal/db/catalogtx/doc.go) |
 | `server/internal/db/repo` | Package repo is the sqlc-generated query layer over the catalog baseline (server/migrations/000001_storage_baseline.up.sql), plus a few hand-written helpers for query plans and model extensions. | [`server/internal/db/repo/doc.go`](../../../server/internal/db/repo/doc.go) |
 | `server/internal/db/sqlitespike` | Package sqlitespike contains the isolated SQLite compatibility proof used before the production database runtime is migrated. | [`server/internal/db/sqlitespike/doc.go`](../../../server/internal/db/sqlitespike/doc.go) |
 | `server/internal/db/vec1ext` | Package vec1ext statically registers the vendored SQLite Vec1 extension. | [`server/internal/db/vec1ext/doc.go`](../../../server/internal/db/vec1ext/doc.go) |
-| `server/internal/db/vectorindex` | Package vectorindex owns the rebuildable Vec1 semantic index policy. | [`server/internal/db/vectorindex/doc.go`](../../../server/internal/db/vectorindex/doc.go) |
-| `server/migrations` | Package migrations embeds the SQL catalog baseline and its forward steps so they can be applied without depending on the working directory or on the files being present on disk. | [`server/migrations/doc.go`](../../../server/migrations/doc.go) |
+| `server/internal/db/vectorindex` | Package vectorindex owns the rebuildable Vec1 semantic index. | [`server/internal/db/vectorindex/doc.go`](../../../server/internal/db/vectorindex/doc.go) |
+| `server/migrations` | Package migrations embeds the catalog baseline (000001_storage_baseline.up.sql, schema version 1, the v26.1.0-rc.1 compatibility baseline) and its numbered forward steps, so they apply without depending on the working directory — the Desktop bundle has no repository checkout and an unpredictable CWD. | [`server/migrations/doc.go`](../../../server/migrations/doc.go) |
 
 ### Media utilities (`media`)
 
@@ -164,7 +164,7 @@ Dependency-free primitives every layer may use: the strict TOML configuration lo
 | `server/internal/db/dbtypes` | Package dbtypes holds the value types the catalog persists in JSON and text columns: [AssetType], per-type metadata ([PhotoSpecificMetadata], [VideoSpecificMetadata], [AudioSpecificMetadata]), ML result payloads (faces, OCR, classification), [StackKind], vectors, and nullable collection types. | [`server/internal/db/dbtypes/doc.go`](../../../server/internal/db/dbtypes/doc.go) |
 | `server/internal/logging` | Package logging builds the process logger. | [`server/internal/logging/doc.go`](../../../server/internal/logging/doc.go) |
 | `server/internal/secretbox` | Package secretbox seals small application secrets (cloud credentials and encrypted settings values) with AES keys derived per scope from one root secret. | [`server/internal/secretbox/doc.go`](../../../server/internal/secretbox/doc.go) |
-| `server/internal/settings` | Package settings defines the runtime-mutable settings domain: the typed values whose single source of truth is the database `settings` table and which are changed at runtime through the API (Settings tabs + Setup), never through TOML. | [`server/internal/settings/doc.go`](../../../server/internal/settings/doc.go) |
+| `server/internal/settings` | Package settings defines the runtime-mutable settings domain: typed values whose single source of truth is the catalog settings row, changed through the Settings and Setup APIs, never through TOML. | [`server/internal/settings/doc.go`](../../../server/internal/settings/doc.go) |
 | `server/internal/testutil` | Package testutil seeds catalog fixtures for tests. | [`server/internal/testutil/doc.go`](../../../server/internal/testutil/doc.go) |
 | `server/internal/utils/memory` | Package memory adapts upload behaviour to host memory. | [`server/internal/utils/memory/doc.go`](../../../server/internal/utils/memory/doc.go) |
 | `server/internal/utils/sysproc` | Package sysproc holds process-spawning helpers shared by media tools. | [`server/internal/utils/sysproc/doc.go`](../../../server/internal/utils/sysproc/doc.go) |
@@ -208,7 +208,7 @@ Uses: `desktop-platform`, `desktop-control`
 
 | Module | Purpose | Doc |
 | --- | --- | --- |
-| `desktop/internal/lumen` | Package lumen owns the optional Lumen Hub child process. | [`desktop/internal/lumen/doc.go`](../../../desktop/internal/lumen/doc.go) |
+| `desktop/internal/lumen` | Package lumen installs and supervises the optional Lumen Hub child process. | [`desktop/internal/lumen/doc.go`](../../../desktop/internal/lumen/doc.go) |
 | `desktop/internal/lumen/controlv1` | Package controlv1 is the generated gRPC client and server for the Lumen Hub control protocol (control.proto). | [`desktop/internal/lumen/controlv1/doc.go`](../../../desktop/internal/lumen/controlv1/doc.go) |
 | `desktop/internal/update` | Package update contains the platform-neutral trust and state policy for Desktop updates. | [`desktop/internal/update/doc.go`](../../../desktop/internal/update/doc.go) |
 

@@ -5,7 +5,7 @@ import type { QueueErrorSampleDTO, QueueSummaryDTO } from "../types";
  * Vocabulary for the closed macro-job catalog.
  *
  * River runs exactly one `catalog_macro` queue with eight durable kinds
- * ([BACKEND.md](../../../../../docs/BACKEND.md), Queues And Processing).
+ * (`server/internal/queue/doc.go`, `server/internal/queue/jobs`).
  * Fine-grained tasks are an in-process DAG and never appear as River jobs, so
  * this set is closed: a kind outside it is a contract change, not a display
  * detail. `getKindLabels` covers every member and `unknownKindLabel` exists only

@@ -84,6 +84,11 @@ generated) with the code change.
   several modules — scope them as `ts:features/<name>#X`.
 - **Stale Web facts**: the Go tool reads `.local/atlas/web-facts.json`; the
   Task targets regenerate it first. Run the Task targets, not the Go command.
+- **Doc reference failures** come from handwritten docs (`docs:` in
+  `atlas.yaml`) naming a path, symbol, Task target, or route that no longer
+  exists. Fix the reference; never add the file to an ignore list. Do not
+  write a new `docs/*.md` that describes how a package works — put that in
+  its `doc.go` / `doc.ts` or an Atlas view.
 - **Explorer UI changes** live in `site/docs/.vitepress/atlas/`; verify with
   `task site:build:atlas` (the public `task site:build` tree-shakes the Atlas
   away and would not catch a broken component).

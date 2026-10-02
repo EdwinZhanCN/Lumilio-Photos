@@ -50,6 +50,7 @@ func main() {
 	edges := atlas.checkGroups()
 	atlas.deriveViews(edges)
 	atlas.checkViews()
+	atlas.checkDocRefs()
 	for _, view := range atlas.Views {
 		view.Mermaid = atlas.mermaid(view)
 	}

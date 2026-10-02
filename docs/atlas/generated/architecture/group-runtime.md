@@ -50,7 +50,7 @@ flowchart LR
 | --- | --- | --- |
 | Desktop runtime |  | `group:desktop-runtime` |
 | server | Command docker-entrypoint prepares Docker bind mounts for the app user, drops privileges, and then executes the requested Server command. | `mod:server` [`server/doc.go`](../../../../server/doc.go) |
-| app | Package app contains the server bootstrap: it wires configuration, logging, storage, the job queue, ML services, and the HTTP router, then serves until the provided context is cancelled. | `mod:server/app` [`server/app/doc.go`](../../../../server/app/doc.go) |
+| app | Package app is the only Server runtime: [Run] wires configuration, logging, libvips, the catalog and QueueDB, migrations, settings, repository storage, the River client and workers, ML services, processors, handlers, and the router, then serves until the context is cancelled. | `mod:server/app` [`server/app/doc.go`](../../../../server/app/doc.go) |
 | cmd | Command server is the standalone Server entry point. | `mod:server/cmd` [`server/cmd/doc.go`](../../../../server/cmd/doc.go) |
 | Lumilio Agent |  | `group:agent` |
 | Catalog |  | `group:catalog` |

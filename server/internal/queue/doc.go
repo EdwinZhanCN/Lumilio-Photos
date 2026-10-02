@@ -14,5 +14,14 @@
 // River never decides whether product work exists; a lost QueueDB only delays
 // work until the next scheduler pass.
 //
+// River has one catalog_macro queue and exactly eight durable kinds (see
+// [server/internal/queue/jobs.RuntimeJobCatalog]). Request QoS stays in the
+// catalog and is emitted as River priority, never as job arguments. River
+// uniqueness is by immutable macro arguments, never a time window; discarded
+// deliveries do not keep uniqueness, so a still-runnable catalog generation
+// starts a fresh bounded delivery. asset_pipeline_failures is catalog product
+// state fenced by source content, pipeline version, and desired version: River
+// delivery attempts never decide retry or terminal outcomes.
+//
 //atlas:group ingest
 package queue

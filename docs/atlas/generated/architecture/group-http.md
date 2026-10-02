@@ -59,9 +59,9 @@ flowchart LR
 | api | Package api is the HTTP transport root. | `mod:server/internal/api` [`server/internal/api/doc.go`](../../../../server/internal/api/doc.go) |
 | api/dto | Package dto defines the HTTP request and response shapes. | `mod:server/internal/api/dto` [`server/internal/api/dto/doc.go`](../../../../server/internal/api/dto/doc.go) |
 | api/handler | Package handler implements the HTTP controllers that server/internal/api.NewRouter mounts: one handler type per domain ([AssetHandler], [AuthHandler], [AlbumHandler], [StorageHandler], [SetupHandler], [AgentHandler], [MusicHandler], [CloudHandler], and others). | `mod:server/internal/api/handler` [`server/internal/api/handler/doc.go`](../../../../server/internal/api/handler/doc.go) |
-| api/problem | Package problem defines Lumilio's language-neutral RFC 9457 vocabulary. | `mod:server/internal/api/problem` [`server/internal/api/problem/doc.go`](../../../../server/internal/api/problem/doc.go) |
+| api/problem | Package problem is the closed RFC 9457 vocabulary of the API. | `mod:server/internal/api/problem` [`server/internal/api/problem/doc.go`](../../../../server/internal/api/problem/doc.go) |
 | api/ratelimit | Package ratelimit provides the bounded, in-memory fixed-window [Limiter] with lockout used for authentication endpoints. | `mod:server/internal/api/ratelimit` [`server/internal/api/ratelimit/doc.go`](../../../../server/internal/api/ratelimit/doc.go) |
-| httporigin | Package httporigin resolves the request-facing browser origin without requiring operators to configure one canonical public URL. | `mod:server/internal/httporigin` [`server/internal/httporigin/doc.go`](../../../../server/internal/httporigin/doc.go) |
+| httporigin | Package httporigin derives the request-facing browser origin, so operators never configure one canonical public URL. | `mod:server/internal/httporigin` [`server/internal/httporigin/doc.go`](../../../../server/internal/httporigin/doc.go) |
 | servertransport | Package servertransport owns the HTTP/TLS listeners for one application runtime generation. | `mod:server/internal/servertransport` [`server/internal/servertransport/doc.go`](../../../../server/internal/servertransport/doc.go) |
 | Lumilio Agent |  | `group:agent` |
 | Catalog |  | `group:catalog` |

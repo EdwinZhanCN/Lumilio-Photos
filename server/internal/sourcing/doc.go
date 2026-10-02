@@ -10,5 +10,12 @@
 // retry after a crash before or after the filesystem move converges on the
 // same Asset; unrecoverable sources are quarantined, never deleted.
 //
+// Materialization owns the staging file. A commit error is always returned to
+// River or the caller, and a failed quarantine never deletes the source. An
+// existing target or an instant-upload duplicate needs exact size plus BLAKE3
+// verification before staging is removed; conflicts keep both files with a
+// recoverable ingest phase. HTTP and cloud callers must not add their own
+// error cleanup around this boundary.
+//
 //atlas:group ingest
 package sourcing

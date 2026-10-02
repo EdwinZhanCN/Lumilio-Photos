@@ -10,6 +10,10 @@ type Config struct {
 	Exclude    []string    `yaml:"exclude"`
 	Groups     []Group     `yaml:"groups"`
 	Exceptions []Exception `yaml:"exceptions"`
+	Docs       []string    `yaml:"docs"`
+	// UndocumentedRoutes are real routes deliberately absent from OpenAPI,
+	// such as infrastructure probes, that documents may still name.
+	UndocumentedRoutes []string `yaml:"undocumentedRoutes"`
 }
 
 // GoModule is one Go module whose packages belong on the map.

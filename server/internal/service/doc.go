@@ -19,5 +19,16 @@
 // transactions. They never touch repository paths directly and never run
 // filesystem, media, or network work inside a write transaction.
 //
+// Lumen: the Lumen SDK owns discovery — bounded DNS-SD scans, strict service
+// correlation, transport state, and the in-band capability verdict — and the
+// Server consumes one immutable SDK runtime snapshot through [LumenService].
+// It maps every SDK field it uses from the manifest's lumen section and never
+// calls SDK defaults or environment loading. Failed scans keep prior
+// observations; only consecutive successful omissions expire a node; mDNS,
+// broker, and static sources are additive. GET /api/v1/capabilities exposes
+// only aggregate discovery state and task availability, and the
+// administrator-only GET /api/v1/admin/lumen/runtime adds bounded per-node
+// diagnostics; neither returns raw TXT metadata or resolver errors.
+//
 //atlas:group service
 package service

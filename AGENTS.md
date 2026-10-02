@@ -52,9 +52,11 @@ and purpose, and the sequence, data-flow, and lifecycle views name the exact
 symbols a flow passes through. Read the owning `doc.go` / `doc.ts` before
 editing a package. Then read only the references relevant to the change:
 
-- Backend: [BACKEND.md](docs/BACKEND.md).
-- Frontend: [FRONTEND.md](docs/FRONTEND.md) and
-  [web/ARCHITECTURE.md](web/ARCHITECTURE.md).
+- Backend: the owning package `doc.go` (find it in the
+  [module catalog](docs/atlas/generated/modules.md)) and the cross-cutting
+  invariants in [architecture.md](docs/architecture.md).
+- Frontend: [web/ARCHITECTURE.md](web/ARCHITECTURE.md) and the feature
+  `doc.ts`.
 - UI or product behavior: [DESIGN.md](docs/DESIGN.md) and
   [core beliefs](docs/core-beliefs.md).
 - Test or demo media: [test-assets.md](docs/test-assets.md).
@@ -115,8 +117,8 @@ mechanical or local edits are exempt. Formats:
   workflow path filters in the same change. Follow
   [lumilio-add-task-target](.agents/skills/lumilio-add-task-target/SKILL.md).
 - Follow the frontend test-layer taxonomy in
-  [FRONTEND.md](docs/FRONTEND.md); do not invent test-file
-  conventions. Placement:
+  [web/ARCHITECTURE.md](web/ARCHITECTURE.md#test-layers); do not invent
+  test-file conventions. Placement:
   [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 - API contracts are OpenAPI-first. Never hand-edit
   `web/src/lib/http-commons/schema.d.ts` or cast around a stale response type.

@@ -150,3 +150,29 @@ func TestMermaidTextEscapesSyntax(t *testing.T) {
 		t.Fatal("exclude globs must match whole path segments")
 	}
 }
+
+func TestDocReferencesMustResolve(t *testing.T) {
+	a := testAtlas()
+	a.Root = t.TempDir()
+	a.Config.UndocumentedRoutes = []string{"/api/v1/health/ready"}
+	a.apiRoutes["GET /api/v1/things/{id}"] = true
+	if err := os.MkdirAll(filepath.Join(a.Root, "server/internal/phase"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	text := "Uses `server/internal/phase`, `server/internal/phase.PhaseNew`, `server/gone.go`, " +
+		"`server/internal/phase.Missing`, `docs/YYYY-MM-DD.md`, `task real`, `task fake`, " +
+		"/api/v1/things/:id, /api/v1/things, /api/v1/health/ready, /api/v1/nope.\n" +
+		"```sh\ntask ignored-in-fences\n```\n"
+	a.checkMarkdownRefs("doc.md", stripFences(text), map[string]bool{"real": true})
+	got := messages(a.Problems)
+	for _, want := range []string{"`server/gone.go`", "`server/internal/phase.Missing`", "`task fake`", "/api/v1/nope"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected a problem for %s, got:\n%s", want, got)
+		}
+	}
+	for _, unwanted := range []string{"phase.PhaseNew", "YYYY", "task real", "things", "health", "ignored-in-fences"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("%s should resolve, got:\n%s", unwanted, got)
+		}
+	}
+}

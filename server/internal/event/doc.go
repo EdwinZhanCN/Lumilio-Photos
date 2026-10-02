@@ -14,5 +14,16 @@
 // carries its resolved owner into downstream asset queries; a nil owner never
 // means "infer it". See .agents/decisions/2026-08-10-event-owner-topology.md.
 //
+// Events are delivered through the closed rebuild_projection_batch macro;
+// River is not the lifecycle authority. source_revision > published_revision
+// is pending rebuild work, and event_dirty_ranges is a recovery ledger, not an
+// incremental computation window. Publish replaces an owner's complete
+// membership in one revision-checked transaction, deleting before inserting.
+// Manual corrections are exact logical-media assignments, and a command
+// followed by two rebuilds is a fixed point. POST /api/v1/events/rebuild only
+// enqueues work and answers 202 Accepted. Event shares and Agent references
+// materialize immutable snapshots of displayable Assets, and automatic
+// membership uses no ML signal.
+//
 //atlas:group domain
 package event

@@ -427,7 +427,7 @@ const totals = computed(() => ({
       <!-- Main -->
       <main class="stage-area">
         <header class="topbar">
-          <button v-if="!navOpen" class="icon-button" title="Show navigator ([)" @click="toggleNav"><PanelLeft :size="16" /></button>
+          <button class="icon-button" :class="{ active: navOpen }" title="Toggle navigator ([)" @click="toggleNav"><PanelLeft :size="16" /></button>
           <nav class="trail">
             <a href="#/" class="trail-stop home">Atlas</a>
             <template v-for="stop in trail" :key="stop.hash">

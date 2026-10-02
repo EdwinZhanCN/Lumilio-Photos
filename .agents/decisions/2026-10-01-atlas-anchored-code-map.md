@@ -51,6 +51,17 @@ or a status, and a selection spotlights its neighbourhood. The tool is a Go
 program (`server/tools/atlas`) plus a Web extractor
 (`web/scripts/atlas-facts.ts`).
 
+Handwritten documents are split by what they describe. Anything that says
+how code works moved next to that code: `docs/BACKEND.md` and
+`docs/FRONTEND.md` were retired on 2026-10-02 — their facts were checked
+against the code and moved into package `doc.go` files and
+`web/ARCHITECTURE.md`, and the stale ones (a schema v5 manifest, a Caddy web
+image, a `/__onb/*` Desktop control plane, a `src/hooks/` directory) were
+dropped. The govips audit became evidence in its decision record. What stays
+in `docs/` is intent, cross-cutting rules, external contracts, and
+procedures, and every repository path, link, Task target, and API route those
+files (and package doc comments) name must resolve under `task atlas:check`.
+
 The owner authors the views and `atlas.yaml`; agents draft package docs and
 views, and must re-verify stale views rather than lock blindly. Dead utility
 packages found while documenting (`internal/utils` root, `utils/errgroup`) were

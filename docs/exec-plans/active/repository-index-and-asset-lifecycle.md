@@ -273,8 +273,9 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
   `doc.ts` updates (`lumilio-feature-doc`).
 
 ### Phase 6 — Docs and proof
-- [ ] Rewrite the ROE sections of `docs/BACKEND.md` and `docs/architecture.md`;
-  update the guardrail links in postmortem 0001; add the retention field to
+- [x] Rewrite the ROE sections of `docs/architecture.md` (done 2026-10-01 with
+  the Atlas; `docs/BACKEND.md` was retired into package `doc.go` files).
+- [ ] Update the guardrail links in postmortem 0001; add the retention field to
   `site/docs` (en and zh-cn) where configuration is documented.
 - [ ] E2E: update `storage-admin.spec.ts` for the new scan statuses; add a
   trash spec (delete, restore with album intact, delete permanently, file gone

@@ -48,5 +48,14 @@
 // outside storage.path. Repository staging remains repository-owned under
 // .lumilio because it is recoverable work tied to that repository.
 //
+// Identity and admission: repositories.role is primary or regular, and the
+// instance is set up only when an admin exists and exactly one active primary
+// Repository exists. Additional Storage Locations are storage_locations rows
+// keyed by the UUID in .lumilioroot; their summaries are catalog projections
+// that never authorize or deny child Repository I/O. Admission is decided per
+// Repository: [UploadAdmission] for upload and cloud materialization,
+// lifecycle leases and identity checks for verify, rename, reconnect, and
+// detach.
+//
 //atlas:group storage
 package storage

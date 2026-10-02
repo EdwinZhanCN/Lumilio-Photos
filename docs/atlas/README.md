@@ -43,6 +43,16 @@ and a table that links each element to `file:line`.
 | **Package docs** — `doc.go` per Go package, `doc.ts` per Web feature | the package itself | people and agents | Every package has one; every `[Name]` doc link (Go) and `{@link X}` (TS) resolves; every code-like Mermaid node in a `doc.ts` is imported. A renamed or deleted symbol fails the build. |
 | **Anchored views** — `views/<kind>/<id>.yaml` | YAML next to this file | people (agents draft) | Every element is anchored to a symbol, API operation, table, or declared external. A broken anchor fails. A **changed** anchor makes the view *stale* and fails until someone re-reads the view and runs `task atlas:lock`. A lifecycle with `enum:` must draw exactly the enum's members. |
 
+Handwritten documents are the fifth piece. Every file listed under `docs:` in
+[`atlas.yaml`](atlas.yaml) — AGENTS.md, CONTRIBUTING.md, `docs/*.md`,
+`web/ARCHITECTURE.md`, and every skill — must only name things that exist:
+repository paths in backticks (including the `server/app.Run` symbol form),
+relative links, `task` targets, and `/api/v1` routes. Package doc comments get
+the same check for routes and Task targets. A document that explains *how code
+works* does not belong in `docs/` at all: that is the owning `doc.go` or
+`doc.ts`, or an Atlas view. `docs/` keeps intent, cross-cutting rules,
+external contracts, and procedures.
+
 The dependency rules are the fourth piece: [`atlas.yaml`](atlas.yaml) lists
 every group and the groups it may use. The checker compares that declaration
 with the real import graph **in both directions** — an undeclared import fails,
@@ -152,6 +162,7 @@ to roughly 6–14 nodes, and put the *why* in `notes`. Look at
 | `N anchor(s) changed since their view was verified` | Open each listed view, compare it with the code at the listed `file:line`, fix the diagram or notes if behaviour changed, then `task atlas:lock`. |
 | `enum … member X is not drawn as a state` | Draw the new state and its transitions. |
 | `generated files are out of date` | `task atlas:generate`. |
+| `` `x` names a repository path or symbol that does not exist`` / `link … points at a file that does not exist` / `names a Task target` / `API route … is not in the OpenAPI document` | A handwritten document drifted. Point it at the new name, or delete the sentence if the thing is gone. A real route deliberately missing from OpenAPI goes in `undocumentedRoutes`. |
 
 ## Prompting agents with the Atlas
 

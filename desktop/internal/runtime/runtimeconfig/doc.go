@@ -9,5 +9,11 @@
 // [TransactionController.Apply] are the only pointer-changing boundaries. Full
 // TOML is an optional advanced recovery surface, not a first-run requirement.
 //
+// Apply journals prepared, stopping-previous, previous-stopped,
+// candidate-selected, and committing phases; it proves the old generation
+// released ownership before the candidate starts and promotes the candidate to
+// last-known-good only after it is ready. Candidate edits are fingerprinted
+// and guarded by aggregate version and base fingerprint.
+//
 //atlas:group desktop-runtime
 package runtimeconfig

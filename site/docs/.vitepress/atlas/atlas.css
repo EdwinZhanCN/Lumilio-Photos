@@ -364,6 +364,11 @@
 .icon-button:hover {
   background: var(--atlas-hover);
 }
+.icon-button.active {
+  background: var(--atlas-surface-2);
+  color: var(--atlas-ink);
+  box-shadow: inset 0 0 0 1px var(--atlas-line);
+}
 .trail {
   flex: 1;
   min-width: 0;
@@ -1430,8 +1435,9 @@
   .navigator {
     position: absolute;
     left: 56px;
-    top: 0;
+    top: 52px; /* under the topbar, matching how the inspector overlays */
     bottom: 0;
+    z-index: 4; /* above the canvas furniture (topbar, title, zoom are all z 2) */
     box-shadow: var(--atlas-shadow-pop);
   }
   .inspector {

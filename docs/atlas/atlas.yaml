@@ -15,6 +15,25 @@ goModules:
   - { dir: server, path: server, side: server }
   - { dir: desktop, path: desktop, side: desktop }
 
+# Handwritten documents whose references must resolve: repository paths in
+# backticks, relative links, `task` targets, and /api/v1 routes. Decision
+# records and postmortems are history and are not checked; active exec plans
+# name work that does not exist yet.
+docs:
+  - AGENTS.md
+  - CONTRIBUTING.md
+  - docs/*.md
+  - docs/atlas/README.md
+  - docs/exec-plans/tech-debt-tracker.md
+  - web/ARCHITECTURE.md
+  - .agents/skills/*/SKILL.md
+
+# Real routes deliberately left out of OpenAPI (inline infrastructure probes).
+undocumentedRoutes:
+  - /api/v1/health
+  - /api/v1/health/live
+  - /api/v1/health/ready
+
 # Developer tooling and generated code are not part of the product map.
 exclude:
   - server/tools/**

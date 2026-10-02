@@ -44,7 +44,7 @@ point that links everything here.
 | Content | Home |
 | --- | --- |
 | Standing orders for every session | root `AGENTS.md` |
-| Current-state contracts and maps | `docs/*.md`, `web/ARCHITECTURE.md` |
+| Cross-cutting rules, intent, and external contracts | `docs/*.md`, `web/ARCHITECTURE.md` (references gated by `task atlas:check`) |
 | What a package is for and where it sits | its `doc.go` / `doc.ts`, gated by `task atlas:check` |
 | How flows, data, and lifecycles move through the code | anchored views in `docs/atlas/views/` ([Atlas](atlas/README.md)) |
 | Large prospective work | `exec-plans/active/`, deleted at completion |
