@@ -1,3 +1,6 @@
+import { useAssetLifecycle } from "@/lib/assets/useAssetLifecycle";
+import { removeMissingLabel, emptyTrashLabel } from "@/lib/assets/lifecycleCopy";
+import { Modal } from "@/components/ui/Modal";
 import { useCallback, useMemo, useState } from "react";
 import {
   CalendarRange,
@@ -65,6 +68,33 @@ export default function StoragePanelFlow({
   const { t, i18n } = useI18n();
   const showMessage = useMessage();
   const viewQuery = useStorageView();
+  const lifecycle = useAssetLifecycle();
+  const [lifecycleAction, setLifecycleAction] = useState<{
+    row: RepositoryRow;
+    kind: "removeMissing" | "emptyTrash";
+  } | null>(null);
+  const lifecyclePending = lifecycle.removeMissing.isPending || lifecycle.emptyTrash.isPending;
+  const confirmLifecycle = async () => {
+    if (!lifecycleAction || lifecyclePending) return;
+    try {
+      const mutation =
+        lifecycleAction.kind === "emptyTrash" ? lifecycle.emptyTrash : lifecycle.removeMissing;
+      await mutation.mutateAsync({
+        body: { repository_id: lifecycleAction.row.id, confirm: true },
+      });
+      setLifecycleAction(null);
+      showMessage("success", t("assets.lifecycle.actionComplete", "Action completed."));
+    } catch (error) {
+      showMessage(
+        "error",
+        localizeAPIProblem(
+          error,
+          t,
+          t("assets.lifecycle.actionFailed", "The lifecycle action could not be completed."),
+        ),
+      );
+    }
+  };
   const model = useMemo(() => buildStorageView(viewQuery.data), [viewQuery.data]);
 
   const { scanRepository, detectStacks, scanningIds } = useRepositoryScan();
@@ -101,6 +131,10 @@ export default function StoragePanelFlow({
     async (command: RepositoryCommand, row: RepositoryRow) => {
       const ref: RepositoryRef = { id: row.id, rawName: row.name, role: row.role };
       switch (command) {
+        case "removeMissing":
+        case "emptyTrash":
+          setLifecycleAction({ row, kind: command });
+          return;
         case "verify":
           try {
             const result = await scanRepository(row.id);
@@ -286,6 +320,44 @@ export default function StoragePanelFlow({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <Modal
+        open={lifecycleAction !== null}
+        onClose={() => setLifecycleAction(null)}
+        dismissable={!lifecyclePending}
+        size="sm"
+        title={lifecycleAction?.kind === "emptyTrash" ? emptyTrashLabel(t) : removeMissingLabel(t)}
+        footer={
+          <>
+            <button
+              className="btn btn-ghost"
+              disabled={lifecyclePending}
+              onClick={() => setLifecycleAction(null)}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              className="btn btn-error"
+              disabled={lifecyclePending}
+              onClick={() => void confirmLifecycle()}
+            >
+              {t("common.confirm", "Confirm")}
+            </button>
+          </>
+        }
+      >
+        <p className="font-medium">{lifecycleAction?.row.name}</p>
+        <p className="py-3">
+          {lifecycleAction?.kind === "emptyTrash"
+            ? t(
+                "assets.lifecycle.emptyWarning",
+                "All trashed files in this scope will be permanently deleted, including trashed copies of active assets. Other copies are kept. Assets with no remaining entry and their metadata are removed. This cannot be undone.",
+              )
+            : t(
+                "assets.lifecycle.missingWarning",
+                "Missing entries will be removed. Assets with no remaining copy and their metadata will be removed. No files are deleted. If a file returns later, it is imported as new.",
+              )}
+        </p>
+      </Modal>
       <PageHeader
         title={t("storagePanel.title", "Storage")}
         subtitle={summary}

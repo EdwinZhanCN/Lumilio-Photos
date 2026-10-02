@@ -14,7 +14,10 @@ import (
 	"path/filepath"
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/api/problem"
 	"server/internal/db/repo"
+	"server/internal/storage"
+	roelocations "server/internal/storage/locations"
 	"server/internal/utils/imagesource"
 	"server/internal/utils/imaging"
 	"strconv"
@@ -264,6 +267,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
 // @Failure 404 {object} api.ProblemResponse "Asset not found"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
+// @Failure 409 {object} api.ProblemResponse "asset_missing, asset_offline, or asset_trashed"
 // @Router /api/v1/assets/{id}/original [get]
 func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -281,10 +285,19 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 		return
 	}
 
+	if !h.ensureAssetAvailable(c, asset.AssetID, asset.LifecycleState) {
+		return
+	}
 	opened, err := h.locationResolver.OpenAsset(ctx, asset.AssetID)
 	if err != nil {
 		log.Printf("Failed to resolve active location for original file: %v", err)
-		respondRepositoryResolveError(c, err, "Failed to access repository")
+		if errors.Is(err, storage.ErrRepositoryOffline) {
+			api.WriteProblem(c, problem.New(problem.AssetOffline, err))
+		} else if errors.Is(err, roelocations.ErrAssetUnavailable) {
+			api.WriteProblem(c, problem.New(problem.AssetMissing, err))
+		} else {
+			respondRepositoryResolveError(c, err, "Failed to access repository")
+		}
 		return
 	}
 
@@ -421,6 +434,7 @@ func (h *AssetHandler) ExportAsset(c *gin.Context) {
 // @Failure 403 {object} api.ProblemResponse "Forbidden"
 // @Failure 404 {object} api.ProblemResponse "Asset or original file not found"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
+// @Failure 409 {object} api.ProblemResponse "asset_missing, asset_offline, or asset_trashed"
 // @Router /api/v1/assets/download [post]
 func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -450,6 +464,9 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 			return
 		}
 
+		if !h.ensureAssetAvailable(c, asset.AssetID, asset.LifecycleState) {
+			return
+		}
 		files = append(files, assetDownloadFile{asset: *asset})
 	}
 
@@ -486,6 +503,7 @@ func (h *AssetHandler) DownloadAssets(c *gin.Context) {
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
 // @Failure 404 {object} api.ProblemResponse "Asset not found or not a video"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
+// @Failure 409 {object} api.ProblemResponse "asset_missing, asset_offline, or asset_trashed"
 // @Router /api/v1/assets/{id}/video/web [get]
 func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	// Parse asset ID from URL parameter
@@ -508,6 +526,9 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 		return
 	}
 
+	if !h.ensureAssetAvailable(c, asset.AssetID, asset.LifecycleState) {
+		return
+	}
 	servePinnedWebMedia(c, h.locationResolver, asset, "_web.mp4", "public, max-age=86400", func(webMediaVariant) string {
 		return "video/mp4"
 	})
@@ -525,6 +546,7 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID"
 // @Failure 404 {object} api.ProblemResponse "Asset not found or not audio"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
+// @Failure 409 {object} api.ProblemResponse "asset_missing, asset_offline, or asset_trashed"
 // @Router /api/v1/assets/{id}/audio/web [get]
 func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	// Parse asset ID from URL parameter
@@ -547,6 +569,9 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 		return
 	}
 
+	if !h.ensureAssetAvailable(c, asset.AssetID, asset.LifecycleState) {
+		return
+	}
 	servePinnedWebMedia(c, h.locationResolver, asset, "_web.mp3", "public, max-age=86400", func(variant webMediaVariant) string {
 		if variant == webMediaVariantWeb {
 			return "audio/mpeg"

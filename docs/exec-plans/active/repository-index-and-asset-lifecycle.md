@@ -11,8 +11,10 @@ renaming `parent_path` to `parent_key`; #222 was amended to match. Phase 3
 tests. Phase 4 is split into three PRs; 4a (lifecycle core, the repository
 trash, and the last two Phase 0 tests) merged in #233 on 2026-09-29, with
 a fix for the video enrich regression #232 left on `dev`. 4b (expiry,
-permanent delete, remove missing, Trash rebuild) is in review on
-`feat/trash-expiry-and-purge`. Child of
+permanent delete, remove missing, Trash rebuild) merged in #234 and 4c
+(carry-over follow-ups) merged in #235. Phase 5 is implemented and validated
+on 2026-09-30; submitted for PR review on 2026-10-02 and awaiting merge.
+Phase 6 remains outstanding. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
 (replace the Repository Observation Engine with a scan index) and
@@ -276,10 +278,10 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
   applies to any re-detection, including a model upgrade.
 
 ### Phase 5 — API and Web (#222, #223)
-- [ ] DTOs and endpoints for the scan status and counters, trash, the Missing
+- [x] DTOs and endpoints for the scan status and counters, trash, the Missing
   view, and the typed `asset_missing`, `asset_offline`, and `asset_trashed`
   problems. Follow `lumilio-api-contract-change` (`task dto`).
-- [ ] Web:
+- [x] Web:
   - Trash view with restore, delete permanently, and empty;
   - Missing view reached from the Storage page count, with "Remove missing
     items";
@@ -287,8 +289,46 @@ trash, 4b the irreversible steps, 4c the in-place carry-over follow-ups.
     retention;
   - viewer states for the typed problems;
   - `VerificationHistoryModal` and `useRepositoryVerifications`.
-- [ ] Terminology registry entries (`lumilio-frontend-i18n`) and feature
+- [x] Terminology registry entries (`lumilio-frontend-i18n`) and feature
   `doc.ts` updates (`lumilio-feature-doc`).
+
+Implementation and evidence (2026-09-30):
+- Whole-selection `/assets/trash` and `/assets/restore` commands authorize
+  every Asset first; bulk Delete now has one preflight instead of parallel
+  single-Asset requests. `/assets/delete-impact` provides the exact Assets,
+  present files, bytes, Repository names, and configured retention for both
+  gallery and viewer confirmations. Restore reports non-overwriting names.
+- `/assets/delete-permanently`, `/assets/remove-missing`, and
+  `/assets/empty-trash` require `confirm: true` and audit the explicit
+  confirmation. Repository-wide actions require an administrator; ordinary
+  Empty trash is owner-scoped. Emptying one Repository preserves entries and
+  metadata held by copies elsewhere, including active Assets with trashed copies.
+- Storage exposes Missing Asset counts and Trash file counts/bytes, links to
+  scoped galleries, and confirmed Repository-wide actions. Missing and Trash
+  reuse one lifecycle flow; the Trash gallery supports restore, permanent
+  delete, and empty. Commands refresh all affected read projections even after
+  a partial purge failure.
+- `/assets/{id}/availability` reads only catalog facts. Viewer, original,
+  bulk download, and playback boundaries use the registered `asset/missing`,
+  `asset/offline`, and `asset/trashed` Problems; Missing/Trash metadata stays
+  readable. The terminology registry and both feature docs were updated.
+- `task server:test`, `task web:test` (temporary Chromium installation through
+  `PLAYWRIGHT_BROWSERS_PATH`), and `task architecture:check` passed. Web: 125
+  test files, 539 tests passed. The real Server HTTP regression covers impact,
+  trash on disk, confirmation refusal, renamed restore with album intact,
+  Missing browse/counts, and removal. Service/handler tests prove owner and
+  Repository scope, whole-selection authorization, and multi-copy availability.
+- The authorization test was proved red by temporarily removing the selection
+  authorization check: expected HTTP 403, got 200. The check was restored and
+  the full Server gate passed.
+- Generated with `task server:sqlc`, `task dto`, and `task web:docs`.
+  Re-running DTO, feature-doc, and config-example generation changed none of
+  58 snapshotted artifacts. `task verify:generated` assumes a committed tree;
+  the pre/post-generation hashes provide freshness evidence for this
+  uncommitted implementation. `i18next-cli status`: zh coverage 100%.
+- PR preparation (2026-10-02): after committing Phase 5,
+  `task verify:generated` passed with no drift; `task ci:site` passed its
+  bilingual documentation checks and production build.
 
 ### Phase 6 — Docs and proof
 - [ ] Rewrite the ROE sections of `docs/BACKEND.md` and `docs/architecture.md`;

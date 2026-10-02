@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import { missingLabel, trashLabel } from "@/lib/assets/lifecycleCopy";
 import { Fragment, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "@/lib/utils/formatters";
@@ -19,7 +21,7 @@ type Props = {
   renderActions: (row: RepositoryRow) => ReactNode;
 };
 
-const COLUMN_COUNT = 7;
+const COLUMN_COUNT = 9;
 
 /**
  * Repository rows for one Storage Location. The model's own order is the
@@ -35,6 +37,8 @@ export default function RepositoryTable({ rows, expandedId, onToggleRow, renderA
     { label: t("storagePanel.column.available", "Available") },
     { label: t("storagePanel.column.state", "State") },
     { label: t("storagePanel.column.assets", "Assets") },
+    { label: missingLabel(t) },
+    { label: trashLabel(t) },
     { label: t("storagePanel.column.verification", "Scan") },
     { label: t("storagePanel.column.actions", "Actions"), className: "text-right" },
   ];
@@ -109,6 +113,19 @@ export default function RepositoryTable({ rows, expandedId, onToggleRow, renderA
                     </span>
                   </td>
                   <td className="text-xs tabular-nums text-base-content/75">{row.assetCount}</td>
+                  <td>
+                    <Link className="link text-xs" to={`/storage/${row.id}/missing`}>
+                      {row.missingCount ?? 0}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link className="link text-xs" to={`/storage/${row.id}/trash`}>
+                      {t("storagePanel.trashSummary", "Files: {{files}} · {{bytes}}", {
+                        files: row.trashCount ?? 0,
+                        bytes: formatBytes(row.trashBytes ?? 0),
+                      })}
+                    </Link>
+                  </td>
                   <td>
                     <span
                       className={`badge badge-sm badge-soft ${verificationBadgeClass(row.verification)}`}
