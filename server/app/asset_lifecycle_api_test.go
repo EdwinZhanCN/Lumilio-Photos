@@ -35,6 +35,7 @@ func TestAssetLifecycleAPI(t *testing.T) {
 	require.Equal(t, info.Size(), impact.Bytes)
 	require.Equal(t, 30, impact.RetentionDays)
 	require.Equal(t, s.primary.ID, impact.Repositories[0].ID)
+	s.waitProcessingSettled()
 	s.mustJSON(http.MethodPost, "/api/v1/assets/trash", selection, nil)
 	_, err = os.Stat(original)
 	require.ErrorIs(t, err, os.ErrNotExist)
@@ -77,6 +78,7 @@ func TestAssetLifecycleAPI(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, s.albumAssets(album), 1)
 	// Missing metadata can be read, but originals carry the dedicated Problem.
+	s.waitProcessingSettled()
 	require.NoError(t, os.Remove(restoredPath))
 	s.scan(s.primary, 2*time.Minute)
 	assertProblem("/api/v1/assets/"+id+"/availability", problem.AssetMissing)
