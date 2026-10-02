@@ -6,11 +6,30 @@ instead of reading hundreds of thousands of lines; agents read it to know where
 a change belongs and which boundaries it must not cross.
 
 ```sh
-task atlas            # build and serve the site at http://127.0.0.1:6690
+task atlas            # open the Atlas in the internal docs site: http://localhost:6690/atlas/
+task atlas:data       # refresh its data; an open Atlas page reloads by itself
 task atlas:check      # fail if anything is out of sync (also in task test and CI)
 task atlas:generate   # rewrite docs/atlas/generated after editing views or docs
 task atlas:lock       # mark views verified — only after re-reading stale ones
 ```
+
+### Exploring
+
+The Atlas is an internal page of the VitePress site (`site/docs/atlas/`, UI in
+`site/docs/.vitepress/atlas/`). It is built only when `LUMILIO_ATLAS=1`, which
+`task atlas` sets, and is never part of the public docs build. Diagrams are
+laid out with ELK.
+
+- **Click** a node, step, or state to inspect it: its anchor (open it in VS Code
+  or on GitHub), its connections, and the other views it appears in. The rest
+  of the map dims so the neighbourhood stands out.
+- **Double-click** or **Enter** goes inside: a group opens its package map, a
+  module opens its neighbourhood.
+- **J / K** walk the elements in order, **F** fits, **⌫** goes back, **⌘K** or
+  **/** jumps to any view, group, module, or symbol, **I** toggles the
+  inspector, **[** the navigator, **1–5** switch lens.
+- Drag or two-finger scroll to pan; pinch or ⌘/Ctrl + scroll to zoom. The trail
+  at the top records where you have been; the briefing remembers it.
 
 Without a browser, read [generated/README.md](generated/README.md) — every
 view is also checked-in markdown with a Mermaid diagram (GitHub renders it)
@@ -50,8 +69,9 @@ docs/atlas/
     lifecycle/*.yaml      state machines                    (authored)
   atlas.lock.json         verified hash of every code anchor (task atlas:lock)
   generated/              markdown for every view + module catalog (never edit)
-server/tools/atlas/       the Go extractor, checker, generator, and site
+server/tools/atlas/       the Go extractor, checker, and generator (writes .local/atlas/*.json)
 web/scripts/atlas-facts.ts  the Web extractor (modules, imports, doc.ts, symbols)
+site/docs/.vitepress/atlas/  the explorer UI (Vue, Mermaid + ELK), local-only
 ```
 
 ## Package docs (`doc.go`)
@@ -111,6 +131,9 @@ per kind:
   constant set or a TS string-literal union, and anchor each state to its
   constant (Go) or set `member:` (TS); the checker then requires the states to
   be exactly the enum.
+
+Optional `layout: dagre` switches a view from the default ELK layout to
+dagre, which suits some cyclic state machines (see `desktop-runtime`).
 
 Good views answer one question ("how does an upload become an Asset?"), keep
 to roughly 6–14 nodes, and put the *why* in `notes`. Look at

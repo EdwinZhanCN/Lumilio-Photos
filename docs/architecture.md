@@ -8,7 +8,7 @@ and would drift if it were copied here.
 ## Start with the Atlas
 
 The [Atlas](atlas/README.md) is the map of the code. Browse it with
-`task atlas` (an interactive site at <http://127.0.0.1:6690>), or read the
+`task atlas` (an interactive explorer at <http://localhost:6690/atlas/>), or read the
 generated markdown under [`atlas/generated/`](atlas/generated/README.md):
 
 - **Architecture** — [system context](atlas/generated/architecture/system-context.md),

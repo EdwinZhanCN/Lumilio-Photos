@@ -48,7 +48,6 @@ vars:
   GO_BUILD_TAGS: '{{.GO_BUILD_TAGS | default "sqlite_fts5"}}'
   API_URL: '{{.API_URL | default "http://127.0.0.1:6680"}}'
   WEB_DEV_PORT: '{{.WEB_DEV_PORT | default "6657"}}'
-  ATLAS_ADDR: '{{.ATLAS_ADDR | default "127.0.0.1:6690"}}'
   DEV_ROOT: '{{joinPath .ROOT_DIR ".local" "dev"}}'
   DEV_CONFIG: '{{joinPath .DEV_ROOT "config" "server.toml"}}'
 
@@ -116,10 +115,16 @@ tasks:
   # The Atlas spans Server, Desktop, and Web, so its targets live here. The Web
   # facts are extracted first; the Go tool joins them with the Go packages.
   atlas:
-    desc: Build the Atlas site and serve it (default http://127.0.0.1:6690)
+    desc: Open the Atlas code map in the internal docs site (http://localhost:6690/atlas/)
+    cmds:
+      - task: atlas:data
+      - task: site:atlas
+
+  atlas:data:
+    desc: Write the Atlas site model to .local/atlas; an open Atlas page hot-reloads
     cmds:
       - task: web:atlas:facts
-      - go -C server run ./tools/atlas site --serve {{.ATLAS_ADDR}}
+      - go -C server run ./tools/atlas data
 
   atlas:generate:
     desc: Regenerate docs/atlas/generated; fails on broken anchors, undeclared dependencies, or stale views
@@ -324,6 +329,7 @@ tasks:
       - task: site:install:ci
       - task: site:checks
       - task: site:build
+      - task: site:build:atlas
 
   ci:desktop:panel:
     desc: Install and build the Desktop control panel frontend

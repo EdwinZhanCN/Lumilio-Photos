@@ -7,39 +7,39 @@ summary: >-
   outside transactions under one resource governor; the commit coordinator
   alone writes the results and advances applied state. Losing QueueDB only
   delays work.
-direction: LR
+direction: TB
 nodes:
   - id: requests
     label: Requests (upload, scan, retry, reindex)
     anchor: go:pipeline.RequestAssetStagesTx
-    group: Catalog
+    group: Desired state
     note: Write desired state in the same transaction as the product change.
-  - id: receipts
-    label: catalog_operation_receipts
-    anchor: sql:catalog_operation_receipts
-    shape: store
-    group: Catalog
-    note: Durable ingest, reindex, and other operation receipts the browser can follow.
   - id: state
-    label: asset_pipeline_state
+    label: asset_pipeline_state · desired_version
     anchor: sql:asset_pipeline_state
     shape: store
-    group: Catalog
-    note: desired_version vs applied_version per Asset and stage (analyze, derivatives, transcode, enrich).
+    group: Desired state
+    note: One row per Asset and stage (analyze, derivatives, transcode, enrich); work exists while desired_version > applied_version.
+  - id: receipts
+    label: catalog_operation_receipts · pending
+    anchor: sql:catalog_operation_receipts
+    shape: store
+    group: Desired state
+    note: Durable ingest, reindex, and other operation receipts the browser can follow.
   - id: scans
-    label: repository_scans
+    label: repository_scans · queued
     anchor: sql:repository_scans
     shape: store
-    group: Catalog
-    note: Pending scans and pending_hash entries drive repository work.
-  - id: wake
-    label: SchedulerWake
-    anchor: go:queue.SchedulerWake
-    note: Committed writes coalesce into one wake-up; the periodic pass is the recovery path.
+    group: Desired state
+    note: Queued scans and pending_hash entries drive repository work.
   - id: scheduler
     label: Catalog scheduler
     anchor: go:queue.Scheduler.ScheduleOnce
     note: Bounded pass that derives work only from catalog state, never from River.
+  - id: wake
+    label: SchedulerWake
+    anchor: go:queue.SchedulerWake
+    note: The scheduler blocks on this channel between passes. Committed writes coalesce into one wake-up; the periodic tick is the recovery path.
   - id: catalogjobs
     label: Macro job catalog
     anchor: go:jobs.RuntimeJobCatalog
@@ -48,7 +48,6 @@ nodes:
     label: River on QueueDB
     anchor: go:queue.New
     shape: queue
-    group: QueueDB
     note: Disposable delivery state with uniqueness over active deliveries.
   - id: workers
     label: Macro workers
@@ -77,6 +76,18 @@ nodes:
     label: Commit coordinator
     anchor: go:commit.Coordinator
     note: Batches results into bounded writer transactions and checks fences.
+  - id: applied
+    label: asset_pipeline_state · applied_version
+    anchor: sql:asset_pipeline_state
+    shape: store
+    group: Applied state
+    note: The same rows as desired state; applied_version catches up, or the result is stale and the work is derived again.
+  - id: terminal
+    label: catalog_operation_receipts · terminal
+    anchor: sql:catalog_operation_receipts
+    shape: store
+    group: Applied state
+    note: What the browser's upload queue and the processing monitor wait for.
 edges:
   - from: requests
     to: state
@@ -93,10 +104,10 @@ edges:
   - from: scans
     to: scheduler
     label: due scans, pending hashes
-  - from: wake
-    to: scheduler
+  - from: scheduler
+    to: wake
     style: dashed
-    label: wake hint
+    label: waits on
   - from: scheduler
     to: catalogjobs
     label: typed args
@@ -126,10 +137,10 @@ edges:
     label: immutable result + fence
     anchor: go:commit.Coordinator.ApplyAssetMetadata
   - from: coordinator
-    to: state
-    label: applied_version = desired (or stale)
+    to: applied
+    label: applied_version = desired, or stale
   - from: coordinator
-    to: receipts
+    to: terminal
     label: terminal
   - from: coordinator
     to: wake

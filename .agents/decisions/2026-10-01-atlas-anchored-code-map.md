@@ -42,10 +42,14 @@ One map with three layers, each with a mechanical guarantee
 `atlas.yaml` declares group dependencies, compared with real imports in both
 directions and required to be acyclic. Generated markdown is checked in so
 agents and GitHub can read every view without running anything; the
-interactive site is built locally by `task atlas` and not checked in. The tool
-is a Go program (`server/tools/atlas`) plus a Web extractor
-(`web/scripts/atlas-facts.ts`); Mermaid renders in the browser from the pinned
-`mermaid` devDependency.
+interactive explorer is an internal page of the VitePress site, built only with
+`LUMILIO_ATLAS=1` (`task atlas`) and compiled in CI by `site:build:atlas`, but
+never deployed. It renders Mermaid with the ELK layout (`layout: dagre` per
+view for cyclic state machines) and follows one visual language: the canvas is
+the room, text appears in an inspector on demand, color only marks a view kind
+or a status, and a selection spotlights its neighbourhood. The tool is a Go
+program (`server/tools/atlas`) plus a Web extractor
+(`web/scripts/atlas-facts.ts`).
 
 The owner authors the views and `atlas.yaml`; agents draft package docs and
 views, and must re-verify stale views rather than lock blindly. Dead utility

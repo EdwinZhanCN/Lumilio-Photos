@@ -7,33 +7,35 @@ _dataflow · source: `docs/atlas/views/dataflow/background-work.yaml`_
 Every asynchronous step is catalog-owned. A request writes desired state; the scheduler derives disposable River jobs from it; workers compute outside transactions under one resource governor; the commit coordinator alone writes the results and advances applied state. Losing QueueDB only delays work.
 
 ```mermaid
-flowchart LR
-    subgraph n_g_Catalog["Catalog"]
+flowchart TB
+    subgraph n_g_Desired_state["Desired state"]
         n_requests["Requests (upload, scan, retry, reindex)"]
-        n_receipts[("catalog_operation_receipts")]
-        n_state[("asset_pipeline_state")]
-        n_scans[("repository_scans")]
+        n_state[("asset_pipeline_state · desired_version")]
+        n_receipts[("catalog_operation_receipts · pending")]
+        n_scans[("repository_scans · queued")]
     end
-    n_wake["SchedulerWake"]
     n_scheduler["Catalog scheduler"]
+    n_wake["SchedulerWake"]
     n_catalogjobs["Macro job catalog"]
-    n_files[("Repository files and artifacts")]
-    n_coordinator["Commit coordinator"]
-    subgraph n_g_QueueDB["QueueDB"]
-        n_river[["River on QueueDB"]]
-    end
+    n_river[["River on QueueDB"]]
     subgraph n_g_Execution["Execution"]
         n_workers["Macro workers"]
         n_governor["Execution governor"]
         n_processors["Processors"]
         n_lumen[/"Lumen Hub (optional ML)"/]
     end
+    n_files[("Repository files and artifacts")]
+    n_coordinator["Commit coordinator"]
+    subgraph n_g_Applied_state["Applied state"]
+        n_applied[("asset_pipeline_state · applied_version")]
+        n_terminal[("catalog_operation_receipts · terminal")]
+    end
     n_requests -->|"desired_version++"| n_state
     n_requests -->|"pending receipt"| n_receipts
     n_state -->|"desired > applied"| n_scheduler
     n_receipts -->|"pending ingest"| n_scheduler
     n_scans -->|"due scans, pending hashes"| n_scheduler
-    n_wake -.->|"wake hint"| n_scheduler
+    n_scheduler -.->|"waits on"| n_wake
     n_scheduler -->|"typed args"| n_catalogjobs
     n_catalogjobs -->|"InsertMany (priority from QoS)"| n_river
     n_river -->|"deliver"| n_workers
@@ -42,8 +44,8 @@ flowchart LR
     n_processors -->|"read originals, publish artifacts"| n_files
     n_processors -.->|"embeddings, faces, OCR"| n_lumen
     n_processors -->|"immutable result + fence"| n_coordinator
-    n_coordinator -->|"applied_version = desired (or stale)"| n_state
-    n_coordinator -->|"terminal"| n_receipts
+    n_coordinator -->|"applied_version = desired, or stale"| n_applied
+    n_coordinator -->|"terminal"| n_terminal
     n_coordinator -.->|"notify"| n_wake
     classDef external stroke-dasharray:4 3
     class n_lumen external
@@ -54,11 +56,11 @@ flowchart LR
 | Element | Description | Anchor |
 | --- | --- | --- |
 | Requests (upload, scan, retry, reindex) | Write desired state in the same transaction as the product change. | `go:pipeline.RequestAssetStagesTx` [`server/internal/pipeline/catalog.go:28`](../../../../server/internal/pipeline/catalog.go#L28) |
-| catalog_operation_receipts | Durable ingest, reindex, and other operation receipts the browser can follow. | `sql:catalog_operation_receipts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| asset_pipeline_state | desired_version vs applied_version per Asset and stage (analyze, derivatives, transcode, enrich). | `sql:asset_pipeline_state` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| repository_scans | Pending scans and pending_hash entries drive repository work. | `sql:repository_scans` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
-| SchedulerWake | Committed writes coalesce into one wake-up; the periodic pass is the recovery path. | `go:queue.SchedulerWake` [`server/internal/queue/scheduler_wake.go:8`](../../../../server/internal/queue/scheduler_wake.go#L8) |
+| asset_pipeline_state · desired_version | One row per Asset and stage (analyze, derivatives, transcode, enrich); work exists while desired_version > applied_version. | `sql:asset_pipeline_state` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
+| catalog_operation_receipts · pending | Durable ingest, reindex, and other operation receipts the browser can follow. | `sql:catalog_operation_receipts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
+| repository_scans · queued | Queued scans and pending_hash entries drive repository work. | `sql:repository_scans` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 | Catalog scheduler | Bounded pass that derives work only from catalog state, never from River. | `go:queue.Scheduler.ScheduleOnce` [`server/internal/queue/scheduler.go:70`](../../../../server/internal/queue/scheduler.go#L70) |
+| SchedulerWake | The scheduler blocks on this channel between passes. Committed writes coalesce into one wake-up; the periodic tick is the recovery path. | `go:queue.SchedulerWake` [`server/internal/queue/scheduler_wake.go:8`](../../../../server/internal/queue/scheduler_wake.go#L8) |
 | Macro job catalog | The closed set of job kinds; payloads carry identities and fences only. | `go:jobs.RuntimeJobCatalog` [`server/internal/queue/jobs/types.go:35`](../../../../server/internal/queue/jobs/types.go#L35) |
 | River on QueueDB | Disposable delivery state with uniqueness over active deliveries. | `go:queue.New` [`server/internal/queue/queue_setup.go:96`](../../../../server/internal/queue/queue_setup.go#L96) |
 | Macro workers |  | `go:queue.AnalyzeAssetWorker` [`server/internal/queue/macro_asset_workers.go:61`](../../../../server/internal/queue/macro_asset_workers.go#L61) |
@@ -67,6 +69,8 @@ flowchart LR
 | Lumen Hub (optional ML) |  | `ext:Lumen Hub` |
 | Repository files and artifacts |  | `go:server/internal/storage.RepositoryFS` [`server/internal/storage/repository_fs.go:187`](../../../../server/internal/storage/repository_fs.go#L187) |
 | Commit coordinator | Batches results into bounded writer transactions and checks fences. | `go:commit.Coordinator` [`server/internal/commit/coordinator.go:122`](../../../../server/internal/commit/coordinator.go#L122) |
+| asset_pipeline_state · applied_version | The same rows as desired state; applied_version catches up, or the result is stale and the work is derived again. | `sql:asset_pipeline_state` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
+| catalog_operation_receipts · terminal | What the browser's upload queue and the processing monitor wait for. | `sql:catalog_operation_receipts` [`server/migrations/000001_storage_baseline.up.sql`](../../../../server/migrations/000001_storage_baseline.up.sql) |
 
 ## Anchored flows
 

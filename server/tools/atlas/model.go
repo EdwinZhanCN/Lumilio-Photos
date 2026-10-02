@@ -45,6 +45,7 @@ type View struct {
 	Title       string       `yaml:"title" json:"title"`
 	Summary     string       `yaml:"summary" json:"summary"`
 	Direction   string       `yaml:"direction" json:"direction,omitempty"`
+	Layout      string       `yaml:"layout" json:"layout,omitempty"`
 	Enum        string       `yaml:"enum" json:"enum,omitempty"`
 	Nodes       []Node       `yaml:"nodes" json:"nodes"`
 	Edges       []Edge       `yaml:"edges" json:"edges,omitempty"`

@@ -250,57 +250,47 @@ func mermaidText(text string) string {
 	return replacer.Replace(text)
 }
 
-// mermaid renders a view. Interactive output adds click links for the Atlas
-// site; the checked-in markdown omits them because GitHub ignores them.
-func (a *Atlas) mermaid(view *View, interactive bool) string {
+// mermaid renders a view. Node and edge ids are deterministic (mermaidID) so
+// the site can map rendered SVG elements back to view elements.
+func (a *Atlas) mermaid(view *View) string {
 	switch view.Kind {
 	case "sequence":
 		return a.sequenceMermaid(view)
 	case "lifecycle":
 		return a.lifecycleMermaid(view)
 	}
-	return a.flowMermaid(view, interactive)
+	return a.flowMermaid(view)
 }
 
-func (a *Atlas) nodeHref(view *View, node Node) string {
-	if resolved := a.Anchors[node.Anchor]; resolved != nil {
-		switch resolved.Kind {
-		case "mod":
-			return "#/module/" + resolved.Module
-		case "group":
-			return "#/view/group-" + strings.TrimPrefix(node.Anchor, "group:")
-		}
-	}
-	return "#/view/" + view.ID + "?node=" + node.ID
-}
-
-func (a *Atlas) flowMermaid(view *View, interactive bool) string {
+func (a *Atlas) flowMermaid(view *View) string {
 	var builder strings.Builder
 	direction := view.Direction
 	if direction == "" {
 		direction = "LR"
 	}
 	fmt.Fprintf(&builder, "flowchart %s\n", direction)
+	// Emit nodes in declaration order; a group's subgraph is written where its
+	// first member appears. ELK breaks cycles by this order, so the order an
+	// author lists nodes in is the order the diagram reads in.
 	byGroup := map[string][]Node{}
-	var order []string
 	for _, node := range view.Nodes {
-		if _, ok := byGroup[node.Group]; !ok {
-			order = append(order, node.Group)
-		}
 		byGroup[node.Group] = append(byGroup[node.Group], node)
 	}
-	for _, group := range order {
-		indent := "    "
-		if group != "" {
-			fmt.Fprintf(&builder, "    subgraph %s[\"%s\"]\n", mermaidID("g_"+group), mermaidText(group))
-			indent = "        "
+	written := map[string]bool{}
+	for _, node := range view.Nodes {
+		if node.Group == "" {
+			fmt.Fprintf(&builder, "    %s\n", flowNode(node))
+			continue
 		}
-		for _, node := range byGroup[group] {
-			fmt.Fprintf(&builder, "%s%s\n", indent, flowNode(node))
+		if written[node.Group] {
+			continue
 		}
-		if group != "" {
-			builder.WriteString("    end\n")
+		written[node.Group] = true
+		fmt.Fprintf(&builder, "    subgraph %s[\"%s\"]\n", mermaidID("g_"+node.Group), mermaidText(node.Group))
+		for _, member := range byGroup[node.Group] {
+			fmt.Fprintf(&builder, "        %s\n", flowNode(member))
 		}
+		builder.WriteString("    end\n")
 	}
 	violations := []int{}
 	exceptions := []int{}
@@ -339,11 +329,6 @@ func (a *Atlas) flowMermaid(view *View, interactive bool) string {
 	}
 	if len(external) > 0 {
 		fmt.Fprintf(&builder, "    class %s external\n", strings.Join(external, ","))
-	}
-	if interactive {
-		for _, node := range view.Nodes {
-			fmt.Fprintf(&builder, "    click %s href \"%s\"\n", mermaidID(node.ID), a.nodeHref(view, node))
-		}
 	}
 	return builder.String()
 }

@@ -5,7 +5,7 @@
 //	atlas generate  write docs/atlas/generated; fail on any problem or stale view
 //	atlas check     fail if anything is invalid, stale, or not regenerated
 //	atlas lock      record the current hash of every anchor (after reviewing views)
-//	atlas site      write the browsable site to .local/atlas/site [--serve addr]
+//	atlas data      write the site model to .local/atlas for the VitePress Atlas
 //
 // Every command needs --web-facts, written by web/scripts/atlas-facts.ts.
 // Use the root Task targets (task atlas, atlas:generate, atlas:check,
@@ -24,13 +24,12 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fail(errors.New("usage: atlas <generate|check|lock|site> --web-facts <file> [--serve addr]"))
+		fail(errors.New("usage: atlas <generate|check|lock|data> [--web-facts <file>] [--out dir]"))
 	}
 	command := os.Args[1]
 	flags := flag.NewFlagSet("atlas", flag.ExitOnError)
 	webFacts := flags.String("web-facts", "", "Web facts JSON from web/scripts/atlas-facts.ts")
-	serve := flags.String("serve", "", "serve the site on this address after writing it")
-	out := flags.String("out", ".local/atlas/site", "site output directory, relative to the repository root")
+	out := flags.String("out", ".local/atlas", "data output directory, relative to the repository root")
 	_ = flags.Parse(os.Args[2:])
 
 	root, err := gitRoot()
@@ -52,7 +51,7 @@ func main() {
 	atlas.deriveViews(edges)
 	atlas.checkViews()
 	for _, view := range atlas.Views {
-		view.Mermaid = atlas.mermaid(view, true)
+		view.Mermaid = atlas.mermaid(view)
 	}
 	files := atlas.generatedFiles()
 
@@ -80,17 +79,12 @@ func main() {
 			fail(err)
 		}
 		fmt.Printf("atlas: locked %d views; every anchored view is now marked verified\n", len(atlas.viewAnchors))
-	case "site":
+	case "data":
 		target := filepath.Join(root, *out)
-		if err := atlas.writeSite(target); err != nil {
+		if err := atlas.writeData(target); err != nil {
 			fail(err)
 		}
-		fmt.Printf("atlas: site written to %s (%d problems, %d stale anchors)\n", target, len(atlas.Problems), len(atlas.Stale))
-		if *serve != "" {
-			if err := serveSite(target, *serve); err != nil {
-				fail(err)
-			}
-		}
+		fmt.Printf("atlas: site data written to %s (%d problems, %d stale anchors)\n", target, len(atlas.Problems), len(atlas.Stale))
 	default:
 		fail(fmt.Errorf("unknown command %q", command))
 	}

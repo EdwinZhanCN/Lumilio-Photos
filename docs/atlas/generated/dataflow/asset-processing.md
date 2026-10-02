@@ -9,15 +9,15 @@ What each pipeline stage reads and what it produces. The original file is only e
 ```mermaid
 flowchart LR
     n_original[("Original file in a repository")]
-    n_lumen[/"Lumen Hub"/]
-    n_artifacts[("Derived artifacts")]
-    n_coordinator["Commit coordinator"]
     subgraph n_g_Stages["Stages"]
         n_analyze["analyze"]
         n_derivatives["derivatives"]
         n_transcode["transcode"]
         n_enrich["enrich"]
     end
+    n_lumen[/"Lumen Hub"/]
+    n_artifacts[("Derived artifacts")]
+    n_coordinator["Commit coordinator"]
     subgraph n_g_Catalog["Catalog"]
         n_metadata[("assets metadata, stacks, media items")]
         n_thumbs[("thumbnails")]

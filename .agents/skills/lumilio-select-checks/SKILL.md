@@ -39,6 +39,7 @@ Run every row the diff touches, nothing more:
 | Module boundaries, cross-module wiring | `task architecture:check` |
 | Any Go import between packages, a `doc.go`, `docs/atlas/**`, or code an Atlas view anchors | `task atlas:check`; on a stale view follow [lumilio-atlas](../lumilio-atlas/SKILL.md) |
 | `site/**` docs | `task ci:site` |
+| `site/docs/.vitepress/atlas/**` (Atlas explorer UI) | `task site:build:atlas`, then look at it with `task atlas` |
 | `assets.lock.json` / `lumen.lock.json` | [lumilio-pin-reconcile](../lumilio-pin-reconcile/SKILL.md) |
 | Generated artifacts (`schema.d.ts`, OpenAPI, `doc.md`, config examples) | `task verify:generated` |
 | Taskfiles or workflows | [lumilio-add-task-target](../lumilio-add-task-target/SKILL.md); path filters update in the same PR |

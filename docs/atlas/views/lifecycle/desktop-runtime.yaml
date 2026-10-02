@@ -8,6 +8,7 @@ summary: >-
   journaled quiesce-and-restart with a last-known-good fallback.
 enum: go:desktop/internal/control/dto.RuntimePhase
 direction: TB
+layout: dagre
 nodes:
   - id: stopped
     label: stopped

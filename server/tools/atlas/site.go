@@ -1,20 +1,11 @@
 package main
 
 import (
-	"embed"
 	"encoding/json"
-	"fmt"
-	"io/fs"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 )
-
-//go:embed site
-var siteAssets embed.FS
 
 type siteGroup struct {
 	Group
@@ -48,10 +39,12 @@ type siteData struct {
 	Usage    map[string][]string        `json:"usage"`
 	Problems []Problem                  `json:"problems"`
 	Stale    []Problem                  `json:"stale"`
-	Symbols  []siteSymbol               `json:"symbols"`
 }
 
-func (a *Atlas) writeSite(target string) error {
+// writeData writes the site model for the VitePress Atlas: atlas.json holds
+// everything a page needs to render, and atlas-symbols.json the search index,
+// which the site loads only when search opens.
+func (a *Atlas) writeData(target string) error {
 	data := siteData{
 		Modules:  a.sortedModules(),
 		Anchors:  a.Anchors,
@@ -73,66 +66,34 @@ func (a *Atlas) writeSite(target string) error {
 		}
 		data.Views = append(data.Views, item)
 	}
-	for _, symbol := range a.Symbols {
-		if !symbol.Exported || symbol.Kind == "field" {
-			continue
-		}
-		data.Symbols = append(data.Symbols, siteSymbol{
-			Key: symbol.Key, Name: symbol.Name, Module: symbol.Module,
-			File: symbol.File, Line: symbol.Line, Kind: symbol.Kind,
-		})
-	}
-	sort.Slice(data.Symbols, func(i, j int) bool { return data.Symbols[i].Key < data.Symbols[j].Key })
 	if data.Problems == nil {
 		data.Problems = []Problem{}
 	}
 	if data.Stale == nil {
 		data.Stale = []Problem{}
 	}
-
-	if err := os.RemoveAll(target); err != nil {
-		return err
+	var symbols []siteSymbol
+	for _, symbol := range a.Symbols {
+		if !symbol.Exported || symbol.Kind == "field" {
+			continue
+		}
+		symbols = append(symbols, siteSymbol{
+			Key: symbol.Key, Name: symbol.Name, Module: symbol.Module,
+			File: symbol.File, Line: symbol.Line, Kind: symbol.Kind,
+		})
 	}
+	sort.Slice(symbols, func(i, j int) bool { return symbols[i].Key < symbols[j].Key })
 	if err := os.MkdirAll(target, 0o755); err != nil {
 		return err
 	}
-	assets, _ := fs.Sub(siteAssets, "site")
-	if err := fs.WalkDir(assets, ".", func(name string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
-		}
-		content, err := fs.ReadFile(assets, name)
+	for name, value := range map[string]any{"atlas.json": data, "atlas-symbols.json": symbols} {
+		encoded, err := json.Marshal(value)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(target, name), content, 0o644)
-	}); err != nil {
-		return err
+		if err := os.WriteFile(filepath.Join(target, name), encoded, 0o644); err != nil {
+			return err
+		}
 	}
-	mermaid, err := os.ReadFile(filepath.Join(a.Root, "web/node_modules/mermaid/dist/mermaid.min.js"))
-	if err != nil {
-		return fmt.Errorf("read mermaid (run `task web:install`): %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(target, "mermaid.min.js"), mermaid, 0o644); err != nil {
-		return err
-	}
-	encoded, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	script := "window.ATLAS = " + strings.ReplaceAll(string(encoded), "</", "<\\/") + ";\n"
-	return os.WriteFile(filepath.Join(target, "atlas-data.js"), []byte(script), 0o644)
-}
-
-func serveSite(dir, addr string) error {
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("atlas: browse http://%s/\n", listener.Addr())
-	handler := http.FileServer(http.Dir(dir))
-	return http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		handler.ServeHTTP(w, r)
-	}))
+	return nil
 }

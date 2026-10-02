@@ -9,10 +9,6 @@ Lumilio at the highest level: one Go Server process owns the SQLite catalog, the
 ```mermaid
 flowchart LR
     n_user(["User in a browser"])
-    n_repos[("Storage Locations and Repositories")]
-    n_lumen[/"Lumen Hub (ML)"/]
-    n_llm[/"LLM provider"/]
-    n_icloud[/"iCloud Photos"/]
     subgraph n_g_Browser["Browser"]
         n_web["Web SPA (React)"]
     end
@@ -31,6 +27,10 @@ flowchart LR
         n_queue[("QueueDB (River)")]
         n_ocr[("Bleve OCR index")]
     end
+    n_repos[("Storage Locations and Repositories")]
+    n_lumen[/"Lumen Hub (ML)"/]
+    n_llm[/"LLM provider"/]
+    n_icloud[/"iCloud Photos"/]
     n_user --> n_web
     n_web -->|"HTTPS JSON, SSE"| n_http
     n_desktop -->|"in-process"| n_runtime

@@ -65,7 +65,7 @@ func (a *Atlas) viewMarkdown(view *View) []byte {
 	fmt.Fprintf(&b, "# %s\n\n", view.Title)
 	fmt.Fprintf(&b, "_%s · source: `%s`_\n\n", view.Category, view.Source)
 	fmt.Fprintf(&b, "%s\n\n", strings.TrimSpace(view.Summary))
-	fmt.Fprintf(&b, "```mermaid\n%s```\n\n", a.mermaid(view, false))
+	fmt.Fprintf(&b, "```mermaid\n%s```\n\n", a.mermaid(view))
 	switch view.Kind {
 	case "sequence":
 		b.WriteString("## Participants\n\n| Participant | Anchor |\n| --- | --- |\n")

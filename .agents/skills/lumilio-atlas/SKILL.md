@@ -57,8 +57,10 @@ with the view file and `file:line`.
    anchor (`go:scan.Scanner.RunTurn` over `mod:...`). Use `ext:` only for
    things outside the repository.
 3. Keep 6–14 nodes. Put the *why* in `notes`. Link `related` views.
-4. `task atlas:generate`, open the view in `task atlas`, check the drawing,
-   then `task atlas:lock`.
+4. `task atlas:generate`, open the view with `task atlas`
+   (http://localhost:6690/atlas/; `task atlas:data` refreshes an open page),
+   check the drawing — if ELK draws a cyclic state machine badly, try
+   `layout: dagre` — then `task atlas:lock`.
 
 ## Verification
 
@@ -82,3 +84,6 @@ generated) with the code change.
   several modules — scope them as `ts:features/<name>#X`.
 - **Stale Web facts**: the Go tool reads `.local/atlas/web-facts.json`; the
   Task targets regenerate it first. Run the Task targets, not the Go command.
+- **Explorer UI changes** live in `site/docs/.vitepress/atlas/`; verify with
+  `task site:build:atlas` (the public `task site:build` tree-shakes the Atlas
+  away and would not catch a broken component).

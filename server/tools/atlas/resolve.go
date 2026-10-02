@@ -159,6 +159,9 @@ func (a *Atlas) checkViews() {
 			a.problem(where, "view id %q is already used by %s", view.ID, previous)
 		}
 		seen[view.ID] = where
+		if view.Layout != "" && view.Layout != "elk" && view.Layout != "dagre" {
+			a.problem(where, "layout %q must be elk or dagre", view.Layout)
+		}
 		if strings.TrimSpace(view.Title) == "" || strings.TrimSpace(view.Summary) == "" {
 			a.problem(where, "view needs a title and a summary")
 		}
