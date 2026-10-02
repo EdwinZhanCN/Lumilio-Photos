@@ -25,6 +25,7 @@ import './atlas.css'
 import AtlasCanvas from './AtlasCanvas.vue'
 import AtlasInspector from './AtlasInspector.vue'
 import AtlasPalette from './AtlasPalette.vue'
+import AtlasMark from './AtlasMark.vue'
 import loaded from 'virtual:lumilio-atlas'
 import {
   type AtlasData,
@@ -349,7 +350,7 @@ const totals = computed(() => ({
     <template v-else>
       <!-- Rail -->
       <nav class="rail">
-        <a class="rail-mark" href="#/" title="Briefing"><span class="mark" /></a>
+        <a class="rail-mark" href="#/" title="Briefing"><AtlasMark /></a>
         <button
           v-for="(icon, key) in LENS_ICON"
           :key="key"
@@ -479,7 +480,7 @@ const totals = computed(() => ({
         <!-- Briefing -->
         <section v-else-if="route.page === 'home'" class="page briefing">
           <div class="briefing-head">
-            <span class="mark large" />
+            <span class="mark-tile"><AtlasMark :size="28" /></span>
             <div>
               <h1>Lumilio Atlas</h1>
               <p class="status-line" :class="healthy ? 'ok' : 'bad'">
