@@ -131,10 +131,16 @@ Amended 2026-09-28 while landing Phase 4a.
   scanner (`CommitTrash`, `CommitRestore`), which tolerates a scan that saw the
   file vanish or reappear first. Recovery trusts the disk: a file found at its
   destination was moved.
-- **Refusals reuse the `repository/conflict` Problem** with `conflict_type`
-  `repository_offline`, `file_changed`, `asset_missing`, `not_trashed`,
-  `trash_file_missing`, or `move_failed`, until Phase 5 adds dedicated asset
-  Problems.
+- **Unavailable files use typed Asset Problems** (amended 2026-09-30,
+  Phase 5): `asset/missing`, `asset/offline`, and `asset/trashed`. Metadata
+  remains readable in Missing and Trash; availability reads only catalog
+  facts, and original/playback requests enforce the same state. Other
+  lifecycle refusals retain `repository/conflict` with `file_changed`,
+  `not_trashed`, or `move_failed`. Selection commands authorize every Asset
+  before invoking the lifecycle service. Irreversible HTTP actions require
+  `confirm: true` and audit `explicit_lifecycle_action`; Repository-wide
+  actions require administrator access, and ordinary Empty trash requests
+  are scoped to the signed-in owner's entries.
 - **User edits are marked, not inferred** (amended 2026-09-29, Phase 4c). A
   description edit sets `specific_metadata.description_edited`; only a marked
   description survives re-extraction, and an extracted caption follows the

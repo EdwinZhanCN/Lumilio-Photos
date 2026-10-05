@@ -68,6 +68,9 @@ type StorageRepositoryViewDTO struct {
 	Reachability string                                   `json:"reachability" example:"active"`
 	WritePolicy  StorageRepositoryWritePolicyDTO          `json:"write_policy"`
 	Activity     string                                   `json:"activity" example:"idle"`
+	MissingCount int64                                    `json:"missing_count"`
+	TrashCount   int64                                    `json:"trash_count"`
+	TrashBytes   int64                                    `json:"trash_bytes"`
 	AssetCount   *int64                                   `json:"asset_count,omitempty" example:"1240"`
 	Verification *StorageRepositoryVerificationSummaryDTO `json:"verification,omitempty"`
 }

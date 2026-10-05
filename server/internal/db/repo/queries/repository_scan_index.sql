@@ -380,3 +380,17 @@ LIMIT sqlc.arg(row_limit);
 -- name: CountRepositoryEntriesWithTrashID :one
 SELECT count(*) FROM repository_entries
 WHERE trash_id = sqlc.arg(trash_id);
+
+-- name: CountRepositoryLifecycle :one
+SELECT COUNT(DISTINCT CASE WHEN a.lifecycle_state = 'missing' AND e.state = 'missing' THEN e.asset_id END) AS missing_count,
+       COUNT(CASE WHEN e.state = 'trashed' THEN 1 END) AS trash_count,
+       CAST(COALESCE(SUM(CASE WHEN e.state = 'trashed' THEN e.size ELSE 0 END), 0) AS INTEGER) AS trash_bytes
+FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
+WHERE e.repository_id = sqlc.arg(repository_id);
+
+-- name: ListScopedTrashedRepositoryEntries :many
+SELECT e.* FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
+WHERE e.state = 'trashed'
+  AND (sqlc.narg(repository_id) IS NULL OR e.repository_id = sqlc.narg(repository_id))
+  AND (sqlc.narg(owner_id) IS NULL OR a.owner_id = sqlc.narg(owner_id))
+ORDER BY e.entry_id LIMIT sqlc.arg(row_limit);

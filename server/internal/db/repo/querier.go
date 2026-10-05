@@ -154,6 +154,7 @@ type Querier interface {
 	CountRepositoriesByReachability(ctx context.Context, reachability dbtypes.RepositoryReachability) (int64, error)
 	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID uuid.UUID) (int64, error)
 	CountRepositoryEntriesWithTrashID(ctx context.Context, trashID uuid.NullUUID) (int64, error)
+	CountRepositoryLifecycle(ctx context.Context, repositoryID uuid.UUID) (CountRepositoryLifecycleRow, error)
 	CountStackedMediaItems(ctx context.Context, mediaItemIds []uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CountVideoAssetsForIndexing(ctx context.Context, repositoryID interface{}) (int64, error)
@@ -648,6 +649,7 @@ type Querier interface {
 	// rows are not part of the tree.
 	ListRepositoryEntryChildren(ctx context.Context, arg ListRepositoryEntryChildrenParams) ([]RepositoryEntry, error)
 	ListRepositoryScans(ctx context.Context, arg ListRepositoryScansParams) ([]RepositoryScan, error)
+	ListScopedTrashedRepositoryEntries(ctx context.Context, arg ListScopedTrashedRepositoryEntriesParams) ([]RepositoryEntry, error)
 	ListShareLinksByOwner(ctx context.Context, ownerID int32) ([]ShareLink, error)
 	ListStorageLocations(ctx context.Context) ([]StorageLocation, error)
 	ListStoredLocationClusterAssetsForScope(ctx context.Context, arg ListStoredLocationClusterAssetsForScopeParams) ([]ListStoredLocationClusterAssetsForScopeRow, error)

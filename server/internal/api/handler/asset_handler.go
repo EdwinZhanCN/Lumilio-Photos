@@ -24,24 +24,25 @@ import (
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
-	assetService     service.AssetService
-	authService      *service.AuthService
-	indexingService  service.AssetIndexingService
-	stackService     service.StackService
-	queries          *repo.Queries
-	database         *sql.DB
-	readerDatabase   *sql.DB
-	writer           *catalogtx.Writer
-	repoManager      storage.RepositoryManager
-	stagingManager   storage.StagingManager
-	files            *storage.RepositoryFSFactory
-	locationResolver *roelocations.Resolver
-	settingsService  service.SettingsService
-	runtimeChecker   service.LumenService
-	memoryMonitor    *memory.MemoryMonitor
-	sessionManager   *upload.SessionManager
-	chunkMerger      *upload.ChunkMerger
-	uploadLimiter    chan struct{}
+	assetService       service.AssetService
+	trashRetentionDays int
+	authService        *service.AuthService
+	indexingService    service.AssetIndexingService
+	stackService       service.StackService
+	queries            *repo.Queries
+	database           *sql.DB
+	readerDatabase     *sql.DB
+	writer             *catalogtx.Writer
+	repoManager        storage.RepositoryManager
+	stagingManager     storage.StagingManager
+	files              *storage.RepositoryFSFactory
+	locationResolver   *roelocations.Resolver
+	settingsService    service.SettingsService
+	runtimeChecker     service.LumenService
+	memoryMonitor      *memory.MemoryMonitor
+	sessionManager     *upload.SessionManager
+	chunkMerger        *upload.ChunkMerger
+	uploadLimiter      chan struct{}
 }
 
 // NewAssetHandler creates a new AssetHandler instance
@@ -260,7 +261,7 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Success 200 {object} dto.MessageResponseDTO "Asset deleted successfully"
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID format"
-// @Failure 409 {object} api.RepositoryConflictProblemResponse "Nothing moved: conflict_type is repository_offline, file_changed, asset_missing, or move_failed"
+// @Failure 409 {object} api.ProblemResponse "asset_offline, asset_missing, or repository/conflict; no files moved"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id} [delete]
 func (h *AssetHandler) DeleteAsset(c *gin.Context) {
@@ -271,7 +272,7 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 		return
 	}
 
-	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to delete this asset", "You don't have permission to delete this asset"); !ok {
+	if _, ok := h.getAuthorizedAssetAny(c, id, "Authentication required to delete this asset", "You don't have permission to delete this asset"); !ok {
 		return
 	}
 
@@ -290,9 +291,9 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Success 200 {object} dto.MessageResponseDTO "Asset restored successfully"
+// @Success 200 {object} dto.AssetLifecycleResultDTO "Asset restored; renamed destination paths are reported"
 // @Failure 400 {object} api.ProblemResponse "Invalid asset ID format"
-// @Failure 409 {object} api.RepositoryConflictProblemResponse "Nothing moved: conflict_type is repository_offline, not_trashed, trash_file_missing, or move_failed"
+// @Failure 409 {object} api.ProblemResponse "asset_offline, asset_missing, or repository/conflict; no files moved"
 // @Failure 500 {object} api.ProblemResponse "Internal server error"
 // @Router /api/v1/assets/{id}/restore [post]
 func (h *AssetHandler) RestoreAsset(c *gin.Context) {
@@ -307,12 +308,13 @@ func (h *AssetHandler) RestoreAsset(c *gin.Context) {
 		return
 	}
 
-	if _, err := h.assetService.RestoreAssets(c.Request.Context(), trashRequestFrom(c, id)); err != nil {
+	result, err := h.assetService.RestoreAssets(c.Request.Context(), trashRequestFrom(c, id))
+	if err != nil {
 		writeTrashProblem(c, err)
 		return
 	}
 
-	api.JSONOK(c, dto.MessageResponseDTO{Message: "Asset restored successfully"})
+	api.JSONOK(c, restoreDTO(result))
 }
 
 // AddAssetToAlbum adds an asset to an album

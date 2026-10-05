@@ -282,6 +282,27 @@ func (q *Queries) CountRepositoryEntriesWithTrashID(ctx context.Context, trashID
 	return count, err
 }
 
+const countRepositoryLifecycle = `-- name: CountRepositoryLifecycle :one
+SELECT COUNT(DISTINCT CASE WHEN a.lifecycle_state = 'missing' AND e.state = 'missing' THEN e.asset_id END) AS missing_count,
+       COUNT(CASE WHEN e.state = 'trashed' THEN 1 END) AS trash_count,
+       CAST(COALESCE(SUM(CASE WHEN e.state = 'trashed' THEN e.size ELSE 0 END), 0) AS INTEGER) AS trash_bytes
+FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
+WHERE e.repository_id = ?1
+`
+
+type CountRepositoryLifecycleRow struct {
+	MissingCount int64 `db:"missing_count" json:"missing_count"`
+	TrashCount   int64 `db:"trash_count" json:"trash_count"`
+	TrashBytes   int64 `db:"trash_bytes" json:"trash_bytes"`
+}
+
+func (q *Queries) CountRepositoryLifecycle(ctx context.Context, repositoryID uuid.UUID) (CountRepositoryLifecycleRow, error) {
+	row := q.db.QueryRowContext(ctx, countRepositoryLifecycle, repositoryID)
+	var i CountRepositoryLifecycleRow
+	err := row.Scan(&i.MissingCount, &i.TrashCount, &i.TrashBytes)
+	return i, err
+}
+
 const deleteMissingRepositoryEntriesForAsset = `-- name: DeleteMissingRepositoryEntriesForAsset :execrows
 DELETE FROM repository_entries
 WHERE asset_id = ?1
@@ -1350,6 +1371,65 @@ func (q *Queries) ListRepositoryScans(ctx context.Context, arg ListRepositorySca
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listScopedTrashedRepositoryEntries = `-- name: ListScopedTrashedRepositoryEntries :many
+SELECT e.entry_id, e.repository_id, e.path, e.path_key, e.parent_key, e.kind, e.size, e.mtime_ns, e.ctime_ns, e.file_id, e.stat_checked_ns, e.state, e.content_id, e.quick_fingerprint, e.quick_fingerprint_version, e.asset_id, e.revision, e.missing_since, e.trash_id, e.trashed_at, e.updated_at FROM repository_entries e JOIN assets a ON a.asset_id = e.asset_id
+WHERE e.state = 'trashed'
+  AND (?1 IS NULL OR e.repository_id = ?1)
+  AND (?2 IS NULL OR a.owner_id = ?2)
+ORDER BY e.entry_id LIMIT ?3
+`
+
+type ListScopedTrashedRepositoryEntriesParams struct {
+	RepositoryID interface{} `db:"repository_id" json:"repository_id"`
+	OwnerID      interface{} `db:"owner_id" json:"owner_id"`
+	RowLimit     int64       `db:"row_limit" json:"row_limit"`
+}
+
+func (q *Queries) ListScopedTrashedRepositoryEntries(ctx context.Context, arg ListScopedTrashedRepositoryEntriesParams) ([]RepositoryEntry, error) {
+	rows, err := q.db.QueryContext(ctx, listScopedTrashedRepositoryEntries, arg.RepositoryID, arg.OwnerID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RepositoryEntry
+	for rows.Next() {
+		var i RepositoryEntry
+		if err := rows.Scan(
+			&i.EntryID,
+			&i.RepositoryID,
+			&i.Path,
+			&i.PathKey,
+			&i.ParentKey,
+			&i.Kind,
+			&i.Size,
+			&i.MtimeNs,
+			&i.CtimeNs,
+			&i.FileID,
+			&i.StatCheckedNs,
+			&i.State,
+			&i.ContentID,
+			&i.QuickFingerprint,
+			&i.QuickFingerprintVersion,
+			&i.AssetID,
+			&i.Revision,
+			&i.MissingSince,
+			&i.TrashID,
+			&i.TrashedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err

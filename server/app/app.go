@@ -797,6 +797,7 @@ func run(
 
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, sqlDB, database.Writer, repoManager, stagingManager, settingsService, lumenService, repositoryFiles)
+	assetController.SetTrashRetentionDays(appConfig.RepositoryTrash.RetentionDays)
 	assetController.SetReaderDatabase(database.ReaderSQL)
 	assetController.SetLocationResolver(assetLocationResolver)
 	assetController.StartCleanupTasks(ctx)
@@ -825,7 +826,7 @@ func run(
 	cloudController := handler.NewCloudHandler(cloudSyncService)
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager)
 	repositoryScanController.SetBootstrapService(bootstrapService)
-	storageController := handler.NewStorageHandler(repoManager, queries, repositoryScanner)
+	storageController := handler.NewStorageHandler(repoManager, database.ReaderQueries, repositoryScanner)
 	hostActionController := handler.NewHostActionHandler(repoManager, controls.RepositoryManagerReady != nil)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 	eventController := handler.NewEventHandlerWithReader(eventService, sqlDB, database.Writer, database.ReaderSQL, shareLinkService)

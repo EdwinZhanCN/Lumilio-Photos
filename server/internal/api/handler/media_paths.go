@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"server/internal/api"
+	"server/internal/api/problem"
 	"server/internal/artifact"
 	"server/internal/db/repo"
 	"server/internal/pipeline"
@@ -172,7 +173,11 @@ func servePinnedWebMedia(c *gin.Context, resolver assetLocationResolver, asset *
 	}
 	repositoryFS, file, opened, err := openWebMediaVariant(c.Request.Context(), resolver, asset, suffix, requested)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
+		if errors.Is(err, storage.ErrRepositoryOffline) {
+			api.WriteProblem(c, problem.New(problem.AssetOffline, err))
+		} else if errors.Is(err, locations.ErrAssetUnavailable) {
+			api.WriteProblem(c, problem.New(problem.AssetMissing, err))
+		} else if errors.Is(err, fs.ErrNotExist) {
 			api.WriteProblem(c, api.NotFound(err))
 		} else {
 			api.WriteProblem(c, api.Internal(err))

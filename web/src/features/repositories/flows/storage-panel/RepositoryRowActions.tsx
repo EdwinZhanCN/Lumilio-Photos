@@ -1,3 +1,4 @@
+import { removeMissingLabel, emptyTrashLabel } from "@/lib/assets/lifecycleCopy";
 import type { ReactNode } from "react";
 import {
   Cloud,
@@ -16,6 +17,8 @@ import { useI18n } from "@/lib/i18n";
 import type { RepositoryRow } from "./storageViewModel";
 
 export type RepositoryCommand =
+  | "removeMissing"
+  | "emptyTrash"
   | "verify"
   | "cancelVerification"
   | "verificationHistory"
@@ -88,6 +91,12 @@ export default function RepositoryRowActions({
             <li role="none" className="menu-title">
               {t("storagePanel.maintenance", "Maintenance")}
             </li>
+            {item(
+              "removeMissing",
+              <Trash2 className="size-4" aria-hidden />,
+              removeMissingLabel(t),
+            )}
+            {item("emptyTrash", <Trash2 className="size-4" aria-hidden />, emptyTrashLabel(t))}
             {item(
               "detectStacks",
               <Layers className="size-4" aria-hidden />,

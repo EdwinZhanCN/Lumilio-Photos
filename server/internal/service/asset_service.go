@@ -60,6 +60,9 @@ type AssetService interface {
 	// nothing, when a repository is offline or a file changed.
 	DeleteAssets(ctx context.Context, request trash.Request) (trash.DeleteResult, error)
 	RestoreAssets(ctx context.Context, request trash.Request) (trash.RestoreResult, error)
+	DeleteAssetsPermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
+	RemoveMissingAssets(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
+	EmptyAssetTrash(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
 	UpdateAssetExtractedMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, common dbtypes.CommonMetadata, exifRaw json.RawMessage) error
@@ -767,6 +770,9 @@ func geohashesForGPS(latitude, longitude *float64) (*string, *string) {
 type AssetTrash interface {
 	Delete(ctx context.Context, request trash.Request) (trash.DeleteResult, error)
 	Restore(ctx context.Context, request trash.Request) (trash.RestoreResult, error)
+	DeletePermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error)
+	RemoveMissing(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error)
+	Empty(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error)
 }
 
 // ErrAssetTrashUnavailable reports a Server built without the repository
@@ -1894,4 +1900,23 @@ func filenameMembershipParams(params QueryAssetsParams) repo.GetMediaItemRefsUni
 	out.CameraModel = params.CameraModel
 	out.LensModel = params.LensModel
 	return out
+}
+
+func (s *assetService) DeleteAssetsPermanently(ctx context.Context, request trash.Request) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.DeletePermanently(ctx, request)
+}
+func (s *assetService) RemoveMissingAssets(ctx context.Context, request trash.RemoveMissingRequest) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.RemoveMissing(ctx, request)
+}
+func (s *assetService) EmptyAssetTrash(ctx context.Context, request trash.Request, repositoryID uuid.NullUUID, ownerID *int32) (trash.PurgeResult, error) {
+	if s.trash == nil {
+		return trash.PurgeResult{}, ErrAssetTrashUnavailable
+	}
+	return s.trash.Empty(ctx, request, repositoryID, ownerID)
 }
