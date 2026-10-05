@@ -66,18 +66,18 @@ useful; implementation plans belong in `exec-plans/`.
   owner-scoped topology such as Event must always carry its resolved owner into
   downstream asset queries. `nil` must never be used to infer an Event owner.
 - `server/internal/storage`: RepositoryFS, repository layout/configuration,
-  staging, and the Repository Observation Engine (ROE). ROE persists a node
-  graph, resumable directory frontiers, native change cursors, revisioned
-  observations and Locations, and exact content identity. Its
-  `C0 → crawl → fixed C1 → dirty verification → finalize` protocol never
-  treats a watcher hint as absence authority.
+  staging, the repository scan index (`storage/scan`), and repository Trash
+  (`storage/trash`). `repository_entries` mirrors the tree with stat tuples,
+  revisioned content/Asset bindings and present, pending-hash, missing,
+  unsupported, or trashed state. `repository_scans` persists resumable walk
+  progress; absence requires a positive probe and marker re-check.
 - The catalog schema is one standalone baseline (`000001_storage_baseline.up.sql`,
   `PRAGMA user_version = 1`, the rc.1 compatibility baseline) that establishes desired/applied pipeline state and
   typed execution ledgers. QueueDB River migrations are independent and may be
   recreated without touching the catalog.
 - `server/internal/sourcing`: recoverable staged materialization for upload and
-  cloud flows. A committed source publishes the same node/content/Location
-  facts as repository observation.
+  cloud flows. A committed source publishes the same entry/content/Asset
+  facts as the scan index.
 - `server/internal/db` and `server/migrations`: one physical catalog writer
   plus four query-only WAL readers for product facts, and an independent
   one-writer/four-reader QueueDB for disposable River macro-job control state.
@@ -110,8 +110,8 @@ useful; implementation plans belong in `exec-plans/`.
   desired/applied state. It never inspects River state to decide whether
   product work exists. River uniqueness covers active delivery states only, so
   a discarded delivery can be re-created while Catalog still reports lag.
-- ROE claims bounded deterministic directory frontiers. Asset, repository, and
-  projection pipelines publish typed work identities, execute under one global
+- The scan index diffs complete directory listings in bounded writer batches.
+  Asset, repository, and projection pipelines publish typed work identities, execute under one global
   resource governor, and acknowledge background catalog results through the
   bounded commit coordinator.
 - `server/internal/search/bleveocr`: rebuildable OCR search sidecar. SQLite OCR
@@ -184,17 +184,38 @@ useful; implementation plans belong in `exec-plans/`.
   its repository under `.lumilio/staging`.
 - Registered repository I/O is rooted by `internal/storage.RepositoryFS` and
   serialized against repository relocation/removal. Assets own logical
-  owner/content identity, not paths; versioned Locations bind them to
-  repository nodes. Durable jobs carry stable IDs and expected revisions.
-  Native codecs receive absolute filenames only through the explicit
-  local-path adapter after resolving an active Location.
-- ROE streams bounded directory pages including `inbox/` and excluding
-  `.lumilio/`. Healthy native cursors make unchanged passes independent of tree
-  size. Gaps, overflow, offline volumes, access errors, cancellation, and
-  incomplete coverage preserve existing Locations until an authoritative
-  caught-up child set proves absence.
-- Full BLAKE3 plus size is immutable exact content identity. SQL uniqueness
-  enforces one Asset per owner/content pair and allows any number of active
-  Locations. Revisioned outbox consumers are leased, bounded, at-least-once,
-  and idempotent.
+  owner/content identity, not paths; revisioned repository entries bind them to
+  files. Durable jobs carry stable IDs and expected revisions. Native codecs
+  receive absolute filenames through the local-path adapter after resolving a
+  present entry.
+- Full scans walk the tree including `inbox/` and excluding `.lumilio/`.
+  Unchanged stat tuples avoid hashing except within the two-second racily-clean
+  window. Settling files schedule a delayed follow-up. Watcher hints batch for
+  10 seconds; overflow or watcher startup failure requests a full scan.
+  Startup and jittered periodic full scans remain authoritative. Unreadable
+  directories retain indexed children; absence requires `lstat` and a marker
+  re-check. No filesystem I/O occurs inside catalog transactions; scan writer
+  batches cap at 256 rows and adapt within the 25 ms hold budget.
+- Full BLAKE3 plus size is exact content identity. SQL uniqueness enforces one
+  Asset per owner/content pair with multiple entries. Walk and hash work are
+  separate: a completed scan receipt does not prove ingestion complete.
+- Entry triggers derive Asset lifecycle: present or bound pending-hash wins as
+  active, then missing, then trashed. Offline is availability only. Missing
+  retains metadata and can return on a scan; scans never unlink, trash, or
+  purge. In-place edits keep identity or copy user metadata according to the
+  existing-copy and target-content branches in
+  [the backend lifecycle contract](BACKEND.md#asset-lifecycle-and-repository-trash).
+- Delete moves present files into each Repository's `.lumilio/trash`, with
+  format-1 info sidecars, whole-selection preflight, same-volume moves, and no
+  overwrite. Restore retains metadata and album membership and chooses a free
+  sibling when the original path is occupied. Startup recovers journaled moves;
+  hourly maintenance rebuilds Trash and expires files after required
+  `repository_trash.retention_days` (generated examples: 30).
+- Permanent delete unlinks trashed files; Remove missing items performs no file
+  deletion. Both purge entries through `lifecycle.PurgeEntriesTx`, the only
+  Asset hard-delete path, removing an Asset only after its last entry is gone.
+  Explicit irreversible API actions require confirmation. See
+  [the scan index](BACKEND.md#repository-scan-index) for delivery and status
+  semantics, and the [lifecycle](BACKEND.md#asset-lifecycle-and-repository-trash)
+  for journal, recovery, and API boundaries.
 - ML/Lumen paths should degrade when features are disabled; media management should remain usable without external ML.

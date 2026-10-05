@@ -38,16 +38,20 @@ any work and without repairing the stale receipt.
 
 ## Guardrails added
 
-The old scan-wide worker and scanner were removed by the Repository Observation
-Engine cutover. Their replacement makes a scan a sequence of bounded, durable
-controller turns rather than one long River execution:
+The scan-wide worker and the later ROE controller have both been removed.
+The scan index now persists resumable turns in `repository_scans`, independently
+of River deliveries. Current guardrails are:
 
-- [The controller receipt test](../../server/internal/storage/roe/controller/controller_integration_test.go)
-  proves repeat requests coalesce onto a stable operation while observations
-  publish progressively.
-- [The cancellation recovery test](../../server/internal/storage/roe/controller/controller_integration_test.go)
-  proves cancellation preserves unverified Locations and that a later recovery
-  operation converges.
-- [The expired-lease outbox test](../../server/internal/storage/roe/controller/pipeline_integration_test.go)
-  proves a crash-style delivery replay remains idempotent.
+- [The macro timeout contract](../../server/internal/queue/macro_contract_test.go)
+  (`TestMacroWorkersDeclareExplicitTimeouts`) locks the scan delivery's explicit
+  15-minute timeout instead of inheriting River's one-minute default.
+- [The continuation wake test](../../server/internal/queue/continuation_wake_test.go)
+  proves one scan delivery can advance through bounded, snoozed turns.
+- [The scan index tests](../../server/internal/storage/scan/scan_test.go)
+  prove queued requests coalesce, offline scans leave entries unchanged, and a
+  marker removed before an absence commit prevents that commit.
+- [The scan API cancellation test](../../server/internal/api/handler/repository_scan_handler_test.go)
+  checks the durable cancellation state returned by the public API.
 - These tests run under the existing [`server:test` task](../../taskfile.yml).
+  The replacement architecture is described in
+  [Repository scan index](../../docs/BACKEND.md#repository-scan-index).
