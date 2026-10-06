@@ -78,7 +78,7 @@ Windows ship the Desktop App rather than a separately operated Server, but that
 does not narrow their backend test surface: the App embeds the complete runtime,
 so both Desktop platforms run all Server tests in their native CI environment.
 
-TOML contains all immutable database/server/logging/storage/repository-observation/auth/
+TOML contains all immutable database/server/logging/storage/repository-scan/trash/auth/
 transcode/Lumen/tool decisions. `[database]` contains the explicit persistent
 catalog path and the distinct persistent `queue_path`; River execution state is
 not part of catalog backups. The application secret is a file reference and may be
@@ -88,7 +88,7 @@ generated desktop manifests, or logs.
 `[repository_scan].interval_seconds` controls a mandatory startup-and-periodic
 authoritative verification sweep over every active Repository.
 `settle_seconds` controls file-stability observation; there is no enable switch
-or repository concurrency/batch knob because bounded ROE turns and global
+or repository concurrency/batch knob because bounded scan turns and global
 resource admission own those limits.
 
 `[repository_trash].retention_days` is how long a deleted file stays in its
@@ -129,10 +129,11 @@ the Settings WebView never calls the Server HTTP API.
   diagnostics.
 - `internal/db`: database connection, migrations, generated sqlc repo layer.
 - `internal/storage`: RepositoryFS, repository/staging managers, repository config,
-  and the Repository Observation Engine under `internal/storage/roe`.
+  the scan index under `internal/storage/scan`, and repository Trash under
+  `internal/storage/trash`.
 - `internal/cloud`: cloud ingest and sync providers.
 - `internal/sourcing`: unified staged materialization for upload and cloud sync;
-  committed files publish the same node/Location facts used by repository observation.
+  committed files publish the same entry/content/Asset facts used by the scan index.
 - `internal/classify`: classifier support code shared by API/service paths.
 - `internal/logging`: zap logger setup, stdlib bridge, and repository audit helpers.
 - `internal/agent`: agent service and tools.
@@ -226,43 +227,94 @@ Owner identity is instance-local database policy rather than portable
 All runtime access inside a registered repository goes through the shared
 `internal/storage.RepositoryFS` factory. It verifies the catalog UUID against
 `.lumiliorepo`, holds a lifecycle read lease, and owns canonical user/private
-path parsing. Assets do not own paths. `repository_nodes` stores the relative
-directory graph, while versioned `asset_locations` binds a physical node to an
-owner/content Asset. River payloads carry stable IDs and expected revisions;
-workers resolve an active Location immediately before opening media. Native
-media tools use the documented RepositoryFS local-path adapter only at that
-boundary.
+path parsing. Assets do not own paths. `repository_entries` mirrors files and
+directories with repository-relative `path`, comparison `path_key`, `parent_key`,
+stat tuples, state, and revision; file entries bind content and Asset IDs.
+`storage/locations.Resolver` resolves present entries before media I/O. Native
+media tools use the RepositoryFS local-path adapter at that boundary.
 
-The Repository Observation Engine (ROE) streams the full user tree, including
-`inbox/`, in bounded directory pages and excludes only application-private
-`.lumilio/`. A run captures change cursor `C0`, crawls progressively, drains to
-a fixed `C1`, verifies dirty directories, and only then finalizes absences from
-authoritatively covered child sets. Cursor gaps, watcher overflow, volume
-replacement, offline repositories, cancellation, and access errors fail closed:
-positive observations may publish, but unproven absence never closes a valid
-Location. Native USN/ReadDirectoryChangesW, FSEvents, and inotify adapters are
-hints backed by periodic authoritative verification. Periodic full-verification
-timer requests coalesce onto an active run. `full_verification_requested_epoch`
-is distinct from the sticky requirement; `full_verification_performed` records
-completion so the next interval starts after the scan finishes. A newer
-explicit force request or cursor gap is not lost.
+### Repository scan index
 
-Independent ROE directory frontiers are enumerated in bounded deterministic
-batches. Catalog desired/applied rows are authoritative for asset, repository,
-and projection work. A bounded Catalog scheduler derives closed macro work
-identities directly into disposable QueueDB; rebuilding QueueDB therefore only
-delays execution. Catalog QoS is projected into River's native priority rather
-than carried in macro payloads. Committed catalog writes provide a coalesced
-low-latency wake hint and the periodic pass remains the crash-recovery path.
-Fine-grained compute is admitted by the process-wide resource governor and
-background results activate through the bounded commit coordinator.
+`internal/storage/scan` replaces ROE. A full scan walks the user tree, including
+`inbox/` and excluding `.lumilio/`, marker files, and nested Repositories, in
+sorted depth-first order. Each directory is listed completely and diffed against
+its indexed children. Unchanged stat tuples avoid rehashing unless racily clean: a check within two seconds of mtime
+cannot prove unchanged bytes. Recently modified files are deferred using
+`repository_scan.settle_seconds`, with a delayed settle follow-up.
 
-Changed or unresolved nodes are hashed once with BLAKE3 from a stable open
-handle and committed only if their observation revision and before/after token
-still match. `content_objects` owns exact byte identity; one owner/content pair
-has one Asset and may have multiple active Locations. Catalog desired/applied
-state is the durable handoff; the bounded coordinator activates typed results
-without holding a filesystem operation inside a database transaction.
+A catalog-only entry becomes missing only after a positive `lstat` absence
+probe and a repository-marker re-check before the removing commit. Unreadable
+directories preserve their children; offline or mismatched repositories stop
+with `offline`. Scanning never unlinks files, trashes files, or purges Assets.
+Missing files that return can bind to their existing Asset again.
+
+`repository_scans` stores the trigger, scope, resume path, cancellation request,
+and counters. Statuses are `queued`, `walking`, `sweeping`, `completed`, `offline`,
+`failed`, and `cancelled`; requests coalesce into a queued scan by widening its
+scope. The per-directory diff handles absence during the walk; `sweeping` is
+retained as a scan status, rather than a repository-wide deletion transaction.
+Cancellation stops further work at a turn boundary and keeps committed entries.
+
+The scheduler derives work from scans and `pending_hash` entries and delivers
+one unique River job per Repository. Bounded walk turns precede a separate hash
+pass; scan completion does not mean hashing or Asset processing has finished.
+Hashing uses a stable handle and BLAKE3, checks the before/after observation,
+and commits only against the expected entry revision. Upload and cloud
+materialization bind known content through the same carry-over rules without
+rehashing. `content_objects` owns exact byte identity; SQL enforces one Asset
+per owner/content pair, with multiple file entries allowed.
+
+`github.com/syncthing/notify` supplies hints through a 10-second aggregator.
+More than 512 events or a full buffer requests a full scan; watcher startup
+failure requests a full scan and retries with backoff. Startup and periodic
+full scans remain the authority, with periodic interval jitter of 3/4–5/4.
+A no-change full scan still walks the tree; it avoids content hashing and
+unchanged entry writes, rather than using native journal cursors.
+
+Scan commits use `commit.ScanWriter`: no filesystem I/O, hashing, or sleeping
+inside a catalog transaction. Writer batches are capped at 256 rows; walk
+batches adapt toward a 10 ms target within the 25 ms writer-hold budget. Catalog scheduler wake hints
+and periodic recovery recreate delivery from durable catalog facts if QueueDB
+is discarded. Resource admission and the commit coordinator also govern
+background Asset processing.
+
+### Asset lifecycle and repository Trash
+
+Triggers on entries derive `assets.lifecycle_state`: a `present` or bound
+`pending_hash` entry makes an Asset active; otherwise any missing entry makes
+it missing; otherwise trashed entries make it trashed. Offline is availability,
+not a fourth lifecycle state. Normal browse reads active Assets; Missing and
+Trash keep metadata readable, while unavailable originals return typed
+`asset/missing`, `asset/offline`, or `asset/trashed` Problems at media boundaries.
+
+Delete preflights the whole selection and refuses offline repositories,
+changed stat tuples or pending hashes, and Assets with neither present nor
+trashed files before moving anything. Already trashed selections are idempotent.
+Files move without overwrite on the same volume to
+`.lumilio/trash/files/<trash_id>/<name>`, with format-1 JSON sidecars at
+`.lumilio/trash/info/<trash_id>.json`. Restore keeps Asset identity and metadata,
+including album membership; occupied original paths get a free
+`name (restored).ext` sibling. New present copies can reactivate trashed Assets.
+Moves are journaled in `lifecycle_operations`, audited in
+`lifecycle_audit_events`, and reconciled after a crash on startup.
+
+Hourly maintenance retries recovery, rebuilds Trash from sidecars, and expires
+files after the configured retention. Unknown newer sidecar formats are
+reported and left alone; rebuild waits for open trash journals. Permanent
+delete and expiry unlink trashed files before purging entries. Remove missing
+items purges missing entries without deleting files. `lifecycle.PurgeEntriesTx`
+is the only Asset hard-delete path: it deletes an Asset and its metadata only
+when no entry remains. Repository removal also uses it. Explicit permanent
+delete, remove-missing, and empty-trash API commands require `confirm: true`;
+Repository-wide actions require an administrator.
+
+In-place content changes follow three branches: keep the Asset ID and metadata
+when no other present copy or target owner/content Asset exists; fork and copy
+user metadata when another present copy remains; or bind to the existing target
+Asset without merging metadata, preserving the old Asset as missing when
+necessary. Re-extraction preserves user-edited descriptions. Manual face
+assignments are reapplied on re-detection by overlap (IoU ≥ 0.5 stays manual;
+positive overlap below 0.5 becomes an unconfirmed automatic member).
 
 ## Database And API Contracts
 

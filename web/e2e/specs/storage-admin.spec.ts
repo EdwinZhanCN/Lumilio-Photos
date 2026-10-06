@@ -16,7 +16,14 @@ type ScanAccepted = components["schemas"]["dto.RepositoryScanQueuedDTO"];
 type ScanRun = components["schemas"]["dto.RepositoryScanRunDTO"];
 type AssetList = components["schemas"]["dto.QueryAssetsResponseDTO"];
 
-const ACTIVE_VERIFICATION_STATUSES = new Set(["queued", "walking", "sweeping"]);
+// Explicit terminal states from RepositoryScanRunDTO: a missing or unknown
+// status must never accidentally satisfy the completion wait.
+const TERMINAL_SCAN_STATUSES = new Set<NonNullable<ScanRun["status"]>>([
+  "completed",
+  "offline",
+  "failed",
+  "cancelled",
+]);
 
 // Scan and ingestion run on the server's River workers. On a low-power E2E
 // host (Intel N100) a lifecycle scan plus a manual scan of one file can take
@@ -180,15 +187,15 @@ test("@smoke administrator adds a Repository and scans it from Storage", async (
         `/api/v1/storage/repositories/${repositoryId}/verifications/${operationId}`,
         { token: workspace.token },
       );
-      expect(ACTIVE_VERIFICATION_STATUSES.has(run.status ?? "")).toBe(false);
+      expect(run.status && TERMINAL_SCAN_STATUSES.has(run.status)).toBe(true);
     }).toPass({ timeout: SERVER_PROCESSING_TIMEOUT });
     return run!;
   };
 
   let receipt = await scanFromRowMenu();
   let run = await waitForTerminalScan(receipt.operation_id!);
-  // A coalesced receipt joined a run whose snapshot may predate the copied
-  // file; request one fresh scan once that run is terminal.
+  // A coalesced receipt joined a queued run whose trigger may predate the copied
+  // file; request one fresh manual scan once that run is terminal.
   if (receipt.coalesced) {
     receipt = await scanFromRowMenu();
     run = await waitForTerminalScan(receipt.operation_id!);
@@ -220,13 +227,18 @@ test("@smoke administrator adds a Repository and scans it from Storage", async (
     expect(assets.items ?? []).toHaveLength(1);
   }).toPass({ timeout: SERVER_PROCESSING_TIMEOUT });
 
-  // The Storage read model reports this scan as the latest verification.
+  // A watcher scan may follow the manual scan while ingestion runs. Verify
+  // the Storage projection against the operation it actually reports, not
+  // against an assumption that our manual receipt remains the latest.
   await expect(async () => {
     const current = await storageRepository(workspace.token, repositoryId);
-    expect(current.verification).toMatchObject({
-      operation_id: receipt.operation_id,
-      status: "completed",
-    });
+    expect(current.verification?.operation_id).toBeTruthy();
+    const projectedRun = await api<ScanRun>(
+      `/api/v1/storage/repositories/${repositoryId}/verifications/${current.verification!.operation_id}`,
+      { token: workspace.token },
+    );
+    expect(projectedRun.status).toBe("completed");
+    expect(current.verification?.status).toBe(projectedRun.status);
     expect(current.activity ?? "idle").toBe("idle");
   }).toPass({ timeout: SERVER_PROCESSING_TIMEOUT });
   // ...and counts the ingested asset. Ingestion is already proven above, so
