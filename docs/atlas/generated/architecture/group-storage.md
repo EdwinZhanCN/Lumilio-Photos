@@ -23,6 +23,7 @@ flowchart LR
         n_server_internal_storage_repocfg["storage/repocfg"]
         n_server_internal_storage_rootcfg["storage/rootcfg"]
         n_server_internal_storage_scan["storage/scan"]
+        n_server_internal_storage_testfixture["storage/testfixture"]
         n_server_internal_storage_trash["storage/trash"]
     end
     subgraph n_g_Depends_on["Depends on"]
@@ -42,6 +43,8 @@ flowchart LR
     n_server_internal_storage_locations --> n_server_internal_storage
     n_server_internal_storage_scan --> n_server_internal_storage
     n_server_internal_storage_scan --> n_server_internal_storage_pathsemantics
+    n_server_internal_storage_testfixture --> n_server_internal_storage_repocfg
+    n_server_internal_storage_testfixture --> n_server_internal_storage_rootcfg
     n_server_internal_storage_trash --> n_server_internal_storage_scan
     n_g_Storage -.-> n_out_catalog
     n_g_Storage -.-> n_out_domain
@@ -67,6 +70,7 @@ flowchart LR
 | storage/repocfg | Package repocfg defines a single repository's own configuration: the .lumiliorepo file and the catalog column that mirrors it. | `mod:server/internal/storage/repocfg` [`server/internal/storage/repocfg/doc.go`](../../../../server/internal/storage/repocfg/doc.go) |
 | storage/rootcfg | Package rootcfg owns the portable .lumilioroot marker used to identify an authorized repository container independently from its current mount path. | `mod:server/internal/storage/rootcfg` [`server/internal/storage/rootcfg/doc.go`](../../../../server/internal/storage/rootcfg/doc.go) |
 | storage/scan | Package scan is the repository scan index (#222). | `mod:server/internal/storage/scan` [`server/internal/storage/scan/doc.go`](../../../../server/internal/storage/scan/doc.go) |
+| storage/testfixture | Package testfixture builds deterministic Storage Location and Repository trees for tests. | `mod:server/internal/storage/testfixture` [`server/internal/storage/testfixture/doc.go`](../../../../server/internal/storage/testfixture/doc.go) |
 | storage/trash | Package trash moves deleted Assets' files into their repository's trash and back. | `mod:server/internal/storage/trash` [`server/internal/storage/trash/doc.go`](../../../../server/internal/storage/trash/doc.go) |
 | Catalog |  | `group:catalog` |
 | Domain semantics |  | `group:domain` |
