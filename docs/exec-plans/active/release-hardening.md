@@ -9,8 +9,9 @@ use by Edwin and a few friends. It can be postponed.
 As of 2026-09-24: Phases 0–2 done; Phase 3 E2E specs done; `dev` at
 `f598310a` is fully green in CI on draft promotion PR #210 (every job and all
 eight E2E slices, including the new `@people`). Remaining work is split into
-four child plans, each written to be picked up by a fresh session:
+the following child plans, each written to be picked up by a fresh session:
 [repository-index-and-asset-lifecycle.md](repository-index-and-asset-lifecycle.md) (blockers #222 and #223: scan index, trash, missing, purge),
+[storage-repository-lifecycle.md](storage-repository-lifecycle.md) (P0–P8: storage assessment, creation, private recovery, setup adoption, and reconnect),
 the compatibility baseline (done 2026-09-24, PR #225; [decision](../../../.agents/decisions/2026-09-24-rc-compatibility-baseline.md)),
 [rc-smoke-checklist.md](rc-smoke-checklist.md) (Phase 3 manual smoke), and
 [rc-release.md](rc-release.md) (notes, release workflow, promotion, tag).
