@@ -196,8 +196,8 @@ offscreen media nodes are removed and inactive list/search queries have bounded
 cache lifetimes. The Home map loads only when visible and requests a bounded
 preview; the Map route queries map points for its current viewport; the Places
 rail drains location clusters but never map points.
-`web/scripts/check-bundle-budget.ts` holds the production entry chunk to 420 KiB
-gzip (`vp run test:bundle`).
+`web/scripts/check-bundle-budget.ts` checks a 420 KiB gzip budget for the
+production entry chunk when running `vp run test:bundle`; it is not in CI.
 
 ## Test layers
 
@@ -241,7 +241,7 @@ If no direct test covers the change, run the nearest characterization tests plus
 
 `task web:test` runs TypeScript checking, linting, the source-boundary checker, and the frontend test suite. The standalone `vp node scripts/check-source-boundaries.ts` command gives faster architectural feedback while editing. The checker rejects unresolved internal imports, non-standard feature roots, misplaced shared-state or persistence modules, reusable server queries under `hooks/`, same-feature aliases, cross-feature deep imports, reverse dependencies on `app`, lower-layer imports of features, unapproved worker registrations, runtime import cycles, and feature dependency cycles. Tests/specs participate in ownership and public-entry checks but stay out of the production cycle graph. `doc.ts`, WASM, and the generated schema are intentionally excluded from the runtime graph; `doc.ts` links are checked by the documentation lint rule instead.
 
-Also run `vp run test:bundle` from `web/` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths: it builds the production app and enforces the bundle budget. Browser-capability tests (`*.browser.test.ts`) run in real Chromium as part of `task web:test`.
+Also run `vp run test:bundle` from `web/` after changes to workers, WASM, upload recovery/lifecycle, bundling, or other production-only browser paths: it builds the production app and checks the bundle budget (a local check, not a CI gate). Browser-capability tests (`*.browser.test.ts`) run in real Chromium as part of `task web:test`.
 
 ## Placement decision
 

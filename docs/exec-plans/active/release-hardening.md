@@ -1,8 +1,11 @@
-# Release hardening week
+# Release hardening
 
 Status: active, created 2026-09-22 for a release candidate originally
 targeted at 2026-09-29. On 2026-09-24 the owner made the rc.1 date **TBD**
 until the RC blockers #222 and #223 land.
+rc.1 is a quality milestone, not a date deadline: the storage refactor completes fully,
+storage-repository bugs are eradicated, and core paths hold up through a stretch of real
+use by Edwin and a few friends. It can be postponed.
 As of 2026-09-24: Phases 0–2 done; Phase 3 E2E specs done; `dev` at
 `f598310a` is fully green in CI on draft promotion PR #210 (every job and all
 eight E2E slices, including the new `@people`). Remaining work is split into
@@ -54,14 +57,17 @@ follow-up in the tech-debt tracker.
 - A blocker is a bug that loses or corrupts user data, blanks or blocks a core
   flow (sign-in, upload, browse, view, search, albums, people, share, storage,
   backup/restore), or breaks install/upgrade. Everything else is deferrable.
-- No check is skipped, disabled, or quarantined to reach green.
+- Correctness tests are never skipped, disabled, or quarantined to reach green.
+  Performance and hardware checks in declared non-required lanes are not quarantine.
 
 ## RC blocker issues
 
 - Source of truth: `gh issue list --milestone v26.1.0-rc.1 --state open`
   ([milestone](https://github.com/EdwinZhanCN/Lumilio-Photos/milestone/1)).
-  The user adds blockers there; do not add or remove issues from it without
-  the user.
+  Only issues meeting the blocker definition belong in rc.1. #242 remains;
+  #217 is outside rc.1, and #240 moves to rc.2: real-build updater proof needs
+  a prior released build with an updater. The user adds blockers there; do not
+  add or remove issues from it without the user.
 - Work each issue in its own fresh session: branch from the latest `dev`,
   fix with a failing-first test where applicable, open a PR into `dev` whose
   body says `Closes #<n>`, and keep the Status of this plan current. The
@@ -82,14 +88,14 @@ follow-up in the tech-debt tracker.
   - repository-index-and-asset-lifecycle first, because it changes the
     catalog baseline, scanning, Storage, and delete. rc-release Phase 0
     (release workflow de-risk) is done; the compatibility baseline is done,
-    and this plan re-proves its backup/restore round trip on the new schema.
+    and an optional Docker checkpoint re-proves its round trip on the new schema.
   - rc-smoke-checklist Part A only after its last PR merges and an RC image
-    built from that `dev` exists on the radxa.
+    built from that `dev` exists on any Docker host.
   - rc-release Phases 1–4 last, and only once the RC blocker milestone is
     empty.
   - Other blocker issues can be worked in parallel with all of these; rerun
     the upgrade-restore and smoke rows that a blocker fix touches.
-- Remote Docker host `radxa-x4` (Intel N100, 7.5 GiB, Fedora 44, fish shell):
+- Optional remote Docker host `radxa-x4` (Intel N100, 7.5 GiB, Fedora 44, fish shell):
   build images on the Mac for `linux/amd64`, ship with `docker save | gzip -1
   | ssh radxa-x4 'gunzip | docker load'`, run there. For the E2E stack, do not
   use `task web:e2e:up` against the remote (it passes `--build`); use
@@ -97,7 +103,7 @@ follow-up in the tech-debt tracker.
   lumilio-photos-e2e up -d --no-build --wait`, tunnel ports 16657–16659, and
   run slices from the Mac with `LUMILIO_E2E_DOCKER_HOST=ssh://radxa-x4`.
 - A real Lumen Hub runs on the radxa at `:50051` (face, siglip, ocr).
-- CI runs only on PRs and `main` pushes, and a PR into `dev` only runs the
+- Required CI runs only on PRs and `main` pushes, and a PR into `dev` only runs the
   jobs its paths touch; #210's CI is the full baseline. CI fails on any flaky
   test (`failOnFlakyTests`).
 
@@ -148,9 +154,9 @@ follow-up in the tech-debt tracker.
 - [x] Tracker item removed; `lumilio-frontend-i18n` now requires literal keys.
 
 ### Phase 3 — Flow coverage for untested journeys
-- [ ] Manual smoke checklist on a fresh Docker Compose install and on Desktop
-  (macOS or Windows): People, Albums/Collections, Share links, Studio,
-  Settings/Users, Storage admin, Map. Owned by
+- [ ] Tag-time core smoke checkpoint on any Docker host and Edwin's Mac Desktop
+  (Windows if available): setup, upload/browse, Storage create including a
+  removable location, Trash/restore, and language switch; other rows are spot checks. Owned by
   [rc-smoke-checklist.md](rc-smoke-checklist.md).
 - [x] Playwright specs for the three highest-risk untested flows: Share link
   create/open/revoke, Storage admin add/verify Repository, People merge.
@@ -231,15 +237,18 @@ follow-up in the tech-debt tracker.
   Phase 0.
 - [ ] `dev` → `main` promotion PR, green CI, then the `rc.1` tag; the release
   workflow builds every Desktop and Server artifact.
-- [ ] Smoke the published artifacts once (Docker image digest, one Desktop
-  build).
+- [ ] Post-tag checkpoint: smoke the published Docker image by digest on any
+  Docker host (radxa optional), and install one published Desktop build.
 
 ## Validation boundaries
 
-- CI green on the promotion commit, with no skipped or quarantined checks.
-- zh coverage 100% after a clean extraction.
-- The smoke checklist is recorded with a verdict for every flow.
-- No open blocker; each deferred item has a tracker entry naming its owner
-  path and user impact.
+- CI green on the promotion commit. Correctness tests are never skipped, disabled, or
+  quarantined to reach green. Performance and hardware checks in declared non-required
+  lanes are not quarantine.
+- Report zh catalog coverage after a clean extraction at tag time; 100% is
+  a target, not a blocking gate.
+- The smoke checklist core rows have tag-time verdicts; other rows are spot checks.
+- No open blocker; tracker entries with owner paths and user impact are
+  encouraged for deferred items, but missing materials do not block merges.
 - Milestone `v26.1.0-rc.1` has no open issues.
 - An upgraded catalog and a restored backup both open and browse correctly.

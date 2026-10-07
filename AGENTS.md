@@ -90,9 +90,10 @@ the skill before running its workflow. Current set:
 - `exec-plan` — plan lifecycle
 
 Project-coupled decisions live in `.agents/decisions/`; escaped-bug records
-live in `.agents/postmortems/`. A non-trivial change updates one memory in
+live in `.agents/postmortems/`. A non-trivial change should update one memory in
 the same PR — the owning decision record, exec plan, or postmortem;
-mechanical or local edits are exempt. Formats:
+mechanical or local edits are exempt. Missing memory materials do not block
+merges. Formats:
 [agent-harness.md](docs/agent-harness.md).
 
 ## Non-Negotiable Rules
