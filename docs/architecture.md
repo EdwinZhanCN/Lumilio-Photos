@@ -58,7 +58,9 @@ useful; implementation plans belong in `exec-plans/`.
   truth.
 - Event topology is owner-wide and derived from logical `media_item` facts.
   `source_revision`/`published_revision` and the shared Event resolver are the
-  lifecycle authority; repository Browse Scope is applied only as a read
+  lifecycle authority. Events contain photos and videos only; audio belongs
+  in Music ([audio participation](../.agents/decisions/2026-10-06-audio-event-participation.md)).
+  Repository Browse Scope is applied only as a read
   projection. Contract:
   [Event owner-topology](../.agents/decisions/2026-08-10-event-owner-topology.md).
 - Owner scope is explicit at topology boundaries: a generic administrator

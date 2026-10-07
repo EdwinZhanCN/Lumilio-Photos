@@ -1,7 +1,8 @@
 /**
  * # Events
  *
- * Events owns deterministic, user-correctable media organization.
+ * Events owns deterministic, user-correctable photo and video organization.
+ * Audio belongs in Music and cannot be added to an Event.
  *
  * ## State
  *
@@ -10,7 +11,7 @@
  * lifecycle only while a source revision is pending. Gallery selection remains
  * owned by the Assets scope. List and detail apply Repository Browse Scope as
  * a read projection; counts, cover, and gallery come from that same resolved
- * set.
+ * photo/video set, also used for viewer navigation and Event share snapshots.
  *
  * ## Flows
  *

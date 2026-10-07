@@ -70,6 +70,7 @@ WITH scoped_members AS (
   LEFT JOIN assets primary_asset
     ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
   WHERE emi.event_id = ? AND emi.owner_id = ?
+    AND mi.media_kind IN ('photo', 'video', 'live_photo')
     AND EXISTS (
       SELECT 1
       FROM media_item_assets scoped_membership
@@ -160,24 +161,22 @@ WITH resolved AS (
     ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
   WHERE emi.event_id = (SELECT event_id FROM resolved)
     AND emi.owner_id = ?
+    AND mi.media_kind IN ('photo', 'video', 'live_photo')
 )
 SELECT e.event_id, resolved.redirected_from, e.start_at, e.end_at, e.timezone,
        e.title_override,
-       e.generated_cover_media_item_id,
-       e.cover_override_media_item_id,
-       COALESCE(
-         (
-           SELECT media_item_id
-           FROM member_assets
-           WHERE representative_asset_id IS NOT NULL
-             AND media_kind IN ('photo', 'video', 'live_photo')
-           ORDER BY CASE WHEN media_item_id = e.cover_override_media_item_id THEN 0
-                         WHEN media_item_id = e.generated_cover_media_item_id THEN 1
-                         ELSE 2 END,
-                    position, media_item_id
-           LIMIT 1
-         ),
-         COALESCE(e.cover_override_media_item_id, e.generated_cover_media_item_id)
+       (SELECT media_item_id FROM member_assets WHERE media_item_id=e.generated_cover_media_item_id),
+       (SELECT media_item_id FROM member_assets WHERE media_item_id=e.cover_override_media_item_id),
+       (
+         SELECT media_item_id
+         FROM member_assets
+         WHERE representative_asset_id IS NOT NULL
+           AND media_kind IN ('photo', 'video', 'live_photo')
+         ORDER BY CASE WHEN media_item_id = e.cover_override_media_item_id THEN 0
+                       WHEN media_item_id = e.generated_cover_media_item_id THEN 1
+                       ELSE 2 END,
+                  position, media_item_id
+         LIMIT 1
        ),
        (
          SELECT representative_asset_id
@@ -198,7 +197,8 @@ JOIN events e ON e.event_id = resolved.event_id AND e.owner_id = ?
 LEFT JOIN member_assets
   ON member_assets.event_id = e.event_id AND member_assets.owner_id = e.owner_id
 WHERE e.status = 'active'
-GROUP BY e.event_id`
+GROUP BY e.event_id
+HAVING count(member_assets.media_item_id) > 0`
 	var summary Summary
 	var redirectedFrom sql.NullString
 	if err := db.QueryRowContext(ctx, query, eventID, ownerID, ownerID, ownerID).Scan(
@@ -262,6 +262,7 @@ LEFT JOIN assets primary_asset
   ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
 WHERE emi.event_id = (SELECT event_id FROM resolved)
   AND emi.owner_id = ?
+  AND mi.media_kind IN ('photo', 'video', 'live_photo')
 ORDER BY emi.position, emi.media_item_id`
 	return scanOrderedAssets(ctx, db, query, limit, eventID, ownerID, ownerID)
 }
@@ -295,6 +296,7 @@ LEFT JOIN assets primary_asset
   ON primary_asset.asset_id = mi.primary_asset_id AND primary_asset.owner_id = emi.owner_id
 WHERE emi.event_id = (SELECT event_id FROM resolved)
   AND emi.owner_id = ?
+  AND mi.media_kind IN ('photo', 'video', 'live_photo')
   AND EXISTS (
     SELECT 1
     FROM media_item_assets scoped_membership

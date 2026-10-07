@@ -138,7 +138,7 @@ the Settings WebView never calls the Server HTTP API.
 - `internal/logging`: zap logger setup, stdlib bridge, and repository audit helpers.
 - `internal/agent`: agent service and tools.
 - `internal/event`: owner-scoped Event candidates, deterministic `events-v1`
-  segmentation/reconciliation, correction transactions, resolution, and direct
+  photo/video segmentation/reconciliation, correction transactions, resolution, and direct
   typed relations. Event membership atoms are always `media_item` rows.
   `MarkEventFactsChangedTx` is the single factual invalidation boundary.
 - `internal/utils`: media, hashing, raw, exif, upload, imaging, and support utilities.
