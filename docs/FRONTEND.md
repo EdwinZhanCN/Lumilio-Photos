@@ -212,8 +212,8 @@ The production web image uses Caddy:
   queries `/assets/map-points` with its current WGS-84 viewport. The Collections
   Places rail drains location-cluster pages to produce complete city summaries,
   but it never drains map points.
-- `web/scripts/check-bundle-budget.ts` enforces a 420 KiB gzip budget for the
-  production entry chunk as part of `vp run test:bundle`.
+- `web/scripts/check-bundle-budget.ts` checks a 420 KiB gzip budget for the
+  production entry chunk when running `vp run test:bundle`; it is not in CI.
 
 ## Z-Index
 

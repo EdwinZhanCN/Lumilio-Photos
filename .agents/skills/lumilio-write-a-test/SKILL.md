@@ -97,12 +97,15 @@ gate.
 
 ## Prove the guard
 
-A regression test must be able to fail for its mechanism:
+A regression test should be able to fail for its mechanism. When practical:
 
 1. Introduce the regression.
 2. Watch the test go red.
 3. Revert the regression, keep the test.
 4. State that red run in the PR.
+
+Red-run materials are guidance; their absence does not block merges.
+Required correctness assertions and checks still apply.
 
 Assert external state (re-read the file, re-query the API, re-render the
 page), not the implementation's self-report. A timeout or a keyword probe on

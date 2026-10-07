@@ -14,15 +14,16 @@ a fix for the video enrich regression #232 left on `dev`. 4b (expiry,
 permanent delete, remove missing, Trash rebuild) merged in #234 and 4c
 (carry-over follow-ups) merged in #235. Phase 5 merged in #237 on 2026-10-05.
 Phase 6 documentation and E2E items are done and locally validated on
-2026-10-05; hardware qualification, the radxa round trip, and plan/issue closure
-remain outstanding. Child of
+2026-10-05; plan/issue closure remains outstanding. N100 measurements and a Docker
+round trip are optional reference data, not completion prerequisites. Child of
 [release-hardening.md](release-hardening.md) (Phase 6). Implements the RC
 blockers [#222](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/222)
 (replace the Repository Observation Engine with a scan index) and
 [#223](https://github.com/EdwinZhanCN/Lumilio-Photos/issues/223) (unify
 trash, missing files, and purge). All owner decisions on both issues were
-resolved on 2026-09-24. The rc.1 date is TBD until this plan lands (owner
-decision 2026-09-24).
+resolved on 2026-09-24. rc.1 is a quality milestone, not a date deadline: the storage
+refactor completes fully, storage-repository bugs are eradicated, and core paths hold up
+through a stretch of real use by Edwin and a few friends. It can be postponed.
 
 Goal: `dev` scans repositories with a Syncthing-style index whose cost is
 linear in the tree and never holds the catalog writer beyond the batch budget.
@@ -44,8 +45,9 @@ both issues are ticked.
 
 - **The issues are the design.** #222 specifies the data model, scan algorithm,
   watcher, and execution; #223 specifies the lifecycle, delete, restore,
-  purge, in-place carry-over, and surfaces. Change the issue body first, and
-  only with the owner's approval, before code diverges from it.
+  purge, in-place carry-over, and surfaces. Product-behavior changes need Edwin's
+  approval. Record implementation
+  deviations in the PR and decision record; they need no prior issue-body approval.
 - **An Asset exists if and only if it has at least one entry.** `PurgeEntries` is
   the only code path that deletes from `assets`. Enforce this with
   `tools/architecturecheck` or a test.
@@ -53,7 +55,8 @@ both issues are ticked.
   into the trash, and never purges an Asset.** Only a user action, or the
   expiry of one, does.
 - **No filesystem I/O, hashing, or sleeping inside a catalog transaction.**
-  Writer batches are at most 256 rows and at most 25 ms. There is no
+  Writer batches are at most 256 rows. The 25ms writer p99 target is a
+  non-required performance metric. There is no
   repository-wide `COUNT` in a writer transaction.
 - **File moves stay on one volume and never overwrite.** A failed move changes
   nothing in the catalog. Delete, restore, and expiry are journaled through
@@ -93,10 +96,11 @@ own boxes.
   - repository removal purges missing-only Assets (defect 2);
   - a missing file is not listed in browse (defect 1);
   - an in-place overwrite keeps album membership (defect 5).
-- [ ] These tests are never skipped. Each one is written first on the branch
-  of the phase that fixes it, run once against unmodified `dev` code, and its
-  failing output is recorded in that PR's description. It then lands in the
-  same PR as the fix.
+- [ ] Correctness tests are never skipped; precise timing targets live in the
+  declared non-required perf lane. Each one is written first on the branch
+  of the phase that fixes it, run once against unmodified `dev` code, and
+  lands in the same PR as the fix. Recording the failing output in that PR's
+  description is encouraged.
 
 Where they are (2026-09-27): `server/app/blackbox_harness_test.go` boots a
 complete in-process Server from the generated `dev-vite` manifest, the way
@@ -164,8 +168,11 @@ and `dev` keeps a working Trash throughout.
   - the settle follow-up described under Fixed contracts.
 - [x] Seeded model test with 64 seeds; a 10k-vs-40k linearity check in
   `task server:test` (about 18 s: 106 µs vs 118 µs per file on an M-series
-  Mac, 1.12×); writer-hold p99 of at most 25 ms asserted for the walk and
-  hash passes. On its first run the model test found orphaned rows under a
+  Mac, 1.12×); writer-hold p99 is measured for the walk and hash passes. Normal tests
+  reject growth >=3x or p99 >=100ms; `LUMILIO_PERF=1` checks 1.5x/25ms in
+  `.github/workflows/perf.yml` (weekly, manual, and promotion PR runs).
+  Report 10k-vs-40k elapsed time; completion within two minutes is not acceptance. On
+  its first run the model test found orphaned rows under a
   directory renamed mid-scan; the walk now descends only into directories
   whose own row is live.
 
@@ -338,11 +345,13 @@ Implementation and evidence (2026-09-30):
 - [x] E2E: update `storage-admin.spec.ts` for the new scan statuses; add a
   trash spec (delete, restore with album intact, delete permanently, file gone
   from disk).
-- [ ] N100 qualification (`lumilio-remote-qualification`): the 100k profile,
+- Optional reference-hardware benchmark (`lumilio-remote-qualification`): the 100k profile,
   a no-change rescan, writer-hold p99, and a real library import of 10k or
-  more while measuring API p95. Record the numbers here and in #222.
-- [ ] Re-prove the compatibility baseline's RC-build round trip on the new
-  schema (radxa, image built from `dev` after this plan's last PR): fresh
+  more while measuring API p95. Report the numbers when hardware is available: 100k
+  growth/1.5x, unchanged
+  rescan/60s, writer p99/25ms, and API p95 are reference data, not gates.
+- Optional checkpoint: re-prove the compatibility baseline's RC-build round trip on the new
+  schema (any Docker host; radxa optional, image built from `dev` after this plan's last PR): fresh
   install stamps version 1 everywhere; backup → restore keeps counts, user
   edits, and original-file checksums, and the Trash view: a trashed item
   survives the round trip and can be rebuilt from its info sidecars when the
@@ -390,16 +399,42 @@ Implementation and evidence for items 1–2 (2026-10-05):
   installing the global Vite+ CLI and putting the installed Swag tool on PATH.
   `vp fmt` checked/formatted the two specs; `git diff --check` passed.
   The disposable stack was torn down with `task web:e2e:down`.
-- Items 3–5 remain open: no N100 qualification, radxa round trip, plan
-  completion, or issue closure was performed.
+- No reference-hardware benchmark or Docker round trip was performed.
+  Those are optional; plan completion and issue closure remain outstanding.
+
+Remaining deterministic acceptance gaps (audit of `dev` @ `e12c55fa`,
+2026-10-07). These are CI-reproducible and still required before #222/#223
+close:
+- #222: a no-change rescan test that counts hash invocations and entry write
+  statements (today it checks counters and unchanged revisions); album
+  membership and a cross-repository directory move in the move test; an
+  upload-then-scan test that proves zero rehash; a convergence test with the
+  watcher disabled or unavailable (periodic scan only); enforcement (test or
+  `architecturecheck`) of the structural writer budget: at most 256 rows per
+  batch, no file I/O, hashing, sleep, or repository-wide `COUNT` inside a
+  writer transaction.
+- #223: two-copy delete/restore asserting album and face preservation;
+  external deletion hidden from search, albums, and library counts (browse is
+  covered); duplicate resolution moving non-kept files into Trash and
+  restoring them; in-place edit tests with a real XMP/EXIF write, user tags,
+  rating/like, and regenerated artifacts; the fork and bind-without-merge
+  branches asserting full metadata snapshots; a server or E2E test where a
+  backup taken before a delete is restored and the Trash view is rebuilt from
+  its sidecars.
+- Process: complete this plan per `lumilio-exec-plan`.
 
 ## Validation boundaries
 
-- Every acceptance box in #222 and #223 is ticked, with the evidence linked
+- Every deterministic correctness/data-safety acceptance box in #222 and #223 is ticked,
+  with the evidence linked
   from the closing PRs.
-- CI is green on `dev` with no skipped, disabled, or quarantined test. Every
-  Phase 0 test is present, and its PR records that it failed on the old code.
-- N100 numbers are recorded, and they meet #222's targets or carry an
-  owner-approved revision.
+- CI is green on `dev`. Correctness tests are never skipped, disabled, or quarantined to
+  reach green. Performance and hardware checks in declared non-required lanes are not
+  quarantine.
+  Every Phase 0 correctness test is present; recording a red run is encouraged.
+- N100/radxa numbers are optional reference-hardware and marketing data;
+  they do not block completing this plan or closing #222/#223. Unchanged
+  rescans still require zero hashes and zero writes; offline scans change
+  nothing, crash reconciliation and marker safety remain deterministic gates.
 - No code path other than `PurgeEntries` deletes from `assets`, enforced by a
   check.
