@@ -5,7 +5,7 @@ Status: implemented
 This record makes the test-layering decision resolvable in-repo; earlier
 prose cited out-of-repo ADRs (ADR-005/006 in the owner's vault). The layer
 table itself lives in
-[FRONTEND.md](../../docs/FRONTEND.md); the placement procedure
+[web/ARCHITECTURE.md](../../web/ARCHITECTURE.md#test-layers); the placement procedure
 is [lumilio-write-a-test](../skills/lumilio-write-a-test/SKILL.md).
 
 ## Problem

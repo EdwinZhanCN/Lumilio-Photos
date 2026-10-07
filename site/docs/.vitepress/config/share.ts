@@ -5,6 +5,9 @@ import { loadEnv } from 'vite'
 // @ts-ignore
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
 import { withMermaid } from "vitepress-plugin-mermaid";
+import { atlasData } from '../atlas/plugin'
+
+const atlasEnabled = process.env.LUMILIO_ATLAS === '1'
 import mediaManifest from '../media-manifest.json'
 
 
@@ -31,7 +34,9 @@ export const sharedConfig = withMermaid(defineConfig({
     // Internal engineering docs are written for repository readers and may
     // contain Markdown that Vue's compiler treats as template syntax. Keep the
     // whole internal tree out of the public build, deployment, and search.
-    srcExclude: ['internal/**'],
+    // The Atlas (atlas/**) is an internal, local-only code map: it is built
+    // only by `task atlas` (LUMILIO_ATLAS=1) and never deployed.
+    srcExclude: ['internal/**', ...(atlasEnabled ? [] : ['atlas/**'])],
     lang: 'en',
     title: "Lumilio Photos",
     description: "Next-Gen Lightweight High-performance Media Manage Web App",
@@ -39,6 +44,10 @@ export const sharedConfig = withMermaid(defineConfig({
     base: VITE_BASE_URL,
     lastUpdated: true, // 上次更新
     vite: {
+        // Compile-time switch: the public build tree-shakes the Atlas away.
+        define: {
+            __LUMILIO_ATLAS__: JSON.stringify(atlasEnabled),
+        },
         build: {
             chunkSizeWarningLimit: 1600
         },
@@ -54,10 +63,14 @@ export const sharedConfig = withMermaid(defineConfig({
                     return transformed === code ? null : { code: transformed, map: null }
                 },
             },
-            groupIconVitePlugin()
+            groupIconVitePlugin(),
+            // Always registered so the public build resolves the Atlas's
+            // virtual modules (to empty data) even though it never ships them.
+            atlasData(process.cwd(), atlasEnabled),
         ],
         server: {
-            port: 18089
+            // The Atlas runs on its own port so it can sit beside the docs.
+            port: atlasEnabled ? 6690 : 18089
         }
     },
     markdown: { // markdown 配置

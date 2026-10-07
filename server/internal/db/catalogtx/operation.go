@@ -1,5 +1,3 @@
-// Package catalogtx owns the closed, low-cardinality names and measured
-// transaction capabilities for Lumilio's SQLite catalog.
 package catalogtx
 
 import "fmt"

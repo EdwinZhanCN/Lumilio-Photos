@@ -339,9 +339,10 @@ Implementation and evidence (2026-09-30):
   bilingual documentation checks and production build.
 
 ### Phase 6 — Docs and proof
-- [x] Rewrite the ROE sections of `docs/BACKEND.md` and `docs/architecture.md`;
-  update the guardrail links in postmortem 0001; add the retention field to
-  `site/docs` (en and zh-cn) where configuration is documented.
+- [x] Rewrite the ROE sections of `docs/architecture.md`; the Atlas retired
+  `docs/BACKEND.md` into owning package `doc.go` files. Postmortem 0001
+  guardrail links and the retention field in `site/docs` (en and zh-cn)
+  are also updated.
 - [x] E2E: update `storage-admin.spec.ts` for the new scan statuses; add a
   trash spec (delete, restore with album intact, delete permanently, file gone
   from disk).

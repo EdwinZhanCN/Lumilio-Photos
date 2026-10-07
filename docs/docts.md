@@ -31,6 +31,13 @@ The `import type` is not decoration; it is the anti-drift mechanism:
   ignores `{@link}` entirely).
 
 Together, the prose can never name a symbol that doesn't exist or silently rot.
+
+Diagrams get the same guarantee. Mermaid node labels are plain strings that
+neither tsc nor the oxlint rule reads, so `web/scripts/atlas-facts.ts` (run
+by `task atlas:check`) treats any label that reads like a code identifier —
+camelCase, PascalCase with an inner capital, or a `use*` hook — as a claim to
+name real code and fails unless the `doc.ts` imports it. Plain-language
+labels stay free prose.
 `task verify:generated` re-renders every `doc.md` in CI so a forgotten render
 cannot land.
 

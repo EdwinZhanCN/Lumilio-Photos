@@ -1,0 +1,102 @@
+id: library-search
+kind: sequence
+title: Library search (fused retrieval)
+summary: >-
+  One search box, four independent channels. Each channel decides its own
+  membership (a calibrated semantic cutoff, Bleve OCR matching, FTS place
+  matching, filename matching); weighted reciprocal-rank fusion merges them
+  and the fused set is the result. Search degrades gracefully when Lumen is
+  unavailable.
+nodes:
+  - id: web
+    label: Assets search (Web)
+    anchor: ts:useAssetsSearch
+  - id: handler
+    label: AssetHandler
+    anchor: go:handler.AssetHandler.SearchAssets
+  - id: service
+    label: AssetService
+    anchor: go:service.AssetService
+  - id: semantic
+    label: Embedding retriever
+    anchor: go:search.EmbeddingRetriever
+  - id: lumen
+    label: Lumen Hub
+    anchor: go:service.LumenService
+  - id: vec
+    label: Vec1 vector index
+    anchor: sql:search_embeddings_vec
+  - id: ocr
+    label: Bleve OCR retriever
+    anchor: go:search.BleveOCRRetriever
+  - id: place
+    label: Place retriever (FTS5)
+    anchor: sql:location_search_fts
+  - id: catalog
+    label: Catalog reader
+    anchor: go:search.HydrateAssets
+steps:
+  - from: web
+    to: handler
+    label: POST /assets/search {query, filter}
+    anchor: api:POST /api/v1/assets/search
+  - from: handler
+    to: service
+    label: SearchAssets
+    anchor: go:service.AssetService.SearchAssets
+  - block: par
+    label: every channel is self-thresholded
+    steps:
+      - from: service
+        to: semantic
+        label: RetrieveSet (calibrated cutoff)
+        anchor: go:search.EmbeddingRetriever.RetrieveSet
+      - from: semantic
+        to: lumen
+        label: embed query text
+        anchor: go:service.LumenService.SemanticTextEmbed
+      - from: semantic
+        to: vec
+        label: KNN in the active embedding space, cosine floor
+    else:
+      - label: OCR
+        steps:
+          - from: service
+            to: ocr
+            label: strict-then-relaxed Bleve match
+            anchor: go:search.BleveOCRRetriever.Retrieve
+      - label: place
+        steps:
+          - from: service
+            to: place
+            label: FTS match on place names
+            anchor: go:search.NewPlaceRetriever
+      - label: filename
+        steps:
+          - from: service
+            to: catalog
+            label: filename match, one primary per media item
+  - from: service
+    to: service
+    label: weighted RRF (semantic 1.0, place 0.8, OCR 0.7, filename 0.6)
+    anchor: go:search.FuseSet
+  - from: service
+    to: catalog
+    label: hydrate ranked Assets in the requested lifecycle state
+    anchor: go:service.assetService.searchAssetsFusedSet
+  - from: handler
+    to: web
+    label: best results (top-N by confidence) + full set under the chosen sort
+    reply: true
+notes:
+  - title: No TopK anywhere
+    body: >-
+      The fused set is the answer; "best results" is a confidence-ordered
+      subset of it, and the results tier is the same set under the requested
+      sort. Each channel only has a large safety cap.
+  - title: Degradation
+    body: >-
+      If Lumen is not configured or fails, the semantic channel is skipped and
+      the response is flagged `semantic_unavailable`; OCR, place, and filename
+      matches still answer.
+related: [system-context, background-work]

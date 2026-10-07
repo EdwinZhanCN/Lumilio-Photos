@@ -1,6 +1,3 @@
-// Package runtimeconfig stores the complete, schema-versioned Server intent
-// and its crash-recoverable current/LKG pointers. It never reads secrets or
-// fills missing manifest fields; strict validation belongs to server/config.
 package runtimeconfig
 
 import (

@@ -1,0 +1,155 @@
+id: system-context
+kind: architecture
+title: System context
+summary: >-
+  Lumilio at the highest level: one Go Server process owns the SQLite catalog,
+  the disposable River queue, and every registered repository on disk, and
+  serves both the API and the React SPA. Machine learning, LLMs, and cloud
+  import are optional external services. The Desktop App runs the same Server
+  in-process; Linux runs it as a container.
+direction: LR
+nodes:
+  - id: user
+    label: User in a browser
+    anchor: ext:User
+    shape: actor
+  - id: web
+    label: Web SPA (React)
+    anchor: mod:web/src/app
+    group: Browser
+    note: Served by the Server; typed against the generated OpenAPI client.
+  - id: desktop
+    label: Desktop App (tray + Settings)
+    anchor: go:desktop/internal/runtime.Controller
+    group: Desktop host (macOS, Windows)
+    note: Supervises one in-process Server generation; the product UI stays in the browser.
+  - id: manifest
+    label: TOML manifest
+    anchor: go:config.LoadAppConfig
+    shape: store
+    group: Server process
+    note: Complete, schema-versioned, runtime-immutable configuration.
+  - id: http
+    label: HTTP API + SPA
+    anchor: go:api.NewRouter
+    group: Server process
+    note: Auth, origin, setup, and rate-limit boundaries; RFC 9457 Problems.
+  - id: services
+    label: Services
+    anchor: mod:server/internal/service
+    group: Server process
+  - id: work
+    label: Scheduler, River workers, commit coordinator
+    anchor: go:queue.Scheduler
+    group: Server process
+  - id: runtime
+    label: server/app.Run
+    anchor: go:server/app.Run
+    group: Server process
+    note: The only composition root; owns startup and graceful shutdown.
+  - id: catalog
+    label: Catalog (SQLite + FTS5 + Vec1)
+    anchor: go:db.DB
+    shape: store
+    group: App-private state
+    note: Product truth. One writer, bounded query-only readers.
+  - id: queue
+    label: QueueDB (River)
+    anchor: go:db.QueueDB
+    shape: store
+    group: App-private state
+    note: Disposable delivery state; may be recreated.
+  - id: ocr
+    label: Bleve OCR index
+    anchor: go:bleveocr.Index
+    shape: store
+    group: App-private state
+    note: Rebuildable sidecar fed by a catalog outbox.
+  - id: repos
+    label: Storage Locations and Repositories
+    anchor: go:server/internal/storage.RepositoryFS
+    shape: store
+    note: User media on disk. Originals are never rewritten.
+  - id: lumen
+    label: Lumen Hub (ML)
+    anchor: ext:Lumen Hub
+    shape: external
+    note: Optional. Semantic, face, OCR, and BioCLIP inference over mDNS or a configured URL.
+  - id: llm
+    label: LLM provider
+    anchor: ext:LLM provider
+    shape: external
+    note: Optional. Powers the Lumilio Agent.
+  - id: icloud
+    label: iCloud Photos
+    anchor: ext:iCloud Photos
+    shape: external
+    note: Optional cloud import source.
+edges:
+  - from: user
+    to: web
+  - from: web
+    to: http
+    label: HTTPS JSON, SSE
+    anchor: go:api.RegisterSPA
+  - from: desktop
+    to: runtime
+    label: in-process
+    anchor: go:desktop/internal/runtime.Controller.Start
+  - from: runtime
+    to: manifest
+    label: strict load
+  - from: runtime
+    to: http
+  - from: http
+    to: services
+  - from: services
+    to: catalog
+    label: named transactions
+  - from: services
+    to: work
+    label: desired state
+    style: dashed
+  - from: work
+    to: queue
+  - from: work
+    to: catalog
+    label: commit coordinator
+    anchor: go:commit.Coordinator
+  - from: work
+    to: repos
+    label: scan, ingest, artifacts
+  - from: catalog
+    to: ocr
+    label: outbox
+    style: dashed
+    anchor: go:bleveocr.Writer
+  - from: work
+    to: lumen
+    label: inference
+    style: dashed
+    anchor: go:service.LumenService
+  - from: services
+    to: llm
+    label: agent runs
+    style: dashed
+    anchor: go:llm.NewChatModel
+  - from: services
+    to: icloud
+    label: import
+    style: dashed
+    anchor: go:icloud.NewClient
+notes:
+  - title: Three configuration owners
+    body: >-
+      Browser preferences live in localStorage; runtime-mutable settings live
+      in the catalog and change through the Settings and Setup APIs;
+      runtime-immutable process configuration lives in the complete TOML
+      manifest. There is no fourth source: no code defaults, no automatic
+      config search, and no ordinary environment overrides.
+  - title: Delivery shapes
+    body: >-
+      Linux runs the Server as a host-network container at port 6680. macOS
+      and Windows run the Desktop App, which hosts the same server/app runtime
+      in-process and opens the product in the system browser.
+related: [server-groups, web-groups, desktop-groups, upload-to-catalog, background-work]

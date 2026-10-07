@@ -136,7 +136,7 @@ func (m *SourceMaterializer) MaterializeStaged(ctx context.Context, source Inges
 }
 
 // MaterializeCommit resumes one staging journal by stable identifier. It is
-// safe after crashes before/after the filesystem rename, ROE publication, or
+// safe after crashes before/after the filesystem rename, scan binding, or
 // journal completion.
 func (m *SourceMaterializer) MaterializeCommit(ctx context.Context, commitID uuid.UUID) (*repo.Asset, error) {
 	return m.materializeCommit(ctx, commitID, nil)

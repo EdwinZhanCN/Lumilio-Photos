@@ -68,6 +68,12 @@ tasks:
     cmds:
       - vp node scripts/render-feature-docs.ts
 
+  atlas:facts:
+    desc: Extract Web modules, imports, doc.ts content, and symbols for the Atlas
+    cmds:
+      - mkdir -p ../.local/atlas
+      - vp node scripts/atlas-facts.ts --out ../.local/atlas/web-facts.json
+
   e2e:up:
     desc: Start the isolated E2E Compose environment
     cmds:

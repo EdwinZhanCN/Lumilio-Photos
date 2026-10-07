@@ -31,7 +31,9 @@
  *     MAP --> ROUTEASSET["/assets/:assetId"]
  * ```
  *
- * {@link GalleryGrid} delegates finite asset presentation to Assets.
+ * {@link BrowseScopeSelect} is the Repositories-owned scope control.
+ * {@link GalleryGrid} delegates finite asset presentation to Assets through
+ * {@link AssetPreviewGrid}.
  * {@link SpacetimeMapCard} is lazy-loaded only when its card nears the viewport
  * and delegates map rendering to {@link PhotoMapView}. Selecting a map point
  * navigates to the owning asset route rather than opening an editor in Home.
@@ -49,9 +51,10 @@
  *
  * @module
  */
+import type { AssetPreviewGrid } from "../assets/index.ts";
 import type { useLocationClusters } from "../assets/map/useLocationClusters.ts";
 import type { useMapPhotoAssets } from "../assets/map/useMapPhotoAssets.ts";
-import type { useBrowseScope } from "../repositories/index.ts";
+import type { BrowseScopeSelect, useBrowseScope } from "../repositories/index.ts";
 import type { useFeaturedPhotos } from "./api/useFeaturedPhotos.ts";
 import type { usePhotoStats } from "./api/usePhotoStats.ts";
 import type GalleryGrid from "./flows/overview/GalleryGrid.tsx";

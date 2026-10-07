@@ -1,4 +1,3 @@
-// Package event owns deterministic media Event semantics.
 package event
 
 import "time"

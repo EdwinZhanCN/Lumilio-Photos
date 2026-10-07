@@ -54,4 +54,4 @@ of River deliveries. Current guardrails are:
   checks the durable cancellation state returned by the public API.
 - These tests run under the existing [`server:test` task](../../taskfile.yml).
   The replacement architecture is described in
-  [Repository scan index](../../docs/BACKEND.md#repository-scan-index).
+  [Repository scan index](../../server/internal/storage/scan/doc.go).

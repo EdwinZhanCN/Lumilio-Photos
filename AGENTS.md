@@ -45,11 +45,18 @@ configuration that boots and diagnoses cleanly.
 Before substantive changes, read the
 [system map](docs/architecture.md) and check
 [active execution plans](docs/exec-plans/active/).
-Then read only the references relevant to the change:
+To understand or locate code, start from the [Atlas](docs/atlas/README.md):
+the [generated index](docs/atlas/generated/README.md) and
+[module catalog](docs/atlas/generated/modules.md) show every package's group
+and purpose, and the sequence, data-flow, and lifecycle views name the exact
+symbols a flow passes through. Read the owning `doc.go` / `doc.ts` before
+editing a package. Then read only the references relevant to the change:
 
-- Backend: [BACKEND.md](docs/BACKEND.md).
-- Frontend: [FRONTEND.md](docs/FRONTEND.md) and
-  [web/ARCHITECTURE.md](web/ARCHITECTURE.md).
+- Backend: the owning package `doc.go` (find it in the
+  [module catalog](docs/atlas/generated/modules.md)) and the cross-cutting
+  invariants in [architecture.md](docs/architecture.md).
+- Frontend: [web/ARCHITECTURE.md](web/ARCHITECTURE.md) and the feature
+  `doc.ts`.
 - UI or product behavior: [DESIGN.md](docs/DESIGN.md) and
   [core beliefs](docs/core-beliefs.md).
 - Test or demo media: [test-assets.md](docs/test-assets.md).
@@ -59,6 +66,8 @@ Then read only the references relevant to the change:
 - Known debt: [tech-debt-tracker.md](docs/exec-plans/tech-debt-tracker.md).
 - Harness itself (memories, skills, gates):
   [agent-harness.md](docs/agent-harness.md).
+- Code map, package docs, and diagrams:
+  [Atlas README](docs/atlas/README.md).
 
 ## Agent Memories And Skills
 
@@ -76,6 +85,7 @@ the skill before running its workflow. Current set:
 - `z-index` — stacking tokens
 - `add-task-target` — Taskfile / CI wiring
 - `feature-doc` — `doc.ts` / `doc.md`
+- `atlas` — package `doc.go`, group rules, anchored views, re-verifying stale views
 - `pin-reconcile` — `assets.lock.json` / `lumen.lock.json`
 - `exec-plan` — plan lifecycle
 
@@ -108,8 +118,8 @@ merges. Formats:
   workflow path filters in the same change. Follow
   [lumilio-add-task-target](.agents/skills/lumilio-add-task-target/SKILL.md).
 - Follow the frontend test-layer taxonomy in
-  [FRONTEND.md](docs/FRONTEND.md); do not invent test-file
-  conventions. Placement:
+  [web/ARCHITECTURE.md](web/ARCHITECTURE.md#test-layers); do not invent
+  test-file conventions. Placement:
   [lumilio-write-a-test](.agents/skills/lumilio-write-a-test/SKILL.md).
 - API contracts are OpenAPI-first. Never hand-edit
   `web/src/lib/http-commons/schema.d.ts` or cast around a stale response type.
@@ -135,6 +145,14 @@ merges. Formats:
   matching `import type`, and the generated sibling `doc.md` is never edited by
   hand
   ([lumilio-feature-doc](.agents/skills/lumilio-feature-doc/SKILL.md)).
+- Every Go package documents itself in `doc.go` with an `//atlas:group`
+  directive and doc links that resolve. An import that crosses into a group
+  not listed in its group's `uses` in `docs/atlas/atlas.yaml` fails
+  `task atlas:check`: declare it there (an architecture decision) or remove
+  the import. When code an Atlas view anchors changes, re-read that view,
+  fix it if the behaviour changed, then `task atlas:lock` — never lock
+  without reading
+  ([lumilio-atlas](.agents/skills/lumilio-atlas/SKILL.md)).
 
 ## Execution Plans
 
